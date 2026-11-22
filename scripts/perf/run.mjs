@@ -2,13 +2,16 @@
 //
 //   node scripts/perf/run.mjs --lane pr|nightly|long [--only <metric,…>] [--runs <n>]
 //                             [--absolute] [--machine <class>] [--update-baseline "<reason>"]
+//                             [--from-report <report.json>]
 //
 // Each probe (an existing benchmark or a script in scripts/perf/) runs `runs` times and every
 // metric's value is the median of the runs. Two judgements (gate.mjs): `--absolute` compares
 // with chapter 11's budgets (for the reference machine or a named local machine; CI runners
 // only compare with their baseline), and a value more than 10% worse than the baseline of this
 // platform and machine class fails. `--update-baseline` writes the values as the new baseline
-// (the reason goes into the file; commit it with the reason in the message).
+// (the reason goes into the file; commit it with the reason in the message). `--from-report`
+// judges a report another machine wrote instead of measuring (a CI runner's Nightly artifact:
+// with `--machine github-arm64 --update-baseline …` it records that runner class's baseline).
 //
 // Needs the development-flavor package (`npm run package:desktop -- --flavor development`);
 // the size probe also needs the release build's installer (`-- --flavor release --make`).
@@ -363,6 +366,27 @@ async function measureAll(options) {
   return { wanted, values, samples, errors };
 }
 
+/**
+ * The values of a report `run.mjs` wrote elsewhere, as if just measured.
+ * @param {string} file
+ * @param {Lane} lane
+ * @param {string[] | undefined} only
+ */
+async function fromReport(file, lane, only) {
+  const report = await readResult(path.resolve(file));
+  /** @type {Record<string, number[]>} */
+  const values = {};
+  if (isRecord(report.runs)) {
+    for (const [id, runs] of Object.entries(report.runs)) {
+      if (Array.isArray(runs)) values[id] = runs.filter((v) => typeof v === 'number');
+    }
+  }
+  const wanted = METRICS.filter((m) =>
+    only === undefined ? m.lanes.includes(lane) : only.includes(m.id),
+  );
+  return { wanted, values, samples: {}, errors: [] };
+}
+
 async function main() {
   const { values: args } = parseArgs({
     options: {
@@ -373,6 +397,7 @@ async function main() {
       absolute: { type: 'boolean', default: false },
       machine: { type: 'string' },
       'update-baseline': { type: 'string' },
+      'from-report': { type: 'string' },
     },
   });
   const lane = /** @type {Lane} */ (
@@ -381,13 +406,17 @@ async function main() {
   const machine = args.machine ?? machineClass();
   const out = path.join(repoRoot, 'tmp', 'perf', lane);
   await mkdir(out, { recursive: true });
-  const measured = await measureAll({
-    lane,
-    only: args.only?.split(',').map((id) => id.trim()),
-    runs: args.runs === undefined ? undefined : Number(args.runs),
-    form: args.form === 'dev' ? 'dev' : 'packaged',
-    out,
-  });
+  const only = args.only?.split(',').map((id) => id.trim());
+  const measured =
+    args['from-report'] === undefined
+      ? await measureAll({
+          lane,
+          only,
+          runs: args.runs === undefined ? undefined : Number(args.runs),
+          form: args.form === 'dev' ? 'dev' : 'packaged',
+          out,
+        })
+      : await fromReport(args['from-report'], lane, only);
   const baselines = await readBaselines(process.platform, machine);
   const verdicts = measured.wanted.flatMap((metric) => {
     const runs = measured.values[metric.id] ?? [];
