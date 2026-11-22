@@ -1099,6 +1099,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'terminal.openFailed': '无法打开终端：{reason}',
   'terminal.copied': '已复制。',
   'bgTasks.openTerminal': '在终端面板中打开',
+  'diff.added': '新增',
+  'diff.removed': '删除',
   'bgTasks.duration':
     '{hours, plural, =0 {{minutes, plural, =0 {{seconds} 秒} other {{minutes} 分 {seconds} 秒}}} other {{hours} 小时 {minutes} 分}}',
 

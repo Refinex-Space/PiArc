@@ -356,6 +356,10 @@ describe('P0 row types', () => {
     expect(
       [...card.querySelectorAll('.diff-line')].map((l) => l.getAttribute('data-kind')),
     ).toEqual(['removed', 'added']);
+    // R5 (A11): a screen reader tells removed and added lines apart, not only the colour.
+    expect(
+      [...card.querySelectorAll('.diff-sign')].map((sign) => sign.getAttribute('aria-label')),
+    ).toEqual(['Removed', 'Added']);
   });
 
   it('bash card: command, directory, semantic status, exit code and the saved output', async () => {

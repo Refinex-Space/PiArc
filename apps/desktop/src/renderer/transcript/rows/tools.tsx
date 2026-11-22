@@ -341,6 +341,24 @@ export function FileChangeCard({
   );
 }
 
+/** A diff line's sign: `+` or `−` named "Added" or "Removed" for screen readers (R5), which
+ * otherwise read both kinds of line alike; context lines have none. */
+export function DiffSign({ kind }: { readonly kind: DiffHunk['lines'][number]['kind'] }) {
+  const t = useT();
+  if (kind === 'added' || kind === 'removed') {
+    return (
+      <span className="diff-sign" role="img" aria-label={t(`diff.${kind}`)}>
+        {kind === 'added' ? '+' : '−'}
+      </span>
+    );
+  }
+  return (
+    <span className="diff-sign" aria-hidden="true">
+      {' '}
+    </span>
+  );
+}
+
 export function DiffView({
   hunks,
   limit,
@@ -377,9 +395,7 @@ export function DiffView({
               <td className="diff-gutter">{old}</td>
               <td className="diff-gutter">{now}</td>
               <td className="diff-text">
-                <span className="diff-sign" aria-hidden="true">
-                  {line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '}
-                </span>
+                <DiffSign kind={line.kind} />
                 {revealBidi(line.text)}
               </td>
             </tr>

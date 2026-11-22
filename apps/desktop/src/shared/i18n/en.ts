@@ -1135,6 +1135,8 @@ export const en = {
   'terminal.openFailed': 'The terminal could not be opened: {reason}',
   'terminal.copied': 'Copied.',
   'bgTasks.openTerminal': 'Open in terminal panel',
+  'diff.added': 'Added',
+  'diff.removed': 'Removed',
   'bgTasks.duration':
     '{hours, plural, =0 {{minutes, plural, =0 {{seconds} s} other {{minutes} min {seconds} s}}} other {{hours} h {minutes} min}}',
 

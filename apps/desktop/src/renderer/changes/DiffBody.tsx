@@ -9,6 +9,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useT } from '../app/app-context.js';
 import { Token } from '../transcript/highlight/CodeBlock.js';
 import { revealBidi } from '../transcript/reveal.js';
+import { DiffSign } from '../transcript/rows/tools.js';
 import type { HighlightClient } from '../transcript/highlight/highlight-client.js';
 import type { HighlightLines } from '../transcript/highlight/protocol.js';
 import { useDarkScheme } from '../transcript/use-color-scheme.js';
@@ -142,9 +143,7 @@ function Hunk({
               <Gutter file={file} side="old" line={old} />
               <Gutter file={file} side="new" line={now} />
               <td className="diff-text">
-                <span className="diff-sign" aria-hidden="true">
-                  {line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '}
-                </span>
+                <DiffSign kind={line.kind} />
                 {tokens === undefined
                   ? revealBidi(line.text)
                   : tokens.map((token, i) => <Token key={i} token={token} dark={dark} />)}
