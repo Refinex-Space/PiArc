@@ -55,19 +55,40 @@ function deliver(id: number, payload: Uint8Array): void {
   }
 }
 
+/** Attempts at subscribing to a terminal's route, and the pause after each refusal (ms). */
+export const SUBSCRIBE_ATTEMPTS = 20;
+export const SUBSCRIBE_RETRY_MS = 250;
+
+/**
+ * Subscribes to terminal `id`'s route while `set` still follows it. A session terminal is in
+ * Core's task list before its program has started: a window that learns the id from there asks
+ * before Core knows the terminal and is refused (W3, slow ConPTY starts on Windows), so a
+ * refusal is retried rather than final.
+ */
+function subscribe(id: number, set: Set<Listener>, attempt = 1): void {
+  window.piarc
+    .subscribeEvents(`term/${String(id)}`, (batch) => {
+      deliver(id, batch.payload);
+    })
+    .catch((error: unknown) => {
+      if (listeners.get(id) !== set) return;
+      if (attempt >= SUBSCRIBE_ATTEMPTS) {
+        console.error('[terminal] cannot follow terminal events', error);
+        return;
+      }
+      setTimeout(() => {
+        if (listeners.get(id) === set) subscribe(id, set, attempt + 1);
+      }, SUBSCRIBE_RETRY_MS);
+    });
+}
+
 /** Listens to terminal `id`'s events; returns the function that stops. */
 export function onTerminalEvents(id: number, listener: Listener): () => void {
   let set = listeners.get(id);
   if (set === undefined) {
     set = new Set();
     listeners.set(id, set);
-    window.piarc
-      .subscribeEvents(`term/${String(id)}`, (batch) => {
-        deliver(id, batch.payload);
-      })
-      .catch((error: unknown) => {
-        console.error('[terminal] cannot follow terminal events', error);
-      });
+    subscribe(id, set);
   }
   set.add(listener);
   return () => {
