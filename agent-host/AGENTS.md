@@ -72,6 +72,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 ## 扩展包与 MCP prompts（T40，ADR-0058）
 
+- Pi 自己设置里的包清单（T45，ADR-0062）：`runtime/pi-settings.ts` 的 `withoutPiPackages` 让 Pi 的包管理器读不到用户级 `pi/settings.json` 与项目 `.pi/settings.json` 的 `packages`（否则它在每次资源重载时为缺失的来源运行带安装脚本的 npm、git 克隆后 `npm install`，只有 `PI_OFFLINE` 能挡，而那也关掉远程模型目录）；会话运行时只经它创建 `SettingsManager`。测试：`runtime/pi-settings.test.ts`（含 Pi 自己会装包的前提用例，不设 `PI_OFFLINE`）与 L2 `sec-pi-settings-packages`。
 - Pi 包的扩展：能力 `plugins` 打开时，注册表 `#open` 经 `runtime/plugin-extensions.ts` 的 `pluginExtensions` 取 Core 的 `plugins/extensions`（已确认的入口文件，任何失败都不加载），作为 `additionalExtensionPaths` 交给 Pi（`session-runtime.ts`）；不要把包写进 `pi/settings.json`（Pi 会为缺失的包运行带脚本的 npm）。`resources/reload` 时 `changedExtensions` 比对，变化的空闲会话立即重开，运行中的回合结束后重开（`profileStale`），并让 MCP 池 `refresh()`。子 agent 的会话不加载包的扩展。
 - MCP prompts：`src/mcp/prompts.ts`（命令名、参数对应、文本拼接）、连接的 `prompts`/`getPrompt`、池的 `prompts()`/`getPrompt()`；`resources/listCommands` 经 `withPromptCommands` 接在 Core 的命令后，输入经 `expandInput` 在 `#prepare` 之前展开（Core 已展开过的输入不动）。
 

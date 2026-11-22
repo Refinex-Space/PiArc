@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.55（2026-11-22） |
+| 版本 | 2.56（2026-11-22） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -276,6 +276,7 @@ PiArc/
 | [0059](../adr/0059-m4-hooks-config-diagnostics-and-usage-cost.md) | M4 hooks（UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure）的挂载点与 `watchPaths`、ConfigChange 阻断后本会话保留旧值；`mcp_tool` handler 经 AHP `hooks/mcpTool` 交给工作区的 MCP 池；配置诊断复用 T24 的报告结构并按来源类别列出全部来源；用量按请求从 JSONL 派生，按目录价或用户价以整数计算 | 诊断与成本都从功能自己的加载器和会话文件得出，不另写判断；没有价格的模型成本是"未知"而不是 0 |
 | [0060](../adr/0060-notebook-edit-actionable-notifications-and-diff-comments.md) | NotebookEdit 只替换一个 cell 的字节区间、Rust 与 TS 共用向量、新 cell 的 id 由调用 id 派生；系统通知只放行能在通知里读完的请求，按钮经同一审批账本；diff 行内评论是渲染进程的草稿，按摘录重新定位，一次发送 | 保真写入不产生整文件 diff；通知没有阅读闸门，只给短请求"允许"；评论发送后就是普通消息，不需要 Core 存储 |
 | [0061](../adr/0061-accessibility-and-localization.md) | 状态清单逐条 axe（亮暗）并由注册点核对覆盖；transcript 是带行名称的 feed；进展经 5 秒节流的 live region；审批卡出现时取焦点；侧栏叠层、高对比度代码主题与强制颜色的系统按钮色；i18n 检查进 verify | 无障碍要靠检查守住，读屏与对比度在真实背景上成立 |
+| [0062](../adr/0062-security-hardening-threat-map-redaction-and-diagnostics.md) | 威胁映射（`tests/security/threats.yaml`）进 verify；日志写入时脱敏；诊断包先预览后经原生保存对话框写出；发布构建拒绝远程调试开关、不带测试页；Pi 自己设置里的包清单不生效；依赖审计流水线；审批卡与 diff 显示双向控制字符 | 每条威胁的对策要有能失败的检查；凭据与会话内容不出本机；Pi 不能绕开扩展包的安装规则 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -1479,7 +1480,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 |---|---|---|
 | 提示注入导致破坏性操作 | 仓库文件、网页、MCP 返回内容诱导 agent 执行 `rm -rf`、泄露密钥 | 默认询问；deny 规则；Bash 子命令分析；关键路径删除总是询问；沙箱；审批卡展示完整命令；WebFetch 的网页只作为辅助模型提问里的材料，提取结果是工具结果，不进 system prompt，网页内容不影响权限裁决（T29） |
 | 恶意项目配置 | 克隆的仓库带 hooks、MCP、allow 规则、插件，打开即执行 | 项目信任闸门（10.2）：信任前不执行任何项目级可执行配置 |
-| 恶意插件 / MCP server / Pi 包 | 安装后获得进程权限 | 安装前展示来源与能力；启用需确认；Agent Host 的 Seatbelt 配置限制进程级写入范围 |
+| 恶意插件 / MCP server / Pi 包 | 安装后获得进程权限 | 安装前展示来源与能力；启用需确认；Agent Host 的 Seatbelt 配置限制进程级写入范围；Pi 自己设置里的包清单不由 Agent Host 安装或加载（T45） |
 | 凭据泄露 | 明文文件、环境变量继承、日志 | 加密保险箱，主密钥只在系统凭据库；不经环境变量传递；日志与诊断包自动脱敏 |
 | 沙箱逃逸 | 命令通过未代理的网络通道外传 | 沙箱默认无直连网络；沙箱外重试必须审批 |
 | 审批疲劳与误点 | 连续弹窗导致误允许 | 400 ms 防误触；长参数阅读闸门；"总是允许"规则可预览、可编辑、可撤销；审计可查 |
@@ -1489,7 +1490,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 应用文件被篡改 | 替换应用内的 asar、bundle 或 node | app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏；对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）；安装位置使用系统默认目录，依靠文件系统权限 |
 | 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）；Core 以最小环境启动内置 node（不传 `DYLD_*`）；内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`，同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
-| 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关 |
+| 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关；发布构建拒绝 Chromium 的远程调试开关（T45） |
 | 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 窗口禁止导航到应用自身协议以外的地址；新窗口一律拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
 
 ### 10.2 项目信任
@@ -1498,11 +1499,13 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 - 信任前：memory 文件照常加载（它们是指令而非代码，但 UI 会标注来源）；不执行项目 hooks；不连接项目 MCP；不应用项目 allow 规则（deny 与 ask 照常生效）；不加载项目插件与 Pi 扩展。
 - 信任决定存在 Core（按仓库主 checkout 解析，worktree 共享），可在设置中撤销。项目配置文件发生变化时，新增的可执行项需要再次确认。
 - T13 落地（ADR-0025）：主 checkout 规则见 `crates/piarc-git/CLAUDE.md`（linked worktree 经 `gitdir` 与 `commondir` 找到主仓库；submodule 没有 `commondir`，按独立项目；非 git 目录取自身规范路径）。可执行项枚举只读键名与条目：`.piarc/settings*.json`、`.claude/settings*.json` 的 hooks、allow 规则、`enabledPlugins`，`.mcp.json` 的 server（T36 起另含 `.piarc/settings*.json` 的 `mcpServers` 与子 agent 定义的内联 server，条目按程序或地址命名，改了运行什么即为新增项；`.pi/mcp.json` 不再枚举），`.claude-plugin/` 的插件，`.pi/extensions/` 的条目与 `.pi/settings.json` 的 `extensions`、`packages`；信任时的条目存为快照，之后多出的条目是"新增项"。撤销删除决定并重启该工作区的 Agent Host。所有消费者经 `piarc_config::project_trust` 查询；项目不受信任时，设置合并排除项目层的 hooks 与 allow 规则，deny 与 ask 照常生效。
-- T18 落地（ADR-0029）：信任决定为"信任"、且当前没有快照之外的新增可执行项时，项目才受信任（I63）：`trust/get` 与客户端的信任视图在用户确认之前都答"不信任"，删除的条目不需要再确认。客户端在工作区的第一个会话之前（没有决定时）、或有新增项时显示信任对话框：前者按类别与来源文件列出全部可执行项，后者只列新增项；对话框说明 memory 文件不受信任影响。"暂不信任"同样写入决定，之后不再询问，可从文件夹菜单的"项目信任…"修改。决定与撤销在应答之前让同一主 checkout 的打开工作区进入重启，客户端随后可以立即创建会话。信任决定由渲染进程发出、没有原生确认，登记为 I79，由 T45 评估。
+- T18 落地（ADR-0029）：信任决定为"信任"、且当前没有快照之外的新增可执行项时，项目才受信任（I63）：`trust/get` 与客户端的信任视图在用户确认之前都答"不信任"，删除的条目不需要再确认。客户端在工作区的第一个会话之前（没有决定时）、或有新增项时显示信任对话框：前者按类别与来源文件列出全部可执行项，后者只列新增项；对话框说明 memory 文件不受信任影响。"暂不信任"同样写入决定，之后不再询问，可从文件夹菜单的"项目信任…"修改。决定与撤销在应答之前让同一主 checkout 的打开工作区进入重启，客户端随后可以立即创建会话。信任决定由渲染进程发出、没有原生确认，登记为 I79：T45 评估后列为残余风险（渲染进程被注入时能静默信任项目），给"信任"加主进程原生确认要改变本节的决定与首次使用的流程，交 R5 由用户决定。
 
 R2 起，肯定决定携带与 checkout、目录、清单及既有决定绑定的版本。清单或数据库快照不可用时保持未信任。版本已变时返回最新视图，用户重新确认。linked worktree 通过主仓库反向登记校验（ADR-0034）。
 
 R4 起，信任只覆盖信任清单扫描的文件：skill、命令与子 agent 定义只有在主 checkout 根自己的资源目录里时，其 `allowed-tools`、hooks 与内联 MCP 才随项目信任生效（worktree 会话从 `.piarc/worktrees/<名称>/` 向上找到的另一分支的文件不算）；hook 的条目名按 `type` 取实际运行的字段，并带上 `headers`、`allowedEnvVars`、`model`。
+
+T45 起（ADR-0062），`.pi/settings.json` 的 `packages` 与用户级 `pi/settings.json` 的 `packages` 不再由 Pi 安装或加载（Pi 的包管理器会为缺失的来源运行带安装脚本的 npm），扩展包只经下一段的 PiArc 扩展包；信任清单仍把 `.pi/settings.json` 的 `packages` 列为可执行项。
 
 T40 起（ADR-0058），`.piarc/settings*.json` 的 `plugins` 开启的包在清单里另列出它的全部可执行项（来源 `plugin:<id>`），信任即把这些项记为该包已确认；包后来新增的项只等该包自己的确认，不让项目回到未信任。在受信任的项目里经原生确认开启项目作用域的包时，新增的清单项并入信任快照。
 
@@ -1551,6 +1554,7 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 
 - 遥测默认关闭；开启后只上报匿名的性能与崩溃指标，不含会话内容、文件路径、命令文本。
 - 诊断包由用户手动导出，导出前展示内容清单并脱敏。
+- T45 落地（ADR-0062）：PiArc 还没有遥测代码（没有上报，也没有开关）；Pi 的版本检查与安装遥测由 Core 固定关闭。会话之外的全部外连逐项列在[外连与遥测](../security/egress.md)，一次完整 mock 会话里 Agent Host 只连模型服务商、Electron 没有外连（`crates/piarc-testkit/tests/egress.rs`、`apps/desktop/e2e/t45-egress.e2e.ts`）。日志写入时由 `piarc-telemetry::redact` 替换保险箱里的凭据值与常见密钥格式（Agent Host 的 stderr 同样）。诊断包在配置诊断页准备：Core 在内存里组装日志、版本、用户级设置与配置诊断（设置里密钥名的键、`env` 与 `headers` 的值也替换，主目录写作 `~`），页面列出文件、替换计数与永不包含的内容（保险箱、数据库、会话内容、检查点），用户在主进程的原生保存对话框里选位置后才写出 ZIP。第 10.1 节每条威胁的对策与测试见 `tests/security/threats.yaml`，生成的覆盖表在 [`docs/security/threat-coverage.md`](../security/threat-coverage.md)；Electron 官方清单的逐条复核在 [`docs/security/electron-checklist.md`](../security/electron-checklist.md)。
 
 ---
 
@@ -1855,6 +1859,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.49 | 2026-11-21 | T39（ADR-0056）补充第 4 章 ADR-0056（ADR-0057 以提议列出）、6.2.3 节写明沙箱内自动批准在第 7 步、沙箱外执行紧接第 3 步；6.10 节 T39 落地（设置与来源约束、按命令生成配置、网络卡、拒绝反馈、不可用时降级、限制）；9.2 节审计的沙箱记录；10.3 节 Agent Host 配置定稿。Windows 隔离方案的 ADR-0057 为提议，第 6.10 节 Windows 一条、10.3、15.2 节与 R16 待用户决定后更新。 |
 | 2.50 | 2026-11-21 | T39：ADR-0057 被用户采纳。第 4 章去掉"提议"；6.10 节 Windows 一条写明评估结论（到 Beta 维持现状，MXC ProcessContainer 为 Beta 之后的候选及其前提）；10.3 节 Windows 的 Agent Host 没有第二道防线并计入已接受风险；15.2 节沙箱一行与第 14 章 R16 的对策和触发条件随之更新。 |
 | 2.51 | 2026-11-21 | T40（ADR-0058）补充第 4 章 ADR-0058；6.3.1 节插件 hooks 的层与确认；6.4 节插件的子 agent 定义；6.7 节 T40 落地（识别、安装位置、作用域与开关、确认与再确认、组件命名与优先级、Pi 扩展经 AHP、设置页）；6.8 节 MCP prompts 作为斜杠命令；6.14 节插件一行；7.4 节能力 `plugins` 与 Core API；9.2 节 `packages` 表（schema v10）；10.2 节项目作用域的包与信任。 |
+| 2.56 | 2026-11-22 | T45（ADR-0062）补充第 4 章 ADR-0062；10.1 节第 9–11 行的对策改用分号分隔（措辞不变，便于逐条映射），恶意插件一行加"Pi 自己设置里的包清单不由 Agent Host 安装或加载"，通用运行时一行加远程调试开关；10.5 节 T45 落地（外连清单、日志脱敏、诊断包、威胁映射与 Electron 清单复核）。 |
 | 2.55 | 2026-11-22 | T44 补充第 11 章：每一行由 `scripts/perf/` 自动测量（PR 冒烟、Nightly 两平台、长跑；绝对预算与按平台、机器类别、流水线分存的基线两道判定，覆盖检查），说明见[性能测量](../engineering/performance.md)；原"未测"的 macOS 格子补上 T44 在 M1 Max 上的实测，其余行加 T44 数值并标出超出项（I191–I194，I26 附物理占用读数）；空闲 CPU 由"接近 0%"定为可见与隐藏时应用全部进程加 Agent Host 合计 ≤ 5%（一个核心、60 s 平均）并要求隐藏时无 rAF 回调与终端帧，依据是实测 3.5–3.6%（I190）；体积按 I41 裁剪后安装后 446.6 MB；8 小时长会话一行仍未测（用户决定不在 T44 做本机长跑，I195）。只有 macOS 数据，按本章收紧规则不收紧任何预算。 |
 | 2.54 | 2026-11-21 | T43（ADR-0061）补充第 4 章 ADR-0061；8.7 节无障碍与本地化的落地（状态清单与 axe、feed 与行名称、节流播报、审批卡焦点、键盘与焦点环、强制颜色、i18n 检查与按应用语言格式化）。 |
 | 2.53 | 2026-11-21 | T42（ADR-0060）补充第 4 章 ADR-0060；6.1.4 节 `NotebookEdit` 已实现（参数、cell 字节区间的保真编辑、共享向量、新 cell 的 id）；8.2 节 Changes 面板的 diff 行内评论；8.8 节可操作通知（`notificationAllow` 的条件、经同一审批账本答复、审计来源"通知"）；7.7 节说明评论不需要词级 diff。 |

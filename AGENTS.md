@@ -18,12 +18,17 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | 命令 | 用途 |
 |---|---|
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
-| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
+| `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、cargo-audit、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，`npm run audit:deps` 需要 cargo-audit，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
 | `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
-| `npm run verify` | 全部 16 项检查，结束时打印汇总表；收尾跑一次（先提交代码），全部通过且工作区干净时记下提交 |
+| `npm run verify` | 全部 17 项检查，结束时打印汇总表；收尾跑一次（先提交代码），全部通过且工作区干净时记下提交 |
 | `npm run verify -- --baseline` | 开工基线：上次全量通过之后只改了 `docs/` 时只查改动文件与验收清单，否则跑全量（`docs/plan/protocol.md`） |
 | `npm run gen:tokens` | 由 `design/tokens/` 生成渲染进程的 CSS 自定义属性与共享的 TS 常量；改令牌后运行并提交（verify 第 15 步检查漂移、对比度与品牌，ADR-0029） |
 | `node scripts/ci/check-i18n.mjs` | verify 第 16 步：中英文目录键与占位符一致、ICU 有效、只用该语言有的复数类别、引用的键存在、渲染进程与主进程没有硬编码文字与不带 locale 的格式化（规则见 `docs/engineering/accessibility.md`） |
+| `node scripts/ci/check-threats.mjs [--results target/l2/results.json --doc check\|write]` | verify 第 17 步：第 10.1 节每条威胁在 `tests/security/threats.yaml` 有条目、每个对策都被映射、测试 ID 都存在、带威胁编号的测试都已映射；`--doc write` 重新生成 `docs/security/threat-coverage.md`（规则见 `testing.md` 第 16 节） |
+| `npm run audit:deps` | 依赖安全（T45）：npm audit（全部工作区）、cargo-audit（`.tools/`）、cargo-deny 的 advisories 与 licenses、npm 发布依赖的许可证；例外只在 `tests/security/audit-exceptions.yaml`（过期即失败）；要联网，CI 的 `deps-security.yml` 在依赖改动与每天运行 |
+| `node scripts/ci/check-release-runtime.mjs` | 发布构建（先 `npm run package:desktop`）上 `ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port` 不生效，每项带未写 fuse 的 Electron 上的对照（T45-A12，CI `desktop` 作业） |
+| `PIARC_EVIDENCE_TASK=T45 npx playwright test -c apps/desktop/playwright.config.ts t45- --project dev` | T45 L4：XSS 载荷在审批卡、Changes 与评论、设置页、hook 提示、终端 OSC 8 上不执行；每个 `window.piarc` 命令以畸形参数调用得到结构化错误；页面伪造的 allow 规则与沙箱放宽停在原生确认；诊断包的预览与导出（截图在 `tmp/evidence/T45/`）；net log 里没有外连 |
+| `cargo test -p piarc-testkit --test credential_leaks --test egress` 与 `cargo test -p piarc-core --test diagnostics` | T45：保险箱的已知密钥不进 Agent Host 与 Bash 的环境、日志与数据目录；按应用方式运行的 Agent Host 在完整 mock 会话里只连 mock 服务商；导出的诊断包没有凭据、会话内容与主目录 |
 | `PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43- --project dev` | T43 无障碍：状态清单全部状态的 axe（亮暗，报告在 `tmp/evidence/T43/axe/`）、审批卡焦点、只用键盘的流程与系统偏好、中英文截图与溢出检查 |
 | `node scripts/dev/check-prompt-originality.mjs` | 修改 Harness 英文提示词或工具指引后，在含本地参考副本的机器上做连续 10 词比对，更新 `docs/engineering/prompt-originality.md` |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
@@ -163,3 +168,4 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - M4 hooks、配置诊断与用量（T41，ADR-0059）：StopFailure 的错误类型只在 `agent-host/src/runtime/turn-errors.ts` 的 `stopFailureType` 映射；`mcp_tool` hook 经 AHP `hooks/mcpTool` 交给 Agent Host 的工作区池，不在 Core 另起 MCP 客户端；ConfigChange 阻断的层值只经 `ToolIo::apply_pins` 施加（权限裁决与 hooks 规划都要用它）。配置诊断的新来源加一个 `piarc_config::SourceKind` 与 `config_diagnostics/sources.rs` 的生成函数，用该功能自己的加载器，不另写判断。成本只在 `piarc_core::usage` 计算（整数皮美元，规则同 pi-ai `calculateCost`），没有价格的模型成本是 `None`（界面"未知"），不要当成 0；用户价格只读用户级 `modelPrices`。
 - 性能（T44）：第 11 章的每一行在 `scripts/perf/metrics.mjs` 有指标或排除理由（`metrics.test.mjs` 检查），新探针在 `run.mjs` 的 `PROBES` 加一项；基线按平台、机器类别、流水线分存，只经 `--update-baseline "<原因>"` 更新，不为让检查通过而更新，也不放宽 `floor` 或预算。测量时窗口在前台、接电源、不同时跑其他重负载（打包、verify、另一个探针）；只改了渲染进程也要重新打开发构建，探针测的是 `out/development/` 的打包产物。
 - Hooks（T25，ADR-0039）：hook 命令只在 Core 运行（`piarc-hooks` 解析、匹配、执行、合并，`piarc-core::hooks` 读设置与信任、写审计），Agent Host 只经 `hooks/run` 报告 Pi 事件并应用结果；新增事件在 `HookEvent` 加一项、在挂载处调 `HooksService::run`，不另写执行器。Stop 续跑上限只在 `piarc_hooks::STOP_CONTINUATION_LIMIT`。L2 的 hook 夹具是 `tests/scenarios/fixtures/hooks/hook.mjs.txt`（复制成 `hook.mjs` 运行）。
+- 安全收口（T45，ADR-0062）：第 10.1 节的每条对策在 `tests/security/threats.yaml` 有测试（verify 第 17 步，`testing.md` 第 16 节），新增对策时同时改架构那一行与映射，新测试名带 `THR-NN`。日志写入时由 `piarc-telemetry::redact` 脱敏，Core 在每次保险箱操作后登记凭据值；不要把凭据格式化进错误再指望别处过滤，也不要绕过 tracing 直接写日志文件。诊断包只经 `piarc_telemetry::BundleInput` 加内容，保险箱、数据库与会话内容永不进去。Pi 自己设置里的 `packages` 对 Pi 不可见（`agent-host/src/runtime/pi-settings.ts`）：L2 与会话测试的 Agent Host 带 `PI_OFFLINE=1`，Pi 只在联网时走的路径要按 `crates/piarc-testkit/tests/egress.rs` 的方式测。构建期常量 `__PIARC_RELEASE_BUILD__` 只在 `package:desktop` 打发布构建时为真：发布构建拒绝 `--remote-debugging-port` 并去掉测试页（`renderer/test-pages.tsx`），bare `vite build` 与开发构建保留。审批卡、diff 与路径经 `transcript/reveal.ts` 显示双向控制字符。

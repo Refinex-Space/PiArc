@@ -12,13 +12,13 @@
 | L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`（`src/l2/`），驱动在 `piarc-devcli`；能力清单 `tests/capabilities.yaml`；见第 12、13 节 | `cargo test -p piarc-testkit --test scenarios`；全部（含能力检查）：`node scripts/ci/run-l2.mjs` | 每次提交 | T05、T15 |
 | L3 行为对齐 | 同一个严格 mock 同时服务 PiArc 与真实的 `claude -p`，录制两侧的请求结构与行为轨迹，归一化后做结构化 diff | 场景 `tests/l3/scenarios/<id>.yaml`（格式 `tests/l3/schema.json`），有意偏离与排除清单 `tests/l3-allowlist.yaml`，脚本在 `scripts/l3/`；见第 14 节 | `npm run l3`（`-- --repeat 2` 检查同侧可重复）；剥离检查的单测随 `npm test` | 每晚（`.github/workflows/l3-nightly.yml`）/ 手动 | T30 |
 | L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
-| 安全回归 | Markdown 与链接渲染的 XSS 载荷集、preload API 越权调用、外部导航拦截（架构第 10.3 节） | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；XSS 载荷集由 T09 加入 | 纯函数部分由 `npm run verify` 运行；Electron 层同 L4 | 每次提交 | T03 起 |
+| 安全回归 | 第 10.1 节每条威胁的对策（威胁映射 `tests/security/threats.yaml`，第 16 节）；XSS 载荷集在全部渲染面、preload 畸形参数与越权调用、外部导航拦截（架构第 10.3 节）；发布构建的运行时探测 | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance`、`t45-*` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；载荷集 `src/shared/xss-payloads.ts`（T09 起，T45 扩充）；打包产物：`scripts/ci/check-release-runtime.mjs`、`check-app-layout.mjs` | 映射与纯函数由 `npm run verify` 运行（第 17 步检查映射）；Electron 层同 L4；打包产物检查在 CI `desktop` 作业 | 每次提交 | T03 起，T45 |
 | 性能 | 架构第 11 章的预算，两个平台分别测量：PR 冒烟、Nightly 完整测量、长跑；绝对预算与相对基线两道判定 | 框架 `scripts/perf/`（指标表 `metrics.mjs`、门禁 `gate.mjs`、入口 `run.mjs`、探针 `probe-*.mjs`、长跑 `long-run.mjs`），已有基准在 `scripts/bench/` 与 `e2e/t19.bench.ts` 作为探针；基线 `scripts/perf/baselines/`；见第 15 节与 `performance.md` | `node scripts/perf/run.mjs --lane pr\|nightly\|long`；第 11 章覆盖检查与门禁单测随 `npm test` | 每次提交（冒烟，CI `desktop` 作业）/ 每晚（`perf-nightly.yml`）/ 本机（8 小时长跑） | T04、T09、T10、T44 |
 | 多服务商 | 部分 L2 场景对真实服务商运行 | 与 L2 场景共用，按标记筛选 | 手动或每晚，需要密钥与预算（第 8 节） | 每晚，可选 | R2 起 |
 
 ## 2. 质量门禁
 
-`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 16 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
+`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 17 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
 
 | # | 步骤 | 单独运行 |
 |---|---|---|
@@ -38,6 +38,7 @@
 | 14 | L2 场景与能力清单 | `node scripts/ci/run-l2.mjs`：构建 Agent Host bundle → 全部场景（`cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json`）→ 能力覆盖与 `capabilities.md` 漂移检查（第 12、13 节） |
 | 15 | 设计令牌 | `node scripts/ci/check-design-tokens.mjs`：生成物与 `design/tokens/` 一致、声明的前景 / 背景对在四种颜色模式下达到 WCAG、主色色相与表面色的品牌规则、不打包字体与音频（ADR-0029；试改令牌用 `--tokens <目录>`） |
 | 16 | i18n | `node scripts/ci/check-i18n.mjs`：两种语言键集合一致、ICU 有效且两种语言占位符一致、只用该语言有的复数类别、`t('…')` 引用的键存在、渲染进程与主进程没有硬编码的用户可见文字与不带 locale 的 `toLocaleString()`（T43，规则见 `accessibility.md`） |
+| 17 | 威胁映射 | `node scripts/ci/check-threats.mjs --results target/l2/results.json --doc check`：第 10.1 节每行都有 `THR` 条目、每个对策都被映射、每个测试 ID 在仓库里存在、待补项的任务未完成、以威胁编号命名的测试都已映射，`docs/security/threat-coverage.md` 与映射和第 14 步的 L2 报告一致（第 16 节，T45） |
 
 CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。L3 不在 PR CI 中，由独立的 Nightly 工作流运行（第 14 节）；它的剥离检查单测（`scripts/l3/*.test.mjs`）属于第 5 步。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。verify 作业结束后把 L2 报告（`target/l2/results.json`）上传为 artifact `l2-report-<os>`。
 
@@ -342,7 +343,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 - `workspace.run_files` 在该次运行的临时根下建立夹具，可设置祖先目录的 memory、模拟家目录 `home 家/`、数据目录 `data 数据/` 或用于审批的相邻文件。`workspace.git: true` 在工作区创建空仓库，便于验证初始 Git 状态；再加 `git_commit: true` 以固定身份提交初始文件，`git_branches` 在初始提交上建分支（T35，worktree 需要提交）。会话的 `worktree: { name?, base? }` 让它在独立 worktree 中创建（T35）。
 - 会话通常在动作开始前建立。`sessions.<label>.deferred: true` 将该会话的创建推迟到第一次输入，可验证跨会话的授权与配置。
 - 按字节的夹具放在 `tests/scenarios/fixtures/`（`.gitattributes` 设为 `-text`，换行与编码不被 Git 改动）；加载时检查夹具存在。PDF 夹具用 `piarc-fs` 测试里的 `make_pdf` 生成，手写的 PDF 可能取不到文字。
-- 端点脚本工具参数里的 `{{workspace}}` 换成本次运行工作区的绝对路径（T30，L3 场景要用绝对路径的 `file_path`）。
+- 端点脚本工具参数里的 `{{workspace}}` 换成本次运行工作区的绝对路径（T30，L3 场景要用绝对路径的 `file_path`）；`workspace.files` 与 `run_files` 里的 `{{workspace}}` 同样替换，按 JSON 字符串转义（T45）。`run_files` 写的 `data 数据/pi/settings.json` 保留，运行器只并入它自己的 `retry`。L2 的 Agent Host 带 `PI_OFFLINE=1`，Pi 只在联网时才走的路径（包安装、远程模型目录）在场景里看不到，要按应用的方式运行时参照 `crates/piarc-testkit/tests/egress.rs`。
 - WebFetch 场景（T29，`webfetch-*.yaml`）：`web.pages` 按路径给出状态、`content_type`、`body`（`repeat` 重复多次，用来越过正文上限）与重定向的 `location`。`{{web}}` 在页面与端点工具参数里换成 `http://127.0.0.1:<端口>`，`{{web_alt}}` 换成同一服务器的 `http://localhost:<端口>`（另一个主机，用于跨站重定向与按域名的规则）。只有带 `web` 段的场景，Core 的 WebFetch 允许列表才放行这两个主机；场景不访问外网。WebFetch 的提取是一次额外的模型请求：没有辅助模型时为它在同一端点留一步，设了 `modelProviders.auxiliary`（用 `run_files` 写 `data 数据/settings.json`）时在那个端点留一步。
 - 扩展包场景（T40，`plugin-*.yaml`、`pi-package-git.yaml`）：包目录用 `run_files` 写在运行根下，顶层 `packages` 在打开工作区之前经 Core 的 `package_install` 安装（`source: git` 时运行器先把目录做成一个提交的 git 仓库，再以 `file://` 地址安装），缺省开启并确认全部可执行项（`confirm: false` 只开启不确认，`enable: false` 只安装）。`mcp-prompts.yaml` 的夹具 server 带 `MCP_ECHO_PROMPTS=1`。
 - MCP 场景（T36，`mcp-*.yaml`）：stdio server 写在工作区的 `.mcp.json` 或 `run_files` 的 `data 数据/settings.json` 里，`{{mcp_echo}}` 换成 `packages/testkit/src/mcp-echo-server.ts` 的绝对路径（`node {{mcp_echo}} <名字>`，环境变量见 `packages/testkit/AGENTS.md`）；顶层 `mcp_http` 的每个名字起一个 `MockMcpServer`（`oauth: true` 时带自己的授权服务器：元数据发现、动态注册、PKCE、轮换的 refresh token），`{{mcp_http:<名字>}}` 换成它的 `/mcp` 地址。夹具的 `MCP_ECHO_START_LOG` 把每次启动记成一行，`expect.json_lines` 据此断言进程数。
@@ -598,3 +599,21 @@ approvals:                        # 按工具调用 id 作答；没有点名的�
 - 基线按平台与机器类别存放，只经 `--update-baseline "<原因>"` 更新，提交说明写原因与新旧值；不要为让检查通过而更新基线，也不要放宽 `floor` 或预算（预算只能收紧，放宽走 ADR）。
 - 新加的指标先在同一提交上连续跑 5 次冒烟确认没有误报，再放进 PR 流水线；噪声大的只放 Nightly。
 - 性能测试只用 mock provider，不访问真实服务商；探针在临时目录里起应用，不读本机的 PiArc 数据与 `~/.claude`。
+
+## 16. 威胁映射与安全对策（T45）
+
+架构第 10.1 节的每条威胁在 `tests/security/threats.yaml` 有一个 `THR-NN` 条目（格式写在该文件头部，决定见 ADR-0062）。verify 第 17 步用 `scripts/ci/check-threats.mjs` 检查它，并生成 [`docs/security/threat-coverage.md`](../security/threat-coverage.md)（不要手改；`node scripts/ci/check-threats.mjs --results target/l2/results.json --doc write` 重写）。
+
+新增或改变安全对策时：
+
+1. 在第 10.1 节对应行的对策列写上它（以 `；` 分隔），同步架构的修订记录；
+2. 在映射里加一个 `countermeasures` 条目，`arch` 写那段原文；能自动化的写测试 ID，流程类写理由与检查项（`process:<文件>#<标记>`，文件里放 `<!-- 标记 -->`），已接受的风险写理由与 ADR 或登记事项，暂时测不了的写 `deferred` 与负责的任务；
+3. 新测试的名称带威胁编号：Vitest 与 Playwright 写 `it('THR-04 …')`，Rust 写 `fn thr04_…`，L2 场景的 `description` 以 `THR-04.` 开头并用能力 ID 映射。带编号却没映射的测试会让检查失败；
+4. 测试 ID 只引用真实存在的用例：`rust:` 要有 `#[test]`/`#[tokio::test]`，`vitest:`、`l4:` 的标题逐字一致且不是 `skip`，`cap:` 的能力为 `active` 且有场景覆盖，`ci:` 的脚本里出现该检查名。
+
+相关的固定检查：
+
+- XSS 载荷集只加不删；新的渲染面（设置页、面板、通知）要在 `t45-xss.e2e.ts` 里渲染一遍载荷并断言哨兵不变、没有事件属性与框架元素、链接只剩安全协议、窗口不导航、CSP 不报告。
+- 新增 `window.piarc` 命令时，`t45-ipc-hardening.e2e.ts` 会自动用畸形参数调用它：参数要在主进程校验，非法时抛 `TypeError`；没有参数的命令加进该文件的 `NO_PARAMETERS`。
+- 新增外连写进 [`docs/security/egress.md`](../security/egress.md)，并让 `t45-egress.e2e.ts` 或 `egress.rs` 覆盖。
+- 依赖：`npm run audit:deps`（CI `deps-security.yml` 在依赖改动与每天运行）；例外只写进 `tests/security/audit-exceptions.yaml`，带理由、影响与复查日期。
