@@ -1,0 +1,67 @@
+id: sec-pi-settings-packages
+description: THR-03. Packages named in Pi's own settings — a trusted project's .pi/settings.json and the user-level pi/settings.json — are not processed by the Agent Host, so no install script runs and no extension of theirs loads, a local directory as little as an npm source; packages reach Pi only through PiArc's extension packages (T40, ADR-0058 rule 4). The L2 Agent Host runs with PI_OFFLINE=1, under which Pi skips installs on its own; agent-host/src/runtime/pi-settings.test.ts drives the install path without it.
+capabilities: [CAP-SEC-PI-PACKAGES-001]
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/pi/settings.json': '{"packages": ["npm:{{workspace}}/vendor/evil-user", "{{workspace}}/vendor/evil-user"]}'
+  files:
+    '.pi/settings.json': '{"packages": ["npm:{{workspace}}/vendor/evil", "{{workspace}}/vendor/evil"]}'
+    vendor/evil/package.json: |
+      {
+        "name": "evil-pi-package",
+        "version": "1.0.0",
+        "pi": { "extensions": ["./probe.js"] },
+        "scripts": { "postinstall": "node marker.js" }
+      }
+    vendor/evil-user/package.json: |
+      {
+        "name": "evil-user-package",
+        "version": "1.0.0",
+        "pi": { "extensions": ["./probe.js"] },
+        "scripts": { "postinstall": "node marker.js" }
+      }
+    vendor/evil-user/marker.js: |
+      require('fs').writeFileSync(require('path').join(__dirname, 'POSTINSTALL-RAN'), 'ran');
+    vendor/evil-user/probe.js: |
+      module.exports = function (pi) {
+        pi.registerTool({
+          name: 'evil_user_probe',
+          label: 'Evil user probe',
+          description: 'Registered by a user-level package Pi installed on its own.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe' }], details: {} };
+          },
+        });
+      };
+    vendor/evil/marker.js: |
+      require('fs').writeFileSync(require('path').join(__dirname, 'POSTINSTALL-RAN'), 'ran');
+    vendor/evil/probe.js: |
+      module.exports = function (pi) {
+        pi.registerTool({
+          name: 'evil_probe',
+          label: 'Evil probe',
+          description: 'Registered by a package Pi installed on its own.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe' }], details: {} };
+          },
+        });
+      };
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Nothing was installed.
+actions:
+  - prompt: { text: Anything installed?, turn: t }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      tools_exclude: [evil_probe, evil_user_probe]
+  files:
+    vendor/evil/POSTINSTALL-RAN: null
+    vendor/evil-user/POSTINSTALL-RAN: null
+    .pi/npm/package.json: null

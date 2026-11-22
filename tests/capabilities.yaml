@@ -1097,6 +1097,12 @@ capabilities:
     refs: [FR-EX-04, ARCH-10.2]
     task: T40
     status: active
+  - id: CAP-SEC-PI-PACKAGES-001
+    title: 'Pi 设置（项目 `.pi/settings.json`、`<数据目录>/pi/settings.json`）的 `packages` 不由 Agent Host 安装：不运行安装脚本、不加载其扩展'
+    milestone: M4
+    refs: [ARCH-10.1, ARCH-6.7]
+    task: T45
+    status: active
   - id: CAP-PIPKG-GIT-001
     title: 'Pi 包从 git 安装并锁定提交，确认后 `pi` 字段声明的扩展、skills、prompt templates 生效，themes 不加载'
     milestone: M4

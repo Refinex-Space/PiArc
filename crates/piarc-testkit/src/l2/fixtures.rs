@@ -97,7 +97,7 @@ pub(super) fn prepare_workspace(
     mcp_urls: &BTreeMap<String, String>,
 ) -> Result<(), String> {
     for (path, content) in &spec.workspace.run_files {
-        write_file(root, path, &fill_paths(spec, content, mcp_urls))?;
+        write_file(root, path, &fill_paths(spec, content, workspace, mcp_urls))?;
     }
     if spec.workspace.git {
         let result = Command::new("git")
@@ -113,7 +113,11 @@ pub(super) fn prepare_workspace(
         }
     }
     for (path, content) in &spec.workspace.files {
-        write_file(workspace, path, &fill_paths(spec, content, mcp_urls))?;
+        write_file(
+            workspace,
+            path,
+            &fill_paths(spec, content, workspace, mcp_urls),
+        )?;
     }
     if spec.workspace.git_commit {
         commit_all(workspace, &spec.workspace.git_branches)?;
@@ -140,11 +144,30 @@ pub(super) fn prepare_workspace(
 /// can configure it in `.mcp.json` (`"command": "node", "args": ["{{mcp_echo}}", "alpha"]`).
 pub const MCP_ECHO_PLACEHOLDER: &str = "{{mcp_echo}}";
 
-fn fill_paths(spec: &ScenarioSpec, content: &str, mcp_urls: &BTreeMap<String, String>) -> String {
+/// A path for a JSON string in a fixture file: no `\\?\` prefix (Node rejects it on Windows)
+/// and backslashes escaped.
+fn json_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    let plain = text.strip_prefix(r"\\?\").unwrap_or(&text);
+    let quoted = serde_json::to_string(plain).unwrap_or_default();
+    quoted.trim_matches('"').to_owned()
+}
+
+fn fill_paths(
+    spec: &ScenarioSpec,
+    content: &str,
+    workspace: &Path,
+    mcp_urls: &BTreeMap<String, String>,
+) -> String {
     let mut content = content.to_owned();
     // `{{mcp_http:<name>}}`: the URL of the scenario's HTTP MCP fixture server `name` (T36).
     for (name, url) in mcp_urls {
         content = content.replace(&format!("{{{{mcp_http:{name}}}}}"), url);
+    }
+    // `{{workspace}}`: the workspace's absolute path, escaped for a JSON string (T45: a Pi
+    // settings file naming a package inside the workspace).
+    if content.contains(super::runner::WORKSPACE_PLACEHOLDER) {
+        content = content.replace(super::runner::WORKSPACE_PLACEHOLDER, &json_path(workspace));
     }
     if !content.contains(MCP_ECHO_PLACEHOLDER) {
         return content;
@@ -159,11 +182,7 @@ fn fill_paths(spec: &ScenarioSpec, content: &str, mcp_urls: &BTreeMap<String, St
         .join("src")
         .join("mcp-echo-server.ts");
     let echo = std::fs::canonicalize(&echo).unwrap_or(echo);
-    let text = echo.to_string_lossy();
-    // Windows: no `\\?\` prefix for Node, and backslashes escaped for JSON.
-    let plain = text.strip_prefix(r"\\?\").unwrap_or(&text);
-    let quoted = serde_json::to_string(plain).unwrap_or_default();
-    content.replace(MCP_ECHO_PLACEHOLDER, quoted.trim_matches('"'))
+    content.replace(MCP_ECHO_PLACEHOLDER, &json_path(&echo))
 }
 
 /// Commits the workspace's files with a fixed identity, then creates `branches` there (T35).

@@ -83,11 +83,15 @@ impl Env {
         }
         let pi = data.join("pi");
         write_json(&pi.join("models.json"), &json!({ "providers": providers }))?;
-        // Retries wait milliseconds, not seconds.
-        write_json(
-            &pi.join("settings.json"),
-            &json!({ "retry": { "baseDelayMs": 5 } }),
-        )?;
+        // Retries wait milliseconds, not seconds; other keys a scenario's `run_files` wrote stay.
+        let settings_file = pi.join("settings.json");
+        let mut settings = std::fs::read_to_string(&settings_file)
+            .ok()
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+            .filter(Value::is_object)
+            .unwrap_or_else(|| json!({}));
+        settings["retry"] = json!({ "baseDelayMs": 5 });
+        write_json(&settings_file, &settings)?;
         let (auth, oauth_file) = login::oauth_setup(spec, &mocks, root).await?;
         let gate = Arc::new(Gate::new(spec.expect.tool_batches.clone()));
         let home = root.join("home 家");

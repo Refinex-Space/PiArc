@@ -34,6 +34,7 @@ use super::matcher::{ObservedEvent, check_events, compact, describe, matches, wi
 use crate::record::RequestRecord;
 use crate::scenario::{Scenario, ScenarioLibrary};
 use crate::server::{MockProvider, Mode};
+pub(super) use env::WORKSPACE_PLACEHOLDER;
 use env::{Env, pi_provider};
 
 mod approvals;

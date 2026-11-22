@@ -26,6 +26,7 @@ import type { McpSession } from '../mcp/session.js';
 import { createToolResultBudget, TOOL_RESULT_LIMITS } from '../harness/tool-results.js';
 import { toolOptions } from '../tools/index.js';
 import type { ToolProfile } from '../tools/profile.js';
+import { withoutPiPackages } from './pi-settings.js';
 import { onlyConservative, scheduled, shellsFor } from './session-helpers.js';
 import { PI_NATIVE_TOOLS, type RegistryOptions } from './session-types.js';
 
@@ -71,9 +72,10 @@ export async function createSessionRuntime(
   const factory: CreateAgentSessionRuntimeFactory = async (target) => {
     // In-memory overrides (no silent provider retries, the compaction threshold) are
     // applied by `harness.compaction` once the session exists and before every run.
-    const settingsManager = SettingsManager.create(target.cwd, target.agentDir, {
-      projectTrusted: false,
-    });
+    // Pi never installs the packages its own settings name (THR-03, `pi-settings.ts`).
+    const settingsManager = withoutPiPackages(
+      SettingsManager.create(target.cwd, target.agentDir, { projectTrusted: false }),
+    );
     const sessionId = target.sessionManager.getSessionId();
     const io = tools.kind === 'core' ? tools.ioFor(sessionId) : undefined;
     // Which command tools the session gets depends on the shells Core found (T17).
