@@ -162,108 +162,108 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         </button>
       )}
       {!reviewing && (
-      <>
-        {!network && (
-          <label>
-            {t('approval.feedback')}
-            <input
-              value={feedback}
-              onChange={(e) => {
-                setFeedback(e.target.value);
-              }}
-            />
-          </label>
-        )}
-        {allowPersistent && offered.length > 0 && (
-          <label>
-            {t('approval.rule')}
-            <textarea
-              value={rules}
-              rows={Math.min(Math.max(rules.split('\n').length, 1), 6)}
-              data-testid="approval-rules"
-              readOnly={request.kind === 'permissionExpansion' && request.tool === 'MemoryImport'}
-              onChange={(e) => {
-                setRules(e.target.value);
-              }}
-            />
-          </label>
-        )}
-        {allowPersistent && request.directory != null && (
-          <label>
-            {t('approval.directory')}
-            <input
-              value={directory}
-              onChange={(e) => {
-                setDirectory(e.target.value);
-              }}
-            />
-          </label>
-        )}
-        <div className="approval-actions">
-          <button
-            type="button"
-            className="button"
-            disabled={waiting}
-            onClick={() => {
-              answer('deny');
-            }}
-          >
-            {t('approval.deny')}
-          </button>
-          <button
-            type="button"
-            className="button"
-            disabled={waiting}
-            onClick={() => {
-              answer('allowOnce');
-            }}
-          >
-            {t('approval.once')}
-          </button>
-          {request.protectedPath !== true && (
+        <>
+          {!network && (
+            <label>
+              {t('approval.feedback')}
+              <input
+                value={feedback}
+                onChange={(e) => {
+                  setFeedback(e.target.value);
+                }}
+              />
+            </label>
+          )}
+          {allowPersistent && offered.length > 0 && (
+            <label>
+              {t('approval.rule')}
+              <textarea
+                value={rules}
+                rows={Math.min(Math.max(rules.split('\n').length, 1), 6)}
+                data-testid="approval-rules"
+                readOnly={request.kind === 'permissionExpansion' && request.tool === 'MemoryImport'}
+                onChange={(e) => {
+                  setRules(e.target.value);
+                }}
+              />
+            </label>
+          )}
+          {allowPersistent && request.directory != null && (
+            <label>
+              {t('approval.directory')}
+              <input
+                value={directory}
+                onChange={(e) => {
+                  setDirectory(e.target.value);
+                }}
+              />
+            </label>
+          )}
+          <div className="approval-actions">
             <button
               type="button"
               className="button"
               disabled={waiting}
               onClick={() => {
-                answer('allowSession');
+                answer('deny');
               }}
             >
-              {t('approval.session')}
+              {t('approval.deny')}
             </button>
-          )}
-          {allowPersistent && (
-            <button
-              type="button"
-              className="button"
-              disabled={
-                waiting ||
-                !canAlwaysAllow(false, long, expanded) ||
-                (offered.length > 0 && edited.length === 0) ||
-                (request.directory != null && !directory.trim())
-              }
-              onClick={() => {
-                answer('allowAlways');
-              }}
-            >
-              {t('approval.always')}
-            </button>
-          )}
-          {network && (
             <button
               type="button"
               className="button"
               disabled={waiting}
-              data-testid="approval-add-domain"
               onClick={() => {
-                answer('allowAlways');
+                answer('allowOnce');
               }}
             >
-              {t('approval.addToAllowlist')}
+              {t('approval.once')}
             </button>
-          )}
-        </div>
-      </>
+            {request.protectedPath !== true && (
+              <button
+                type="button"
+                className="button"
+                disabled={waiting}
+                onClick={() => {
+                  answer('allowSession');
+                }}
+              >
+                {t('approval.session')}
+              </button>
+            )}
+            {allowPersistent && (
+              <button
+                type="button"
+                className="button"
+                disabled={
+                  waiting ||
+                  !canAlwaysAllow(false, long, expanded) ||
+                  (offered.length > 0 && edited.length === 0) ||
+                  (request.directory != null && !directory.trim())
+                }
+                onClick={() => {
+                  answer('allowAlways');
+                }}
+              >
+                {t('approval.always')}
+              </button>
+            )}
+            {network && (
+              <button
+                type="button"
+                className="button"
+                disabled={waiting}
+                data-testid="approval-add-domain"
+                onClick={() => {
+                  answer('allowAlways');
+                }}
+              >
+                {t('approval.addToAllowlist')}
+              </button>
+            )}
+          </div>
+        </>
       )}
       {error && <p role="alert">{error}</p>}
     </section>

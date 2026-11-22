@@ -128,7 +128,9 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
           {t('permissions.auto.enableToggle')}
         </label>
         <p className="muted">
-          {t(auto.model === '' && !enabled ? 'permissions.auto.needModel' : 'permissions.auto.hint')}
+          {t(
+            auto.model === '' && !enabled ? 'permissions.auto.needModel' : 'permissions.auto.hint',
+          )}
         </p>
       </div>
       {AUTO_MODE_LISTS.map((list) => (

@@ -183,7 +183,11 @@ export type PreferenceChange =
   | { readonly key: 'permissions.enableAutoMode'; readonly value: boolean }
   /** T46: `null` removes the reviewer. */
   | { readonly key: 'autoMode.model'; readonly value: string | null }
-  | { readonly key: 'autoMode.list'; readonly list: AutoModeList; readonly value: readonly string[] }
+  | {
+      readonly key: 'autoMode.list';
+      readonly list: AutoModeList;
+      readonly value: readonly string[];
+    }
   /** `value` `null` restores the default key. */
   | { readonly key: 'keybinding'; readonly command: string; readonly value: string | null };
 

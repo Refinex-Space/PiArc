@@ -14,9 +14,7 @@ export function AutoReviewStatus({
 }) {
   const t = useT();
   if (state === undefined || state === 'ready') return null;
-  const text = t(
-    `autoReview.status.${reason ?? (state === 'paused' ? 'consecutive' : 'noModel')}`,
-  );
+  const text = t(`autoReview.status.${reason ?? (state === 'paused' ? 'consecutive' : 'noModel')}`);
   return (
     <span
       className="tag auto-review-warning"
