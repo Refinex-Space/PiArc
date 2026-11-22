@@ -123,7 +123,7 @@ async function piarc(root, baseUrl, form, runs) {
         await page.evaluate(
           `new Promise((resolve, reject) => {
             // The list is virtual: look for this reply's text, not for one more row.
-            const expected = /^Answer ${String(i)}\.(?!\d)/u;
+            const expected = /^Answer ${String(i)}\\.(?!\\d)/u;
             const started = performance.now();
             const observer = new MutationObserver(() => {
               const replies = document.querySelectorAll('[data-testid="agent-message"]');
