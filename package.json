@@ -22,6 +22,7 @@
     "test": "vitest run",
     "package:desktop": "node scripts/dev/package-desktop.mjs",
     "check:fuses": "node scripts/ci/check-fuses.mjs",
+    "audit:deps": "node scripts/ci/audit-deps.mjs",
     "bench:s1": "node scripts/bench/s1-transcript.mjs",
     "bench:t19": "playwright test --config apps/desktop/e2e/t19.bench.config.ts",
     "bench:t18": "node scripts/bench/t18-cold-start.mjs",

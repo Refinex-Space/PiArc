@@ -1,0 +1,23 @@
+# Exceptions of the dependency audit (`npm run audit:deps`, scripts/ci/audit-deps.mjs, T45):
+# advisories that stay for now, each with the reason, the impact on PiArc and the date by which
+# it is reviewed again. An exception past `review_by` fails the audit; one that matches no
+# advisory any more is reported for removal. High and critical npm advisories and every cargo
+# vulnerability fail without an exception; lower npm advisories are listed and may be recorded
+# here so their review is not forgotten.
+version: 1
+exceptions:
+  - ecosystem: npm
+    id: GHSA-g3hv-75wg-m249
+    package: minimatch
+    severity: moderate
+    reason: >-
+      Reaches the tree only through eslint 10.14 and typescript-eslint 8.72 (development tools,
+      not shipped). The fixed releases (eslint 10.15.0, typescript-eslint 8.73.0, both of
+      2026-11-16) bring the new strict rule no-unsafe-class-instance-assignment, which reports
+      nine false positives on Electron's BrowserWindow.fromWebContents results; upgrade once that
+      is settled (I06).
+    impact: >-
+      Denial of service through crafted glob patterns. Only the repository's own ESLint
+      configuration and file paths reach minimatch, at development time; nothing a user or a
+      model supplies.
+    review_by: '2027-01-31'

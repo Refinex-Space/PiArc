@@ -1,0 +1,439 @@
+# Threat map (T45, NFR-03): one entry per row of architecture section 10.1, its countermeasures
+# and the tests that assert them. Checked by `node scripts/ci/check-threats.mjs` (verify step 17),
+# which also generates docs/security/threat-coverage.md. Rules: docs/engineering/testing.md
+# section 16.
+#
+# - id: THR-<NN>, stable; title: the threat as written in the first column of section 10.1.
+# - countermeasures[].arch: one countermeasure of the row's third column, verbatim (the column is
+#   split at `；`); every one must be mapped. Entries without `arch` add a countermeasure the row
+#   does not name.
+# - type: automated (at least one test), process (reason; a checklist item as `process:` ID),
+#   accepted-risk (reason and refs), deferred (reason and the unfinished task that adds tests).
+# - tests: `cap:<CAP-ID>` (L2 scenarios covering the capability), `rust:<file>::<fn>`,
+#   `vitest:<file>::<title>`, `l4:<file>::<title>`, `ci:<script>[#<check>]`,
+#   `process:<file>#<marker>` (the file contains `<!-- <marker> -->`).
+# - Tests added for a threat carry its number: `it('THR-04 …')`, `fn thr04_…`, an L2 description
+#   starting with `THR-04.`; the check fails when such a test is not mapped to that threat.
+version: 1
+threats:
+  - id: THR-01
+    title: 提示注入导致破坏性操作
+    countermeasures:
+      - arch: 默认询问
+        measure: 手动模式下非只读的命令与改动先询问
+        type: automated
+        tests:
+          - rust:crates/piarc-policy/src/decision/tests.rs::mode_defaults
+          - cap:CAP-PERM-MODE-001
+          - cap:CAP-PERM-READONLY-001
+      - arch: deny 规则
+        measure: deny 规则优先于 allow 与 hook 的允许
+        type: automated
+        tests:
+          - rust:crates/piarc-policy/src/decision/tests.rs::deny_then_ask_then_allow_and_allow_never_beats_deny
+          - rust:crates/piarc-core/src/tool_io/hooks_tests.rs::a_hook_allow_leaves_deny_rules_ask_rules_and_plan_mode_in_force
+          - cap:CAP-PERM-RULE-001
+      - arch: Bash 子命令分析
+        measure: 复合命令逐个子命令裁决，分析不了的命令询问
+        type: automated
+        tests:
+          - rust:crates/piarc-policy/tests/bash_cases.rs::data_driven_cases
+          - rust:crates/piarc-policy/tests/bash_cases.rs::random_input_does_not_panic
+          - cap:CAP-PERM-BASH-001
+      - arch: 关键路径删除总是询问
+        measure: 删除主目录、工作区根等关键路径在任何模式下询问，包括跳过权限与沙箱自动批准
+        type: automated
+        tests:
+          - rust:crates/piarc-policy/src/decision/tests.rs::mandatory_asks_hold_in_every_mode
+          - rust:crates/piarc-core/src/tool_io/policy/tests/t23.rs::critical_deletions_ask_even_in_bypass_with_an_allow_rule
+          - cap:CAP-PERM-CRITICAL-001
+          - cap:CAP-SANDBOX-AUTO-001
+      - arch: 沙箱
+        measure: 命令沙箱限制写入范围与网络（macOS）
+        type: automated
+        tests:
+          - rust:crates/piarc-core/tests/sandbox.rs::writes_stay_inside_the_writable_directories
+          - rust:crates/piarc-core/tests/sandbox.rs::protected_paths_refuse_writes
+          - cap:CAP-SANDBOX-MACOS-001
+      - arch: 审批卡展示完整命令
+        measure: 审批卡显示完整命令
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/renderer/transcript/rows/rows.test.tsx::renders the five ledger card kinds, keeps approvals through a history reload, and removes invalidated requests
+          - l4:apps/desktop/e2e/t19-security.e2e.ts::renders reply, tool output, command output and file paths as inert text
+      - arch: WebFetch 的网页只作为辅助模型提问里的材料，提取结果是工具结果，不进 system prompt，网页内容不影响权限裁决（T29）
+        measure: 网页只作为辅助模型的材料，提取结果是工具结果
+        type: automated
+        tests:
+          - vitest:agent-host/src/harness/web-fetch.test.ts::fetches through Core and answers with the auxiliary model
+          - rust:crates/piarc-core/src/tool_io/policy/tests/t29.rs::a_fetch_needs_the_approved_url
+          - cap:CAP-TOOL-WEBFETCH-001
+
+  - id: THR-02
+    title: 恶意项目配置
+    countermeasures:
+      - arch: 项目信任闸门（10.2）：信任前不执行任何项目级可执行配置
+        measure: 信任前不运行项目 hooks、不连项目 MCP、不应用项目 allow 规则、不加载项目插件与 Pi 扩展
+        type: automated
+        tests:
+          - rust:crates/piarc-config/tests/settings.rs::project_executables_wait_for_trust_and_deny_rules_do_not
+          - rust:crates/piarc-core/src/tool_io/hooks_tests.rs::untrusted_project_hooks_wait_for_trust_while_user_hooks_run
+          - rust:crates/piarc-core/src/mcp/tests.rs::an_untrusted_projects_servers_wait_and_user_servers_are_ready
+          - rust:crates/piarc-core/src/plugins/tests.rs::an_untrusted_project_loads_no_project_package_and_trust_confirms_its_items
+          - rust:crates/piarc-testkit/tests/agent_host/trust.rs::project_extensions_load_only_while_core_trusts_the_project
+          - vitest:agent-host/src/harness/project-trust.test.ts::is untrusted when Core does not answer in time
+          - cap:CAP-TRUST-PROJECT-001
+          - cap:CAP-MCP-TRUST-001
+          - cap:CAP-PLUGIN-TRUST-001
+          - cap:CAP-CONFIG-COMPAT-001
+      - measure: 项目配置新增的可执行项在再次确认前不生效
+        type: automated
+        tests:
+          - rust:crates/piarc-core/tests/state.rs::a_trust_view_lists_the_items_and_what_is_new_since_the_decision
+          - rust:crates/piarc-config/tests/executables.rs::lists_every_category_with_its_source_and_detects_new_items
+          - l4:apps/desktop/e2e/t18-trust.e2e.ts::the trust dialog lists the items; the decision decides what the model gets
+      - measure: 项目文件选不了跳过权限与 auto，项目的沙箱设置只能收紧
+        type: automated
+        tests:
+          - rust:crates/piarc-config/tests/claude.rs::project_files_cannot_select_bypass_or_auto_and_the_diagnostics_say_why
+          - rust:crates/piarc-core/src/tool_io/policy/tests/t23.rs::bypass_needs_the_user_setting_and_project_modes_are_ignored
+          - rust:crates/piarc-config/src/sandbox.rs::a_project_cannot_turn_the_sandbox_off
+          - cap:CAP-SANDBOX-PROJECT-001
+      - measure: 信任查询任何失败都按不信任
+        type: automated
+        tests:
+          - rust:crates/piarc-core/tests/state.rs::trust_get_answers_untrusted_on_every_failure
+          - vitest:agent-host/src/harness/project-trust.test.ts::is untrusted when the connection to Core is gone
+
+  - id: THR-03
+    title: 恶意插件 / MCP server / Pi 包
+    countermeasures:
+      - arch: 安装前展示来源与能力
+        measure: 启用前的原生确认列出来源与每个可执行项
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/core/plugins-ipc.test.ts::lists the source and every executable item, with the extension note
+          - l4:apps/desktop/e2e/t40-plugins.e2e.ts::packages install off, turn on only after the native confirmation, and list what is unsupported
+          - cap:CAP-PLUGIN-001
+      - arch: 启用需确认
+        measure: 启用与更新带来的新增项需确认；npm 只经内置 npm 且不运行安装脚本
+        type: automated
+        tests:
+          - rust:crates/piarc-core/src/plugins/tests.rs::npm_installs_run_the_bundled_npm_without_scripts
+          - rust:crates/piarc-core/src/plugins/tests.rs::a_git_update_leaves_new_items_off_until_confirmed
+          - vitest:apps/desktop/src/main/core/plugins-ipc.test.ts::answers planned confirmations and records them
+          - cap:CAP-PLUGIN-HOOKS-001
+      - arch: Agent Host 的 Seatbelt 配置限制进程级写入范围
+        measure: Agent Host 及其子进程（MCP server、扩展、npm）只能写工作区与自己的目录（macOS）
+        type: automated
+        tests:
+          - rust:crates/piarc-core/tests/agent_host_profile.rs::the_agent_host_writes_only_its_places
+          - rust:crates/piarc-testkit/tests/sessions/sandbox.rs::the_agent_host_profile_keeps_extensions_and_mcp_servers_in_their_places
+      - measure: Windows 上 Agent Host 没有进程级隔离
+        type: accepted-risk
+        reason: Windows 到 Beta 没有等价的 OS 沙箱，Agent Host 只用 Job Object 管理进程树，没有第二道防线；设置页、环境栏与配置诊断标明沙箱不生效
+        refs: [ADR-0057, I180]
+        tests:
+          - cap:CAP-SANDBOX-WINDOWS-001
+      - measure: Pi 自己设置里的包清单不由 Agent Host 安装或加载
+        type: automated
+        tests:
+          - vitest:agent-host/src/runtime/pi-settings.test.ts::THR-03 hides every package source from Pi, so nothing installs, runs or loads
+          - cap:CAP-SEC-PI-PACKAGES-001
+
+  - id: THR-04
+    title: 凭据泄露
+    countermeasures:
+      - arch: 加密保险箱，主密钥只在系统凭据库
+        measure: 凭据只在 AES-256-GCM 保险箱，主密钥在系统凭据库，磁盘上没有明文
+        type: automated
+        tests:
+          - rust:crates/piarc-secrets/tests/vault.rs::round_trips_entries_through_the_encrypted_file
+          - rust:crates/piarc-secrets/tests/vault.rs::any_modified_byte_fails_with_an_integrity_error
+          - rust:crates/piarc-testkit/tests/sessions/provider_settings.rs::provider_settings_crud_keeps_credentials_in_the_vault
+          - rust:crates/piarc-testkit/tests/sessions/login.rs::authorization_code_sign_in_reaches_the_vault_and_signs_out
+          - rust:crates/piarc-core/src/tool_io/policy/tests/t38.rs::agent_hosts_cannot_reach_search_keys
+          - cap:CAP-PROVIDER-OAUTH-001
+      - arch: 不经环境变量传递
+        measure: Agent Host、命令与 MCP 子进程的环境没有凭据，只透传白名单变量
+        type: automated
+        tests:
+          - rust:crates/piarc-host/src/config.rs::passes_only_named_variables_and_the_fixed_ones
+          - rust:crates/piarc-core/tests/exec_commands.rs::the_environment_has_no_internal_variables
+          - rust:crates/piarc-testkit/tests/agent_host/credentials.rs::login_and_one_refresh_reach_the_vault_and_every_session
+          - vitest:agent-host/src/runtime/credentials.test.ts::reports an unavailable vault and never falls back to the environment
+          - cap:CAP-EXEC-ENV-001
+      - arch: 日志与诊断包自动脱敏
+        measure: 服务商回显的密钥在进入会话文件前替换
+        type: automated
+        tests:
+          - vitest:agent-host/src/providers/policy.test.ts::redacts the provider key echoed by an HTTP error before the Pi session can persist it
+
+  - id: THR-05
+    title: 沙箱逃逸
+    countermeasures:
+      - arch: 沙箱默认无直连网络
+        measure: 沙箱内只能经会话代理联网，白名单外的主机询问
+        type: automated
+        tests:
+          - rust:crates/piarc-core/tests/sandbox.rs::connections_around_the_proxy_fail
+          - rust:crates/piarc-sandbox/tests/proxy.rs::connect_outside_the_allowlist_is_refused_with_a_reason
+          - rust:crates/piarc-sandbox/tests/proxy.rs::names_resolving_to_loopback_or_metadata_are_refused
+          - rust:crates/piarc-testkit/tests/sessions/sandbox.rs::hosts_outside_the_allowlist_ask_and_a_changed_allowlist_applies_to_the_next_command
+      - arch: 沙箱外重试必须审批
+        measure: 沙箱外重试在任何模式下询问，只能允许一次
+        type: automated
+        tests:
+          - rust:crates/piarc-policy/src/decision/tests.rs::an_unsandboxed_command_asks_in_every_mode
+          - cap:CAP-SANDBOX-RETRY-001
+      - measure: agent 启动进程的每条路径都经同一沙箱包装
+        type: automated
+        tests:
+          - cap:CAP-SANDBOX-PATHS-001
+      - measure: Windows 上没有命令沙箱
+        type: accepted-risk
+        reason: Windows 到 Beta 没有 OS 级沙箱（需求 D7），经批准的命令可以写工作区外与外传数据；沙箱开关在 Windows 上不可用且说明原因
+        refs: [ADR-0057, I180]
+        tests:
+          - cap:CAP-SANDBOX-WINDOWS-001
+
+  - id: THR-06
+    title: 审批疲劳与误点
+    countermeasures:
+      - arch: 400 ms 防误触
+        measure: 新卡片 400 ms 内的按键不作答
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/renderer/transcript/rows/approval-keys.test.ts::arms the first visible card at 400 ms and ignores repeats
+          - l4:apps/desktop/e2e/t43-approval-focus.e2e.ts::a new card takes focus on its container, waits for a composition, and guards Enter for 400 ms
+      - arch: 长参数阅读闸门
+        measure: 折叠的长参数展开之前不能"总是允许"
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/renderer/transcript/rows/approval-keys.test.ts::gates persistent rules on protected paths and collapsed parameters
+          - l4:apps/desktop/e2e/t20-approvals.e2e.ts::guards approval shortcuts with the actual composer, focused card and visible order
+      - arch: '"总是允许"规则可预览、可编辑、可撤销'
+        measure: '"总是允许"逐条可编辑，经原生确认保存，设置页可删除'
+        type: automated
+        tests:
+          - l4:apps/desktop/e2e/t23-permissions.e2e.ts::always allow saves one edited rule per subcommand; bypass needs settings and a native confirmation
+          - l4:apps/desktop/e2e/t23-permissions.e2e.ts::the Permissions page edits rules by source behind a native confirmation and filters the audit
+          - rust:crates/piarc-core/src/tool_io/policy/tests.rs::permanent_answers_must_include_every_value_shown_for_confirmation
+          - cap:CAP-PERM-APPROVAL-001
+      - arch: 审计可查
+        measure: 审批结果与规则命中写入审计，设置页可筛选
+        type: automated
+        tests:
+          - rust:crates/piarc-core/src/tool_io/policy/tests.rs::concurrent_answers_apply_once_and_each_decision_is_audited_by_session
+          - rust:crates/piarc-core/src/tool_io/policy/tests/t23.rs::settings_page_lists_edits_and_audits_rules
+          - cap:CAP-PERM-AUDIT-001
+      - measure: 系统通知对高风险请求只给"打开"
+        type: automated
+        tests:
+          - rust:crates/piarc-core/src/tool_io/policy/tests/t42.rs::long_critical_and_protected_requests_only_open_the_card
+          - vitest:apps/desktop/src/main/platform/attention.test.ts::only opens a request a notification may not allow
+
+  - id: THR-07
+    title: 多窗口审批错乱
+    countermeasures:
+      - arch: 审批账本的 revision 与 connectionEpoch 校验
+        measure: 同一请求只采用第一个有效答复，过期的 revision 与连接代次被拒
+        type: automated
+        tests:
+          - rust:crates/piarc-core/src/tool_io/policy/tests.rs::concurrent_answers_apply_once_and_each_decision_is_audited_by_session
+          - rust:crates/piarc-core/src/tool_io/policy/tests.rs::disconnect_expires_pending_cards_and_records_refusal_for_recovery
+          - rust:crates/piarc-testkit/tests/sessions/permissions.rs::only_one_answer_applies_and_the_mode_entry_survives_core_restart
+          - l4:apps/desktop/e2e/t35-windows.e2e.ts::one approval in two windows takes the first answer and leaves both
+          - l4:apps/desktop/e2e/t42-notify.e2e.ts::approval notifications answer through the ledger
+
+  - id: THR-08
+    title: 供应链
+    countermeasures:
+      - arch: 精确版本锁定
+        measure: npm 依赖精确版本；Cargo 依赖只在工作区声明且精确版本
+        type: automated
+        tests:
+          - vitest:scripts/ci/supply-chain.test.mjs::THR-08 every npm dependency is pinned to an exact version
+          - vitest:scripts/ci/supply-chain.test.mjs::THR-08 Cargo dependencies are declared once in the workspace with exact versions
+      - arch: '`npm ci --ignore-scripts`'
+        measure: CI 安装依赖不运行安装脚本
+        type: automated
+        tests:
+          - vitest:scripts/ci/supply-chain.test.mjs::THR-08 every CI install of the dependencies runs without install scripts
+      - arch: '`cargo-deny`、`cargo-audit`、`npm audit`'
+        measure: 安全公告、许可证与来源检查；高危与严重问题没有现行例外即失败
+        type: automated
+        tests:
+          - vitest:scripts/lib/audit.test.mjs::THR-08 fails on high and critical npm advisories and every cargo vulnerability without a current exception
+          - vitest:scripts/lib/audit.test.mjs::THR-08 an exception past its review date no longer covers the advisory and fails
+          - vitest:scripts/lib/audit.test.mjs::THR-08 checks the licenses of the npm packages that ship, not the development tools
+          - ci:scripts/ci/audit-deps.mjs
+          - ci:scripts/dev/verify.mjs#cargo-deny
+      - arch: 新增依赖需评审
+        measure: 新增依赖在 PR 中评审
+        type: process
+        reason: 是否引入一个依赖要人判断（用途、替代方案、维护状况、许可证、体积）；PR 模板的检查项要求写明，测试保证模板里有这一项
+        tests:
+          - process:.github/pull_request_template.md#dependency-review
+          - vitest:scripts/ci/supply-chain.test.mjs::THR-08 the pull request template asks for a review of new dependencies and their sources
+
+  - id: THR-09
+    title: 更新通道被劫持
+    countermeasures:
+      - arch: 没有平台签名可依赖（ADR-0018）：HTTPS
+        measure: 更新只经 HTTPS 下载
+        type: deferred
+        task: T50
+        reason: 更新流程由 T50 实现，届时补测试并更新本条
+      - arch: 每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新
+        measure: 发布清单签名与文件哈希校验，篡改即拒绝
+        type: automated
+        tests:
+          - rust:crates/piarc-core/tests/release.rs::a_signed_manifest_and_its_files_verify
+          - rust:crates/piarc-core/tests/release.rs::changed_manifest_content_is_refused
+          - rust:crates/piarc-core/tests/release.rs::a_file_whose_hash_differs_from_the_manifest_is_refused
+          - rust:crates/piarc-core/tests/release.rs::a_manifest_signed_with_another_key_is_refused
+          - vitest:scripts/release/release-manifest.test.mjs::rejects changed content, a changed trusted comment and another key
+      - arch: 私钥只在需要维护者审批的发布环境中使用
+        measure: 清单签名私钥只在受保护的发布环境
+        type: deferred
+        task: T50
+        reason: 发布流水线与受保护环境由 T50 建立
+      - arch: 不防发布账号本身被攻破
+        measure: 发布账号被攻破
+        type: accepted-risk
+        reason: 清单签名只防下载渠道与镜像被篡改；能以发布账号身份签名与发布的攻击者不在防护范围内
+        refs: [ADR-0018]
+
+  - id: THR-10
+    title: 应用文件被篡改
+    countermeasures:
+      - arch: app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏
+        measure: ASAR 完整性校验与 OnlyLoadAppFromAsar（发布构建的 fuse）
+        type: automated
+        tests:
+          - vitest:scripts/ci/check-fuses.test.mjs::release settings follow ADR-0018 rule 1
+          - vitest:scripts/ci/check-fuses.test.mjs::names a fuse whose state differs
+          - ci:scripts/ci/check-fuses.mjs
+      - arch: 对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）
+        measure: 本机攻击者篡改安装目录
+        type: accepted-risk
+        reason: 没有平台签名时完整性信息本身不受保护；能写安装目录的本机攻击者已能以用户身份运行任意程序
+        refs: [ADR-0018]
+      - arch: 安装位置使用系统默认目录，依靠文件系统权限
+        measure: 安装在系统默认目录
+        type: process
+        reason: 安装位置由安装器决定（macOS 拖入"应用程序"，Windows 由 Velopack 装在用户目录），首次运行指引说明
+        refs: [ADR-0018]
+
+  - id: THR-11
+    title: 渲染进程注入（XSS）
+    countermeasures:
+      - arch: 渲染进程 sandbox + contextIsolation、无 Node
+        measure: 所有窗口 sandbox、contextIsolation，页面没有 Node 全局
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/web-preferences.test.ts::fixes the security-relevant preferences
+          - l4:apps/desktop/e2e/preload.e2e.ts::require, process, module and Buffer are not defined in the page
+          - l4:apps/desktop/e2e/preload.e2e.ts::the window renderer runs in the OS-level sandbox
+      - arch: 严格 CSP
+        measure: 主进程下发的 CSP 不允许内联脚本、eval 与外部资源
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/security/csp.test.ts::allows no inline code or eval
+          - l4:apps/desktop/e2e/csp.e2e.ts::does not run an injected inline script
+          - l4:apps/desktop/e2e/csp.e2e.ts::refuses eval and the Function constructor
+          - l4:apps/desktop/e2e/csp.e2e.ts::blocks fetch to an external address
+      - arch: Markdown 不走 `innerHTML`，原始 HTML 当文本
+        measure: 模型输出的原始 HTML 作为文本，链接只保留安全协议
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::turns every XSS payload into text or a link without a dangerous target
+          - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::drops every other target, including encoded ones
+      - arch: preload 白名单 + 主进程校验来源
+        measure: window.piarc 只有白名单函数，主进程按 senderFrame 的 origin 拒绝外来请求
+        type: automated
+        tests:
+          - l4:apps/desktop/e2e/preload.e2e.ts::window.piarc exposes exactly the allowlisted functions
+          - l4:apps/desktop/e2e/preload.e2e.ts::IPC from another origin is rejected
+          - l4:apps/desktop/e2e/preload.e2e.ts::IPC from an origin that only starts with the app origin is rejected
+          - vitest:apps/desktop/src/main/ipc/sender.test.ts::rejects origins that only start with the app origin
+      - arch: 有副作用的命令仍经 Core 的权限裁决
+        measure: 终端写入要求真实输入；"总是允许"与 allow 规则经主进程原生确认
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/core/terminal-ipc.test.ts::refuses writes without recent real input; pointer moves need none
+          - l4:apps/desktop/e2e/t20-approvals.e2e.ts::edits and confirms an exact rule, declines protected writes and restores the chosen mode
+      - arch: XSS 载荷回归测试（第 10.3 节）
+        measure: XSS 载荷集在渲染面上以文本呈现
+        type: automated
+        tests:
+          - l4:apps/desktop/e2e/transcript-security.e2e.ts::renders every payload of a finished message as inert text
+          - l4:apps/desktop/e2e/transcript-security.e2e.ts::renders the payloads inertly while they stream
+          - l4:apps/desktop/e2e/t19-security.e2e.ts::renders reply, tool output, command output and file paths as inert text
+
+  - id: THR-12
+    title: 应用被当作通用运行时滥用
+    countermeasures:
+      - arch: 发布构建关闭对应 fuses（ADR-0018）
+        measure: 发布构建关闭 RunAsNode、NodeOptions、NodeCliInspect
+        type: automated
+        tests:
+          - vitest:scripts/ci/check-fuses.test.mjs::release settings follow ADR-0018 rule 1
+          - vitest:scripts/ci/check-fuses.test.mjs::development settings differ only in EnableNodeCliInspectArguments
+          - ci:scripts/ci/check-fuses.mjs
+      - arch: Agent Host 用独立的 node，不依赖这些开关
+        measure: Agent Host 用内置 node 启动，命令环境去掉 Electron 与 Node 的内部变量
+        type: automated
+        tests:
+          - rust:crates/piarc-core/src/agent_host.rs::host_config_puts_the_bundled_node_first_on_path
+          - rust:crates/piarc-core/tests/exec_commands.rs::the_environment_has_no_internal_variables
+
+  - id: THR-13
+    title: 恶意链接与导航
+    countermeasures:
+      - arch: 窗口禁止导航到应用自身协议以外的地址
+        measure: 导航与重定向只允许应用自身的 origin
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/security/navigation.test.ts::blocks other origins, including look-alike prefixes
+          - l4:apps/desktop/e2e/navigation.e2e.ts::blocks changing location to an external address
+          - l4:apps/desktop/e2e/navigation.e2e.ts::blocks a redirect from an app page to an external address
+      - arch: 新窗口一律拒绝
+        measure: window.open 与 target=_blank 被拒
+        type: automated
+        tests:
+          - l4:apps/desktop/e2e/external-links.e2e.ts::denies window.open and target=_blank links
+      - arch: 外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:`
+        measure: 外链经主进程原生确认，只放行 https、http、mailto 且不带用户信息
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/external-links.test.ts::rejects every other scheme
+          - vitest:apps/desktop/src/main/external-links.test.ts::rejects URLs with user information, which hide the real host
+          - 'l4:apps/desktop/e2e/external-links.e2e.ts::rejects javascript:, file: and other schemes without asking'
+          - l4:apps/desktop/e2e/t34-terminal.e2e.ts::OSC 8 links and plain URLs show their address and open only when confirmed
+          - l4:apps/desktop/e2e/transcript-security.e2e.ts::opens links only through the main process confirmation
+      - measure: piarc:// 链接只做定位，不带可执行内容
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/launch.test.ts::carry nothing that runs
+
+  - id: THR-14
+    title: 同一用户的进程向 PiArc 注入代码
+    countermeasures:
+      - arch: macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）
+        measure: 应用开启 hardened runtime，entitlements 只有两项
+        type: automated
+        tests:
+          - ci:scripts/ci/check-app-layout.mjs
+          - vitest:scripts/ci/check-app-layout.test.mjs::reads an ad-hoc signature with the hardened runtime
+      - arch: Core 以最小环境启动内置 node（不传 `DYLD_*`）
+        measure: Agent Host 只收到白名单环境变量
+        type: automated
+        tests:
+          - rust:crates/piarc-host/src/config.rs::passes_only_named_variables_and_the_fixed_ones
+      - arch: 内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`，同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39）
+        measure: 同一用户的进程调试附加 Agent Host
+        type: accepted-risk
+        reason: 去掉 get-task-allow 要对 node 重签，违背 ADR-0018 保留官方签名的决定；能调试附加的进程已以用户身份运行
+        refs: [ADR-0018, I39]

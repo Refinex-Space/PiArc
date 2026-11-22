@@ -1485,9 +1485,9 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 审批疲劳与误点 | 连续弹窗导致误允许 | 400 ms 防误触；长参数阅读闸门；"总是允许"规则可预览、可编辑、可撤销；审计可查 |
 | 多窗口审批错乱 | 两个窗口回答同一请求或过期请求 | 审批账本的 revision 与 connectionEpoch 校验 |
 | 供应链 | npm / crates 依赖被投毒 | 精确版本锁定；`npm ci --ignore-scripts`；`cargo-deny`、`cargo-audit`、`npm audit`；新增依赖需评审 |
-| 更新通道被劫持 | 恶意更新包 | 没有平台签名可依赖（ADR-0018）：HTTPS；每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新；私钥只在需要维护者审批的发布环境中使用。不防发布账号本身被攻破 |
-| 应用文件被篡改 | 替换应用内的 asar、bundle 或 node | app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏。对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）；安装位置使用系统默认目录，依靠文件系统权限 |
-| 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）。内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`：Core 以最小环境启动它（不传 `DYLD_*`），但同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
+| 更新通道被劫持 | 恶意更新包 | 没有平台签名可依赖（ADR-0018）：HTTPS；每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新；私钥只在需要维护者审批的发布环境中使用；不防发布账号本身被攻破 |
+| 应用文件被篡改 | 替换应用内的 asar、bundle 或 node | app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏；对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）；安装位置使用系统默认目录，依靠文件系统权限 |
+| 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）；Core 以最小环境启动内置 node（不传 `DYLD_*`）；内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`，同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
 | 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关 |
 | 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 窗口禁止导航到应用自身协议以外的地址；新窗口一律拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |

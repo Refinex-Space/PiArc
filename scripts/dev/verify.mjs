@@ -86,6 +86,21 @@ export const STEPS = [
   { name: 'design tokens', command: nodeScript('scripts/ci/check-design-tokens.mjs') },
   // Same keys in both catalogs, valid ICU with the same placeholders, no hard-coded text (T43).
   { name: 'i18n', command: nodeScript('scripts/ci/check-i18n.mjs') },
+  // Every row of architecture section 10.1 mapped to existing tests, and threat-coverage.md
+  // matches the map and step 14's L2 report (T45).
+  {
+    name: 'threat map',
+    command: () => ({
+      cmd: process.execPath,
+      args: [
+        path.join(repoRoot, 'scripts', 'ci', 'check-threats.mjs'),
+        '--results',
+        path.join(repoRoot, 'target', 'l2', 'results.json'),
+        '--doc',
+        'check',
+      ],
+    }),
+  },
 ];
 
 /**

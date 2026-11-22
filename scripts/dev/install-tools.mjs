@@ -11,10 +11,12 @@ import { capture, isMain, repoRoot, run } from '../lib/repo.mjs';
  * grep and find tools in the behavior comparison test (T07, `crates/piarc-testkit/tests/
  * agent_host/parity.rs`); PiArc's own Grep and Glob run in Core and need neither. bindgen-cli
  * regenerates the libghostty-vt bindings (`scripts/dev/gen-ghostty-bindings.mjs`, T10); it
- * loads libclang at run time (Xcode command line tools on macOS).
+ * loads libclang at run time (Xcode command line tools on macOS). cargo-audit checks Cargo.lock
+ * against the RustSec database in the dependency audit (`npm run audit:deps`, T45).
  */
 export const TOOLS = [
   { crate: 'cargo-deny', version: '0.20.2', bin: 'cargo-deny' },
+  { crate: 'cargo-audit', version: '0.23.0', bin: 'cargo-audit' },
   { crate: 'ripgrep', version: '15.2.0', bin: 'rg' },
   { crate: 'fd-find', version: '10.5.0', bin: 'fd' },
   { crate: 'bindgen-cli', version: '0.73.2', bin: 'bindgen' },

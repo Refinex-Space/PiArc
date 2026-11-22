@@ -54,7 +54,7 @@ jobs:
           path: .tools/cache/ghostty-vt
           key: ghostty-vt-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
 
-      - name: Install pinned tools (cargo-deny, ripgrep, fd, bindgen-cli)
+      - name: Install pinned tools (cargo-deny, cargo-audit, ripgrep, fd, bindgen-cli)
         run: node scripts/dev/install-tools.mjs
 
       - name: Install npm dependencies
