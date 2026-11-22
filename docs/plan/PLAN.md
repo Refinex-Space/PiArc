@@ -173,7 +173,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
-| T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 未开始 | — |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,15 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-**T43 无障碍与本地化**（开工 2026-11-21；基线 `npm run verify -- --baseline` 通过，复用 868065b 的全量结果；依赖 T42 为"部分完成"，遗留的 A06 通知截图与 A07 Windows CI 不影响本任务；origin 停在 e0c41ce，没有新的 Windows CI 结果可关闭 `blocked` 项）
-
-- [x] 1 axe 自动化：状态清单入库、Playwright 逐条亮 / 暗检查、修复全部违规、页面注册表与清单的覆盖检查
-- [x] 2 读屏：transcript 行的可访问名称（i18n）、流式节流播报（常量集中）、审批卡焦点与播报（输入法推迟、400 ms）
-- [x] 3 键盘与系统偏好：全键盘流程、焦点顺序与焦点环、对话框焦点受限与归还、终端保留全局快捷键；reduced-motion、contrast more、forced-colors
-- [x] 4 `docs/engineering/accessibility.md`：规则摘要、状态清单维护、读屏核对清单（VoiceOver 一列）
-- [x] 5 本地化：`scripts/ci/check-i18n.mjs` 并入 verify（键集合、引用、ICU 与占位符、硬编码字符串）、`Intl` 格式化、中英文截图；I186 代码高亮跟随应用主题
-- [ ] 验收 A01–A11；收尾（apps/desktop AGENTS.md、coding-standards 复用表、testing.md）
 
 ## 登记事项
 
@@ -1064,3 +1055,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 决策：ADR-0060（补充）；架构 2.53；没有新增 IPC 命令（`window.piarc` 仍为 115 个函数），应用状态加 `notificationsSupported`、应用事件加 `approvalNotice`。notebook 不解析再序列化（避免整文件 diff）；通知只放行能在通知里读完的请求（短单行命令、增删不超过 12 行的改动）；评论不进 Core
 - 登记：新增 I186（代码高亮配色跟随系统而非应用主题，T43）、I187（通知横幅截图与 Windows Toast 实机核对，W4）
 - 下一项：macOS 上的 T43（无障碍与本地化）。A06 在用户给终端"屏幕录制"权限后补拍，A07 在用户推送后由下一个任务的开工检查按 Windows CI 关闭。本地提交，未推送。
+
+### 2026-11-21 T43 部分完成（提交 00b452b）
+
+- 交付：状态清单 `apps/desktop/e2e/a11y/states.ts`（57 条）与 `t43-a11y` 旅程（亮暗 axe 114 次零违规）、覆盖检查 `e2e/a11y/states.test.ts`；transcript 由 `log` 改为 `feed`，行名称 `transcript/row-label.ts`（`src/shared/row-kinds.ts`）；节流 live region（`LiveRegion.tsx`、`live-announcer.ts`、`LIVE_ANNOUNCE` 5 s）；审批卡焦点与名称（`approvals/use-approval-focus.ts`、`approval-label.ts`，合成后移动、400 ms 防误触）；键盘：侧栏分隔条进 `nav`、右栏与停靠区有名称且分隔条可用方向键、关掉含焦点的停靠面板时焦点回输入框、`Dialog` 的 `focusKey`（模型切换预览丢焦点）、composer 与附件按钮的焦点环、审批快捷键不吞其他文本框的按键；颜色：侧栏 90% 叠层、GitHub 高对比度代码主题并跟随应用主题（I186）、diff 行号 24 px、强制颜色下主按钮用系统按钮色与状态点形状、输出风格列表去掉嵌套交互、标题层级；本地化：`scripts/ci/check-i18n.mjs`（verify 第 16 步）、`format.number`/`format.dateTime`、外链确认与 Markdown 标签走目录、中文复数 `one` 改 `=1`、设置导航行随长名称增高；`docs/engineering/accessibility.md`（规则、检查、读屏清单）；L4 `t43-a11y`、`t43-keyboard`、`t43-approval-focus`、`t43-locales`；T29 的 OAuth 辅助函数移到 `e2e/oauth.ts`
+- 验收：10 项通过，A10（VoiceOver 实际操作）blocked，看板为"部分完成"。`npm run verify` 16/16（00b452b，Vitest 1,696 passed，L2 204 passed 3 个按平台跳过）；开发打包后全量 dev L4 160 passed，`external-links` 两例因确认框改为跟随应用语言而按旧英文断言失败、已改为中英文都接受并通过，`t18-review` 因终端没有"屏幕录制"权限 `screencapture` 失败（已知环境限制，`apps/desktop/AGENTS.md`）
+- 决策：ADR-0061（补充）；架构 2.54；verify 增为 16 步；`window.piarc` 函数数不变（没有新增 IPC）
+- 登记：I186 已落地；新增 I188（VoiceOver 实际核对待用户，Narrator 与 NVDA 由 W3 按同一清单）
+- 下一项：macOS 上的 T44（性能预算进 CI 与长跑测试）。A10 在用户按 `docs/engineering/accessibility.md` 第 3 节操作 VoiceOver 后补结论。本地提交，未推送。

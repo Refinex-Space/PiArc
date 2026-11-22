@@ -4213,78 +4213,78 @@
       "id": "T43-A01",
       "task": "T43",
       "description": "axe 在状态清单的全部条目上零违规，亮色与暗色各跑一遍；清单覆盖每个设置页、每种 transcript 行类型、四类审批卡与交付物 1 列出的对话框和面板。验证：Playwright + axe 报告（`tmp/evidence/T43/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43-a11y --project dev：9 passed，状态清单 57 条（每个设置页 11、transcript 行类型 19、命令 / 文件改动 / 权限扩展 / 提问四类审批卡与计划卡、9 个面板与卡片、8 个对话框（信任、命令面板、快捷键、输出风格、模型切换代价、回退、登录、终端文本）、空状态与错误卡等）在亮色与暗色下各跑 axe（WCAG 2.0–2.2 A/AA + best-practice）共 114 次零违规，报告 tmp/evidence/T43/axe/*.json；最后一个用例核对本次全部到达。修复靠改实现（landmark、标签、对比度、焦点、目标尺寸、嵌套交互），未禁用规则。插件启用确认是主进程原生对话框，axe 无法检查，界面一侧（已安装插件的 Skills 与插件页）在清单中"
     },
     {
       "id": "T43-A02",
       "task": "T43",
       "description": "新增页面未登记到状态清单时覆盖检查失败。验证：临时新增一个未登记页面时的失败输出，撤销后通过。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run apps/desktop/e2e/a11y`：临时新增未登记的设置页 `registerSettingsPage({ id: 'probe' … })` 时失败（`expected { settingsPages: [ 'probe' ], … }`），删除后 2 passed；输出 tmp/evidence/T43/a02-unlisted-page.txt"
     },
     {
       "id": "T43-A03",
       "task": "T43",
       "description": "transcript 每种行类型都有可访问名称，中英文各自正确。验证：组件测试断言可访问名称。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run apps/desktop/src/renderer/transcript/row-label.test.tsx`：4 passed，19 种行类型在英文与中文下的可访问名称逐条断言（中文暴露并修复了 `one` 复数分支永不匹配的缺陷），列表行渲染为带该名称的 `article`"
     },
     {
       "id": "T43-A04",
       "task": "T43",
       "description": "100 token/s 流式输出期间 live region 按节流间隔更新、不逐字更新，回合结束时播报一次结果。验证：测试（假时钟统计更新次数）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npx vitest run apps/desktop/src/renderer/transcript/live-announcer.test.ts apps/desktop/src/renderer/transcript/LiveRegion.test.tsx`：假时钟下 100 token/s 流式 20 s，live region 按 5 s 间隔更新（0、5、10、15、20 s 共 5 次，不逐 token），回合结束时结果只播报一次；相同文本不重复，结果到来时丢弃待发进展"
     },
     {
       "id": "T43-A05",
       "task": "T43",
       "description": "审批卡出现时焦点移到卡片容器并播报；输入法合成期间推迟移动焦点；卡片出现后 400 ms 内键盘激活无效。验证：Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43-approval-focus --project dev：卡片出现时焦点在卡片容器，名称为\"Approval needed. Run command? env echo hi\"；400 ms 内对\"Allow once\"按 Enter 与 Space 不答复，之后 Enter 答复（requestId one、allowOnce）；CDP 输入法合成期间新卡出现时焦点留在 composer，合成提交后移到卡片"
     },
     {
       "id": "T43-A06",
       "task": "T43",
       "description": "只用键盘完成新建会话、发送消息、处理四类审批卡、打开 Changes 并发表评论、修改一项设置、进入与离开终端面板；焦点顺序符合设计，焦点环始终可见，对话框关闭后焦点回到触发元素。验证：Playwright 键盘流程用例与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43-keyboard --project dev：只用键盘完成 Mod+N 新建会话与发送、信任对话框、命令 / 文件改动 / 权限扩展三类卡（Mod+Enter）与提问表单（Tab、Space、Mod+Enter）、Mod+Shift+D 打开 Changes 并经行号按钮写评论、Mod+, 在设置窗口改主题、Ctrl+` 进入终端再离开（焦点回到输入框）；80 次 Tab 的区域顺序为侧栏 → 主区 → 右栏 → 停靠区且每个停靠点都有焦点环；Mod+K 面板 Esc 后焦点回到 composer。截图 tmp/evidence/T43/keyboard-focus-ring.png、keyboard-settings.png"
     },
     {
       "id": "T43-A07",
       "task": "T43",
       "description": "`prefers-reduced-motion` 与应用内开关关闭动效；`prefers-contrast: more` 使用高对比度令牌；`forced-colors: active` 下使用系统颜色，状态信息不只靠颜色表达。验证：Playwright 媒体模拟用例与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43-keyboard --project dev 的 \"reduced motion, more contrast and forced colors\"：系统 reducedMotion 与应用内开关都使 data-reduce-motion=true、过渡时长 0s；contrast more 使 data-color-mode=lightHighContrast 且令牌取高对比度值；forcedColors active 时令牌为 CanvasText，工具状态点保留形状（forced-color-adjust none）且有文字，主按钮用 ButtonFace/ButtonText。截图 tmp/evidence/T43/contrast-more.png、forced-colors.png"
     },
     {
       "id": "T43-A08",
       "task": "T43",
       "description": "两种语言键集合不一致、代码引用不存在的键、占位符不一致或出现硬编码的用户可见字符串时 verify 失败。验证：临时删除一个英文键、临时写入一个硬编码字符串时的失败输出，撤销后通过。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "临时删除英文键 `link.open` 并写入硬编码 `title=\"Blocked link\"` 时 `node scripts/ci/check-i18n.mjs`（verify 第 16 步）报 3 个问题并 exit=1（zh-CN 键不在 en、硬编码 title、`t('link.open')` 不存在），恢复后 exit=0；输出 tmp/evidence/T43/a08-i18n-failure.txt。占位符不一致、复数类别与无 locale 格式化由 `npx vitest run scripts/ci/check-i18n.test.mjs` 覆盖"
     },
     {
       "id": "T43-A09",
       "task": "T43",
       "description": "主要页面在中文与英文下无截断与溢出。验证：两种语言的截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43-locales --project dev：中文与英文各截会话、Changes、新建会话与 11 个设置页（tmp/evidence/T43/locales/），按钮、标签页、导航项、表头、徽标无溢出；修复了英文\"Configuration diagnostics\"在固定行高里换行溢出"
     },
     {
       "id": "T43-A10",
       "task": "T43",
       "description": "`docs/engineering/accessibility.md` 包含读屏核对清单，VoiceOver 一列逐项有结论，需要用户操作的项注明。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "docs/engineering/accessibility.md 第 3 节有 10 项读屏核对清单（VoiceOver、Narrator、NVDA 各一列），自动化一列写明已由测试覆盖的部分；VoiceOver 一列需要人在 macOS 上实际开启 VoiceOver 逐项操作，夜间自动模式下用户不在场，记为\"待用户核对\"，登记 I188"
     },
     {
       "id": "T43-A11",
       "task": "T43",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "`npm run verify` 在 00b452b 全部 16 步通过（工作区干净；Vitest 1,696 passed，L2 204 passed、3 个按平台跳过）；首次全量在 c78b7f2 因 t43-locales 的一处多余 `??` 未过 ESLint，00b452b 修复后通过"
     },
     {
       "id": "T44-A01",
