@@ -47,7 +47,8 @@ export const METRICS = [
     better: 'lower',
     budget: 1000,
     lanes: ['pr', 'nightly'],
-    floor: 30,
+    // Same commit, quiet machine: medians of three runs 945 to 1,045 ms (T44 PR smoke).
+    floor: 150,
     how: 'Core open_workspace to the Agent Host ready, then resuming a session (release build); median of 10',
   },
   {
@@ -223,7 +224,8 @@ export const METRICS = [
     better: 'lower',
     budget: 1.1,
     lanes: ['pr', 'nightly'],
-    floor: 0.1,
+    // Same commit: medians 0.15 to 0.72 ms; a 2 ms delay in forwarding still fails.
+    floor: 0.5,
     how: "the main process's forwarding time per delivery under 100,000 events/min; p95",
   },
   {
@@ -234,7 +236,8 @@ export const METRICS = [
     better: 'lower',
     budget: { darwin: 5, win32: 15 },
     lanes: ['pr', 'nightly'],
-    floor: 0.1,
+    // Same commit: medians 0.24 to 0.33 ms.
+    floor: 0.25,
     how: 'fs/read of a 4 KB file between Core and a real Agent Host client; p95',
   },
   {
@@ -245,7 +248,8 @@ export const METRICS = [
     better: 'lower',
     budget: { darwin: 2, win32: 10 },
     lanes: ['pr', 'nightly'],
-    floor: 0.1,
+    // Same commit: medians 0.72 to 0.91 ms.
+    floor: 0.25,
     how: 'policy/evaluate on the representative rule and Bash set, 1,000 decisions; p95',
   },
   {
