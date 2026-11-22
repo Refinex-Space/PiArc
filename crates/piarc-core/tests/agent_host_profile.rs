@@ -140,7 +140,14 @@ fn the_agent_host_writes_only_its_places() {
 fn thr03_the_agent_host_cannot_plant_code_in_pis_directory() {
     let d = Dirs::new("pi code");
     let pi = d.data.join("pi");
-    for dir in ["extensions", "skills/planted", "prompts", "npm", "git", "sessions/w"] {
+    for dir in [
+        "extensions",
+        "skills/planted",
+        "prompts",
+        "npm",
+        "git",
+        "sessions/w",
+    ] {
         std::fs::create_dir_all(pi.join(dir)).expect("pi directory");
     }
     std::fs::write(pi.join("settings.json"), "{}\n").expect("pi settings");
@@ -170,7 +177,10 @@ fn thr03_the_agent_host_cannot_plant_code_in_pis_directory() {
         !d.writes(&pi.join("extensions").join("x.js")),
         "created <pi>/extensions"
     );
-    assert!(!pi.join("extensions").exists(), "<pi>/extensions was created");
+    assert!(
+        !pi.join("extensions").exists(),
+        "<pi>/extensions was created"
+    );
 }
 
 #[test]
