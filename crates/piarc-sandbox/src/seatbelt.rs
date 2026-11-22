@@ -129,8 +129,9 @@ impl SeatbeltProfile {
     /// ADR-0004 rule 4, ADR-0015, architecture section 10.3): the fixed text of
     /// `seatbelt/agent-host.sbpl` with `workspace` and `data_dir` (canonical directories) as
     /// parameters. Writes go only to the workspace (its protected paths excepted), Pi's agent
-    /// directory, the Agent Host's own directory and the sessions' temporary directories;
-    /// reads and the network stay open.
+    /// directory (except the parts that make code run: extensions, skills, prompts, packages,
+    /// settings and models), the Agent Host's own directory and the sessions' temporary
+    /// directories; reads and the network stay open.
     ///
     /// # Errors
     ///
@@ -141,6 +142,7 @@ impl SeatbeltProfile {
         builder.param("WORKSPACE", workspace)?;
         builder.raw_param("WORKSPACE_RE", regex_escape(utf8(workspace)?));
         builder.param("PI_DIR", &data_dir.join("pi"))?;
+        builder.raw_param("PI_RE", regex_escape(utf8(&data_dir.join("pi"))?));
         builder.param("AGENT_HOST_DIR", &data_dir.join("agent-host"))?;
         builder.raw_param("DATA_RE", regex_escape(utf8(data_dir)?));
         let pattern = alternation(protected.iter().map(|p| glob_regex(p)))

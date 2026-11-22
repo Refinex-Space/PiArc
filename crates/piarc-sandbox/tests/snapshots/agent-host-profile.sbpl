@@ -5,7 +5,8 @@
 ; The text is fixed; PiArc's paths and the protected-path expressions reach it as sandbox-exec
 ; -D parameters (crates/piarc-sandbox/src/seatbelt.rs, SeatbeltProfile::agent_host):
 ;   WORKSPACE, WORKSPACE_RE  the workspace (a regex-escaped copy for the regex rules)
-;   PI_DIR                   <data>/pi: Pi's agent directory (session files, settings, caches)
+;   PI_DIR, PI_RE            <data>/pi: Pi's agent directory (session files, settings, caches),
+;                            and a regex-escaped copy
 ;   AGENT_HOST_DIR           <data>/agent-host: TMPDIR, npx's npm cache, XDG_CACHE_HOME
 ;   DATA_RE                  <data>, regex-escaped: the sessions' temporary directories
 ;   PROTECTED_RE, ANCHORS_RE the protected paths at any depth, and the directories that keep
@@ -28,6 +29,15 @@
   (subpath (param "PI_DIR"))
   (subpath (param "AGENT_HOST_DIR"))
   (regex (string-append "^" (param "DATA_RE") "/sessions/[^/]+/tmp(/.*)?$")))
+; The parts of Pi's agent directory that make code run stay read-only (R5, THR-03): Pi loads
+; every file under extensions/ and the `extensions` of settings.json into the Agent Host; Core
+; reads the user's skills and commands (allowed-tools and hooks, no trust needed) from skills/
+; and prompts/, and the confirmed packages from npm/ and git/; models.json names the
+; endpoints. Core writes them; a child of the Agent Host must not. settings.json.lock, Pi's
+; lock for reading its settings, stays writable.
+(deny file-write*
+  (regex (string-append "^" (param "PI_RE") "/(extensions|skills|prompts|npm|git)(/.*)?$"))
+  (regex (string-append "^" (param "PI_RE") "/(settings|models)\\.json$")))
 (allow file-write-data
   (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")
   (literal "/dev/dtracehelper") (regex #"^/dev/tty") (regex #"^/dev/fd/[0-9]+$"))
@@ -60,6 +70,7 @@
 WORKSPACE=/Users/dev/项目 one
 WORKSPACE_RE=/Users/dev/项目 one
 PI_DIR=/Users/dev/Library/Application Support/PiArc/pi
+PI_RE=/Users/dev/Library/Application Support/PiArc/pi
 AGENT_HOST_DIR=/Users/dev/Library/Application Support/PiArc/agent-host
 DATA_RE=/Users/dev/Library/Application Support/PiArc
 PROTECTED_RE=/(.*/)?(\.git/hooks|\.git/config|\.git/config\.worktree|\.git/modules/.+/hooks|\.git/modules/.+/config|\.git/worktrees/[^/]+/config\.worktree|\.piarc|\.claude|\.pi|\.mcp\.json|\.vscode|\.idea|\.gitconfig|\.bashrc|\.bash_profile|\.bash_login|\.bash_logout|\.profile|\.zshrc|\.zshenv|\.zprofile|\.zlogin|\.zlogout)(/.*)?$

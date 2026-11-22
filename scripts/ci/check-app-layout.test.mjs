@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
+import { ENTITLEMENTS } from '../../apps/desktop/packaging/macos-sign.mjs';
 import {
   entitlementKeys,
   findDevTools,
@@ -50,6 +53,15 @@ describe('entitlementKeys', () => {
       '<plist><dict><key>com.b</key><true/><key>com.a</key><true />' +
       '<key>com.off</key><false/></dict></plist>';
     expect(entitlementKeys(xml)).toEqual(['com.a', 'com.b']);
+  });
+
+  it('THR-14 the app asks for only JIT and disabled library validation', () => {
+    // The layout check compares the signed app with this file, so the file itself must not
+    // grow: get-task-allow or allow-dyld-environment-variables would undo the hardened runtime.
+    expect(entitlementKeys(readFileSync(ENTITLEMENTS, 'utf8'))).toEqual([
+      'com.apple.security.cs.allow-jit',
+      'com.apple.security.cs.disable-library-validation',
+    ]);
   });
 });
 

@@ -134,6 +134,7 @@ threats:
         type: automated
         tests:
           - rust:crates/piarc-core/tests/agent_host_profile.rs::the_agent_host_writes_only_its_places
+          - rust:crates/piarc-core/tests/agent_host_profile.rs::thr03_the_agent_host_cannot_plant_code_in_pis_directory
           - rust:crates/piarc-testkit/tests/sessions/sandbox.rs::the_agent_host_profile_keeps_extensions_and_mcp_servers_in_their_places
       - measure: Windows 上 Agent Host 没有进程级隔离
         type: accepted-risk
@@ -377,6 +378,7 @@ threats:
         tests:
           - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::turns every XSS payload into text or a link without a dangerous target
           - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::drops every other target, including encoded ones
+          - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::keeps raw HTML as html nodes, verbatim
       - arch: preload 白名单 + 主进程校验来源
         measure: window.piarc 只有白名单函数，主进程按 senderFrame 的 origin 拒绝外来请求
         type: automated
@@ -475,6 +477,7 @@ threats:
         tests:
           - ci:scripts/ci/check-app-layout.mjs
           - vitest:scripts/ci/check-app-layout.test.mjs::reads an ad-hoc signature with the hardened runtime
+          - vitest:scripts/ci/check-app-layout.test.mjs::THR-14 the app asks for only JIT and disabled library validation
       - arch: Core 以最小环境启动内置 node（不传 `DYLD_*`）
         measure: Agent Host 只收到白名单环境变量
         type: automated

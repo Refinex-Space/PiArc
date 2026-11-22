@@ -130,6 +130,49 @@ fn the_agent_host_writes_only_its_places() {
     );
 }
 
+/// THR-03 (R5): the parts of Pi's agent directory that make code run are not the Agent Host's
+/// to write. Pi loads every file under `<pi>/extensions` and the `extensions` of
+/// `<pi>/settings.json` into the Agent Host; Core reads user skills and commands (with their
+/// `allowed-tools` and hooks, which need no trust) from `<pi>/skills` and `<pi>/prompts`, and
+/// confirmed packages from `<pi>/npm` and `<pi>/git`. A child of the Agent Host (an MCP server,
+/// npx) writing there would run in the Agent Host or in Core on the next session.
+#[test]
+fn thr03_the_agent_host_cannot_plant_code_in_pis_directory() {
+    let d = Dirs::new("pi code");
+    let pi = d.data.join("pi");
+    for dir in ["extensions", "skills/planted", "prompts", "npm", "git", "sessions/w"] {
+        std::fs::create_dir_all(pi.join(dir)).expect("pi directory");
+    }
+    std::fs::write(pi.join("settings.json"), "{}\n").expect("pi settings");
+    let allowed = [
+        pi.join("sessions").join("w").join("session.jsonl"),
+        // Pi locks its global settings to read them.
+        pi.join("settings.json.lock"),
+    ];
+    let refused = [
+        pi.join("extensions").join("planted.js"),
+        pi.join("skills").join("planted").join("SKILL.md"),
+        pi.join("prompts").join("planted.md"),
+        pi.join("npm").join("package.json"),
+        pi.join("git").join("planted.js"),
+        pi.join("settings.json"),
+        pi.join("models.json"),
+    ];
+    for path in &allowed {
+        assert!(d.writes(path), "should write {}", path.display());
+    }
+    for path in &refused {
+        assert!(!d.writes(path), "should not write {}", path.display());
+    }
+    // Nor can the directories be created when they are missing.
+    std::fs::remove_dir_all(pi.join("extensions")).expect("remove");
+    assert!(
+        !d.writes(&pi.join("extensions").join("x.js")),
+        "created <pi>/extensions"
+    );
+    assert!(!pi.join("extensions").exists(), "<pi>/extensions was created");
+}
+
 #[test]
 fn reads_stay_open() {
     let d = Dirs::new("reads");

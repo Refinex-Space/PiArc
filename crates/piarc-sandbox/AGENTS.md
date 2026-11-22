@@ -38,7 +38,7 @@ Bash 沙箱与 Agent Host 的 Seatbelt 配置、会话的本地代理与域名�
 ## Agent Host 的配置（T39 定稿，ADR-0056 第 11 条）
 
 - 模板 `src/seatbelt/agent-host.sbpl`，生成函数 `SeatbeltProfile::agent_host(workspace, data_dir, protected)`，包装 `agent_host_launch(workspace, data_dir)`；golden 为 `tests/snapshots/agent-host-profile.sbpl`。
-- 读取、进程、网络放开；写入只限工作区（受保护路径除外，`.piarc/worktrees/<名称>/` 同样）、`<数据目录>/pi`、`<数据目录>/agent-host`、`<数据目录>/sessions/*/tmp` 与终端设备；`.pi/settings.json.lock` 单独放行（Pi 1.5.2 读项目设置前用 proper-lockfile 建它）。用户设置、`core.sqlite`、保险箱、用户级资源、shell integration、检查点与日志对 Agent Host 及其子进程只读。
+- 读取、进程、网络放开；写入只限工作区（受保护路径除外，`.piarc/worktrees/<名称>/` 同样）、`<数据目录>/pi`（`extensions/`、`skills/`、`prompts/`、`npm/`、`git/`、`settings.json`、`models.json` 除外：Pi 自动加载或 Core 当作用户级来源读取，R5）、`<数据目录>/agent-host`、`<数据目录>/sessions/*/tmp` 与终端设备；`.pi/settings.json.lock` 单独放行（Pi 1.5.2 读项目设置前用 proper-lockfile 建它）。用户设置、`core.sqlite`、保险箱、用户级资源、shell integration、检查点与日志对 Agent Host 及其子进程只读。
 - Core（`piarc_core::agent_host`）在 macOS 上对打包与开发两种启动都套这份配置，`agent_host_env` 把 `TMPDIR`、`npm_config_cache`、`XDG_CACHE_HOME` 指向 `<数据目录>/agent-host/`，启动前建好这些目录。
 - 第 6.10 节说的"MCP server 在沙箱外"指 Bash 沙箱：stdio MCP server 由 Agent Host 启动，仍受这份配置约束。常见 MCP server 若必须放宽写入范围才能运行，属于放松安全基线，按变更型写 ADR。
 
