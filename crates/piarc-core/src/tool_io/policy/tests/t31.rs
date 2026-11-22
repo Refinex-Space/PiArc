@@ -14,7 +14,13 @@ impl Fixture {
         std::fs::write(path, text).expect("write");
     }
 
-    async fn start(&self, id: &str, parent: &str, kind: &str, background: bool) -> Value {
+    pub(super) async fn start(
+        &self,
+        id: &str,
+        parent: &str,
+        kind: &str,
+        background: bool,
+    ) -> Value {
         let p = SubagentStartParams {
             session_id: id.into(),
             parent_session_id: parent.into(),
@@ -30,7 +36,13 @@ impl Fixture {
         serde_json::to_value(self.io.start_subagent(p).await.expect("registered")).expect("json")
     }
 
-    async fn evaluate_as(&self, session: &str, call: &str, tool: &str, input: Value) -> Value {
+    pub(super) async fn evaluate_as(
+        &self,
+        session: &str,
+        call: &str,
+        tool: &str,
+        input: Value,
+    ) -> Value {
         let params =
             json!({"sessionId": session, "toolCallId": call, "tool": tool, "input": input});
         self.io

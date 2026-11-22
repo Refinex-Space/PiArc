@@ -134,7 +134,8 @@ export function parseAudit(raw: string): AuditRow[] {
         step: d.outcome,
         conclusion: str(d.conclusion),
         rule: str(d.reason),
-        ruleSource: str(d.agentType),
+        // A subagent's review names its type (T31's audit annotation).
+        ruleSource: isRecord(d.subagent) ? str(d.subagent.agentType) : undefined,
         review: {
           model: str(d.model) ?? '',
           durationMs: typeof d.durationMs === 'number' ? d.durationMs : undefined,

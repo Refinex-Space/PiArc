@@ -483,3 +483,53 @@ async fn without_a_reviewer_model_cards_go_to_the_user() {
         Some(piarc_protocol::policy::AutoReviewReason::NoModel)
     );
 }
+
+/// A-10: a subagent's call is reviewed in its main session's Auto mode, through the main
+/// session's workspace; the request names the subagent type, the audit row its origin, and its
+/// refusals count on the main session.
+#[tokio::test]
+async fn a_subagents_review_names_it_and_counts_on_the_main_session() {
+    const CHILD: &str = "child-46";
+    let deny = || answered("deny", "Not needed for the delegated task.");
+    let reviewer = Reviewer::new(vec![deny(), deny(), deny()]);
+    let f = Fixture::auto(ENABLED, &reviewer).await;
+    let started = f.start(CHILD, SESSION, "general-purpose", false).await;
+    assert_eq!(started["permissionMode"], "auto");
+    for n in 0..3 {
+        let result = f
+            .evaluate_as(
+                CHILD,
+                &format!("c{n}"),
+                "Bash",
+                json!({"command": "printenv HOME"}),
+            )
+            .await;
+        assert_eq!(result["allowed"], false);
+        assert_eq!(result["review"]["verdict"], "deny");
+    }
+    let asked = reviewer.asked();
+    assert_eq!(asked.len(), 3);
+    assert_eq!(asked[0].session_id, CHILD);
+    assert_eq!(
+        asked[0].environment.agent_type.as_deref(),
+        Some("general-purpose")
+    );
+    let rows: Vec<Value> = f
+        .child_audit(CHILD)
+        .into_iter()
+        .filter(|r| r["source"] == "reviewer" && r["outcome"].is_string())
+        .collect();
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0]["subagent"]["agentType"], "general-purpose");
+    assert_eq!(rows[0]["subagent"]["rootSessionId"], SESSION);
+    // The third refusal paused review for the whole tree: the main session shows it.
+    let main = f.io.session(SESSION).expect("main");
+    let status = lock(&main.policy)
+        .auto
+        .status(PermissionMode::Auto)
+        .expect("status");
+    assert_eq!(
+        status.state,
+        piarc_protocol::policy::AutoReviewState::Paused
+    );
+}

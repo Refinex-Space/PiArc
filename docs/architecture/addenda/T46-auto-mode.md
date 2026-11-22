@@ -369,4 +369,5 @@ L2 场景（能力 ID 前缀 `CAP-PERM-AUTO-`）：`perm-auto-allow`、`perm-aut
 | 设置读写 | `piarc_config::auto_mode` 是唯一读取入口；窗口经偏好通道写 PiArc 用户级的 `permissions.enableAutoMode` 与 `autoMode.*`（Core 的 `client_settings` 白名单），开启前主进程原生确认且要求已选审查模型；`~/.claude/settings.json` 的条目在设置页各列表下只读列出（取自配置诊断） |
 | 用量 | 会话的"审查"一行汇总整棵会话树（含子 agent 的审查）；模型行与子 agent 行各自计入 |
 | L2 | 第 8 节所列场景之外另有 `perm-auto-unsandboxed`（只在 macOS：Windows 没有沙箱）；mock 端点的 `strict_tools` 让目录把它的工具可靠性记为 `verified`；L3 对 `perm-auto-*` 全部排除（审查请求无法在两侧编排） |
+| 审计的子 agent 字段 | 与 `permission` 行同一个 `subagents::annotate`：会话列是子会话 id，`detail.subagent` 带 `rootSessionId`、`parentSessionId`、`agentType`（第 4.1 节写作 `agentId`、`agentType`） |
 | T48 触发点 | `crates/piarc-core/src/tool_io/policy/review.rs` 的 `ToolIo::reviewer_refused`：审查模型答 `deny`、审计写完、拒绝结果交回模型之前 |
