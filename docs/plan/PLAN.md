@@ -316,8 +316,8 @@ T45（2026-11-21 开工；基线 `npm run verify -- --baseline` 全量 16 项通
 - [x] "全量恶意仓库"夹具 L2 场景（A04）：`sec-malicious-repo-untrusted`、`sec-malicious-repo-new-item`
 - [ ] Electron 安全清单复核 `docs/security/electron-checklist.md`（A05）；I52 的规则与 `will-frame-navigate`
 - [x] 依赖审计：cargo-audit、npm audit、npm 许可证、例外清单、CI 流水线、本地命令；PR 模板（A06，82b5711）；另修 THR-03：Pi 设置里的 `packages` 不再由 Agent Host 安装（10a3008）
-- [ ] 日志写入脱敏（tracing 层与 Agent Host stderr）；Agent Host 与 Bash 子进程环境无凭据（A07）
-- [ ] 诊断包导出：清单与脱敏摘要、确认后写出、界面与截图（A08）
+- [x] 日志写入脱敏（tracing 层与 Agent Host stderr）；Agent Host 与 Bash 子进程环境无凭据（A07，022122f）
+- [x] 诊断包导出：清单与脱敏摘要、确认后写出、界面与截图（A08，63e3b2b；`tmp/evidence/T45/diagnostic-bundle-*.png`）
 - [ ] 遥测默认关闭与外连记录、报告（A09）
 - [ ] XSS 载荷集扩充到全部渲染面（A10）
 - [ ] preload 畸形参数、"总是允许"只经原生确认（A11）

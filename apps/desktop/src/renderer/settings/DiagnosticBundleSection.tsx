@@ -135,7 +135,7 @@ export function DiagnosticBundleSection({ workspace }: { readonly workspace: str
       )}
       {state.kind === 'preview' && (
         <div className="diagnostic-bundle-preview" data-testid="diagnostic-bundle-preview">
-          <h3 className="settings-subheading">{t('diagnostics.bundle.files')}</h3>
+          <h3 className="permission-source-title">{t('diagnostics.bundle.files')}</h3>
           <ul className="diagnostic-bundle-files" data-testid="diagnostic-bundle-files">
             {state.manifest.files.map((file) => (
               <li key={file.name}>
@@ -143,7 +143,7 @@ export function DiagnosticBundleSection({ workspace }: { readonly workspace: str
               </li>
             ))}
           </ul>
-          <h3 className="settings-subheading">{t('diagnostics.bundle.redactions')}</h3>
+          <h3 className="permission-source-title">{t('diagnostics.bundle.redactions')}</h3>
           <ul data-testid="diagnostic-bundle-redactions">
             {redactions.length === 0 ? (
               <li>{t('diagnostics.bundle.noRedactions')}</li>
