@@ -730,22 +730,24 @@ impl ToolIo {
             "fs/glob" => {
                 let p: FsGlobParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
+                let deny = self.read_deny(&s).await?;
                 blocking(move || {
                     let exclude = p.exclude.unwrap_or_default();
-                    piarc_fs::glob(
-                        scope.as_ref().unwrap_or(&s.scope),
-                        &p.path,
-                        &p.pattern,
-                        &exclude,
-                        p.limit,
-                    )
+                    let scope = scope.as_ref().unwrap_or(&s.scope);
+                    piarc_fs::glob(scope, &p.path, &p.pattern, &exclude, p.limit)
+                        .map(|r| files::without_denied_names(r, deny.as_ref()))
                 })
                 .await
             }
             "fs/grep" => {
                 let p: FsGrepParams = parse(method, params)?;
                 let s = self.session(&p.session_id.0)?;
-                blocking(move || files::grep(scope.as_ref().unwrap_or(&s.scope), &p)).await
+                let deny = self.read_deny(&s).await?;
+                blocking(move || {
+                    files::grep(scope.as_ref().unwrap_or(&s.scope), &p)
+                        .map(|r| files::without_denied_lines(r, deny.as_ref()))
+                })
+                .await
             }
             "exec/run" | "exec/shells" | "exec/kill" => {
                 self.dispatch_exec(method, params, peer).await

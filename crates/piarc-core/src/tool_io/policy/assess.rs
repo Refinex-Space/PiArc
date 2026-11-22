@@ -139,7 +139,7 @@ impl Places {
         }
     }
 
-    fn context(&self) -> PathContext<'_> {
+    pub(super) fn context(&self) -> PathContext<'_> {
         PathContext {
             home: &self.home_posix,
             cwd: &self.cwd_posix,
@@ -249,6 +249,16 @@ pub(super) fn file_call(
     let family = if write { "Edit" } else { "Read" };
     let rule = format!("{family}({})", path_rule(resolved, places));
     Assessment::new(input, vec![rule])
+}
+
+/// Whether a `Read(…)` deny rule certainly covers `path`: Grep and Glob over a directory leave
+/// such files out of their results (R5, I120).
+pub(super) fn read_denied(rules: &RuleSet, places: &Places, path: &Path) -> bool {
+    let paths = [posix(path)];
+    matches!(
+        rules.find(Behavior::Deny, "Read", Subject::Paths(&paths), Some(&places.context())),
+        Some((_, Certainty::Certain))
+    )
 }
 
 /// A path as a rule names it: `./rel` under the session's directory, `~/rel` under home,

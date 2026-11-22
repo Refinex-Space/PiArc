@@ -642,6 +642,33 @@ fn rules_of(s: &SessionIo, settings: &Settings) -> Arc<RuleSet> {
     )
 }
 
+/// The session's `Read(…)` deny rules, applied to search results (R5, I120): a deny on a file
+/// keeps its lines and its name out of Grep and Glob over a directory, as for Read itself.
+pub(crate) struct ReadDeny {
+    rules: Arc<RuleSet>,
+    places: assess::Places,
+}
+
+impl ReadDeny {
+    pub(crate) fn denies(&self, path: &Path) -> bool {
+        assess::read_denied(&self.rules, &self.places, path)
+    }
+}
+
+impl ToolIo {
+    /// The filter for session `s`'s search results; `None` without a permission service.
+    pub(super) async fn read_deny(&self, s: &SessionIo) -> Result<Option<ReadDeny>, ErrorObject> {
+        let Ok(services) = self.services() else {
+            return Ok(None);
+        };
+        let settings = session_settings(services, s).await?;
+        Ok(Some(ReadDeny {
+            rules: rules_of(s, &settings),
+            places: assess::Places::new(&s.scope),
+        }))
+    }
+}
+
 /// The workspace's rules without a session's own (`agents/list`, T31).
 pub(super) fn workspace_rules(settings: &Settings, root: &Path) -> Arc<RuleSet> {
     assess::rule_set(&settings.permission_lists(), &[], &[], root, &mut None)

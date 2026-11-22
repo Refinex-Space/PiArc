@@ -324,3 +324,37 @@ pub(super) fn grep(
         },
     )
 }
+
+/// `result` without the lines of files a `Read(…)` deny covers (R5, I120). A search of one file
+/// went through the call's own rules; only directory searches are filtered.
+pub(super) fn without_denied_lines(
+    mut result: piarc_protocol::fs::FsGrepResult,
+    deny: Option<&super::policy::ReadDeny>,
+) -> piarc_protocol::fs::FsGrepResult {
+    let Some(deny) = deny.filter(|_| result.is_directory) else {
+        return result;
+    };
+    let base = std::path::PathBuf::from(&result.path);
+    let mut removed = 0_u64;
+    result.lines.retain(|line| {
+        let keep = !deny.denies(&base.join(&line.path));
+        if !keep && line.is_match {
+            removed += 1;
+        }
+        keep
+    });
+    result.match_count = result.match_count.saturating_sub(removed);
+    result
+}
+
+/// `result` without the names a `Read(…)` deny covers (R5, I120).
+pub(super) fn without_denied_names(
+    mut result: piarc_protocol::fs::FsGlobResult,
+    deny: Option<&super::policy::ReadDeny>,
+) -> piarc_protocol::fs::FsGlobResult {
+    if let Some(deny) = deny {
+        let base = std::path::PathBuf::from(&result.path);
+        result.matches.retain(|name| !deny.denies(&base.join(name)));
+    }
+    result
+}

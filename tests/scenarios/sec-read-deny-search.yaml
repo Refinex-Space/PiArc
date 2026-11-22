@@ -1,0 +1,40 @@
+id: sec-read-deny-search
+description: "THR-01. A Read deny rule keeps the file out of Grep and Glob as well: a directory search leaves out its lines and its name, and Grep or Glob on the file itself is refused (R5, I120)."
+capabilities: [CAP-PERM-RULE-001]
+workspace:
+  trusted: true
+  files:
+    notes.txt: "plain notes MARK-public\n"
+    secret.env: "API_KEY=MARK-secret-42\n"
+    .piarc/settings.json: '{"permissions":{"deny":["Read(./secret.env)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: grep-dir, name: Grep, input: { pattern: 'MARK-', path: '.' } }
+      - tool_calls:
+          - { id: glob-dir, name: Glob, input: { pattern: '*', path: '.' } }
+      - tool_calls:
+          - { id: grep-file, name: Grep, input: { pattern: 'MARK-', path: secret.env } }
+      - text: Finished.
+actions:
+  - prompt: { text: Search the workspace., turn: t }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: grep-dir, is_error: false, contains: MARK-public }
+    - { index: 1, not_contains: [MARK-secret-42] }
+    - index: 2
+      tool_results:
+        - { id: grep-dir, is_error: false, contains: MARK-public }
+        - { id: glob-dir, is_error: false, contains: notes.txt }
+    - { index: 2, not_contains: [MARK-secret-42, secret.env] }
+    - index: 3
+      tool_results:
+        - { id: grep-dir, is_error: false, contains: MARK-public }
+        - { id: glob-dir, is_error: false, contains: notes.txt }
+        - { id: grep-file, is_error: true, contains: 'Read(./secret.env)' }
+    - { index: 3, not_contains: [MARK-secret-42] }

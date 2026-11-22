@@ -558,7 +558,7 @@ T38 落地（ADR-0055）：`WebSearch` 的参数为 `query`、可选的 `allowed
 - **Windows 上的命令**：`Bash` 工具在 Windows 上通过 Git Bash 执行（Pi 的默认行为），分析方式同上；另提供 `PowerShell` 工具，规则写作 `PowerShell(命令模式)`（与 Claude Code 一致）。第一版不对 PowerShell 做语法级拆分，也不设只读白名单：除非整条命令被规则精确允许，否则在 Manual 模式下一律询问。PowerShell 的语法级分析在 M4 评估。T17 落地（ADR-0028）：Git Bash 依次查用户设置 `shell.gitBashPath`、`%ProgramFiles%\Git`、`%ProgramFiles(x86)%\Git`、`%LOCALAPPDATA%\Programs\Git`、`PATH` 上 `git.exe` 所在的安装，不用 `PATH` 上其他的 `bash.exe`（`System32\bash.exe` 是 WSL）；找不到时会话不注册 `Bash`、只有 `PowerShell`，Core 在 `core/notices` 发一次 `gitBashMissing` 提示安装 Git for Windows。`PowerShell` 优先 PowerShell 7（`pwsh`），没有时用 Windows PowerShell 5.1。
 - 关键路径删除（`rm -rf` 指向工作区根、家目录、`/` 等）与 `requiresUserInteraction` 类工具在任何模式下都询问。
 - `WebFetch(domain:…)`（T29）：规则匹配、hooks matcher 与实际抓取都用 `piarc_web::rule_host` 解析同一个 URL（小写主机，IPv6 带方括号）；"总是允许"按该主机生成规则，URL 解析不出主机时不提供规则。
-- 已知限制（R3）：`Read(…)` 的 deny 按调用的路径参数匹配，Grep、Glob 以目录为参数时不过滤结果中的被拒文件，Bash 的递归读取（`grep -r`、`rg`）同样不受它约束，过滤由 T45 补上（I120）；带通配的 Bash/PowerShell allow 规则不放行越界路径（ADR-0047，R3）：像路径的参数在会话目录外或无法定位时按越界询问，精确规则照旧放行。
+- `Read(…)` 的 deny 也作用于 Grep、Glob：以文件为参数时按调用裁决，以目录为参数时 Core 在返回前去掉被拒文件的行与文件名（R5，I120，`tool_io/files.rs` 的 `without_denied_*`，L2 `sec-read-deny-search`）。已知限制：Bash 的递归读取（`grep -r`、`rg`）不受它约束；带通配的 Bash/PowerShell allow 规则不放行越界路径（ADR-0047，R3）：像路径的参数在会话目录外或无法定位时按越界询问，精确规则照旧放行。
 - 控制字符（R4）：命令含制表与换行以外的控制字符（C0、DEL、C1 CSI）时 Bash 分析判为无法静态判定（询问）；`terminal: true` 的命令由 Core 直接拒绝：终端的行编辑会执行这些字符（`^U` 擦掉前文、回车提前执行），键入的结果与裁决的文本不同。
 
 #### 6.2.3 裁决流程
