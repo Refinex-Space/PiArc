@@ -347,3 +347,48 @@ async fn an_untouched_agent_branch_is_deleted_and_a_moved_one_kept() {
     assert!(!git(&repo, &["branch", "--list", "piarc/agent-ffff0000"]).is_empty());
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// W3-A06: a worktree whose files lie beyond 260 characters is created, inspected and removed
+/// (Git for Windows needs `core.longpaths`, which every PiArc git run passes).
+#[tokio::test]
+async fn a_worktree_beyond_260_characters_is_created_and_removed() {
+    let root = temp_dir("long");
+    let repo = root.join("repo 仓库");
+    std::fs::create_dir_all(&repo).expect("repo");
+    git(&repo, &["init", "-q"]);
+    let deep: PathBuf = ["长目录 a", "long directory name b", "long directory name c"]
+        .iter()
+        .map(|part| format!("{part} {}", "x".repeat(40)))
+        .collect();
+    std::fs::create_dir_all(repo.join(&deep)).expect("deep");
+    std::fs::write(repo.join(&deep).join("file 文件.txt"), "deep\n").expect("file");
+    git(&repo, &["-c", "core.longpaths=true", "add", "."]);
+    git(
+        &repo,
+        &["-c", "core.longpaths=true", "commit", "-q", "-m", "deep"],
+    );
+    let git_runner = runner();
+
+    let created = worktree::create(&git_runner, &repo, "long-one", None)
+        .await
+        .expect("created");
+    let file = created.worktree.path.join(&deep).join("file 文件.txt");
+    assert!(
+        file.as_os_str().len() > 260,
+        "{} is only {} long",
+        file.display(),
+        file.as_os_str().len()
+    );
+    assert_eq!(std::fs::read_to_string(&file).expect("read"), "deep\n");
+    assert!(
+        worktree::changes(&git_runner, &created.worktree.path)
+            .await
+            .expect("status")
+            .is_clean()
+    );
+    worktree::remove(&git_runner, &repo, &created.worktree.path, false)
+        .await
+        .expect("removed");
+    assert!(!created.worktree.path.exists());
+    let _ = std::fs::remove_dir_all(&root);
+}
