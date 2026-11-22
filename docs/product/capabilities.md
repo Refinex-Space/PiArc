@@ -11,7 +11,7 @@
 | M1 | 61 | 61 | 0 | 0 |
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
-| M4 | 28 | 26 | 2 | 0 |
+| M4 | 31 | 29 | 2 | 0 |
 | M5 | 7 | 0 | 7 | 0 |
 
 ## M1
@@ -210,6 +210,9 @@
 | CAP-SANDBOX-PROJECT-001 | 项目级配置只能收紧沙箱：自动批准与白名单域名不生效并在配置诊断中标出 | FR-TL-07、ARCH-6.2.1、ARCH-6.10 | T39 | `sandbox-project-tightens`（仅 macos） | 已实现 |
 | CAP-SANDBOX-RETRY-001 | 沙箱外重试（dangerouslyDisableSandbox）在任何模式都询问，只有仅本次与拒绝，hooks 不能代答 | FR-TL-07、ARCH-6.10 | T39 | `sandbox-unsandboxed-retry`（仅 macos） | 已实现 |
 | CAP-SANDBOX-WINDOWS-001 | Windows 上命令的隔离方案（第一版只做进程树管理，见需求 D7） | FR-TL-07、ARCH-6.10 | T39 | `sandbox-windows-not-applied`（仅 windows） | 已实现 |
+| CAP-SEC-INJECTION-001 | 仓库文件、WebFetch 内容、MCP 返回内容诱导的破坏性命令进入审批，审批卡带完整命令；关键路径删除在跳过权限下仍询问 | ARCH-10.1、ARCH-6.2 | T45 | `sec-inject-mcp`<br>`sec-inject-repo-file`<br>`sec-inject-webfetch` | 已实现 |
+| CAP-SEC-MALICIOUS-REPO-001 | 带全部种类项目级可执行配置的仓库在信任前零执行；信任后新增的可执行项在再次确认前不运行 | ARCH-10.1、ARCH-10.2 | T45 | `sec-malicious-repo-new-item`<br>`sec-malicious-repo-untrusted` | 已实现 |
+| CAP-SEC-PI-PACKAGES-001 | Pi 设置（项目 `.pi/settings.json`、`<数据目录>/pi/settings.json`）的 `packages` 不由 Agent Host 安装：不运行安装脚本、不加载其扩展 | ARCH-10.1、ARCH-6.7 | T45 | `sec-pi-settings-packages` | 已实现 |
 | CAP-SYS-NOTIFY-002 | 在通知中直接允许或拒绝 | FR-SY-03 | T42 | `notify-approval` | 已实现 |
 | CAP-TOOL-NOTEBOOK-001 | NotebookEdit 编辑 Jupyter cell（插入、替换、删除，未改动的部分逐字节不变） | FR-TL-06、ARCH-6.1.4 | T42 | `notebook-edit-delete`<br>`notebook-edit-insert`<br>`notebook-edit-replace` | 已实现 |
 | CAP-TOOL-NOTEBOOK-ERRORS-001 | NotebookEdit 的先读后改、外部修改与不存在的 cell 报错，无 id 的旧版 notebook 按序号定位 | FR-TL-06、ARCH-6.1.2 | T42 | `notebook-edit-errors` | 已实现 |
