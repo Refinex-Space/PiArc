@@ -393,6 +393,7 @@ async function fromReport(file, lane, only) {
     values,
     samples: {},
     errors: [],
+    measuredAt: text(report.date) ?? 'unknown',
     host: {
       platform,
       cpu: text(report.cpu) ?? 'unknown',
@@ -445,7 +446,7 @@ async function main() {
   const host = 'host' in measured ? measured.host : thisHost();
   // `win32-x64` → `win32`
   const platform = host.platform.split('-')[0] ?? process.platform;
-  const baselines = await readBaselines(platform, machine);
+  const baselines = await readBaselines(platform, machine, lane);
   const verdicts = measured.wanted.flatMap((metric) => {
     const runs = measured.values[metric.id] ?? [];
     if (runs.length === 0) return [];
@@ -490,7 +491,7 @@ async function main() {
   for (const line of failed) console.error(`FAIL ${line}`);
   if (args['update-baseline'] !== undefined) {
     if (args['update-baseline'].trim() === '') throw new Error('--update-baseline needs a reason');
-    const file = baselineFile(platform, machine);
+    const file = baselineFile(platform, machine, lane);
     /** @type {unknown} */
     const previous = JSON.parse(await readFile(file, 'utf8').catch(() => '{}'));
     const kept = isRecord(previous) && isRecord(previous.values) ? previous.values : {};
@@ -501,9 +502,10 @@ async function main() {
       `${JSON.stringify(
         {
           machine,
+          lane,
           platform: report.platform,
           cpu: report.cpu,
-          updated: report.date,
+          updated: 'host' in measured ? measured.measuredAt : report.date,
           reason: args['update-baseline'],
           values,
         },

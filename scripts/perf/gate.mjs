@@ -2,7 +2,8 @@
 // the reference machine or a named local one; CI runners differ from the reference machines, so
 // there only the second applies), and against the baseline of the same platform and machine
 // class: a regression of more than 10% (and more than the metric's `floor`) fails. Baselines are
-// committed per platform and machine class and change only through
+// committed per platform, machine class and lane (the PR smoke's loads are shorter than
+// Nightly's, so their values differ) and change only through
 // `node scripts/perf/run.mjs --lane <lane> --update-baseline "<reason>"`.
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -88,25 +89,28 @@ export function machineClass(env = process.env) {
 }
 
 /**
- * The file of the baselines of `platform` on `machine`.
+ * The file of the baselines of `lane` for `platform` on `machine`.
  * @param {string} platform
  * @param {string} machine
+ * @param {string} lane
  */
-export function baselineFile(platform, machine) {
-  return path.join(BASELINES, `${platform}-${machine}.json`);
+export function baselineFile(platform, machine, lane) {
+  return path.join(BASELINES, `${platform}-${machine}-${lane}.json`);
 }
 
 /**
- * The baseline values (by metric id) of `platform` on `machine`; empty when none were recorded.
+ * The baseline values (by metric id) of `lane` for `platform` on `machine`; empty when none
+ * were recorded.
  * @param {string} platform
  * @param {string} machine
+ * @param {string} lane
  * @returns {Promise<Record<string, number>>}
  */
-export async function readBaselines(platform, machine) {
+export async function readBaselines(platform, machine, lane) {
   /** @type {unknown} */
   let parsed;
   try {
-    parsed = JSON.parse(await readFile(baselineFile(platform, machine), 'utf8'));
+    parsed = JSON.parse(await readFile(baselineFile(platform, machine, lane), 'utf8'));
   } catch {
     return {};
   }

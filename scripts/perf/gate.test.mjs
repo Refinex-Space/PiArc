@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { failures, judge, machineClass } from './gate.mjs';
+import path from 'node:path';
+
+import { baselineFile, failures, judge, machineClass, readBaselines } from './gate.mjs';
 
 const latency = /** @type {import('./metrics.mjs').Metric} */ ({
   id: 'x-p95',
@@ -62,5 +64,20 @@ describe('machineClass', () => {
     expect(machineClass({ PIARC_PERF_MACHINE: 'm1-pro' })).toBe('m1-pro');
     expect(machineClass({ CI: 'true' })).toBe(`github-${process.arch}`);
     expect(machineClass({})).toBe('local');
+  });
+});
+
+describe('baselines', () => {
+  it('are kept per platform, machine class and lane', () => {
+    expect(path.basename(baselineFile('win32', 'github-x64', 'pr'))).toBe(
+      'win32-github-x64-pr.json',
+    );
+    expect(baselineFile('darwin', 'local', 'pr')).not.toBe(
+      baselineFile('darwin', 'local', 'nightly'),
+    );
+  });
+
+  it('are empty for a machine class without a file', async () => {
+    expect(await readBaselines('darwin', 'no-such-machine', 'pr')).toEqual({});
   });
 });
