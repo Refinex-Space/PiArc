@@ -39,7 +39,12 @@ export function parseLaunchUrl(text: string): LaunchTarget | undefined {
   switch (url.hostname) {
     case 'open': {
       const target = url.searchParams.get('path');
-      return target === null ? undefined : folder(target);
+      // A link names a local folder: a UNC path (`\\host\share`, `//host/share`) or a device
+      // path (`\\?\`, `\\.\`) would make Core reach another host, which can leak the user's
+      // NetNTLM hash on Windows (T45, I170). Folders given on the command line or dropped keep
+      // their own rules.
+      if (target === null || /^[\\/]{2}/u.test(target)) return undefined;
+      return folder(target);
     }
     case 'session': {
       let id: string;

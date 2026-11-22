@@ -458,10 +458,11 @@ threats:
           - l4:apps/desktop/e2e/t34-terminal.e2e.ts::OSC 8 links and plain URLs show their address and open only when confirmed
           - l4:apps/desktop/e2e/t45-xss.e2e.ts::THR-13 OSC 8 links with script and data targets in the terminal neither open nor navigate
           - l4:apps/desktop/e2e/transcript-security.e2e.ts::opens links only through the main process confirmation
-      - measure: piarc:// 链接只做定位，不带可执行内容
+      - measure: piarc:// 链接只做定位，不带可执行内容，不打开网络共享与设备路径
         type: automated
         tests:
           - vitest:apps/desktop/src/main/launch.test.ts::carry nothing that runs
+          - vitest:apps/desktop/src/main/launch.test.ts::THR-13 open no network share or device path, which would make Core reach another host
 
   - id: THR-14
     title: 同一用户的进程向 PiArc 注入代码

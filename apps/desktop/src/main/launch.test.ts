@@ -18,6 +18,18 @@ describe('piarc:// links', () => {
     });
   });
 
+  it('THR-13 open no network share or device path, which would make Core reach another host', () => {
+    for (const target of [
+      '%5C%5Cattacker.example%5Cshare',
+      '%5C%5C%3F%5CUNC%5Cattacker.example%5Cshare',
+      '%5C%5C%3F%5CC%3A%5Cwork',
+      '%5C%5C.%5Cpipe%5Cx',
+      '%2F%2Fattacker.example%2Fshare',
+    ]) {
+      expect(parseLaunchUrl(`piarc://open?path=${target}`), target).toBeUndefined();
+    }
+  });
+
   it('carry nothing that runs', () => {
     // A prompt or a command in the link is ignored; only the folder is taken.
     expect(parseLaunchUrl('piarc://open?path=%2Fw&prompt=rm%20-rf&run=1')).toEqual({
