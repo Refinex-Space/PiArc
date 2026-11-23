@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::Path;
+use std::sync::{Arc, Weak};
 
 use piarc_git::worktree::{self, Created, Worktree};
 use piarc_hooks::HookEvent;
@@ -52,6 +53,23 @@ fn bound(workspace: &Path, path: &Path) -> Result<(piarc_fs::DirectoryBinding, S
 }
 
 impl ToolIo {
+    /// Hooks of one workspace can return the same path. Other workspaces may proceed independently.
+    async fn lock_worktrees(&self, project: &Path) -> tokio::sync::OwnedMutexGuard<()> {
+        let lifecycle = {
+            let mut locks = super::lock(&self.worktree_lifecycle);
+            locks.retain(|_, weak| weak.strong_count() > 0);
+            locks
+                .get(project)
+                .and_then(Weak::upgrade)
+                .unwrap_or_else(|| {
+                    let mutex = Arc::new(tokio::sync::Mutex::new(()));
+                    locks.insert(project.to_owned(), Arc::downgrade(&mutex));
+                    mutex
+                })
+        };
+        lifecycle.lock_owned().await
+    }
+
     fn worktree_facts(&self, id: &str, project: &Path, parent: Option<&super::SessionIo>) -> Facts {
         if let Some(parent) = parent {
             let mut facts = self.session_facts(parent, id, CancellationToken::new());
@@ -127,7 +145,7 @@ impl ToolIo {
         restoring: Option<&Path>,
     ) -> Result<Created> {
         worktree::check_name(name).map_err(|e| crate::worktrees::feature(&e))?;
-        let _guard = self.worktree_lifecycle.lock().await;
+        let _guard = self.lock_worktrees(project).await;
         let parent = parent_id.and_then(|p| self.session(p).ok());
         let facts = self.worktree_facts(parent_id.unwrap_or(id), project, parent.as_deref());
         let request =
@@ -135,13 +153,18 @@ impl ToolIo {
         if let Some(hooks) = self.hook_service()
             && let Some(plan) = hooks.plan(&facts, &request).await
         {
-            let existing = entries(&worktree::worktrees_dir(project))?;
+            let native = std::fs::canonicalize(project).map_err(|e| refused(e.to_string()))?;
+            let base = worktree::worktrees_dir(&native);
+            let parent =
+                piarc_fs::DirectoryBinding::capture(&base).map_err(|e| refused(e.to_string()))?;
+            let existing = entries(&base)?;
             let answer = hooks
                 .execute(&facts, &request, plan, self.exec.hook_launch().await)
                 .await;
             if let Some(reason) = answer.decision.block {
                 return Err(refused(reason));
             }
+            parent.verify().map_err(|e| refused(e.to_string()))?;
             let raw = answer
                 .decision
                 .worktree_path
@@ -249,12 +272,23 @@ impl ToolIo {
         discard: bool,
         release: bool,
     ) -> Result<bool> {
-        let _guard = self.worktree_lifecycle.lock().await;
+        let _guard = self.lock_worktrees(project).await;
         let Some(owner) = self.hook_owner(path).await? else {
             return Ok(false);
         };
         if owner.workspace != path_text(project) || owner.session_id != session_id {
             return Err(refused("Worktree belongs to another session or workspace"));
+        }
+        match std::fs::symlink_metadata(path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // The hook already removed it; a previous run may have failed to mark the session.
+                if release {
+                    self.release_worktree_owner(path, &owner.session_id).await?;
+                }
+                return Ok(true);
+            }
+            Err(e) => return Err(refused(format!("Cannot inspect hook worktree: {e}"))),
+            Ok(_) => {}
         }
         let (binding, identity) = bound(project, path)?;
         if owner.identity != identity {
@@ -306,12 +340,18 @@ impl ToolIo {
             }
         }
         if release {
-            let storage = &self.policy.as_ref().ok_or(Error::NoDataDirectory)?.storage;
-            let key = path_text(path);
-            storage
-                .run(move |s| s.release_hook_worktree(&key, &owner.session_id))
-                .await??;
+            self.release_worktree_owner(path, &owner.session_id).await?;
         }
         Ok(true)
+    }
+
+    async fn release_worktree_owner(&self, path: &Path, session: &str) -> Result<()> {
+        let storage = &self.policy.as_ref().ok_or(Error::NoDataDirectory)?.storage;
+        let key = path_text(path);
+        let session = session.to_owned();
+        storage
+            .run(move |s| s.release_hook_worktree(&key, &session))
+            .await??;
+        Ok(())
     }
 }

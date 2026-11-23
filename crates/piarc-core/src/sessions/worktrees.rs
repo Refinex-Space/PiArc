@@ -270,24 +270,27 @@ impl Hub {
                 });
             }
             let workspace = Path::new(&workspace);
-            if tree.removed_at.is_none()
-                || path.try_exists().map_err(|e| Error::Internal {
-                    reason: e.to_string(),
-                })?
-            {
+            if tree.removed_at.is_none() {
                 return crate::tool_io::ToolIo::verify_hook_worktree(workspace, &path, &owner);
             }
-            self.ctx
-                .tool_io
-                .make_worktree(
-                    id,
-                    workspace,
-                    &owner.name,
-                    tree.branch.as_deref(),
-                    None,
-                    Some(&path),
-                )
-                .await?;
+            if path.try_exists().map_err(|e| Error::Internal {
+                reason: e.to_string(),
+            })? {
+                // A previous restore completed the hook before it could clear removed_at.
+                crate::tool_io::ToolIo::verify_hook_worktree(workspace, &path, &owner)?;
+            } else {
+                self.ctx
+                    .tool_io
+                    .make_worktree(
+                        id,
+                        workspace,
+                        &owner.name,
+                        tree.branch.as_deref(),
+                        None,
+                        Some(&path),
+                    )
+                    .await?;
+            }
             let key = id.to_owned();
             self.ctx
                 .storage

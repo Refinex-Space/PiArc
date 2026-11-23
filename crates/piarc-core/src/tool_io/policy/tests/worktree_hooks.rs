@@ -64,6 +64,8 @@ async fn worktree_hooks_bind_a_directory_and_refuse_unsafe_or_failed_removal() {
     f.write_user_settings(SETTINGS);
     assert!(remove("owner", true).await.unwrap());
     assert!(!tree.path.exists());
+    // If recording the removal failed after the hook returned, the retry is idempotent.
+    assert!(remove("owner", true).await.unwrap());
     assert!(f.io.hook_owner(&tree.path).await.unwrap().is_some());
     let reopened =
         f.io.make_worktree("owner", &project, "review", None, None, Some(&tree.path))

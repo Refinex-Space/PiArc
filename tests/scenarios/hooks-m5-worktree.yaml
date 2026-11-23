@@ -11,10 +11,22 @@ workspace:
 providers:
   main:
     wire: anthropic
-    steps: [{ text: Done. }]
+    steps:
+      - tool_calls:
+          - id: nested
+            name: Agent
+            input:
+              {
+                description: Inspect,
+                prompt: Inspect.,
+                subagent_type: general-purpose,
+                isolation: worktree,
+              }
+      - text: The creation hook refused the second directory.
 sessions:
-  main: { provider: main, worktree: { name: review } }
+  main: { provider: main, mode: acceptEdits, worktree: { name: review } }
 actions:
+  - write_file: { path: fail-create, content: fail }
   - prompt: { text: Start., turn: one }
   - wait: { method: turn/completed, turn: one }
   - check_worktree: { fields: { path: .piarc/worktrees/isolated-review, exists: true } }
@@ -28,4 +40,7 @@ actions:
   - remove_worktree: { discard: true }
   - check_worktree: { fields: { exists: false, removed: true } }
 expect:
-  request_counts: { main: 1 }
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results: [{ id: nested, is_error: true, contains: fixture create failed }]
