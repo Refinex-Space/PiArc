@@ -2,7 +2,7 @@
 //! branch, when its cleanup is due after archiving, whether the cleanup waits for the user, and
 //! when it was removed. The cleanup rules are `piarc-core::worktrees`'.
 
-use rusqlite::params;
+use rusqlite::{OptionalExtension, params};
 
 use crate::error::{Error, Result};
 use crate::store::Store;
@@ -33,7 +33,67 @@ pub struct DueWorktree {
     pub path: String,
 }
 
+/// The Core-owned record of a directory created by a WorktreeCreate hook.
+#[derive(Debug, Clone)]
+pub struct HookWorktree {
+    /// Main workspace whose trusted settings select the hooks.
+    pub workspace: String,
+    /// Session that requested the directory.
+    pub session_id: String,
+    /// Original name passed to the hook, reused when restoring.
+    pub name: String,
+    /// Filesystem object identity at creation.
+    pub identity: String,
+}
+
 impl Store {
+    /// # Errors
+    /// Returns a database error if ownership cannot be read.
+    pub fn hook_worktree(&self, path: &str) -> Result<Option<HookWorktree>> {
+        self.conn
+            .query_row(
+                "SELECT workspace, session_id, name, identity FROM hook_worktrees WHERE path = ?1",
+                [path],
+                |row| {
+                    Ok(HookWorktree {
+                        workspace: row.get(0)?,
+                        session_id: row.get(1)?,
+                        name: row.get(2)?,
+                        identity: row.get(3)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Error::sqlite("cannot read hook worktree ownership"))
+    }
+
+    /// Records a new directory or a directory restored for the same owner.
+    ///
+    /// # Errors
+    /// Returns a database error if registration fails. Another owner's record is preserved.
+    pub fn register_hook_worktree(&self, path: &str, tree: &HookWorktree) -> Result<bool> {
+        self.conn.execute("INSERT INTO hook_worktrees(path,workspace,session_id,name,identity)
+            SELECT ?1,?2,?3,?4,?5 WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE worktree=?1 AND id<>?3)
+            ON CONFLICT(path) DO UPDATE SET identity=excluded.identity
+            WHERE workspace=excluded.workspace AND session_id=excluded.session_id AND name=excluded.name",
+            params![path, tree.workspace, tree.session_id, tree.name, tree.identity])
+            .map(|n| n == 1).map_err(Error::sqlite("cannot register hook worktree ownership"))
+    }
+
+    /// Releases ownership after the hook removed a directory that will not be restored.
+    ///
+    /// # Errors
+    /// Returns a database error if the record cannot be deleted.
+    pub fn release_hook_worktree(&self, path: &str, id: &str) -> Result<()> {
+        self.conn
+            .execute(
+                "DELETE FROM hook_worktrees WHERE path=?1 AND session_id=?2",
+                params![path, id],
+            )
+            .map(drop)
+            .map_err(Error::sqlite("cannot release hook worktree ownership"))
+    }
+
     /// Records the worktree of session `id` (T35): its directory and branch. Returns false when
     /// the index has no row for it yet.
     ///

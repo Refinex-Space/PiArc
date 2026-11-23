@@ -1,0 +1,31 @@
+id: hooks-m5-worktree
+description: A trusted hook creates an isolated directory in a non-Git workspace. Cleanup waits for confirmation and a failing removal preserves the directory.
+capabilities: [CAP-HOOK-WORKTREE-001, CAP-HOOK-M5-001]
+workspace:
+  trusted: true
+  fixtures:
+    worktree.mjs: hooks/worktree.mjs.txt
+  files:
+    .piarc/settings.json: |
+      {"hooks":{"WorktreeCreate":[{"hooks":[{"type":"command","command":"node worktree.mjs"}]}],"WorktreeRemove":[{"hooks":[{"type":"command","command":"node worktree.mjs"}]}]}}
+providers:
+  main:
+    wire: anthropic
+    steps: [{ text: Done. }]
+sessions:
+  main: { provider: main, worktree: { name: review } }
+actions:
+  - prompt: { text: Start., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_worktree: { fields: { path: .piarc/worktrees/isolated-review, exists: true } }
+  - set_prefs: { archived: true }
+  - advance_clock: { seconds: 2592001 }
+  - sweep_worktrees: { waiting: [main] }
+  - write_file: { path: fail-remove, content: fail }
+  - remove_worktree: { discard: true, succeeds: false }
+  - check_files: { files: { .piarc/worktrees/isolated-review/created.txt: review } }
+  - write_file: { path: fail-remove, content: 'off' }
+  - remove_worktree: { discard: true }
+  - check_worktree: { fields: { exists: false, removed: true } }
+expect:
+  request_counts: { main: 1 }

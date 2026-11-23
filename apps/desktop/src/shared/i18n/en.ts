@@ -1144,6 +1144,7 @@ export const en = {
 
   'dialog.archiveWorktree.message':
     '{count, plural, one {The session’s worktree has # uncommitted change. Archive it anyway?} other {The session’s worktree has # uncommitted changes. Archive it anyway?}}',
+  'dialog.archiveWorktree.uninspected': 'PiArc cannot inspect changes in this hook-created directory. Keep it when archiving?',
   'dialog.archiveWorktree.detail':
     'Keep the worktree: the session is archived and the worktree stays; its cleanup 30 days later asks again if it still has changes. Discard: the changes are thrown away and the worktree is removed. Its branch stays either way.',
   'dialog.archiveWorktree.keep': 'Keep worktree and archive',

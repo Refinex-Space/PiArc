@@ -76,7 +76,7 @@ impl Hub {
                 Ok(opened)
             }
             (Err(error), Some(created)) => {
-                self.discard_worktree(&workspace.path, &created).await;
+                self.discard_worktree(&id, &workspace.path, &created).await;
                 Err(error)
             }
             (Err(error), None) => Err(error),

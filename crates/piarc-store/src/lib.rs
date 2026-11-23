@@ -56,4 +56,4 @@ pub use records::{AuditEvent, AuditFilter, TrustDecision, TrustRecord, Workspace
 pub use search::{SearchHit, SessionHits};
 pub use store::{BUSY_TIMEOUT, CACHE_KIB, Store};
 pub use usage::{RequestTokens, UsageGroup, UsageSession};
-pub use worktrees::{DueWorktree, WorktreeRecord};
+pub use worktrees::{DueWorktree, HookWorktree, WorktreeRecord};

@@ -1107,6 +1107,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
     '{hours, plural, =0 {{minutes, plural, =0 {{seconds} 秒} other {{minutes} 分 {seconds} 秒}}} other {{hours} 小时 {minutes} 分}}',
 
   'dialog.archiveWorktree.message': '会话的 worktree 有 {count} 处未提交的改动。仍要归档吗？',
+  'dialog.archiveWorktree.uninspected': 'PiArc 无法核实 hook 创建的目录里有哪些改动。归档时保留它吗？',
   'dialog.archiveWorktree.detail':
     '保留 worktree：会话归档，worktree 保留；30 天后清理时如果仍有改动会再次询问。丢弃：改动被丢弃，worktree 被删除。两种选择都保留分支。',
   'dialog.archiveWorktree.keep': '保留 worktree 并归档',

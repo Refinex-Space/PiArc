@@ -111,6 +111,7 @@ export function partialReport(turns: number, report: string): string {
 
 /** Follows the report of an isolated run whose worktree has changes (T35). */
 export function worktreeKept(path: string, branch: string): string {
+  if (!branch) return `[The hook-created work directory was kept for inspection: ${path}]`;
   return (
     `[The subagent worked in its own git worktree, which keeps its changes: ${path} ` +
     `(branch ${branch}). Review or merge them from there.]`

@@ -49,6 +49,7 @@ mod tasks;
 mod terminals;
 mod web;
 mod web_search;
+mod worktree_hooks;
 pub(crate) use web_search::chosen_backend as chosen_search_backend;
 
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
@@ -231,6 +232,8 @@ pub struct ToolIo {
     config: Arc<ToolIoConfig>,
     /// One file is written by one request at a time, whichever session sends it.
     locks: files::Locks,
+    /// Serializes worktree ownership checks with creation and removal.
+    worktree_lifecycle: Arc<tokio::sync::Mutex<()>>,
     /// Shells, environment and runner of commands.
     exec: Arc<exec::Exec>,
     policy: Option<policy::Services>,
@@ -277,6 +280,7 @@ impl ToolIo {
             sessions: Arc::default(),
             config: Arc::new(config),
             locks: Arc::default(),
+            worktree_lifecycle: Arc::default(),
             exec: Arc::new(exec),
             policy: None,
             checkpoints: None,

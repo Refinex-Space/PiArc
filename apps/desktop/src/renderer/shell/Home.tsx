@@ -271,7 +271,7 @@ function useWorktreeChoice(workspace: string | undefined): WorktreeChoice {
         const value: unknown = JSON.parse(text);
         const answer =
           typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-        if (answer.repository !== true) {
+        if (answer.repository !== true && answer.hook !== true) {
           setBranches(false);
           return;
         }

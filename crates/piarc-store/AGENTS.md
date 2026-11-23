@@ -17,6 +17,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - 表用 `STRICT`；时间是 Unix 毫秒；路径列存 UTF-8 文本（非 UTF-8 路径拒绝为 `NonUtf8Path`）。
 
 - schema v5（T28，ADR-0044）：`checkpoints`（自增 id 即回合顺序，会话与回合 id 唯一）、`checkpoint_files`（自增 id 即写入顺序，前后内容的十六进制 SHA-256，空值表示文件不存在，`operation` 为 `create`/`modify`/`restore`/`undo`/`discard`，`restore_id` 是恢复批次，随检查点级联删除）、`checkpoint_sessions`（最近访问时间，30 天清理用）。读写在 `src/checkpoints.rs`，规则在 `piarc-checkpoint`，编排在 `piarc-core::checkpoints`；`referenced_snapshots` 是回收时仍被引用的哈希集合。
+- schema v12（T48，ADR-0068）：`hook_worktrees` 持久化 hook 目录的工作区、会话、名称与文件系统身份；目录被清理后仍保留归属，供原会话恢复。
 - schema v11（T41，ADR-0059）：`usage_records` 每次模型请求一行（assistant 消息的 `usage` 为类别 `model`，`piarc.auxiliaryUsage` 与 Pi 的 `usage` 条目为 `auxiliary` 并带用途），由 `pi_session::SessionMeta::fold` 返回的 `Folded.usage` 在索引扫描的同一事务写入，删除与重建的路径与 `session_text` 相同（`delete_texts` 一起删）；`model_prices` 是 Core 见到的目录价。查询在 `src/usage.rs`（`usage_groups` 按会话、类别、用途、模型求和，`usage_requests` 给分档计价逐请求读，`usage_sessions`、`put_model_prices`、`model_prices`）；计价在 `piarc-core::usage`。迁移清空 `session_files`，已有会话重扫一次。
 - schema v10（T40，ADR-0058）：`packages`（id、类别、来源类别与地址、安装目录、git 提交、版本、npm 完整性值、已确认可执行项名称的 JSON 数组、时间），读写在 `src/packages.rs`（`put_package`、`package`、`packages`、`remove_package`）；是否启用与作用域在设置的 `plugins` 键，不在这张表。
 - schema v9（T36，ADR-0053）：`mcp_servers(workspace, name, enabled, changed_at)` 记用户对某工作区某 MCP server 的启停（`src/mcp.rs` 的 `set_mcp_enabled`、`mcp_choices`）。

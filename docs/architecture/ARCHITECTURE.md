@@ -913,6 +913,8 @@ T35 落地（ADR-0052）：
 - 子 agent：`isolation: worktree`（定义或调用参数）时 Core 在 `subagent/start` 里建 `.piarc/worktrees/agent-<id>/`（基础为父会话工作树的当前 HEAD）、以它为子会话的文件根并答 `cwd`；结束时无未提交改动且 HEAD 未动则不加 `--force` 删除 worktree 与分支，否则保留并在 `subagent/finish` 的结果里给出路径与分支，Agent Host 接在报告后。
 - 归档与清理：归档前主进程查 worktree 的改动，有改动时原生对话框三选一（保留并归档 / 丢弃改动并删除 / 取消）；归档后 30 天到期（`worktree_cleanup_at`），Core 启动时与每 6 小时清理：无改动的删除目录、保留分支，有改动的标记等待用户（删除或再保留 30 天），git 拒绝时保留现场不强删；重新打开已清理的会话时按原分支重建 worktree。
 
+T48 增补（ADR-0068）：受信任的 `WorktreeCreate` 可以接管创建，stdout 指定 `.piarc/worktrees/` 下新建的直接子目录；`WorktreeRemove` 由同一工作区的当前设置选择。Core 在数据库中登记工作区、会话、请求名和目录身份，移除前核对。非 Git 目录的改动无法核实，到期清理和子会话结束时保留目录；用户在原生确认框选择移除后才执行 hook。hook 返回非零时保留失败原因。重开已清理的会话使用原所有者和路径重新创建。
+
 ### 6.13 多模型适配
 
 - **模型能力表**（Agent Host 维护，来源为 pi-ai 模型目录 + PiArc 覆盖配置）：上下文窗口、最大输出、视觉、工具调用可靠性等级、thinking/effort 档位、prompt cache 支持、服务端工具支持。

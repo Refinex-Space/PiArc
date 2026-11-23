@@ -2,7 +2,7 @@
 
 - 状态：已接受（2026-11-23，用户委托本次 T48 会话裁决）
 - 日期：2026-11-23
-- 涉及：T48-A07、架构第 6.12 节、[ADR-0052](0052-worktrees-search-and-desktop-integration.md) 第 1、3、4 条
+- 涉及：T48-A07、架构第 6.12 节、[ADR-0052](0052-worktrees-search-windows-and-background.md) 第 1、3、4 条
 
 ## 背景
 

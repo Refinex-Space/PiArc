@@ -628,6 +628,8 @@ impl Store {
             .map_err(Error::sqlite("cannot read sessions"))?;
         if let Some(file) = &file {
             delete_texts(&tx, id)?;
+            tx.execute("DELETE FROM hook_worktrees WHERE session_id = ?1", [id])
+                .map_err(Error::sqlite("cannot release deleted session worktree"))?;
             tx.execute("DELETE FROM sessions WHERE id = ?1", [id])
                 .map_err(Error::sqlite("cannot delete from sessions"))?;
             tx.execute("DELETE FROM session_files WHERE file_path = ?1", [file])

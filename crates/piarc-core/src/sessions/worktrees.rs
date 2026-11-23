@@ -39,17 +39,30 @@ impl Hub {
             .unwrap_or_else(|| id.chars().take(8).collect());
         self.ctx
             .worktrees
-            .create(workspace, &name, request.base.as_deref())
+            .create(id, workspace, &name, request.base.as_deref())
             .await
     }
 
     /// The session could not be created: its new worktree and branch go again.
-    pub(super) async fn discard_worktree(&self, workspace: &Path, created: &Created) {
+    pub(super) async fn discard_worktree(&self, id: &str, workspace: &Path, created: &Created) {
         let tree = &created.worktree;
+        match self
+            .ctx
+            .tool_io
+            .remove_hook_worktree(id, workspace, &tree.path, false, true)
+            .await
+        {
+            Ok(true) => return,
+            Ok(false) => {}
+            Err(error) => {
+                tracing::warn!(target: "piarc_core::worktrees", %error, "creation failed; hook directory retained");
+                return;
+            }
+        }
         if let Err(error) = self
             .ctx
             .worktrees
-            .remove(workspace, &tree.path, false)
+            .remove(id, workspace, &tree.path, false)
             .await
         {
             tracing::warn!(target: "piarc_core::worktrees", "cannot remove {}: {error}", tree.path.display());
@@ -101,7 +114,8 @@ impl Hub {
         let top = matches!(&checkout, Ok(c) if c.kind != piarc_git::CheckoutKind::NotGit
             && c.root == workspace);
         if !top {
-            return Ok(json!({ "repository": false }));
+            let hook = self.ctx.tool_io.offers_hook_worktree(&workspace).await;
+            return Ok(json!({ "repository": false, "hook": hook }));
         }
         let (current, branches) = self.ctx.worktrees.branches(&workspace).await?;
         Ok(json!({ "repository": true, "current": current, "branches": branches }))
@@ -154,14 +168,14 @@ impl Hub {
         let changes = if exists {
             self.ctx.worktrees.changes(&workspace, &tree).await?
         } else {
-            piarc_git::worktree::Changes::default()
+            Some(piarc_git::worktree::Changes::default())
         };
         Ok(json!({
             "path": path_text(&tree),
             "branch": piarc_git::worktree::head_branch(&tree),
             "exists": exists,
-            "changes": changes.total,
-            "files": changes.files,
+            "changes": changes.as_ref().map(|c| c.total),
+            "files": changes.map(|c| c.files).unwrap_or_default(),
         }))
     }
 
@@ -187,7 +201,7 @@ impl Hub {
         let path = PathBuf::from(&record.path);
         self.ctx
             .worktrees
-            .remove(&workspace, &path, discard)
+            .remove(&id, &workspace, &path, discard)
             .await?;
         let (key, at) = (id, self.ctx.worktrees.now());
         self.ctx
@@ -248,6 +262,39 @@ impl Hub {
             return Ok(());
         };
         let path = PathBuf::from(&tree.path);
+        if let Some(owner) = self.ctx.tool_io.hook_owner(&path).await? {
+            if owner.session_id != id || owner.workspace != workspace {
+                return Err(Error::InvalidArgument {
+                    field: "worktree",
+                    reason: "worktree ownership does not match the session".into(),
+                });
+            }
+            let workspace = Path::new(&workspace);
+            if tree.removed_at.is_none()
+                || path.try_exists().map_err(|e| Error::Internal {
+                    reason: e.to_string(),
+                })?
+            {
+                return crate::tool_io::ToolIo::verify_hook_worktree(workspace, &path, &owner);
+            }
+            self.ctx
+                .tool_io
+                .make_worktree(
+                    id,
+                    workspace,
+                    &owner.name,
+                    tree.branch.as_deref(),
+                    None,
+                    Some(&path),
+                )
+                .await?;
+            let key = id.to_owned();
+            self.ctx
+                .storage
+                .run(move |s| s.set_worktree_removed(&key, None))
+                .await??;
+            return Ok(());
+        }
         if tree.removed_at.is_none() || std::fs::symlink_metadata(&path).is_ok() {
             return Ok(());
         }

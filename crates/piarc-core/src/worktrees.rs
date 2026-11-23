@@ -107,14 +107,15 @@ impl Worktrees {
     /// Creates worktree `name` of the repository at `workspace` (its top level) from `base`.
     pub async fn create(
         &self,
+        session: &str,
         workspace: &Path,
         name: &str,
         base: Option<&str>,
     ) -> Result<Created> {
-        let git = self.git(workspace).await?;
-        let created = worktree::create(&git, workspace, name, base)
-            .await
-            .map_err(|e| feature(&e))?;
+        let created = self
+            .tool_io
+            .make_worktree(session, workspace, name, base, None, None)
+            .await?;
         tracing::info!(target: "piarc_core::worktrees", path = %created.worktree.path.display(),
             branch = %created.worktree.branch, copied = created.copied.len(), "worktree created");
         Ok(created)
@@ -130,13 +131,28 @@ impl Worktrees {
     }
 
     /// Uncommitted changes of the worktree at `path`.
-    pub async fn changes(&self, workspace: &Path, path: &Path) -> Result<Changes> {
+    pub async fn changes(&self, workspace: &Path, path: &Path) -> Result<Option<Changes>> {
+        if self.tool_io.hook_owner(path).await?.is_some()
+            && !ToolIo::linked_worktree(workspace, path)
+        {
+            return Ok(None);
+        }
         let git = self.git(workspace).await?;
-        worktree::changes(&git, path).await.map_err(|e| feature(&e))
+        worktree::changes(&git, path)
+            .await
+            .map(Some)
+            .map_err(|e| feature(&e))
     }
 
     /// Removes the worktree at `path` (forced: the user chose to discard its changes).
-    pub async fn remove(&self, workspace: &Path, path: &Path, force: bool) -> Result<()> {
+    pub async fn remove(&self, id: &str, workspace: &Path, path: &Path, force: bool) -> Result<()> {
+        if self
+            .tool_io
+            .remove_hook_worktree(id, workspace, path, force, false)
+            .await?
+        {
+            return Ok(());
+        }
         let git = self.git(workspace).await?;
         worktree::remove(&git, workspace, path, force)
             .await
@@ -195,8 +211,21 @@ impl Worktrees {
 
     /// Removes one due worktree when clean (true); marks it to wait when changed (false).
     async fn sweep_one(&self, id: &str, workspace: &Path, path: &Path) -> Result<bool> {
-        let gone = std::fs::symlink_metadata(path).is_err();
-        if !gone && !self.changes(workspace, path).await?.is_clean() {
+        let gone = match std::fs::symlink_metadata(path) {
+            Ok(_) => false,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => true,
+            Err(e) => {
+                return Err(Error::Internal {
+                    reason: e.to_string(),
+                });
+            }
+        };
+        if !gone
+            && !self
+                .changes(workspace, path)
+                .await?
+                .is_some_and(|c| c.is_clean())
+        {
             let key = id.to_owned();
             self.storage
                 .run(move |s| s.set_worktree_cleanup(&key, None, true))
@@ -204,7 +233,9 @@ impl Worktrees {
             return Ok(false);
         }
         // Without force: a change made since the check above makes git refuse.
-        self.remove(workspace, path, false).await?;
+        if !gone || self.tool_io.hook_owner(path).await?.is_none() {
+            self.remove(id, workspace, path, false).await?;
+        }
         let (key, at) = (id.to_owned(), self.now());
         self.storage
             .run(move |s| s.set_worktree_removed(&key, Some(at)))

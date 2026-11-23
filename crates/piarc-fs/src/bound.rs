@@ -112,7 +112,11 @@ impl DirectoryBinding {
         base.descend(canonical).map_err(|e| Error::io(canonical, e))
     }
 
-    pub(crate) fn existing_directory(canonical: &Path) -> Result<Self> {
+    /// Binds an existing directory without following links and confirms its identity.
+    ///
+    /// # Errors
+    /// Returns an error when the canonical directory cannot be bound.
+    pub fn existing_directory(canonical: &Path) -> Result<Self> {
         let binding = Self::capture(canonical)?;
         if binding.path != canonical {
             return Err(Error::coded(
@@ -123,6 +127,12 @@ impl DirectoryBinding {
         }
         binding.verify()?;
         Ok(binding)
+    }
+
+    /// Filesystem device and file index of this bound directory.
+    #[must_use]
+    pub fn identity(&self) -> (u64, u64) {
+        self.identity
     }
 
     fn new(path: PathBuf, dir: Dir) -> io::Result<Self> {

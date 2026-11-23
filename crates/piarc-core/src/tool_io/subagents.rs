@@ -68,6 +68,7 @@ pub(super) struct Link {
 /// A subagent's temporary worktree (T35).
 #[derive(Debug, Clone)]
 pub(crate) struct AgentWorktree {
+    session_id: String,
     /// The workspace whose repository holds it.
     pub project: std::path::PathBuf,
     pub path: std::path::PathBuf,
@@ -359,7 +360,9 @@ impl ToolIo {
         let parent_cwd = parent.scope.cwd();
         match p.isolation {
             Some(SubagentIsolation::Worktree) => {
-                let tree = self.agent_worktree(&p.session_id, parent).await?;
+                let tree = self
+                    .agent_worktree(&p.session_id, &p.parent_session_id, parent)
+                    .await?;
                 // The canonical root carries Windows' `\\?\` prefix and the cwd does not (W3).
                 let root = piarc_git::strip_verbatim(parent.scope.root().to_path_buf());
                 let below = parent_cwd
@@ -381,26 +384,37 @@ impl ToolIo {
     async fn agent_worktree(
         &self,
         id: &str,
+        parent_id: &str,
         parent: &SessionIo,
     ) -> Result<AgentWorktree, ErrorObject> {
         // Git cannot take a verbatim `\\?\C:\…` path: it becomes `//?/C:/…` (W3).
         let project = piarc_git::strip_verbatim(parent.project().to_path_buf());
-        let git = self.git_runner(&project).await?;
-        let base = piarc_git::worktree::head(&git, parent.scope.root())
-            .await
-            .map_err(|e| e.to_error_object())?;
+        let base = if piarc_git::resolve(parent.scope.root())
+            .is_ok_and(|c| c.kind != piarc_git::CheckoutKind::NotGit)
+        {
+            let git = self.git_runner(&project).await?;
+            Some(
+                piarc_git::worktree::head(&git, parent.scope.root())
+                    .await
+                    .map_err(|e| e.to_error_object())?,
+            )
+        } else {
+            None
+        };
         let short: String = id
             .chars()
             .filter(char::is_ascii_alphanumeric)
             .take(8)
             .collect();
         let name = format!("{}{short}", piarc_git::worktree::AGENT_PREFIX);
-        let created = piarc_git::worktree::create(&git, &project, &name, Some(&base))
+        let created = self
+            .make_worktree(id, &project, &name, base.as_deref(), Some(parent_id), None)
             .await
             .map_err(|e| e.to_error_object())?;
         tracing::info!(target: "piarc_core::worktrees", session = %id,
             path = %created.worktree.path.display(), "subagent worktree created");
         Ok(AgentWorktree {
+            session_id: id.to_owned(),
             project,
             path: created.worktree.path,
             branch: created.worktree.branch,
@@ -427,7 +441,12 @@ impl ToolIo {
             path: piarc_fs::display(&tree.path),
             branch: tree.branch.clone(),
         };
-        let git = self.git_runner(&tree.project).await.ok()?;
+        if tree.base.is_empty() {
+            return Some(kept);
+        }
+        let Ok(git) = self.git_runner(&tree.project).await else {
+            return Some(kept);
+        };
         let untouched = async {
             let clean = piarc_git::worktree::changes(&git, &tree.path)
                 .await?
@@ -440,6 +459,17 @@ impl ToolIo {
             Ok(false) => return Some(kept),
             Err(error) => {
                 tracing::warn!(target: "piarc_core::worktrees", "cannot inspect {}: {error}", kept.path);
+                return Some(kept);
+            }
+        }
+        match self
+            .remove_hook_worktree(&tree.session_id, &tree.project, &tree.path, false, true)
+            .await
+        {
+            Ok(true) => return None,
+            Ok(false) => {}
+            Err(error) => {
+                tracing::warn!(target: "piarc_core::worktrees", %error, "subagent hook worktree retained");
                 return Some(kept);
             }
         }

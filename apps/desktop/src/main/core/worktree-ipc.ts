@@ -44,11 +44,14 @@ function workspace(value: unknown): string {
 }
 
 /** The worktree status Core reported, or `undefined` for a session without a worktree. */
-export function worktreeChanges(text: string): { path: string; changes: number } | undefined {
+export function worktreeChanges(
+  text: string,
+): { path: string; changes: number | null } | undefined {
   const value: unknown = JSON.parse(text);
   if (typeof value !== 'object' || value === null) return undefined;
   const status = value as Record<string, unknown>;
-  return typeof status.path === 'string' && typeof status.changes === 'number'
+  return typeof status.path === 'string' &&
+    (typeof status.changes === 'number' || status.changes === null)
     ? { path: status.path, changes: status.changes }
     : undefined;
 }
@@ -75,7 +78,7 @@ async function archive(
   window: BrowserWindow | null,
   id: string,
 ): Promise<boolean> {
-  let status: { path: string; changes: number } | undefined;
+  let status: { path: string; changes: number | null } | undefined;
   try {
     status = worktreeChanges(await core.sessionWorktreeStatus(id));
   } catch {
@@ -83,10 +86,13 @@ async function archive(
     status = undefined;
   }
   let discard = false;
-  if (status !== undefined && status.changes > 0) {
+  if (status !== undefined && (status.changes === null || status.changes > 0)) {
     const response = await ask(window, {
       type: 'warning',
-      message: t.t('dialog.archiveWorktree.message', { count: String(status.changes) }),
+      message:
+        status.changes === null
+          ? t.t('dialog.archiveWorktree.uninspected')
+          : t.t('dialog.archiveWorktree.message', { count: String(status.changes) }),
       detail: [status.path, t.t('dialog.archiveWorktree.detail')].join('\n'),
       buttons: [
         t.t('dialog.archiveWorktree.keep'),
