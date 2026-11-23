@@ -32,10 +32,10 @@ impl Request {
         text: String,
     ) -> Result<Value> {
         check_panel(&panel_id)?;
-        if text.trim().is_empty() || text.len() > 1024 * 1024 {
+        if text.trim().is_empty() || text.encode_utf16().count() > 1_000_000 {
             return Err(Error::InvalidArgument {
                 field: "text",
-                reason: "expected a non-empty question of at most 1 MiB".into(),
+                reason: "expected a non-empty question of at most 1,000,000 UTF-16 units".into(),
             });
         }
         let params = SideChatAskParams {
