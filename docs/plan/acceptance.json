@@ -4780,8 +4780,8 @@
       "id": "T49-A12",
       "task": "T49",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "macOS arm64：npm run verify 退出 0，17/17 PASS。Vitest 171 个文件通过；L2 252 通过、3 项仅适用 Windows，MISSING 0。target/verify/last-pass.json 记录 f11a450。上一轮唯一失败的内置命令清单已补上对 btw 的精确断言，piarc-config 76/76。见 tmp/evidence/T49/verify-final.log、config-registry-final.log。"
     },
     {
       "id": "T50-A01",

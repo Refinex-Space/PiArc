@@ -180,7 +180,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 部分完成 | 03b7ed1 |
-| T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 进行中 | — |
+| T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 已完成 | f11a450 |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | W4 | [Windows：M4 达标与 Beta 同步](tasks/W4-windows-m4-parity-and-beta.md) | 6 | R5、T50 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T51 | [Beta 端到端验收](tasks/T51-beta-acceptance.md) | 6 | W4 | macOS 与 Windows | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,16 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-### T49 侧边对话与平台快捷操作
-
-- [x] 开工基线复用 750d144，772 项验收清单通过。T48 的会话历史与缓存前缀已有验证，待补的原生桌面与 Windows CI 证据可单独追踪。
-- [x] ADR-0069 记录外部草稿的约束，用户委托裁决。
-- [x] 侧边会话、工具拒绝与计量已实现。真实 Pi 的 mock 请求与文件比对通过，见 ADR-0070、`tmp/evidence/T49/final-feature-tests.log`、`side-store-tests.log`。权限恢复后，正式 L2 side-chat-isolation 通过（四次请求、两次侧聊用量、无 Core 工具 I/O），见 side-isolation-native.json。全量 macOS L2 共 255 项，252 项通过、3 项仅适用于 Windows。生成能力文档后漂移检查通过（MISSING 0）。
-- [x] 停靠面板、停止、复制、快捷键和内置命令通过实际 Shell 的 DOM 测试。A04–A05 的原生 Playwright 在 dev 与 packaged 均通过，相关用例 24/24；亮暗截图、axe 结果与 ego-browser 实操截图在 tmp/evidence/T49/。
-- [x] App Intents 原型与正式包、签名与实机清单已准备好。用户确认原型可发现并运行，正式动作进入正确工作区、草稿原样显示且未自动发送。布局 28/28、发布 fuse 9/9、隔离主窗口启动通过。用户接受以实机文字记录代替截图，A09 已通过。A08 已核对 cdb81a0 的 macOS CI，arm64 与 x64 发布打包均通过。
-- [x] 外部预填与 Windows 跳转列表通过本地单测。A11 的 Windows x64 CI 已核对（cdb81a0，跳转列表 2/2、启动路由 7/7）；实机步骤登记到 I229。
-- [ ] 全量检查、证据与文档（A12）。
 
 ## 登记事项
 
@@ -1234,3 +1224,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 在干净提交 03b7ed1 运行 `npm run verify` 为 12/17（`tmp/evidence/T48/verify.log`）。同提交独立构建两种 Core 模块、API 声明快照及 renderer 通过；Core 单测 237 项通过，独立计时测试也通过。受限模块涉及 NAPI 与 bundle 目录清理、进程检查、真实 Seatbelt、L2 和缺少其报告的威胁映射。单独核对威胁映射通过（14 条威胁、59 个对策、170 个测试 ID）。
 - A11 的 10 项能力均已登记，本次生成与漂移复核均为 MISSING 0；环境生成稿保存在 `tmp/evidence/T48/capabilities-final.md`，报告在 `l2-final.json`。在可运行 Seatbelt 与 Electron 的 macOS 会话中重新跑全量 L2 和 T48 Playwright，用成功的 L2 报告重新生成 `docs/product/capabilities.md`，提交后执行 `npm run verify` 并核对对应 Windows CI。开工时还按协议用既有 CI 原始日志关闭了 T46-A13 和 R5-A01。
 - 看板下一项 T49 在 macOS 执行。当前环境不能建立绿色开工基线，优先复验 T48。
+
+### 2026-11-23 T49 已完成（全量验证提交 f11a450）
+
+- 12 项验收全部通过。侧边对话从已完成回合取得上下文，独立停止，关面板丢弃，工具拒绝与用量单列。专用外部草稿路由与侧边会话设计见 ADR-0069、ADR-0070。
+- macOS arm64 的 `npm run verify` 17/17，完整 L2 252 项通过、3 项仅适用于 Windows，能力覆盖 MISSING 0。桌面定向 Playwright 的 dev、packaged 各 12/12，ego-browser 实操、侧边面板亮暗 axe 检查通过。证据在 `tmp/evidence/T49/verify-final.log`、`native-playwright-final.log`、`ego-native-side-chat.png`。
+- 用户在快捷指令中找到并运行原型，又在正式包确认工作区正确、草稿原样显示、没有自动发送；本次接受文字记录代替截图。两个 macOS 发布架构的打包、动作元数据、签名与 fuse 均有 CI 记录，见 [工程记录](../engineering/app-intents.md)。
+- [Windows x64 CI](https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269417) 在 cdb81a0 上的跳转列表与启动路由测试通过，整个 Vitest 1844/1844。该版 Windows 全量为 16/17，唯一失败的 Rust 命令清单断言已在 6a562f6 补齐并通过本机全量。Windows 菜单的实机显示与点击由 W4 按 I229 验证。下一项为 T50（macOS）。
