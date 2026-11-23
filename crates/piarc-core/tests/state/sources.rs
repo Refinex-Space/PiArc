@@ -149,11 +149,9 @@ fn every_source_is_reported_with_its_state_and_a_change_refreshes_it() {
     let user_reviewer = named(&agents, "home/.claude/agents/reviewer.md");
     assert_eq!(user_reviewer["status"], "ignored");
     assert_eq!(user_reviewer["overridden"][0]["pointer"], "/reviewer");
-    assert!(
-        user_reviewer["overridden"][0]["sourceFile"]
-            .as_str()
-            .expect("source file")
-            .ends_with("ws 来源/.claude/agents/reviewer.md")
+    assert_eq!(
+        user_reviewer["overridden"][0]["sourceFile"],
+        project_reviewer["file"]
     );
     let broken = named(&agents, "broken.md");
     assert_eq!(broken["status"], "invalid");
