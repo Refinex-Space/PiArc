@@ -78,6 +78,9 @@ export function failures(verdicts) {
   });
 }
 
+export const NO_BASELINE_REASON =
+  'no baseline for this platform, machine class and lane, and no --absolute: nothing judged';
+
 /**
  * The lines for values that nothing judged: no baseline for this platform, machine class and
  * lane, and no `--absolute`. A run like that would pass whatever it measured (R5: CI runners
@@ -92,7 +95,7 @@ export function unjudged(verdicts, absolute) {
     .filter((v) => v.baseline === undefined)
     .map(
       (v) =>
-        `${v.id}: no baseline for this platform, machine class and lane, and no --absolute: nothing judged ${Number.isInteger(v.value) ? String(v.value) : v.value.toFixed(2)} ${v.unit}`,
+        `${v.id}: ${NO_BASELINE_REASON} ${Number.isInteger(v.value) ? String(v.value) : v.value.toFixed(2)} ${v.unit}`,
     );
 }
 

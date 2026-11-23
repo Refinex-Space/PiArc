@@ -17,13 +17,22 @@
 // the size probe also needs the release build's installer (`-- --flavor release --make`).
 // The report goes to tmp/perf/<lane>/report.json; the exit code is 1 when anything failed.
 import { spawn } from 'node:child_process';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { isMain, isRecord, repoRoot, resolveBin } from '../lib/repo.mjs';
-import { baselineFile, failures, judge, machineClass, readBaselines, unjudged } from './gate.mjs';
+import {
+  baselineFile,
+  failures,
+  judge,
+  machineClass,
+  NO_BASELINE_REASON,
+  readBaselines,
+  unjudged,
+} from './gate.mjs';
 import { quantile } from './lib.mjs';
 import { METRICS } from './metrics.mjs';
 
@@ -111,7 +120,9 @@ export const PROBES = {
   'cold-start': {
     runs: { pr: 1, nightly: 1, long: 0 },
     async run(ctx) {
-      const out = path.join(ctx.out, 'cold-start.json');
+      // The standalone benchmark exits 1 when its maximum exceeds its absolute budget.
+      // Only a fresh, complete report can distinguish that case from a broken launch.
+      const out = path.join(ctx.out, `cold-start-${randomUUID()}.json`);
       const launches = ctx.lane === 'pr' ? 5 : 10;
       const { code } = await exec(node, [
         script('bench/t18-cold-start.mjs'),
@@ -123,7 +134,16 @@ export const PROBES = {
         out,
       ]);
       const result = await readResult(out).catch(() => undefined);
-      if (result === undefined) throw new Error(`the cold start bench failed (${String(code)})`);
+      if (
+        result === undefined ||
+        !Array.isArray(result.timingsMs) ||
+        result.timingsMs.length !== launches ||
+        (code !== 0 &&
+          !(code === 1 && numberAt(result, ['maxMs']) > numberAt(result, ['budgetMs'])))
+      ) {
+        throw new Error(`cold-start workload failed (exit ${String(code)})`);
+      }
+      await rename(out, path.join(ctx.out, 'cold-start.json'));
       return { values: { 'cold-start': numberAt(result, ['medianMs']) }, samples: launches };
     },
   },
@@ -144,7 +164,8 @@ export const PROBES = {
       const rounds = [...output.matchAll(/^round\s+\d+:.*open \+ resume\s+([\d.]+) ms/gmu)].map(
         (m) => Number(m[1]),
       );
-      if (rounds.length === 0) throw new Error('t14-warmup printed no rounds');
+      if (rounds.length !== 10)
+        throw new Error(`t14-warmup completed ${String(rounds.length)} of 10 rounds`);
       // The largest of the ten, as T14 and chapter 11 measure it (the example exits non-zero
       // when it is over the budget, which the verdict reports).
       return { values: { 'workspace-ready': Math.max(...rounds) }, samples: rounds.length };
@@ -195,7 +216,7 @@ export const PROBES = {
     runs: { pr: 1, nightly: 1, long: 0 },
     async run(ctx) {
       const out = path.join(ctx.out, 'event-channel.json');
-      await exec(node, [
+      const { code } = await exec(node, [
         script('bench/s2-event-channel.mjs'),
         '--form',
         ctx.form,
@@ -204,6 +225,7 @@ export const PROBES = {
         '--out',
         out,
       ]);
+      if (code !== 0) throw new Error(`event-channel workload failed (exit ${String(code)})`);
       const result = await readResult(out);
       return {
         values: {
@@ -221,20 +243,21 @@ export const PROBES = {
     runs: { pr: 1, nightly: 1, long: 0 },
     async run(ctx) {
       const out = path.join(ctx.out, 'transcript');
-      await exec(
+      const { code } = await exec(
         node,
         [
           resolveBin('@playwright/test', 'playwright'),
           'test',
           '--config',
-          path.join(repoRoot, 'apps', 'desktop', 'e2e', 't19.bench.config.ts'),
+          path.join(repoRoot, 'apps', 'desktop', 'e2e', 't44-transcript.bench.config.ts'),
           '--output',
           out,
         ],
         { ...process.env, PIARC_BENCH_SCALE: ctx.lane === 'pr' ? '0.25' : '1' },
       );
+      if (code !== 0) throw new Error(`transcript workload failed (exit ${String(code)})`);
       const dirs = await readdir(out);
-      const dir = dirs.find((d) => d.startsWith('t19.bench'));
+      const dir = dirs.find((d) => d.startsWith('t44-transcript.bench'));
       if (dir === undefined) throw new Error('the transcript bench wrote no timings');
       const result = await readResult(path.join(out, dir, 'timings.json'));
       const streaming = isRecord(result.streaming) ? result.streaming : {};
@@ -259,7 +282,7 @@ export const PROBES = {
     runs: { pr: 0, nightly: 1, long: 0 },
     async run(ctx) {
       const out = path.join(ctx.out, 'terminal.json');
-      await exec(node, [
+      const { code } = await exec(node, [
         script('bench/s7-terminal.mjs'),
         '--form',
         ctx.form,
@@ -270,6 +293,7 @@ export const PROBES = {
         '--out',
         out,
       ]);
+      if (code !== 0) throw new Error(`terminal workload failed (exit ${String(code)})`);
       const result = await readResult(out);
       return {
         values: {
@@ -305,8 +329,8 @@ function perfScript(name, runs, args = () => []) {
         out,
         ...args(ctx),
       ]);
-      const result = await readResult(out).catch(() => undefined);
-      if (result === undefined) throw new Error(`${name} failed (${String(code)})`);
+      if (code !== 0) throw new Error(`${name} failed (exit ${String(code)})`);
+      const result = await readResult(out);
       /** @type {Record<string, number>} */
       const values = {};
       if (isRecord(result.values)) {
@@ -387,6 +411,14 @@ async function fromReport(file, lane, only) {
   const wanted = METRICS.filter((m) =>
     only === undefined ? m.lanes.includes(lane) : only.includes(m.id),
   );
+  const savedErrors = report.measurementErrors ?? report.errors ?? [];
+  if (!Array.isArray(savedErrors) || !savedErrors.every((error) => typeof error === 'string')) {
+    throw new Error(`${file}: invalid performance errors`);
+  }
+  const errors =
+    report.measurementErrors === undefined
+      ? savedErrors.filter((error) => !error.includes(NO_BASELINE_REASON))
+      : savedErrors;
   const text = (/** @type {unknown} */ v) => (typeof v === 'string' ? v : undefined);
   // The machine that measured: its platform picks the budget and the baseline file.
   const platform = text(report.platform);
@@ -395,7 +427,7 @@ async function fromReport(file, lane, only) {
     wanted,
     values,
     samples: {},
-    errors: [],
+    errors,
     measuredAt: text(report.date) ?? 'unknown',
     host: {
       platform,
@@ -468,6 +500,7 @@ async function main() {
   // Recording a baseline is how an unjudged value gets judged next time.
   const nothingJudged =
     args['update-baseline'] === undefined ? unjudged(verdicts, args.absolute) : [];
+  const measurementErrors = [...new Set([...measured.errors, ...missing])];
   const report = {
     date: new Date().toISOString(),
     lane,
@@ -476,7 +509,8 @@ async function main() {
     absolute: args.absolute,
     verdicts,
     runs: measured.values,
-    errors: [...measured.errors, ...missing, ...nothingJudged],
+    measurementErrors,
+    errors: [...measurementErrors, ...nothingJudged],
   };
   // A judged report of another machine is not rewritten (it may be the file just read).
   if (!('host' in measured)) {
