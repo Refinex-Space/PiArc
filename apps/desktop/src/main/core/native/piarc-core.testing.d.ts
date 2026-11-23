@@ -191,6 +191,10 @@ export declare class CoreRuntime {
    * what the summary should focus on. Resolves with `{ turnId }`.
    */
   compact(id: string, instructions?: string | null): Promise<string>;
+  /** Asks a question in a panel's in-memory session. Resolves with `{text, stopped}`. */
+  askSideChat(id: string, panelId: string, text: string): Promise<string>;
+  /** Stops the panel's model request; closing also discards its history. */
+  controlSideChat(id: string, panelId: string, close: boolean): Promise<string>;
   /** The session's context usage by category (T27); resolves with the `ContextUsage` JSON. */
   contextUsage(id: string): Promise<string>;
   /**

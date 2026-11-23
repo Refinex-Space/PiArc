@@ -180,7 +180,13 @@ export class AppShell {
    * window, opening one when none is open.
    */
   launch(target: LaunchTarget): void {
-    if (this.main === null || this.main.isDestroyed()) {
+    // An external draft must not replace unsent input in a running window.
+    if (
+      target.kind === 'draft' ||
+      target.kind === 'newSession' ||
+      this.main === null ||
+      this.main.isDestroyed()
+    ) {
       this.openMain([target]);
       return;
     }

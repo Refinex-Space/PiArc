@@ -65,6 +65,10 @@ export type AhpMessage =
   | ModelsCredentialStatusResponse
   | SessionSetPermissionModeRequest
   | SessionSetPermissionModeResponse
+  | SideChatAskRequest
+  | SideChatAskResponse
+  | SideChatControlRequest
+  | SideChatControlResponse
   | SessionCompactRequest
   | SessionCompactResponse
   | SessionForkRequest
@@ -365,6 +369,10 @@ export type ModelsUpdated = Record<string, never>;
  * Acknowledgement that the mode entry is in the session.
  */
 export type SetPermissionModeResult = Record<string, never>;
+/**
+ * The requested panel has been stopped or closed.
+ */
+export type SideChatControlled = Record<string, never>;
 /**
  * Result of `session/steer` and `session/followUp`.
  */
@@ -2642,6 +2650,130 @@ export interface SessionSetPermissionModeResponse {
   id: RequestId;
   jsonrpc: JsonRpcVersion;
   result: SetPermissionModeResult;
+}
+/**
+ * Request for `session/sideChatAsk`.
+ */
+export interface SideChatAskRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/sideChatAsk';
+  params: SideChatAskParams;
+}
+/**
+ * One question in a panel's ephemeral conversation.
+ */
+export interface SideChatAskParams {
+  /**
+   * Distinct panel lifetime, including across windows.
+   */
+  panelId: string;
+  /**
+   * Parent conversation.
+   */
+  sessionId: SessionId;
+  /**
+   * User's question.
+   */
+  text: string;
+}
+/**
+ * Successful response to `session/sideChatAsk`.
+ */
+export interface SideChatAskResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SideChatAnswer;
+}
+/**
+ * Answer and accounting of the question, including partial answers on stop.
+ */
+export interface SideChatAnswer {
+  /**
+   * Provider failure after zero or more billable steps.
+   */
+  error?: string | null;
+  /**
+   * User stopped the answer.
+   */
+  stopped: boolean;
+  /**
+   * Text suitable for the panel.
+   */
+  text: string;
+  /**
+   * One entry per request with provider usage.
+   */
+  usage: SideChatUsage[];
+}
+/**
+ * Tokens billed to a side conversation, separately from the parent's JSONL.
+ */
+export interface SideChatUsage {
+  /**
+   * Cached input tokens read.
+   */
+  cacheRead: number;
+  /**
+   * Cache-write tokens.
+   */
+  cacheWrite: number;
+  /**
+   * One-hour writes, contained in cache_write.
+   */
+  cacheWrite1h: number;
+  /**
+   * Fresh input tokens.
+   */
+  input: number;
+  /**
+   * Session model.
+   */
+  model: ModelRef;
+  /**
+   * Output tokens.
+   */
+  output: number;
+  /**
+   * Reasoning tokens, contained in output.
+   */
+  reasoning: number;
+}
+/**
+ * Request for `session/sideChatControl`.
+ */
+export interface SideChatControlRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/sideChatControl';
+  params: SideChatControlParams;
+}
+/**
+ * Discard the panel or just stop its current answer.
+ */
+export interface SideChatControlParams {
+  /**
+   * True to dispose of the conversation.
+   */
+  close: boolean;
+  /**
+   * The panel to control.
+   */
+  panelId: string;
+  /**
+   * Parent conversation.
+   */
+  sessionId: SessionId;
+}
+/**
+ * Successful response to `session/sideChatControl`.
+ */
+export interface SideChatControlResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SideChatControlled;
 }
 /**
  * Request for `session/compact`.

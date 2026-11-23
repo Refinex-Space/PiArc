@@ -281,6 +281,84 @@ pub struct SessionPromptParams {
     pub command: Option<crate::skills::PromptCommand>,
 }
 
+/// One question in a panel's ephemeral conversation.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SideChatAskParams {
+    /// Parent conversation.
+    pub session_id: SessionId,
+    /// Distinct panel lifetime, including across windows.
+    pub panel_id: String,
+    /// User's question.
+    pub text: String,
+}
+
+/// Discard the panel or just stop its current answer.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SideChatControlParams {
+    /// Parent conversation.
+    pub session_id: SessionId,
+    /// The panel to control.
+    pub panel_id: String,
+    /// True to dispose of the conversation.
+    pub close: bool,
+}
+
+/// Tokens billed to a side conversation, separately from the parent's JSONL.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SideChatUsage {
+    /// Session model.
+    pub model: ModelRef,
+    /// Fresh input tokens.
+    #[schemars(with = "u64")]
+    pub input: u32,
+    /// Output tokens.
+    #[schemars(with = "u64")]
+    pub output: u32,
+    /// Cached input tokens read.
+    #[schemars(with = "u64")]
+    pub cache_read: u32,
+    /// Cache-write tokens.
+    #[schemars(with = "u64")]
+    pub cache_write: u32,
+    /// One-hour writes, contained in cache_write.
+    #[schemars(with = "u64")]
+    pub cache_write_1h: u32,
+    /// Reasoning tokens, contained in output.
+    #[schemars(with = "u64")]
+    pub reasoning: u32,
+}
+
+/// Answer and accounting of the question, including partial answers on stop.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SideChatAnswer {
+    /// Text suitable for the panel.
+    pub text: String,
+    /// User stopped the answer.
+    pub stopped: bool,
+    /// One entry per request with provider usage.
+    pub usage: Vec<SideChatUsage>,
+    /// Provider failure after zero or more billable steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+request!(
+    /// Ask in a temporary side session (Core → Agent Host).
+    SideChatAsk, "session/sideChatAsk", SideChatAskParams, SideChatAnswer
+);
+/// The requested panel has been stopped or closed.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SideChatControlled {}
+
+request!(
+    /// Stop or dispose of a side session (Core → Agent Host).
+    SideChatControl, "session/sideChatControl", SideChatControlParams, SideChatControlled
+);
+
 /// Parameters of `session/compact`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

@@ -42,6 +42,7 @@ use crate::route::RouteKey;
 mod changes;
 pub(crate) mod notices;
 mod rewind;
+mod side_chat;
 
 pub use rewind::CheckpointOp;
 
@@ -61,6 +62,20 @@ pub enum Op {
     /// Compacts the conversation as a turn of its own (`/compact [focus]`; the session must be
     /// idle), with what the summary should focus on.
     Compact(Option<String>),
+    /// Ask independently of the parent turn and queue.
+    SideChatAsk {
+        /// UI panel lifetime.
+        panel_id: String,
+        /// Plain question.
+        text: String,
+    },
+    /// Stop or close the identified panel.
+    SideChatControl {
+        /// UI panel lifetime.
+        panel_id: String,
+        /// Discard history too.
+        close: bool,
+    },
     /// The session's context usage (`session/getContextUsage`, T27).
     ContextUsage,
     /// Switches the session permission mode and records a transcript entry.
@@ -701,6 +716,7 @@ impl SessionActor {
         self.ops += 1;
         self.report_busy();
         let request = Request {
+            storage: self.ctx.storage.clone(),
             id: SessionId(self.id.clone()),
             ws: self.ws.clone(),
             tool_io: self.ctx.tool_io.clone(),
@@ -831,6 +847,7 @@ impl SessionActor {
 
 /// One request on its way to the Agent Host.
 struct Request {
+    storage: crate::storage::Storage,
     id: SessionId,
     ws: WorkspaceHandle,
     tool_io: crate::tool_io::ToolIo,
@@ -953,6 +970,12 @@ impl Request {
                 };
                 self.call::<SessionCompact>(&supervisor, Some(&request_id), params)
                     .await
+            }
+            Op::SideChatAsk { panel_id, text } => {
+                self.ask_side_chat(&supervisor, panel_id, text).await
+            }
+            Op::SideChatControl { panel_id, close } => {
+                self.control_side_chat(&supervisor, panel_id, close).await
             }
             Op::ContextUsage => {
                 let params = SessionTarget {

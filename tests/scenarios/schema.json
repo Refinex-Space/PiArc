@@ -634,6 +634,17 @@
             }
           }
         },
+        "side_chat": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["panel", "text", "answer"],
+          "properties": {
+            "session": { "$ref": "#/$defs/label" },
+            "panel": { "$ref": "#/$defs/label" },
+            "text": { "type": "string", "minLength": 1 },
+            "answer": { "type": "string" }
+          }
+        },
         "compact": {
           "type": "object",
           "additionalProperties": false,
@@ -1742,6 +1753,11 @@
               }
             }
           }
+        },
+        "no_core_io": {
+          "description": "Tool call IDs for which Core must receive no I/O requests.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         },
         "core_io": {
           "description": "Core answered a request with this method for this tool call.",

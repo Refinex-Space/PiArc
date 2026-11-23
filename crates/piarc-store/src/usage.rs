@@ -76,7 +76,62 @@ pub struct UsageSession {
     pub updated_at: Option<i64>,
 }
 
+pub(crate) fn insert_record(
+    conn: &rusqlite::Connection,
+    session: &str,
+    u: &crate::RequestUsage,
+    ephemeral_workspace: Option<&str>,
+) -> Result<()> {
+    conn.prepare_cached(
+        "INSERT INTO usage_records (session_id, entry_id, at, kind, purpose, provider,
+                    model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+                    cache_write_1h_tokens, reasoning_tokens, ephemeral_workspace)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+    )
+    .and_then(|mut s| {
+        s.execute(params![
+            session,
+            u.entry_id,
+            u.at,
+            u.kind,
+            u.purpose,
+            u.provider,
+            u.model,
+            u.input,
+            u.output,
+            u.cache_read,
+            u.cache_write,
+            u.cache_write_1h,
+            u.reasoning,
+            ephemeral_workspace
+        ])
+    })
+    .map_err(Error::sqlite("cannot write usage_records"))?;
+    Ok(())
+}
+
 impl Store {
+    /// Records side-chat accounting which has no transcript source, in one transaction.
+    ///
+    /// # Errors
+    /// A database write failed.
+    pub fn record_side_chat(
+        &mut self,
+        id: &str,
+        workspace: &str,
+        records: &[crate::RequestUsage],
+    ) -> Result<()> {
+        let tx = self
+            .conn
+            .transaction()
+            .map_err(Error::sqlite("cannot start usage transaction"))?;
+        for row in records {
+            insert_record(&tx, id, row, Some(workspace))?;
+        }
+        tx.commit()
+            .map_err(Error::sqlite("cannot commit usage transaction"))
+    }
+
     /// The usage of every indexed session, summed per session, kind, purpose and model.
     ///
     /// # Errors
@@ -158,11 +213,13 @@ impl Store {
         let mut statement = self
             .conn
             .prepare_cached(
-                "SELECT id, COALESCE(custom_title, name, first_message), workspace_path,
-                    subagent_parent, subagent_type, updated_at
-                 FROM sessions
-                 WHERE id IN (SELECT DISTINCT session_id FROM usage_records)
-                 ORDER BY updated_at DESC, id",
+                "SELECT billed.session_id, COALESCE(s.custom_title, s.name, s.first_message),
+                    COALESCE(s.workspace_path, billed.workspace), s.subagent_parent,
+                    s.subagent_type, COALESCE(s.updated_at, billed.at)
+                 FROM (SELECT session_id, MAX(ephemeral_workspace) AS workspace, MAX(at) AS at
+                       FROM usage_records GROUP BY session_id) AS billed
+                 LEFT JOIN sessions AS s ON s.id = billed.session_id
+                 ORDER BY 6 DESC, billed.session_id",
             )
             .map_err(Error::sqlite("cannot read sessions"))?;
         let rows = statement

@@ -115,6 +115,9 @@ pub struct Expect {
     /// Core requests per tool call.
     #[serde(default)]
     pub core_io: Vec<CoreIoExpect>,
+    /// Calls for which Core must receive no tool I/O at all.
+    #[serde(default)]
+    pub no_core_io: Vec<String>,
     /// A subset of Core's configuration diagnostics of the workspace after the run, with
     /// `files` keyed by layer id (T24).
     #[serde(default)]

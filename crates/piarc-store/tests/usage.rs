@@ -138,3 +138,57 @@ fn catalog_prices_are_kept_and_replaced() {
         [("anthropic".to_owned(), "a".to_owned(), price(2.0))]
     );
 }
+
+#[test]
+fn side_chat_usage_precedes_parent_history_and_survives_reindexing() {
+    let dir = TempDir::new("side-usage");
+    let sessions = dir.path().join("sessions");
+    std::fs::create_dir(&sessions).expect("session directory");
+    let db = dir.path().join("core.sqlite");
+    let mut store = Store::open(&db, 0).expect("store");
+    let record = piarc_store::RequestUsage {
+        entry_id: None,
+        at: Some(20),
+        kind: "auxiliary",
+        purpose: Some("sideChat".into()),
+        provider: "piarc-mock".into(),
+        model: "model".into(),
+        input: 101,
+        output: 11,
+        cache_read: 7,
+        cache_write: 3,
+        cache_write_1h: 1,
+        reasoning: 2,
+    };
+    store
+        .record_side_chat("main", "/repo", &[record])
+        .expect("bill side chat");
+    assert_eq!(
+        store.usage_sessions().unwrap()[0].workspace.as_deref(),
+        Some("/repo")
+    );
+    drop(store);
+    let mut store = Store::open(&db, 1).expect("reopen");
+    store
+        .rebuild_index(&sessions)
+        .expect("rebuild without parent file");
+    assert_eq!(groups(&store)[0].input, 101);
+    let mut main = SessionWriter::create(&sessions, "/repo", "main", Some(3));
+    let line = main.assistant("hello", "model", 7, 9);
+    main.append_raw(&line);
+    store.sync_dir(&sessions).unwrap();
+    store.rebuild_index(&sessions).unwrap();
+    let report = groups(&store);
+    assert_eq!(report.len(), 2);
+    let side = report
+        .iter()
+        .find(|g| g.purpose.as_deref() == Some("sideChat"))
+        .unwrap();
+    assert_eq!(
+        (side.requests, side.input, side.output, side.cache_write_1h),
+        (1, 101, 11, 1)
+    );
+    assert_eq!(store.usage_sessions().unwrap().len(), 1);
+    store.remove_session("main").unwrap();
+    assert!(groups(&store).is_empty());
+}

@@ -12671,6 +12671,203 @@
       "description": "Acknowledgement that the mode entry is in the session.",
       "type": "object"
     },
+    "SideChatAnswer": {
+      "description": "Answer and accounting of the question, including partial answers on stop.",
+      "properties": {
+        "error": {
+          "description": "Provider failure after zero or more billable steps.",
+          "type": ["string", "null"]
+        },
+        "stopped": {
+          "description": "User stopped the answer.",
+          "type": "boolean"
+        },
+        "text": {
+          "description": "Text suitable for the panel.",
+          "type": "string"
+        },
+        "usage": {
+          "description": "One entry per request with provider usage.",
+          "items": {
+            "$ref": "#/$defs/SideChatUsage"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["text", "stopped", "usage"],
+      "type": "object"
+    },
+    "SideChatAskParams": {
+      "description": "One question in a panel's ephemeral conversation.",
+      "properties": {
+        "panelId": {
+          "description": "Distinct panel lifetime, including across windows.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Parent conversation."
+        },
+        "text": {
+          "description": "User's question.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "panelId", "text"],
+      "type": "object"
+    },
+    "SideChatAskRequest": {
+      "description": "Request for `session/sideChatAsk`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/sideChatAsk",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SideChatAskParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SideChatAskResponse": {
+      "description": "Successful response to `session/sideChatAsk`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SideChatAnswer"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SideChatControlParams": {
+      "description": "Discard the panel or just stop its current answer.",
+      "properties": {
+        "close": {
+          "description": "True to dispose of the conversation.",
+          "type": "boolean"
+        },
+        "panelId": {
+          "description": "The panel to control.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "Parent conversation."
+        }
+      },
+      "required": ["sessionId", "panelId", "close"],
+      "type": "object"
+    },
+    "SideChatControlRequest": {
+      "description": "Request for `session/sideChatControl`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/sideChatControl",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SideChatControlParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SideChatControlResponse": {
+      "description": "Successful response to `session/sideChatControl`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SideChatControlled"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "SideChatControlled": {
+      "description": "The requested panel has been stopped or closed.",
+      "type": "object"
+    },
+    "SideChatUsage": {
+      "description": "Tokens billed to a side conversation, separately from the parent's JSONL.",
+      "properties": {
+        "cacheRead": {
+          "description": "Cached input tokens read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cacheWrite": {
+          "description": "Cache-write tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cacheWrite1h": {
+          "description": "One-hour writes, contained in cache_write.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input": {
+          "description": "Fresh input tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "Session model."
+        },
+        "output": {
+          "description": "Output tokens.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reasoning": {
+          "description": "Reasoning tokens, contained in output.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "input",
+        "output",
+        "cacheRead",
+        "cacheWrite",
+        "cacheWrite1h",
+        "reasoning"
+      ],
+      "type": "object"
+    },
     "SkillInfo": {
       "description": "A skill in effect.",
       "properties": {
@@ -16228,6 +16425,18 @@
     },
     {
       "$ref": "#/$defs/SessionSetPermissionModeResponse"
+    },
+    {
+      "$ref": "#/$defs/SideChatAskRequest"
+    },
+    {
+      "$ref": "#/$defs/SideChatAskResponse"
+    },
+    {
+      "$ref": "#/$defs/SideChatControlRequest"
+    },
+    {
+      "$ref": "#/$defs/SideChatControlResponse"
     },
     {
       "$ref": "#/$defs/SessionCompactRequest"

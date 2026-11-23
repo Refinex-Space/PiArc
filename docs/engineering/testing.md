@@ -338,7 +338,7 @@ sessions:                         # 可选；缺省为一个会话 main，使用
   a: { provider: one, cwd: 'alpha dir' }   # settings_model: true（T31）：建会话不指定模型，设置的 model、effortLevel 生效
 actions: [...]                    # 见 12.2
 approvals: []                     # 见 12.3
-expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics, json_lines, absent_on_disk, audit }   # 见 12.4
+expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, no_core_io, config_diagnostics, json_lines, absent_on_disk, audit }   # 见 12.4
 ```
 
 - 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；预置模型夹具经 `x-piarc-scenario` 请求头选择脚本。两个会话要并发请求时用两个端点，各自的步数互不影响。
@@ -364,6 +364,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | 动作 | 字段 | 做什么 |
 |---|---|---|
 | `prompt` | `text`、`turn`（标签） | `session_op(Prompt)`，记下回合 id |
+| `side_chat` | `session`（可选）、`panel`、`text`、`answer` | 在独立面板提问，核对返回的文字，随后关闭面板 |
 | `steer`、`follow_up` | `text`、`item`（标签）、`turn` | 运行中进入排队表（`item` 记下排队项 id）；空闲时直接开始回合（`turn` 记下回合 id） |
 | `queue_edit`、`queue_delete`、`queue_reorder` | `item`/`text`；`items`（全部标签的新顺序） | 改排队表 |
 | `compact` | `instructions`（可选） | 经 Core 执行内置 `/compact`（T27 起可带重点说明，等同 `/compact <重点>`），记录这次压缩启动的回合并等待完成 |
@@ -425,6 +426,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `request_counts` | 每个端点收到的请求数，恰好相等 |
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID。运行根下 Claude Code 的配置（任何 `.claude/` 目录内的条目与 `.claude.json`）在 Core 启动前与关闭后逐字节相同，否则以 `claude_config` 失败列出新增、修改、删除的路径（T24，ADR-0005 第 2 条） |
 | `tool_batches` | 工具调用 id 的分批：Core 收到的委托请求按这些批次成组到达。运行器经 Core 的 `ToolIoObserver` 扣住下一批的请求，整批到齐才一起放行；另一批的调用提前到达即失败。不靠计时 |
+| `no_core_io` | 工具调用 ID 列表。Core 对这些调用收到的 I/O 请求数必须为零 |
 | `core_io` | `{ call, method }`：Core 为该工具调用回答过这个 AHP 方法（例如 `fs/read`、`exec/run`），证明工具经 Core 执行 |
 | `audit` | 列表：每项 `kind`（`memory`、`hook`、`permission`、`sandbox`、`autoReview`）、`detail`（行 `detail` 的字段子集）、可选 `count`；运行结束后经 Core 的 `audit_events` 取本工作区该类的行，缺省至少一行匹配，有 `count` 时匹配行数恰好相等（T47） |
 | `absent_on_disk` | 字符串列表（每个至少 8 个字符）：运行结束后用 `plaintext::scan` 逐字节扫描数据目录、工作区、家目录与缓存目录，任何文件含有其中之一即失败，一个文件都没读到也失败（T38：只该在保险箱里的 key） |

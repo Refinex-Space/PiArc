@@ -524,6 +524,40 @@ impl CoreRuntime {
         self.op(env, "CoreRuntime.compact", id, Op::Compact(instructions))
     }
 
+    /// Asks a question in a panel's in-memory session. Resolves with `{text, stopped}`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn ask_side_chat<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        panel_id: String,
+        text: String,
+    ) -> napi::Result<Object<'env>> {
+        self.op(
+            env,
+            "CoreRuntime.askSideChat",
+            id,
+            Op::SideChatAsk { panel_id, text },
+        )
+    }
+
+    /// Stops the panel's model request; closing also discards its history.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn control_side_chat<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        panel_id: String,
+        close: bool,
+    ) -> napi::Result<Object<'env>> {
+        self.op(
+            env,
+            "CoreRuntime.controlSideChat",
+            id,
+            Op::SideChatControl { panel_id, close },
+        )
+    }
+
     /// The session's context usage by category (T27); resolves with the `ContextUsage` JSON.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn context_usage<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {

@@ -32,6 +32,28 @@ describe('piarc:// links', () => {
     }
   });
 
+  it('accepts bounded plain text only on the dedicated draft route', () => {
+    const text = '/run <text> & 你好\nnext';
+    const link = 'piarc://draft?path=%2Fwork%20tree&text=' + encodeURIComponent(text);
+    const draft = { kind: 'draft', path: '/work tree', text };
+    expect(parseLaunchUrl(link + '&send=1')).toEqual(draft);
+    expect(launchTargets(['PiArc', link], false, '/')).toEqual([draft]);
+    expect(parseLaunchUrl('piarc://draft?path=%2Fw')).toEqual({
+      kind: 'draft',
+      path: '/w',
+      text: '',
+    });
+    expect(parseLaunchUrl('piarc://draft?path=%2Fw&text=' + '😀'.repeat(2048))?.kind).toBe('draft');
+    for (const invalid of [
+      'piarc://draft?path=%2Fw&text=' + '😀'.repeat(2049),
+      'piarc://draft?path=%2Fw&text=one%00two',
+      'piarc://draft?path=%5C%5Cremote%5Cshare',
+      'piarc://draft?path=%2F%2Fremote%2Fshare',
+      'piarc://draft?path=relative',
+    ])
+      expect(parseLaunchUrl(invalid)).toBeUndefined();
+  });
+
   it('carry nothing that runs', () => {
     // A prompt or a command in the link is ignored; only the folder is taken.
     expect(parseLaunchUrl('piarc://open?path=%2Fw&prompt=rm%20-rf&run=1')).toEqual({

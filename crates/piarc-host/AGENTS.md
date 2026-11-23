@@ -68,3 +68,4 @@ Core 侧的 Agent Host 监管：启动、握手、stdio 读写、背压、心跳
 ## 参考
 
 - 架构第 7.4、7.5 节；ADR-0009、ADR-0010；`docs/spikes/S09-ahp-resilience.md`。
+- 侧边对话使用协商能力 `sideChat`。连接未启用时，监管器在写出 `session/sideChatAsk`、`session/sideChatControl` 前返回 `methodNotFound`。

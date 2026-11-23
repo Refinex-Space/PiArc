@@ -26,6 +26,7 @@ export interface PanelContext {
   readonly workspaceTasks?: boolean;
   /** The terminal panel is open (T34: Ctrl+`). */
   readonly terminal?: boolean;
+  readonly sideChat?: { readonly close: () => void };
 }
 
 export interface PanelSpec {
@@ -36,6 +37,8 @@ export interface PanelSpec {
   readonly title: MessageId;
   /** Lower first. */
   readonly order: number;
+  /** Retain a session panel's ephemeral conversation while another tab is shown. */
+  readonly keepMounted?: boolean;
   /** Whether it applies now (for example only with a session selected); always by default. */
   readonly when?: (context: PanelContext) => boolean;
   readonly render: (context: PanelContext) => ReactNode;

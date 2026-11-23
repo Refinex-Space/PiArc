@@ -121,4 +121,6 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 
 ## 参考
 
+- T49：会话内的 `Mod+;` 或 `/btw` 打开停靠面板。主进程仅通过 `askSideChat`、`controlSideChat` 转发，并在页面离开时释放内存对话。T49 L4 用 `PIARC_EVIDENCE_TASK=T49 npx playwright test -c apps/desktop/playwright.config.ts t49- --project dev`。平台动作的原生构建见 [macOS 快捷指令](../../docs/engineering/app-intents.md)，跳转列表见 [platform](src/main/platform/AGENTS.md)。
+
 - 架构第 3.4、6.11、7.6、8.1–8.8、10.2、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1、6 条、ADR-0022、ADR-0023、ADR-0029、ADR-0051；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。

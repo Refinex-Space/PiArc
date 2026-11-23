@@ -146,6 +146,7 @@ export const A11Y_STATES = [
     note: 'Changes panel with a comment being written and saved ones',
   },
   { id: 'panel:terminal', area: 'panel', panel: 'terminal', note: 'terminal panel' },
+  { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
   // Dialogs, one or more per file that renders `<Dialog>`.
   { id: 'dialog:trust', area: 'dialog', source: 'shell/TrustDialog.tsx', note: 'trust a folder' },
   {

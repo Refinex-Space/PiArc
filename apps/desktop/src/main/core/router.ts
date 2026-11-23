@@ -1,7 +1,7 @@
 // The main process's routing table: route key → windows subscribed to it (architecture
 // sections 7.6 and 8.3). Each window has one event port (a MessagePortMain in production).
 // Batches are forwarded by route key as they are; the payload is never read here. The main
-// process itself listens to `core/activity` only (T35: the tray's counts), through `listen`.
+// process listens to activity for the tray and workspace snapshots for the Windows jump list.
 import { performance } from 'node:perf_hooks';
 
 import type { EventBatch, EventPortMessage } from '../../shared/ipc.js';

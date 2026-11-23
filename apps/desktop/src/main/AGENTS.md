@@ -23,8 +23,8 @@
 
 ## 启动目标（`launch.ts`）
 
-- `piarc://open?path=<绝对路径>` 与 `piarc://session/<id>` 只做定位；其他主机名与参数一律忽略（链接不能带提示词或命令）。T29 的 OAuth 回调走回环端口，不经这里。
-- 命令行：第 0 个参数是可执行文件；`process.defaultApp`（`electron <app>`）时第一个非开关参数是应用路径要跳过（Playwright 会把自己的开关放在它前面，不能按固定位置跳）。开关一律忽略，相对路径按工作目录解析。
+- `piarc://open?path=<绝对路径>` 与 `piarc://session/<id>` 只做定位；这两种链接继续忽略提示词。T49 专用的 `piarc://draft?path=…&text=…` 只预填新会话草稿，由用户手动发送。T29 的 OAuth 回调走回环端口，不经这里。
+- 命令行：第 0 个参数是可执行文件；`process.defaultApp`（`electron <app>`）时第一个非开关参数是应用路径要跳过（Playwright 会把自己的开关放在它前面，不能按固定位置跳）。两个固定的跳转列表开关打开新会话或文件夹选择器，其他开关忽略，相对路径按工作目录解析。
 - 来源都汇成 `LaunchTarget`：启动参数、第二次启动（`second-instance` 带 argv 与工作目录）、macOS `open-url`/`open-file`（要在 `ready` 之前注册，先进 `early` 队列）、拖入窗口的文件夹（preload `pathForFile`）。窗口页面挂载前的目标排在 `AppShell` 的队列里，页面经 `takeLaunchTargets` 取走，之后的目标作为 `launch` 应用事件送达。主进程不检查路径是否为目录，交给 Core 的 `openWorkspace`。
 - macOS 的 scheme 与文件夹文档类型在 `forge.config.ts` 的 `protocols`、`extendInfo`；只有打包构建调用 `setAsDefaultProtocolClient`。Windows 的注册在 `platform/windows-shell.ts`（`HKCU\Software\Classes`，系统目录的 `reg.exe`，不经 shell），由 `platform/velopack.ts` 的安装、更新、卸载钩子运行。
 

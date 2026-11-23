@@ -399,6 +399,18 @@ pub enum Action {
         #[serde(default)]
         instructions: Option<String>,
     },
+    /// Ask in a temporary side panel and compare the returned answer.
+    SideChat {
+        /// The main session when absent.
+        #[serde(default)]
+        session: Option<String>,
+        /// Panel lifetime.
+        panel: String,
+        /// Side question.
+        text: String,
+        /// Expected answer.
+        answer: String,
+    },
     /// Edits a queue item.
     QueueEdit {
         /// The session.
@@ -612,6 +624,7 @@ impl Action {
             Self::Prompt(_) => "prompt",
             Self::Steer(_) => "steer",
             Self::FollowUp(_) => "follow_up",
+            Self::SideChat { .. } => "side_chat",
             Self::Compact { .. } => "compact",
             Self::QueueEdit { .. } => "queue_edit",
             Self::QueueDelete { .. } => "queue_delete",
@@ -668,6 +681,7 @@ impl Action {
             Self::QueueEdit { session, .. }
             | Self::QueueDelete { session, .. }
             | Self::QueueReorder { session, .. }
+            | Self::SideChat { session, .. }
             | Self::Compact { session, .. }
             | Self::SetModel { session, .. }
             | Self::SetEffort { session, .. }

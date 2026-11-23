@@ -53,6 +53,8 @@
 
 ## 4. 开发构建与发布构建的差异
 
+T49 给同一 preload 白名单增加 `askSideChat` 和 `controlSideChat`。主进程验证会话、面板、问题和控制参数，按发送窗口分配 Host 侧的面板编号。窗口销毁、渲染进程退出或整页导航会触发释放。Host 用内存会话生成回答，模型的工具请求只能得到本地拒绝结果。外部草稿的导航约束见 ADR-0069。
+
 | 项 | 发布构建 | 开发构建（`--flavor development` 打包） | 开发服务器模式（`electron-forge start`） |
 |---|---|---|---|
 | `EnableNodeCliInspectArguments` | 关 | 开（调试打包产物；Playwright 依赖它连接主进程） | 不写 fuse（node_modules 中的 Electron） |

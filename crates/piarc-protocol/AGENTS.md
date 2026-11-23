@@ -50,3 +50,4 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 ## 参考
 
 - 架构第 7.4 节（AHP）、第 7.6 节（类型来源与 L1 快照）；ADR-0009、ADR-0014。
+- T49 的 `sideChat` 能力启用 `session/sideChatAsk` 与 `session/sideChatControl`。请求带独立的面板标识，答案与每次模型请求的用量走应答，不占主会话事件的 seq。

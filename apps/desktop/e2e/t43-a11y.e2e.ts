@@ -73,6 +73,10 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await focusMain(app);
   await idle(page);
   await checkState(page, 'window:conversation');
+  await page.keyboard.press(`${MOD}+Semicolon`);
+  await expect(page.getByTestId('side-chat')).toBeVisible();
+  await checkState(page, 'panel:side-chat');
+  await page.getByRole('button', { name: 'Close side chat' }).click();
   await checkState(page, 'row:userMessage');
   await checkState(page, 'row:agentMessage');
   await checkState(page, 'row:reasoning');

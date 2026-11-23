@@ -85,6 +85,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "hook_worktrees",
         sql: include_str!("sql/0012_hook_worktrees.sql"),
     },
+    Migration {
+        version: 13,
+        name: "ephemeral_usage",
+        sql: include_str!("sql/0013_ephemeral_usage.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

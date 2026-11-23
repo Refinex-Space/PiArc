@@ -129,3 +129,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 投影器只认 `parentToolCallId` 为空的工具事件（工具嵌套调用的子调用不成条目）。条目 id：文本与 reasoning 为 `<messageId>#<contentIndex>`（`messageId` 由投影器生成，历史里是 Pi 的 entry id，两者不同），工具为工具调用 id（实时与历史相同），用户消息为 `<turnId>:user:<n>`（历史里是 entry id）。
 - 记录事件的测试钩子在注册表里也记下 `beginTurn`、`markAborting`、`steer`、`followUp`、`takeFollowUp` 这些步骤，golden 测试按同样的顺序回放（`projector.golden.test.ts` 的 `replay` 与 `#onEvent` 保持一致）。
 
+
+## 侧边对话（T49）
+
+`runtime/side-chat.ts` 按主会话与面板管理 Pi 的内存 SessionManager。首问从已完成回合的 leaf 取历史，复用主请求的 system 与工具声明。工具调用只得到本地拒绝结果。关闭面板、主会话或切换分支会中断进行中的请求并释放历史。每次回答经 AHP 返回计费用量，由 Core 登记。端到端 HTTP mock 与文件字节比对在 `runtime/fork-context.test.ts`，L2 场景为 `side-chat-isolation`。

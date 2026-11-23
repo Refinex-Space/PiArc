@@ -340,32 +340,7 @@ impl<'t> TextSink<'t> {
 
     fn insert_usage(&mut self, session: &str, u: &RequestUsage) -> Result<()> {
         self.clear(session)?;
-        self.tx
-            .prepare_cached(
-                "INSERT INTO usage_records (session_id, entry_id, at, kind, purpose, provider,
-                    model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-                    cache_write_1h_tokens, reasoning_tokens)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-            )
-            .and_then(|mut s| {
-                s.execute(params![
-                    session,
-                    u.entry_id,
-                    u.at,
-                    u.kind,
-                    u.purpose,
-                    u.provider,
-                    u.model,
-                    u.input,
-                    u.output,
-                    u.cache_read,
-                    u.cache_write,
-                    u.cache_write_1h,
-                    u.reasoning
-                ])
-            })
-            .map_err(Error::sqlite("cannot write usage_records"))?;
-        Ok(())
+        crate::usage::insert_record(self.tx, session, u, None)
     }
 
     /// Before the first row of a scan from the start of a file that now names another session
@@ -409,9 +384,12 @@ impl<'t> TextSink<'t> {
 fn delete_texts(conn: &rusqlite::Connection, id: &str) -> Result<()> {
     conn.execute("DELETE FROM session_text WHERE session_id = ?1", [id])
         .map_err(Error::sqlite("cannot delete from session_text"))?;
-    conn.execute("DELETE FROM usage_records WHERE session_id = ?1", [id])
-        .map(drop)
-        .map_err(Error::sqlite("cannot delete from usage_records"))
+    conn.execute(
+        "DELETE FROM usage_records WHERE session_id = ?1 AND ephemeral_workspace IS NULL",
+        [id],
+    )
+    .map(drop)
+    .map_err(Error::sqlite("cannot delete from usage_records"))
 }
 
 fn store_scan(
@@ -515,7 +493,7 @@ impl Store {
                 "BEGIN;
                  DELETE FROM session_files;
                  DELETE FROM session_text;
-                 DELETE FROM usage_records;
+                 DELETE FROM usage_records WHERE ephemeral_workspace IS NULL;
                  UPDATE sessions SET cwd = NULL, parent_session = NULL, name = NULL,
                     subagent_parent = NULL, subagent_type = NULL,
                     first_message = NULL, model_provider = NULL, model_id = NULL,
@@ -626,6 +604,11 @@ impl Store {
             )
             .optional()
             .map_err(Error::sqlite("cannot read sessions"))?;
+        tx.execute(
+            "DELETE FROM usage_records WHERE session_id = ?1 AND ephemeral_workspace IS NOT NULL",
+            [id],
+        )
+        .map_err(Error::sqlite("cannot delete side chat usage"))?;
         if let Some(file) = &file {
             delete_texts(&tx, id)?;
             tx.execute("DELETE FROM hook_worktrees WHERE session_id = ?1", [id])

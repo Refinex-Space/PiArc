@@ -40,3 +40,4 @@ NAPI-RS 导出层（薄）：把 `piarc_core::CoreRuntime` 暴露为主进程里
 ## 参考
 
 - 架构第 7.1、7.6 节；ADR-0014；`crates/piarc-core/AGENTS.md`；`docs/spikes/S02-napi-event-channel.md`。
+- `askSideChat(sessionId, panelId, text)` 返回 JSON `{text, stopped}`；`controlSideChat(sessionId, panelId, close)` 返回 JSON `null`。停止仅中断当前问题，关闭同时释放面板历史。

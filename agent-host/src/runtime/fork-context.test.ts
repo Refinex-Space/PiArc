@@ -1,6 +1,6 @@
 // Drive a real Pi session, its Agent tool and its child's Pi session. Intercept the Anthropic
 // HTTP request after serialization; the fake Core boundary supplies only the test permissions.
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -58,11 +58,12 @@ interface Wire {
 }
 type Step = Parameters<typeof reply>[0];
 async function withSession(
-  respond: (body: Wire) => Step | undefined | Promise<Step>,
+  respond: (body: Wire, signal: AbortSignal) => Step | undefined | Promise<Step>,
   check: (
     prompt: (text: string | UserInput) => Promise<void>,
     bodies: Wire[],
     starts: string[],
+    side: { registry: SessionRegistry; directory: string; calls: string[] },
   ) => Promise<void>,
   answersForSkill?: Record<string, unknown>,
 ) {
@@ -76,7 +77,7 @@ async function withSession(
     expect(request.url).toContain('/messages');
     const wire = { ...(body as Omit<Wire, 'raw'>), raw };
     bodies.push(wire);
-    const next = await respond(wire);
+    const next = await respond(wire, request.signal);
     if (next === undefined) throw new Error('Unexpected extra provider request');
     return reply(next);
   });
@@ -84,6 +85,7 @@ async function withSession(
   await store.modify('anthropic', () => Promise.resolve({ type: 'api_key', key: 'test-fixture' }));
   const workspace = await openWorkspace(dir, dir, store);
   const starts: string[] = [];
+  const calls: string[] = [];
   const bridge = new CoreBridge((raw) => {
     const { method, id, params } = raw as {
       method: string;
@@ -99,6 +101,7 @@ async function withSession(
       'subagent/finish': {},
       ...answersForSkill,
     };
+    calls.push(method);
     if (method === 'subagent/start') starts.push(String(params.agentType));
     if (!(method in answers)) throw new Error('Unexpected Core request: ' + method);
     bridge.handleResponse({ jsonrpc: '2.0', id, result: answers[method] });
@@ -151,6 +154,7 @@ async function withSession(
       },
       bodies,
       starts,
+      { registry, directory: dir, calls },
     );
   } finally {
     await registry.closeAll();
@@ -377,3 +381,142 @@ it('persists the original server compaction entry and never its transient reques
   expect(entries).toContain('Answer.');
   expect(entries).not.toContain('TRANSIENT-REQUEST-MARKER');
 });
+
+it('keeps side answers and denied tools in memory and preserves the serialized parent prefix', async () => {
+  const script = [
+    'Parent result.',
+    { id: 'write-side', name: 'Write', input: { path: 'never.txt', content: 'PRIVATE' } },
+    'PRIVATE answer.',
+    'Second side answer.',
+    'New panel.',
+    'Parent continued.',
+  ];
+  await withSession(
+    () => script.shift(),
+    async (prompt, bodies, _starts, { registry, directory, calls }) => {
+      await prompt('Parent question.');
+      const files = async () =>
+        (await readdir(directory, { recursive: true })).filter((name) => name.endsWith('.jsonl'));
+      const before = await files();
+      expect(before).toHaveLength(1);
+      const [relative] = before;
+      assert(relative);
+      const file = path.join(directory, relative);
+      const bytes = await readFile(file);
+      const count = calls.length;
+      const result = await registry.askSideChat('main', 'p1', 'PRIVATE side question.');
+      expect(result.text).toBe('PRIVATE answer.');
+      expect(result.usage).toHaveLength(2);
+      expect(calls.slice(count)).toEqual([]);
+      expect(bodies[1]?.messages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Parent result.' }],
+          }),
+        ]),
+      );
+      const [mainWire, sideWire] = bodies;
+      assert(mainWire && sideWire);
+      for (const key of ['system', 'tools'] as const) {
+        const bytes = Buffer.from(`"${key}":${JSON.stringify(mainWire[key])}`);
+        expect(Buffer.from(mainWire.raw).includes(bytes)).toBe(true);
+        expect(Buffer.from(sideWire.raw).includes(bytes)).toBe(true);
+      }
+      expect(JSON.stringify(bodies[2]?.messages)).toContain('Side chats cannot execute tools.');
+      await registry.askSideChat('main', 'p1', 'Second side question.');
+      expect(JSON.stringify(bodies[3]?.messages)).toContain('PRIVATE answer.');
+      registry.controlSideChat('main', 'p1', true);
+      await registry.askSideChat('main', 'p1', 'Clean panel?');
+      expect(JSON.stringify(bodies[4]?.messages)).not.toContain('PRIVATE');
+      expect(await files()).toEqual(before);
+      expect(await readFile(file)).toEqual(bytes);
+      await prompt('Continue.');
+      expect(JSON.stringify(bodies[5]?.messages)).not.toContain('PRIVATE');
+      expect(JSON.stringify(bodies[5]?.messages)).not.toContain('Clean panel?');
+    },
+  );
+}, 30000);
+
+it('discards a running panel, aborts its provider, and leaves an in-flight parent turn alone', async () => {
+  const mainStarted = Promise.withResolvers<undefined>();
+  const sideStarted = Promise.withResolvers<undefined>();
+  const mainAnswer = Promise.withResolvers<string>();
+  await withSession(
+    async (body, signal) => {
+      const tail = JSON.stringify(body.messages.at(-1));
+      if (tail.includes('RUNNING-MAIN')) {
+        mainStarted.resolve(undefined);
+        return mainAnswer.promise;
+      }
+      if (tail.includes('WAIT-SIDE')) {
+        sideStarted.resolve(undefined);
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(new Error('Stopped test stream'));
+            },
+            { once: true },
+          );
+        });
+      }
+      return 'Answer.';
+    },
+    async (prompt, bodies, _starts, { registry }) => {
+      await prompt('COMPLETED-MAIN');
+      const main = prompt('RUNNING-MAIN');
+      try {
+        await mainStarted.promise;
+        const side = registry.askSideChat('main', 'run', 'WAIT-SIDE');
+        await sideStarted.promise;
+        expect(JSON.stringify(bodies.at(-1)?.messages)).toContain('COMPLETED-MAIN');
+        expect(JSON.stringify(bodies.at(-1)?.messages)).not.toContain('RUNNING-MAIN');
+        registry.controlSideChat('main', 'run', true);
+        expect((await side).stopped).toBe(true);
+        expect((await registry.askSideChat('main', 'run', 'Fresh panel?')).text).toBe('Answer.');
+        expect(JSON.stringify(bodies.at(-1)?.messages)).not.toContain('WAIT-SIDE');
+      } finally {
+        mainAnswer.resolve('Parent finished.');
+        await main;
+      }
+    },
+  );
+}, 30000);
+
+it('stops a question without clearing earlier answers, and closes running requests with the parent', async () => {
+  let waiting = Promise.withResolvers<undefined>();
+  await withSession(
+    async (body, signal) => {
+      if (JSON.stringify(body.messages.at(-1)).includes('HOLD')) {
+        waiting.resolve(undefined);
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(new Error('Closed test stream'));
+            },
+            { once: true },
+          );
+        });
+      }
+      return 'Completed answer.';
+    },
+    async (_prompt, bodies, _starts, { registry }) => {
+      await registry.askSideChat('main', 'panel', 'Initial side question.');
+      const interrupted = registry.askSideChat('main', 'panel', 'HOLD first request.');
+      await waiting.promise;
+      registry.controlSideChat('main', 'panel', false);
+      expect((await interrupted).stopped).toBe(true);
+      await registry.askSideChat('main', 'panel', 'Resume.');
+      expect(JSON.stringify(bodies.at(-1)?.messages)).toContain('Initial side question.');
+      expect(JSON.stringify(bodies.at(-1)?.messages)).not.toContain('HOLD first request.');
+      waiting = Promise.withResolvers<undefined>();
+      const pending = registry.askSideChat('main', 'panel', 'HOLD until parent closes.');
+      await waiting.promise;
+      await registry.close('main');
+      expect((await pending).stopped).toBe(true);
+      await expect(registry.askSideChat('main', 'panel', 'Is it open?')).rejects.toThrow();
+    },
+  );
+}, 30000);

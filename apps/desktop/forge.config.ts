@@ -23,6 +23,7 @@ import {
   copyAgentHostResources,
   resourcesDirOf,
 } from './packaging/agent-host-layout.mjs';
+import { embedAppIntents } from './packaging/app-intents.mjs';
 import { MakerHdiutilDmg } from './packaging/maker-dmg.mjs';
 import { copyVelopackRuntime } from './packaging/velopack-runtime.mjs';
 import { resealElectron, signResourcesAndBundle } from './packaging/macos-sign.mjs';
@@ -74,7 +75,9 @@ async function finishPackage(outputPath: string, platform: string, arch: string)
     // Before the signatures are redone: Electron's locales other than the app's (I41).
     const removed = await trimElectronLocales(path.join(outputPath, `${appName}.app`));
     console.log(`removed ${String(removed.length)} Electron locales`);
-    await resealElectron(path.join(outputPath, `${appName}.app`));
+    const app = path.join(outputPath, `${appName}.app`);
+    await resealElectron(app);
+    await embedAppIntents(repoRoot, app, arch);
   }
   const agentHost = await copyAgentHostResources({ repoRoot, resourcesDir, platform, arch });
   if (platform === 'darwin') {

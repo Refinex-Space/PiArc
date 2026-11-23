@@ -2,6 +2,7 @@
 // has already resolved the parent's prompt and visible tools for its most recent request.
 import { getCurrentSystemMessage, type Message, type SystemMessage } from '@earendil-works/pi-ai';
 import {
+  buildSessionContext,
   convertToLlm,
   type AgentSession,
   type SessionManager,
@@ -52,13 +53,14 @@ export function trackForkContext(session: AgentSession, inherited?: ForkContext)
 /** Take only the parent branch, including messages recorded since its last request (the
  * assistant response which launched the fork, for example). A reopened session has its
  * persistent declarations and frozen prompt, even before making another request. */
-export function forkContext(session: AgentSession): ForkContext {
+export function forkContext(session: AgentSession, completedLeaf?: string | null): ForkContext {
   const manager = session.sessionManager;
   const branch = manager.getBranch();
   const previous = sent.get(session);
   // Restore from durable entries, not provider-only transformations: in particular, the
   // server compaction extension creates temporary markers which only it knows how to replay.
-  const messages = convertToLlm(manager.buildSessionContext().messages);
+  const leaf = completedLeaf === undefined ? manager.getLeafId() : completedLeaf;
+  const messages = convertToLlm(buildSessionContext(branch, leaf).messages);
   const onBranch = previous?.leaf != null && branch.some((entry) => entry.id === previous.leaf);
   const memory = branch.findLast(
     (e) => e.type === 'custom' && e.customType === 'piarc.systemPrompt',
@@ -78,7 +80,7 @@ export function forkContext(session: AgentSession): ForkContext {
     }
   }
   return {
-    leaf: manager.getLeafId(),
+    leaf,
     messages,
     system,
     memory: memory?.type === 'custom' ? memory.data : undefined,

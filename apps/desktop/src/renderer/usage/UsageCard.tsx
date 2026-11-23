@@ -7,16 +7,24 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../app/app-context.js';
 import { useTurnInfo } from '../store/hooks.js';
 import { Cost, TokenList, purposeLabel } from './UsageViews.js';
-import { parseSessionUsage } from './usage.js';
+import { parseSessionUsage, totalTokens, usageChanged } from './usage.js';
 
 export function UsageCard({ sessionId }: { readonly sessionId: string }) {
   const { t } = useApp();
   const turn = useTurnInfo(sessionId);
   const [usage, setUsage] = useState<SessionUsage | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
-    // After a turn: Core indexes the session file before it answers.
-    if (turn.running) return;
+    const refresh = () => {
+      setRevision((previous) => previous + 1);
+    };
+    usageChanged.addEventListener(sessionId, refresh);
+    return () => {
+      usageChanged.removeEventListener(sessionId, refresh);
+    };
+  }, [sessionId]);
+  useEffect(() => {
     let current = true;
     window.piarc
       .sessionUsage(sessionId)
@@ -31,7 +39,7 @@ export function UsageCard({ sessionId }: { readonly sessionId: string }) {
     return () => {
       current = false;
     };
-  }, [sessionId, turn.running]);
+  }, [sessionId, turn.running, revision]);
   if (error !== undefined) {
     return (
       <p className="usage-card error-text" role="alert">
@@ -86,6 +94,8 @@ export function UsageCard({ sessionId }: { readonly sessionId: string }) {
             {(usage.auxiliary ?? []).map((a) => (
               <li key={a.purpose}>
                 <span className="usage-line-name">{purposeLabel(t, a.purpose)}</span>
+                {a.purpose === 'sideChat' &&
+                  t('usage.tokenCount', { count: totalTokens(a.tokens) })}
                 <Cost cost={a.cost} />
               </li>
             ))}

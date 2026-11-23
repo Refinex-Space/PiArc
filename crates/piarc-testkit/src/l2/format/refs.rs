@@ -179,6 +179,7 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
         | Action::CheckStoredSession { .. }
         | Action::CheckTrust { .. }
         | Action::SetEffort { .. }
+        | Action::SideChat { .. }
         | Action::Compact { .. }
         | Action::SetMode { .. }
         | Action::Abort { .. }

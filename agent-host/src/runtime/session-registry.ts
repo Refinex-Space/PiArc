@@ -13,6 +13,7 @@
 // session's cwd. The few Pi defaults that read the process-global agent directory
 // (`getAgentDir()`) are pinned to PiArc's directory once, in main.ts.
 import { runDelegation } from '../harness/subagents/agent-tool.js';
+import { SideChats } from './side-chat.js';
 import { trackForkContext } from './fork-context.js';
 import { randomUUID } from 'node:crypto';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
@@ -141,6 +142,22 @@ export class SessionRegistry {
         tools: () => session.getActiveToolNames().map(hosted.toCanonical),
       };
     });
+  }
+
+  readonly #panels = new WeakMap<HostedSession, SideChats>();
+
+  async askSideChat(sessionId: string, panelId: string, text: string) {
+    const parent = this.#get(sessionId);
+    let panels = this.#panels.get(parent);
+    if (!panels) {
+      panels = new SideChats();
+      this.#panels.set(parent, panels);
+    }
+    return panels.ask(parent, panelId, text);
+  }
+
+  controlSideChat(sessionId: string, panelId: string, close: boolean): void {
+    this.#panels.get(this.#get(sessionId))?.control(panelId, close);
   }
 
   get size(): number {
@@ -498,6 +515,7 @@ export class SessionRegistry {
     const hosted = this.#get(sessionId);
     const turnId = hosted.projector.activeTurnId;
     hosted.closed = true;
+    this.#panels.get(hosted)?.dispose();
     // Its subagents end with it, background ones included (T31).
     hosted.delegation?.abort();
     this.subagents.abortBelow(sessionId);
@@ -628,6 +646,7 @@ export class SessionRegistry {
     }
     const cwd = session.sessionManager.getCwd();
     hosted.closed = true;
+    this.#panels.get(hosted)?.dispose();
     hosted.hooks?.mute();
     hosted.memory.cancel();
     this.#sessions.delete(sessionId);

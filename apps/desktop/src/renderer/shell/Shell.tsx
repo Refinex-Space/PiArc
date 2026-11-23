@@ -20,6 +20,7 @@ import { DockArea, RailArea } from './PanelAreas.js';
 import type { PanelContext } from './registry.js';
 import './harness-panels.js';
 import './task-panels.js';
+import './SideChat.js';
 import '../changes/panels.js';
 import '../terminal/panels.js';
 import { toggleTerminalPanel, useTerminalPanelOpen } from '../terminal/panel-state.js';
@@ -129,6 +130,11 @@ export function Shell() {
     );
   }, []);
   const [view, setView] = useState<View>({ kind: 'home', workspace: undefined });
+  const [sideSession, setSideSession] = useState<string>();
+  const selected = view.kind === 'session' ? view.id : undefined;
+  useEffect(() => {
+    if (sideSession !== selected) setSideSession(undefined);
+  }, [sideSession, selected]);
   const [viewNonce, setViewNonce] = useState(0);
   const [layout, setLayout] = useState<Layout>(() => loadLayout(localStore()));
   const [trust, setTrust] = useState<TrustRequest | undefined>(undefined);
@@ -227,14 +233,24 @@ export function Shell() {
         show({ kind: 'session', id: target.sessionId });
         return;
       }
-      openPath(target.path).then(
-        (opened) => ensureTrust(opened, 'decide'),
-        (error: unknown) => {
-          console.error('[shell] cannot open the folder', error);
-        },
-      );
+      if (target.kind === 'newSession') {
+        show({ kind: 'home', workspace: undefined });
+        return;
+      }
+      const opened = target.kind === 'chooseFolder' ? openFolder() : openPath(target.path);
+      opened
+        .then(async (workspace) => {
+          if (workspace === undefined) return;
+          const proceed = await ensureTrust(workspace, 'decide');
+          if (proceed && target.kind === 'draft') {
+            show({ kind: 'home', workspace, draft: target.text });
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('[shell] cannot open the launch target', error);
+        });
     },
-    [show, ensureTrust, openPath],
+    [show, ensureTrust, openFolder, openPath],
   );
   useLaunchTargets(launch);
   const drop = useMemo(
@@ -313,6 +329,12 @@ export function Shell() {
         }
         break;
       }
+      case 'session.sideChat':
+        if (selected && !trust && !shortcutsOpen) {
+          setSideSession(selected);
+          showPanel('side-chat');
+        }
+        break;
       case 'session.model':
         if (!trust && !shortcutsOpen) modelButton.current?.click();
         break;
@@ -387,7 +409,19 @@ export function Shell() {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
-  const context = usePanelContext(store, view.kind === 'session' ? view.id : undefined);
+  const baseContext = usePanelContext(store, selected);
+  const context =
+    sideSession && sideSession === selected
+      ? {
+          ...baseContext,
+          sideChat: {
+            close: () => {
+              setSideSession(undefined);
+              focusMessageBox();
+            },
+          },
+        }
+      : baseContext;
   return (
     <StoreContext.Provider value={store}>
       <UiContext.Provider value={ui}>

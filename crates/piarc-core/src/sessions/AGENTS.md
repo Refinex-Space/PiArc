@@ -47,3 +47,4 @@
 - `sessions/provider_settings.rs` 为每次设置操作启动受监督的专用 Host，仅向它提供保险箱服务。它在 `agent-host/settings/` 工作，通过 `ModelRuntime.login/logout` 保存凭据，操作后关闭。变更完成后向已运行的工作区发送 `models/reload`；稍后启动的工作区在握手时读取当前刷新开关。
 - 配置变更先在 `agent-host/provider-change.json` 记录公开目标和变更 ID。若设置 Host 或 Core 中断，下一次打开工作区或设置时从新 Host 查询已持久化凭据的变更 ID，恢复对应的公开配置和端点投影。恢复记录、诊断、客户端回应均不带密钥。
 - 变更端点地址或线协议时须重新提交或清除密钥。自定义凭据在保险箱内绑定端点与协议，随 AHP 交给 Host。云厂商字段放在 Pi 的单次请求 credential.env 中。进程环境使用启动器既有的白名单。
+- T49 的 `Op::SideChatAsk` 与 `Op::SideChatControl` 经同一会话 actor 分发到独立请求，不占主回合、不触发输入 hooks。Agent Host 返回每次请求的模型与 token，Core 在返回答案前向数据库记账。面板正文只在客户端和 Agent Host 的内存中。

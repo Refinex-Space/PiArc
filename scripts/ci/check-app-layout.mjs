@@ -26,6 +26,7 @@ import { parseArgs } from 'node:util';
 
 import { listPackage } from '@electron/asar';
 
+import { APP_IDENTIFIER } from '../../apps/desktop/app-identity.mjs';
 import { coreBinaryName } from '../../apps/desktop/core-binary.mjs';
 import { parseBuildFlavor } from '../../apps/desktop/fuses.mjs';
 import {
@@ -34,7 +35,7 @@ import {
   agentHostLayout,
 } from '../../apps/desktop/packaging/agent-host-layout.mjs';
 import { ENTITLEMENTS } from '../../apps/desktop/packaging/macos-sign.mjs';
-import { isMain } from '../lib/repo.mjs';
+import { isMain, isRecord, readJsonFile } from '../lib/repo.mjs';
 import { packagedAppPath, productName } from './check-fuses.mjs';
 
 /** Team identifier of the Node.js Foundation's Developer ID certificate. */
@@ -233,6 +234,30 @@ export function checkAppLayout({ app, platform, arch, flavor }) {
   }
   const verify = codesign(['--verify', '--deep', '--strict', '--verbose=1', app]);
   add('codesign --verify --deep --strict (app)', verify.code === 0, verify.output.trim());
+
+  const extension = path.join(app, 'Contents', 'Extensions', 'PiArcShortcuts.appex');
+  const extensionSignature = signatureOf(extension);
+  add(
+    'App Intents extension: signed for the host app',
+    extensionSignature.info.identifier === APP_IDENTIFIER + '.shortcuts' &&
+      extensionSignature.info.adhoc &&
+      codesign(['--verify', '--strict', extension]).code === 0,
+    extensionSignature.output.trim(),
+  );
+  const metadata = path.join(
+    extension,
+    'Contents/Resources/Metadata.appintents/extract.actionsdata',
+  );
+  const contents = existsSync(metadata) ? readJsonFile(metadata) : undefined;
+  const actions = isRecord(contents) && isRecord(contents.actions) ? contents.actions : {};
+  for (const id of ['OpenPiArc', 'OpenWorkspace', 'NewSession']) {
+    const action = actions[id];
+    add(
+      `App Intents extension: ${id} discoverable metadata`,
+      isRecord(action) && action.isDiscoverable === true,
+      metadata,
+    );
+  }
 
   const appSig = signatureOf(app);
   add('app: ad-hoc signature', appSig.info.adhoc, appSig.output.trim());

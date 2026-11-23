@@ -54,6 +54,8 @@ export const IPC_CHANNELS = {
   sessionSteer: 'piarc:session.steer',
   sessionFollowUp: 'piarc:session.followUp',
   sessionAbort: 'piarc:session.abort',
+  sideChatAsk: 'piarc:session.sideChatAsk',
+  sideChatControl: 'piarc:session.sideChatControl',
   sessionPermissionMode: 'piarc:session.permissionMode',
   approvalAnswer: 'piarc:approval.answer',
   sessionCompact: 'piarc:session.compact',
@@ -163,6 +165,9 @@ export function isWorktreeName(value: unknown): value is string {
 /** What a link, a dropped folder or a second start asks the app to open (T35). */
 export type LaunchTarget =
   | { readonly kind: 'workspace'; readonly path: string }
+  | { readonly kind: 'draft'; readonly path: string; readonly text: string }
+  | { readonly kind: 'newSession' }
+  | { readonly kind: 'chooseFolder' }
   | { readonly kind: 'session'; readonly sessionId: string };
 
 /** The list a permission rule is in. */
@@ -679,6 +684,8 @@ export interface PiarcApi {
   followUp(id: string, input: string | OutgoingInput): Promise<string>;
   /** Stops the running turn; resolves with the returned queue as JSON. */
   abort(id: string): Promise<string>;
+  askSideChat(sessionId: string, panelId: string, question: string): Promise<string>;
+  controlSideChat(sessionId: string, panelId: string, close: boolean): Promise<void>;
   setPermissionMode(id: string, mode: PermissionMode): Promise<void>;
   /** The permission rules of a workspace by source (JSON), the most recent one when null. */
   permissionRules(workspace: string | null): Promise<string>;

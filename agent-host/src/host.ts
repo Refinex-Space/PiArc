@@ -57,6 +57,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'skills',
   'plugins',
   'autoMemory',
+  'sideChat',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -102,6 +103,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   const { log } = options;
   let shuttingDown: Promise<void> | undefined;
   let registry: SessionRegistry | undefined;
+  let sideChatEnabled = false;
   // The workspace's MCP pool (T36), when Core enabled `mcpPool`.
   let mcp: McpPool | undefined;
   // Core may send its first request right after `core/welcome`, while the workspace is still
@@ -389,6 +391,31 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const instructions = optionalString('session/compact', fields, 'instructions');
     return (await sessions('session/compact')).compact(sessionId, requestId, instructions);
   });
+  connection.handle('session/sideChatAsk', async (params) => {
+    const method = 'session/sideChatAsk';
+    const fields = paramsObject(method, params);
+    const registry = await sessions(method);
+    if (!sideChatEnabled) throw new AhpError('methodNotFound', 'Core did not enable sideChat');
+    return registry.askSideChat(
+      stringField(method, fields, 'sessionId'),
+      stringField(method, fields, 'panelId'),
+      stringField(method, fields, 'text'),
+    );
+  });
+  connection.handle('session/sideChatControl', async (params) => {
+    const method = 'session/sideChatControl';
+    const fields = paramsObject(method, params);
+    if (typeof fields.close !== 'boolean')
+      throw new AhpError('invalidParams', 'Expected a boolean close flag');
+    const registry = await sessions(method);
+    if (!sideChatEnabled) throw new AhpError('methodNotFound', 'Core did not enable sideChat');
+    registry.controlSideChat(
+      stringField(method, fields, 'sessionId'),
+      stringField(method, fields, 'panelId'),
+      fields.close,
+    );
+    return {};
+  });
   connection.handle('session/getContextUsage', async (params) => {
     const method = 'session/getContextUsage';
     const sessionId = stringField(method, paramsObject(method, params), 'sessionId');
@@ -661,6 +688,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
         credentials,
         welcome.allowModelNetwork === true,
       );
+      sideChatEnabled = welcome.enabled.includes('sideChat');
       if (welcome.modelPreferences != null) workspace.preferences.set(welcome.modelPreferences);
       if (options.testOAuthProvider !== undefined) {
         registerTestOAuthProvider(workspace.modelRuntime, options.testOAuthProvider);

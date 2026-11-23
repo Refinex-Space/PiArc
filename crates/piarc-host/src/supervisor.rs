@@ -468,6 +468,18 @@ impl Tracking {
 
 impl Link {
     fn check_method(&self, method: &str) -> Result<()> {
+        if !self.side_chat_enabled
+            && matches!(method, "session/sideChatAsk" | "session/sideChatControl")
+        {
+            return Err(Error::Remote {
+                method: method.to_owned(),
+                error: piarc_protocol::ErrorObject::new(
+                    ErrorKind::MethodNotFound,
+                    "the connected Agent Host does not support side chats",
+                    false,
+                ),
+            });
+        }
         if !self.models_enabled
             && (method.starts_with("models/")
                 || matches!(

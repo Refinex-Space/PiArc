@@ -246,3 +246,26 @@ fn auto_reviews_are_their_own_line_priced_with_the_users_price() {
         "the subagent's review is in its cost"
     );
 }
+
+#[test]
+fn side_chat_requests_are_in_the_parent_total_and_their_own_breakdown() {
+    let groups = vec![
+        group("main", "model", None, "a", 1200),
+        group("main", "auxiliary", Some("sideChat"), "a", 430),
+    ];
+    let sessions = vec![session("main", None)];
+    let book = PriceBook::new(&[("p".into(), "a".into(), PLAIN.into())], None);
+    let inputs = Inputs {
+        groups: &groups,
+        requests: &HashMap::new(),
+        sessions: &sessions,
+        book: &book,
+    };
+    let result = report(&inputs, &|_| true);
+    let parent = &result.sessions[0];
+    assert_eq!(parent.tokens.input, 1630);
+    assert_eq!(parent.auxiliary.len(), 1);
+    assert_eq!(parent.auxiliary[0].purpose, "sideChat");
+    assert_eq!(parent.auxiliary[0].tokens.input, 430);
+    assert!(parent.auxiliary[0].cost.is_some_and(|cost| cost > 0.0));
+}

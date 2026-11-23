@@ -608,12 +608,13 @@ impl Hub {
                 });
             }
             remove_path(file, |path| std::fs::remove_file(path)).await?;
-            let key = id.clone();
-            self.ctx
-                .storage
-                .run(move |store| store.remove_session(&key))
-                .await??;
         }
+        // A side chat can incur usage before Pi writes the parent's first JSONL.
+        let key = id.clone();
+        self.ctx
+            .storage
+            .run(move |store| store.remove_session(&key))
+            .await??;
         self.remove_session_dir(&id).await?;
         // Its snapshots go with it; their objects with the next collection.
         let key = id.clone();

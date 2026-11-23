@@ -411,6 +411,9 @@ export function Conversation({
         case 'context':
           showPanel('context');
           break;
+        case 'sideChat':
+          ui.runCommand('session.sideChat');
+          break;
         case 'outputStyle':
           void refreshCommands().then((list) => {
             if (args === '') {

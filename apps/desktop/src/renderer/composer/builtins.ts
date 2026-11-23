@@ -7,6 +7,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 export type BuiltinAction =
   | 'newSession'
   | 'subtask'
+  | 'sideChat'
   | 'compact'
   | 'rewind'
   | 'help'
@@ -22,6 +23,7 @@ interface Builtin {
 
 const BUILTINS: Readonly<Record<string, Builtin>> = {
   clear: { action: 'newSession', label: 'composer.command.clear' },
+  btw: { action: 'sideChat', label: 'sideChat.title' },
   subtask: { action: 'subtask', label: 'composer.command.subtask' },
   compact: { action: 'compact', label: 'composer.command.compact' },
   rewind: { action: 'rewind', label: 'composer.command.rewind' },

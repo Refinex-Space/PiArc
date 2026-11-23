@@ -421,6 +421,34 @@ impl Driver<'_> {
                 self.compact_session(session.as_deref(), instructions.clone())
                     .await
             }
+            Action::SideChat {
+                session,
+                panel,
+                text,
+                answer,
+            } => {
+                let actual = self
+                    .op(
+                        session.as_deref(),
+                        Op::SideChatAsk {
+                            panel_id: panel.clone(),
+                            text: text.clone(),
+                        },
+                    )
+                    .await?;
+                if actual["text"].as_str() != Some(answer.as_str()) || actual["stopped"] != false {
+                    return Err(format!("side chat answer differed: {actual}"));
+                }
+                self.op(
+                    session.as_deref(),
+                    Op::SideChatControl {
+                        panel_id: panel.clone(),
+                        close: true,
+                    },
+                )
+                .await
+                .map(drop)
+            }
             Action::QueueEdit {
                 session,
                 item,

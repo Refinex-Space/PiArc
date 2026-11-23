@@ -122,6 +122,7 @@ impl HostConfig {
                 Capability::new("skills"),
                 Capability::new("plugins"),
                 Capability::new("autoMemory"),
+                Capability::new("sideChat"),
             ],
             allow_model_network: None,
             model_preferences: None,

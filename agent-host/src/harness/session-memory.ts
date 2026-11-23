@@ -147,6 +147,11 @@ export class SessionMemory {
     return this.#system?.text;
   }
 
+  /** Cache boundary to reproduce the same wire layout in side requests. */
+  get frozenSystem(): FrozenSystem | undefined {
+    return this.#system;
+  }
+
   /** The versions the frozen system prompt was built from. */
   #remember(data: unknown): void {
     if (!isObject(data) || !isObject(data.versions)) return;

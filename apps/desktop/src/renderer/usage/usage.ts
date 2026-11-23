@@ -11,6 +11,9 @@ import type {
   UsageTokens,
 } from '@piarc/protocol';
 
+/** A side request was billed without a main-turn event. Event names are session ids. */
+export const usageChanged = new EventTarget();
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

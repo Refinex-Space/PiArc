@@ -51,7 +51,7 @@ use crate::secrets::{
 use crate::session::{
     PolicyRecover, SessionAbort, SessionClose, SessionCompact, SessionCreate,
     SessionEventNotification, SessionFollowUp, SessionFork, SessionPrompt, SessionResume,
-    SessionSetPermissionMode, SessionSteer,
+    SessionSetPermissionMode, SessionSteer, SideChatAsk, SideChatControl,
 };
 use crate::skills::{
     ResourcesListCommands, ResourcesListSkills, ResourcesReload, SkillsInvoke, SkillsListMethod,
@@ -220,6 +220,10 @@ pub static CONTRACTS: &[Contract] = &[
     response::<ModelsCredentialStatus>("models/credentialStatus/result"),
     request::<SessionSetPermissionMode>("session/setPermissionMode"),
     response::<SessionSetPermissionMode>("session/setPermissionMode/result"),
+    request::<SideChatAsk>(SideChatAsk::NAME),
+    response::<SideChatAsk>("session/sideChatAsk/result"),
+    request::<SideChatControl>(SideChatControl::NAME),
+    response::<SideChatControl>("session/sideChatControl/result"),
     request::<SessionCompact>(SessionCompact::NAME),
     response::<SessionCompact>("session/compact/result"),
     request::<SessionFork>(SessionFork::NAME),

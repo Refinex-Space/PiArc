@@ -279,6 +279,30 @@
     },
     {
       "kind": "request",
+      "method": "session/sideChatAsk",
+      "name": "session/sideChatAsk",
+      "schema": "SideChatAskRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/sideChatAsk",
+      "name": "session/sideChatAsk/result",
+      "schema": "SideChatAskResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/sideChatControl",
+      "name": "session/sideChatControl",
+      "schema": "SideChatControlRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/sideChatControl",
+      "name": "session/sideChatControl/result",
+      "schema": "SideChatControlResponse"
+    },
+    {
+      "kind": "request",
       "method": "session/compact",
       "name": "session/compact",
       "schema": "SessionCompactRequest"

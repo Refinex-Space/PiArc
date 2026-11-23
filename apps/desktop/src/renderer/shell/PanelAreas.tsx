@@ -1,7 +1,7 @@
 // The right rail and the dock (architecture section 8.2): containers for the panels other tasks
 // register (`registry.ts`). An area with nothing registered renders nothing; one with panels
 // shows tabs, remembers its size and can be resized.
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { isImeComposing } from '../composer/ime-guard.js';
@@ -104,7 +104,17 @@ function Area({
         ))}
       </div>
       <div className="panel-body" role="tabpanel">
-        {shown?.render(context)}
+        {panels
+          .filter((panel) => panel === shown || panel.keepMounted)
+          .map((panel) =>
+            panel.keepMounted ? (
+              <div key={panel.id} hidden={panel !== shown}>
+                {panel.render(context)}
+              </div>
+            ) : (
+              <Fragment key={panel.id}>{panel.render(context)}</Fragment>
+            ),
+          )}
       </div>
     </aside>
   );

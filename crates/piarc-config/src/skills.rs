@@ -46,6 +46,7 @@ pub const DEFAULT_STYLE: &str = "Default";
 
 /// A built-in command: name, aliases, argument hint (ADR-0054 rule 13).
 pub const BUILT_IN_COMMANDS: &[(&str, &[&str], Option<&str>)] = &[
+    ("btw", &[], None),
     ("compact", &[], Some("[focus]")),
     ("subtask", &[], Some("<task>")),
     ("clear", &["reset", "new"], None),

@@ -84,3 +84,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0066](0066-fork-tool-declarations.md) | fork 继承父会话的工具声明，调用仍受子会话权限及深度限制（修订 ADR-0048 第 4 条） | 已接受 |
 | [0067](0067-fork-skill-index-and-grants.md) | 隔离 skill 的索引只用显式描述或名称；授权与 hooks 只交给实际执行的子会话（修订 ADR-0054） | 已接受 |
 | [0068](0068-worktree-hook-ownership.md) | hook 创建目录的文件边界、归属登记与非 Git 清理（修订 ADR-0052） | 已接受 |
+| [0069](0069-external-session-drafts.md) | 外部快捷操作打开可编辑草稿，用户手动发送（修订 ADR-0052 第 10 条） | 已接受 |
+| [0070](0070-in-memory-side-conversations.md) | 独立的内存侧边对话、工具拒绝和无转录来源的用量 | 已接受（补充） |

@@ -358,6 +358,41 @@ textarea.input {
   overflow: auto;
 }
 
+.side-chat {
+  padding: var(--piarc-space-3);
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+
+.side-chat-history,
+.side-chat-exchange,
+.side-chat form {
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+
+.side-chat-exchange {
+  justify-items: start;
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  padding-block: var(--piarc-space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.side-chat-exchange p {
+  margin: 0;
+}
+.side-chat-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+.side-chat textarea {
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+  background: var(--piarc-surface-panel);
+}
+
 /* ---- sidebar ---- */
 
 .sidebar {

@@ -158,7 +158,7 @@ capabilities:
     milestone: M5
     refs: [FR-CH-08]
     task: T49
-    status: planned
+    status: active
 
   # Models and providers
   - id: CAP-PROVIDER-ANTHROPIC-001

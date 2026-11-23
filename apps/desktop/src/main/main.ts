@@ -33,6 +33,7 @@ import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
 import { URL_SCHEME, launchTargets, parseLaunchUrl } from './launch.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { PreferenceStore } from './preferences.js';
+import { connectJumpList } from './platform/jump-list.js';
 import { applyAppIdentity } from './platform/index.js';
 import { confirmQuit } from './platform/quit.js';
 import { TrayIcon, parseActivity, trayIconDirectory } from './platform/tray.js';
@@ -227,6 +228,13 @@ function start(dirs: DataDirs): void {
       },
     );
     appShell.onLanguage(() => tray?.refresh());
+    connectJumpList(
+      eventRouter,
+      () => appShell.t(),
+      (refresh) => {
+        appShell.onLanguage(refresh);
+      },
+    );
     eventRouter.listen('core/activity', (batch) => {
       const activity = parseActivity(batch.payload);
       if (activity !== undefined) tray?.update(activity);
@@ -277,7 +285,9 @@ function start(dirs: DataDirs): void {
         ...launchTargets(process.argv, process.defaultApp, process.cwd()),
         ...early.splice(0),
       ];
-      appShell.openMain(targets);
+      const [first, ...rest] = targets;
+      appShell.openMain(first ? [first] : []);
+      for (const target of rest) appShell.launch(target);
     });
   });
 }

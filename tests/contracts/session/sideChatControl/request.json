@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 17,
+  "method": "session/sideChatControl",
+  "params": {
+    "sessionId": "main",
+    "panelId": "panel",
+    "close": true
+  }
+}

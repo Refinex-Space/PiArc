@@ -93,7 +93,32 @@ impl Driver<'_> {
         for f in self.env.gate.failures() {
             failures.push(failure("tool_batches", f));
         }
+        self.check_core_io(&mut failures);
+        if self.mode == Mode::Strict && self.spec.approvals.len() != self.answered.len() {
+            failures.push(failure(
+                "approvals",
+                format!(
+                    "approvals: {} answer(s) declared, but Core issued {} approval requests",
+                    self.spec.approvals.len(),
+                    self.answered.len()
+                ),
+            ));
+        }
+        failures
+    }
+    fn check_core_io(&self, failures: &mut Vec<Failure>) {
         let calls = self.env.gate.calls();
+        for (call, method) in &calls {
+            if call
+                .as_ref()
+                .is_some_and(|id| self.spec.expect.no_core_io.contains(id))
+            {
+                failures.push(failure(
+                    "core_io",
+                    format!("unexpected `{method}` request for tool call {call:?}"),
+                ));
+            }
+        }
         for expected in &self.spec.expect.core_io {
             let seen: BTreeSet<&str> = calls
                 .iter()
@@ -110,16 +135,5 @@ impl Driver<'_> {
                 ));
             }
         }
-        if self.mode == Mode::Strict && self.spec.approvals.len() != self.answered.len() {
-            failures.push(failure(
-                "approvals",
-                format!(
-                    "approvals: {} answer(s) declared, but Core issued {} approval requests",
-                    self.spec.approvals.len(),
-                    self.answered.len()
-                ),
-            ));
-        }
-        failures
     }
 }

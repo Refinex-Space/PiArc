@@ -124,6 +124,7 @@ export function buildMenuTemplate(context: MenuContext): MenuItemConstructorOpti
         },
       },
       command('terminal.toggle'),
+      command('session.sideChat'),
       command('app.commandPalette'),
       separator,
       ...(context.developer

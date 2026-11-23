@@ -1,0 +1,7 @@
+"Open PiArc" = "打开 PiArc";
+"Open Workspace in PiArc" = "在 PiArc 中打开工作区";
+"New Session in PiArc" = "在 PiArc 中新建会话";
+"Workspace Path" = "工作区路径";
+"Draft Text" = "草稿文字";
+"Enter an absolute local folder path of at most 4096 UTF-16 code units." = "请输入本地文件夹的绝对路径，最多 4096 个 UTF-16 代码单元。";
+"The draft must fit within 4096 UTF-16 code units and contain no null characters." = "草稿最多 4096 个 UTF-16 代码单元，且不能含有空字符。";

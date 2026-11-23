@@ -100,6 +100,14 @@ function launchTargetsOf(value: unknown): LaunchTarget[] | undefined {
     const target = item as Record<string, unknown>;
     if (target.kind === 'workspace' && typeof target.path === 'string') {
       targets.push({ kind: 'workspace', path: target.path });
+    } else if (
+      target.kind === 'draft' &&
+      typeof target.path === 'string' &&
+      typeof target.text === 'string'
+    ) {
+      targets.push({ kind: 'draft', path: target.path, text: target.text });
+    } else if (target.kind === 'newSession' || target.kind === 'chooseFolder') {
+      targets.push({ kind: target.kind });
     } else if (target.kind === 'session' && typeof target.sessionId === 'string') {
       targets.push({ kind: 'session', sessionId: target.sessionId });
     } else {
@@ -341,6 +349,13 @@ const api: PiarcApi = {
       .then((value: unknown) => expectString(value)),
   abort: (id) =>
     ipcRenderer.invoke(IPC_CHANNELS.sessionAbort, id).then((value: unknown) => expectString(value)),
+  askSideChat: (session, panel, question) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sideChatAsk, session, panel, question)
+      .then((value: unknown) => expectString(value)),
+  controlSideChat: async (session, panel, close) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sideChatControl, session, panel, close);
+  },
   setPermissionMode: async (id, mode) => {
     await ipcRenderer.invoke(IPC_CHANNELS.sessionPermissionMode, id, mode);
   },

@@ -126,6 +126,7 @@ pub(crate) type Restores = Mutex<BTreeMap<String, watch::Receiver<crate::Result<
 pub(crate) struct Link {
     pub epoch: u64,
     pub models_enabled: bool,
+    pub side_chat_enabled: bool,
     pub writer: mpsc::Sender<Vec<u8>>,
     /// Closes the Agent Host's stdin once the queued frames are written: the signal for an
     /// orderly exit.
@@ -198,6 +199,7 @@ pub(crate) async fn start(
     tokio::spawn(log_stderr(stderr, shared.workspace.clone(), epoch));
     let mut link = Link {
         models_enabled: false,
+        side_chat_enabled: false,
         epoch,
         writer,
         close_stdin,
@@ -220,6 +222,7 @@ pub(crate) async fn start(
     };
     match accept_hello(config, epoch, &hello) {
         Ok((params, welcome)) => {
+            link.side_chat_enabled = welcome.enabled.iter().any(|c| c.as_str() == "sideChat");
             link.models_enabled = welcome.enabled.iter().any(|c| c.as_str() == "models");
             let frame = encode(&ResultMessage::<HostHello>::new(
                 hello.id.clone(),

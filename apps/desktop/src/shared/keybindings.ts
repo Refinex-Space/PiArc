@@ -32,6 +32,7 @@ export interface CommandSpec {
 export const COMMANDS = [
   { id: 'session.new', defaultKey: 'Mod+N', label: 'command.session.new', scope: 'app' },
   { id: 'session.close', defaultKey: 'Mod+W', label: 'command.session.close', scope: 'app' },
+  { id: 'session.sideChat', defaultKey: 'Mod+;', label: 'sideChat.title', scope: 'app' },
   {
     id: 'session.permissionMode',
     defaultKey: 'Mod+Shift+M',

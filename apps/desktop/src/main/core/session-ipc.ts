@@ -27,6 +27,7 @@ import { electronExternalLinkPort } from '../external-link-port.js';
 import { LinkConfirmations, parseExternalUrl } from '../external-links.js';
 import type { RegisterHandler } from '../ipc/register.js';
 import type { CoreRuntime } from './native/piarc-core.js';
+import { registerSideChatHandlers } from './side-chat-ipc.js';
 
 /** The part of Core these commands use. */
 export type SessionCore = Pick<
@@ -43,6 +44,8 @@ export type SessionCore = Pick<
   | 'followUp'
   | 'followUpInput'
   | 'abort'
+  | 'askSideChat'
+  | 'controlSideChat'
   | 'answerApproval'
   | 'setPermissionMode'
   | 'compact'
@@ -496,6 +499,7 @@ export function registerSessionHandlers(
       : core.followUpInput(sessionId(id), input(message)),
   );
   registerHandler(IPC_CHANNELS.sessionAbort, (_event, [id]) => core.abort(sessionId(id)));
+  registerSideChatHandlers(registerHandler, core);
   registerHandler(IPC_CHANNELS.sessionPermissionMode, async (event, [id, mode]) => {
     if (!isPermissionMode(mode)) throw new TypeError('unknown permission mode');
     if (mode === 'bypassPermissions') {

@@ -57,3 +57,4 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 ## 参考
 
 - 架构第 9.1–9.3 节；ADR-0011、ADR-0044；`docs/research/pi-v1.4.0-baseline.md` 第 4.3 节。
+- schema v13（T49）为 `usage_records` 加入 `ephemeral_workspace`。侧边对话的请求由 Core 直接记账，归入 `auxiliary/sideChat`。索引重建保留这些记录，即使主会话还没有 JSONL 也能按工作区查询用量。删除会话时一并清理。
