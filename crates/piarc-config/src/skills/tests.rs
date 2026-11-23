@@ -202,6 +202,45 @@ fn skill_frontmatter_fields() {
 }
 
 #[test]
+fn fork_skill_frontmatter_validates_agent_and_background() {
+    let parse = |fields: &str| {
+        parse_skill(
+            Path::new("check/SKILL.md"),
+            ResourceSource::User,
+            &format!("---\n{fields}\n---\nRead the notes."),
+        )
+        .unwrap()
+    };
+    assert_eq!(
+        parse("context: fork").fork,
+        Some(SkillFork {
+            agent: None,
+            background: true
+        })
+    );
+    assert_eq!(
+        parse("context: fork\nagent: Explore\nbackground: false").fork,
+        Some(SkillFork {
+            agent: Some("Explore".into()),
+            background: false
+        })
+    );
+    assert!(parse("agent: Explore\nbackground: true").fork.is_none());
+    let invalid = parse("context: fork\nagent: [Explore]\nbackground: later");
+    for field in ["agent", "background"] {
+        assert!(invalid.info.warnings.iter().any(|warning| {
+            warning.kind == ResourceWarningKind::InvalidField
+                && warning.field.as_deref() == Some(field)
+        }));
+    }
+    let unsupported_context = parse("context: other");
+    assert!(unsupported_context.info.warnings.iter().any(|warning| {
+        warning.kind == ResourceWarningKind::InvalidField
+            && warning.field.as_deref() == Some("context")
+    }));
+}
+
+#[test]
 fn invalid_yaml_still_loads_and_bad_names_are_issues() {
     let t = Tree::new("invalid");
     t.write(

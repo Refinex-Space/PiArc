@@ -102,6 +102,17 @@ pub struct Skill {
     pub body: String,
     /// The frontmatter `hooks` object, as written.
     pub hooks: Option<Value>,
+    /// The agent and scheduling requested by `context: fork`.
+    pub fork: Option<SkillFork>,
+}
+
+/// How a skill requests an isolated execution context.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillFork {
+    /// The subagent definition to use. When omitted, the Agent tool's default type applies.
+    pub agent: Option<String>,
+    /// Whether the parent can continue while the child runs.
+    pub background: bool,
 }
 
 /// A command file or Pi prompt template in effect.
@@ -829,6 +840,18 @@ impl<'t> Front<'t> {
             .unwrap_or_else(|| first_line(self.body))
     }
 
+    fn skill_fork(&mut self) -> Option<SkillFork> {
+        let context = self.text("context")?;
+        if context != "fork" {
+            self.invalid("context");
+            return None;
+        }
+        Some(SkillFork {
+            agent: self.text("agent"),
+            background: self.flag("background").unwrap_or(true),
+        })
+    }
+
     fn line(&self, key: &str) -> Option<u64> {
         self.yaml.and_then(|yaml| frontmatter::line_of(yaml, key))
     }
@@ -948,6 +971,7 @@ pub fn parse_skill(
     let allowed_tools = front.list("allowed-tools", split_tools);
     let paths = front.list("paths", split_commas);
     let hooks = front.hooks();
+    let fork = front.skill_fork();
     front.remaining(SKILL_FIELDS);
     let info = SkillInfo {
         plugin: None,
@@ -971,6 +995,7 @@ pub fn parse_skill(
         info,
         body: front.body.to_owned(),
         hooks,
+        fork,
     })
 }
 
