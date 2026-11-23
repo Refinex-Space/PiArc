@@ -11,25 +11,5 @@ developer_instructions = """
 - /task <编号> 在 Codex 中写作 $task <编号>（.agents/skills/task/）。
 - 协议里的 TodoWrite 对应 Codex 的计划工具 update_plan；需要用户做决定时，在回复里列出编号选项并停下等待。
 - packages/protocol/src/generated/ 是生成物，只能经 npm run gen:protocol 更新，不手改。
-- 用户授权后可以普通推送到指定远端与分支。git reset --hard、git clean 由 .codex/rules/piarc.rules 禁止。
+- 用户授权后可以普通推送到指定远端与分支。破坏性 Git 操作按 docs/plan/protocol.md 执行。
 """
-
-# Read denies from .claude/settings.json, enforced by the OS sandbox for every sandboxed command.
-# Commands allowed in .codex/rules/piarc.rules (node, npm, cargo, ...) run outside the sandbox, as they
-# do in Claude Code. Edit/Write deny on packages/protocol/src/generated/ is not mapped here: a sandbox
-# deny would also stop `npm run gen:protocol`; verify's "protocol drift" step catches hand edits.
-default_permissions = "piarc"
-
-[permissions.piarc]
-description = "Workspace writable; secrets unreadable (mirrors .claude/settings.json)"
-extends = ":workspace"
-
-[permissions.piarc.filesystem]
-"~/.ssh" = "deny"
-"~/.npmrc" = "deny"
-# Windows and Linux expand ** before the sandbox starts; bound the scan.
-glob_scan_max_depth = 4
-
-[permissions.piarc.filesystem.":workspace_roots"]
-"**/.env" = "deny"
-"**/.env.*" = "deny"

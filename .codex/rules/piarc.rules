@@ -11,17 +11,6 @@
 
 # ---------- deny ----------
 prefix_rule(
-    pattern = ["git", "reset", "--hard"],
-    decision = "forbidden",
-    justification = "Discards uncommitted work. Use git stash or ask the user.",
-)
-prefix_rule(
-    pattern = ["git", "clean"],
-    decision = "forbidden",
-    justification = "Deletes untracked files. Ask the user.",
-    match = ["git clean -fdx", "git clean -n"],
-)
-prefix_rule(
     pattern = ["security", ["find-generic-password", "find-internet-password", "dump-keychain"]],
     decision = "forbidden",
     justification = "Never read credentials from the keychain (CLAUDE.md invariants, ADR-0021).",
