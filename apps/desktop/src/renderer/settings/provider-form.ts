@@ -41,6 +41,7 @@ export interface CatalogEntry {
   efforts: string[];
   toolReliability: string;
   /** The provider's own web search serves WebSearch (T38). */
+  serverContextEdits?: ('clearTools' | 'compact')[];
   nativeWebSearch?: boolean;
   /** Meets the Auto mode reviewer bar (T46). */
   reviewer?: boolean;
@@ -48,6 +49,7 @@ export interface CatalogEntry {
 
 /** The user's settings for one model (T29). */
 export interface ModelOverride {
+  serverContextEdit?: 'clearTools' | 'compact';
   displayName?: string;
   contextWindow?: number;
   vision?: boolean;

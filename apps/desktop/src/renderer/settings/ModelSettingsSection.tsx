@@ -33,6 +33,7 @@ interface Draft {
   displayName: string;
   contextWindow: string;
   vision: '' | 'on' | 'off';
+  serverContextEdit?: '' | 'clearTools' | 'compact';
   nativeWebSearch: '' | 'on' | 'off';
   defaultEffort: string;
   toolProfile: '' | 'default' | 'conservative';
@@ -40,6 +41,7 @@ interface Draft {
 
 function draftOf(o: ModelOverride | undefined): Draft {
   return {
+    serverContextEdit: o?.serverContextEdit ?? '',
     displayName: o?.displayName ?? '',
     contextWindow: o?.contextWindow === undefined ? '' : String(o.contextWindow),
     vision: o?.vision === undefined ? '' : o.vision ? 'on' : 'off',
@@ -52,6 +54,7 @@ function draftOf(o: ModelOverride | undefined): Draft {
 /** The override a draft stands for, or a message id when the window is invalid. */
 export function overrideOf(draft: Draft): ModelOverride | MessageId {
   const out: ModelOverride = {};
+  if (draft.serverContextEdit) out.serverContextEdit = draft.serverContextEdit;
   const name = draft.displayName.trim();
   if (name !== '') out.displayName = name;
   if (draft.contextWindow.trim() !== '') {
@@ -84,6 +87,11 @@ function ModelForm({
   const t = useT();
   const base = useId();
   const [draft, setDraft] = useState(() => draftOf(current));
+  const unavailableEdit =
+    current?.serverContextEdit !== undefined &&
+    !model.serverContextEdits?.includes(current.serverContextEdit)
+      ? current.serverContextEdit
+      : undefined;
   const [invalid, setInvalid] = useState<MessageId>();
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft({ ...draft, [key]: value });
@@ -190,6 +198,38 @@ function ModelForm({
             <option value="off">{t('models.settings.off')}</option>
           </select>
         </div>
+        {((model.serverContextEdits?.length ?? 0) > 0 ||
+          current?.serverContextEdit !== undefined) && (
+          <div className="setting">
+            <label className="setting-label" htmlFor={id('compaction')}>
+              {t('models.settings.compaction')}
+            </label>
+            <select
+              className="input"
+              id={id('compaction')}
+              value={draft.serverContextEdit ?? ''}
+              onChange={(event) => {
+                set('serverContextEdit', event.currentTarget.value as Draft['serverContextEdit']);
+              }}
+            >
+              <option value="">{t('models.settings.clientCompact')}</option>
+              {unavailableEdit !== undefined && (
+                <option value={unavailableEdit} disabled>
+                  {t('models.settings.serverUnavailable')}
+                </option>
+              )}
+              {model.serverContextEdits?.map((edit) => (
+                <option key={edit} value={edit}>
+                  {t(
+                    edit === 'clearTools'
+                      ? 'models.settings.clearTools'
+                      : 'models.settings.serverCompact',
+                  )}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="setting">
           <label className="setting-label" htmlFor={id('effort')}>
             {t('models.settings.effort')}

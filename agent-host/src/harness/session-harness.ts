@@ -21,6 +21,7 @@ import type {
   PermissionMode,
   ReminderType,
   SessionRemindParams,
+  ServerContextEdit,
 } from '@piarc/protocol';
 
 import { AhpError } from '../protocol/errors.js';
@@ -113,6 +114,7 @@ export interface SessionHarnessOptions {
   readonly appended: (message: ReminderMessage) => void;
   readonly log: (line: string) => void;
   /** The context window of a model per the user's setting (T29). */
+  readonly serverContextEdit?: (model: Model<Api>) => ServerContextEdit | null | undefined;
   readonly contextWindow?: (model: Model<Api>) => number;
   /** The auxiliary model channel (T29): WebFetch's extraction. */
   readonly auxiliary?: AuxiliaryModel;
@@ -208,6 +210,7 @@ export class SessionHarness {
       hooks,
       appended: o.appended,
       log: o.log,
+      ...(o.serverContextEdit === undefined ? {} : { serverContextEdit: o.serverContextEdit }),
       ...(o.contextWindow === undefined ? {} : { contextWindow: o.contextWindow }),
     });
   }

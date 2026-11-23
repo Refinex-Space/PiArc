@@ -5,6 +5,7 @@ import { getSupportedThinkingLevels, type Api, type Model } from '@earendil-work
 import type { CatalogModel, ModelSwitchPreviewResult } from '@piarc/protocol';
 import type { AgentSession } from '@earendil-works/pi-coding-agent';
 
+import { serverContextEdits } from './context-edits.js';
 import { AhpError } from '../protocol/errors.js';
 import { isObject } from '../runtime/items.js';
 import { nativeSearchCapability } from './web-search.js';
@@ -66,6 +67,7 @@ export function capabilities(model: Model<Api>): CatalogModel {
         ? ('verified' as const)
         : ('unknown' as const),
     ...nativeSearchCapability(model),
+    ...serverContextEdits(model),
     ...catalogPrice(model),
     ...CAPABILITY_OVERRIDES.get(`${model.provider}/${model.id}`),
   };

@@ -134,6 +134,11 @@ export const en = {
   'models.settings.displayName': 'Display name',
   'models.settings.contextWindow': 'Context window (tokens)',
   'models.settings.vision': 'Image input',
+  'models.settings.serverUnavailable': 'Configured server strategy unavailable',
+  'models.settings.compaction': 'Context management',
+  'models.settings.clientCompact': 'Client compaction',
+  'models.settings.clearTools': 'Clear tool results on Anthropic',
+  'models.settings.serverCompact': 'Summarize on Anthropic',
   'models.settings.nativeWebSearch': "Provider's web search",
   'webSearch.title': 'Web search',
   'webSearch.hint':
@@ -316,6 +321,7 @@ export const en = {
   'context.tokens': '{tokens, number} of {window, number} tokens',
   'context.threshold': 'Compacts automatically at {threshold, number} tokens',
   'context.autoOff': 'Automatic compaction is off in the settings',
+  'context.serverFallback': 'Server context management is unavailable. This session is using client compaction.',
   'context.autoStopped':
     'Automatic compaction stopped: {reason, select, ineffective {the context stayed above the limit} other {it failed three times}}',
   'context.source.estimate': 'Estimated',

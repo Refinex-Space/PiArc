@@ -1157,6 +1157,13 @@
           "description": "Meets the Auto mode reviewer bar (T46): verified tool calls, a context window of at\nleast 64,000 tokens and output of at least 1,024.",
           "type": "boolean"
         },
+        "serverContextEdits": {
+          "description": "Server strategies confirmed for this provider, API and model.",
+          "items": {
+            "$ref": "#/$defs/ServerContextEdit"
+          },
+          "type": "array"
+        },
         "toolProfile": {
           "anyOf": [
             {
@@ -1793,6 +1800,10 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "serverFallback": {
+          "description": "Server-side management was requested but client compaction had to take over.",
+          "type": "boolean"
         },
         "source": {
           "$ref": "#/$defs/UsageSource",
@@ -7236,6 +7247,17 @@
           "description": "Whether the provider's own web search serves `WebSearch` (T38); absent: the catalog's\nanswer (Anthropic's own models).",
           "type": ["boolean", "null"]
         },
+        "serverContextEdit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ServerContextEdit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Opt into one server-side context edit. Absent selects client compaction."
+        },
         "toolProfile": {
           "anyOf": [
             {
@@ -10933,6 +10955,21 @@
       },
       "required": ["released"],
       "type": "object"
+    },
+    "ServerContextEdit": {
+      "description": "The Anthropic context-management edit a user can select in place of client compaction.",
+      "oneOf": [
+        {
+          "const": "clearTools",
+          "description": "Clear older tool results on the provider.",
+          "type": "string"
+        },
+        {
+          "const": "compact",
+          "description": "Have the provider summarize the prefix when its threshold is reached.",
+          "type": "string"
+        }
+      ]
     },
     "SessionAbortRequest": {
       "description": "Request for `session/abort`.",

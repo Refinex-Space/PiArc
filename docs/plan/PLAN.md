@@ -314,7 +314,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 开工基线：macOS arm64，工作区干净，T47 已完成；`npm run verify -- --baseline` 复用 9212335 的全量结果，两项增量检查通过。gh 当前登录无效，未更新旧任务的 Windows CI 记录。
 - 已核对 pi-mcp 1.5.2：公开接口支持声明 `elicitation` 并注册 `elicitation/create` handler。通过内存传输在初始化时断言 form 与 URL 两种能力，再由 server 发请求，分别收到 `form accept` 和 `url decline`。A10 走客户端对话框、原生确认与 hooks 实现路径。
 - 开工检查点已提交（b92ac7c）。续做时恢复了 GitHub 访问，核对了 9212335 的原生 CI 日志，关闭 T46-A13 与 R5-A01；T45-A02 仍缺完整的映射测试通过记录。
-- [ ] A01–A03：压缩策略选择、失败回退、会话恢复与前缀验证。
+- [ ] A01–A02：服务端按模型选择与失败回退已接入；真实 Pi/Anthropic SDK、设置 UI 及既有回归共 24 项通过。两种协议与故障注入的正式 L2 待可启动 macOS 沙箱的环境复验。
+- [x] A03：真实 SessionManager 在重启后从分支恢复 Anthropic compaction 块到原 assistant 位置，原 JSONL 的字节前缀不变。`npx vitest run agent-host/src/runtime/server-compaction.test.ts`。
 - [ ] A04–A05：fork 子 agent 的历史、缓存、审批与检查点。父子工具声明一致涉及 ADR-0048 第 4 条，[ADR-0066](../adr/0066-fork-tool-declarations.md) 已接受，仅声明可见性例外，执行仍受限。
 - [ ] A06：fork skill 的 agent 选择、后台执行与正文隔离。[ADR-0067](../adr/0067-fork-skill-index-and-grants.md) 已接受，缺省时索引只列名称，授权绑定实际执行者。
   - 配置解析与非法字段测试已通过（`cargo test -p piarc-config --lib skills`，15 项）。

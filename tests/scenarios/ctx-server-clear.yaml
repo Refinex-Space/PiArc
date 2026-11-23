@@ -1,0 +1,29 @@
+id: ctx-server-clear
+description: A supported Anthropic model uses provider tool-result clearing without launching a client summary, even above the client threshold.
+capabilities: [CAP-CX-COMPACT-SERVER-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"anthropic/claude-sonnet-4-5":{"serverContextEdit":"clearTools"}}}}'
+providers:
+  builtin-anthropic:
+    wire: anthropic
+    model: claude-sonnet-4-5
+    context_window: 32000
+    steps:
+      - { text: First answer., usage: { input_tokens: 20000 } }
+      - text: Second answer.
+sessions:
+  main: { provider: builtin-anthropic }
+actions:
+  - prompt: { text: First., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - prompt: { text: Second., turn: second }
+expect:
+  request_counts: { builtin-anthropic: 2 }
+  requests:
+    - {
+        provider: builtin-anthropic,
+        index: 0,
+        body: { context_management: { edits: [{ type: clear_tool_uses_20250919 }] } },
+      }
+    - { provider: builtin-anthropic, index: 1, user_texts: [First., Second.] }

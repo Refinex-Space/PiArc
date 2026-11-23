@@ -131,6 +131,11 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'models.settings.displayName': '显示名',
   'models.settings.contextWindow': '上下文窗口（token）',
   'models.settings.vision': '图片输入',
+  'models.settings.serverUnavailable': '已配置的服务端策略不可用',
+  'models.settings.compaction': '上下文管理',
+  'models.settings.clientCompact': '客户端压缩',
+  'models.settings.clearTools': '由 Anthropic 清理工具结果',
+  'models.settings.serverCompact': '由 Anthropic 生成摘要',
   'models.settings.nativeWebSearch': '服务商自带网页搜索',
   'webSearch.title': '网页搜索',
   'webSearch.hint':
@@ -310,6 +315,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'context.tokens': '{tokens, number} / {window, number} tokens',
   'context.threshold': '达到 {threshold, number} tokens 时自动压缩',
   'context.autoOff': '设置中已关闭自动压缩',
+  'context.serverFallback': '服务端上下文管理不可用，本会话已切换到客户端压缩。',
   'context.autoStopped':
     '已停止自动压缩：{reason, select, ineffective {压缩后上下文仍超过上限} other {连续 3 次失败}}',
   'context.source.estimate': '估算值',

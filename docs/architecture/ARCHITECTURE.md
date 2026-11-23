@@ -745,7 +745,9 @@ T27 落地（ADR-0043）：`reminders.ts` 是模型可见运行时提示的唯�
 - PreCompact hook 可阻断压缩或提供摘要指令；PostCompact 通知。
 - 压缩后重新注入：memory 文件、当前计划、任务清单状态、最近调用的 skill 正文、最近读写过的文件内容。各项上限见第 6.15 节"压缩后恢复"；超出文件上限的部分只给路径提示。
 - 连续多次压缩后上下文立即又满（例如单个超大工具输出）时停止自动压缩并报告，避免空转。
-- 对 Anthropic 模型，服务端 context editing / compaction 作为可选策略（M5），与客户端压缩统一抽象。
+- 自动上下文管理按模型选择。缺省使用客户端策略；Anthropic Messages 能力表列出的模型可选服务端工具结果清理（`clear_tool_uses_20250919`），其中支持阈值压缩的也可选服务端摘要（`compact_20260112`）。模型设置保存在用户级 `modelProviders.models` 的 `serverContextEdit`。全局关闭自动压缩时两种自动策略都停止；显式 `/compact` 保留 T27 的用户指定重点与客户端摘要路径。
+- 服务端策略接管时，Pi 的客户端自动阈值与溢出压缩关闭。请求在 `before_provider_request` 合并服务端编辑配置与所需 beta；已有的工具和 thinking beta 一起保留。PreCompact 在将编辑配置交给服务端之前执行，阻断仅跳过该次编辑；对服务端摘要，其 stdout 可以指定摘要指令。PostCompact 只在服务端返回非空摘要后触发。工具清理没有摘要。服务端策略激活时停止后台暖缓存请求，避免它触发新的编辑或 hook。
+- Anthropic 的摘要按原位置回传。在 `provider_stream_event` 读原始摘要块，由 `message_end` 随对应 assistant 消息一次追加到 JSONL。发送时只在对应模型的 assistant 消息上还原这个块，早期记录保留；重启、回退按当前分支恢复。用量环沿用服务端报告。当前选择不支持或服务端请求失败时，本会话恢复客户端自动压缩，在上下文卡标出回退。重新选择模型或策略可再试。服务端协议见 [Anthropic context editing](https://platform.claude.com/docs/en/build-with-claude/context-editing) 与 [threshold compaction](https://platform.claude.com/docs/en/build-with-claude/compaction-threshold)。
 
 T27 落地（ADR-0043）：
 

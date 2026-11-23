@@ -1,0 +1,41 @@
+id: ctx-server-compact
+description: The official Anthropic adapter requests threshold compaction. The response crosses the client threshold without launching a client summary; after Core restarts, the original conversation and the server block both return in order.
+capabilities: [CAP-CX-COMPACT-SERVER-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"anthropic/claude-sonnet-4-6":{"serverContextEdit":"compact"}}}}'
+providers:
+  builtin-anthropic:
+    wire: anthropic
+    model: claude-sonnet-4-6
+    context_window: 100000
+    steps:
+      - text: First answer.
+        compaction: Server summary of the first question.
+        usage: { input_tokens: 89000 }
+      - text: Second answer.
+sessions:
+  main: { provider: builtin-anthropic }
+actions:
+  - prompt: { text: First question., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - restart_core: {}
+  - resume: {}
+  - prompt: { text: Second question., turn: second }
+expect:
+  request_counts: { builtin-anthropic: 2 }
+  requests:
+    - provider: builtin-anthropic
+      index: 0
+      body: { context_management: { edits: [{ type: compact_20260112 }] } }
+    - provider: builtin-anthropic
+      index: 1
+      body:
+        messages:
+          - { role: user }
+          - role: assistant
+            content:
+              - { type: compaction, content: Server summary of the first question. }
+              - { type: text, text: First answer. }
+          - { role: user }
+      user_texts: ['First question.', 'Second question.']

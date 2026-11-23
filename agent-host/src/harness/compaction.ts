@@ -42,9 +42,10 @@ import {
   type Api,
   type Model,
 } from '@earendil-works/pi-ai';
-import type { AutoCompactStop, ContextSettings } from '@piarc/protocol';
+import type { AutoCompactStop, ContextSettings, ServerContextEdit } from '@piarc/protocol';
 
 import { describeError } from '../protocol/errors.js';
+import { ServerCompaction } from './server-compaction.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import { isObject } from '../runtime/items.js';
 import type { CoreIo } from '../tools/core-io.js';
@@ -111,6 +112,7 @@ export interface SessionCompactionOptions {
   readonly appended: (message: ReminderMessage) => void;
   readonly log: (line: string) => void;
   /** The context window of a model per the user's setting (T29); absent: the catalog's. */
+  readonly serverContextEdit?: (model: Model<Api>) => ServerContextEdit | null | undefined;
   readonly contextWindow?: (model: Model<Api>) => number;
 }
 
@@ -253,6 +255,7 @@ async function summarize(
 /** One session's compaction settings, summary, restore and circuit breaker. */
 export class SessionCompaction {
   readonly #o: SessionCompactionOptions;
+  readonly #server = new ServerCompaction();
   #settings: ContextSettings | undefined;
   /** Automatic compactions in a row that failed or were ineffective, and the last kind. */
   #strikes = 0;
@@ -288,6 +291,7 @@ export class SessionCompaction {
     return {
       contextWindow: input === undefined ? 0 : effectiveWindow(input),
       autoCompactThreshold: input === undefined ? 0 : autoCompactThreshold(input),
+      ...(this.#server.fallback ? { serverFallback: true } : {}),
       autoCompact:
         this.#stopped !== undefined
           ? 'stopped'
@@ -320,18 +324,20 @@ export class SessionCompaction {
   apply(): void {
     const session = this.#o.session();
     const input = this.#input();
-    const model = session?.model;
+    const model: Model<Api> | undefined = session?.model;
     if (session === undefined) return;
     const retry = { provider: { maxRetries: 0 } };
     if (input === undefined || model === undefined) {
       session.settingsManager.applyOverrides({ retry });
       return;
     }
+    const enabled = this.#settings?.autoCompactEnabled !== false;
+    const server = this.#server.select(model, this.#o.serverContextEdit?.(model), enabled);
     const reserveTokens = piReserveTokens(model.contextWindow, autoCompactThreshold(input));
     session.settingsManager.applyOverrides({
       retry,
       compaction: {
-        enabled: this.#settings?.autoCompactEnabled !== false && this.#stopped === undefined,
+        enabled: enabled && !server && this.#stopped === undefined,
         reserveTokens,
         modelOverrides: { [`${model.provider}/${model.id}`]: { reserveTokens } },
       },
@@ -457,6 +463,17 @@ export class SessionCompaction {
   }
 
   extension: ExtensionFactory = (pi) => {
+    this.#server.install(
+      pi,
+      () => {
+        this.apply();
+        this.#o.usage().compacted();
+      },
+      async () => this.#o.hooks?.preCompact('auto', undefined),
+      async (summary) => {
+        await this.#o.hooks?.postCompact('auto', summary);
+      },
+    );
     pi.on('session_before_compact', async (event) => {
       this.#failure = undefined;
       this.#lastFailure = undefined;

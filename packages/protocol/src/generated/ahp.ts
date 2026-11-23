@@ -300,6 +300,10 @@ export type ModelAlias = 'fast' | 'balanced' | 'strong' | 'haiku' | 'sonnet' | '
  */
 export type EffortLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 /**
+ * The Anthropic context-management edit a user can select in place of client compaction.
+ */
+export type ServerContextEdit = 'clearTools' | 'compact';
+/**
  * The Tool Profile a model sees (architecture section 6.13): the default one, or the
  * conservative one with fewer tools, more explicit descriptions and task list reminders.
  */
@@ -1433,6 +1437,10 @@ export interface ModelOverride {
    */
   nativeWebSearch?: boolean | null;
   /**
+   * Opt into one server-side context edit. Absent selects client compaction.
+   */
+  serverContextEdit?: ServerContextEdit | null;
+  /**
    * Tool Profile; absent: chosen by the tool reliability.
    */
   toolProfile?: ToolProfileKind | null;
@@ -2167,6 +2175,10 @@ export interface CatalogModel {
    * least 64,000 tokens and output of at least 1,024.
    */
   reviewer?: boolean;
+  /**
+   * Server strategies confirmed for this provider, API and model.
+   */
+  serverContextEdits?: ServerContextEdit[];
   /**
    * The Tool Profile in effect for the model (T29); absent: the default one.
    */
@@ -6363,6 +6375,10 @@ export interface ContextUsage {
    * automatic compaction window, whichever is smaller.
    */
   contextWindow: number;
+  /**
+   * Server-side management was requested but client compaction had to take over.
+   */
+  serverFallback?: boolean;
   /**
    * Where the total comes from.
    */

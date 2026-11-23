@@ -78,6 +78,7 @@ export function usageOf(value: unknown): ContextUsage | undefined {
     tokens,
     contextWindow,
     autoCompactThreshold: threshold,
+    ...(value.serverFallback === true ? { serverFallback: true } : {}),
     categories,
     source,
     autoCompact: state,

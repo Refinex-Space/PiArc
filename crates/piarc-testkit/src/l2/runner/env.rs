@@ -270,9 +270,11 @@ pub(super) fn fill_workspace(value: &mut Value, workspace: &Path) {
 /// Stands for the workspace's absolute path in the tool arguments of an endpoint's script.
 pub const WORKSPACE_PLACEHOLDER: &str = "{{workspace}}";
 
-/// The Pi provider id of endpoint `name`.
+/// The Pi provider id of endpoint `name`. A `builtin-` fixture runs the named provider's
+/// real adapter against the same loopback mock, for provider-specific feature negotiation.
 pub(super) fn pi_provider(name: &str) -> String {
-    format!("mock-{name}")
+    name.strip_prefix("builtin-")
+        .map_or_else(|| format!("mock-{name}"), str::to_owned)
 }
 
 pub(super) fn pi_provider_entry(

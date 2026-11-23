@@ -138,6 +138,7 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
             })}
           </ul>
           <AutoCompactLine usage={usage} />
+          {usage.serverFallback === true && <p role="status">{t('context.serverFallback')}</p>}
         </>
       )}
       <button

@@ -93,6 +93,16 @@ pub enum ToolProfileKind {
     Conservative,
 }
 
+/// The Anthropic context-management edit a user can select in place of client compaction.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ServerContextEdit {
+    /// Clear older tool results on the provider.
+    ClearTools,
+    /// Have the provider summarize the prefix when its threshold is reached.
+    Compact,
+}
+
 /// A selectable chat model and its negotiated capabilities.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -124,6 +134,9 @@ pub struct CatalogModel {
     /// The provider's own web search can serve `WebSearch` (T38, ADR-0055).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub native_web_search: bool,
+    /// Server strategies confirmed for this provider, API and model.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub server_context_edits: Vec<ServerContextEdit>,
     /// The catalog's prices (T41); absent when the catalog has none (all rates zero, or a
     /// credit plan priced outside the catalog).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -157,6 +170,9 @@ pub struct ModelOverride {
     /// answer (Anthropic's own models).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_web_search: Option<bool>,
+    /// Opt into one server-side context edit. Absent selects client compaction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_context_edit: Option<ServerContextEdit>,
     /// Tool reliability Core derives from the provider configuration (keyless local
     /// endpoints are `low`); not a user setting.
     #[serde(default, skip_serializing_if = "Option::is_none")]

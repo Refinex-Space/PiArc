@@ -86,6 +86,9 @@ pub struct Step {
     /// Answer with an HTTP error instead of a response.
     #[serde(default)]
     pub error: Option<InjectedError>,
+    /// A threshold-compaction block before the assistant output (Anthropic Messages).
+    #[serde(default)]
+    pub compaction: Option<String>,
     /// A server-side web search before the text (Anthropic Messages only, T38): a
     /// `server_tool_use` block, then its `web_search_tool_result`, and the text's citations.
     #[serde(default)]
@@ -335,6 +338,7 @@ impl Step {
             disconnect_after_events: None,
             stall_after_events: None,
             error: None,
+            compaction: None,
             web_search: None,
         }
     }

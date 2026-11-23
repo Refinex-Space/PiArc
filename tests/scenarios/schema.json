@@ -462,6 +462,7 @@
           "type": "integer",
           "minimum": 0
         },
+        "compaction": { "type": "string" },
         "web_search": {
           "description": "A server-side web search before the text (Anthropic Messages only, T38).",
           "type": "object",

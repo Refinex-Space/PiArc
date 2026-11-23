@@ -194,6 +194,7 @@ export interface UsageLimits {
   readonly contextWindow: number;
   readonly autoCompactThreshold: number;
   readonly autoCompact: AutoCompactState;
+  readonly serverFallback?: boolean;
   readonly autoCompactStopped?: AutoCompactStop;
 }
 
@@ -230,6 +231,7 @@ export class ContextUsageTracker {
       categories,
       source,
       autoCompact: limits.autoCompact,
+      ...(limits.serverFallback ? { serverFallback: true } : {}),
       ...(limits.autoCompactStopped === undefined
         ? {}
         : { autoCompactStopped: limits.autoCompactStopped }),

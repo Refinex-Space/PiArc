@@ -81,6 +81,7 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
     io: tools.kind === 'core' ? tools.ioFor(manager.getSessionId()) : undefined,
     appended: (message) => opened.projector?.reminder(message),
     log: sessionLog,
+    serverContextEdit: (model) => workspace.preferences.override(model)?.serverContextEdit,
     contextWindow: (model) => workspace.preferences.contextWindow(model),
     nativeWebSearch: (model) => workspace.preferences.nativeWebSearch(model),
     ...(input.agents === undefined ? {} : { agents: input.agents }),

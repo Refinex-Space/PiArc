@@ -135,6 +135,9 @@ pub struct ContextUsage {
     pub source: UsageSource,
     /// Whether the session compacts automatically.
     pub auto_compact: AutoCompactState,
+    /// Server-side management was requested but client compaction had to take over.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub server_fallback: bool,
     /// Why automatic compaction stopped, when it did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_compact_stopped: Option<AutoCompactStop>,

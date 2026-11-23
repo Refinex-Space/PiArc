@@ -37,6 +37,11 @@ function parseOverride(key: string, value: unknown): ModelOverride {
   const out: { -readonly [K in keyof ModelOverride]: ModelOverride[K] } = {};
   const { displayName, contextWindow, vision, defaultEffort, toolProfile, toolReliability } = value;
   const { nativeWebSearch } = value;
+  if (value.serverContextEdit != null) {
+    if (value.serverContextEdit !== 'clearTools' && value.serverContextEdit !== 'compact')
+      fail(`${key}.serverContextEdit`);
+    out.serverContextEdit = value.serverContextEdit;
+  }
   if (nativeWebSearch !== undefined) {
     if (typeof nativeWebSearch !== 'boolean') fail(`${key}.nativeWebSearch`);
     out.nativeWebSearch = nativeWebSearch;

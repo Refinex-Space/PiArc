@@ -921,6 +921,12 @@ capabilities:
     refs: [ARCH-6.6.3]
     task: T27
     status: active
+  - id: CAP-CX-COMPACT-SERVER-001
+    title: '按模型启用 Anthropic 服务端清理或压缩，出错时退回客户端，恢复时保留服务端上下文'
+    milestone: M5
+    refs: [FR-CX-03, ARCH-6.6.4]
+    task: T48
+    status: active
   - id: CAP-CTX-COMPACT-001
     title: '自动压缩与手动 `/compact`，熔断与压缩后恢复关键上下文'
     milestone: M2

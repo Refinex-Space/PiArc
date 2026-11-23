@@ -248,6 +248,12 @@ pub(crate) fn encode_stream(step: &Step, context: &StreamContext) -> Result<Vec<
         event("ping", &json!({ "type": "ping" })),
     ];
     let mut index = 0;
+    if let Some(summary) = &step.compaction {
+        let start = json!({"type":"compaction","content":null});
+        let delta = json!({"type":"compaction_delta","content":summary});
+        push_block(&mut events, index, &start, std::iter::once(delta));
+        index += 1;
+    }
     let thinking = step.thinking_fragments();
     if !thinking.is_empty() {
         let start = json!({ "type": "thinking", "thinking": "" });
