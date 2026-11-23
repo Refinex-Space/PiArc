@@ -39,3 +39,5 @@ expect:
         - method: core/notices
           params: { type: hook, event: PostToolUse, level: error, message: timed out after 1 s }
     - { method: turn/completed, turn: t, params: { status: completed } }
+  audit:
+    - { kind: hook, detail: { event: PostToolUse, timedOut: true }, count: 1 }

@@ -8,6 +8,7 @@ use std::time::Duration;
 use piarc_ports::BoxFuture;
 use piarc_protocol::hooks::{HooksPrompt, HooksPromptParams, HooksPromptResult};
 use piarc_protocol::policy::{PolicyReview, PolicyReviewParams, PolicyReviewResult};
+use piarc_protocol::{ErrorKind, ErrorObject};
 
 use super::{Hub, Routes, lock};
 use crate::hooks::HookOutlet;
@@ -55,25 +56,26 @@ impl HookOutlet for HubHooks {
     fn mcp_tool(
         &self,
         params: piarc_protocol::hooks::HooksMcpToolParams,
-    ) -> BoxFuture<'static, Result<piarc_protocol::hooks::HooksMcpToolResult, String>> {
+    ) -> BoxFuture<'static, Result<piarc_protocol::hooks::HooksMcpToolResult, ErrorObject>> {
         let session = self
             .routes
             .upgrade()
             .and_then(|routes| lock(&routes).sessions.get(&params.session_id).cloned());
         Box::pin(async move {
-            let session = session.ok_or_else(|| "the session is not open".to_owned())?;
-            let host = session
-                .host()
-                .await
-                .ok_or_else(|| "the session's Agent Host is not running".to_owned())?;
+            let session = session.ok_or_else(|| {
+                ErrorObject::new(ErrorKind::SessionNotFound, "the session is not open", false)
+            })?;
+            let host = session.host().await.ok_or_else(|| {
+                ErrorObject::new(
+                    ErrorKind::HostUnavailable,
+                    "the session's Agent Host is not running",
+                    true,
+                )
+            })?;
             let timeout = Duration::from_millis(params.timeout_ms) + TRANSPORT_SLACK;
             host.call_within::<piarc_protocol::hooks::HooksMcpTool>(params, timeout)
                 .await
-                .map_err(|e| match e {
-                    // The pool's own words ("MCP server \"x\" is not configured").
-                    piarc_host::Error::Remote { error, .. } => error.message,
-                    other => other.to_string(),
-                })
+                .map_err(|e| e.to_error_object())
         })
     }
 }

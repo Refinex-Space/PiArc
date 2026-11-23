@@ -39,6 +39,7 @@ use piarc_hooks::{
 use piarc_ports::{BoxFuture, ProcessSpawner};
 use piarc_protocol::hooks::{HooksPromptParams, HooksPromptResult};
 use piarc_protocol::policy::PermissionMode;
+use piarc_protocol::{ErrorKind, ErrorObject};
 use serde_json::{Map, Value, json};
 use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
@@ -133,7 +134,7 @@ pub(crate) trait HookOutlet: Send + Sync {
     fn mcp_tool(
         &self,
         params: piarc_protocol::hooks::HooksMcpToolParams,
-    ) -> BoxFuture<'static, Result<piarc_protocol::hooks::HooksMcpToolResult, String>>;
+    ) -> BoxFuture<'static, Result<piarc_protocol::hooks::HooksMcpToolResult, ErrorObject>>;
 }
 
 /// Bytes of an `http` hook's response read.
@@ -232,9 +233,15 @@ impl piarc_hooks::McpToolPort for SessionMcp {
     fn call(
         &self,
         call: piarc_hooks::McpToolCall,
-    ) -> BoxFuture<'static, Result<piarc_hooks::McpToolReply, String>> {
+    ) -> BoxFuture<'static, Result<piarc_hooks::McpToolReply, ErrorObject>> {
         let Some(outlet) = self.outlet.clone() else {
-            return Box::pin(async { Err("no Agent Host can run mcp_tool hooks here".to_owned()) });
+            return Box::pin(async {
+                Err(ErrorObject::new(
+                    ErrorKind::HostUnavailable,
+                    "no Agent Host can run mcp_tool hooks here",
+                    false,
+                ))
+            });
         };
         let params = piarc_protocol::hooks::HooksMcpToolParams {
             session_id: self.session_id.clone(),

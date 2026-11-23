@@ -381,7 +381,10 @@ async fn call_tool(
             ))
         }
         Bounded::Done(Ok(reply)) => RunStatus::Answered(reply.text),
-        Bounded::Done(Err(why)) => RunStatus::Failed(why),
+        Bounded::Done(Err(error)) if error.data.kind == piarc_protocol::ErrorKind::Timeout => {
+            RunStatus::TimedOut(timeout)
+        }
+        Bounded::Done(Err(error)) => RunStatus::Failed(error.message),
         Bounded::TimedOut => RunStatus::TimedOut(timeout),
         Bounded::Cancelled => RunStatus::Cancelled,
     };

@@ -568,13 +568,20 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       });
     }
     const servers = await pool(method);
-    const result = await servers.call(
-      `hook:${stringField(method, fields, 'sessionId')}`,
-      stringField(method, fields, 'server'),
-      stringField(method, fields, 'tool'),
-      args as Record<string, unknown>,
-      { signal: AbortSignal.timeout(timeoutMs) },
-    );
+    const signal = AbortSignal.timeout(timeoutMs);
+    const result = await servers
+      .call(
+        `hook:${stringField(method, fields, 'sessionId')}`,
+        stringField(method, fields, 'server'),
+        stringField(method, fields, 'tool'),
+        args as Record<string, unknown>,
+        { signal },
+      )
+      .catch((error: unknown) => {
+        // The MCP client reports its local abort before Core's hook timer on some runs.
+        if (signal.aborted) throw new AhpError('timeout', 'MCP hook timed out');
+        throw error;
+      });
     const text = result.content
       .flatMap((block) => (block.type === 'text' ? [block.text] : []))
       .join('\n');

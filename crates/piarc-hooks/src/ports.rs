@@ -3,6 +3,7 @@
 //! drops the future), and reads the answer with Claude Code's output protocol.
 
 use piarc_ports::BoxFuture;
+use piarc_protocol::ErrorObject;
 
 /// One `http` handler's request: the hook input JSON as the body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,5 +92,5 @@ pub trait McpToolPort: Send + Sync {
     /// # Errors
     ///
     /// Why there is no answer (the server is not connected, no Agent Host, the call failed).
-    fn call(&self, call: McpToolCall) -> BoxFuture<'static, Result<McpToolReply, String>>;
+    fn call(&self, call: McpToolCall) -> BoxFuture<'static, Result<McpToolReply, ErrorObject>>;
 }

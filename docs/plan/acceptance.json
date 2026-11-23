@@ -4613,7 +4613,7 @@
       "task": "T47",
       "description": "`npm run verify` 通过（含 Windows CI 上的注册表读取测试）。验证：命令输出。",
       "status": "blocked",
-      "evidence": "本地 macOS arm64 在 8d31bf2 上 RUST_TEST_THREADS=1 npm run verify 为 17/17，macOS CI 同提交也是 17/17。Windows 的配置诊断来源、Git Bash、worktree 隔离和两项原生注册表测试通过，L2 227 通过、15 项按平台跳过。唯一失败是共享 MCP 进程测试把 Windows 8.3 工作目录与规范化的长路径按原始字符串比较。已改为比较两个规范目录并校验相同的非零 PID，等待修复后的 Windows verify。https://github.com/Refinex-Space/PiArc/actions/runs/45141919344/job/137581947098"
+      "evidence": "macOS arm64 在 c333144 上 RUST_TEST_THREADS=1 npm run verify 17/17，macOS CI 同提交 17/17。Windows Rust 工作区已通过，包括两项原生注册表读取、worktree 共享及此前三个测试夹具。Windows verify 16/17，L2 的 hooks-m4-mcp-tool 超时通知不一致。本机复现为远端计时先结束时丢失 timeout 类型；修复后确定性回归通过，带 timedOut 审计断言的并发场景 32/32 通过。等待含修复的 Windows 原生 verify。https://github.com/Refinex-Space/PiArc/actions/runs/45150011134/job/137608739640"
     },
     {
       "id": "T48-A01",

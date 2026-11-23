@@ -334,6 +334,36 @@ async fn sessions_of_a_workspace_share_one_mcp_server_process() {
     supervisor.shutdown().await;
 }
 
+/// Call the host directly so its own deadline, rather than Core's hook runner, fires first.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_mcp_hooks_local_abort_reaches_core_as_a_timeout() {
+    use piarc_protocol::hooks::{HooksMcpTool, HooksMcpToolParams};
+
+    let env = Env::new("mcp hook timeout", &[], json!({})).await;
+    *env.mcp.lock().expect("lock") =
+        harness::mcp_servers(&["checks"], &json!({"MCP_ECHO_REPLY": "1"}));
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let session = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let error = supervisor
+        .call::<HooksMcpTool>(HooksMcpToolParams {
+            session_id: session.0,
+            server: "checks".into(),
+            tool: "reply".into(),
+            arguments: json!({"text": "late", "delay_ms": 5000}),
+            timeout_ms: 100,
+        })
+        .await
+        .expect_err("the hook must time out");
+    let piarc_core::agent_host::Error::Remote { error, .. } = error else {
+        panic!("expected a remote hook timeout, got {error:?}");
+    };
+    assert_eq!(error.data.kind, piarc_protocol::ErrorKind::Timeout);
+    supervisor.shutdown().await;
+}
+
 const KILL_A: &str = r#"
 id: kill-a
 # Every rule on: the reopened session's turn, cut off by the kill, is closed when the session

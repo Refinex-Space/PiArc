@@ -233,6 +233,55 @@ async fn http_timeouts_errors_and_a_missing_port_do_not_block() {
     assert!(matches!(missing.status, RunStatus::NotStarted(_)));
 }
 
+struct FailingMcp(piarc_protocol::ErrorKind);
+
+impl McpToolPort for FailingMcp {
+    fn call(
+        &self,
+        _call: McpToolCall,
+    ) -> BoxFuture<'static, Result<crate::McpToolReply, piarc_protocol::ErrorObject>> {
+        let kind = self.0;
+        Box::pin(async move {
+            Err(piarc_protocol::ErrorObject::new(
+                kind,
+                "remote failure",
+                false,
+            ))
+        })
+    }
+}
+
+#[tokio::test]
+async fn an_mcp_tool_timeout_reported_by_the_host_counts_as_a_timeout() {
+    let timeout = Duration::from_secs(1);
+    let hook = handler(
+        Action::McpTool(crate::config::McpTool {
+            server: "checks".into(),
+            tool: "reply".into(),
+            input: json!({}),
+        }),
+        Some(timeout),
+    );
+    for (kind, expected) in [
+        (
+            piarc_protocol::ErrorKind::Timeout,
+            RunStatus::TimedOut(timeout),
+        ),
+        (
+            piarc_protocol::ErrorKind::InternalError,
+            RunStatus::Failed("remote failure".into()),
+        ),
+    ] {
+        let runner = runner().with_mcp(Arc::new(FailingMcp(kind)));
+        assert_eq!(
+            run_one(&runner, HookEvent::PostToolUse, hook.clone())
+                .await
+                .status,
+            expected
+        );
+    }
+}
+
 #[tokio::test]
 async fn cancelling_the_event_stops_remote_handlers() {
     let slow = Arc::new(FakeHttp {

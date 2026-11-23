@@ -45,7 +45,7 @@ hooks 的通用部分（架构第 6.3 节，ADR-0039、ADR-0055）：配置解�
 
 ## handler 类型（T38，ADR-0055；`mcp_tool` T41）
 
-- `mcp_tool`（T41）：`server`、`tool`、`input`；`mcp_tool::fill` 把 `input` 里的 `${a.b}` 换成 hook 输入的值（整串只是一个占位时保留类型），经 `McpToolPort`（Core 的 `sessions/hooks.rs` → AHP `hooks/mcpTool` → Agent Host 工作区 MCP 池的 `call`）调用；文本等同命令的 stdout（`RunStatus::Answered`），`isError`、server 未配置或未连接、超时（默认 600 s）都是非阻断错误。所有事件都收它。
+- `mcp_tool`（T41）：`server`、`tool`、`input`；`mcp_tool::fill` 把 `input` 里的 `${a.b}` 换成 hook 输入的值（整串只是一个占位时保留类型），经 `McpToolPort`（Core 的 `sessions/hooks.rs` → AHP `hooks/mcpTool` → Agent Host 工作区 MCP 池的 `call`）调用；文本等同命令的 stdout（`RunStatus::Answered`），`isError`、server 未配置或未连接、超时（默认 600 s）都是非阻断错误。Agent Host 先报告的 `ErrorKind::Timeout` 与本地计时到期都进入 `RunStatus::TimedOut`，通知与审计一致。所有事件都收它。
 - `Handler.action` 是 `Action::{Command, Http, Prompt, McpTool}`；`Handler::kind()` 给 `HandlerKind`。事件收不收某类由 `HookEvent::supports` 决定（Claude Code 的表：SessionStart 只收 command；SessionEnd、Notification、PreCompact、PostCompact、SubagentStart 收 command 与 http；其余三种都收），不收的写 `UnsupportedType` 诊断。
 - `Runner::with_http(port, HttpRules)`、`with_judge(port)` 由 Core 每次执行时装上；没装就是 `NotStarted`。远端 handler 的结果是 `RunStatus::Replied`（命令会打印的 JSON，空表示无输出）或 `RunStatus::Failed`（非阻断错误），之后与命令走同一个 `Outcome::read`、`Decision::merge`。
 - `http`：`HttpRules.allowed_urls` 是 `allowedHttpHookUrls`（`None` 不限制；`*` 通配，scheme 与主机不分大小写，主机末尾点忽略），不匹配就不发请求；头部的 `$VAR`、`${VAR}` 只在 handler 的 `allowedEnvVars` 与（设置时的）`httpHookAllowedEnvVars` 都列出时取 `HttpRules.env` 的值，否则为空串；回答：2xx 空体无输出、2xx JSON 对象按输出协议读，其他都是非阻断错误。

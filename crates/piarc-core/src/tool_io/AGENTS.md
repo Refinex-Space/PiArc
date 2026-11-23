@@ -64,7 +64,7 @@
 ## M4 hooks（T41，ADR-0059）
 
 - `tool_io/hooks_m4.rs`：CwdChanged（`exec_run` 结束后 shell 目录变了）、FileChanged（会话的 `WatchSlot`，`watchPaths` 整体替换并带替换序号，上限 `MAX_WATCH_PATHS`，每 `FILE_POLL` 轮询一次文件的存在、大小与修改时间；不要换回 FSEvents：负载下它的流启动会阻塞几十秒）、ConfigChange（`check_config` 把设置文件与 `SessionIo.config_seen` 比对：会话登记时取基线，`sessions/session.rs` 的 `Request::run` 在每个输入前调用，`sessions/workspace.rs` 的 `config_change_hooks` 在设置监听看到变化时调用；阻断时 `SessionIo.config_pins` 记该层旧值，`ToolIo::apply_pins` 在权限裁决（`policy.rs` 的 `session_settings`）与 hooks 规划（`run_hooks` → `HooksService::plan_adjusted`）里施加；`policy_settings` 不可阻断）。UserPromptExpansion 在 `hooks.rs` 的 `user_prompt_expansion`，由 `skills.rs` 的 `expand_command` 在登记 `allowed-tools` 与 hooks 之前调用；InstructionsLoaded、StopFailure、MCP prompt 的 UserPromptExpansion 经 `hooks/run`（`host_event` 的白名单字段）。
-- `mcp_tool`：`hooks/mod.rs` 的 `SessionMcp` 端口 → `sessions/hooks.rs` 的 `HookOutlet::mcp_tool` → AHP `hooks/mcpTool`，远端错误只取 Agent Host 给的消息。
+- `mcp_tool`：`hooks/mod.rs` 的 `SessionMcp` 端口 → `sessions/hooks.rs` 的 `HookOutlet::mcp_tool` → AHP `hooks/mcpTool`，保留远端错误的结构化类型。`timeout` 和 Core 本地超时均按同一时限写通知和审计，其余远端错误显示原消息。
 - 单测：`cargo test -p piarc-core --lib tool_io::hooks::tests::m4`；L2 `hooks-m4-*`。
 
 ## 文件根与设置来源（T35，ADR-0052）
