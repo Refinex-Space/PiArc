@@ -323,6 +323,7 @@ T47 自动记忆与企业托管配置（macOS 收尾）：
 - [x] L2 重跑 239 通过、3 项仅 Windows。由完整报告重新生成 `capabilities.md`，199 项 active 能力无缺失。
 - [x] 自动记忆回归先红后绿：索引曾达 201 行；撤销信任后仍能恢复正文；同名本地笔记损坏时导入会覆盖；目录标记缺创建时间。现按项目锁串行更改与导入，`cargo test -p piarc-core --lib auto_memory` 8 项、`--lib tool_io::policy::tests::t47` 3 项通过。
 - [x] 全量门禁首步发现两份托管文件夹具格式漂移；按项目 Prettier 格式化后，格式检查与双平台布局读取测试均通过。
+- [x] 修复 Agent Host 端到端夹具的开会话顺序：T47 的 `memory/status` 在打开期间调用，原夹具登记过晚导致 `SessionNotFound`。现在按生产顺序登记，断言查询恰好成功一次且独立于模型工具调用，`cargo test -p piarc-testkit --test agent_host` 18 项通过。
 - [ ] 在最终提交上运行 `npm run verify` 与 T47 的 Electron L4（A13 的 Windows 部分待 CI）。
 - [x] I169：用户委托裁决，采纳 ADR-0065。两份 HTTP hook 白名单逐键由最高托管来源决定。新增两个回归测试在修复前失败，修复后 `cargo test -p piarc-config --lib` 75 项通过。
 - [x] 收尾文档：复用表、S10 第 20 项、增补第 9.1 节与 I156/I157 评估已补齐。

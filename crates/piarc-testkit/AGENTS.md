@@ -52,7 +52,7 @@
 - 等待一律等事件或条件（`Recorder::until`、`turn_completed`），超时只作安全网。
 - 中断或杀进程的时点靠场景步骤的 `stall_after_events`。中断后的对话由 Harness Kit 补齐（ADR-0026），这类场景开着 `role_order`；只有含 steer 的场景关闭它（steer 按 Pi 的做法紧跟工具结果，形成相邻的 user 消息）。
 - `golden.rs`：用 `--test-record-events <目录>` 让 Agent Host 把 Pi 的原始事件与注册表的步骤（回合接受、中断、排队）写到 `<目录>/<会话 id>.jsonl`，按场景录制 `agent-host/test/golden/` 的输入。平时只检查已提交的录制与 Pi 现在产生的事件类型一致；投影的期望输出是 Vitest 文件快照。
-- Core 侧的 `Core` 处理者回答 `trust/get`，并把 `fs/*`、`exec/*` 交给真实的 `ToolIo`、记录每次调用（`calls_of`）。会话一律经 `open()` 打开：它在 `session/create` 之后把 cwd 登记为该会话的工作区根，否则工具请求会得到 `sessionNotFound`。
+- Core 侧的 `Core` 处理者回答 `trust/get`，并把 `fs/*`、`exec/*` 交给真实的 `ToolIo`、记录每次调用（`calls_of`）。会话经 `open()` 打开。与生产端相同，夹具先选定会话 ID 并在 Core 登记 cwd，再用该 ID 调用 `session/create`。这样 Agent Host 在打开期间查询 `memory/status` 就能读到本会话的状态。
 - `tools.rs`（A01、A02、A04、A05）、`parity.rs`（A06，Pi 原生工具 vs 委托工具；T16 起脚本在每次 Edit 前先 Read，比较 Read 结果时去掉行号）与 `with_io_spy`（`NODE_OPTIONS` 预加载 `packages/testkit/src/io-spy.ts`）是 S4 的证据。spy 记录带时间戳，按场景窗口判定；会话创建时 Pi 的 `existsSync(cwd)` 是已知的唯一一次（I20）。
 - 工具的 I/O 要 Core 读 stdout 才能进行：让 Core 停读的测试（背压）不能等真实工具完成，用不存在的工具名制造通知。
 - `mock-vision` 模型接受图片输入，`tool_results_in` 把图片块写成 `[image <类型> <base64>]`。

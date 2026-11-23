@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -575,14 +576,22 @@ pub async fn open_with_model(
     cwd: &str,
     model: Option<ModelRef>,
 ) -> SessionId {
-    let id = supervisor
-        .create_session(SessionCreateParams::new(cwd).with_model(model))
-        .await
-        .expect("session opens")
-        .session_id;
+    static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
+    let id = SessionId(format!(
+        "test-session-{}",
+        NEXT_SESSION.fetch_add(1, Ordering::Relaxed)
+    ));
+    // Core registers its id before session/create: the host queries memory/status during open.
     core.io
         .open_session(&id.0, Path::new(cwd), Path::new(cwd))
         .expect("Core knows the session's workspace");
+    let mut params = SessionCreateParams::new(cwd).with_model(model);
+    params.session_id = Some(id.clone());
+    let opened = supervisor
+        .create_session(params)
+        .await
+        .expect("session opens");
+    assert_eq!(opened.session_id, id);
     id
 }
 
