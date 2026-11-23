@@ -27,6 +27,7 @@ import {
   type KeyedReminder,
   type Reminders,
 } from './reminders.js';
+import { SUBAGENT_ENTRY } from './subagents/definitions.js';
 
 const INITIAL = 'piarc.systemPrompt';
 const VISITED = 'piarc.memoryDirectories';
@@ -70,6 +71,7 @@ export class SessionMemory {
   #inactiveRules = false;
   /** A subagent's identity and context choice (T31). */
   readonly #persona: Persona | undefined;
+  readonly #forkCallId: string | undefined;
 
   constructor(
     manager: SessionManager,
@@ -102,6 +104,14 @@ export class SessionMemory {
         };
         this.#apply(entry.data);
         this.#remember(entry.data);
+      } else if (
+        entry.type === 'custom' &&
+        entry.customType === SUBAGENT_ENTRY &&
+        isObject(entry.data) &&
+        'forkedAt' in entry.data &&
+        typeof entry.data.toolCallId === 'string'
+      ) {
+        this.#forkCallId = entry.data.toolCallId;
       } else if (entry.type === 'custom_message' && entry.customType === UPDATE) {
         this.#apply(entry.details);
       } else if (entry.type === 'custom_message' && entry.customType === REMINDER_ENTRY) {
@@ -414,7 +424,7 @@ export class SessionMemory {
 
     pi.on('before_provider_request', ({ payload }, ctx) =>
       ctx.model?.api === 'anthropic-messages'
-        ? anthropicMemoryPayload(payload, this.#system)
+        ? anthropicMemoryPayload(payload, this.#system, this.#forkCallId)
         : undefined,
     );
     if (!this.#read) return;

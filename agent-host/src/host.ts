@@ -404,9 +404,13 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       type !== 'monitorOutput' &&
       (type !== 'hookContext' || fields.wake === true)
     ) {
-      throw new AhpError('invalidParams', `${method}: unsupported reminder type or wake request`, {
-        details: { member: 'type' },
-      });
+      throw new AhpError(
+        'invalidParams',
+        `${method}: expected backgroundTask, monitorOutput, or hookContext without wake`,
+        {
+          details: { member: 'type' },
+        },
+      );
     }
     const key = optionalString(method, fields, 'key');
     return (await sessions(method)).remind(sessionId, {

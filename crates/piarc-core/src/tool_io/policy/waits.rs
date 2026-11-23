@@ -61,6 +61,11 @@ pub(super) async fn post_card(
         }
         state.publish(&card.session_id, services);
     }
+    // MCP nested questions already wait without a transport deadline. Their cancellation is
+    // scoped to the interaction, whereas policy/pending acknowledges a policy/evaluate call.
+    if card.kind == ApprovalKind::Elicitation {
+        return Ok(true);
+    }
     let pending = PolicyPendingParams {
         session_id: card.session_id.clone(),
         tool_call_id: call.to_owned(),

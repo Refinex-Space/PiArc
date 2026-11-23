@@ -9,23 +9,37 @@ export const MEMORY_MARKER = '[PiArc memory]';
  * tool results as user messages. Deliver the notice (memory, hook context or a reminder) as a sibling
  * text block on that wire, after any tool results; keep the original messages and cache
  * metadata in the session. */
-export function anthropicMemoryPayload(payload: unknown, frozen?: FrozenSystem): unknown {
+export function anthropicMemoryPayload(
+  payload: unknown,
+  frozen?: FrozenSystem,
+  forkCallId?: string,
+): unknown {
   if (!isObject(payload) || !Array.isArray(payload.messages)) return undefined;
   const messages: unknown[] = [];
   let group: Record<string, unknown>[] = [];
 
   function flush(): void {
+    // A fork's first task follows the inherited tool results. On the Anthropic wire both
+    // are user blocks of the same turn, with tool results ahead of the task.
+    const forkBoundary =
+      forkCallId !== undefined &&
+      group[0] !== undefined &&
+      blocks(group[0].content).some(
+        (block) =>
+          isObject(block) && block.type === 'tool_result' && block.tool_use_id === forkCallId,
+      );
     if (
       group.length > 1 &&
-      group.some((message) =>
-        blocks(message.content).some(
-          (block) =>
-            isObject(block) &&
-            block.type === 'text' &&
-            typeof block.text === 'string' &&
-            isNotice(block.text),
-        ),
-      )
+      (forkBoundary ||
+        group.some((message) =>
+          blocks(message.content).some(
+            (block) =>
+              isObject(block) &&
+              block.type === 'text' &&
+              typeof block.text === 'string' &&
+              isNotice(block.text),
+          ),
+        ))
     ) {
       messages.push({ ...group[0], content: group.flatMap((message) => blocks(message.content)) });
     } else {

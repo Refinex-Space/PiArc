@@ -57,10 +57,12 @@ pub enum WorktreeError {
         reason: &'static str,
     },
     /// The directory is not the top level of a git working tree.
-    #[error("{} is not the top level of a git working tree", path.display())]
+    #[error("{}: {reason}", path.display())]
     NotTopLevel {
         /// The directory.
         path: PathBuf,
+        /// Git's diagnostic, or the top-level requirement when the directory is a subfolder.
+        reason: String,
     },
     /// The base names no commit.
     #[error("{base:?} names no commit in this repository")]
@@ -350,21 +352,31 @@ pub async fn create(
 }
 
 async fn check_top_level(git: &Git, repository: &Path) -> Result<(), WorktreeError> {
-    let not_top = || WorktreeError::NotTopLevel {
+    let not_top = |reason| WorktreeError::NotTopLevel {
         path: repository.to_owned(),
+        reason,
     };
     let output = git
         .run(repository, &["rev-parse", "--show-toplevel"])
         .await?;
     if output.code != Some(0) {
-        return Err(not_top());
+        let reason = if output.stderr.is_empty() {
+            "git rev-parse could not determine the working tree root".into()
+        } else {
+            output.stderr
+        };
+        return Err(not_top(reason));
     }
     let shown = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
     let same = match (crate::canonical(&shown), crate::canonical(repository)) {
         (Ok(a), Ok(b)) => a == b,
         _ => false,
     };
-    if same { Ok(()) } else { Err(not_top()) }
+    if same {
+        Ok(())
+    } else {
+        Err(not_top("not the top level of a git working tree".into()))
+    }
 }
 
 /// Whether git ignores `relative` (`/`-separated, relative to `repository`).
