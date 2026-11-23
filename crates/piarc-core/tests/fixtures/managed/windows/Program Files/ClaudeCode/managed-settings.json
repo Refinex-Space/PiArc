@@ -12,7 +12,9 @@
     ]
   },
   "deniedMcpServers": [{ "serverName": "untrusted-db" }],
-  "sandbox": { "network": { "allowManagedDomainsOnly": true, "allowedDomains": ["registry.npmjs.org"] } },
+  "sandbox": {
+    "network": { "allowManagedDomainsOnly": true, "allowedDomains": ["registry.npmjs.org"] }
+  },
   "cleanupPeriodDays": 30,
   "forceLoginMethod": "console",
   "companyAnnouncements": ["Welcome"],
