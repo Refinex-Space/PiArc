@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 部分完成（仅 A13 待 Windows CI） | 7ab91c5 |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,13 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T47 的 Windows CI 复验（19d6e90）：
-
-- [x] [Windows verify](https://github.com/Refinex-Space/PiArc/actions/runs/45137220532/job/137566485157) 的 Git Bash 语法错误、worktree 共享和两项注册表测试均通过。唯一失败是配置诊断用例用带斜杠的字符串匹配 `sourceFile`。断言现核对实际生效的项目定义的完整文件路径，本机定向测试通过。
-- [x] [8d31bf2 的 Windows verify](https://github.com/Refinex-Space/PiArc/actions/runs/45141919344/job/137581947098) 确认配置诊断用例通过。下一处失败在 Agent Host 的共享 MCP 进程测试：Node 返回 Windows 临时目录的 8.3 短路径，原断言直接匹配长路径。现在对两边的实际目录做规范化并核对同一个非零 PID。Git Bash、worktree、注册表用例和 227 个 Windows L2 均通过。
-- [x] [c333144 的 Windows verify](https://github.com/Refinex-Space/PiArc/actions/runs/45150011134/job/137608739640) 已通过全量 Rust 测试。L2 的 `hooks-m4-mcp-tool` 缺少超时通知。本机顺序重跑 12/12 通过；并发 24 次有 1 次报告 `MCP request aborted`，对应审计 `durationMs: 1000`、`timedOut: false`。Agent Host 现在用 AHP 的 `timeout` 类型返回 hook 自身的超时，Core 保留错误类型，runner 按原时限写超时通知与审计。远端先超时的确定性回归通过，加强审计断言的场景并发复验 32/32 通过。
-- [ ] 用修复后的 Windows verify 关闭 A13。
 
 ## 登记事项
 
@@ -548,8 +541,8 @@ T47 的 Windows CI 复验（19d6e90）：
 | I224 | T46 | `npm run l3`（Claude Code 2.1.318）在 T46 之前就有的缺口：`config-diag-sources` 与 `hooks-m4-*` 六个 L2 场景（T41）既没有 L3 镜像也没有在 `tests/l3-allowlist.yaml` 排除；`perm-plan` 有 5 条未解释差异，都是 PiArc 请求里的 `NotebookEdit` 工具（T42 加入，Claude Code 在 `-p` 下不声明它）。L3 不在 verify 中，只在 Nightly 运行，所以 Nightly 目前会失败。T46 只为自己的 `perm-auto-*` 场景加了排除 | R6 或下一个运行 L3 的任务：为这七个场景写 L3 镜像或排除理由，为 `NotebookEdit` 补 allowlist 条目（确认 Claude Code 该版本的对应工具） |
 | I225 | T46 | T48 的 `PermissionDenied` hook 接入点：Core `crates/piarc-core/src/tool_io/policy/review.rs` 的 `ToolIo::reviewer_refused`（审查模型答 `deny`、`autoReview` 审计已写、拒绝结果交回模型之前；参数是本次调用的 `Call` 与审查结论 `ToolReview`）。只有审查模型的拒绝触发；超时、服务商错误、无法解析、不可用都转人工，不触发 | T48 在这里运行 `PermissionDenied` hooks（输入带审查模型、理由与类别），hook 的 `retry` 等输出按 Claude Code 的语义接入 |
 | I226 | T46 | `audit_events` 没有统一的保留期限：T46 的 `autoReview` 行（每次送审一行，含截断的理由与输入哈希）与其他审计行一样随数据库保留，不自动清理（设计增补第 4.3 节） | R6 评估审计的统一保留期限与清理方式 |
-| I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy。**bbc6b60 复核**：[Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936) 的会话归档通过。T34 的 dev 用例等不到 PowerShell 报告子进程 PID；dev 和 packaged 两种形态重新显示面板后均只读到 tick 1。三项继续由 W4 核对。 |
-| I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。**bbc6b60 复核**：[macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807623) 的 L2 为 239 通过、3 项仅 Windows；权限裁决 p95 为 2.544375 ms，仍超 2 ms 预算，沿 I103 跟进。 |
+| I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy。**bbc6b60 复核**：[Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936) 的会话归档通过。T34 的 dev 用例等不到 PowerShell 报告子进程 PID；dev 和 packaged 两种形态重新显示面板后均只读到 tick 1。三项继续由 W4 核对。 **T47 收尾**：[9212335 的 Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677946) 仅终端隐藏后重显用例在 dev 和 packaged 各失败一次。此前 [8d31bf2 的 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45141919344/job/137581947186) 还出现过 T18 会话归档与 T35 worktree 归档后目录仍在。W4 实机复核这些行为。Windows clippy、Git Bash 语法诊断及完整 verify 已通过。 |
+| I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。**bbc6b60 复核**：[macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807623) 的 L2 为 239 通过、3 项仅 Windows；权限裁决 p95 为 2.544375 ms，仍超 2 ms 预算，沿 I103 跟进。 **9212335 复核**：[macOS CI](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677879) 的 L2 全部适用场景通过。权限裁决 p95 为 3.011083 ms；T33 的终端任务快照还出现一次 shell 提示符先后到达导致的不一致。本机同提交全量 verify 通过。 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -1212,3 +1205,10 @@ T47 的 Windows CI 复验（19d6e90）：
 - [Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936) 中 T47 的记忆页、托管锁定、命令面板及打包探针 7/7 通过。整项 342 通过、3 失败、28 跳过。3 个失败均在 T34 终端，详见 I227，继续由 W4 跟进。
 - Windows verify 16/17，唯一失败是 I227 中 Git Bash 语法错误用例的输出前缀。7ab91c5 只调整测试夹具，将前置标记和语法诊断送入同一管道，继续检查前缀、行号、退出码和后续命令未执行。根据 ADR-0028，跨管道输出按到达顺序合并。
 - 本机在干净提交 7ab91c5 上运行 `RUST_TEST_THREADS=2 npm run verify` 17/17 PASS，L2 239 通过、3 项仅 Windows；Windows x64 的 `exec_commands` 交叉 Clippy 通过。原生 Windows 验收仍需包含该提交的 verify。A01–A12 passing，A13 blocked。
+
+### 2026-11-23 T47 已完成（验收提交 9212335）
+
+- A01–A13 全部 passing。macOS arm64 在干净提交 9212335 上运行 `RUST_TEST_THREADS=1 npm run verify`，17/17 通过。[Windows x64 原生 verify](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677414) 同一提交也为 17/17。注册表读取、排除用户策略、worktree 共享及仓库隔离均有通过记录。L2 在 macOS 为 239 通过、3 项仅 Windows，在 Windows 为 227 通过、15 项按平台跳过。
+- 修复复验中发现的问题：配置诊断核对覆盖来源的完整路径（8d31bf2）；共享 MCP 进程的测试按规范路径核对工作区并校验两个会话得到同一非零 PID（c333144）。MCP hook 的 Agent Host 超时先于 Core 返回时，原来报告普通中断，审计也失去超时标记；9212335 透传 AHP 的 `timeout`，两端都生成同一通知及审计。远端先超时的回归和 L2 `hooks-m4-mcp-tool` 在 Windows 均通过，期限与中断行为保留。
+- [Windows 桌面 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677946) 的 T47 相关 7 项全部通过。整个作业 343 通过、2 失败、28 跳过，剩余的两项均是 T34 终端恢复，继续由 I227/W4 跟进。macOS CI 的独立问题见 I228。
+- 看板下一项为 T48（M5 Harness 补全，macOS）。

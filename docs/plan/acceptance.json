@@ -4550,7 +4550,7 @@
       "task": "T47",
       "description": "同一仓库的不同 worktree 共享记忆，不同仓库互相隔离。验证：测试。",
       "status": "passing",
-      "evidence": "macOS 全量 verify 和 Windows x64 原生 CI（bbc6b60）均运行 auto_memory::tests::worktrees_share_and_repositories_are_isolated 并通过：linked worktree 与主 checkout 共用记忆目录，另一仓库隔离。Windows 运行 https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807884"
+      "evidence": "macOS arm64 和 Windows x64 在 9212335 的完整 verify 中均通过 auto_memory::tests::worktrees_share_and_repositories_are_isolated。测试在真实 Git 仓库和 linked worktree 之间读写同一笔记，并验证第二个仓库无法读取。https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677414"
     },
     {
       "id": "T47-A05",
@@ -4612,8 +4612,8 @@
       "id": "T47-A13",
       "task": "T47",
       "description": "`npm run verify` 通过（含 Windows CI 上的注册表读取测试）。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "macOS arm64 在 c333144 上 RUST_TEST_THREADS=1 npm run verify 17/17，macOS CI 同提交 17/17。Windows Rust 工作区已通过，包括两项原生注册表读取、worktree 共享及此前三个测试夹具。Windows verify 16/17，L2 的 hooks-m4-mcp-tool 超时通知不一致。本机复现为远端计时先结束时丢失 timeout 类型；修复后确定性回归通过，带 timedOut 审计断言的并发场景 32/32 通过。等待含修复的 Windows 原生 verify。https://github.com/Refinex-Space/PiArc/actions/runs/45150011134/job/137608739640"
+      "status": "passing",
+      "evidence": "9212335：macOS arm64 的 RUST_TEST_THREADS=1 npm run verify 与 Windows x64 原生 CI 的 npm run verify 均为 17/17（All 17 steps passed）。Windows 日志确认 the_policy_value_is_read_from_the_registry 与 the_current_users_policy_key_is_not_read 通过。Windows L2 227 通过、15 项按平台跳过；macOS L2 239 通过、3 项按平台跳过。https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677414"
     },
     {
       "id": "T48-A01",
