@@ -12,7 +12,7 @@
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
 | M4 | 31 | 31 | 0 | 0 |
-| M5 | 18 | 14 | 4 | 0 |
+| M5 | 25 | 24 | 1 | 0 |
 
 ## M1
 
@@ -223,13 +223,20 @@
 
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
-| CAP-AGENT-FORK-001 | fork 模式子 agent 继承父会话历史并共享缓存 | ARCH-6.15 | T48 | — | 计划中 |
+| CAP-AGENT-FORK-001 | fork 子 agent 继承分支历史及父会话的 system 与工具前缀，审批和检查点归主会话 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T48 | `subagent-fork` | 已实现 |
 | CAP-CHAT-SIDE-001 | 侧边对话基于当前上下文提问，不写入主对话 | FR-CH-08 | T49 | — | 计划中 |
 | CAP-CONFIG-MANAGED-001 | 企业托管配置是最高层：托管 deny 在裁决第 1 步生效，列表与其他层合并，标量覆盖其他层 | ARCH-6.14、ARCH-6.2.3 | T47 | `managed-precedence` | 已实现 |
 | CAP-CONFIG-MANAGED-CHANGE-001 | 托管配置变化在下一次检查内生效，ConfigChange hook 不能阻断，运行中变坏的文件沿用上次内容 | ARCH-6.14、ARCH-6.3.2 | T47 | `managed-change` | 已实现 |
 | CAP-CONFIG-MANAGED-CLAUDE-001 | 兼容读取 Claude Code 的托管文件（macOS 与 Windows 两套布局），不支持的键在配置诊断中列为已忽略 | ARCH-6.14 | T47 | `managed-claude-code-macos`<br>`managed-claude-code-windows` | 已实现 |
 | CAP-CONFIG-MANAGED-HOOKS-001 | "只允许托管 hooks"：只运行托管 hooks，跳过的 hooks 写入审计 | ARCH-6.3.1 | T47 | `managed-hooks-only` | 已实现 |
-| CAP-HOOK-M5-001 | WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks | FR-HN-05、ARCH-6.3.2 | T48 | — | 计划中 |
+| CAP-CX-COMPACT-SERVER-001 | 按模型启用 Anthropic 服务端清理或压缩，出错时退回客户端，恢复时保留服务端上下文 | FR-CX-03、ARCH-6.6.4 | T48 | `ctx-server-clear`<br>`ctx-server-compact`<br>`ctx-server-fallback`<br>`ctx-server-openai` | 已实现 |
+| CAP-HOOK-ELICITATION-001 | Elicitation 可代答或阻断 MCP 请求，ElicitationResult 可修改用户的回答 | FR-HN-05、FR-EX-03、ARCH-6.3.2、ARCH-6.8 | T48 | `mcp-elicitation-hooks` | 已实现 |
+| CAP-HOOK-M5-001 | WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks | FR-HN-05、ARCH-6.3.2 | T48 | `hooks-m5-model-switch`<br>`hooks-m5-permission-denied`<br>`hooks-m5-worktree`<br>`mcp-elicitation-hooks` | 已实现 |
+| CAP-HOOK-PERMISSIONDENIED-001 | Auto 审查拒绝后执行 PermissionDenied hook，并将重试提示随拒绝结果返回 | FR-HN-05、ARCH-6.3.2 | T48 | `hooks-m5-permission-denied` | 已实现 |
+| CAP-HOOK-POSTMODELSWITCH-001 | PostModelSwitch 的补充上下文随下一次模型请求送达 | FR-HN-05、ARCH-6.3.2、ARCH-6.13 | T48 | `hooks-m5-model-switch` | 已实现 |
+| CAP-HOOK-PREMODELSWITCH-001 | PreModelSwitch 提供模型、上下文与缓存成本，可允许、拒绝或询问 | FR-HN-05、ARCH-6.3.2、ARCH-6.13 | T48 | `hooks-m5-model-switch` | 已实现 |
+| CAP-HOOK-WORKTREE-001 | WorktreeCreate 与 WorktreeRemove 接管受管理 worktree 的创建和移除，失败时保留原因 | FR-HN-05、ARCH-6.3.2、ARCH-6.12 | T48 | `hooks-m5-worktree` | 已实现 |
+| CAP-MCP-ELICITATION-001 | MCP 表单与 URL 请求从所属会话接收接受、拒绝、取消结果，打开 URL 需原生确认 | FR-EX-03、ARCH-6.8 | T48 | `mcp-elicitation`<br>`mcp-elicitation-hooks` | 已实现 |
 | CAP-MEM-AUTO-001 | 自动记忆：模型经 `Memory` 工具由 Core 保存笔记并审计，新会话第 4 段带索引，笔记正文读取后才进上下文，压缩后恢复 | FR-CX-05、ARCH-6.6.2 | T47 | `memory-auto-compact`<br>`memory-auto-save` | 已实现 |
 | CAP-MEM-AUTO-OFF-001 | 自动记忆关闭或项目未受信任时没有 `Memory` 工具（关闭时也没有索引）；项目文件只能关闭自动记忆 | FR-CX-05、ARCH-10.2 | T47 | `memory-auto-off`<br>`memory-auto-untrusted` | 已实现 |
 | CAP-PERM-AUTO-001 | 自动审查模式：可配置的审查模型代替人审批，决策可审计 | FR-PM-06、ARCH-6.0 | T46 | `perm-auto-allow` | 已实现 |
@@ -240,7 +247,7 @@
 | CAP-PERM-AUTO-PAUSE-001 | 连续拒绝达到阈值后暂停自动审查、改由人工审批，用户允许一次后恢复 | FR-PM-06、ARCH-10.1 | T46 | `perm-auto-pause` | 已实现 |
 | CAP-PERM-AUTO-SCOPE-001 | Auto 模式只在用户级设置开启；项目级的开关、审查模型、策略与可信基础设施不生效并在配置诊断中标为已忽略 | FR-PM-06、ARCH-6.2.1、ARCH-10.2 | T46 | `perm-auto-project-ignored` | 已实现 |
 | CAP-PERM-AUTO-SUBAGENT-001 | 子 agent 的调用按主会话的 Auto 模式送审，并行子 agent 的审查并发进行，审计标明来源 | FR-PM-06、ARCH-6.4 | T46 | `perm-auto-subagents` | 已实现 |
-| CAP-SKILL-FORK-001 | skill 的 `context: fork` | ARCH-6.14 | T48 | — | 计划中 |
+| CAP-SKILL-FORK-001 | 带 `context: fork` 的 skill 在指定子 agent 中执行，主会话只接收结果 | FR-EX-01、ARCH-6.7 | T48 | `skill-fork`<br>`skill-fork-background` | 已实现 |
 
 ## 由客户端测试（L4）验证的需求
 
