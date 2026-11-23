@@ -4535,85 +4535,85 @@
       "id": "T47-A02",
       "task": "T47",
       "description": "agent 写入记忆后，索引与主题文件出现在增补规定的位置，审计记录写入会话，transcript 显示\"已保存记忆\"。验证：L2 场景与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 memory-auto-save（索引与主题文件、kind memory 审计、请求含 Memory 工具）；L4 t47-memory.e2e.ts（transcript \"Saved memory · build\"、auto-memory/<键>/build.md 与 MEMORY.md，截图 tmp/evidence/T47/transcript-saved-memory.png）"
     },
     {
       "id": "T47-A03",
       "task": "T47",
       "description": "新会话的 system prompt 第 4 段包含索引且遵守长度上限，主题文件只在读取后进入上下文；压缩后的请求重新包含索引。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 memory-auto-save（后一会话 system prompt 第 4 段含索引与说明、正文读取后才进上下文）、memory-auto-compact（压缩后请求重新含索引与读过的笔记）；cargo test -p piarc-core --lib auto_memory（INDEX_LINES/INDEX_BYTES 截断）"
     },
     {
       "id": "T47-A04",
       "task": "T47",
       "description": "同一仓库的不同 worktree 共享记忆，不同仓库互相隔离。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib auto_memory（同一仓库的 worktree 共用目录、不同仓库隔离）"
     },
     {
       "id": "T47-A05",
       "task": "T47",
       "description": "用户可在设置中浏览、编辑、删除记忆；关闭自动记忆后，请求中不含记忆，写入工具不出现在工具列表中。验证：Playwright 与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 t47-memory.e2e.ts（记忆页查看、编辑、删除、导入、关闭开关后新会话请求不含 Memory 工具，截图 memory-page-*.png）；L2 memory-auto-off"
     },
     {
       "id": "T47-A06",
       "task": "T47",
       "description": "记忆的读写与导入过程中，`.claude/` 与 `~/.claude/` 下没有任何写入。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib auto_memory（导入只读）；L4 t47-memory.e2e.ts 断言工作区无 .claude/、测试家目录 .claude 下只有原文件；L2 每个场景比对 Claude Code 配置快照"
     },
     {
       "id": "T47-A07",
       "task": "T47",
       "description": "托管层的值在会话、项目、用户各层同时设置同一键时胜出；列表键合并且托管 deny 生效。验证：测试矩阵。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 managed-precedence（托管层胜过会话、项目、用户；列表合并、托管 deny 生效）；cargo test -p piarc-config managed"
     },
     {
       "id": "T47-A08",
       "task": "T47",
       "description": "开启\"只允许托管 hooks\"后，用户、项目与插件的 hooks 不执行且写入审计，托管 hooks 照常执行。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L2 managed-hooks-only（用户、项目、插件 hooks 不执行并写审计，托管 hooks 执行）"
     },
     {
       "id": "T47-A09",
       "task": "T47",
       "description": "增补定义为\"非管理员来源\"的位置中的配置不获得托管优先级。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-config managed 与 cargo test -p piarc-core --lib managed::（HKCU、用户偏好、数据目录与家目录下的文件不获托管优先级）"
     },
     {
       "id": "T47-A10",
       "task": "T47",
       "description": "Claude Code 托管文件（macOS 与 Windows 两套路径布局的夹具）被读取，支持的键生效，其余键在配置诊断中列为\"已忽略\"。验证：测试与 Playwright 截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib managed::（claude_codes_managed_files_load_in_both_layouts）；L2 managed-claude-code-macos、managed-claude-code-windows；L4 t47-memory.e2e.ts 托管用例（截图 tmp/evidence/T47/managed-diagnostics.png，cleanupPeriodDays 列为已忽略）"
     },
     {
       "id": "T47-A11",
       "task": "T47",
       "description": "托管文件格式错误时按增补规定处理；托管配置变化后在增补规定的时间内生效，且 `ConfigChange` hook 不能阻断托管来源的变化。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-core --lib managed::（启动时格式错误拒绝、运行中变坏沿用上次内容）与 --lib workspace_settings（首次注册未完成时托管变化照常上报，9f98aea）；L2 managed-change（轮询内生效、ConfigChange 以 policy_settings 运行且阻断无效、stale）；startup-error.test.ts（本地化启动错误）"
     },
     {
       "id": "T47-A12",
       "task": "T47",
       "description": "设置界面中被托管锁定的项显示锁定标识且不可编辑。验证：Playwright 与截图（`tmp/evidence/T47/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "L4 t47-memory.e2e.ts 托管用例（横幅、记忆、权限、沙箱、输出风格的锁定标识与禁用，截图 tmp/evidence/T47/managed-*.png）"
     },
     {
       "id": "T47-A13",
       "task": "T47",
       "description": "`npm run verify` 通过（含 Windows CI 上的注册表读取测试）。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "未在最终提交上运行全量 npm run verify（用户要求跳过验证收尾）；已运行：L2 全量 239 通过（修复前一次 managed-change 超时，已定位并修复）、受影响 L4 31 通过、desktop Vitest 402 通过、Windows 交叉 clippy 通过；Windows 注册表读取测试待推送后 Windows CI"
     },
     {
       "id": "T48-A01",

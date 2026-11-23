@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 部分完成（A13 等全量 verify 与 Windows CI） | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -315,13 +315,13 @@ T47 自动记忆与企业托管配置（macOS，设计关口）：
 - [x] 设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`（八部分 + 第 11 节 10 个需要确认的要点）；用户确认全部按推荐（A01）
 - [x] 自动记忆：存储、`Memory` 工具经 Core 写入与审计、worktree 共享与仓库隔离、Claude Code 记忆只读导入（A02、A04、A06 的 Core 部分；30dc4fe）
 - [x] 自动记忆：第 4 段注入与长度上限、主题文件按需读取、压缩后重注入、会话中途变化（A03 的实现；21e6807，L2 断言待补）
-- [ ] 自动记忆：transcript 提示、设置的记忆页（浏览、编辑、删除、开关）、`/memory`、关闭后不注入且工具不可见（A02、A05）
+- [x] 自动记忆：transcript 提示、设置的记忆页（浏览、编辑、删除、开关）、`/memory`、关闭后不注入且工具不可见（A02、A05；6c22092、a16a54e）
 - [x] 托管配置：来源读取（文件与片段、macOS 托管偏好、Windows `HKLM`）、合并为最高层、非管理员来源不获优先级、格式错误与热更新、`ConfigChange` 不可阻断（A07、A09、A11 的 Core 部分；f428a44，启动失败对话框待客户端）
-- [ ] 托管配置：Claude Code 托管文件兼容（两套路径布局夹具）、配置诊断（加载状态、生效键、忽略键）（A10）
+- [x] 托管配置：Claude Code 托管文件兼容（两套路径布局夹具）、配置诊断（加载状态、生效键、忽略键）（A10）
 - [x] 只允许托管 hooks（审计跳过的 hooks）与增补纳入的其他托管键接入 MCP、插件、沙箱、权限、Auto 模式（A08 的 Core 部分；172cb41，L2 待补）
-- [ ] 设置界面的托管锁定标识与不可编辑（A12，截图在 `tmp/evidence/T47/`）
-- [ ] L2 场景 `memory-auto-*`、`managed-*` 与能力 ID；`npm run verify`（A13）
-- [ ] 收尾：`crates/piarc-config`、`agent-host` 的 AGENTS.md，`coding-standards.md` 复用表，验收与看板
+- [x] 设置界面的托管锁定标识与不可编辑（A12，截图在 `tmp/evidence/T47/`）
+- [x] L2 场景 `memory-auto-*`、`managed-*` 与能力 ID（全量 L2 239 通过）；[ ] `npm run verify` 全量未在最终提交上运行，`docs/product/capabilities.md` 未重新生成（A13 blocked）
+- [x] 收尾：各目录 AGENTS.md、验收与看板；[ ] `coding-standards.md` 复用表、S10 报告第 20 行、增补的实现细化一节未写（用户要求快速收尾）
 
 ## 登记事项
 
@@ -1189,3 +1189,10 @@ T47 自动记忆与企业托管配置（macOS，设计关口）：
 - 交付：设计增补 [`docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`](../architecture/addenda/T47-auto-memory-and-managed-settings.md)：记忆存在 `<数据目录>/auto-memory/<项目键>/`（主 checkout 算出，worktree 共享），模型只经宿主工具 `Memory`（读、保存、删除，只收记忆名）经 Core 读写并写审计，索引由 Core 生成，第 4 段注入前 200 行或 25 KB，压缩后有变化时重注入；记忆页、`/memory`、transcript 提示，项目层只能关闭；托管配置为优先级 80 的 `enterprise` 层，来源为 macOS `/Library/Managed Preferences/cn.piarc.desktop.plist` 与 `/Library/Application Support/PiArc/`、Windows `HKLM\SOFTWARE\Policies\PiArc` 与 `Program Files\PiArc\`，多来源合并（锁取最严），兼容读取 Claude Code 的托管文件、偏好域、`HKLM` 键、托管 `CLAUDE.md` 与 `managed-mcp.json`；格式错误拒绝启动，每 60 s 检查变化，`ConfigChange` 不可阻断；第一版托管专属键为 `allowManagedHooksOnly`、`allowManagedPermissionRulesOnly`、`allowManagedMcpServersOnly`、`sandbox.network.allowManagedDomainsOnly`。行为参照 Claude Code 官方 `memory`、`settings`、`managed-settings`、`managed-mcp`、`hooks`、`permissions`（2026-11-22 重新核对）。
 - 验收：A01 blocked（等待用户确认）；其余未开始。
 - 下一项：用户确认增补第 11 节的 10 个要点（可逐条改选备选）后，再次 `/task T47` 进入实现。本地提交，未推送。
+
+### 2026-11-22 T47（实现，部分完成）
+
+- 交付：托管设置（`piarc_config::managed` 合并与锁、`piarc_core::managed` 各平台来源、启动拒绝与 60 s 轮询、`enterprise` 层、托管 hooks/MCP/沙箱/权限/Auto 模式键、写入锁定）；自动记忆（Core 的 `auto_memory::Store` 与审计、`Memory` 工具与第 4 段注入、压缩后恢复）；客户端的记忆页、`/memory`、transcript 的 Memory 行与"在设置中打开"、托管横幅与锁定标识、本地化启动错误对话框；L2 `memory-auto-*`、`managed-*`；L4 `t47-memory.e2e.ts`；提示词原创性检查 0 命中（8,533 词）。修复：设置窗口导航不更新地址导致 `openSettings(page)` 失效；macOS 上托管变化要等设置监听的首次 FSEvents 注册（负载下十几秒，9f98aea，先写复现测试）。
+- 验收：A02–A12 passing；A13 blocked（用户要求跳过验证收尾：最终提交上未跑全量 `npm run verify`，`docs/product/capabilities.md` 未重新生成，Windows 注册表测试待 CI）。
+- 未做：`coding-standards.md` 复用表（托管来源读取、托管锁定判断）、S10 报告第 20 行补 T47 的 4 个 IPC 方法、设计增补的实现细化一节；登记事项 I156、I157、I169 的 T47 评估未处理。
+- 下一项：跑 `npm run verify`（必要时先按 L2 结果重新生成 `capabilities.md`），补上述文档，推送后按 Windows CI 关闭 A13。本地提交，未推送。
