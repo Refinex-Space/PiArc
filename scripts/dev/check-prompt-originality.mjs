@@ -29,6 +29,7 @@ function render() {
         import * as search from './agent-host/src/harness/prompts/web-search.ts';
         import { HOOK_JUDGE_SYSTEM } from './agent-host/src/harness/prompts/hook-judge.ts';
         import * as review from './agent-host/src/harness/prompts/auto-review.ts';
+        import * as memory from './agent-host/src/harness/prompts/auto-memory.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -81,7 +82,11 @@ function render() {
           notice.hookStoppedRun('PostToolBatch', ''),
           // T46: Auto mode's review prompt, its answer tool and the tool's parameters.
           review.AUTO_REVIEW_SYSTEM, review.REVIEW_TOOL_DESCRIPTION,
-          ...Object.values(review.REVIEW_TOOL_PARAMETERS.properties).map((p) => p.description)];
+          ...Object.values(review.REVIEW_TOOL_PARAMETERS.properties).map((p) => p.description),
+          // T47: the lines around the auto memory index, the managed instructions and a note
+          // restored after a compaction (the tool's description and guidance come with the
+          // profile and the system prompt above).
+          memory.MEMORY_PREAMBLE, memory.managedSource(''), memory.restoredMemory('')];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
@@ -149,6 +154,10 @@ function sourceTexts() {
     'agent-host/src/harness/auto-review.ts',
     'crates/piarc-policy/src/review.rs',
     'crates/piarc-core/src/tool_io/policy/review.rs',
+    // T47: the Memory tool's results Core writes, and the index's own lines.
+    'agent-host/src/harness/auto-memory.ts',
+    'crates/piarc-core/src/tool_io/auto_memory.rs',
+    'crates/piarc-core/src/auto_memory.rs',
   ]) {
     const source = readFileSync(path.join(repoRoot, file), 'utf8');
     for (const m of source.matchAll(literal)) {
