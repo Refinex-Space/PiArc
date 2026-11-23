@@ -236,7 +236,7 @@ pub struct ToolIo {
     /// One file is written by one request at a time, whichever session sends it.
     locks: files::Locks,
     /// Serializes worktree ownership checks with creation and removal.
-    worktree_lifecycle: Arc<Mutex<HashMap<PathBuf, std::sync::Weak<tokio::sync::Mutex<()>>>>>,
+    worktree_lifecycle: Arc<worktree_hooks::LifecycleLocks>,
     /// Shells, environment and runner of commands.
     exec: Arc<exec::Exec>,
     policy: Option<policy::Services>,

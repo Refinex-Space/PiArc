@@ -17,6 +17,10 @@ use crate::error::{Error, Result};
 use crate::hooks::{Facts, Request};
 use crate::sessions::path_text;
 
+/// One active lifecycle operation per workspace. Unused lock entries are weak.
+pub(super) type LifecycleLocks =
+    std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, Weak<tokio::sync::Mutex<()>>>>;
+
 fn refused(message: impl Into<String>) -> Error {
     Error::Feature {
         kind: ErrorKind::PermissionDenied,

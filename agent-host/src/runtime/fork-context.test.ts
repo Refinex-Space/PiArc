@@ -211,10 +211,10 @@ it('forks the exact Anthropic loadout and active history and refuses a recursive
       expect(prefix(child.messages.slice(0, parent.messages.length))).toEqual(
         prefix(parent.messages),
       );
-      expect(child.messages[parent.messages.length]).toMatchObject({
+      expect(child.messages[parent.messages.length]).toEqual({
         role: 'assistant',
-        content: expect.arrayContaining([
-          expect.objectContaining({
+        content: [
+          {
             type: 'tool_use',
             id: 'fork-1',
             name: 'Agent',
@@ -224,8 +224,8 @@ it('forks the exact Anthropic loadout and active history and refuses a recursive
               prompt: 'Follow the label.',
               run_in_background: false,
             },
-          }),
-        ]),
+          },
+        ],
       });
       expect(JSON.stringify(bodies[3]?.messages)).toContain(
         'cannot start another conversation fork',
