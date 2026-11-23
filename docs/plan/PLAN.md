@@ -313,12 +313,12 @@ T47 自动记忆与企业托管配置（macOS，设计关口）：
 
 - [x] 开工检查：基线 `npm run verify -- --baseline` 通过（复用 84a4d07 的全量结果）；CI 运行 45036807604 核对：T39-A12、T42-A07 通过并关闭，Windows verify 的 clippy 死代码已修，其余失败登记 I227
 - [x] 设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`（八部分 + 第 11 节 10 个需要确认的要点）；用户确认全部按推荐（A01）
-- [ ] 自动记忆：存储、`Memory` 工具经 Core 写入与审计、worktree 共享与仓库隔离、Claude Code 记忆只读导入（A02、A04、A06）
-- [ ] 自动记忆：第 4 段注入与长度上限、主题文件按需读取、压缩后重注入、会话中途变化（A03）
+- [x] 自动记忆：存储、`Memory` 工具经 Core 写入与审计、worktree 共享与仓库隔离、Claude Code 记忆只读导入（A02、A04、A06 的 Core 部分；30dc4fe）
+- [x] 自动记忆：第 4 段注入与长度上限、主题文件按需读取、压缩后重注入、会话中途变化（A03 的实现；21e6807，L2 断言待补）
 - [ ] 自动记忆：transcript 提示、设置的记忆页（浏览、编辑、删除、开关）、`/memory`、关闭后不注入且工具不可见（A02、A05）
-- [ ] 托管配置：来源读取（文件与片段、macOS 托管偏好、Windows `HKLM`）、合并为最高层、非管理员来源不获优先级、格式错误与热更新、`ConfigChange` 不可阻断（A07、A09、A11）
+- [x] 托管配置：来源读取（文件与片段、macOS 托管偏好、Windows `HKLM`）、合并为最高层、非管理员来源不获优先级、格式错误与热更新、`ConfigChange` 不可阻断（A07、A09、A11 的 Core 部分；f428a44，启动失败对话框待客户端）
 - [ ] 托管配置：Claude Code 托管文件兼容（两套路径布局夹具）、配置诊断（加载状态、生效键、忽略键）（A10）
-- [ ] 只允许托管 hooks（审计跳过的 hooks）与增补纳入的其他托管键接入 MCP、插件、沙箱、权限、Auto 模式（A08）
+- [x] 只允许托管 hooks（审计跳过的 hooks）与增补纳入的其他托管键接入 MCP、插件、沙箱、权限、Auto 模式（A08 的 Core 部分；172cb41，L2 待补）
 - [ ] 设置界面的托管锁定标识与不可编辑（A12，截图在 `tmp/evidence/T47/`）
 - [ ] L2 场景 `memory-auto-*`、`managed-*` 与能力 ID；`npm run verify`（A13）
 - [ ] 收尾：`crates/piarc-config`、`agent-host` 的 AGENTS.md，`coding-standards.md` 复用表，验收与看板
