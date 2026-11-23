@@ -4543,7 +4543,7 @@
       "task": "T47",
       "description": "新会话的 system prompt 第 4 段包含索引且遵守长度上限，主题文件只在读取后进入上下文；压缩后的请求重新包含索引。验证：mock provider 请求断言。",
       "status": "passing",
-      "evidence": "L2 memory-auto-save（后一会话 system prompt 第 4 段含索引与说明、正文读取后才进上下文）、memory-auto-compact（压缩后请求重新含索引与读过的笔记）；cargo test -p piarc-core --lib auto_memory（INDEX_LINES/INDEX_BYTES 截断）"
+      "evidence": "L2 memory-auto-save（后一会话 system prompt 第 4 段含索引与说明、正文读取后才进上下文）、memory-auto-compact（压缩后请求重新含索引与读过的笔记）；cargo test -p piarc-core --lib auto_memory（INDEX_LINES/INDEX_BYTES 截断）。续验 d0b3109：cargo test -p piarc-core --lib auto_memory，200 行（含标题、空行、截断提示）边界和 25 KiB 截断均通过；撤销信任后压缩恢复拒绝读取正文，主会话仍能读取索引。"
     },
     {
       "id": "T47-A04",
@@ -4564,14 +4564,14 @@
       "task": "T47",
       "description": "记忆的读写与导入过程中，`.claude/` 与 `~/.claude/` 下没有任何写入。验证：测试。",
       "status": "passing",
-      "evidence": "cargo test -p piarc-core --lib auto_memory（导入只读）；L4 t47-memory.e2e.ts 断言工作区无 .claude/、测试家目录 .claude 下只有原文件；L2 每个场景比对 Claude Code 配置快照"
+      "evidence": "cargo test -p piarc-core --lib auto_memory（导入只读）；L4 t47-memory.e2e.ts 断言工作区无 .claude/、测试家目录 .claude 下只有原文件；L2 每个场景比对 Claude Code 配置快照。续验 d0b3109：同名且格式损坏的本地主题在导入时也跳过并保持原字节，来源文件快照一致。"
     },
     {
       "id": "T47-A07",
       "task": "T47",
       "description": "托管层的值在会话、项目、用户各层同时设置同一键时胜出；列表键合并且托管 deny 生效。验证：测试矩阵。",
       "status": "passing",
-      "evidence": "L2 managed-precedence（托管层胜过会话、项目、用户；列表合并、托管 deny 生效）；cargo test -p piarc-config managed"
+      "evidence": "L2 managed-precedence（托管层胜过会话、项目、用户；列表合并、托管 deny 生效）；cargo test -p piarc-config managed。续验 d0b3109：cargo test -p piarc-config --lib，75 项通过。ADR-0065 的两个回归覆盖 HTTP hook 名单独立接管、空名单、格式错误及移除策略后的恢复。"
     },
     {
       "id": "T47-A08",
@@ -4606,14 +4606,14 @@
       "task": "T47",
       "description": "设置界面中被托管锁定的项显示锁定标识且不可编辑。验证：Playwright 与截图（`tmp/evidence/T47/`）。",
       "status": "passing",
-      "evidence": "L4 t47-memory.e2e.ts 托管用例（横幅、记忆、权限、沙箱、输出风格的锁定标识与禁用，截图 tmp/evidence/T47/managed-*.png）"
+      "evidence": "L4 t47-memory.e2e.ts 托管用例（横幅、记忆、权限、沙箱、输出风格的锁定标识与禁用，截图 tmp/evidence/T47/managed-*.png）。续验 d0b3109：实际 Electron 的 t47-memory.e2e.ts 与 preload.e2e.ts 共 9 项通过（dev），截图已刷新。"
     },
     {
       "id": "T47-A13",
       "task": "T47",
       "description": "`npm run verify` 通过（含 Windows CI 上的注册表读取测试）。验证：命令输出。",
       "status": "blocked",
-      "evidence": "未在最终提交上运行全量 npm run verify（用户要求跳过验证收尾）；已运行：L2 全量 239 通过（修复前一次 managed-change 超时，已定位并修复）、受影响 L4 31 通过、desktop Vitest 402 通过、Windows 交叉 clippy 通过；Windows 注册表读取测试待推送后 Windows CI"
+      "evidence": "macOS arm64 在干净提交 d0b3109 执行 RUST_TEST_THREADS=2 npm run verify，17/17 PASS，target/verify/last-pass.json 记录该提交；Vitest 1796 通过、1 跳过，L2 239 通过、0 失败、3 项仅 Windows，MISSING 0。Electron dev 的 T47 与 preload 共 9/9。日志 tmp/evidence/T47/verify-d0b3109-j2.log、closeout-electron.log。Windows 原生注册表验收仍待包含 d0b3109 的 Windows verify；运行 45110810423 对应较早的 e7262b0。"
     },
     {
       "id": "T48-A01",

@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 部分完成（A13 等 Windows CI） | d0b3109 |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,25 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T47 自动记忆与企业托管配置（macOS 收尾）：
-
-- [x] 开工检查：基线 `npm run verify -- --baseline` 通过（复用 84a4d07 的全量结果）；CI 运行 45036807604 核对：T39-A12、T42-A07 通过并关闭，Windows verify 的 clippy 死代码已修，其余失败登记 I227
-- [x] 设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`（八部分 + 第 11 节 10 个需要确认的要点）；用户确认全部按推荐（A01）
-- [x] 自动记忆：存储、`Memory` 工具经 Core 写入与审计、worktree 共享与仓库隔离、Claude Code 记忆只读导入（A02、A04、A06 的 Core 部分；30dc4fe）
-- [x] 自动记忆：第 4 段注入与长度上限、主题文件按需读取、压缩后重注入、会话中途变化（A03 的实现；21e6807，L2 断言待补）
-- [x] 自动记忆：transcript 提示、设置的记忆页（浏览、编辑、删除、开关）、`/memory`、关闭后不注入且工具不可见（A02、A05；6c22092、a16a54e）
-- [x] 托管配置：来源读取（文件与片段、macOS 托管偏好、Windows `HKLM`）、合并为最高层、非管理员来源不获优先级、格式错误与热更新、`ConfigChange` 不可阻断（A07、A09、A11 的 Core 部分；f428a44，启动失败对话框待客户端）
-- [x] 托管配置：Claude Code 托管文件兼容（两套路径布局夹具）、配置诊断（加载状态、生效键、忽略键）（A10）
-- [x] 只允许托管 hooks（审计跳过的 hooks）与增补纳入的其他托管键接入 MCP、插件、沙箱、权限、Auto 模式（A08 的 Core 部分；172cb41，L2 待补）
-- [x] 设置界面的托管锁定标识与不可编辑（A12，截图在 `tmp/evidence/T47/`）
-- [x] L2 重跑 239 通过、3 项仅 Windows。由完整报告重新生成 `capabilities.md`，199 项 active 能力无缺失。
-- [x] 自动记忆回归先红后绿：索引曾达 201 行；撤销信任后仍能恢复正文；同名本地笔记损坏时导入会覆盖；目录标记缺创建时间。现按项目锁串行更改与导入，`cargo test -p piarc-core --lib auto_memory` 8 项、`--lib tool_io::policy::tests::t47` 3 项通过。
-- [x] 全量门禁首步发现两份托管文件夹具格式漂移；按项目 Prettier 格式化后，格式检查与双平台布局读取测试均通过。
-- [x] 修复 Agent Host 端到端夹具的开会话顺序：T47 的 `memory/status` 在打开期间调用，原夹具登记过晚导致 `SessionNotFound`。现在按生产顺序登记，断言查询恰好成功一次且独立于模型工具调用，`cargo test -p piarc-testkit --test agent_host` 18 项通过。
-- [ ] 在最终提交上运行 `npm run verify` 与 T47 的 Electron L4（A13 的 Windows 部分待 CI）。
-- [x] I169：用户委托裁决，采纳 ADR-0065。两份 HTTP hook 白名单逐键由最高托管来源决定。新增两个回归测试在修复前失败，修复后 `cargo test -p piarc-config --lib` 75 项通过。
-- [x] 收尾文档：复用表、S10 第 20 项、增补第 9.1 节与 I156/I157 评估已补齐。
 
 ## 登记事项
 
@@ -1201,3 +1182,11 @@ T47 自动记忆与企业托管配置（macOS 收尾）：
 - 验收：A02–A12 passing；A13 blocked（用户要求跳过验证收尾：最终提交上未跑全量 `npm run verify`，`docs/product/capabilities.md` 未重新生成，Windows 注册表测试待 CI）。
 - 未做：`coding-standards.md` 复用表（托管来源读取、托管锁定判断）、S10 报告第 20 行补 T47 的 4 个 IPC 方法、设计增补的实现细化一节；登记事项 I156、I157、I169 的 T47 评估未处理。
 - 下一项：跑 `npm run verify`（必要时先按 L2 结果重新生成 `capabilities.md`），补上述文档，推送后按 Windows CI 关闭 A13。本地提交，未推送。
+
+### 2026-11-23 T47 续做（macOS 验收通过，等待 Windows CI）
+
+- 修复与决策：用户委托裁决 I169，采纳 [ADR-0065](../adr/0065-managed-http-hook-allowlists.md)。管理员可独立限定 HTTP hook 的 URL 和请求头变量，空列表有效（41d9b0c）。记忆索引连同标题和截断提示遵守 200 行、25 KiB 的上限；撤销信任后保留索引，拒绝模型继续读取主题和压缩恢复正文。同名文件即使损坏也由导入保留，更改按项目串行（3d85cde）。以上问题均先运行失败测试再修复。
+- 交付：补齐工程规范复用表、S10 第 20 项的 4 个 IPC 方法和设计增补第 9.1 节。按完整 L2 报告更新能力清单，T47 六项能力有场景。I156 已评估，动态请求头命令仍由配置诊断标为不支持；I157 已复核，同名不同地址的 OAuth 状态仍需单独迁移。
+- 全量验收：干净提交 d0b3109 上 `RUST_TEST_THREADS=2 npm run verify` 17/17 PASS。Vitest 164 个文件、1,796 项通过、1 项跳过；L2 239 通过、0 失败、3 项仅 Windows，199 项 active 能力 MISSING 0。`PIARC_EVIDENCE_TASK=T47 npx playwright test -c apps/desktop/playwright.config.ts t47- preload.e2e --project dev --output=tmp/evidence/T47/closeout-l4` 9/9。日志在 `tmp/evidence/T47/verify-d0b3109-j2.log` 和 `tmp/evidence/T47/closeout-electron.log`。
+- 验证中修复两套托管 JSON 夹具的格式（e7262b0），并让 Agent Host 测试夹具按生产顺序在 Core 登记会话后再向 Host 发起创建，校验打开时的记忆状态查询（d0b3109，18 项 Agent Host 测试通过）。本机默认并发的全量运行曾分别在 macOS 设置监听、沙箱联网构建用例超时，两者单独复测通过；最终运行限定 Rust 测试并发数为 2，沿用原断言和超时。
+- A01–A12 passing；A13 blocked，只缺包含夹具修复的 Windows 原生 CI 验收。[CI 45110810423](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423) 对应 e7262b0。看板下一项为 T48（macOS），其实现不依赖注册表原生测试。
