@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | d0b3109 |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 部分完成（A04、A13 等 Windows CI） | e2ffefa |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,11 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T47，跟进 Windows verify 45110810423：
-
-- [x] Windows 上两项原生注册表测试通过，L2 227 通过、15 项按平台跳过。工作树夹具给 Git 的路径含 verbatim 前缀；T46 测试在读取“审查中”版本前收到了回复。分别改用生产的路径规范化函数，让脚本审查器每次都等初始版本读完再答。
-- [ ] 重跑最终提交的全量门禁；Windows 的 worktree 行为和整项 verify 待新提交的 CI。
 
 ## 登记事项
 
@@ -547,6 +542,7 @@ T47，跟进 Windows verify 45110810423：
 | I225 | T46 | T48 的 `PermissionDenied` hook 接入点：Core `crates/piarc-core/src/tool_io/policy/review.rs` 的 `ToolIo::reviewer_refused`（审查模型答 `deny`、`autoReview` 审计已写、拒绝结果交回模型之前；参数是本次调用的 `Call` 与审查结论 `ToolReview`）。只有审查模型的拒绝触发；超时、服务商错误、无法解析、不可用都转人工，不触发 | T48 在这里运行 `PermissionDenied` hooks（输入带审查模型、理由与类别），hook 的 `retry` 等输出按 Claude Code 的语义接入 |
 | I226 | T46 | `audit_events` 没有统一的保留期限：T46 的 `autoReview` 行（每次送审一行，含截断的理由与输入哈希）与其他审计行一样随数据库保留，不自动清理（设计增补第 4.3 节） | R6 评估审计的统一保留期限与清理方式 |
 | I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy |
+| I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
@@ -1195,3 +1191,10 @@ T47，跟进 Windows verify 45110810423：
 - 全量验收：干净提交 d0b3109 上 `RUST_TEST_THREADS=2 npm run verify` 17/17 PASS。Vitest 164 个文件、1,796 项通过、1 项跳过；L2 239 通过、0 失败、3 项仅 Windows，199 项 active 能力 MISSING 0。`PIARC_EVIDENCE_TASK=T47 npx playwright test -c apps/desktop/playwright.config.ts t47- preload.e2e --project dev --output=tmp/evidence/T47/closeout-l4` 9/9。日志在 `tmp/evidence/T47/verify-d0b3109-j2.log` 和 `tmp/evidence/T47/closeout-electron.log`。
 - 验证中修复两套托管 JSON 夹具的格式（e7262b0），并让 Agent Host 测试夹具按生产顺序在 Core 登记会话后再向 Host 发起创建，校验打开时的记忆状态查询（d0b3109，18 项 Agent Host 测试通过）。本机默认并发的全量运行曾分别在 macOS 设置监听、沙箱联网构建用例超时，两者单独复测通过；最终运行限定 Rust 测试并发数为 2，沿用原断言和超时。
 - A01–A12 passing；A13 blocked，只缺包含夹具修复的 Windows 原生 CI 验收。[CI 45110810423](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423) 对应 e7262b0。看板下一项为 T48（macOS），其实现不依赖注册表原生测试。
+
+### 2026-11-23 T47 核对 Windows CI（本地修复 e2ffefa）
+
+- [Windows verify 45110810423](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483164)（e7262b0）已实际运行注册表读取和排除用户策略的两项测试，均通过。Windows L2 227 通过、15 项按平台跳过。17 步中只有 Rust 测试未通过。
+- Windows 新发现的两项失败均已定位。A04 的工作树夹具把 verbatim 路径传给 Git，创建 worktree 时即报错，尚未执行记忆共享断言。夹具现复用 `piarc_git::canonical`。T46 审查回退用例可能在读取“审查中”卡片前收到脚本回复，版本断言比较了同一个版本；现每轮读取初始版本后才放行回复，仍逐项检查版本递增和拒绝过期答复。生产代码无改动。旧提交的 macOS CI 另有两项待复核，见 I228。
+- 修复后在 macOS 定向重跑两项用例均通过，`piarc-core` 的 Windows x64 交叉 Clippy 通过。在干净提交 e2ffefa 上，`RUST_TEST_THREADS=2 npm run verify` 17/17 PASS，L2 239 通过、3 项仅 Windows，MISSING 0。完整日志在 `tmp/evidence/T47/verify-windows-followup.log`。
+- A01–A03、A05–A12 通过；A04 和 A13 等待含 e2ffefa 的 Windows 原生 CI。看板下一项为 T48（macOS），两项遗留仅涉及 Windows 验收。

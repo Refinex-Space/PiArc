@@ -4550,7 +4550,7 @@
       "task": "T47",
       "description": "同一仓库的不同 worktree 共享记忆，不同仓库互相隔离。验证：测试。",
       "status": "blocked",
-      "evidence": "macOS 的 worktrees_share_and_repositories_are_isolated 通过。Windows CI 45110810423 的 Git 无法解析夹具传入的 verbatim 路径，用例在创建 worktree 时失败，尚未执行共享与隔离断言。已改用 piarc_git::canonical；等待含修复的 Windows CI。https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483164"
+      "evidence": "macOS 的 worktrees_share_and_repositories_are_isolated 通过。Windows CI 45110810423 的 Git 无法解析夹具传入的 verbatim 路径，用例在创建 worktree 时失败，尚未执行共享与隔离断言。e2ffefa 改用 piarc_git::canonical；本机定向测试、全量 verify 及 piarc-core 的 Windows x64 交叉 Clippy 均通过。等待含修复的 Windows 原生 CI。https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483164"
     },
     {
       "id": "T47-A05",
@@ -4613,7 +4613,7 @@
       "task": "T47",
       "description": "`npm run verify` 通过（含 Windows CI 上的注册表读取测试）。验证：命令输出。",
       "status": "blocked",
-      "evidence": "macOS arm64 在干净提交 d0b3109 执行 RUST_TEST_THREADS=2 npm run verify，17/17 PASS，target/verify/last-pass.json 记录该提交；Vitest 1796 通过、1 跳过，L2 239 通过、0 失败、3 项仅 Windows，MISSING 0。Electron dev 的 T47 与 preload 共 9/9。日志 tmp/evidence/T47/verify-d0b3109-j2.log、closeout-electron.log。Windows CI 45110810423（e7262b0）的 the_policy_value_is_read_from_the_registry 和 the_current_users_policy_key_is_not_read 均通过；Windows L2 227 通过，15 项按平台跳过。Windows verify 的 cargo test 因 worktree 夹具路径和 T46 审查版本断言失败，整项待包含两处修复的新 CI。https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483164"
+      "evidence": "macOS arm64 在干净提交 e2ffefa 执行 RUST_TEST_THREADS=2 npm run verify，17/17 PASS，target/verify/last-pass.json 记录该提交；Vitest 1796 通过、1 跳过，L2 239 通过、0 失败、3 项仅 Windows，MISSING 0。Electron dev 的 T47 与 preload 共 9/9。日志 tmp/evidence/T47/verify-windows-followup.log、tmp/evidence/T47/closeout-electron.log。Windows CI 45110810423（e7262b0）的 the_policy_value_is_read_from_the_registry 和 the_current_users_policy_key_is_not_read 均通过；Windows L2 227 通过，15 项按平台跳过。Windows verify 的 cargo test 因 worktree 夹具路径和 T46 审查版本断言失败，e2ffefa 已修复两项夹具，两条用例在 macOS 均通过。整项待包含 e2ffefa 的新 Windows CI。https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483164"
     },
     {
       "id": "T48-A01",
