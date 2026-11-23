@@ -6,7 +6,7 @@
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
-use crate::config::Action;
+use crate::config::{Action, Handler};
 use crate::event::HookEvent;
 use crate::output::Outcome;
 use crate::runner::Detail;
@@ -35,6 +35,52 @@ pub fn audit_detail(
     verdict: &str,
 ) -> Value {
     let handler = &outcome.handler;
+    let mut record = describe(event, subject, handler);
+    match &outcome.detail {
+        Detail::Process => {}
+        Detail::McpTool { is_error } => {
+            record.insert("toolError".into(), json!(is_error));
+        }
+        Detail::Http { status } => {
+            record.insert("httpStatus".into(), json!(status));
+        }
+        Detail::Prompt {
+            model,
+            input_tokens,
+            output_tokens,
+        } => {
+            record.insert("model".into(), json!(model));
+            record.insert("inputTokens".into(), json!(input_tokens));
+            record.insert("outputTokens".into(), json!(output_tokens));
+        }
+    }
+    record.insert("exitCode".into(), json!(outcome.exit_code));
+    record.insert("durationMs".into(), json!(outcome.duration_ms));
+    record.insert("timedOut".into(), json!(outcome.timed_out));
+    record.insert("cancelled".into(), json!(outcome.cancelled));
+    record.insert("decision".into(), json!(verdict));
+    Value::Object(record)
+}
+
+/// The audit record of a hook handler that did not run because managed settings allow only
+/// managed hooks (T47, `allowManagedHooksOnly`): the same fields that name the handler, and
+/// `decision: "skipped"` with the reason.
+#[must_use]
+pub fn skipped_detail(
+    event: HookEvent,
+    subject: Option<&str>,
+    handler: &Handler,
+    reason: &str,
+) -> Value {
+    let mut record = describe(event, subject, handler);
+    record.insert("decision".into(), json!("skipped"));
+    record.insert("skipped".into(), json!(reason));
+    Value::Object(record)
+}
+
+/// The fields that name a handler: event, matcher value, where it is defined, its type and a
+/// hash of what it runs.
+fn describe(event: HookEvent, subject: Option<&str>, handler: &Handler) -> Map<String, Value> {
     let mut record = Map::new();
     record.insert("event".into(), json!(event.name()));
     record.insert("matcherValue".into(), json!(subject));
@@ -81,30 +127,7 @@ pub fn audit_detail(
             record.insert("tool".into(), json!(tool.tool));
         }
     }
-    match &outcome.detail {
-        Detail::Process => {}
-        Detail::McpTool { is_error } => {
-            record.insert("toolError".into(), json!(is_error));
-        }
-        Detail::Http { status } => {
-            record.insert("httpStatus".into(), json!(status));
-        }
-        Detail::Prompt {
-            model,
-            input_tokens,
-            output_tokens,
-        } => {
-            record.insert("model".into(), json!(model));
-            record.insert("inputTokens".into(), json!(input_tokens));
-            record.insert("outputTokens".into(), json!(output_tokens));
-        }
-    }
-    record.insert("exitCode".into(), json!(outcome.exit_code));
-    record.insert("durationMs".into(), json!(outcome.duration_ms));
-    record.insert("timedOut".into(), json!(outcome.timed_out));
-    record.insert("cancelled".into(), json!(outcome.cancelled));
-    record.insert("decision".into(), json!(verdict));
-    Value::Object(record)
+    record
 }
 
 #[cfg(test)]

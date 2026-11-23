@@ -65,7 +65,12 @@ pub const CLIENT_SWITCHES: &[&str] = &[
 ///
 /// `invalidParams` for another pointer or a file that is not a JSON object (left as it is);
 /// `ioError` when the file cannot be written.
-pub fn write(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<Value> {
+pub fn write(
+    data_dir: &Path,
+    managed: &crate::managed::ManagedSettings,
+    pointer: &str,
+    value: Option<Value>,
+) -> Result<Value> {
     let top = pointer
         .strip_prefix('/')
         .and_then(|rest| rest.split('/').next());
@@ -86,13 +91,22 @@ pub fn write(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<Val
             ),
         });
     }
-    write_user_value(data_dir, pointer, value)?;
+    write_user_value(data_dir, managed, pointer, value)?;
     read(data_dir)
 }
 
-/// Applies a validated setting from a Core feature (not a renderer-supplied pointer).
-pub(crate) fn write_user_value(data_dir: &Path, pointer: &str, value: Option<Value>) -> Result<()> {
+/// Applies a validated setting from a Core feature (not a renderer-supplied pointer). A setting
+/// the managed settings lock is refused (T47).
+pub(crate) fn write_user_value(
+    data_dir: &Path,
+    managed: &crate::managed::ManagedSettings,
+    pointer: &str,
+    value: Option<Value>,
+) -> Result<()> {
     let mut table = LayerTable::default();
+    if let Some(layer) = managed.snapshot().layer() {
+        table.insert(layer);
+    }
     table.insert(LayerSpec {
         id: ids::USER,
         precedence: precedence::USER,
@@ -109,6 +123,7 @@ pub(crate) fn write_user_value(data_dir: &Path, pointer: &str, value: Option<Val
             field: "pointer",
             reason: error.to_string(),
         },
+        managed @ piarc_config::WriteError::Managed { .. } => Error::from(managed),
         other => io_error(&other.to_string()),
     })?;
     Ok(())
@@ -128,6 +143,16 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// [`super::write`] without managed settings.
+    fn write(dir: &Path, pointer: &str, value: Option<Value>) -> Result<Value> {
+        super::write(
+            dir,
+            &crate::managed::ManagedSettings::none(),
+            pointer,
+            value,
+        )
+    }
 
     #[test]
     fn writes_client_keys_only_and_keeps_the_rest_of_the_file() {
@@ -177,5 +202,60 @@ mod tests {
         assert_eq!(after["shell"]["gitBashPath"], "C:\\bash.exe");
         std::fs::remove_dir_all(&dir).expect("cleanup");
         assert_eq!(read(&dir).expect("missing file"), json!({}));
+    }
+
+    /// T47-A12's Core side: a setting the managed settings lock is refused, the others are
+    /// written.
+    #[test]
+    fn a_locked_setting_is_refused() {
+        let root = std::env::temp_dir().join(format!(
+            "piarc-client-managed-{}-{}",
+            std::process::id(),
+            crate::storage::now_ms()
+        ));
+        let admin =
+            crate::managed::store::macos_files_dir(&root, piarc_ports::PolicyProduct::Piarc);
+        std::fs::create_dir_all(&admin).expect("admin dir");
+        std::fs::write(
+            admin.join(crate::managed::SETTINGS_FILE),
+            r#"{ "appearance": { "theme": "dark" }, "permissions": { "enableBypassPermissions": false } }"#,
+        )
+        .expect("managed file");
+        let managed = crate::managed::ManagedSettings::load(&crate::managed::ManagedConfig {
+            store: Some(std::sync::Arc::new(crate::managed::store::FixedPolicy {
+                layout: Some(crate::managed::store::Layout::MacOs(root.clone())),
+                preferences: None,
+                user: None,
+                registry: None,
+            })),
+            poll: crate::managed::DEFAULT_POLL,
+        })
+        .expect("managed settings");
+        let data = root.join("data");
+        std::fs::create_dir_all(&data).expect("data");
+        for pointer in ["/appearance/theme", "/permissions/enableBypassPermissions"] {
+            let value = if pointer.ends_with("theme") {
+                json!("light")
+            } else {
+                json!(true)
+            };
+            let refused = super::write(&data, &managed, pointer, Some(value)).expect_err(pointer);
+            let object = refused.to_error_object();
+            assert_eq!(
+                object.data.kind,
+                piarc_protocol::ErrorKind::PermissionDenied
+            );
+            assert_eq!(object.data.details.expect("details")["reason"], "managed");
+        }
+        let written = super::write(
+            &data,
+            &managed,
+            "/appearance/density",
+            Some(json!("compact")),
+        )
+        .expect("an unlocked key");
+        assert_eq!(written["appearance"]["density"], "compact");
+        assert!(written["appearance"].get("theme").is_none());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

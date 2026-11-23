@@ -34,6 +34,8 @@ pub const AUTO_ALLOW: &str = "/sandbox/autoAllowBashIfSandboxed";
 pub const DENY_READ: &str = "/sandbox/filesystem/denyRead";
 /// `sandbox.network.allowedDomains`.
 pub const ALLOWED_DOMAINS: &str = "/sandbox/network/allowedDomains";
+/// Managed settings only (T47): the proxy allows the managed domains alone.
+pub const MANAGED_DOMAINS_ONLY: &str = "/sandbox/network/allowManagedDomainsOnly";
 
 /// Where an allowed domain or a `denyRead` path comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -87,6 +89,10 @@ pub struct Resolved {
     pub deny_read: Vec<Entry<PathBuf>>,
     /// Domains the proxy lets through: the user's, then the enterprise's; without duplicates.
     pub allowed_domains: Vec<Entry<String>>,
+    /// Managed settings' `sandbox.network.allowManagedDomainsOnly` (T47): only the managed
+    /// domains (and managed `WebFetch(domain:…)` allow rules) count, and a domain outside them
+    /// is refused without a network card.
+    pub managed_domains_only: bool,
 }
 
 impl Resolved {
@@ -132,9 +138,11 @@ pub fn resolve(
     home: Option<&Path>,
 ) -> Resolved {
     let flag = |pointer: &str| settings.get(pointer).and_then(Value::as_bool) == Some(true);
+    let managed_only = flag(MANAGED_DOMAINS_ONLY);
     let mut resolved = Resolved {
         enabled: flag(ENABLED),
         auto_allow: flag(AUTO_ALLOW),
+        managed_domains_only: managed_only,
         ..Resolved::default()
     };
     for spec in settings.table().layers().iter().rev() {
@@ -161,7 +169,22 @@ pub fn resolve(
                 });
             }
         }
-        if spec.scope == Scope::User {
+        if spec.scope == Scope::Enterprise {
+            for domain in strings(value, ALLOWED_DOMAINS) {
+                push_domain(&mut resolved, domain, origin, spec.id);
+            }
+            if managed_only {
+                for rule in strings(value, "/permissions/allow") {
+                    if let Some(domain) = rule
+                        .strip_prefix("WebFetch(domain:")
+                        .and_then(|r| r.strip_suffix(')'))
+                    {
+                        push_domain(&mut resolved, domain, origin, spec.id);
+                    }
+                }
+            }
+        }
+        if spec.scope == Scope::User && !managed_only {
             for domain in strings(value, ALLOWED_DOMAINS) {
                 push_domain(&mut resolved, domain, origin, spec.id);
             }
@@ -375,6 +398,53 @@ mod tests {
     }
 
     /// A project cannot turn the user's sandbox off, but may turn auto-approval off.
+    /// T47: managed domains come with the user's; under `allowManagedDomainsOnly` only the
+    /// managed domains and managed `WebFetch(domain:…)` allow rules count.
+    #[test]
+    fn managed_domains_and_the_managed_only_lock() {
+        let dirs = Dirs::new("managed");
+        dirs.write(
+            dirs.data.join("settings.json"),
+            &json!({ "sandbox": { "network": { "allowedDomains": ["user.example"] } } }),
+        );
+        let layer = |value: Value| {
+            crate::managed::Managed::build(
+                vec![crate::managed::RawSource {
+                    family: crate::managed::Family::Piarc,
+                    channel: crate::managed::Channel::File,
+                    location: "managed-settings.json".into(),
+                    body: crate::managed::RawBody::Value(value),
+                }],
+                None,
+            )
+            .layer()
+        };
+        let load = |value: Value| {
+            let mut table = LayerTable::workspace(&dirs.data, &dirs.workspace, Some(&dirs.home));
+            table.insert(layer(value));
+            Settings::load(table, TrustState::Trusted)
+        };
+        let open = resolve(
+            &load(json!({ "sandbox": { "network": { "allowedDomains": ["corp.example"] } } })),
+            None,
+            Some(&dirs.home),
+        );
+        assert_eq!(open.domains(), ["corp.example", "user.example"]);
+        assert_eq!(open.allowed_domains[0].origin, Origin::Enterprise);
+        assert!(!open.managed_domains_only);
+        let only = resolve(
+            &load(json!({
+                "sandbox": { "network": { "allowedDomains": ["corp.example"], "allowManagedDomainsOnly": true } },
+                "permissions": { "allow": ["WebFetch(domain:docs.corp.example)", "Bash(ls)"] }
+            })),
+            None,
+            Some(&dirs.home),
+        );
+        assert_eq!(only.domains(), ["corp.example", "docs.corp.example"]);
+        assert!(only.managed_domains_only);
+        let _ = std::fs::remove_dir_all(&dirs.root);
+    }
+
     #[test]
     fn a_project_cannot_turn_the_sandbox_off() {
         let dirs = Dirs::new("off");

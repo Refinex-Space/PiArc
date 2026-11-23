@@ -3,7 +3,8 @@
 //! - Start: the session's explicit choice, then the mode remembered for the workspace
 //!   (`workspaces.default_mode`), then `permissions.defaultMode`, then Manual.
 //! - `bypassPermissions` needs `permissions.enableBypassPermissions: true` in the user's own
-//!   settings file; a project file cannot enable it. The client asks for a second, native
+//!   settings file (or managed settings, which also lock it off, T47); a project file cannot
+//!   enable it. The client asks for a second, native
 //!   confirmation before it switches.
 //! - A project's `bypassPermissions` or `auto` never applies; each session start records the
 //!   ignored value in the audit.
@@ -14,18 +15,18 @@
 //!   workspace) and the audit records why.
 use super::*;
 
-/// Whether the user enabled bypass mode in their own settings file.
+/// Whether the user enabled bypass mode in their own settings file; managed settings decide
+/// first (T47: `permissions.enableBypassPermissions: false` there turns it off for good).
 pub(super) fn bypass_enabled(settings: &Settings) -> bool {
     settings
-        .layer(piarc_config::ids::USER)
-        .and_then(|v| v.pointer("/permissions/enableBypassPermissions"))
+        .user_value("/permissions/enableBypassPermissions")
         .and_then(Value::as_bool)
         == Some(true)
 }
 
-/// Whether Auto mode is available (T46). The managed settings' switch is T47's.
+/// Whether Auto mode is available (T46; managed settings can lock it off, T47).
 pub(super) fn auto_available(settings: &Settings) -> bool {
-    piarc_config::auto_mode::read(settings).available(false)
+    piarc_config::auto_mode::read(settings).available()
 }
 
 fn available(settings: &Settings) -> piarc_policy::Available {

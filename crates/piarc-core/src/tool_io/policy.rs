@@ -708,7 +708,11 @@ fn rules_of(s: &SessionIo, settings: &Settings) -> Arc<RuleSet> {
     let own_turn = (!std::ptr::eq(owner, s)).then(|| lock(&s.policy).turn_rules());
     let mut state = lock(&owner.policy);
     let state = &mut *state;
-    let turn = own_turn.unwrap_or_else(|| state.turn_rules());
+    let mut turn = own_turn.unwrap_or_else(|| state.turn_rules());
+    if settings.managed_rules_only() {
+        // Only managed rules decide (T47): a skill's `allowed-tools` grants nothing.
+        turn.clear();
+    }
     assess::rule_set(
         &settings.permission_lists(),
         &state.rules,

@@ -152,6 +152,9 @@ pub(super) struct SessionState {
     hosts: Arc<Mutex<Vec<String>>>,
     /// The proxy's recent refusals, oldest first.
     refusals: Arc<Mutex<VecDeque<(Instant, Refused)>>>,
+    /// Managed settings allow their own domains only (T47): no card for any other host; set
+    /// by each launch from the settings as they stand.
+    managed_only: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl SessionState {
@@ -220,6 +223,7 @@ impl ToolIo {
                             layer: "session",
                         })
                         .collect(),
+                    managed_domains_only: false,
                 },
                 extra_dirs: forced.extra_dirs.clone(),
                 available,
@@ -278,6 +282,10 @@ impl ToolIo {
         policy.extra_dirs = effective.extra_dirs.clone();
         policy.deny_read = effective.resolved.deny_read_paths();
         let proxy = self.session_proxy(s, session_id, platform).await?;
+        s.sandbox.managed_only.store(
+            effective.resolved.managed_domains_only,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         proxy.set_allowlist(allowlist(&effective.resolved.domains()));
         let (launch, resolved) = proxy.launch(&policy).map_err(|e| sandbox_error(&e))?;
         let wrap = Wrap {
@@ -313,6 +321,7 @@ impl ToolIo {
             services: self.policy.clone(),
             hosts: Arc::clone(&s.sandbox.hosts),
             refusals: Arc::clone(&s.sandbox.refusals),
+            managed_only: Arc::clone(&s.sandbox.managed_only),
             timeout: self.config.sandbox.approval_timeout,
         });
         let started = SessionSandbox::start(
@@ -453,12 +462,18 @@ struct Gate {
     services: Option<Services>,
     hosts: Arc<Mutex<Vec<String>>>,
     refusals: Arc<Mutex<VecDeque<(Instant, Refused)>>>,
+    managed_only: Arc<std::sync::atomic::AtomicBool>,
     timeout: Duration,
 }
 
 impl ProxyHooks for Gate {
     fn unlisted<'a>(&'a self, host: &'a str, port: u16) -> piarc_ports::BoxFuture<'a, bool> {
         Box::pin(async move {
+            // Managed settings allow their domains only: refused without a card, the refusal
+            // is audited like any other (T47).
+            if self.managed_only.load(std::sync::atomic::Ordering::Relaxed) {
+                return false;
+            }
             if lock(&self.hosts)
                 .iter()
                 .any(|h| h.eq_ignore_ascii_case(host))

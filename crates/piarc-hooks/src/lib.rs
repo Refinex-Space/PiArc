@@ -50,7 +50,7 @@ mod run;
 mod runner;
 pub mod spill;
 
-pub use audit::audit_detail;
+pub use audit::{audit_detail, skipped_detail};
 pub use config::{
     Action, Command, Diagnostic, DiagnosticKind, Handler, HookConfig, Http, LayerHooks, McpTool,
     Prompt, Shell, Source,

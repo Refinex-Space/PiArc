@@ -71,8 +71,9 @@ impl CoreRuntime {
         value: Option<serde_json::Value>,
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
     ) -> Result<()> {
+        let managed = self.storage()?.dirs().managed().clone();
         self.client_settings_job(on_done, move |dir| {
-            crate::client_settings::write(dir, &pointer, value)
+            crate::client_settings::write(dir, &managed, &pointer, value)
         })
     }
 

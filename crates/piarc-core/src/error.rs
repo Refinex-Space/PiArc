@@ -219,14 +219,22 @@ impl From<piarc_config::WriteError> for Error {
     fn from(error: piarc_config::WriteError) -> Self {
         let kind = match &error {
             piarc_config::WriteError::Io { .. } => ErrorKind::IoError,
-            piarc_config::WriteError::ClaudeConfig { .. } => ErrorKind::PermissionDenied,
+            piarc_config::WriteError::ClaudeConfig { .. }
+            | piarc_config::WriteError::Managed { .. } => ErrorKind::PermissionDenied,
             _ => ErrorKind::InvalidParams,
+        };
+        // The client tells a locked setting from other refusals (T47).
+        let details = match &error {
+            piarc_config::WriteError::Managed { pointer } => {
+                Some(serde_json::json!({ "reason": "managed", "pointer": pointer }).to_string())
+            }
+            _ => None,
         };
         Self::Feature {
             kind,
             retryable: false,
             message: error.to_string(),
-            details: None,
+            details,
         }
     }
 }

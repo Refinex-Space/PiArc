@@ -115,7 +115,7 @@ impl Hub {
         let dir = self.ctx.storage.dirs().data();
         settings.project(dir, committed)?;
         settings.finish(committed);
-        settings.persist(dir)?;
+        settings.persist(dir, self.ctx.storage.dirs().managed())?;
         self.reload_models(self.ctx.catalog_network.load(Ordering::Acquire))
             .await
     }
@@ -136,7 +136,7 @@ impl Hub {
             Operation::List => {}
             Operation::Refresh(enabled) => {
                 settings.catalog_refresh = enabled;
-                settings.persist(dir)?;
+                settings.persist(dir, self.ctx.storage.dirs().managed())?;
                 self.ctx.catalog_network.store(enabled, Ordering::Release);
                 self.reload_models(enabled).await?;
             }
@@ -146,7 +146,7 @@ impl Hub {
                 settings.auxiliary = prefs.auxiliary;
                 settings.auxiliary_alias = prefs.auxiliary_alias;
                 settings.aliases = prefs.aliases;
-                settings.persist(dir)?;
+                settings.persist(dir, self.ctx.storage.dirs().managed())?;
                 self.publish_preferences(&settings);
                 self.reload_models(self.ctx.catalog_network.load(Ordering::Acquire))
                     .await?;
@@ -189,7 +189,7 @@ impl Hub {
             .map_err(host_error)?;
         settings.project(dir, true)?;
         settings.finish(true);
-        settings.persist(dir)?;
+        settings.persist(dir, self.ctx.storage.dirs().managed())?;
         // A local endpoint's models are graded by the provider kind (T29).
         self.publish_preferences(settings);
         self.reload_models(self.ctx.catalog_network.load(Ordering::Acquire))

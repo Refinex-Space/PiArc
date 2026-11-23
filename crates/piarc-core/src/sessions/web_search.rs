@@ -49,9 +49,11 @@ impl Hub {
             known(id)?;
         }
         let data = self.ctx.storage.dirs().data().to_owned();
+        let managed = self.ctx.storage.dirs().managed().clone();
         tokio::task::spawn_blocking(move || {
             crate::client_settings::write_user_value(
                 &data,
+                &managed,
                 "/webSearch/backend",
                 backend.map(Value::String),
             )

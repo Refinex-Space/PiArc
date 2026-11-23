@@ -186,8 +186,9 @@ impl Hub {
             .replace('/', "~1");
         let pointer = format!("/modelPrices/{key}");
         let data = self.ctx.storage.dirs().data().to_owned();
+        let managed = self.ctx.storage.dirs().managed().clone();
         tokio::task::spawn_blocking(move || {
-            crate::client_settings::write_user_value(&data, &pointer, price)
+            crate::client_settings::write_user_value(&data, &managed, &pointer, price)
         })
         .await
         .map_err(|e| internal("writing the price", e))??;

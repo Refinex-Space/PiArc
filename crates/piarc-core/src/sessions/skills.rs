@@ -107,7 +107,12 @@ impl Hub {
             )
             .map(|_| ())
             .map_err(Error::from),
-            None => crate::client_settings::write_user_value(dirs.data(), "/outputStyle", value),
+            None => crate::client_settings::write_user_value(
+                dirs.data(),
+                dirs.managed(),
+                "/outputStyle",
+                value,
+            ),
         })
         .await
         .map_err(|e| Error::Internal {

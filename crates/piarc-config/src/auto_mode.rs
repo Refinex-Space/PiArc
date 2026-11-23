@@ -11,6 +11,9 @@
 //! - A project file's `permissions.enableAutoMode` and `autoMode` never apply ([`USER_ONLY`],
 //!   removed before the merge and reported as `projectAutoMode`); its `defaultMode: "auto"`
 //!   is left out like `bypassPermissions`.
+//! - Managed settings (T47) decide before the user's file: their `permissions.enableAutoMode`
+//!   and `autoMode.model` replace the user's ([`Settings::user_value`]), their lists come
+//!   first, and their `disableAutoMode` or `enableAutoMode: false` locks the mode off.
 
 use serde_json::Value;
 
@@ -28,8 +31,10 @@ pub const POLICY_CHARS: usize = 8_000;
 /// What Auto mode reads from the settings.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AutoModeSettings {
-    /// The user turned the mode on in PiArc's user file.
+    /// The user turned the mode on in PiArc's user file (or managed settings did).
     pub enabled: bool,
+    /// Managed settings decide the switch (T47): the user cannot change it.
+    pub managed: bool,
     /// Some layer sets `disableAutoMode: "disable"`.
     pub disabled: bool,
     /// The reviewer model, `provider/model`, from PiArc's user file.
@@ -45,11 +50,10 @@ pub struct AutoModeSettings {
 }
 
 impl AutoModeSettings {
-    /// Whether a session may be in Auto mode. `organization_disabled` is the managed settings'
-    /// switch (T47); until then callers pass `false`.
+    /// Whether a session may be in Auto mode.
     #[must_use]
-    pub fn available(&self, organization_disabled: bool) -> bool {
-        self.enabled && !self.disabled && !organization_disabled
+    pub fn available(&self) -> bool {
+        self.enabled && !self.disabled
     }
 }
 
@@ -58,13 +62,17 @@ impl AutoModeSettings {
 pub fn read(settings: &Settings) -> AutoModeSettings {
     let user = settings.layer(ids::USER);
     let claude = settings.layer(ids::CLAUDE_USER);
-    let enabled = user
-        .and_then(|v| v.pointer("/permissions/enableAutoMode"))
+    let managed = settings.managed();
+    let enabled = settings
+        .user_value("/permissions/enableAutoMode")
         .and_then(Value::as_bool)
         == Some(true);
     let disabled = settings.get("/disableAutoMode").and_then(Value::as_str) == Some("disable");
-    let model = user
-        .and_then(|v| v.pointer("/autoMode/model"))
+    let locked = managed.is_some_and(|m| {
+        m.pointer("/permissions/enableAutoMode").is_some() || m.get("disableAutoMode").is_some()
+    });
+    let model = settings
+        .user_value("/autoMode/model")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|m| !m.is_empty())
@@ -72,7 +80,7 @@ pub fn read(settings: &Settings) -> AutoModeSettings {
     let mut budget = POLICY_CHARS;
     let mut list = |key: &str| {
         let mut out: Vec<String> = Vec::new();
-        for layer in [user, claude].into_iter().flatten() {
+        for layer in [managed, user, claude].into_iter().flatten() {
             let entries = layer
                 .pointer(&format!("/autoMode/{key}"))
                 .and_then(Value::as_array)
@@ -97,6 +105,7 @@ pub fn read(settings: &Settings) -> AutoModeSettings {
     };
     AutoModeSettings {
         enabled,
+        managed: locked,
         disabled,
         model,
         environment: list("environment"),
@@ -190,13 +199,34 @@ mod tests {
         );
         let settings = load(&f, TrustState::Trusted);
         let auto = read(&settings);
-        assert!(auto.enabled && !auto.disabled && auto.available(false));
-        assert!(!auto.available(true));
+        assert!(auto.enabled && !auto.disabled && auto.available() && !auto.managed);
         assert_eq!(auto.model.as_deref(), Some("rev/model"));
         assert_eq!(auto.environment, ["github.com/acme", "s3://acme-logs"]);
         assert_eq!(auto.allow, ["npm publish of @acme packages"]);
         assert_eq!(auto.hard_deny, ["Deleting cloud buckets"]);
         assert!(auto.soft_deny.is_empty());
+
+        // Managed settings (T47) lock the switch off and add their policy first.
+        let managed = crate::managed::Managed::build(
+            vec![crate::managed::RawSource {
+                family: crate::managed::Family::Piarc,
+                channel: crate::managed::Channel::Policy,
+                location: "policy".into(),
+                body: crate::managed::RawBody::Value(json!({
+                    "permissions": {"enableAutoMode": false},
+                    "autoMode": {"hard_deny": ["Organization rule"]}
+                })),
+            }],
+            None,
+        );
+        let mut table = LayerTable::workspace(&f.data, &f.workspace, Some(&f.home));
+        table.insert(managed.layer());
+        let auto = read(&Settings::load(table, TrustState::Trusted));
+        assert!(!auto.enabled && auto.managed && !auto.available());
+        assert_eq!(
+            auto.hard_deny,
+            ["Organization rule", "Deleting cloud buckets"]
+        );
     }
 
     /// Every project file's keys are reported as ignored for this reason.
@@ -269,7 +299,7 @@ mod tests {
             &json!({"disableAutoMode": "disable"}),
         );
         let auto = read(&load(&f, TrustState::Untrusted));
-        assert!(auto.enabled && auto.disabled && !auto.available(false));
+        assert!(auto.enabled && auto.disabled && !auto.available());
         assert_eq!(auto.allow[0].chars().count(), ENTRY_CHARS);
         let total: usize = [&auto.allow, &auto.soft_deny]
             .iter()

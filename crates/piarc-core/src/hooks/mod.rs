@@ -4,7 +4,10 @@
 //! - Configuration: the `hooks` of every settings layer, read the way a permission decision
 //!   reads settings ([`TrustService::permission_settings`]), so an untrusted project's hooks
 //!   (`.piarc/settings*.json`, `.claude/settings*.json`) are left out while the user's run.
-//!   `disableAllHooks` after merging turns them all off.
+//!   `disableAllHooks` turns them off; set outside managed settings it leaves the managed
+//!   hooks on. Managed settings' `allowManagedHooksOnly` runs only the managed hooks and those
+//!   of packages the managed settings turn on; each other handler an event matches is audited
+//!   as skipped (T47).
 //! - Input: the event's own fields plus `session_id`, `transcript_path`, `cwd`,
 //!   `hook_event_name`, `prompt_id` once the session had input, and, where Claude Code sends
 //!   them, `permission_mode` and `effort`. In a subagent `session_id`, `transcript_path` and
@@ -325,14 +328,52 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// The hooks of `settings`, highest precedence first.
+/// The hooks of `settings` that run, highest precedence first.
 pub(crate) fn config_of(settings: &piarc_config::Settings) -> HookConfig {
-    config_with(settings, &[])
+    config_with(settings, &[]).run
+}
+
+/// The reason in the audit of a handler that `allowManagedHooksOnly` keeps from running.
+pub(crate) const MANAGED_ONLY: &str = "managedOnly";
+
+/// The hooks that run and, under `allowManagedHooksOnly`, those that would have run (T47).
+struct Configs {
+    run: HookConfig,
+    skipped: Option<HookConfig>,
+}
+
+/// Which hooks of a layer run under the managed settings (T47, design addendum sections 5.2
+/// and 5.3): `disableAllHooks` in managed settings turns every hook off; elsewhere it turns off
+/// all but the managed hooks; `allowManagedHooksOnly` keeps the managed hooks and the hooks of
+/// packages the managed settings turn on.
+fn managed_hooks(settings: &piarc_config::Settings) -> (bool, bool, impl Fn(&str) -> bool + '_) {
+    let managed = settings.managed();
+    let on = |pointer: &str| managed.and_then(|m| m.pointer(pointer)) == Some(&Value::Bool(true));
+    let all_off = on("/disableAllHooks");
+    let others_off = settings
+        .table()
+        .layers()
+        .iter()
+        .rev()
+        .filter(|spec| spec.id != piarc_config::ids::ENTERPRISE)
+        .find_map(|spec| settings.layer(spec.id)?.get("disableAllHooks")?.as_bool())
+        .unwrap_or(false);
+    let only = on("/allowManagedHooksOnly");
+    let managed_layer = move |layer: &str| {
+        layer == piarc_config::ids::ENTERPRISE
+            || layer.strip_prefix("plugin:").is_some_and(|id| {
+                managed
+                    .and_then(|m| m.get("plugins"))
+                    .and_then(|p| p.get(id))
+                    == Some(&Value::Bool(true))
+            })
+    };
+    (all_off, others_off || only, managed_layer)
 }
 
 /// [`config_of`] with a session's scoped hooks (T31, T37) above the settings files, and the
 /// confirmed hooks of the extension packages in effect below them (T40, layer `plugin:<id>`).
-fn config_with(settings: &piarc_config::Settings, scoped: &[Scoped]) -> HookConfig {
+fn config_with(settings: &piarc_config::Settings, scoped: &[Scoped]) -> Configs {
     let packages: Vec<(String, Option<PathBuf>, Value)> = settings
         .packages()
         .active
@@ -379,8 +420,15 @@ fn config_with(settings: &piarc_config::Settings, scoped: &[Scoped]) -> HookConf
         )
         .chain(packages)
         .collect();
-    let disabled = settings.get("/disableAllHooks") == Some(&Value::Bool(true));
-    HookConfig::parse(&layers, disabled)
+    let (all_off, managed_only, managed_layer) = managed_hooks(settings);
+    let (kept, others): (Vec<LayerHooks<'_>>, Vec<LayerHooks<'_>>) = layers
+        .into_iter()
+        .partition(|layer| !managed_only || managed_layer(&layer.source.layer));
+    let audited = settings.get("/allowManagedHooksOnly") == Some(&Value::Bool(true));
+    Configs {
+        run: HookConfig::parse(&kept, all_off),
+        skipped: (audited && !all_off).then(|| HookConfig::parse(&others, false)),
+    }
 }
 
 /// Whether Claude Code sends `permission_mode` with `event`.
@@ -610,21 +658,28 @@ impl HooksService {
         facts: &Facts,
         request: &Request,
     ) -> Option<Plan> {
-        let config = {
+        let configs = {
             let scoped = lock(&self.inner.scoped);
             config_with(
                 settings,
                 scoped.get(&facts.session_id).map_or(&[], Vec::as_slice),
             )
         };
-        let mut handlers = config.select(request.event, request.subject.as_deref());
-        if let Some((tool, input)) = &request.tool {
-            handlers.retain(|h| {
-                h.condition
-                    .as_deref()
-                    .is_none_or(|rule| (self.inner.condition)(rule, tool, input, facts))
-            });
+        let select = |config: &HookConfig| {
+            let mut handlers = config.select(request.event, request.subject.as_deref());
+            if let Some((tool, input)) = &request.tool {
+                handlers.retain(|h| {
+                    h.condition
+                        .as_deref()
+                        .is_none_or(|rule| (self.inner.condition)(rule, tool, input, facts))
+                });
+            }
+            handlers
+        };
+        if let Some(skipped) = &configs.skipped {
+            self.audit_skipped(facts, request, select(skipped));
         }
+        let handlers = select(&configs.run);
         if handlers.is_empty() {
             return None;
         }
@@ -750,6 +805,52 @@ impl HooksService {
         input
     }
 
+    /// One audit row per handler `allowManagedHooksOnly` kept from running (T47), written in
+    /// the background: the decision does not wait for it.
+    fn audit_skipped(
+        &self,
+        facts: &Facts,
+        request: &Request,
+        handlers: Vec<Arc<piarc_hooks::Handler>>,
+    ) {
+        if handlers.is_empty() {
+            return;
+        }
+        let rows: Vec<piarc_store::AuditEvent> = handlers
+            .iter()
+            .map(|handler| piarc_store::AuditEvent {
+                at: now_ms(),
+                kind: "hook".into(),
+                session_id: Some(facts.session_id.clone()),
+                workspace: Some(piarc_fs::display(&facts.root)),
+                detail: piarc_hooks::skipped_detail(
+                    request.event,
+                    request.subject.as_deref(),
+                    handler,
+                    MANAGED_ONLY,
+                )
+                .to_string(),
+            })
+            .collect();
+        let storage = self.inner.storage.clone();
+        let session = facts.session_id.clone();
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        handle.spawn(async move {
+            let written = storage
+                .run(move |db| {
+                    rows.iter()
+                        .try_for_each(|row| db.append_audit(row).map(drop))
+                })
+                .await;
+            if !matches!(written, Ok(Ok(()))) {
+                tracing::warn!(target: "piarc_core::hooks", %session,
+                    "cannot record skipped hooks in the audit");
+            }
+        });
+    }
+
     async fn audit(&self, facts: &Facts, request: &Request, ran: &Ran) {
         let rows: Vec<piarc_store::AuditEvent> = ran
             .outcomes
@@ -845,3 +946,6 @@ fn bounded(facts: &Facts, event: HookEvent, ran: Ran) -> Answer {
         decision,
     }
 }
+
+#[cfg(test)]
+mod managed_tests;

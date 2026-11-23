@@ -152,11 +152,22 @@ pub fn active(settings: &Settings, installed: &[Installed], data: &Path) -> Pack
             out.missing.push(id);
             continue;
         };
+        // A package the managed settings turn on is the administrator's choice: its executable
+        // items count as confirmed (T47, design addendum section 5.3).
+        let managed_on = settings
+            .managed()
+            .and_then(|m| m.get(SETTINGS_KEY))
+            .and_then(|p| p.get(&id))
+            == Some(&Value::Bool(true));
         match manifest::read(&record.path, &data_dir(data, &id)) {
             Ok(manifest) if manifest.id == id => out.active.push(Active {
+                confirmed: if managed_on {
+                    manifest.executables().into_iter().map(|e| e.name).collect()
+                } else {
+                    record.confirmed.clone()
+                },
                 manifest,
                 scope,
-                confirmed: record.confirmed.clone(),
             }),
             Ok(manifest) => out.broken.push((
                 id,

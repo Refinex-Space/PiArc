@@ -30,6 +30,13 @@ pub enum WriteError {
         /// The refused file.
         path: PathBuf,
     },
+    /// Managed settings lock this setting (T47): the user's and the project's files cannot
+    /// change it.
+    #[error("{pointer} is set by the organization's managed settings")]
+    Managed {
+        /// The locked setting.
+        pointer: String,
+    },
     /// The pointer is empty or not of the `/key/key` form.
     #[error("invalid settings key {0:?}")]
     InvalidPointer(String),
@@ -54,6 +61,22 @@ pub enum WriteError {
     },
 }
 
+/// Refuses a write the managed settings of `table` lock (T47, `crate::managed::locked`).
+fn check_lock(table: &LayerTable, pointer: &str) -> Result<(), WriteError> {
+    let managed = table
+        .get(ids::ENTERPRISE)
+        .and_then(|spec| match &spec.source {
+            crate::layers::Source::Value(value) => Some(value),
+            crate::layers::Source::File(_) => None,
+        });
+    if crate::managed::locked(managed, pointer) {
+        return Err(WriteError::Managed {
+            pointer: pointer.to_owned(),
+        });
+    }
+    Ok(())
+}
+
 /// Sets (`Some`) or removes (`None`) the value at `pointer` in the file of layer `layer`,
 /// creating the file, its directory and intermediate objects as needed. Returns the file.
 ///
@@ -67,6 +90,7 @@ pub fn write_value(
     value: Option<Value>,
 ) -> Result<PathBuf, WriteError> {
     let tokens = parse_pointer(pointer)?;
+    check_lock(table, pointer)?;
     update_file(table, layer, |document| {
         apply(document, &tokens, value);
         Ok(())
@@ -88,6 +112,7 @@ pub fn append_unique(
     item: &str,
 ) -> Result<PathBuf, WriteError> {
     let tokens = parse_pointer(pointer)?;
+    check_lock(table, pointer)?;
     update_file(table, layer, |document| {
         let current = document.pointer(pointer).cloned();
         let mut list = match current {
@@ -123,6 +148,11 @@ pub fn append_local_permissions(
     permissions: &[(Category, &str)],
 ) -> Result<Vec<Item>, WriteError> {
     let mut items = Vec::with_capacity(permissions.len());
+    for &(category, _) in permissions {
+        if category == Category::AllowRule {
+            check_lock(table, "/permissions/allow")?;
+        }
+    }
     update_file(table, ids::PROJECT_LOCAL, |document| {
         for &(category, name) in permissions {
             let key = match category {
@@ -195,6 +225,7 @@ pub fn edit_permission_rule(
             "empty or invalid rule".to_owned(),
         ));
     }
+    check_lock(table, &format!("/permissions/{key}"))?;
     update_file(table, layer, |document| {
         let permissions = document
             .as_object_mut()

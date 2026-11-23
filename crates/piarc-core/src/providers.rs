@@ -465,10 +465,19 @@ impl Settings {
     pub(crate) fn pending(&self) -> bool {
         self.pending.is_some()
     }
-    pub(crate) fn persist(&self, dir: &Path) -> Result<()> {
-        crate::client_settings::write_user_value(dir, "/modelProviders", Some(json!(self)))?;
+    pub(crate) fn persist(
+        &self,
+        dir: &Path,
+        managed: &crate::managed::ManagedSettings,
+    ) -> Result<()> {
+        crate::client_settings::write_user_value(
+            dir,
+            managed,
+            "/modelProviders",
+            Some(json!(self)),
+        )?;
         let aliases = (!self.aliases.is_empty()).then(|| json!(self.aliases));
-        crate::client_settings::write_user_value(dir, "/modelAliases", aliases)?;
+        crate::client_settings::write_user_value(dir, managed, "/modelAliases", aliases)?;
         match std::fs::remove_file(Self::journal(dir)) {
             Ok(()) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -758,7 +767,9 @@ mod tests {
         let mut restarted = Settings::read(&dir, true).unwrap();
         assert!(restarted.committed(&status));
         restarted.finish(true);
-        restarted.persist(&dir).unwrap();
+        restarted
+            .persist(&dir, &crate::managed::ManagedSettings::none())
+            .unwrap();
         let second = relay("https://other.example/v1");
         assert!(restarted.prepare(save(second.clone(), None), &[]).is_err());
         restarted
@@ -770,7 +781,9 @@ mod tests {
         assert!(!interrupted.committed(&status));
         interrupted.project(&dir, false).unwrap();
         interrupted.finish(false);
-        interrupted.persist(&dir).unwrap();
+        interrupted
+            .persist(&dir, &crate::managed::ManagedSettings::none())
+            .unwrap();
         assert_eq!(
             read_models(&dir).unwrap()["providers"]["relay"]["baseUrl"],
             first["baseUrl"]
@@ -907,7 +920,9 @@ mod tests {
             aliases: prefs.aliases.clone(),
             ..Settings::default()
         };
-        settings.persist(&dir).unwrap();
+        settings
+            .persist(&dir, &crate::managed::ManagedSettings::none())
+            .unwrap();
         let file = crate::client_settings::read(&dir).unwrap();
         assert_eq!(
             file["modelAliases"],

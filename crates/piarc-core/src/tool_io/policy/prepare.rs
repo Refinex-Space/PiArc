@@ -53,6 +53,9 @@ pub(super) async fn prepare(
         .collect();
     // The skills' directories (T37): Read, Glob and Grep may read them without asking.
     let skill_dirs = lock(&s.skill_dirs).clone();
+    // Only managed rules decide (T47): a rule saved to a settings file would not apply, so the
+    // card offers none ("allow for this session" still works).
+    let managed_rules_only = settings.managed_rules_only();
     tokio::task::spawn_blocking(move || {
         let mut scope = with_directories(s.scope.clone(), &dirs)?;
         for dir in &skill_dirs {
@@ -155,7 +158,7 @@ pub(super) async fn prepare(
             // Outside the sandbox (T39): allowed once or refused, never remembered.
             card.protected_path = Some(true);
         }
-        if card.protected_path != Some(true) {
+        if card.protected_path != Some(true) && !managed_rules_only {
             card.rules.clone_from(&assessment.rules);
         }
         Ok(Prepared {

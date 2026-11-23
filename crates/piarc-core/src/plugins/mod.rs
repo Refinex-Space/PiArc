@@ -460,6 +460,7 @@ impl PluginManager {
             )),
             (PackageScope::User, _) => crate::client_settings::write_user_value(
                 dirs.data(),
+                dirs.managed(),
                 &pointer,
                 value.map(Value::Bool),
             ),
