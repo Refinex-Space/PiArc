@@ -4528,8 +4528,8 @@
       "id": "T47-A01",
       "task": "T47",
       "description": "设计增补覆盖记忆存储、记忆写入、记忆注入、用户可见性、托管格式、交付方式、Claude Code 兼容、异常与变更八部分，并列出需要确认的要点；用户已确认。验证：增补文件与用户确认记录。",
-      "status": "blocked",
-      "evidence": "设计增补 docs/architecture/addenda/T47-auto-memory-and-managed-settings.md 已写完：第 1–8 节对应记忆存储、记忆写入、记忆注入、用户可见性、托管格式、交付方式、Claude Code 兼容、异常与变更，第 11 节列出 10 个需要确认的要点。等待用户确认（设计关口）"
+      "status": "passing",
+      "evidence": "设计增补 docs/architecture/addenda/T47-auto-memory-and-managed-settings.md（4d0f6fa）第 1–8 节覆盖记忆存储、记忆写入、记忆注入、用户可见性、托管格式、交付方式、Claude Code 兼容、异常与变更，第 11 节列出 10 个需要确认的要点；用户在 2026-11-22 的会话中选择\"全部按推荐\"确认"
     },
     {
       "id": "T47-A02",
