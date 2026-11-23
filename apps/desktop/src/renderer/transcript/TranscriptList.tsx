@@ -87,6 +87,7 @@ function RowFrame({
 
 export function TranscriptList({
   ids,
+  following,
   onScroller,
   onContent,
   onRowCommitted,
@@ -94,6 +95,7 @@ export function TranscriptList({
   focus,
 }: {
   ids: readonly string[];
+  following: boolean;
   /** Scroll to this row and mark it for a moment (T35). */
   focus?: { readonly rowId: string; readonly nonce: number } | undefined;
   /** Receives the scroll element. */
@@ -134,7 +136,9 @@ export function TranscriptList({
       return heights.estimate(transcript.row(id), transcript.cacheKey(id), width);
     },
     getItemKey: (index) => ids[index] ?? index,
-    anchorTo: 'end',
+    // ScrollFollow already pins a growing reply before paint. Preserve a visible history
+    // entry during a prepend only while the reader is away from the bottom.
+    anchorTo: following ? 'start' : 'end',
     rangeExtractor: (range) => pixelOverscan(range, instance.current, keepRef.current),
     measureElement: (element, entry, owner) => {
       const size = measureWithObserver(element, entry, owner);

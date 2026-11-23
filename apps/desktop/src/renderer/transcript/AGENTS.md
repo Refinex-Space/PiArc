@@ -47,7 +47,7 @@
 
 宽度变化（经典滚动条出现或消失时占去或让出约 12 px：Windows，以及“显示滚动条”为“始终”或接了鼠标的 macOS）后 `virtualizer.measure()` 会清空全部行高，`TranscriptList` 随即先 `getTotalSize()` 按估算值重算测量结果，再对 DOM 中的行逐一 `resizeItem`：行自己的 ResizeObserver 不会再报告，与旧尺寸比较得不出差值，`measureElement` 又在列表滚动时跳过测量（贴底时宽度变化总伴随一次滚动），任何一步缺了这些行都停在估算高度上互相重叠（W1；`transcript-scroll.e2e.ts` 的变窄用例与 `t19-security.e2e.ts` 展开命令输出时复现）。
 
-行内容和虚拟列表在布局阶段发出贴底请求，同一轮 React 提交的请求合并到绘制前的一个微任务，只读取一次最终布局。流式播报直接订阅当前回复，节流器实际发布时才读取并格式化最新进展。`ResizeObserver` 处理尺寸变化。可见内容先增高、列表随后更新尺寸时，这两次提交都可能影响同一帧的滚动位置。
+行内容和虚拟列表在布局阶段发出贴底请求，同一轮 React 提交的请求合并到绘制前的一个微任务，只读取一次最终布局。贴底时由 ScrollFollow 负责下边界；用户离开底部后，虚拟列表才按行键锚定前插的历史。流式播报直接订阅当前回复，节流器实际发布时才读取并格式化最新进展。`ResizeObserver` 处理尺寸变化。可见内容先增高、列表随后更新尺寸时，这两次提交都可能影响同一帧的滚动位置。
 
 - 审批是 `SessionTranscript.setApprovals` 从 Core 实体快照追加的临时行，历史重载仍显示未处理的请求，重连后的新快照移除旧行。`rows/RowView.tsx` 把审批路由到 `ApprovalCard`、把 `permissionModeChanged` 显示为模式变更记录。快捷键与阅读闸门在 `rows/approval-keys.ts`，由 `approvals/use-approval-keys.ts` 接到各审批卡，仅首个与滚动窗口相交的审批卡可响应。计划卡与提问表单见 [approvals/AGENTS.md](../approvals/AGENTS.md)。
 - 会话的计划与任务清单在 `SessionTranscript.harness`（`store/harness.ts`）：历史窗口的 `harness` 给初值，之后跟随 `harness/todo`、`harness/plan`；右栏任务卡片（`TaskPanel.tsx`）与计划面板只读这里。

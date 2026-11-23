@@ -96,6 +96,7 @@ export function Transcript({
       ) : null}
       <TranscriptList
         ids={ids}
+        following={view.following}
         onScroller={setScroller}
         onContent={setContent}
         onRowCommitted={onRowCommitted}
