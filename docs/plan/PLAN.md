@@ -1272,3 +1272,7 @@ Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m
 ### 2026-11-24 T44 已完成
 
 提交 0cbecdc，Mac M1 Max / 32 GB、接电、打包开发构建，连续执行 5 次 node scripts/perf/run.mjs --lane pr --runs 3 --machine m1-max-32g。五次退出码均为 0，每次 10 个指标均取得 3 轮结果，无探针错误和回归。打包后独占运行性能测量，最终全仓验证另外串行执行。每次执行前后核对 Git HEAD，完整日志与逐轮 report.json 保存在 tmp/evidence/partial-closure/pr-five-0cbecdcbb5e7752bce441f9f2851097c724b742d。 结合已通过的 A09，T44 的 8 项验收全部 passing。
+
+### 2026-11-24 R5 补齐 M4 能力与依赖验收
+
+逐项核对 T39–T45、W3 的 95 项，92 项通过；有证据边界的阻塞项为 T43-A10（未实测的 VoiceOver 操作与播报）、T45-A02（新增 Windows 终端用例和双平台发布探针的 CI 记录）、W3-A01（Windows 实机的新版私有工作集时间序列）。第 16 章 M4 九项与任务证据见 R5-findings.md 第 1.3 节。完整 L2 的能力覆盖 MISSING 0，M4 及之前 planned 0。 全部性能预算由 R5-A02 单独判定。

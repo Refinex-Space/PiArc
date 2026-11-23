@@ -335,8 +335,8 @@
       "id": "R5-A03",
       "task": "R5",
       "description": "第 16 章 M4 行每一项都对应到任务与验收证据；T39–T45、W3 的验收项全部为 `passing` 或理由成立的 `blocked`；`capabilities.md` 无 MISSING，`check-capabilities.mjs --milestone M4` 不列出 `planned` 能力。验证：`acceptance.json` 摘要与两条命令的输出。",
-      "status": "failing",
-      "evidence": "能力部分通过：`check-capabilities.mjs --results target/l2/results.json` → MISSING 0、capability checks passed；`--milestone M4` → planned capabilities of M4 and earlier: 0（T41 遗留的两个能力补 L2 后改 active，71a1e1c）。第 16 章 M4 行九项都对应到任务与验收证据（发现文件第 1.3 节）。验收项不满足：T44-A04 failing、T44-A09 not_started（T44 自己的项，本评审不能改）；W3-A01（与 T35-A11、R4-A01、R4-A03 同为内存）在 ADR-0063 采纳后按物理占用的 macOS 数据达标（3 会话场景最大 264 MB，`tmp/evidence/R5/m3-memory.json`），状态由用户或 W4 决定；其余 blocked 项（T39-A12、T42-A06/A07、T43-A10、T45-A02、W3-A12）理由成立。"
+      "status": "passing",
+      "evidence": "逐项核对 T39–T45、W3 的 95 项，92 项通过；有证据边界的阻塞项为 T43-A10（未实测的 VoiceOver 操作与播报）、T45-A02（新增 Windows 终端用例和双平台发布探针的 CI 记录）、W3-A01（Windows 实机的新版私有工作集时间序列）。第 16 章 M4 九项与任务证据见 R5-findings.md 第 1.3 节。完整 L2 的能力覆盖 MISSING 0，M4 及之前 planned 0。"
     },
     {
       "id": "R5-A04",
