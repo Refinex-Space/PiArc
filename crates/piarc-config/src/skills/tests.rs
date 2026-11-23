@@ -334,6 +334,7 @@ fn merged_command_list_and_conflicts() {
     assert_eq!(
         names,
         [
+            ("btw", CommandKind::BuiltIn, ResourceSource::BuiltIn),
             ("compact", CommandKind::BuiltIn, ResourceSource::BuiltIn),
             ("subtask", CommandKind::BuiltIn, ResourceSource::BuiltIn),
             ("clear", CommandKind::BuiltIn, ResourceSource::BuiltIn),
