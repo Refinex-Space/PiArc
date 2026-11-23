@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 阻塞（等待用户确认设计增补） | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -312,7 +312,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T47 自动记忆与企业托管配置（macOS，设计关口）：
 
 - [x] 开工检查：基线 `npm run verify -- --baseline` 通过（复用 84a4d07 的全量结果）；CI 运行 45036807604 核对：T39-A12、T42-A07 通过并关闭，Windows verify 的 clippy 死代码已修，其余失败登记 I227
-- [ ] 设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`（八部分 + 需要确认的要点），提交后阻塞等待用户确认（A01）
+- [x] 设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`（八部分 + 第 11 节 10 个需要确认的要点），已提交，阻塞等待用户确认（A01）
 - [ ] 自动记忆：存储、`Memory` 工具经 Core 写入与审计、worktree 共享与仓库隔离、Claude Code 记忆只读导入（A02、A04、A06）
 - [ ] 自动记忆：第 4 段注入与长度上限、主题文件按需读取、压缩后重注入、会话中途变化（A03）
 - [ ] 自动记忆：transcript 提示、设置的记忆页（浏览、编辑、删除、开关）、`/memory`、关闭后不注入且工具不可见（A02、A05）
@@ -1182,3 +1182,10 @@ T47 自动记忆与企业托管配置（macOS，设计关口）：
 - 验收：A01–A12 通过；A13 blocked（macOS verify 已过，Windows CI 的 L2 要等推送）。看板改为"部分完成"。
 - 登记：I224（L3 既有缺口）、I225（T48 的 `PermissionDenied` 接入点）、I226（审计保留期限，R6）；I117 关闭。
 - 下一项：T47（自动记忆与企业托管配置，macOS，设计关口）依赖 T46，可以开工；I222 的性能达标任务仍待排期；W4（Windows）依赖 R5 与 T50。本地提交，未推送。
+
+### 2026-11-22 T47 阻塞（等待用户确认设计增补）
+
+- 开工：基线 `npm run verify -- --baseline` 通过（84a4d07 之后只改了 `docs/`，复用全量结果）；T46 为部分完成，遗留的 A13 只等 Windows CI，不影响本任务。R5 推送后的 CI 运行 45036807604 已结束：T39-A12（Windows L2 `sandbox-windows-not-applied` 与 L4 `t39-sandbox` 的 Windows 用例）与 T42-A07（Windows Vitest 的 `attention.test.ts`）通过并改为 passing，T39 改为已完成；Windows verify 的 clippy 失败（`plugins/tests.rs` 的 `file_url` 在 Windows 上未使用）已修（0227a4d，本机 Windows 交叉 clippy 通过），`exec_commands` 的输出顺序与两个平台 L4 的其余失败登记 I227，R5-A01、T45-A02 仍为 blocked。
+- 交付：设计增补 [`docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`](../architecture/addenda/T47-auto-memory-and-managed-settings.md)：记忆存在 `<数据目录>/auto-memory/<项目键>/`（主 checkout 算出，worktree 共享），模型只经宿主工具 `Memory`（读、保存、删除，只收记忆名）经 Core 读写并写审计，索引由 Core 生成，第 4 段注入前 200 行或 25 KB，压缩后有变化时重注入；记忆页、`/memory`、transcript 提示，项目层只能关闭；托管配置为优先级 80 的 `enterprise` 层，来源为 macOS `/Library/Managed Preferences/cn.piarc.desktop.plist` 与 `/Library/Application Support/PiArc/`、Windows `HKLM\SOFTWARE\Policies\PiArc` 与 `Program Files\PiArc\`，多来源合并（锁取最严），兼容读取 Claude Code 的托管文件、偏好域、`HKLM` 键、托管 `CLAUDE.md` 与 `managed-mcp.json`；格式错误拒绝启动，每 60 s 检查变化，`ConfigChange` 不可阻断；第一版托管专属键为 `allowManagedHooksOnly`、`allowManagedPermissionRulesOnly`、`allowManagedMcpServersOnly`、`sandbox.network.allowManagedDomainsOnly`。行为参照 Claude Code 官方 `memory`、`settings`、`managed-settings`、`managed-mcp`、`hooks`、`permissions`（2026-11-22 重新核对）。
+- 验收：A01 blocked（等待用户确认）；其余未开始。
+- 下一项：用户确认增补第 11 节的 10 个要点（可逐条改选备选）后，再次 `/task T47` 进入实现。本地提交，未推送。
