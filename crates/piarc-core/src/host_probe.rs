@@ -15,12 +15,12 @@
 //! the session tests and the L2 scenarios. `mcp/servers` lists the servers of
 //! `<data dir>/settings.json` only (T36).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use piarc_ports::BoxFuture;
-use piarc_protocol::session::{ModelRef, SessionCreateParams};
+use piarc_protocol::session::{ModelRef, SessionCreateParams, SessionId};
 use piarc_protocol::{ErrorKind, ErrorObject};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -217,18 +217,21 @@ async fn converse(
             None => return Err(failed("events", "the supervisor is gone")),
         }
     };
-    let cwd = options.workspace.to_string_lossy().into_owned();
+    // The host queries memory/status during session/create, using the id chosen by Core.
+    let session_id = SessionId(crate::sessions::new_session_id()?);
+    core.io
+        .open_session(&session_id.0, &options.workspace, &options.workspace)
+        .map_err(|e| failed("registering the workspace", e.message))?;
+    let mut params = SessionCreateParams::new(options.workspace.to_string_lossy())
+        .with_model(Some(options.model.clone()));
+    params.session_id = Some(session_id.clone());
     let opened = supervisor
-        .create_session(
-            SessionCreateParams::new(cwd.clone()).with_model(Some(options.model.clone())),
-        )
+        .create_session(params)
         .await
         .map_err(|e| failed("session/create", e))?;
-    let session_id = opened.session_id;
-    let workspace = Path::new(&cwd);
-    core.io
-        .open_session(&session_id.0, workspace, workspace)
-        .map_err(|e| failed("registering the workspace", e.message))?;
+    if opened.session_id != session_id {
+        return Err(failed("session/create", "unexpected session id"));
+    }
     let accepted = supervisor
         .prompt(&session_id, "s6-probe", &options.prompt)
         .await

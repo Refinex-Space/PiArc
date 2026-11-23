@@ -47,6 +47,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 ## 打包的 Agent Host 与 S6 探针（T12）
 
 - `agent_host::start` 一律用 `ProcessTreeSpawner`；`start_bundled` 从打包产物启动（布局、环境变量与 Seatbelt 包装见 `crates/piarc-host/AGENTS.md`）。T39 起 `start_for` 的开发启动（`AgentHostLaunch::Custom`）在 macOS 上同样套定稿配置并设 `agent_host_env`；`agent_host::start` 直接启动（Agent Host 协议测试）不套。Core 的 tokio 运行时开着 I/O（`enable_io`），在它上面监管子进程、跑代理都依赖这一点。
+- 打包探针先由 Core 生成会话 ID、在 `ToolIo` 登记工作区，再以同一 ID 发 `session/create`。Agent Host 在打开会话时就会查询 `memory/status`。
 - `host_probe`、`keychain_probe` 只给测试用：开发构建的 `piarc-napi` 导出 `agentHostProbe`、`keychainProbe`，发布构建不导出。钥匙串探针的条目固定为 `piarc-test.s6-keychain.credential-vault`（构建 A 写、构建 B 读要同一个名字），不碰 `identity` 的正式条目。
 
 ## 发布清单（`release`，ADR-0024）

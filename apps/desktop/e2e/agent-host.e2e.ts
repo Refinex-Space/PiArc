@@ -203,6 +203,9 @@ test('the bundled Agent Host holds a mock conversation with tools and an npx MCP
       'notes.txt',
     );
     expect(report.toolIo.filter((call) => call.error !== null)).toEqual([]);
+    expect(report.toolIo.filter((call) => call.method === 'memory/status')).toEqual([
+      { method: 'memory/status', tool: null, error: null },
+    ]);
     expect(report.toolIo.map((call) => call.method)).toEqual(
       expect.arrayContaining(['exec/run', 'fs/grep', 'fs/glob']),
     );

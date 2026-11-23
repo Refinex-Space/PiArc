@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 部分完成（A04、A13 等 Windows CI） | e2ffefa |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中（跟进 Windows CI） | e2ffefa |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T47 推送后复验（Windows CI 45115969680，e95b4e6）：
+
+- [x] 上一轮 Windows L4 中两处 T47 回归已在本机复现。命令面板断言补上第八项 `/memory`；打包版 Agent Host 探针按生产顺序登记会话，并断言 `memory/status` 成功调用一次。重新打开发包后，在 Electron 的 dev 与 packaged 形态重跑面板、探针及 T47 用例，7/7 通过。
+- [ ] 核对 Windows worktree 隔离、两项注册表测试、17 步 verify 和 T47 桌面用例；按运行证据更新 A04、A13。
 
 ## 登记事项
 
