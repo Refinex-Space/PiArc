@@ -5235,8 +5235,8 @@
       "id": "W3-A01",
       "task": "W3",
       "description": "3 个并行会话 + 子 agent 场景下，各进程内存满足第 11 章预算（M3 退出标准）。验证：测量输出（含机器配置）。",
-      "status": "failing",
-      "evidence": "Windows 11 25H2，i5-1340P / 16 GB（非基准机型），开发构建打包形态：`npm run perf:m3 -- --out tmp/evidence/W3/m3-memory-{1,2}.json` 两次，3 个并行会话（1 个在 worktree）+ 1 个子 agent + 共享 stdio MCP server 与 skills 索引。Agent Host 最大 163、163 MB（上限 270 MB，达标）；应用其余进程最大 576、563 MB（Windows 预算 450 MB，超出；GPU 约 205–216、浏览器 143–150、渲染 150–156、网络 58 MB）。私有工作集（性能计数器 WorkingSetPrivate）合计 256 MB（`tmp/evidence/W3/m3-private-ws.txt`）。与 macOS 同一阻塞项（I26、I146、I201），口径由用户经 ADR 决定"
+      "status": "blocked",
+      "evidence": "ADR-0063 已采纳。Windows 实机两轮的 Agent Host 最大 163 MB（预算 270 MB），应用私有工作集有单次 256 MB 采样（预算 450 MB）；旧探针的 563–576 MB 最大值属于 RSS。架构第 16 章与 R5 要求在 Windows 用新版 npm run perf:m3 -- --form packaged 重测稳态最大私有工作集。当前无该时间序列，留 W4 实机验收。见 docs/reviews/W3-windows-m3-parity.md 第 4 节。"
     },
     {
       "id": "W3-A02",
@@ -5312,8 +5312,8 @@
       "id": "W3-A12",
       "task": "W3",
       "description": "Windows 上 `npm run verify` 通过。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "用户要求跳过收尾的全量 `npm run verify`（2026-11-22）。开工基线 12/17（`tmp/evidence/W3/verify-baseline.txt`）；之后按步骤局部验证通过：cargo-deny 四项、L2 原失败的 13 个场景、`cargo test -p piarc-config/piarc-git/piarc-store/piarc-web`、`piarc-core --lib`（权限计时除外）、`piarc-term` 的 Windows 测试、受影响的 Vitest 与 ESLint、L4 26 个用例。全量 verify（含 Windows 上的权限裁决计时，安静环境下 12.4 ms > 10 ms）待下一次运行"
+      "status": "passing",
+      "evidence": "包含 W3 收尾 de98771 的后继提交 1e24074 在原生 Windows x64 CI 运行 npm run verify，17/17；automatic_decision_latency 通过，L2 为 227 passed、0 failed、15 平台跳过。https://github.com/Refinex-Space/PiArc/actions/runs/45166455597/job/137664551545"
     },
     {
       "id": "W4-A01",

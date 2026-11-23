@@ -1241,3 +1241,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ### 2026-11-24 T48 已完成
 
 12/12 项通过。macOS 全量 L2 已跑过原来受环境阻塞的故障回退、fork、M5 hooks、MCP elicitation 等全部 12 个专项场景。fork 和 elicitation 的 Electron 用例本轮通过，model-switch 首次在夹具启动时超时，单独复跑通过。cdb81a0 的两个平台 CI 也分别在 dev 和 packaged 通过上述三个桌面用例。[Windows L2](https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269417)。
+
+### 2026-11-24 W3 补记 Windows 全量验证
+
+W3-A12 已由 1e24074 的 Windows CI 17/17 补齐。按 ADR-0063 回看旧内存报告，单次私有工作集 256 MB 达标，缺少正式稳态采样窗口的最大值；W3-A01 已明确为待 Windows 实机重测，W3 保留“部分完成”。
