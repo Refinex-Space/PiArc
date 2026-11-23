@@ -30,6 +30,10 @@
 - Memory 由 `tool_io/memory.rs` 组装快照，文件发现和导入在 `memory_reader.rs`。外部导入经同一会话的审批账本，由 `policy/memory.rs` 按工作区及规范目标匹配。见 ADR-0033。
 - Claude Code rules（T24，ADR-0038）：`memory_reader/rules.rs` 选出 `~/.claude/rules/` 与工作区根 `.claude/rules/` 中要载入的文件（排在各自的 `.claude/CLAUDE.md` 之后），无条件的总是载入，带 `paths:` 的在 `fs/memory` 的 `files` 有匹配文件或 `rules` 点名时载入；快照的 `inactiveRules` 告诉 Agent Host 还有没载入的条件 rules。frontmatter 只用于选择，送达的正文不含它。
 
+## 自动记忆（T47）
+
+- `tool_io/auto_memory.rs` 应答 `memory/status`、`memory/apply`：`policy::claim` 消费同一 `Memory` 调用的授权，未信任项目与子会话拒绝写入，读取的笔记记进会话以便压缩后恢复；每次存、删写一行 `kind: "memory"` 审计（名称、类型、字节数、哈希，不含正文）。`memory.rs` 的 `fs/memory` 快照在开关打开时把 `auto_memory::Store::injected` 的索引作为最后一个文件，托管的 `CLAUDE.md` 排在最前。设置与信任取 `SessionIo.project()`，记忆目录按主 checkout。
+
 ## 上下文工程（T27，ADR-0043）
 
 - `tool_io/context.rs` 应答能力 `context` 的三个请求：`context/settings`（`TrustService::permission_settings` 合并的 `/autoCompactEnabled`、`/autoCompactWindow`，窗口夹在 100,000–1,000,000；没有设置服务时返回缺省值）、`fs/changes`（`FileStates::external_changes`：元数据与记录不同才算哈希，同一版本只报告一次，快照不变，所以先读后改照常拦住）、`fs/forgetReads`（`FileStates::forget_read_ranges`，I72）。`fs/read` 带 `restore: true` 且不带 `origin` 时，`policy/grants.rs` 只放行会话文件状态表里、无需审批即可读取的文件（压缩后重注入最近文件）。

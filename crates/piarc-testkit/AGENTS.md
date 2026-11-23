@@ -102,6 +102,8 @@
 
 - T46：端点的 `strict_tools: true` 在 `models.json` 的 `compat` 写 `supportsStrictTools`（Anthropic）或 `supportsStrictMode`（OpenAI），目录因此把它记为 `verified`，可以当 Auto 模式的审查模型（用户设置 `autoMode.model: "mock-<端点>/mock-model"`）；顶层 `review_timeout_ms` 缩短 Core 的审查时限（`CoreConfig.review_timeout`，超时场景用）；审批应答的 `review` 断言卡片转回人工的原因（`none` 为从未送审）。运行器不应答 `review.state` 为 `reviewing` 的卡（它在之后的快照里以新的 revision 回来），`pendingApprovals` 也只计可作答的卡。`perm-auto-*.yaml` 覆盖各条判定与失败路径；审查请求是新的对话，用户消息里有 JSON，`contains` 匹配的是请求体里转义后的文本。
 
+- T47：顶层 `managed`（`files`：`PiArc/<文件>` 或 `ClaudeCode/<文件>` → 内容，按 `layout`（缺省为本平台）的目录布局放在运行根的 `admin 管理/` 下，经 `FixedPolicy` 交给 Core，轮询 `MANAGED_POLL` 100 ms）；动作 `write_managed`（写或删一个托管文件，等 Core 的配置诊断里托管来源的报告变化后才继续）；`expect.audit`（按 `kind` 取工作区审计，逐条做子集比较）。`managed-*.yaml` 覆盖优先级矩阵、只用托管 hooks、Claude Code 两种布局与运行中变化，`memory-auto-*.yaml` 覆盖写入、关闭、未信任与压缩后恢复。
+
 ## 易错点
 
 - Windows：不要把 `canonicalize` 的结果（`\\?\C:\…` 形式）交给 Node 运行脚本，Node 会 `lstat 'C:'` 失败；仓库根用 `CARGO_MANIFEST_DIR` 的上两级。Core 报告的路径不带 `\\?\`，比较时用 harness 的 `canonical()`（L2 运行器里是 `l2::fixtures::canonical`）。

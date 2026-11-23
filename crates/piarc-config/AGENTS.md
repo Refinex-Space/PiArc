@@ -18,7 +18,7 @@
 | `claudeProject` / `claudeProjectLocal` | 30 / 40 | 项目 | `.claude/settings.json` / `.claude/settings.local.json` | 否 |
 | `project` / `projectLocal` | 50 / 60 | 项目 | `.piarc/settings.json` / `.piarc/settings.local.json` | 是 |
 | `session` | 70 | 会话 | 内存中的值 | 否 |
-| `enterprise`（M5） | 80 | 企业 | 托管文件 | 否 |
+| `enterprise`（T47） | 80 | 企业 | 托管设置（Core 读来源后经 `managed::Managed::layer` 插入的值层，没有文件） | 否 |
 
 - Core 一律用 `LayerTable::workspace(data, workspace, home)`（PiArc 四层加 Claude Code 三层，Core 侧经 `DataDirs::layers`）；`LayerTable::piarc` 只有 PiArc 四层，给只测 PiArc 文件的测试用。
 - 加一层 = `LayerTable::insert(LayerSpec { id, precedence, scope, source, format, schema, writable, executable })`，合并代码不改。优先级常量在 `layers::precedence`，顺序即 ADR-0005 第 3 条。
@@ -26,6 +26,13 @@
 - 校验用 `schema::Shape`（结构化描述，不是 JSON Schema 引擎）：错误带文件、JSON Pointer、原因；有错误的文件整份跳过，未知键只是警告。重载时变无效的文件保留上一份有效内容（`LayerStatus::Stale`），删除的文件变为空层。
 - 权限规则按层取：`Settings::permission_lists()`（高到低，项目未受信任时不含项目 allow）、`layer(id)`（某层生效后的值）、`ignored_modes()`（被忽略的项目级 `bypassPermissions`/`auto`，供审计）。设置页的规则编辑经 `edit_permission_rule`（增、改、删一条，只写可写层）。`permissions.enableBypassPermissions` 只由 Core 从用户层读取（T23）。
 - 普通设置写入经 `write_value`，审批的规则与目录经 `append_local_permissions` 同次读改写；并发修改由同一进程锁串行。只写 `writable` 的层（`.piarc/` 与用户文件，永不写 `.claude/`）；同目录临时文件 + `sync_all` + rename，现有文件不是 JSON 对象时拒绝且不改动。
+
+## 托管设置（`src/managed.rs`，T47，设计增补 `T47-auto-memory-and-managed-settings.md` 第 5–8 节）
+
+- `Managed::build(来源, 上一份)` 是托管设置唯一的解析与合并：来源由 Core 按从高到低排好（PiArc 的策略、PiArc 的文件与 `managed-settings.d/`、Claude Code 的策略、Claude Code 的文件），Claude Code 文档只保留映射表里 `Active` 与 `Managed` 的键（`claude::project_managed`，`disableBypassPermissionsMode: "disable"` 变成 `enableBypassPermissions: false`）。单个键类型错只丢该键，锁类键（`LOCKS`）类型错按最严值；锁取所有文档里最严的值；`allowManagedMcpServersOnly`、`allowManagedDomainsOnly` 开启时对应列表取最高文档的整条；不是 JSON 对象的文档进 `errors()`（启动时 Core 据此拒绝启动），运行中变坏的保留上一份内容（`stale`）。
+- 只有托管层能设的键是 `ONLY`（四个 `allowManaged*Only`），其他层的这些值在合并中去掉。锁定判断只用 `managed::locked(托管值, 指针)` 与 `taken`（被托管锁接管的列表）；设置窗口经 Core 的 `managed::view` 取同一份结果（渲染进程的 `isManaged` 按同一规则）。写入经 `write_value`、`append_unique`、`edit_permission_rule` 时被锁定的指针返回 `WriteError::Managed`（Core 映射为 `permissionDenied`，`details.reason: "managed"`）。
+- `Settings::user_value`（跳过权限与 Auto 模式这类只读用户层的开关）先取托管值；`is_locked`、`managed_rules_only` 给 Core 用。`mcp::McpPolicy::from_settings` 按 `allowedMcpServers`、`deniedMcpServers` 与 `allowManagedMcpServersOnly` 排除 server（企业作用域不经允许列表）；`auto_mode::available` 读托管层的 `disableAutoMode` 与 `permissions.enableAutoMode`。
+- 诊断：`Managed::reports()` 每个文档一份 `FileReport`（`kind: enterprise`），Claude Code 文档里不支持的键报"已忽略"。
 
 ## 子 agent 定义（`src/agents.rs`，T31，ADR-0048）
 
@@ -60,7 +67,7 @@
 ## Claude Code 配置（T24，ADR-0038）
 
 - **键映射表**在 `src/claude.rs` 的 `SETTINGS_KEYS`（`settings.json` 的键）与 `STATE_KEYS`（`~/.claude.json`）：每行是键（嵌套键用点）、状态（`Active` 以同一 JSON Pointer 并入、`Planned(任务)`、`Ignored`）与对应的 PiArc 设置或忽略原因。它是唯一判断：合并只保留 `Active` 的键（`claude::project`，读文件时投影），诊断用 `claude::classify` 分类，表外的键为"未知"。某个键的功能落地时：把这一行改为 `active("…", "/…")`，把键加进 `schema::PIARC_SETTINGS`（测试检查生效的键都是 PiArc 已知的设置），需要信任的值加进 `layers::CLAUDE_EXECUTABLE`。不要在别处另写"这个键算不算"的判断。行的来源是官方 settings 索引，Claude Code 增删键时同步。
-- MCP 键（T36）：`~/.claude.json` 的 `mcpServers`（`STATE_KEYS`，诊断里只列 server 名）与 `disabledMcpjsonServers` 生效；`enableAllProjectMcpServers`、`enabledMcpjsonServers` 忽略（项目 server 由 PiArc 的信任决定）；`allowedMcpServers`、`deniedMcpServers` 为 `planned(T47)`。
+- MCP 键（T36）：`~/.claude.json` 的 `mcpServers`（`STATE_KEYS`，诊断里只列 server 名）与 `disabledMcpjsonServers` 生效；`enableAllProjectMcpServers`、`enabledMcpjsonServers` 忽略（项目 server 由 PiArc 的信任决定）；`allowedMcpServers`、`deniedMcpServers` 自 T47 生效（`mcp::McpPolicy`）。
 - M2 生效的键：`permissions.allow`、`ask`、`deny`、`defaultMode`、`additionalDirectories`，以及 T25 的 `hooks`（可执行值，信任前移除）、`disableAllHooks`。hooks 的 handler 形状在 `schema.rs` 的 `HOOK_HANDLER`：只检查已知字段的类型，语义与不支持的字段由 `piarc-hooks` 报告。项目层的 allow、`additionalDirectories`、`acceptEdits` 在信任前移除，`bypassPermissions` 与 `auto` 始终移除（与 PiArc 项目层同一套过滤）；生效键类型错误时整份文件跳过，被忽略的键不校验。
 - **不写 `.claude/`**：`write.rs` 的所有写入（含 `replace_file`）对路径含 `.claude` 目录或名为 `.claude.json` 的目标返回 `WriteError::ClaudeConfig`（Core 映射为 `permissionDenied`），与层是否标为可写无关。"总是允许"、模式记忆、设置页只写 `.piarc/` 与用户级 PiArc 设置。
 - **rules**（`src/rules.rs`）：`rule_files` 递归列出 `*.md`（跟随符号链接，同一目录只访问一次，跳过隐藏项）；`parse` 拆出 frontmatter 的 `paths:`（列表或逗号分隔的字符串，YAML 无效时整个文件按无条件处理）；`PathMatcher` 按 gitignore 语义相对工作区根匹配，Windows 不区分大小写。读取与送达在 `piarc-core::tool_io::memory_reader`。
@@ -77,18 +84,19 @@
 - 用户级 `modelProviders` 的字段由 `piarc_core::providers` 校验。工作区层设置不参与服务商发现。服务商写入复用 `write_value` 的用户设置互斥和 `write::replace_file` 的同目录原子替换。
 
 - 非执行配置 `memory.readBoth` 控制同一目录是否同时加载两个主 memory 文件，随普通标量合并。
+- 自动记忆开关 `autoMemoryEnabled`（T47，与 Claude Code 同名同义）：项目层只能关闭（`true` 在合并前去掉并在诊断中标"已忽略"），托管层设置即锁定；`autoMemoryDirectory` 忽略（位置固定在数据目录）。
 - 非执行配置 `autoCompactEnabled`、`autoCompactWindow`（T27，与 Claude Code 同名同义，`claude::SETTINGS_KEYS` 中为生效）随普通标量合并，Core 的 `tool_io::context` 读取并夹取窗口范围。
 - 非执行配置 `fileCheckpointingEnabled`（T28，与 Claude Code 同名同义，生效）随普通标量合并：`false` 时 Core 的 `tool_io::checkpoints` 不建检查点、写入不存快照，之后的回合没有代码回退。
 - 非执行配置 `askUserQuestion.timeoutSeconds`（T26）是提问表单的超时秒数，随普通标量合并；Claude Code 的 `askUserQuestionTimeout` 仍标为忽略。`plansDirectory` 是 `planned(T48)`：T26 把计划存为会话 entry，R3 决定由 T48 支持批准时把计划另存到该目录（I104）。
 
 ## Auto 模式的设置（`src/auto_mode.rs`，T46）
 
-- `auto_mode::read(settings)` 是唯一读取入口：`permissions.enableAutoMode` 与 `autoMode.model` 只读 PiArc 用户层，`autoMode` 的 `environment`、`allow`、`soft_deny`、`hard_deny` 由 PiArc 用户层与 `~/.claude/settings.json` 按序拼接去重（`$defaults` 跳过，单条 500 字符、合计 8,000 字符），`disableAutoMode: "disable"`（Claude Code 的顶层键）任何层都生效。`available(organization_disabled)` 留给 T47 的托管设置。
+- `auto_mode::read(settings)` 是唯一读取入口：`permissions.enableAutoMode` 与 `autoMode.model` 只读 PiArc 用户层，`autoMode` 的 `environment`、`allow`、`soft_deny`、`hard_deny` 由 PiArc 用户层与 `~/.claude/settings.json` 按序拼接去重（`$defaults` 跳过，单条 500 字符、合计 8,000 字符），`disableAutoMode: "disable"`（Claude Code 的顶层键）任何层都生效。`available` 读托管层（T47）：托管设置关闭 Auto 模式时任何层都开不了。
 - 项目层的 `/permissions/enableAutoMode` 与整个 `/autoMode`（`USER_ONLY`）在 `remerge` 中移除并记进 `ignored_auto`，诊断报 `projectAutoMode`；项目层的 `defaultMode: auto` 仍报 `projectMode`。`claude::SETTINGS_KEYS` 中 `autoMode` 的四个列表与 `disableAutoMode` 为生效，`autoMode.classifyAllShell`、`useAutoModeDuringPlan` 为忽略并写原因。
 
 ## 沙箱设置（`src/sandbox.rs`，T39，ADR-0056）
 
-- 键沿用 Claude Code：`sandbox.enabled`、`sandbox.autoAllowBashIfSandboxed`、`sandbox.filesystem.denyRead`、`sandbox.network.allowedDomains`（`claude::SETTINGS_KEYS` 为生效，其余 `sandbox.*` 逐条忽略并写原因，`network.allowManagedDomainsOnly` 为 T47）。
+- 键沿用 Claude Code：`sandbox.enabled`、`sandbox.autoAllowBashIfSandboxed`、`sandbox.filesystem.denyRead`、`sandbox.network.allowedDomains`（`claude::SETTINGS_KEYS` 为生效，其余 `sandbox.*` 逐条忽略并写原因，`network.allowManagedDomainsOnly` 只在托管设置中生效（T47））。
 - 项目层只能收紧：`remerge` 用 `sandbox::loosening` 去掉项目层的 `allowedDomains`、为真的 `autoAllowBashIfSandboxed`、为假的 `enabled`，记进 `ignored_sandbox`，诊断报 `projectSandbox`；Core 在没有沙箱的平台用 `diagnostics::mark_platform_unsupported` 把生效的开启与自动批准改报 `platform`。
 - `sandbox::resolve(settings, enterprise, home)` 给出开关、模式、带来源的 `denyRead`（项目文件相对项目根、用户文件相对文件所在目录、`~/` 与 `/`、`//` 照常）与允许域名（用户两层，再加企业来源，去重）。写回只经 `write_value`/`append_unique` 的用户层（网络卡的"加入白名单"用 `append_unique`）。
 

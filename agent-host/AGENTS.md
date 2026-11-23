@@ -89,6 +89,11 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - `harness/auto-review.ts` 的 `reviewCall`：审查模型不在目录、没有凭据或不满足 `providers/catalog.ts` 的 `meetsReviewerBar`（工具调用 `verified`、窗口 ≥ 64K、输出 ≥ 1,024，`models/list` 的 `reviewer` 用同一函数）时答 `unknownModel`/`belowBar`、不发请求；否则经辅助通道发一次请求（system 为 `prompts/auto-review.ts` 的 A 段加用户策略 B 段，唯一的 user 消息是 C–G 的 JSON，只声明 `record_review`，`cacheRetention: short`，`maxTokens` 1,024），原样交回参数，或答 `timeout`、`providerError`、`unparsable`。`inputHash` 是 system 与 user 全文的 SHA-256，`promptId` 是 A 段哈希的前 12 位。
 - 结论回到 `policy/evaluate` 的 `review` 时，`harness/policy.ts` 写分支条目 `piarc.autoReview`（`REVIEW_ENTRY`）并让投影器给该调用的条目加 `review`（`Projector.markReviewed`，历史经 `history.ts` 读同一条目）。
 
+## 自动记忆与托管说明（T47，设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`）
+
+- `Memory` 工具在 `harness/auto-memory.ts`：会话打开时按 Core 的 `memory/status` 决定是否给（能力 `autoMemory`、受信任项目、主会话；子 agent 的工具过滤去掉它），每次调用原样经 `memory/apply` 交给 Core，不碰文件；本会话的保存或删除经 `changed` 记进会话 memory 的基线，下一轮不把索引当作新变化提醒。模型可见的文字只在 `prompts/auto-memory.ts`（工具描述、指引、索引前的说明、托管 `CLAUDE.md` 的来源标注、压缩后恢复的笔记开头），改动后跑原创性检查。
+- 注入：索引是 Core `fs/memory` 快照的最后一个文件（`kind: "autoMemory"`），托管的 `CLAUDE.md` 排在最前（`kind: "managed"`），都经 `prompts/system.ts` 的 `sourced` 进项目上下文，不另写消息类型。压缩后恢复本会话读过或存过的笔记（`reinjection.ts` 的 `RESTORE_LIMITS.notes` 与 `notesTotal`，经 `memory/apply` 的 `read` 取当前内容）。
+
 ## 子目录说明
 
 - `src/harness/AGENTS.md`：system prompt 与 memory、权限预检、hooks、宿主工具、上下文工程（提醒、压缩、重注入、熔断、用量）、回合不变量的补齐。

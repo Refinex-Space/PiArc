@@ -228,13 +228,22 @@ async fn run(
         state.workspace.clone(),
         state.resources.clone(),
     );
-    if let Err(error) = tokio::task::spawn_blocking(move || {
+    let mut registration = tokio::task::spawn_blocking(move || {
         watch_dirs(&watcher, &inner, &workspace, &resources);
-    })
-    .await
-    {
-        tracing::error!(target:"piarc_core::settings","settings registration failed: {error}");
-        return;
+    });
+    // Managed settings do not wait for the registration (T47): under load it can take tens of
+    // seconds, and their change must reach the workspace within the poll.
+    loop {
+        tokio::select! {
+            result = &mut registration => {
+                if let Err(error) = result {
+                    tracing::error!(target:"piarc_core::settings","settings registration failed: {error}");
+                    return;
+                }
+                break;
+            }
+            Ok(()) = managed_changes.changed() => state.remanage().await,
+        }
     }
     state.reload().await;
     let _ = registered.send(());
@@ -470,3 +479,6 @@ fn log_issue(issue: &Issue) {
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
+
+#[cfg(test)]
+mod tests;

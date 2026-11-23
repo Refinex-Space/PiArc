@@ -109,6 +109,21 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 设置监听（`workspace_settings.rs`）同时监听 skills、命令与输出风格的目录（`piarc_config::skills::watch_dirs`，只取工作区、数据目录与家目录之下的），每次重载与信任变化推进 `WorkspaceSettings::changes`；工作区 actor 启动时开 `reload_resources` 任务，Agent Host 运行时发 `resources/reload`（不启动它）。
 - `sessions/skills.rs` 是 `Hub` 的 `list_commands`、`list_skills`（有运行中的 Agent Host 时问 `resources/listCommands`、`resources/listSkills`，否则 Core 按文件回答）与 `set_output_style`（工作区写 `.piarc/settings.local.json` 并立即对运行中的 Agent Host 发 `resources/reload`，不带工作区写用户级 `settings.json`）；NAPI `listCommands`、`listSkills`、`setOutputStyle`。内置命令只在 `piarc_config::skills::BUILT_IN_COMMANDS` 定义，`composer::info` 不再带命令列表。
 
+## 托管设置（`managed`，T47，设计增补 `T47-auto-memory-and-managed-settings.md` 第 5–8 节）
+
+- `ManagedSettings`（Core 一份，`DataDirs::managed()`）经 `piarc_ports::PolicyStore` 读管理员来源（应用里是 `managed::store::SystemPolicy`：macOS 的 managed preferences plist 与 `/Library/Application Support/{PiArc,ClaudeCode}/`，Windows 的 `HKLM\SOFTWARE\Policies\{PiArc,ClaudeCode}` 与注册表给出的 Program Files；用户名与 Program Files 不取自环境变量），交给 `piarc_config::managed::Managed::build`，结果是 `Snapshot`（托管值、`CLAUDE.md` 文档、Claude Code 的 `managed-mcp.json`）。`DataDirs::layers` 把它的 `enterprise` 层加进每张设置表，读设置的入口都自动带上，不要另建表。
+- 启动时同步读取（`ManagedSettings::load`），文档不是 JSON 对象时 `CoreRuntime::start` 返回 `Error::ManagedSettings`（kind `managedSettingsInvalid`，`details` 带位置与行列，主进程据此显示本地化对话框并退出）；之后每 `ManagedConfig::poll`（`DEFAULT_POLL` 60 s）重读一次，指纹变化才换快照并推进 `changes()`；工作区设置监听（`workspace_settings.rs` 的 `remanage`）据此替换 `enterprise` 层并发 `core/settings`，`ConfigChange` 以 `policy_settings` 运行且不可阻断。
+- 测试只用 `managed::store::FixedPolicy`（同样的布局放在测试选的目录下，Windows 的注册表换成 `HKCU` 下的测试键）：L2 的 `managed` 段、`createForTests` 的 `PIARC_TEST_MANAGED_ROOT`（轮询 200 ms）。不要让测试读本机的系统位置。
+- 锁定：`client_settings`、`tool_io/policy/settings_view.rs`、沙箱与 Auto 模式的设置写入、插件开关、MCP 启停、记忆开关都经 `piarc_config` 的写入函数，被锁定的指针返回 `permissionDenied`（`details.reason: "managed"`）；`Hub::managed_settings`（NAPI `managedSettings`）给设置窗口锁定视图（`piarc_config::managed::view`）。hooks 在 `allowManagedHooksOnly` 下跳过非托管来源并写审计（`hooks/mod.rs`）。
+- 测试：`cargo test -p piarc-core --lib managed::` 与 `--lib tool_io::policy::tests::t47`。
+
+## 自动记忆（`auto_memory`，T47，设计增补第 1–4 节）
+
+- `auto_memory::Store` 是记忆目录唯一的读写方：`<数据目录>/auto-memory/<目录名-路径哈希12位>/`，键取主 checkout（`piarc_git::resolve(..).main`，worktree 共用），主题文件的 frontmatter 与索引 `MEMORY.md` 都由 Core 写，模型不写索引；上限 `MAX_TOPIC_BYTES`、`MAX_TOPICS`、`INDEX_LINES`、`INDEX_BYTES`。`import_claude` 只读 `~/.claude/projects/<项目键>/memory/`（`claude_dir`）复制一次，不写 `.claude/`。
+- 模型侧在 `tool_io/auto_memory.rs`：`memory/status`（开关与是否给 `Memory` 工具：未信任项目、子会话没有工具）、`memory/apply`（消费同一调用的授权，读、存、删，每次改动一行 `kind: "memory"` 审计）；`fs/memory` 快照的最后一个文件是截断后的索引（`kind: "autoMemory"`）。开关的读取只经 `auto_memory_on`。
+- 用户侧在 `sessions/memory.rs`：`Hub::memory_view`、`memory_edit`（NAPI `memoryView`、`memoryEdit`：存、删、全部删除、导入、开关），改动同样写 `kind: "memory"` 审计（`by: user`、`import`），开关经设置写入函数（用户层或 `.piarc/settings.local.json`，项目只能关闭）。
+- 测试：`cargo test -p piarc-core --lib auto_memory` 与 `--lib tool_io::policy::tests::t47`；L2 `memory-auto-*`。
+
 ## 子目录说明
 
 - `src/tool_io/AGENTS.md`：委托的工具 I/O、工具预检、memory 与 rules、上下文工程、检查点与回退、WebFetch、hooks（T16–T30）。
