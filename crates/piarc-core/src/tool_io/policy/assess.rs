@@ -432,9 +432,11 @@ pub(super) fn other_call(
         // (T31) only starts a subagent, whose own calls are each decided here; `Agent(<type>)`
         // deny and ask rules still apply to it.
         // `ToolSearch` (T36) only loads tool definitions into the conversation, `Skill` (T37)
-        // a skill's instructions; `Skill(<name>)` deny and ask rules still apply.
+        // a skill's instructions; `Skill(<name>)` deny and ask rules still apply. `Memory`
+        // (T47) writes only the repository's auto memory in PiArc's data directory, through
+        // Core, audited; `Memory` deny and ask rules still apply.
         "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" | "Agent"
-        | "KillShell" | "ToolSearch" | "Skill" => {
+        | "KillShell" | "ToolSearch" | "Skill" | "Memory" => {
             ladder.read_only = true;
             return Assessment::new(ladder, Vec::new());
         }

@@ -34,6 +34,17 @@ pub struct FsMemoryParams {
     pub offset: Option<u64>,
 }
 
+/// What a memory document is besides an ordinary memory file (T47).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum MemoryKind {
+    /// A `CLAUDE.md` an organization placed with its managed settings: always first, the user
+    /// cannot leave it out.
+    Managed,
+    /// The index of the agent's auto memory for this repository: last.
+    AutoMemory,
+}
+
 /// One memory document with expanded imports.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct MemoryFile {
@@ -45,6 +56,9 @@ pub struct MemoryFile {
     /// read or wrote a matching file (or did so earlier in the session).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub paths: Option<Vec<String>>,
+    /// A managed `CLAUDE.md` or the auto memory index (T47); absent for ordinary files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<MemoryKind>,
 }
 
 /// The JSON document transferred by fs/memory.
@@ -79,4 +93,88 @@ pub struct FsMemoryResult {
 request! {
     /// Read memory documents for one session.
     FsMemory, "fs/memory", FsMemoryParams, FsMemoryResult
+}
+
+/// `memory/status` (T47): what auto memory offers a session.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryStatusParams {
+    /// The session.
+    pub session_id: String,
+}
+
+/// The answer of `memory/status`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryStatusResult {
+    /// Auto memory is on: the index joins the session's memory snapshot.
+    pub enabled: bool,
+    /// The session offers the `Memory` tool: auto memory is on, the project is trusted and the
+    /// session is not a subagent.
+    pub tool: bool,
+}
+
+request! {
+    /// What auto memory offers a session (T47); asked when the session opens.
+    MemoryStatus, "memory/status", MemoryStatusParams, MemoryStatusResult
+}
+
+/// What a `Memory` call does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum MemoryAction {
+    /// The whole index, or one memory by name.
+    Read,
+    /// Creates or replaces one memory.
+    Save,
+    /// Deletes one memory.
+    Delete,
+}
+
+/// `memory/apply` (T47): one `Memory` tool call, run by Core after the call was allowed.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryApplyParams {
+    /// The session.
+    pub session_id: String,
+    /// The `Memory` call whose permission this consumes.
+    pub tool_call_id: String,
+    /// What to do.
+    pub action: MemoryAction,
+    /// The memory's name (`read` without it returns the whole index).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// `user`, `feedback`, `project` or `reference` (`save`).
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// One line for the index (`save`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The memory's Markdown body (`save`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// A `read` that restores context after a compaction: no tool call, read only, the
+    /// session's own repository only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub restore: bool,
+}
+
+/// The answer of `memory/apply`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryApplyResult {
+    /// The tool result for the model.
+    pub text: String,
+    /// A `save` or `delete` changed the memory: the index as a new session would get it now
+    /// (absent when no memory is left), so the session knows its own change.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<MemoryFile>,
+    /// Whether the memory changed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub changed: bool,
+}
+
+request! {
+    /// Runs one `Memory` tool call (T47).
+    MemoryApply, "memory/apply", MemoryApplyParams, MemoryApplyResult
 }

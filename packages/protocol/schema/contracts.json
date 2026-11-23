@@ -471,6 +471,30 @@
     },
     {
       "kind": "request",
+      "method": "memory/status",
+      "name": "memory/status",
+      "schema": "MemoryStatusRequest"
+    },
+    {
+      "kind": "response",
+      "method": "memory/status",
+      "name": "memory/status/result",
+      "schema": "MemoryStatusResponse"
+    },
+    {
+      "kind": "request",
+      "method": "memory/apply",
+      "name": "memory/apply",
+      "schema": "MemoryApplyRequest"
+    },
+    {
+      "kind": "response",
+      "method": "memory/apply",
+      "name": "memory/apply/result",
+      "schema": "MemoryApplyResponse"
+    },
+    {
+      "kind": "request",
       "method": "fs/stat",
       "name": "fs/stat",
       "schema": "FsStatRequest"

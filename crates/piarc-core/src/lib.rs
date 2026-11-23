@@ -70,6 +70,7 @@
 //! of a session are background tasks the model can read (ADR-0050).
 
 pub mod agent_host;
+pub mod auto_memory;
 pub mod checkpoints;
 pub mod client_settings;
 pub mod clock;

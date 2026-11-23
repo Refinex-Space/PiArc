@@ -30,6 +30,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
+mod auto_memory;
 mod checkpoints;
 mod context;
 mod exec;
@@ -315,7 +316,9 @@ impl ToolIo {
             || method.starts_with("exec/")
             || matches!(
                 method,
-                "policy/evaluate"
+                "memory/status"
+                    | "memory/apply"
+                    | "policy/evaluate"
                     | "policy/recover"
                     | "policy/cancel"
                     | "policy/inputChunk"
@@ -678,6 +681,8 @@ impl ToolIo {
         }
         match method {
             "fs/memory" => return self.memory_snapshot(parse(method, params)?, &peer).await,
+            "memory/status" => return self.memory_status(parse(method, params)?).await,
+            "memory/apply" => return self.memory_apply(parse(method, params)?, &peer).await,
             "policy/inputChunk" => return self.stage_input(parse(method, params)?, &peer),
             "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
             "policy/tools" => return self.denied_tools(parse(method, params)?).await,

@@ -97,6 +97,10 @@ export type AhpMessage =
   | HooksMcpToolResponse
   | FsMemoryRequest
   | FsMemoryResponse
+  | MemoryStatusRequest
+  | MemoryStatusResponse
+  | MemoryApplyRequest
+  | MemoryApplyResponse
   | FsStatRequest
   | FsStatResponse
   | FsReadRequest
@@ -854,6 +858,14 @@ export type HostHookEvent =
   | 'instructionsLoaded'
   | 'stopFailure'
   | 'userPromptExpansion';
+/**
+ * What a `Memory` call does.
+ */
+export type MemoryAction = 'read' | 'save' | 'delete';
+/**
+ * What a memory document is besides an ordinary memory file (T47).
+ */
+export type MemoryKind = 'managed' | 'autoMemory';
 /**
  * What a path names.
  */
@@ -3928,6 +3940,143 @@ export interface FsMemoryResult {
    * Absent after the last byte.
    */
   nextOffset?: number | null;
+}
+/**
+ * Request for `memory/status`.
+ */
+export interface MemoryStatusRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'memory/status';
+  params: MemoryStatusParams;
+}
+/**
+ * `memory/status` (T47): what auto memory offers a session.
+ */
+export interface MemoryStatusParams {
+  /**
+   * The session.
+   */
+  sessionId: string;
+}
+/**
+ * Successful response to `memory/status`.
+ */
+export interface MemoryStatusResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: MemoryStatusResult;
+}
+/**
+ * The answer of `memory/status`.
+ */
+export interface MemoryStatusResult {
+  /**
+   * Auto memory is on: the index joins the session's memory snapshot.
+   */
+  enabled: boolean;
+  /**
+   * The session offers the `Memory` tool: auto memory is on, the project is trusted and the
+   * session is not a subagent.
+   */
+  tool: boolean;
+}
+/**
+ * Request for `memory/apply`.
+ */
+export interface MemoryApplyRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'memory/apply';
+  params: MemoryApplyParams;
+}
+/**
+ * `memory/apply` (T47): one `Memory` tool call, run by Core after the call was allowed.
+ */
+export interface MemoryApplyParams {
+  /**
+   * What to do.
+   */
+  action: MemoryAction;
+  /**
+   * The memory's Markdown body (`save`).
+   */
+  content?: string | null;
+  /**
+   * One line for the index (`save`).
+   */
+  description?: string | null;
+  /**
+   * The memory's name (`read` without it returns the whole index).
+   */
+  name?: string | null;
+  /**
+   * A `read` that restores context after a compaction: no tool call, read only, the
+   * session's own repository only.
+   */
+  restore?: boolean;
+  /**
+   * The session.
+   */
+  sessionId: string;
+  /**
+   * The `Memory` call whose permission this consumes.
+   */
+  toolCallId: string;
+  /**
+   * `user`, `feedback`, `project` or `reference` (`save`).
+   */
+  type?: string | null;
+}
+/**
+ * Successful response to `memory/apply`.
+ */
+export interface MemoryApplyResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: MemoryApplyResult;
+}
+/**
+ * The answer of `memory/apply`.
+ */
+export interface MemoryApplyResult {
+  /**
+   * Whether the memory changed.
+   */
+  changed?: boolean;
+  /**
+   * A `save` or `delete` changed the memory: the index as a new session would get it now
+   * (absent when no memory is left), so the session knows its own change.
+   */
+  index?: MemoryFile | null;
+  /**
+   * The tool result for the model.
+   */
+  text: string;
+}
+/**
+ * One memory document with expanded imports.
+ */
+export interface MemoryFile {
+  /**
+   * Visible Markdown, with source labels on expanded imports.
+   */
+  content: string;
+  /**
+   * A managed `CLAUDE.md` or the auto memory index (T47); absent for ordinary files.
+   */
+  kind?: MemoryKind | null;
+  /**
+   * Source path.
+   */
+  path: string;
+  /**
+   * For a rule with `paths:` frontmatter, its globs: the rule was loaded because the agent
+   * read or wrote a matching file (or did so earlier in the session).
+   */
+  paths?: string[] | null;
 }
 /**
  * Request for `fs/stat`.
@@ -8518,24 +8667,6 @@ export interface MemorySnapshot {
    * load it. Absent when every rule is loaded.
    */
   inactiveRules?: boolean | null;
-}
-/**
- * One memory document with expanded imports.
- */
-export interface MemoryFile {
-  /**
-   * Visible Markdown, with source labels on expanded imports.
-   */
-  content: string;
-  /**
-   * Source path.
-   */
-  path: string;
-  /**
-   * For a rule with `paths:` frontmatter, its globs: the rule was loaded because the agent
-   * read or wrote a matching file (or did so earlier in the session).
-   */
-  paths?: string[] | null;
 }
 /**
  * What a rewind would do (Core API `rewindPreview`).

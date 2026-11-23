@@ -121,6 +121,7 @@ impl HostConfig {
                 Capability::new("mcpPool"),
                 Capability::new("skills"),
                 Capability::new("plugins"),
+                Capability::new("autoMemory"),
             ],
             allow_model_network: None,
             model_preferences: None,

@@ -109,6 +109,7 @@ impl ToolIo {
         let config = Arc::clone(&self.config);
         let scope = session.scope.clone();
         let table = self.layers(session.project());
+        let managed = self.managed().snapshot().memory.clone();
         tokio::task::spawn_blocking(move || {
             // This setting governs the choice of two documents; project code is never enabled.
             let settings = piarc_config::Settings::load(table, piarc_config::TrustState::Untrusted);
@@ -117,6 +118,7 @@ impl ToolIo {
                 &scope,
                 config.home.as_deref(),
                 &config.data_dir,
+                &managed,
                 &dirs,
                 both,
                 &rules,
@@ -155,8 +157,14 @@ impl ToolIo {
             peer,
             generation,
         };
+        // The auto memory index is the last document (T47, design addendum section 3.1).
+        let index = self.auto_memory_index(&session).await;
+        let with_index = |mut files: Vec<MemoryFile>| {
+            files.extend(index.clone());
+            files
+        };
         let initial = match opening {
-            Some(opening) => Some(scan.resolve(opening, &mut choices).await?),
+            Some(opening) => Some(with_index(scan.resolve(opening, &mut choices).await?)),
             None => None,
         };
         let rules = memory_reader::RuleQuery {
@@ -172,7 +180,7 @@ impl ToolIo {
             .collect_memory(&session, dirs.to_vec(), rules, choices.clone())
             .await?;
         let inactive_rules = latest.inactive_rules;
-        let latest = scan.resolve(latest, &mut choices).await?;
+        let latest = with_index(scan.resolve(latest, &mut choices).await?);
         let (files, current_files) = match initial {
             Some(original) if original != latest => (original, Some(latest)),
             _ => (latest, None),
@@ -283,6 +291,7 @@ pub(crate) fn memory_documents(
     root: &std::path::Path,
     home: Option<&std::path::Path>,
     data: &std::path::Path,
+    managed: &[PathBuf],
     read_both: bool,
 ) -> std::io::Result<Vec<piarc_protocol::memory::MemoryFile>> {
     let scope = piarc_fs::Scope::new(root, root).map_err(std::io::Error::other)?;
@@ -290,7 +299,10 @@ pub(crate) fn memory_documents(
         files: Vec::new(),
         active: Vec::new(),
     };
-    let collection = memory_reader::collect(&scope, home, data, &[], read_both, &query, |_| None)?;
+    let collection =
+        memory_reader::collect(&scope, home, data, managed, &[], read_both, &query, |_| {
+            None
+        })?;
     Ok(collection.files)
 }
 

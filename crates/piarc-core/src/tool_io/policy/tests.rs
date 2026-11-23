@@ -661,6 +661,7 @@ mod t37;
 mod t38;
 mod t42;
 mod t46;
+mod t47;
 
 /// W1 (architecture 15.2): Windows paths through the whole production path, preflight, grant
 /// and directory-bound I/O. Long paths and reserved names are made here, never committed.

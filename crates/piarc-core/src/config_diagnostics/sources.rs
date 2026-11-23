@@ -189,25 +189,30 @@ fn memory(inputs: &Inputs<'_>) -> Vec<FileReport> {
         .get("/memory/readBoth")
         .and_then(Value::as_bool)
         == Some(true);
-    let files =
-        match crate::tool_io::memory_documents(inputs.root, inputs.home, inputs.data, read_both) {
-            Ok(files) => files,
-            Err(error) => {
-                let mut r = report(
-                    SourceKind::Memory,
-                    "memory",
-                    inputs.root.join("CLAUDE.md"),
-                    Scope::Project,
-                );
-                r.status = FileStatus::Invalid;
-                r.issues.push(issue(
-                    inputs.root,
-                    format!("cannot read memory: {error}"),
-                    None,
-                ));
-                return vec![r];
-            }
-        };
+    let files = match crate::tool_io::memory_documents(
+        inputs.root,
+        inputs.home,
+        inputs.data,
+        &inputs.managed.memory,
+        read_both,
+    ) {
+        Ok(files) => files,
+        Err(error) => {
+            let mut r = report(
+                SourceKind::Memory,
+                "memory",
+                inputs.root.join("CLAUDE.md"),
+                Scope::Project,
+            );
+            r.status = FileStatus::Invalid;
+            r.issues.push(issue(
+                inputs.root,
+                format!("cannot read memory: {error}"),
+                None,
+            ));
+            return vec![r];
+        }
+    };
     files
         .into_iter()
         // Rules have their own reports.

@@ -460,6 +460,30 @@ pub(in crate::tool_io) fn claim_skill(
     Ok(())
 }
 
+/// Consumes the permission of `Memory` call `call` (T47): the action and name must be the ones
+/// the decision saw.
+pub(in crate::tool_io) fn claim_memory(
+    s: &SessionIo,
+    call: &str,
+    action: &str,
+    name: Option<&str>,
+    peer: &Peer,
+) -> Result<(), ErrorObject> {
+    let mut state = lock(&s.policy);
+    let grant = state
+        .grants
+        .get(call)
+        .filter(|g| g.belongs("Memory", peer))
+        .ok_or_else(mismatch)?;
+    if grant.input.get("action").and_then(Value::as_str) != Some(action)
+        || grant.input.get("name").and_then(Value::as_str) != name
+    {
+        return Err(mismatch());
+    }
+    state.grants.remove(call);
+    Ok(())
+}
+
 pub(in crate::tool_io) fn claim_fetch(
     s: &SessionIo,
     p: &piarc_protocol::web::WebFetchParams,

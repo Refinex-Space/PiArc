@@ -60,6 +60,7 @@ impl Tree {
             &self.scope,
             Some(&self.root.join("home")),
             &self.root.join("data"),
+            &[],
             dirs,
             both,
             query,
@@ -452,5 +453,43 @@ fn conditional_rules_load_for_matching_files_and_stay_when_named() {
     assert!(
         !docs.inactive_rules,
         "the invalid glob never loads and is not pending"
+    );
+}
+
+/// T47: the organization's managed `CLAUDE.md` comes first and is marked, before the user's
+/// files; a missing one is skipped.
+#[test]
+fn managed_instructions_lead_the_documents() {
+    let tree = Tree::new();
+    tree.file("home/.claude/CLAUDE.md", "user");
+    tree.file("CLAUDE.md", "project");
+    tree.file("admin/PiArc/CLAUDE.md", "organization");
+    let managed = [
+        tree.root.join("admin/PiArc/CLAUDE.md"),
+        tree.root.join("admin/ClaudeCode/CLAUDE.md"),
+    ];
+    let collection = collect(
+        &tree.scope,
+        Some(&tree.root.join("home")),
+        &tree.root.join("data"),
+        &managed,
+        &[],
+        false,
+        &RuleQuery::default(),
+        |_| None,
+    )
+    .expect("collect");
+    let texts: Vec<(&str, Option<MemoryKind>)> = collection
+        .files
+        .iter()
+        .map(|f| (f.content.as_str(), f.kind))
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            ("organization", Some(MemoryKind::Managed)),
+            ("user", None),
+            ("project", None)
+        ]
     );
 }

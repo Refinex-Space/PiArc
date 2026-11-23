@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use piarc_fs::{DirectoryBinding, Scope, display, encoding};
-use piarc_protocol::memory::MemoryFile;
+use piarc_protocol::memory::{MemoryFile, MemoryKind};
 
 mod markdown;
 mod rules;
@@ -40,6 +40,8 @@ pub(super) struct Inputs {
     rules: HashMap<PathBuf, Option<Vec<String>>>,
     targets: HashMap<PathBuf, Option<(PathBuf, DirectoryBinding)>>,
     contents: HashMap<PathBuf, Option<Arc<str>>>,
+    /// The organization's managed `CLAUDE.md` files (T47): first, marked `managed`.
+    managed: HashSet<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -51,16 +53,29 @@ pub(super) struct Collection {
     pub(super) inactive_rules: bool,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the places of one discovery: scope, home, data, managed, visited directories, choices"
+)]
 pub(super) fn collect(
     scope: &Scope,
     home: Option<&Path>,
     data: &Path,
+    managed: &[PathBuf],
     directories: &[String],
     read_both: bool,
     query: &RuleQuery,
     decide: impl FnMut(&Path) -> Option<ImportAccess>,
 ) -> io::Result<Collection> {
     let mut sources = Vec::new();
+    let mut managed_sources = HashSet::new();
+    // The organization's managed instructions come before everything (T47).
+    for file in managed {
+        if let Ok(file) = file.canonicalize() {
+            managed_sources.insert(file.clone());
+            sources.push(file);
+        }
+    }
     let mut rules = rules::Selection::default();
     if let Some(home) = home {
         user_source(home, ".claude/CLAUDE.md", &mut sources)?;
@@ -113,6 +128,7 @@ pub(super) fn collect(
     let mut collection = Inputs {
         sources,
         rules: rules.globs,
+        managed: managed_sources,
         ..Inputs::default()
     }
     .expand(scope, home, decide)?;
@@ -139,7 +155,10 @@ impl Inputs {
         };
         let mut files = Vec::new();
         for source in &self.sources {
-            if let Some(file) = reader.document(source, 0)? {
+            if let Some(mut file) = reader.document(source, 0)? {
+                if self.managed.contains(source) {
+                    file.kind = Some(MemoryKind::Managed);
+                }
                 files.push(file);
             }
         }
@@ -267,6 +286,7 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
                 path,
                 content,
                 paths,
+                kind: None,
             }));
         }
         // An imported file can live on a volume with different case rules from the
@@ -311,6 +331,7 @@ impl<F: FnMut(&Path) -> Option<ImportAccess>> Reader<'_, F> {
             path,
             content,
             paths,
+            kind: None,
         }))
     }
 }

@@ -31,7 +31,7 @@ use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::mcp::{
     McpLogin, McpReconnect, McpServersMethod, McpSetEnabled, McpStatusChanged, McpStatusMethod,
 };
-use crate::memory::FsMemory;
+use crate::memory::{FsMemory, MemoryApply, MemoryStatus};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
 use crate::models::{
     ModelsCredential, ModelsCredentialStatus, ModelsList, ModelsLoginCancel, ModelsLoginStart,
@@ -251,6 +251,10 @@ pub static CONTRACTS: &[Contract] = &[
     response::<HooksMcpTool>("hooks/mcpTool/result"),
     request::<FsMemory>(FsMemory::NAME),
     response::<FsMemory>("fs/memory/result"),
+    request::<MemoryStatus>(MemoryStatus::NAME),
+    response::<MemoryStatus>("memory/status/result"),
+    request::<MemoryApply>(MemoryApply::NAME),
+    response::<MemoryApply>("memory/apply/result"),
     request::<FsStat>(FsStat::NAME),
     response::<FsStat>("fs/stat/result"),
     request::<FsRead>(FsRead::NAME),
