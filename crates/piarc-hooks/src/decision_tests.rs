@@ -608,3 +608,24 @@ fn m4_events_block_expansions_and_changes_and_collect_watch_paths() {
         }
     }
 }
+
+#[test]
+fn elicitation_hooks_can_answer_edit_or_block() {
+    use piarc_protocol::mcp::ElicitationReply;
+
+    for event in [HookEvent::Elicitation, HookEvent::ElicitationResult] {
+        let accept = json_out(
+            event,
+            &specific(event, json!({"action":"accept","content":{"name":"one"}})),
+        );
+        let decline = json_out(event, &specific(event, json!({"action":"decline"})));
+        let accepted = Decision::merge(event, std::slice::from_ref(&accept));
+        assert!(
+            matches!(accepted.elicitation, Some(ElicitationReply::Accept { content: Some(ref obj) }) if obj.get("name") == Some(&json!("one")))
+        );
+        let declined = Decision::merge(event, &[decline, accept]);
+        assert_eq!(declined.elicitation, Some(ElicitationReply::Decline));
+        let blocked = Decision::merge(event, &[out(event, 2, "", "refused")]);
+        assert_eq!(blocked.block.as_deref(), Some("refused"));
+    }
+}

@@ -74,6 +74,8 @@ pub struct Decision {
     pub updated_input: Option<Map<String, Value>>,
     /// `PermissionRequest`.
     pub request: Option<RequestAnswer>,
+    /// A PermissionDenied handler invited the model to submit a fresh call.
+    pub retry: bool,
     /// Text for the model's context, in handler order.
     pub context: Vec<String>,
     /// `PostToolUse` and `PostToolUseFailure`: feedback the model reads next to the result.
@@ -91,6 +93,8 @@ pub struct Decision {
     /// `SessionStart`, `CwdChanged`, `FileChanged` (T41): the files to watch next, the union of
     /// the handlers that set `watchPaths`; `None` when none did.
     pub watch_paths: Option<Vec<String>>,
+    /// The MCP response proposed by an elicitation hook. A block always overrides this.
+    pub elicitation: Option<piarc_protocol::mcp::ElicitationReply>,
     /// Each handler's verdict for the audit, in handler order.
     pub verdicts: Vec<&'static str>,
 }
@@ -232,6 +236,14 @@ impl Merger {
         match event {
             HookEvent::PreToolUse => self.pre_tool_use(o),
             HookEvent::PermissionRequest => self.permission_request(o),
+            HookEvent::PermissionDenied => {
+                if o.specific().and_then(|v| v.get("retry")) == Some(&Value::Bool(true)) {
+                    self.d.retry = true;
+                    "retry"
+                } else {
+                    "none"
+                }
+            }
             HookEvent::SessionEnd
             | HookEvent::PostCompact
             | HookEvent::Notification
@@ -262,6 +274,12 @@ impl Merger {
                         };
                         self.d.block.get_or_insert(reason);
                     }
+                }
+                if matches!(event, HookEvent::Elicitation | HookEvent::ElicitationResult) {
+                    if verdict == "block" {
+                        return verdict;
+                    }
+                    return self.elicitation(o);
                 }
                 if self.context_of(o) && verdict == "none" {
                     verdict = "context";
@@ -299,6 +317,39 @@ impl Merger {
             }
             _ => false,
         }
+    }
+
+    fn elicitation(&mut self, outcome: &Outcome) -> &'static str {
+        use piarc_protocol::mcp::ElicitationReply::{Accept, Cancel, Decline};
+
+        let (answer, verdict) = match outcome.specific_field("action") {
+            Some("accept") => {
+                let content = outcome.specific().and_then(|fields| fields.get("content"));
+                if content.is_some_and(|value| !value.is_object()) {
+                    self.d
+                        .errors
+                        .push("An elicitation hook returned invalid content.".into());
+                    return "error";
+                }
+                (
+                    Accept {
+                        content: content.and_then(Value::as_object).cloned(),
+                    },
+                    "accept",
+                )
+            }
+            Some("decline") => (Decline, "decline"),
+            Some("cancel") => (Cancel, "cancel"),
+            _ => return "none",
+        };
+        // The first accepting handler supplies the whole form. A refusal always prevails.
+        if self.d.elicitation.is_none()
+            || (matches!(self.d.elicitation, Some(Accept { .. }))
+                && !matches!(answer, Accept { .. }))
+        {
+            self.d.elicitation = Some(answer);
+        }
+        verdict
     }
 
     fn pre_tool_use(&mut self, o: &Outcome) -> &'static str {

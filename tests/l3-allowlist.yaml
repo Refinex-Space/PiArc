@@ -284,3 +284,5 @@ excluded:
     reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
   - scenario: perm-auto-unsure
     reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: hooks-m5-permission-denied
+    reason: The L3 classifier cannot be scripted to deny a specific call. PiArc runs PermissionDenied after a validated refusal and falls back to human approval when its reviewer has no verdict.

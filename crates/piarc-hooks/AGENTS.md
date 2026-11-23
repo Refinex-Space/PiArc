@@ -18,6 +18,7 @@ hooks 的通用部分（架构第 6.3 节，ADR-0039、ADR-0055）：配置解�
 |---|---|---|
 | UserPromptSubmit | Core | 会话请求发给 Agent Host 之前（`sessions/session.rs`） |
 | PreToolUse / PermissionRequest | Core | 裁决第 2、8 步（`tool_io/policy/hooks.rs`），运行前发 `policy/pending` |
+| PermissionDenied（T48） | Core | Auto 审查拒绝并写审计后；matcher 是工具名，输入含工具名、参数、调用 ID、审查理由。任一成功 handler 返回 `hookSpecificOutput.retry: true` 后，拒绝的结果提示可重新调用，下一次照常裁决 |
 | Notification | Core | 新审批卡 `permission_prompt`、回合结束 `idle_prompt` |
 | SessionStart、SessionEnd、PostToolUse、PostToolUseFailure、Stop、PreCompact、PostCompact | Agent Host | Pi 事件 → AHP `hooks/run`（`tool_io/hooks.rs` 应答，只接受这些与下面三个，按白名单取字段） |
 | SubagentStart（T38） | Agent Host | 子会话首次 `prompt` 之前（`ChildSession.run`）；matcher 是 Core 按 `Link` 取的 agent 类型 |

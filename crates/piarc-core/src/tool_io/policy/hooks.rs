@@ -56,7 +56,7 @@ fn tool_request(event: HookEvent, p: &PolicyEvaluateParams) -> Request {
     let mut fields = Map::new();
     fields.insert("tool_name".into(), json!(p.tool));
     fields.insert("tool_input".into(), Value::Object(input.clone()));
-    if event == HookEvent::PreToolUse {
+    if matches!(event, HookEvent::PreToolUse | HookEvent::PermissionDenied) {
         fields.insert("tool_use_id".into(), json!(p.tool_call_id));
     }
     if let Some(level) = &p.effort {
@@ -253,6 +253,31 @@ impl ToolIo {
             .await
             .decision
             .request
+    }
+
+    /// A retry invitation does not authorize the refused call. Every new call goes through
+    /// the decision ladder again.
+    pub(super) async fn reviewer_refused(
+        &self,
+        call: &super::review::Call<'_>,
+        reason: &str,
+    ) -> bool {
+        let Some(hooks) = self.hook_service() else {
+            return false;
+        };
+        let facts = self.session_facts(call.s, &call.p.session_id, call.generation.child_token());
+        let mut request = tool_request(HookEvent::PermissionDenied, call.p);
+        request.fields.insert("reason".into(), json!(reason));
+        let Some(plan) = hooks.plan_in(call.settings, &facts, &request) else {
+            return false;
+        };
+        working(call.peer, call.p).await;
+        let launch = self.exec.hook_launch().await;
+        hooks
+            .execute(&facts, &request, plan, launch)
+            .await
+            .decision
+            .retry
     }
 
     /// Applies a `PermissionRequest` allow's `updatedPermissions`: `addRules` to the session

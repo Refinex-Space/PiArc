@@ -105,7 +105,11 @@ const ENABLED: &str = r#"{"permissions":{"enableAutoMode":true},"autoMode":{"mod
 
 impl Fixture {
     async fn auto(user: &str, reviewer: &Arc<Reviewer>) -> Self {
-        let mut f = Self::fixed().await;
+        Self::fixed().await.with_reviewer(user, reviewer).await
+    }
+
+    async fn with_reviewer(mut self, user: &str, reviewer: &Arc<Reviewer>) -> Self {
+        let f = &mut self;
         // Every card sends `policy/pending` on the connection; nobody reads it here.
         let (_, idle) = tokio::sync::mpsc::channel(1);
         let mut frames = std::mem::replace(&mut f.frames, idle);
@@ -118,7 +122,7 @@ impl Fixture {
         f.io.changed_mode(SESSION, PermissionMode::Auto)
             .await
             .expect("switch");
-        f
+        self
     }
 
     fn rows(&self, kind: &str) -> Vec<Value> {
@@ -533,4 +537,53 @@ async fn a_subagents_review_names_it_and_counts_on_the_main_session() {
         status.state,
         piarc_protocol::policy::AutoReviewState::Paused
     );
+}
+
+/// PermissionDenied is advisory: it gets the effective input and a retry requires a new review.
+#[tokio::test]
+async fn permission_denied_retry_keeps_the_original_call_denied() {
+    let reviewer = Reviewer::new(vec![
+        answered("deny", "Outside the request."),
+        answered("deny", "Still outside."),
+    ]);
+    let mut settings: Value = serde_json::from_str(ENABLED).unwrap();
+    settings["hooks"] = json!({"PermissionDenied":[{"matcher":"Bash","hooks":[{
+        "type":"command","command":"node hook.mjs denial"
+    }]}]});
+    let f = Fixture::with_hooks(crate::tool_io::CommandEnv::process()).await;
+    std::fs::write(
+        f.work().join("hook.mjs"),
+        include_str!("../../../../../../tests/scenarios/fixtures/hooks/hook.mjs.txt"),
+    )
+    .unwrap();
+    std::fs::create_dir(f.work().join("hook-plans")).unwrap();
+    std::fs::write(
+        f.work().join("hook-plans/denial.json"),
+        r#"{"json":{"hookSpecificOutput":{"hookEventName":"PermissionDenied","retry":true}}}"#,
+    )
+    .unwrap();
+    let f = f.with_reviewer(&settings.to_string(), &reviewer).await;
+    for id in ["first", "retry"] {
+        let decision = f.command(id).await;
+        assert_eq!(decision["allowed"], false);
+        assert!(
+            decision["reason"]
+                .as_str()
+                .unwrap()
+                .contains("You may retry this tool call."),
+            "{decision}"
+        );
+    }
+    assert_eq!(reviewer.asked().len(), 2);
+    let calls = std::fs::read_to_string(f.work().join("hook-log/denial.jsonl")).unwrap();
+    let calls: Vec<Value> = calls
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(calls.len(), 2);
+    let input = &calls[0]["input"];
+    assert_eq!(input["tool_name"], "Bash");
+    assert_eq!(input["tool_use_id"], "first");
+    assert_eq!(input["tool_input"], json!({"command": "printenv HOME"}));
+    assert_eq!(input["reason"], "Outside the request.");
 }

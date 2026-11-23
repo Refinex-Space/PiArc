@@ -883,6 +883,12 @@ capabilities:
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T41
     status: active
+  - id: CAP-HOOK-PERMISSIONDENIED-001
+    title: 'Auto 审查拒绝后执行 PermissionDenied hook，并将重试提示随拒绝结果返回'
+    milestone: M5
+    refs: [FR-HN-05, ARCH-6.3.2]
+    task: T48
+    status: active
   - id: CAP-HOOK-M5-001
     title: 'WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks'
     milestone: M5

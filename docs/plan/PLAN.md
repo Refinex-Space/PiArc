@@ -320,7 +320,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
   - 配置解析与非法字段测试已通过（`cargo test -p piarc-config --lib skills`，15 项）。
 - [ ] A07：worktree 创建与移除 hooks。
 - [ ] A08：切换模型前的决策与切换后的上下文。
-- [ ] A09：Auto 审查拒绝后的 PermissionDenied hook 与重试提示。
+- [ ] A09：Core 已在审查拒绝后分发 PermissionDenied。真实 hook 的定向测试验证拒绝不执行、输入与理由、再次调用重新送审；`cargo test -p piarc-core --lib tool_io::policy::tests::t46` 8/8，`cargo test -p piarc-hooks` 54/54。L2 场景已写；沙箱内的 macOS `sandbox-exec` 无法启动 Agent Host，尚缺端到端证据。
 - [ ] A10：核对 pi-mcp 能力，按结果接入 elicitation 或记录上游阻塞，验证两个 hook。
 - [ ] A11：登记能力，运行 L2 并生成能力文档。
 - [ ] A12：架构与目录文档、界面验收、全量 verify 及 Windows CI 核对。

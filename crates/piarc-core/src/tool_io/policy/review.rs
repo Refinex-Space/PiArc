@@ -351,27 +351,21 @@ impl ToolIo {
         publish_root(call);
         self.audit_review(call, outcome, Some(&model), duration, Some(count))
             .await?;
-        let mut reason = format!(
-            "Permission denied by the automatic reviewer: {} {}",
-            checked.reason,
+        let guidance = if self.reviewer_refused(call, &checked.reason).await {
+            "You may retry this tool call. The new call will be reviewed independently."
+        } else {
             rules::DENIAL_NOTE
+        };
+        let mut reason = format!(
+            "Permission denied by the automatic reviewer: {} {guidance}",
+            checked.reason
         );
         if count.paused.is_some() {
             reason.push(' ');
             reason.push_str(rules::PAUSE_NOTE);
         }
-        self.reviewer_refused(call, &note);
         Ok(Reviewed::Deny(note, reason))
     }
-
-    /// T48's `PermissionDenied` hook runs here: the reviewer refused the call, the refusal is
-    /// in the audit, and the model has not read it yet. Failures go to the user and do not get
-    /// here.
-    #[expect(
-        clippy::unused_self,
-        reason = "the trigger point T48 fills; nothing runs here yet"
-    )]
-    fn reviewer_refused(&self, _call: &Call<'_>, _note: &ToolReview) {}
 
     /// Gives the card to the user with the reason: in place of the reviewing card (`posted`),
     /// or as a new card when no review ran (paused, unavailable).

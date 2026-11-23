@@ -17,6 +17,8 @@ pub enum HookEvent {
     PreToolUse,
     /// Before the user is asked to approve a tool call (step 8 of the decision ladder).
     PermissionRequest,
+    /// The Auto reviewer refused a tool call.
+    PermissionDenied,
     /// After a tool call succeeded.
     PostToolUse,
     /// After a tool call failed.
@@ -47,6 +49,10 @@ pub enum HookEvent {
     ConfigChange,
     /// A turn ended with a model API error after its retries (T41).
     StopFailure,
+    /// An MCP server requests information.
+    Elicitation,
+    /// Before an elicitation response is returned to its server.
+    ElicitationResult,
 }
 
 /// A handler type (the `type` field) PiArc runs.
@@ -128,12 +134,13 @@ impl Default for Timeouts {
 
 impl HookEvent {
     /// Every event, in Claude Code's documentation order.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 23] = [
         Self::SessionStart,
         Self::SessionEnd,
         Self::UserPromptSubmit,
         Self::PreToolUse,
         Self::PermissionRequest,
+        Self::PermissionDenied,
         Self::PostToolUse,
         Self::PostToolUseFailure,
         Self::Stop,
@@ -149,6 +156,8 @@ impl HookEvent {
         Self::FileChanged,
         Self::ConfigChange,
         Self::StopFailure,
+        Self::Elicitation,
+        Self::ElicitationResult,
     ];
 
     /// The configuration key and `hook_event_name`.
@@ -160,6 +169,7 @@ impl HookEvent {
             Self::UserPromptSubmit => "UserPromptSubmit",
             Self::PreToolUse => "PreToolUse",
             Self::PermissionRequest => "PermissionRequest",
+            Self::PermissionDenied => "PermissionDenied",
             Self::PostToolUse => "PostToolUse",
             Self::PostToolUseFailure => "PostToolUseFailure",
             Self::Stop => "Stop",
@@ -175,6 +185,8 @@ impl HookEvent {
             Self::FileChanged => "FileChanged",
             Self::ConfigChange => "ConfigChange",
             Self::StopFailure => "StopFailure",
+            Self::Elicitation => "Elicitation",
+            Self::ElicitationResult => "ElicitationResult",
         }
     }
 
@@ -207,6 +219,7 @@ impl HookEvent {
             HandlerKind::Prompt => matches!(
                 self,
                 Self::PreToolUse
+                    | Self::PermissionDenied
                     | Self::PermissionRequest
                     | Self::PostToolUse
                     | Self::PostToolUseFailure
@@ -226,6 +239,7 @@ impl HookEvent {
         matches!(
             self,
             Self::PreToolUse
+                | Self::PermissionDenied
                 | Self::PermissionRequest
                 | Self::PostToolUse
                 | Self::PostToolUseFailure
@@ -282,7 +296,9 @@ impl HookEvent {
             | Self::PreCompact
             | Self::PostToolBatch
             | Self::UserPromptExpansion
-            | Self::ConfigChange => ExitTwo::Blocks,
+            | Self::ConfigChange
+            | Self::Elicitation
+            | Self::ElicitationResult => ExitTwo::Blocks,
             Self::PostToolUse | Self::PostToolUseFailure => ExitTwo::ToModel,
             Self::SessionStart
             | Self::SessionEnd
@@ -291,7 +307,10 @@ impl HookEvent {
             | Self::InstructionsLoaded
             | Self::CwdChanged
             | Self::FileChanged => ExitTwo::ToUser,
-            Self::PermissionRequest | Self::Notification | Self::StopFailure => ExitTwo::Ignored,
+            Self::PermissionRequest
+            | Self::PermissionDenied
+            | Self::Notification
+            | Self::StopFailure => ExitTwo::Ignored,
         }
     }
 
@@ -327,9 +346,6 @@ pub const LATER_EVENTS: &[(&str, &str)] = &[
     ("WorktreeRemove", "T48"),
     ("PreModelSwitch", "T48"),
     ("PostModelSwitch", "T48"),
-    ("Elicitation", "T48"),
-    ("ElicitationResult", "T48"),
-    ("PermissionDenied", "T48"),
     ("TaskCreated", "unscheduled"),
     ("TaskCompleted", "unscheduled"),
     ("MessageDisplay", "unscheduled"),
