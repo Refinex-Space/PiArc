@@ -32,7 +32,7 @@ describe('ThrottledAnnouncer', () => {
     const seconds = 20;
     // One progress update per token (10 ms apart), each with a different word count.
     for (let token = 1; token <= seconds * 100; token++) {
-      announcer.progress(`Writing the reply: ${String(token)} words so far`);
+      announcer.progress(() => `Writing the reply: ${String(token)} words so far`);
       vi.advanceTimersByTime(10);
     }
     announcer.result('Reply: done.');
@@ -52,10 +52,10 @@ describe('ThrottledAnnouncer', () => {
   it('does not repeat the same text', () => {
     const published: string[] = [];
     const announcer = new ThrottledAnnouncer((text) => published.push(text), clock, 1000);
-    announcer.progress('Running Read a.ts');
-    announcer.progress('Running Read a.ts');
+    announcer.progress(() => 'Running Read a.ts');
+    announcer.progress(() => 'Running Read a.ts');
     vi.advanceTimersByTime(5000);
-    announcer.progress('Running Read a.ts');
+    announcer.progress(() => 'Running Read a.ts');
     vi.advanceTimersByTime(5000);
     expect(published).toEqual(['Running Read a.ts']);
   });
@@ -63,11 +63,31 @@ describe('ThrottledAnnouncer', () => {
   it('drops progress still waiting when the result comes', () => {
     const published: string[] = [];
     const announcer = new ThrottledAnnouncer((text) => published.push(text), clock, 1000);
-    announcer.progress('Running Read a.ts');
+    announcer.progress(() => 'Running Read a.ts');
     vi.advanceTimersByTime(200);
-    announcer.progress('Running Grep TODO');
+    announcer.progress(() => 'Running Grep TODO');
     announcer.result('Done.');
     vi.advanceTimersByTime(5000);
     expect(published).toEqual(['Running Read a.ts', 'Done.']);
   });
+});
+
+it('reads the latest progress only when an announcement is due', () => {
+  const publish = vi.fn();
+  const announcer = new ThrottledAnnouncer(publish, clock);
+  let words = 1;
+  const read = vi.fn(() => String(words));
+  announcer.progress(read);
+  for (let count = 2; count <= 500; count++) {
+    words = count;
+    announcer.progress(read);
+  }
+  expect(read).toHaveBeenCalledTimes(1);
+  vi.advanceTimersByTime(LIVE_ANNOUNCE.intervalMs);
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(publish).toHaveBeenLastCalledWith('500');
+  announcer.progress(read);
+  announcer.result('Finished');
+  vi.advanceTimersByTime(LIVE_ANNOUNCE.intervalMs);
+  expect(read).toHaveBeenCalledTimes(2);
 });

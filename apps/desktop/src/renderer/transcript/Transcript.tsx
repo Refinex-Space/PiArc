@@ -41,20 +41,27 @@ export function Transcript({
   }, [onFollow, follow, scroller]);
   const scrollerRef = useRef<HTMLElement | null>(null);
   scrollerRef.current = scroller;
-  // A row grew (layout phase): pin before paint when following.
+  // Several rows and their Markdown or highlighted children can commit together. Read the
+  // final geometry once before paint, after all their layout effects have run.
+  const pinPending = useRef(false);
   const onRowCommitted = useCallback(() => {
-    const element = scrollerRef.current;
-    if (element === null) {
-      return;
-    }
-    const metrics = {
-      scrollTop: element.scrollTop,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight,
-    };
-    if (follow.resized(metrics, performance.now())) {
-      pinToBottom(element, follow);
-    }
+    if (pinPending.current) return;
+    pinPending.current = true;
+    queueMicrotask(() => {
+      pinPending.current = false;
+      const element = scrollerRef.current;
+      if (!element?.isConnected) {
+        return;
+      }
+      const metrics = {
+        scrollTop: element.scrollTop,
+        scrollHeight: element.scrollHeight,
+        clientHeight: element.clientHeight,
+      };
+      if (follow.resized(metrics, performance.now())) {
+        pinToBottom(element, follow);
+      }
+    });
   }, [follow]);
   useEffect(() => {
     if (scroller === null || onReachTop === undefined) {

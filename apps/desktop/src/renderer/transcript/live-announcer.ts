@@ -20,8 +20,8 @@ export const WINDOW_CLOCK: AnnouncerClock = {
 
 export class ThrottledAnnouncer {
   #published: string | undefined;
-  #publishedAt = Number.NEGATIVE_INFINITY;
-  #waiting: string | undefined;
+  #checkedAt = Number.NEGATIVE_INFINITY;
+  #waiting: (() => string) | undefined;
   #timer: unknown;
 
   constructor(
@@ -31,10 +31,10 @@ export class ThrottledAnnouncer {
   ) {}
 
   /** What the agent is doing now; published when the interval allows. */
-  progress(text: string): void {
-    this.#waiting = text;
+  progress(read: () => string): void {
+    this.#waiting = read;
     if (this.#timer !== undefined) return;
-    const due = this.#publishedAt + this.intervalMs - this.clock.now();
+    const due = this.#checkedAt + this.intervalMs - this.clock.now();
     if (due <= 0) {
       this.#flush();
     } else {
@@ -53,18 +53,25 @@ export class ThrottledAnnouncer {
   }
 
   dispose(): void {
+    this.#waiting = undefined;
     this.#cancel();
   }
 
   #flush(): void {
-    const text = this.#waiting;
+    const read = this.#waiting;
     this.#waiting = undefined;
-    if (text !== undefined && text !== this.#published) this.#emit(text);
+    if (read === undefined) return;
+    const text = read();
+    if (text === this.#published) {
+      this.#checkedAt = this.clock.now();
+    } else {
+      this.#emit(text);
+    }
   }
 
   #emit(text: string): void {
     this.#published = text;
-    this.#publishedAt = this.clock.now();
+    this.#checkedAt = this.clock.now();
     this.publish(text);
   }
 

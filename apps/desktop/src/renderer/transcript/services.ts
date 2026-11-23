@@ -67,21 +67,40 @@ export interface TranscriptServices {
   readonly renderCounter: RenderCounter | null;
 }
 
-/** Starts the two workers and the streaming driver. */
+/** Empty windows keep the streaming driver, but allocate workers only for their first use. */
 export function createTranscriptServices(renderCounter: RenderCounter | null): TranscriptServices {
-  const markdownWorker = new Worker(new URL('../workers/markdown.worker.ts', import.meta.url), {
-    type: 'module',
-    name: 'piarc-markdown',
-  });
-  const highlightWorker = new Worker(new URL('../workers/highlight.worker.ts', import.meta.url), {
-    type: 'module',
-    name: 'piarc-highlight',
-  });
-  const markdown = new MarkdownClient(markdownWorker);
+  let markdownClient: MarkdownClient | undefined;
+  let highlightClient: HighlightClient | undefined;
+  const markdown = () => {
+    markdownClient ??= new MarkdownClient(
+      new Worker(new URL('../workers/markdown.worker.ts', import.meta.url), {
+        type: 'module',
+        name: 'piarc-markdown',
+      }),
+    );
+    return markdownClient;
+  };
   return {
-    markdown,
-    highlight: new HighlightClient(highlightWorker),
-    driver: new StreamingDriver(markdown, window),
+    get markdown() {
+      return markdown();
+    },
+    get highlight() {
+      highlightClient ??= new HighlightClient(
+        new Worker(new URL('../workers/highlight.worker.ts', import.meta.url), {
+          type: 'module',
+          name: 'piarc-highlight',
+        }),
+      );
+      return highlightClient;
+    },
+    driver: new StreamingDriver(
+      {
+        stream: (...args) => {
+          markdown().stream(...args);
+        },
+      },
+      window,
+    ),
     heights: new RowHeights(),
     expansion: new Expansion(),
     renderCounter,

@@ -27,7 +27,7 @@ export class StreamingDriver {
   private lastFrameAt: number | null = null;
 
   constructor(
-    private readonly markdown: MarkdownClient,
+    private readonly markdown: Pick<MarkdownClient, 'stream'>,
     private readonly scheduler: FrameScheduler,
   ) {}
 

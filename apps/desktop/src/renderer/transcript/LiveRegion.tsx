@@ -12,7 +12,7 @@ import { LIVE_ANNOUNCE } from './constants.js';
 import { ThrottledAnnouncer, type AnnouncerClock } from './live-announcer.js';
 import { ERROR_TITLE } from './rows/status.js';
 import { targetOf } from './rows/summary.js';
-import { useShownRowIds, useTranscriptRow, useTranscriptView, useTurn } from './services.js';
+import { useShownRowIds, useTranscriptView, useTurn } from './services.js';
 
 type Translate = (id: MessageId, values?: Record<string, string | number>) => string;
 
@@ -84,15 +84,28 @@ export function LiveRegion({ clock }: { readonly clock?: AnnouncerClock }) {
     const row = transcript.row(id);
     return row?.kind === 'item' && row.item.type === 'agentMessage';
   });
-  const reply = useTranscriptRow(replyId ?? '');
   const [text, setText] = useState('');
   const announcer = useRef<ThrottledAnnouncer | null>(null);
   announcer.current ??= new ThrottledAnnouncer(setText, clock);
   useEffect(() => () => announcer.current?.dispose(), []);
-  const progress = turn.running ? progressText(turn, transcript, reply, t) : undefined;
   useEffect(() => {
-    if (progress !== undefined) announcer.current?.progress(progress);
-  }, [progress]);
+    if (!turn.running) return;
+    // Streaming text lives in the store. A delta only schedules a read: counting and
+    // formatting the growing reply happen when the live region can publish it.
+    const read = () =>
+      progressText(
+        turn,
+        transcript,
+        replyId === undefined ? undefined : transcript.row(replyId),
+        t,
+      );
+    const changed = () => {
+      announcer.current?.progress(read);
+    };
+    const stop = replyId === undefined ? undefined : transcript.subscribeRow(replyId, changed);
+    changed();
+    return stop;
+  }, [turn, transcript, replyId, t]);
   // The turn that was running; its end announces its result.
   const running = useRef<string | undefined>(undefined);
   useEffect(() => {
