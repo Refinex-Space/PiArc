@@ -81,3 +81,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0063](0063-app-memory-physical-footprint.md) | "应用全部进程合计"按物理占用（macOS `phys_footprint`、Windows 私有工作集）测量，预算数值不变，RSS 合计只作参考（修订第 11 章一行的口径，放宽） | 已接受 |
 | [0064](0064-trust-decision-native-confirmation.md) | "信任"项目的决定经主进程原生确认，列出将生效的可执行项；暂不信任与撤销不需要（修订 ADR-0029 的备选方案结论） | 已接受（实现登记 I223） |
 | [0065](0065-managed-http-hook-allowlists.md) | HTTP hook 的 URL 和请求头变量白名单按键取最高托管来源的整份值，支持空名单。未托管的键继续跨层合并。 | 已接受（修订 ADR-0055 第 8 条） |
+| [0066](0066-fork-tool-declarations.md) | fork 继承父会话的工具声明，调用仍受子会话权限及深度限制（拟修订 ADR-0048 第 4 条） | 提议 |
