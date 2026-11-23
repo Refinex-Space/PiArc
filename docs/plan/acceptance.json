@@ -4773,8 +4773,8 @@
       "id": "T49-A11",
       "task": "T49",
       "description": "跳转列表条目的生成与启动参数路由有单元测试，并在 Windows CI 上通过；实机显示与点击由 W4 验证。验证：Windows CI 测试输出。",
-      "status": "blocked",
-      "evidence": "本地运行跳转列表分类、排序、条目移除、固定任务、路径转义、AUMID 一致性和单实例路由的定向用例通过，见 tmp/evidence/T49/shortcuts-vitest.log。Windows CI 尚无包含本任务的运行；W4 的实机步骤见 PLAN.md 的 I229。"
+      "status": "passing",
+      "evidence": "Windows x64 CI（cdb81a0）：jump-list.test.ts 2/2、launch.test.ts 7/7，Vitest 171 个文件 1844/1844 通过。https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269417 。同作业 L2 240 通过、15 项仅其他平台；全量 16/17，Rust 内置命令枚举断言缺少 btw，已由后续本地提交 6a562f6 补齐。跳转列表的实机显示与点击由 W4/I229 验证。"
     },
     {
       "id": "T49-A12",
