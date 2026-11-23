@@ -35,12 +35,18 @@ approvals:
 expect:
   request_counts: { main: 4 }
   requests:
-    - { index: 1, tool_results: [{ id: one, is_error: false, contains: '"release":"automatic"' }] }
-    - { index: 2, tool_results: [{ id: two, is_error: false, contains: '"action":"decline"' }] }
-    - {
-        index: 3,
-        tool_results: [{ id: three, is_error: false, contains: '"release":"normalized"' }],
-      }
+    - index: 1
+      tool_results:
+        - &one { id: one, is_error: false, contains: '"release":"automatic"' }
+    - index: 2
+      tool_results:
+        - *one
+        - &two { id: two, is_error: false, contains: '"action":"decline"' }
+    - index: 3
+      tool_results:
+        - *one
+        - *two
+        - { id: three, is_error: false, contains: '"release":"normalized"' }
   json_lines:
     hook-log/after.jsonl:
       - {

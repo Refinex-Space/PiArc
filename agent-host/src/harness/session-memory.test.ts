@@ -255,6 +255,29 @@ it('keeps tool results ahead of Anthropic memory blocks, preserving cache metada
   expect(anthropicMemoryPayload({ messages: [first] })).toBeUndefined();
 });
 
+it('joins the fork task to its launching tool result and preserves inherited steer boundaries', async () => {
+  const result = (id: string) => ({ type: 'tool_result', tool_use_id: id, content: 'Done' });
+  const tool = result('launch');
+  const prefix = [
+    { role: 'user', content: [result('prior')] },
+    { role: 'user', content: 'Steer the parent.' },
+    { role: 'assistant', content: [{ type: 'tool_use', id: 'launch', name: 'Agent', input: {} }] },
+  ];
+  const payload = {
+    messages: [
+      ...prefix,
+      { role: 'user', content: [tool] },
+      { role: 'user', content: 'Child task.' },
+    ],
+  };
+  const manager = SessionManager.inMemory(cwd);
+  expect(await harness(manager).wire(payload)).toBeUndefined();
+  manager.appendCustomEntry('piarc.subagent', { toolCallId: 'launch', forkedAt: 'parent-leaf' });
+  expect(await harness(manager).wire(payload)).toEqual({
+    messages: [...prefix, { role: 'user', content: [tool, { type: 'text', text: 'Child task.' }] }],
+  });
+});
+
 it('splits the frozen Anthropic system at the project section without changing the bytes or cache TTL', async () => {
   const session = harness(SessionManager.inMemory(cwd));
   const { systemPrompt } = await session.start();

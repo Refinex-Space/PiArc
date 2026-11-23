@@ -37,33 +37,42 @@ approvals:
 expect:
   request_counts: { main: 7 }
   requests:
-    - {
-        provider: main,
-        index: 1,
-        tool_results: [{ id: form1, is_error: false, contains: '"release":"milestone"' }],
-      }
-    - {
-        provider: main,
-        index: 2,
-        tool_results: [{ id: url1, is_error: false, contains: '"action":"accept"' }],
-      }
-    - {
-        provider: main,
-        index: 3,
-        tool_results: [{ id: form2, is_error: false, contains: '"action":"decline"' }],
-      }
-    - {
-        provider: main,
-        index: 4,
-        tool_results: [{ id: url2, is_error: false, contains: '"action":"decline"' }],
-      }
-    - {
-        provider: main,
-        index: 5,
-        tool_results: [{ id: form3, is_error: false, contains: '"action":"cancel"' }],
-      }
-    - {
-        provider: main,
-        index: 6,
-        tool_results: [{ id: url3, is_error: false, contains: '"action":"cancel"' }],
-      }
+    - index: 1
+      provider: main
+      tool_results:
+        - &form1 { id: form1, is_error: false, contains: '"release":"milestone"' }
+    - index: 2
+      provider: main
+      tool_results:
+        - *form1
+        - &url1 { id: url1, is_error: false, contains: '"action":"accept"' }
+    - index: 3
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - &form2 { id: form2, is_error: false, contains: '"action":"decline"' }
+    - index: 4
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - *form2
+        - &url2 { id: url2, is_error: false, contains: '"action":"decline"' }
+    - index: 5
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - *form2
+        - *url2
+        - &form3 { id: form3, is_error: false, contains: '"action":"cancel"' }
+    - index: 6
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - *form2
+        - *url2
+        - *form3
+        - { id: url3, is_error: false, contains: '"action":"cancel"' }
