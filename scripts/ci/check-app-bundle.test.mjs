@@ -34,6 +34,7 @@ it('ships late imports, excludes old chunks and detects a missing or changed pac
       [path.join(runtime, 'bin/rg.exe'), 'rg'],
       [path.join(runtime, 'bin/fd.exe'), 'fd'],
       [path.join(bundle, 'pi-assets/package.json'), '{}'],
+      [path.join(bundle, 'pi-assets/old-build.mjs'), 'stale'],
       [path.join(repoRoot, 'node_modules/@silvia-odwyer/photon-node/package.json'), '{}'],
       [path.join(bundle, 'agent-host.mjs'), `import "./chunks/${entry}";\n`],
       [path.join(bundle, 'bundle-files.json'), JSON.stringify({ entry, files })],
@@ -50,6 +51,9 @@ it('ships late imports, excludes old chunks and detects a missing or changed pac
       resourcesDir,
       platform: 'win32',
       arch: 'x64',
+    });
+    await expect(readFile(path.join(target, 'pi-assets/old-build.mjs'))).rejects.toMatchObject({
+      code: 'ENOENT',
     });
     const installed = path.join(target, 'chunks', late);
     expect(await readFile(installed, 'utf8')).toBe(modules[late]);

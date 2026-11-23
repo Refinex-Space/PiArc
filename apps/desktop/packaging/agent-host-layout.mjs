@@ -103,9 +103,8 @@ export async function copyAgentHostResources({ repoRoot, resourcesDir, platform,
   // Use the entry from the same manifest, even when another development build just finished.
   await writeFile(path.join(target, layout.bundle), entrySource(manifest.entry));
   await writeFile(path.join(target, BUNDLE_MANIFEST), JSON.stringify(manifest) + '\n');
-  await cp(path.join(bundleDir, layout.piAssets), path.join(target, layout.piAssets), {
-    recursive: true,
-  });
+  await mkdir(path.join(target, layout.piAssets));
+  await cp(path.join(bundleDir, layout.piPackageJson), path.join(target, layout.piPackageJson));
   for (const name of AGENT_HOST_EXTERNALS) {
     await cp(
       path.join(repoRoot, 'node_modules', name),
