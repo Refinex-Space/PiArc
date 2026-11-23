@@ -3555,8 +3555,8 @@
       "id": "T35-A11",
       "task": "T35",
       "description": "同一工作区 3 个并行会话（至少 1 个在独立 worktree）加 1 个子 agent 的稳态内存满足第 11 章预算（Agent Host 按活动会话数计算的上限、应用其余进程合计上限）。验证：测量脚本输出与 `docs/perf/M3-memory.md`。",
-      "status": "failing",
-      "evidence": "`npm run perf:m3 -- --form packaged`（3 次，M1 Max 32 GB，`tmp/evidence/T35/m3-memory.json`、`docs/perf/M3-memory.md`）：Agent Host 中位 222 / 最大 238 MB，满足 270 MB 上限；应用其余进程合计中位 566 / 最大 576 MB，超出 macOS 510 MB 上限。没有会话时基线已 505 MB，超出部分在主进程原生内存与渲染进程，登记 I146（R4），预算不放宽"
+      "status": "passing",
+      "evidence": "Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。"
     },
     {
       "id": "T35-A12",

@@ -107,3 +107,6 @@ R4 在 T35 的场景上加了 T35 之后的能力：项目 `.mcp.json` 里一个
 
 空闲（打开工作区、没有会话）时物理占用 190 MB、RSS 517 MB。M3 的内存退出标准在 macOS 上按新口径达标；Windows 由 W4 用同一脚本复测（W3 用性能计数器测得的私有工作集为 256 MB）。
 
+## 2026-11-24 收尾复测
+
+Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。
