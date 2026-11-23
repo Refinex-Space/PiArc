@@ -120,7 +120,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 ## 自动记忆（`auto_memory`，T47，设计增补第 1–4 节）
 
 - `auto_memory::Store` 是记忆目录唯一的读写方：`<数据目录>/auto-memory/<目录名-路径哈希12位>/`，键取主 checkout（`piarc_git::resolve(..).main`，worktree 共用），主题文件的 frontmatter 与索引 `MEMORY.md` 都由 Core 写，模型不写索引；上限 `MAX_TOPIC_BYTES`、`MAX_TOPICS`、`INDEX_LINES`、`INDEX_BYTES`。`import_claude` 只读 `~/.claude/projects/<项目键>/memory/`（`claude_dir`）复制一次，不写 `.claude/`。
-- 模型侧在 `tool_io/auto_memory.rs`：`memory/status`（开关与是否给 `Memory` 工具：未信任项目、子会话没有工具）、`memory/apply`（消费同一调用的授权，读、存、删，每次改动一行 `kind: "memory"` 审计）；`fs/memory` 快照的最后一个文件是截断后的索引（`kind: "autoMemory"`）。开关的读取只经 `auto_memory_on`。
+- 模型侧在 `tool_io/auto_memory.rs`：`memory/status`（开关与是否给 `Memory` 工具：未信任项目、子会话没有工具）、`memory/apply`（消费同一调用的授权，读、存、删，每次改动一行 `kind: "memory"` 审计）；`fs/memory` 快照的最后一个文件是截断后的索引（`kind: "autoMemory"`）。开关的读取只经 `auto_memory_on`。 信任和开关在实际读取主题时也要检查，包括压缩恢复。索引可在未信任主会话加载，200 行与 25 KiB 包含标题和截断提示。导入与编辑按记忆目录取同一把写锁，同名目标即使格式损坏也保留。
 - 用户侧在 `sessions/memory.rs`：`Hub::memory_view`、`memory_edit`（NAPI `memoryView`、`memoryEdit`：存、删、全部删除、导入、开关），改动同样写 `kind: "memory"` 审计（`by: user`、`import`），开关经设置写入函数（用户层或 `.piarc/settings.local.json`，项目只能关闭）。
 - 测试：`cargo test -p piarc-core --lib auto_memory` 与 `--lib tool_io::policy::tests::t47`；L2 `memory-auto-*`。
 

@@ -273,7 +273,7 @@ frontmatter 由 Core 按工具参数生成，模型给不出 `modified`、`sessi
   - 锁类键（`allowManaged*Only`、`disableAutoMode`、`permissions.enableBypassPermissions: false`、`permissions.enableAutoMode: false`）取最严：任一来源开启即开启。
   - 其他标量按来源顺序，高者胜出。
   - 列表拼接去重；但 `allowedMcpServers` 与 `sandbox.network.allowedDomains` 在对应的 `allowManaged*Only` 开启时取设置了它的最高来源的整份，不做并集（并集会放宽白名单）。
-  - `allowedHttpHookUrls` 和 `httpHookAllowedEnvVars` 各自取设置该键的最高托管来源的整份值，空列表也接管。类型或元素错误时记录诊断并对该名单按空值列表执行。移除所有托管来源中的该键后恢复普通层合并（ADR-0065）。
+  - `allowedHttpHookUrls` 和 `httpHookAllowedEnvVars` 各自取设置该键的最高托管来源的整份值，空列表也接管。类型或元素错误时记录诊断并对该名单按空列表执行。移除所有托管来源中的该键后恢复普通层合并（ADR-0065）。
   - `mcpServers` 同名取高者的整条定义。
 - 理由：同一台电脑上的几个来源都由管理员放置，合并让每一份的 deny 与锁都生效；只取一份会让较低来源的限制悄悄失效。Claude Code 默认只取一份，它的 `managedSourcesBehavior` 在 PiArc 里忽略。
 - 配置诊断按来源各列一份报告（第 8.3 节），合并后的值在"企业"层下显示。
@@ -333,7 +333,7 @@ Core 启动失败时返回结构化错误 `managedSettingsInvalid`（`details` �
 
 | 部分 | 位置 |
 |---|---|
-| 协议 | `piarc-protocol`：`memory/apply`（Agent Host → Core，能力 `autoMemory`）、`MemoryFile.kind`、Core API 的记忆页类型与托管状态（`ManagedSettingsState`、来源状态、锁定列表）、错误 `managedSettingsInvalid`；`npm run gen:protocol` 与契约样本 |
+| 协议 | `piarc-protocol`：`memory/apply`（Agent Host → Core，能力 `autoMemory`）、`MemoryFile.kind`、Core API 的记忆页类型与托管状态（来源状态、锁定列表由 `managedSettings` 提供）、错误 `managedSettingsInvalid`；`npm run gen:protocol` 与契约样本 |
 | 托管解析与合并 | `piarc-config::managed`：来源文档 → 合并值（第 6.3 节规则）、每来源报告、托管专属键表、Claude Code 托管文档经 `claude::SETTINGS_KEYS` 投影、`locked(pointer)` 判断；`claude.rs` 中 `autoMemoryEnabled`、`allowedMcpServers`、`deniedMcpServers`、`sandbox.network.allowManagedDomainsOnly` 改为生效，`autoMemoryDirectory` 改为忽略 |
 | 平台读取 | `piarc-ports` 新增窄 trait（读托管来源，返回原始文档与位置），实现在 `piarc-core::managed`：文件与片段（两平台）、plist（macOS，`plist` crate）、注册表（Windows，`windows-registry` crate）；库的选择按补充型决策处理并过 cargo-deny |
 | Core 装配 | `piarc-core::managed`：启动读取、轮询、快照；`DataDirs::layers` 插入 `enterprise` 层（所有读设置的入口自动带上，`tool_io/memory.rs`、`hooks_m4.rs` 两处直接建表的改用它）；写入的锁定检查；诊断来源；`ConfigChange` |
@@ -341,10 +341,20 @@ Core 启动失败时返回结构化错误 `managedSettingsInvalid`（`details` �
 | 自动记忆 | `piarc-core` 新模块：项目键、目录、锁、主题与索引、导入、审计；`tool_io` 应答 `memory/apply` 并消费授权；`fs/memory` 快照加索引 |
 | Agent Host | `harness/auto-memory.ts`（`Memory` 工具、第 2 段指引、本会话写入后的摘要记录）、`prompts/auto-memory.ts`、`reinjection.ts` 的新上限、投影的 transcript 行 |
 | 客户端 | 设置的"记忆"页、锁定标识与判断函数、`/memory`、transcript 行、托管配置无效时的启动错误对话框；新页面与行类型登记到 `e2e/a11y/states.ts`（T43） |
-| L2 与能力 | `tests/scenarios/memory-auto-*.yaml`、`managed-*.yaml`，能力 `CAP-CX-AUTOMEM-*`、`CAP-CFG-MANAGED-*` |
+| L2 与能力 | `tests/scenarios/memory-auto-*.yaml`、`managed-*.yaml`，能力 `CAP-MEM-AUTO-*`、`CAP-CONFIG-MANAGED-*` |
 | 文档 | `crates/piarc-config`、`agent-host` 的 AGENTS.md；`coding-standards.md` 复用表登记"托管来源读取""托管锁定判断" |
 
 测试要点：托管优先级矩阵（同一键在会话、项目、用户、托管层同时设置，托管胜出；列表合并且托管 deny 在第 1 步拒绝）；非管理员来源（6.2）放了配置也不生效；两套 Claude Code 布局的夹具；格式错误的四种情况；轮询生效与 `ConfigChange` 不可阻断；记忆的 worktree 共享与仓库隔离、导入前后 `.claude/` 快照不变、关闭后请求里没有索引与工具。
+
+### 9.1 实现细化（2026-11-23）
+
+| 入口 | 实际行为 |
+|---|---|
+| 记忆存储与注入 | `auto_memory::Store` 以 `piarc_git::resolve` 返回的主 checkout 归属笔记。同一记忆目录的写入共用 `piarc_fs::PathLocks`。导入时在锁内检查同名文件，已有文件即使无法解析也保留。主会话经 `fs/memory` 取得标有 `autoMemory` 的索引，加入第 4 段；标题、空行与截断提示均计入 200 行和 25 KiB 的上限。完整索引和主题文件保存在磁盘。 |
+| 工具与压缩 | `memory/status` 在打开会话时决定是否提供 `Memory`。Core 在 `memory/apply` 实际读写及压缩后恢复正文时再核对开关和信任。工具调用经同一调用授权；压缩恢复只读取指定主题。撤销信任后，主会话仍可见索引。 |
+| 平台策略与刷新 | 生产由 `SystemPolicy` 定位系统来源，测试经 `ManagedConfig.store` 注入 `FixedPolicy`，Windows 注册表用临时测试键。`ManagedSettings` 轮询并发布快照；工作区正在注册文件监听时也会处理托管变化。 |
+| 设置界面 | preload 增加 `managedSettings`、`memoryView`、`memoryEdit`、`revealMemory`。设置页切换或窗口重新获得焦点时，`ManagedProvider` 刷新锁定视图。显示文件夹时主进程从 Core 获取目录。 |
+| 场景与能力 | `memory-auto-*` 覆盖 `CAP-MEM-AUTO-001` 和 `CAP-MEM-AUTO-OFF-001`。`managed-*` 覆盖 `CAP-CONFIG-MANAGED-001` 及其 HOOKS、CLAUDE、CHANGE 三项。设置操作与 transcript 截图由 `t47-memory.e2e.ts` 生成。 |
 
 ## 10. 与已有设计的关系
 

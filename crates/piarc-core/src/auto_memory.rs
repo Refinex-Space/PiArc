@@ -20,7 +20,7 @@
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, PoisonError};
+use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
@@ -53,9 +53,8 @@ pub const INDEX_BYTES: usize = 25 * 1024;
 /// The kinds of memory (Claude Code's four).
 pub const TYPES: [&str; 4] = ["user", "feedback", "project", "reference"];
 
-/// Serializes writes of every project's memory: one save, delete or import at a time, so a
-/// topic and the index it is listed in change together.
-static WRITER: Mutex<()> = Mutex::new(());
+/// Serializes changes to the topics and index of the same repository across Core sessions.
+static WRITERS: LazyLock<piarc_fs::PathLocks> = LazyLock::new(piarc_fs::PathLocks::default);
 
 /// Why a memory operation was refused.
 #[derive(Debug, thiserror::Error)]
@@ -288,6 +287,11 @@ impl Store {
     /// The name, type, description or size is not acceptable, the project is full, or the
     /// write failed (the files are then unchanged).
     pub fn save(&self, topic: &NewTopic<'_>, by: &str) -> Result<Saved, MemoryError> {
+        let _writer = WRITERS.lock(&self.dir.to_string_lossy());
+        self.save_locked(topic, by)
+    }
+
+    fn save_locked(&self, topic: &NewTopic<'_>, by: &str) -> Result<Saved, MemoryError> {
         if !valid_name(topic.name) {
             return Err(MemoryError::Name(topic.name.to_owned()));
         }
@@ -305,7 +309,6 @@ impl Store {
         if body.len() > MAX_TOPIC_BYTES {
             return Err(MemoryError::TooLarge(body.len()));
         }
-        let _writer = WRITER.lock().unwrap_or_else(PoisonError::into_inner);
         let existing = self.list()?;
         let created = !existing.iter().any(|t| t.name == topic.name);
         if created && existing.len() >= MAX_TOPICS {
@@ -343,7 +346,7 @@ impl Store {
     ///
     /// No memory has the name, or a file operation failed.
     pub fn delete(&self, name: &str) -> Result<Topic, MemoryError> {
-        let _writer = WRITER.lock().unwrap_or_else(PoisonError::into_inner);
+        let _writer = WRITERS.lock(&self.dir.to_string_lossy());
         let topic = self
             .read(name)?
             .ok_or_else(|| MemoryError::Missing(name.to_owned()))?;
@@ -375,22 +378,30 @@ impl Store {
         if topics.is_empty() {
             return Ok(None);
         }
-        let mut text = format!("{}\n\n", HEADING);
+        let full = index(&topics);
+        if full.len() <= INDEX_BYTES && full.lines().count() <= INDEX_LINES {
+            return Ok(Some(full));
+        }
+        let notice = |omitted| {
+            format!(
+                "\n({omitted} more memories are not listed here; read the full index with the Memory tool.)\n"
+            )
+        };
+        let mut text = format!("{HEADING}\n\n");
+        let heading_lines = text.lines().count();
+        let longest_notice = notice(topics.len());
+        let entry_limit = INDEX_LINES - heading_lines - longest_notice.lines().count();
+        let byte_limit = INDEX_BYTES - longest_notice.len();
         let mut shown = 0;
-        for topic in &topics {
-            let next = format!("{}\n", line(topic));
-            if shown >= INDEX_LINES || text.len() + next.len() > INDEX_BYTES - 120 {
+        for entry in full.lines().skip(heading_lines).take(entry_limit) {
+            if text.len() + entry.len() + 1 > byte_limit {
                 break;
             }
-            text.push_str(&next);
+            text.push_str(entry);
+            text.push('\n');
             shown += 1;
         }
-        if shown < topics.len() {
-            text.push_str(&format!(
-                "\n({} more memories are not listed here; read the full index with the Memory tool.)\n",
-                topics.len() - shown
-            ));
-        }
+        text.push_str(&notice(topics.len() - shown));
         Ok(Some(text))
     }
 
@@ -429,9 +440,22 @@ impl Store {
                 }
             };
             let topic = claude_topic(&stem, &text);
-            if self.read(&topic.name).ok().flatten().is_some() {
-                out.skipped.push(topic.name);
+            if !valid_name(&topic.name) {
+                out.refused
+                    .push((stem, MemoryError::Name(topic.name).to_string()));
                 continue;
+            }
+            let _writer = WRITERS.lock(&self.dir.to_string_lossy());
+            match std::fs::symlink_metadata(self.dir.join(format!("{}.md", topic.name))) {
+                Ok(_) => {
+                    out.skipped.push(topic.name);
+                    continue;
+                }
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => {
+                    out.refused.push((stem, e.to_string()));
+                    continue;
+                }
             }
             let new = NewTopic {
                 name: &topic.name,
@@ -439,7 +463,7 @@ impl Store {
                 kind: &topic.kind,
                 body: &topic.body,
             };
-            match self.save(&new, "import") {
+            match self.save_locked(&new, "import") {
                 Ok(_) => out.imported.push(topic.name),
                 Err(error) => out.refused.push((stem, error.to_string())),
             }
@@ -452,7 +476,8 @@ impl Store {
         std::fs::create_dir_all(&self.dir)?;
         let marker = self.dir.join(PROJECT_FILE);
         if !marker.exists() {
-            let record = json!({ "checkout": piarc_fs::display(&self.checkout) });
+            let record =
+                json!({ "checkout": piarc_fs::display(&self.checkout), "created": now_iso() });
             replace(&marker, &format!("{record:#}\n"))?;
         }
         Ok(())

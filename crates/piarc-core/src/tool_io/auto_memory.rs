@@ -81,10 +81,7 @@ impl ToolIo {
     pub(super) async fn memory_status(&self, p: MemoryStatusParams) -> Result<Value, ErrorObject> {
         let s = self.session(&p.session_id)?;
         let enabled = s.subagent.is_none() && self.auto_memory_on(s.project()).await;
-        let trusted = match &self.policy {
-            Some(services) => services.trust.state(s.project()).await.is_trusted(),
-            None => false,
-        };
+        let trusted = self.memory_trusted(&s).await;
         to_value(&MemoryStatusResult {
             enabled,
             tool: enabled && trusted,
@@ -113,24 +110,20 @@ impl ToolIo {
                 false,
             ));
         }
+        if !self.memory_trusted(&s).await {
+            return Err(policy::denied(
+                "This project is not trusted: the Memory tool is unavailable.",
+            ));
+        }
         let store = self.memory_store(s.project()).await?;
         let result = match p.action {
             MemoryAction::Read => read(store, p.name).await?,
-            MemoryAction::Save | MemoryAction::Delete => {
-                if !p.restore && !self.memory_writable(&s).await {
-                    return Err(ErrorObject::new(
-                        ErrorKind::PermissionDenied,
-                        "This project is not trusted: memories are not saved or deleted here.",
-                        false,
-                    ));
-                }
-                self.write_memory(&s, &p, store).await?
-            }
+            MemoryAction::Save | MemoryAction::Delete => self.write_memory(&s, &p, store).await?,
         };
         to_value(&result)
     }
 
-    async fn memory_writable(&self, s: &SessionIo) -> bool {
+    async fn memory_trusted(&self, s: &SessionIo) -> bool {
         match &self.policy {
             Some(services) => services.trust.state(s.project()).await.is_trusted(),
             None => false,

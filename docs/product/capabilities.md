@@ -12,7 +12,7 @@
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
 | M4 | 31 | 31 | 0 | 0 |
-| M5 | 14 | 8 | 6 | 0 |
+| M5 | 18 | 14 | 4 | 0 |
 
 ## M1
 
@@ -225,9 +225,13 @@
 |---|---|---|---|---|---|
 | CAP-AGENT-FORK-001 | fork 模式子 agent 继承父会话历史并共享缓存 | ARCH-6.15 | T48 | — | 计划中 |
 | CAP-CHAT-SIDE-001 | 侧边对话基于当前上下文提问，不写入主对话 | FR-CH-08 | T49 | — | 计划中 |
-| CAP-CONFIG-MANAGED-001 | 企业托管配置（兼容读取 Claude Code 的托管文件） | ARCH-6.14 | T47 | — | 计划中 |
+| CAP-CONFIG-MANAGED-001 | 企业托管配置是最高层：托管 deny 在裁决第 1 步生效，列表与其他层合并，标量覆盖其他层 | ARCH-6.14、ARCH-6.2.3 | T47 | `managed-precedence` | 已实现 |
+| CAP-CONFIG-MANAGED-CHANGE-001 | 托管配置变化在下一次检查内生效，ConfigChange hook 不能阻断，运行中变坏的文件沿用上次内容 | ARCH-6.14、ARCH-6.3.2 | T47 | `managed-change` | 已实现 |
+| CAP-CONFIG-MANAGED-CLAUDE-001 | 兼容读取 Claude Code 的托管文件（macOS 与 Windows 两套布局），不支持的键在配置诊断中列为已忽略 | ARCH-6.14 | T47 | `managed-claude-code-macos`<br>`managed-claude-code-windows` | 已实现 |
+| CAP-CONFIG-MANAGED-HOOKS-001 | "只允许托管 hooks"：只运行托管 hooks，跳过的 hooks 写入审计 | ARCH-6.3.1 | T47 | `managed-hooks-only` | 已实现 |
 | CAP-HOOK-M5-001 | WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks | FR-HN-05、ARCH-6.3.2 | T48 | — | 计划中 |
-| CAP-MEM-AUTO-001 | 自动记忆（跨会话笔记） | FR-CX-05 | T47 | — | 计划中 |
+| CAP-MEM-AUTO-001 | 自动记忆：模型经 `Memory` 工具由 Core 保存笔记并审计，新会话第 4 段带索引，笔记正文读取后才进上下文，压缩后恢复 | FR-CX-05、ARCH-6.6.2 | T47 | `memory-auto-compact`<br>`memory-auto-save` | 已实现 |
+| CAP-MEM-AUTO-OFF-001 | 自动记忆关闭或项目未受信任时没有 `Memory` 工具（关闭时也没有索引）；项目文件只能关闭自动记忆 | FR-CX-05、ARCH-10.2 | T47 | `memory-auto-off`<br>`memory-auto-untrusted` | 已实现 |
 | CAP-PERM-AUTO-001 | 自动审查模式：可配置的审查模型代替人审批，决策可审计 | FR-PM-06、ARCH-6.0 | T46 | `perm-auto-allow` | 已实现 |
 | CAP-PERM-AUTO-ALLOW-001 | 审查模型答允许、拒绝、不确定时分别执行一次、拒绝并把理由回给模型、转人工审批卡 | FR-PM-06、ARCH-6.2.3 | T46 | `perm-auto-allow`<br>`perm-auto-deny`<br>`perm-auto-unsure` | 已实现 |
 | CAP-PERM-AUTO-FALLBACK-001 | 审查超时、服务商错误、输出无法解析、结论不在枚举内、审查模型不可用一律转人工，工具不执行 | FR-PM-06、ARCH-6.2.3 | T46 | `perm-auto-invalid-verdict`<br>`perm-auto-provider-error`<br>`perm-auto-timeout`<br>`perm-auto-unavailable`<br>`perm-auto-unparsable` | 已实现 |

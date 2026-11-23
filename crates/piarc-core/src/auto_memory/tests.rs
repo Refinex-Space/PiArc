@@ -92,6 +92,13 @@ fn save_read_list_delete_and_the_generated_index() {
     );
     assert_eq!(index.lines().count(), 4);
     assert!(store.dir().join(PROJECT_FILE).is_file());
+    let marker: Value =
+        serde_json::from_slice(&std::fs::read(store.dir().join(PROJECT_FILE)).unwrap()).unwrap();
+    assert!(
+        marker["created"]
+            .as_str()
+            .is_some_and(|date| date.ends_with('Z'))
+    );
     assert_eq!(store.list().unwrap().len(), 2);
     let deleted = store.delete("deploy").unwrap();
     assert_eq!(deleted.kind, "project");
@@ -163,11 +170,32 @@ fn a_new_session_gets_at_most_the_index_limits() {
     ));
     let injected = store.injected().unwrap().unwrap();
     assert!(injected.len() <= INDEX_BYTES, "{}", injected.len());
-    assert!(injected.lines().count() <= INDEX_LINES + 4);
+    assert!(injected.lines().count() <= INDEX_LINES);
     assert!(injected.contains("more memories are not listed here"));
     // The file keeps every line.
     let full = store.index().unwrap().unwrap();
     assert_eq!(full.lines().count(), MAX_TOPICS + 2);
+}
+
+#[test]
+fn auto_memory_line_budget_includes_the_heading_and_truncation_notice() {
+    let t = Temp::new("short-index");
+    let store = Store::new(&t.0, &t.0.join("repo"));
+    for i in 0..INDEX_LINES - 2 {
+        store
+            .save(&new(&format!("m{i:03}"), "d", "b"), "s")
+            .unwrap();
+    }
+    assert_eq!(store.injected().unwrap(), store.index().unwrap());
+    store.save(&new("extra", "d", "b"), "s").unwrap();
+    let index = store.injected().unwrap().unwrap();
+    assert!(
+        index.lines().count() <= INDEX_LINES,
+        "{} lines",
+        index.lines().count()
+    );
+    let omitted = INDEX_LINES - 1 - index.lines().filter(|line| line.starts_with("- [")).count();
+    assert!(index.contains(&format!("{omitted} more memories")));
 }
 
 /// T47-A04: every worktree of a repository shares one memory; two repositories never do.
@@ -266,12 +294,22 @@ fn claude_code_memory_is_imported_without_writing_to_it() {
         .collect();
     let store = Store::new(&t.0.join("data"), &checkout);
     store.save(&new("existing", "Mine", "kept"), "s").unwrap();
+    // A damaged local note still owns its name; importing must preserve its bytes.
+    std::fs::write(source.join("local.md"), "Imported text").unwrap();
+    std::fs::write(store.dir().join("local.md"), "My original text").unwrap();
     let imported = store.import_claude(&source).unwrap();
     assert_eq!(
         imported.imported,
         vec!["notes".to_owned(), "user-role".to_owned()]
     );
-    assert_eq!(imported.skipped, vec!["existing".to_owned()]);
+    assert_eq!(
+        imported.skipped,
+        vec!["existing".to_owned(), "local".to_owned()]
+    );
+    assert_eq!(
+        std::fs::read_to_string(store.dir().join("local.md")).unwrap(),
+        "My original text"
+    );
     let role = store.read("user-role").unwrap().unwrap();
     assert_eq!(
         (role.kind.as_str(), role.session.as_str()),
@@ -285,5 +323,9 @@ fn claude_code_memory_is_imported_without_writing_to_it() {
     for (path, bytes) in before {
         assert_eq!(std::fs::read(&path).unwrap(), bytes, "{}", path.display());
     }
-    assert_eq!(std::fs::read_dir(&source).unwrap().count(), 4);
+    assert_eq!(
+        std::fs::read_to_string(source.join("local.md")).unwrap(),
+        "Imported text"
+    );
+    assert_eq!(std::fs::read_dir(&source).unwrap().count(), 5);
 }

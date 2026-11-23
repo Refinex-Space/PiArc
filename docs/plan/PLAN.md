@@ -320,9 +320,11 @@ T47 自动记忆与企业托管配置（macOS 收尾）：
 - [x] 托管配置：Claude Code 托管文件兼容（两套路径布局夹具）、配置诊断（加载状态、生效键、忽略键）（A10）
 - [x] 只允许托管 hooks（审计跳过的 hooks）与增补纳入的其他托管键接入 MCP、插件、沙箱、权限、Auto 模式（A08 的 Core 部分；172cb41，L2 待补）
 - [x] 设置界面的托管锁定标识与不可编辑（A12，截图在 `tmp/evidence/T47/`）
-- [x] L2 场景 `memory-auto-*`、`managed-*` 与能力 ID（全量 L2 239 通过）；[ ] `npm run verify` 全量未在最终提交上运行，`docs/product/capabilities.md` 未重新生成（A13 blocked）
+- [x] L2 重跑 239 通过、3 项仅 Windows。由完整报告重新生成 `capabilities.md`，199 项 active 能力无缺失。
+- [x] 自动记忆回归先红后绿：索引曾达 201 行；撤销信任后仍能恢复正文；同名本地笔记损坏时导入会覆盖；目录标记缺创建时间。现按项目锁串行更改与导入，`cargo test -p piarc-core --lib auto_memory` 8 项、`--lib tool_io::policy::tests::t47` 3 项通过。
+- [ ] 在最终提交上运行 `npm run verify` 与 T47 的 Electron L4（A13 的 Windows 部分待 CI）。
 - [x] I169：用户委托裁决，采纳 ADR-0065。两份 HTTP hook 白名单逐键由最高托管来源决定。新增两个回归测试在修复前失败，修复后 `cargo test -p piarc-config --lib` 75 项通过。
-- [ ] 收尾：复用表、S10 第 20 项、增补的实现细化与 I156/I157 评估。
+- [x] 收尾文档：复用表、S10 第 20 项、增补第 9.1 节与 I156/I157 评估已补齐。
 
 ## 登记事项
 
@@ -485,8 +487,8 @@ T47 自动记忆与企业托管配置（macOS 收尾）：
 | I153 | T36 开工检查 | 远端 CI 运行 44868949621（e0c41ce，T35 中途的提交，此前 R3 开工的运行 44731794641 起 Windows 已红，未记录）两平台失败：① 两平台 clippy `too_many_lines`（`crates/piarc-git/tests/worktree.rs:154`，本地 c4094dd 的 verify 已通过，应已修复）；② Windows `piarc-core` 单测 8 个失败：`tool_io::checkpoints` 3 个（回退结果的路径是绝对路径而不是相对路径）、`policy::tests::t23::always_allow_saves_one_rule_per_subcommand`（多存 `Bash(ls *)`）、`t31` 4 个（清理测试目录时 os error 32，文件被占用）；③ Windows L2 12 个失败（`rewind-*` 6 个、`subagent-*` 4 个、`changes-file-and-hunk`、`monitor-rate-limit`）；④ macOS L2 `bg-completion-reminder`（请求里出现了不该有的 `has ended.`，本地通过）；⑤ L4：macOS `t34-terminal*` 6 个、Windows `t19-composer`、`t28-rewind` 7 个。fail-fast 使 T32–T34 的 Windows 进程树测试没有跑到，T32-A04/A13、T33-A02/A12/A14、T34-A14 仍为 blocked | 用户推送当前 HEAD 后复核：Windows 部分交 W2（M2 的 Windows 达标覆盖 T23、T28）与 W3（T31–T35），macOS runner 上的 L2/L4 失败由下一个开工检查按新 CI 定位；用户决定先继续 T36；**R4**：Windows 部分已由 W2 修复；W2 推送后的运行 44887344674 中 macOS verify 通过，Windows 仍有 3 个失败（见 I166），macOS L4 被取消，交 T39 开工检查按新 CI 定位 |
 | I154 | T36 | Pi 扩展经 `registerMcpServer` 或 `mcp_servers_change` 动态加入的 MCP server 不接入 PiArc 的池（Pi 的 MCP 扩展不再加载，ADR-0053 第 1 条） | T40（插件与 Pi 包）接入：经 Core 的配置与信任进 `mcp/servers`，作用域 `plugin`；**已落地（T40）**：插件的 `.mcp.json` 与清单 `mcpServers` 经 Core 进 `mcp/servers`（作用域 `plugin`，名为 `plugin_<plugin>_<server>`，只含已确认的项）；Pi 扩展在运行时经 `registerMcpServer` 动态加入的 server 仍不接入（PiArc 的 MCP 扩展替换 Pi 的，ADR-0053），列入 ADR-0058 后果 |
 | I155 | T36 | MCP 资源（`resources/list`、`resources/read`）没有暴露给模型（Claude Code 有列出与读取资源的工具）；prompts 作为斜杠命令同样未做（架构第 6.8 节缺口） | T40 与 MCP prompts 斜杠命令一起评估：经池取连接（`coding-standards.md` 复用表的 MCP 连接池）；**T40**：prompts 已落地（ADR-0058 第 15、16 条，`mcp__<server>__<prompt>` 斜杠命令）；MCP 资源工具（`resources/list`、`resources/read`）仍未暴露，交 T48 与 elicitation 一起评估 |
-| I156 | T36 | `headersHelper`（运行命令生成 HTTP 请求头）不执行，只报为配置问题；需要它的 server 要改成静态 `headers` 或 OAuth | T47 评估（企业托管配置常用；它是可执行项，要走信任与审计） |
-| I157 | T36 | MCP 的 OAuth 状态按 server 名存在保险箱键 `mcp/<server>`：两个工作区各有一个同名而地址不同的 server 时，pi-mcp 只用地址相同的状态，登录一个会覆盖另一个的 token（需要重新登录） | 后续按 server 地址区分键（如 `mcp/<server>/<地址摘要>`），迁移旧键；T47 前复核 |
+| I156 | T36 | `headersHelper`（运行命令生成 HTTP 请求头）不执行，只报为配置问题；需要它的 server 要改成静态 `headers` 或 OAuth | **T47 已评估**：企业配置沿用 `piarc_config::mcp` 的解析，`headersHelper` 仍在诊断中标为不支持。第一版使用静态 `headers` 或 OAuth。若要运行助手命令，需另行设计其信任、执行与审计。 |
+| I157 | T36 | MCP 的 OAuth 状态按 server 名存在保险箱键 `mcp/<server>`：两个工作区各有一个同名而地址不同的 server 时，pi-mcp 只用地址相同的状态，登录一个会覆盖另一个的 token（需要重新登录） | **T47 已复核，迁移待单独实施**：托管同名定义优先选取。pi-mcp 1.5.2 的 `oauth/provider.js` 在读取状态时核对 `serverUrl`，PiArc 的 `vaultKey` 仍只用名称；同名不同地址的登录会覆盖旧状态、需要重新登录。区分地址需一并迁移旧保险箱键和刷新锁。 |
 | I158 | T37 | 暂不支持的 skill frontmatter 字段：`context: fork`、`agent`、`background`（在子 agent 中运行 skill）与 `model`、`effort`，诊断标 T48；`disallowed-tools`、`shell` 与 `metadata`、`license`、`compatibility` 等标忽略；输出风格的 `force-for-plugin` 标 T40 | T48（`context: fork` 一组与 `model`、`effort`）、T40（插件风格）；**T40**：插件的输出风格整体列为不支持（ADR-0058 第 14 条），`force-for-plugin` 维持忽略 |
 | I159 | T37 | 子 agent 定义的 `skills`（启动时预加载 skill 正文）仍未生效，警告的接手任务由 T37 改为 T48 | T48 与 `context: fork` 一起实现（经 Core 读取正文，不走 `Skill` 调用的授权） |
 | I160 | T37 | Pi 自带的 skills 与 prompt templates 加载已关掉（ADR-0054），Pi 设置里 `skills`、`prompts` 列出的额外路径与 Pi 包携带的 skills、模板不再生效；项目根以下子目录的 `.claude/skills`（Claude Code 的嵌套 skill）与 `--add-dir` 目录的 skills 也不加载 | T40（Pi 包与插件）一并接入；嵌套 skill 由 T48 评估；**T40**：Pi 包携带的 skills 与 prompt templates 经 Core 的发现加载（`ResourceDirs.packages`）；Pi 设置里 `skills`、`prompts` 列出的额外路径、嵌套 skill 与 `--add-dir` 仍不加载，交 T48 |

@@ -181,3 +181,45 @@ async fn auto_memory_turned_off_offers_nothing() {
     let denied = f.evaluate("m3", "Memory", json!({"action": "read"})).await;
     assert_eq!(denied["allowed"], false, "{denied}");
 }
+
+#[tokio::test]
+async fn auto_memory_after_trust_revocation_keeps_only_the_index() {
+    let f = Fixture::new().await;
+    f.allowed_memory(
+        "save",
+        json!({"action": "save", "name": "build", "type": "project",
+        "description": "Build instructions", "content": "The full note."}),
+    )
+    .await
+    .expect("save");
+    let read = json!({"action": "read", "name": "build"});
+    let pending = f.evaluate("pending", "Memory", read.clone()).await;
+    assert_eq!(pending["allowed"], true);
+    f.io.services()
+        .unwrap()
+        .trust
+        .revoke(&f.work)
+        .await
+        .expect("revoke");
+    let session = f.io.session(SESSION).unwrap();
+    let index = f.io.auto_memory_index(&session).await.expect("index");
+    assert!(index.content.contains("Build instructions"));
+    let restore = f
+        .memory(
+            "restore",
+            json!({"action": "read", "name": "build", "restore": true}),
+        )
+        .await;
+    assert_eq!(
+        restore.expect_err("untrusted restore").data.kind,
+        ErrorKind::PermissionDenied
+    );
+    assert_eq!(
+        f.memory("pending", read)
+            .await
+            .expect_err("trust changed")
+            .data
+            .kind,
+        ErrorKind::PermissionDenied
+    );
+}

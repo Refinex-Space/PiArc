@@ -330,3 +330,5 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 双向控制字符的显示 | `apps/desktop/src/renderer/transcript/reveal.ts`（`revealBidi`） | 审批卡、diff、路径与代码把双向控制字符显示为 `[U+XXXX]`；新的显示外部文本的地方复用它 | T45（R5 补登） |
 | 威胁映射与依赖审计 | `scripts/lib/threats.mjs`、`scripts/ci/check-threats.mjs`；`scripts/lib/audit.mjs`、`scripts/ci/audit-deps.mjs` | 第 10.1 节对策与测试的对照；依赖公告与许可证的例外清单 | T45（R5 补登） |
 | Windows 的 `\\?\` 去前缀 | `piarc_git::strip_verbatim`（`piarc-core` 用它）；`piarc-config` 的 `plugins/manifest.rs` `real_path`（功能 crate 不能依赖 `piarc-git`，有意的副本） | 交给 cmd、git、Node 之前去掉 `\\?\`（UNC 还原为 `\\host\share`）；`piarc-core/src/sessions/mod.rs` 的副本语义不同，登记 I175 | W3（R5 补登） |
+| 托管来源读取 | `piarc_ports::PolicyStore`、`piarc_core::managed::{ManagedSettings, store::SystemPolicy, store::FixedPolicy}`、`piarc_config::managed::Managed::build` | 应用由 `SystemPolicy` 定位管理员目录、托管偏好和注册表，测试注入 `FixedPolicy`。业务代码通过 `DataDirs::layers` 取得含 `enterprise` 的设置表，刷新也沿用同一快照。 | T47 |
+| 托管锁定判断 | `piarc_config::Settings::is_locked`、`piarc_config::managed::{locked, taken, view}`、渲染进程 `settings/managed.tsx` | Core 写入前按 JSON Pointer 核对标量和整份接管的列表。界面通过 `managedSettings` 读取同一份锁定视图，以 `useIsManaged` 判断控件。普通合并列表的托管条目单独显示。 | T47 |
