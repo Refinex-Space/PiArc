@@ -110,3 +110,5 @@ R4 在 T35 的场景上加了 T35 之后的能力：项目 `.mcp.json` 里一个
 ## 2026-11-24 收尾复测
 
 Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。
+
+打包构建 0cbecdc 在相同 3 个会话加 1 个子 agent 负载下复跑，12 个稳态样本。Agent Host RSS 峰值 174.46/270 MB，应用其余进程物理占用峰值 259.25/510 MB。完整负载与两项预算均通过，原始报告为 tmp/evidence/partial-closure/m3-final.json。

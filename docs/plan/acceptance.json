@@ -245,7 +245,7 @@
       "task": "R4",
       "description": "当前主线上，同一工作区 3 个并行会话加 1 个子 agent（共享 1 个 stdio MCP server、已加载 skills 索引）的稳态内存满足第 11 章预算。验证：测量脚本输出与 `docs/reviews/R4-findings.md` 中的数据。",
       "status": "passing",
-      "evidence": "Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。"
+      "evidence": "Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。 打包构建 0cbecdc 在相同 3 个会话加 1 个子 agent 负载下复跑，12 个稳态样本。Agent Host RSS 峰值 174.46/270 MB，应用其余进程物理占用峰值 259.25/510 MB。完整负载与两项预算均通过，原始报告为 tmp/evidence/partial-closure/m3-final.json。"
     },
     {
       "id": "R4-A02",
@@ -3556,7 +3556,7 @@
       "task": "T35",
       "description": "同一工作区 3 个并行会话（至少 1 个在独立 worktree）加 1 个子 agent 的稳态内存满足第 11 章预算（Agent Host 按活动会话数计算的上限、应用其余进程合计上限）。验证：测量脚本输出与 `docs/perf/M3-memory.md`。",
       "status": "passing",
-      "evidence": "Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。"
+      "evidence": "Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。 打包构建 0cbecdc 在相同 3 个会话加 1 个子 agent 负载下复跑，12 个稳态样本。Agent Host RSS 峰值 174.46/270 MB，应用其余进程物理占用峰值 259.25/510 MB。完整负载与两项预算均通过，原始报告为 tmp/evidence/partial-closure/m3-final.json。"
     },
     {
       "id": "T35-A12",
@@ -4354,7 +4354,7 @@
       "task": "T45",
       "description": "映射引用的全部测试在 macOS 与 Windows CI 上通过，`docs/security/threat-coverage.md` 由脚本生成且与测试结果一致。验证：CI 输出与生成命令。",
       "status": "blocked",
-      "evidence": "审阅公开 CI 的原始作业日志（tmp/evidence/partial-ci-audit/）：cdb81a0 的 macOS desktop L4 中，原映射的 33 个测试在 dev、packaged 都通过；Windows 两种形态各 31 个通过、2 个终端 OSC 8 用例仅在 POSIX 运行。Windows 的正常链接等价用例在两种形态都通过。自 T45 起的 15 轮 CI，前面的 L4 失败使 release runtime 探针被跳过。修复已把 Windows 正常链接用例纳入映射，并在同一个拒绝用例里通过 ConPTY 检查不允许的协议；发布安全检查可以在独立 L4 失败后继续。14 条威胁、59 个对策、171 个测试 ID，本地生成与漂移检查通过。新 Windows 用例及两侧发布探针仍需对应的 GitHub Actions 实跑记录。https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269496"
+      "evidence": "审阅公开 CI 的原始作业日志（tmp/evidence/partial-ci-audit/）：cdb81a0 的 macOS desktop L4 中，原映射的 33 个测试在 dev、packaged 都通过；Windows 两种形态各 31 个通过、2 个终端 OSC 8 用例仅在 POSIX 运行。Windows 的正常链接等价用例在两种形态都通过。自 T45 起的 15 轮 CI，前面的 L4 失败使 release runtime 探针被跳过。修复已把 Windows 正常链接用例纳入映射，并在同一个拒绝用例里通过 ConPTY 检查不允许的协议；发布安全检查可以在独立 L4 失败后继续。14 条威胁、59 个对策、171 个测试 ID，本地生成与漂移检查通过。新 Windows 用例及两侧发布探针仍需对应的 GitHub Actions 实跑记录。https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269496 本机 0cbecdc 的 macOS 发布包复核通过 29 项布局、9 个 fuse 及 4 组含对照的运行时探针，见 tmp/evidence/partial-closure/gate-release-*.log。"
     },
     {
       "id": "T45-A03",
