@@ -162,7 +162,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 已完成 | ef39d43 |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 33f4bf9 |
-| T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | 991f323 |
+| T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 1b15296 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ca3d873 |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
@@ -308,14 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T34 终端面板补验
-
-- [x] A03：在 macOS 正式面板用系统简体拼音核对 S7 T1–T4，已记录截图与写入结果。
-- [x] macOS 终端面板 L4 11/11 通过。
-- [x] 用户已确认本次一并修复 I185。已复现原生通知迟到时的设置、技能目录和配置诊断问题。
-- [x] I185：阻塞目录注册且不投递文件通知时，Core 仍报告新项目设置；Agent Host 在下一次运行前取得新技能和风格；诊断页本地回归覆盖可见、隐藏、回到窗口和在途请求合并。
-- [ ] 复核 Rust 设置集成测试、正式构建的 Electron L4 和干净提交的完整 `npm run verify`，更新看板与会话日志。
 
 ## 登记事项
 
@@ -507,7 +499,7 @@ T34 终端面板补验
 | I182 | T40 | 插件 skill 与命令文件的 `allowed-tools`、hooks 不生效（不在包的可执行项里，ADR-0058 第 12 条）；Pi 包的扩展不在子 agent 的会话里加载 | 需要时把它们纳入可执行项（逐项确认），由 T48 评估 |
 | I183 | T40 | 配置诊断还没有插件来源的展示：诊断 API 能从各组件的 `plugin` 字段与 `packagesList` 得到来源，界面未列出 | T41（配置诊断完善）；**已落地**（T41，ADR-0059）：诊断按来源类别列出插件与 Pi 包（`config_diagnostics/sources.rs` 的 `packages`） |
 | I184 | T41 | 用量的目录价只在 Core 见过某模型的 `models/list` 之后才有（打开过会话、设置页或生成报告时有运行中的 Agent Host）；从未出现在这些列表里的模型在用量页显示"未知"，直到再次列出 | 可接受的现状；需要时让生成报告在没有运行中 Agent Host 时临时起设置 Host 取一次目录，交 R5 评估 |
-| I185 | T41 | 全量 L2 并行时，T13 的设置监听（FSEvents）事件可能迟到几十秒：ConfigChange 已改为每个输入前核对，不受影响；配置诊断页的自动刷新、skills 与命令变化后的 `resources/reload` 仍依赖它 | R5 评估是否让这些消费方在使用前同样核对（或改为轮询少量固定文件）；**R5**：负载下（本机负载均值约 5–6）`crates/piarc-core/tests/state.rs` 的 `editing_settings_while_running…` 在 3 次全量 verify 中超时 2 次（20 s 内没有设置事件），单独运行通过：设置监听本身在负载下迟到，不只是 L2 并行。交 T48：配置诊断与 `resources/reload` 的消费方在使用前核对文件（同 ConfigChange 的做法），测试改为等确定的信号；不放宽等待时间 |
+| I185 | T41 | 全量 L2 并行时，T13 的设置监听（FSEvents）事件可能迟到几十秒：ConfigChange 已改为每个输入前核对，不受影响；配置诊断页的自动刷新、skills 与命令变化后的 `resources/reload` 仍依赖它 | R5 评估是否让这些消费方在使用前同样核对（或改为轮询少量固定文件）；**R5**：负载下（本机负载均值约 5–6）`crates/piarc-core/tests/state.rs` 的 `editing_settings_while_running…` 在 3 次全量 verify 中超时 2 次（20 s 内没有设置事件），单独运行通过：设置监听本身在负载下迟到，不只是 L2 并行。交 T48：配置诊断与 `resources/reload` 的消费方在使用前核对文件（同 ConfigChange 的做法），测试改为等确定的信号；不放宽等待时间 **已关闭（1b15296）**。注册监听目录期间，Core 继续重载设置和投递事件，每 2 秒核对设置层文件。Agent Host 在运行前核对技能与输出风格，打开的诊断页在恢复焦点时重读，可见期间定时复查。阻塞监听注册的回归、原先超时的两条配置编辑用例和默认并发全量均通过。 |
 | I186 | T42 | 代码高亮的明暗配色跟随系统的 `prefers-color-scheme`（`transcript/use-color-scheme.ts`），不跟随应用的主题选择：系统为浅色、应用选深色时，Changes 面板与 transcript 代码块的 token 用浅色配色画在深色底上，对比度不足（`tmp/evidence/T42/` 的 `comments-saved-dark.png` 可见） | T43（无障碍与对比度）：让 `useDarkScheme` 读 `<html>` 的 `data-color-mode`，或在主进程按偏好设置 `nativeTheme.themeSource`；**已落地（T43）**：`useDarkScheme` 按应用的主题选择（`system` 时才看系统），代码高亮另换为高对比度主题（`transcript/highlight/themes.ts`，ADR-0061） |
 | I187 | T42 | 可操作通知的实机核对：macOS 横幅与按钮的截图需要终端有"屏幕录制"权限（本机 `screencapture` 报 could not create image from display，T42-A06 标 blocked）；Windows Toast 按钮的实机点击 | macOS 截图由用户授权屏幕录制后用 `PIARC_CAPTURE_NOTIFICATION=1 PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-notify --project dev` 补拍；Windows 并入 W4 |
 | I188 | T43 | VoiceOver 实际操作核对未做：`docs/engineering/accessibility.md` 第 3 节的 10 项读屏清单需要人在 macOS 上开 VoiceOver 逐项操作，T43 时用户不在场（T43-A10 标 blocked）；自动化已覆盖行名称、节流播报、审批卡焦点与 axe | 用户按清单操作后把结论填入 VoiceOver 一列，问题登记后由 R5 或后续任务修；Narrator 与 NVDA 由 W3 按同一清单执行；**W3**：讲述人与 NVDA 两列由用户实机核对，全部通过；VoiceOver 一列仍待用户 |
@@ -1239,3 +1231,9 @@ T34 终端面板补验
 - macOS arm64 的 `npm run verify` 17/17，完整 L2 252 项通过、3 项仅适用于 Windows，能力覆盖 MISSING 0。桌面定向 Playwright 的 dev、packaged 各 12/12，ego-browser 实操、侧边面板亮暗 axe 检查通过。证据在 `tmp/evidence/T49/verify-final.log`、`native-playwright-final.log`、`ego-native-side-chat.png`。
 - 用户在快捷指令中找到并运行原型，又在正式包确认工作区正确、草稿原样显示、没有自动发送；本次接受文字记录代替截图。两个 macOS 发布架构的打包、动作元数据、签名与 fuse 均有 CI 记录，见 [工程记录](../engineering/app-intents.md)。
 - [Windows x64 CI](https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269417) 在 cdb81a0 上的跳转列表与启动路由测试通过，整个 Vitest 1844/1844。该版 Windows 全量为 16/17，唯一失败的 Rust 命令清单断言已在 6a562f6 补齐并通过本机全量。Windows 菜单的实机显示与点击由 W4 按 I229 验证。下一项为 T50（macOS）。
+
+### 2026-11-24 T34 已完成，I185 已修复
+
+- 14/14 项通过。W2 补验了 Windows 全量；本次补齐正式终端面板的 macOS 简体拼音。shell 与 Vim 均逐键输入、空格选词，shell 写出的文件精确等于“你好世界测试”。Vim 中 Esc 只取消新的合成，继续输入 x，保存后只有“你好世界测试x”及换行。9 张系统截图和逐次光标位置在 `tmp/evidence/T34/native-ime/`。
+- I185 的失败先在阻塞监听注册、未送达资源通知、诊断页未收到文件事件三种情况下复现。修复后的定向 Vitest 9/9，Core 状态集成 8/8，诊断页 T24/T41 Electron 用例、ego-browser 的可见与回窗刷新均通过。T34 初次面板回归 11/11；修复后一次 Vim 用例在初始屏幕超时，原样复跑通过。
+- `1b15296` 的默认并发 `npm run verify` 17/17；修复前的两次全量均为 16/17。输出分别在 `tmp/evidence/T34/native-ime/verify-i185.log`、`verify.log`、`verify-final.log`。

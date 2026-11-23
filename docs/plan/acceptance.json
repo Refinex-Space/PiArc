@@ -3479,7 +3479,7 @@
       "task": "T34",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：Windows 本机 `npm run verify` 15/15 通过（提交 08fc09e，工作区干净，tmp/evidence/W2/verify-3.log）；`cargo test --workspace --no-fail-fast` 95 个测试目标全部通过，含 piarc-term 写线程与 Core 终端入口（tmp/evidence/W2/cargo-test-all.log）。注意 `piarc-term/tests/pointer.rs` 只在 Unix 上编译，Windows 上 0 个用例（W3 补）。"
+      "evidence": "由 W2 在 Windows 上验证（Windows 11 x64 本机实测，非 CI；用户在 W2 会话中要求认领）：Windows 本机 `npm run verify` 15/15 通过（提交 08fc09e，工作区干净，tmp/evidence/W2/verify-3.log）；`cargo test --workspace --no-fail-fast` 95 个测试目标全部通过，含 piarc-term 写线程与 Core 终端入口（tmp/evidence/W2/cargo-test-all.log）。注意 `piarc-term/tests/pointer.rs` 只在 Unix 上编译，Windows 上 0 个用例（W3 补）。 2026-11-24 macOS 补验：I185 修复后在 1b15296 的代码上使用默认并发 npm run verify，17/17。见 tmp/evidence/T34/native-ime/verify-i185.log。"
     },
     {
       "id": "T35-A01",
