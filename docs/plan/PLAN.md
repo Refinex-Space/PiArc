@@ -162,7 +162,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T31 | [子 agent 与模型别名](tasks/T31-subagents-and-model-aliases.md) | 4 | R3 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 7ec1971 |
 | T32 | [后台任务、Monitor 与 KillShell](tasks/T32-background-tasks-and-monitor.md) | 4 | T31 | macOS | high / 高 | 中 | 无 | 已完成 | ef39d43 |
 | T33 | [无头终端（Core 侧）](tasks/T33-headless-terminal.md) | 4 | T32 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 33f4bf9 |
-| T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 991f323 |
+| T34 | [终端渲染器与终端面板](tasks/T34-terminal-renderer-and-panel.md) | 4 | T33 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | 991f323 |
 | T35 | [Worktree、并行会话、多窗口、全文搜索与后台常驻](tasks/T35-worktrees-parallel-sessions-and-windows.md) | 4 | T34 | macOS | high / 高 | 大 | 无 | 部分完成 | c4094dd |
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ca3d873 |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
@@ -308,6 +308,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+T34 终端面板补验
+
+- [x] A03：在 macOS 正式面板用系统简体拼音核对 S7 T1–T4，已记录截图与写入结果。
+- [ ] 复核终端面板 L4 和全量检查，更新看板与会话日志。
 
 ## 登记事项
 
@@ -455,7 +460,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I138 | T32 | `monitor.wakeIdleSession` 只能在设置文件里改，唤醒间隔与 Monitor 限值没有用户入口（`TaskLimits` 默认值） | R4 与 I03 一起确认默认值；需要入口时由 T41（配置与设置完善）在设置页暴露；**R4**：默认值见 I03；设置页入口交 T41 |
 | I139 | T32 | `core/tasks` 快照是全局最近 200 个任务的整表，每次变化至多每 250 ms 推一次（带每个任务的最后几行）：任务多、输出频繁时载荷偏大 | T44 的性能预算里测一次，必要时按工作区或会话分路由 |
 | I140 | T33 | L3 的 `perm-compound`（Claude Code 2.1.318）有 12 条未解释差异：PiArc 的请求多出 `KillShell`、`Monitor` 两个工具（T32 加入，allowlist 没有对应条目）；L3 不在 verify 中，只在 Nightly 运行 | 下次运行 L3 的任务（或 R4）确认 Claude Code 该版本的对应工具（名称与是否在 `-p` 下提供）后补 allowlist 条目或参数映射；**已关闭（R4）**：T36 已在 allowlist 补上 `Monitor`、`KillShell`（I117），`npm run l3` 0 条未解释差异 |
-| I141 | T34 | 真实拼音输入法在终端面板中的核对未做：T34-A03 的 CDP 合成（预编辑画在光标处、textarea 跟随光标、上屏只写一次）与组件测试已通过，系统"简体拼音"的候选框位置要人在本机前台操作（智能体没有前台键盘与屏幕操作的工具） | 用户按 S7 报告第 8 节 T1–T4 在终端面板（Ctrl+\` 打开）中核对：候选框贴着光标格、预编辑带下划线、选词后只上屏一次、vim 插入模式下 Esc 只取消合成；结果告诉下一个任务即可改判 T34-A03；**R4**：仍等用户核对（列入 R4 报告），T34-A03 保持 blocked；**W3**：用户在 Windows 上用微软拼音核对终端面板与 composer，通过（W3-A03）；macOS 的简体拼音仍待用户核对 |
+| I141 | T34 | T34 首次验收缺少正式终端面板的系统拼音候选框截图，组件测试与 CDP 合成已通过；R4 时仍待补验 | **已关闭**。W3 在 Windows 上核对了微软拼音（W3-A03）。2026-11-24 在 macOS 正式会话终端面板用系统简体拼音通过 S7 第 8 节 T1–T4：shell 与 Vim 中的候选框随光标移动、选词只写入一次、Esc 取消合成且保留 Vim 插入模式。截图与逐词记录见 `tmp/evidence/T34/native-ime/`，T34-A03 已通过 |
 | I142 | T34 | W3 的 Windows 核对项：① 微软拼音在终端面板中的预编辑与候选框位置（同 I141 的 T1–T4）；② ConPTY 下面板中的 vim（Git 自带）、htop 或 PowerShell 进程表的渲染与缩放；③ Ctrl+C：有选区时复制、无选区时中断程序，Ctrl+Shift+C 总是复制，Ctrl+V 粘贴；④ 面板隐藏与窗口最小化时拉帧为 0（`visibility` 应用事件在 Windows 上的行为）；⑤ `t34-terminal*.e2e.ts` 在 Windows 上整体跳过（用例键入 POSIX shell 命令），W3 写 Windows 版（PowerShell 或 cmd、Git 的 vim）后去掉跳过 | W3；**已落地（W3）**：①③④ 实机与 L4 通过；② Git 的 vim、less 与 PowerShell 进程表在缩放前后与 formatter 一致；⑤ `t34-terminal-windows.e2e.ts`（8 个用例），POSIX 两个文件仍在 Windows 跳过并指向它 |
 | I143 | T34 | 应用重启后被中断的会话终端（任务 `interrupted`，T33 已保存 snapshot）在面板中没有"恢复"入口：Core 的 `openSessionTerminal` 支持 `restore`，界面未提供 | T35（并行会话与多窗口）或 M4 的终端完善时加入；T35 未加入（并行会话与多窗口不依赖它），留给 M4 的终端完善；**R4**：交 T48（M5 补全中的终端完善） |
 | I144 | T34 | axe 检查发现存量对比度缺陷：`:root[data-app] button { color: inherit }` 的优先级高于 `.button-primary`，全应用主按钮文字为深色（对比度 2.87）；T34 把三条主按钮规则移到 `:root[data-app]` 下修复，T18 视觉关口的截图里主按钮文字颜色与现在不同 | 已落地（T34）；T43 的无障碍检查覆盖全部界面 |

@@ -3401,8 +3401,8 @@
       "id": "T34-A03",
       "task": "T34",
       "description": "中文输入法的预编辑文本绘制在光标处，候选框跟随光标，上屏文本只写入 PTY 一次。验证：macOS 实测截图与组件测试（模拟 composition 事件）。",
-      "status": "blocked",
-      "evidence": "组件测试与 CDP 合成已通过，真实拼音输入法的实测截图等待用户在本机操作（PLAN I141）。已验证：`npx vitest run apps/desktop/src/renderer/terminal/input.test.ts`（模拟 compositionstart/update/end 与 229 按键：合成中按键不发给 Core、预编辑依次为 ni→你好、上屏只写一次、其后的 input 事件不重复写入）；L4 `t34-terminal-tui.e2e.ts`「the input method composes at the cursor and commits once」在 macOS 上用 CDP `Input.imeSetComposition`/`insertText`：预编辑画在光标处且 PTY 未收到字节、textarea 与光标格重合并随上屏右移 4 格、输出行只有一个“你好”（tmp/evidence/T34/l4/t34-terminal-tui.e2e.ts-th-d4c74-the-cursor-and-commits-once-dev/ime-preedit.png、ime-committed.png）。候选框位置要用系统“简体拼音”在前台实测（S7 第 8 节 T1–T4 改在终端面板中做）。"
+      "status": "passing",
+      "evidence": "macOS 26.5.2 arm64，开发构建 PiArc.app 的正式会话终端面板（395123a，本地 mock 会话）。按 S7 第 8 节 T1–T4，从系统输入菜单选择“简体拼音”，逐键输入 nihao、shijie、ceshi 并用空格选词。shell 与 Vim 中预编辑带下划线，系统候选框随光标移动，每次选词后光标右移 4 格；合成中终端屏幕文本保持原值。shell 写出的文件精确等于“你好世界测试”。Vim 插入模式中再次输入 nihao，Esc 后候选框与预编辑消失，仍显示 -- INSERT --，接着输入 x，保存文件精确等于“你好世界测试x”加换行。系统截图与逐次光标记录在 tmp/evidence/T34/native-ime/（shell-1-nihao.png、shell-2-shijie.png、shell-3-ceshi.png、vim-escape.png、observations.json）。npx vitest run apps/desktop/src/renderer/terminal/input.test.ts 6/6 通过，覆盖合成按键与提交后的 input 去重。另有正式面板 CDP 合成回归 t34-terminal-tui.e2e.ts。"
     },
     {
       "id": "T34-A04",
