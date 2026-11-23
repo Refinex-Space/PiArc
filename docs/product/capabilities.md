@@ -12,7 +12,7 @@
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
 | M4 | 31 | 31 | 0 | 0 |
-| M5 | 25 | 24 | 1 | 0 |
+| M5 | 25 | 25 | 0 | 0 |
 
 ## M1
 
@@ -224,7 +224,7 @@
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
 | CAP-AGENT-FORK-001 | fork 子 agent 继承分支历史及父会话的 system 与工具前缀，审批和检查点归主会话 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T48 | `subagent-fork` | 已实现 |
-| CAP-CHAT-SIDE-001 | 侧边对话基于当前上下文提问，不写入主对话 | FR-CH-08 | T49 | — | 计划中 |
+| CAP-CHAT-SIDE-001 | 侧边对话基于当前上下文提问，不写入主对话 | FR-CH-08 | T49 | `side-chat-isolation` | 已实现 |
 | CAP-CONFIG-MANAGED-001 | 企业托管配置是最高层：托管 deny 在裁决第 1 步生效，列表与其他层合并，标量覆盖其他层 | ARCH-6.14、ARCH-6.2.3 | T47 | `managed-precedence` | 已实现 |
 | CAP-CONFIG-MANAGED-CHANGE-001 | 托管配置变化在下一次检查内生效，ConfigChange hook 不能阻断，运行中变坏的文件沿用上次内容 | ARCH-6.14、ARCH-6.3.2 | T47 | `managed-change` | 已实现 |
 | CAP-CONFIG-MANAGED-CLAUDE-001 | 兼容读取 Claude Code 的托管文件（macOS 与 Windows 两套布局），不支持的键在配置诊断中列为已忽略 | ARCH-6.14 | T47 | `managed-claude-code-macos`<br>`managed-claude-code-windows` | 已实现 |

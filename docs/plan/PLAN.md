@@ -313,7 +313,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 - [x] 开工基线复用 750d144，772 项验收清单通过。T48 的会话历史与缓存前缀已有验证，待补的原生桌面与 Windows CI 证据可单独追踪。
 - [x] ADR-0069 记录外部草稿的约束，用户委托裁决。
-- [x] 侧边会话、工具拒绝与计量已实现。真实 Pi 的 mock 请求与文件比对通过，见 ADR-0070、`tmp/evidence/T49/final-feature-tests.log`、`side-store-tests.log`。权限恢复后，正式 L2 side-chat-isolation 通过（四次请求、两次侧聊用量、无 Core 工具 I/O），见 side-isolation-native.json。
+- [x] 侧边会话、工具拒绝与计量已实现。真实 Pi 的 mock 请求与文件比对通过，见 ADR-0070、`tmp/evidence/T49/final-feature-tests.log`、`side-store-tests.log`。权限恢复后，正式 L2 side-chat-isolation 通过（四次请求、两次侧聊用量、无 Core 工具 I/O），见 side-isolation-native.json。全量 macOS L2 共 255 项，252 项通过、3 项仅适用于 Windows。生成能力文档后漂移检查通过（MISSING 0）。
 - [x] 停靠面板、停止、复制、快捷键和内置命令通过实际 Shell 的 DOM 测试。A04–A05 的原生 Playwright 与截图待复验。
 - [x] App Intents 原型与正式包、签名与实机清单已准备好。用户确认原型可发现并运行，正式动作进入正确工作区、草稿原样显示且未自动发送。布局 28/28、发布 fuse 9/9、隔离主窗口启动通过。用户接受以实机文字记录代替截图，A09 已通过；A08 待 macOS CI。
 - [x] 外部预填与 Windows 跳转列表通过本地单测。A11 待 Windows CI，实机步骤登记到 I229。
