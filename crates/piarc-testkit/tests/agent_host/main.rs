@@ -309,15 +309,18 @@ async fn sessions_of_a_workspace_share_one_mcp_server_process() {
             ("mcp__alpha__echo", "completed")
         );
         let output = &results[0].2;
-        let expected = format!(
-            "alpha echoes \"{said}\" from {} (pid ",
-            harness::canonical(&env.root).to_string_lossy()
+        let (cwd, pid) = output
+            .strip_prefix(&format!("alpha echoes \"{said}\" from "))
+            .and_then(|reply| reply.strip_suffix(')'))
+            .and_then(|reply| reply.rsplit_once(" (pid "))
+            .unwrap_or_else(|| panic!("unexpected echo: {output}"));
+        // Node can report the Windows temporary directory with its 8.3 spelling.
+        assert_eq!(
+            harness::canonical(std::path::Path::new(cwd)),
+            harness::canonical(&env.root),
+            "the shared server runs in the workspace root"
         );
-        assert!(
-            output.starts_with(&expected),
-            "the shared server runs in the workspace root: {output}"
-        );
-        pids.push(output[expected.len()..].trim_end_matches(')').to_owned());
+        pids.push(pid.parse::<std::num::NonZeroU32>().expect("server pid"));
         let first = &env.requests(selector)[0].body;
         assert!(first.contains("\"mcp__alpha__echo\""), "declared directly");
         for absent in ["\"codemode\"", "\"tool_search\"", "\"ToolSearch\""] {

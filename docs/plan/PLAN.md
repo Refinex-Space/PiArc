@@ -312,6 +312,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 T47 的 Windows CI 复验（19d6e90）：
 
 - [x] [Windows verify](https://github.com/Refinex-Space/PiArc/actions/runs/45137220532/job/137566485157) 的 Git Bash 语法错误、worktree 共享和两项注册表测试均通过。唯一失败是配置诊断用例用带斜杠的字符串匹配 `sourceFile`。断言现核对实际生效的项目定义的完整文件路径，本机定向测试通过。
+- [x] [8d31bf2 的 Windows verify](https://github.com/Refinex-Space/PiArc/actions/runs/45141919344/job/137581947098) 确认配置诊断用例通过。下一处失败在 Agent Host 的共享 MCP 进程测试：Node 返回 Windows 临时目录的 8.3 短路径，原断言直接匹配长路径。现在对两边的实际目录做规范化并核对同一个非零 PID。Git Bash、worktree、注册表用例和 227 个 Windows L2 均通过。
 - [ ] 用修复后的 Windows verify 关闭 A13。
 
 ## 登记事项
