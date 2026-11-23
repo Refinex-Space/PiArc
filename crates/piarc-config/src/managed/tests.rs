@@ -363,6 +363,98 @@ fn the_managed_layer_wins_over_session_project_and_user_and_lists_merge() {
 }
 
 #[test]
+fn managed_http_hook_lists_replace_lower_lists_independently_on_reload() {
+    let dirs = Dirs::new("http-hook-lists");
+    let lists = |url: &str, var: &str| json!({ "allowedHttpHookUrls": [url], "httpHookAllowedEnvVars": [var] });
+    dirs.write("data/settings.json", &lists("user-url", "USER_VAR"));
+    dirs.write(
+        "ws/.piarc/settings.json",
+        &lists("project-url", "PROJECT_VAR"),
+    );
+    let lower = lists("session-url", "SESSION_VAR");
+    let mut settings = Settings::load(dirs.table(&Managed::default(), lower), TrustState::Trusted);
+    let urls = "/allowedHttpHookUrls";
+    let vars = "/httpHookAllowedEnvVars";
+    let original = settings.merged().clone();
+    assert_eq!(
+        original.pointer(urls),
+        Some(&json!(["user-url", "project-url", "session-url"]))
+    );
+    assert_eq!(
+        original.pointer(vars),
+        Some(&json!(["USER_VAR", "PROJECT_VAR", "SESSION_VAR"]))
+    );
+
+    let policy = Managed::build(
+        vec![
+            text(
+                Family::Piarc,
+                Channel::Policy,
+                "policy",
+                &json!({ "allowedHttpHookUrls": [] }),
+            ),
+            text(
+                Family::ClaudeCode,
+                Channel::File,
+                "file",
+                &json!({ "allowedHttpHookUrls": ["file-url"] }),
+            ),
+        ],
+        None,
+    );
+    settings.set_layer(ids::ENTERPRISE, Some(policy.layer()));
+    assert_eq!(settings.get(urls), Some(&json!([])));
+    assert_eq!(settings.get(vars), original.pointer(vars));
+    assert!(settings.is_locked(urls));
+    assert!(!settings.is_locked(vars));
+    assert_eq!(policy.reports()[1].overridden[0].pointer, urls);
+    let project = settings
+        .diagnostics()
+        .into_iter()
+        .find(|r| r.layer == ids::PROJECT)
+        .unwrap();
+    assert!(
+        project
+            .ignored
+            .iter()
+            .any(|i| i.pointer == urls && i.reason == IgnoreReason::ManagedOnly)
+    );
+
+    let policy = Managed::build(
+        vec![text(
+            Family::ClaudeCode,
+            Channel::File,
+            "file",
+            &json!({ "httpHookAllowedEnvVars": ["ORG_VAR"] }),
+        )],
+        None,
+    );
+    settings.set_layer(ids::ENTERPRISE, Some(policy.layer()));
+    assert_eq!(settings.get(urls), original.pointer(urls));
+    assert_eq!(settings.get(vars), Some(&json!(["ORG_VAR"])));
+    assert!(!settings.is_locked(urls));
+    assert!(settings.is_locked(vars));
+    settings.set_layer(ids::ENTERPRISE, None);
+    assert_eq!(settings.merged(), &original);
+}
+
+#[test]
+fn malformed_managed_http_hook_lists_remain_restrictive() {
+    let policy = Managed::build(
+        vec![raw_text(
+            "policy",
+            r#"{
+        "allowedHttpHookUrls": "wrong type", "httpHookAllowedEnvVars": [1, "VAR"]
+    }"#,
+        )],
+        None,
+    );
+    assert_eq!(policy.value["allowedHttpHookUrls"], json!([]));
+    assert_eq!(policy.value["httpHookAllowedEnvVars"], json!([]));
+    assert_eq!(policy.sources[0].issues.len(), 2);
+}
+
+#[test]
 fn only_managed_settings_set_the_locks_and_a_project_only_turns_memory_off() {
     let dirs = Dirs::new("only");
     dirs.write(

@@ -212,7 +212,7 @@ frontmatter 由 Core 按工具参数生成，模型给不出 `modified`、`sessi
 - 全部托管来源（第 6 节）先合并成一个值，作为 `LayerTable` 中优先级 80 的 `enterprise` 层（`Scope::Enterprise`，`Source::Value`），合并代码不变。
 - 标量：托管层的值胜出，会话、项目、用户各层的同一键都被覆盖，配置诊断标"被托管覆盖"。
 - 对象：逐键合并，锁定按叶子。
-- 列表：托管条目加入合并结果，用户删不掉它们；其他层的条目照常合并（下面的专属键另有规定）。
+- 列表：托管条目加入合并结果，用户删不掉它们；其他层的条目照常合并。托管专属键见下节。HTTP hook 的两份白名单另依 [ADR-0065](../../adr/0065-managed-http-hook-allowlists.md) 按键独立接管。
 - 权限规则：托管 deny 走裁决第 1 步（`piarc_policy::decide` 已有的 `enterprise` 槽），托管 ask、allow 在第 4、6 步，来源标 `enterprise`。
 - hooks：托管层的 hooks 与其他层合并；`disableAllHooks` 只有在托管层设置时才能关掉托管 hooks（与 Claude Code 相同）。
 - 信任：托管层不是项目层，不受项目信任约束；托管 hooks 与 MCP server 在未信任的项目里照常生效。
@@ -273,6 +273,7 @@ frontmatter 由 Core 按工具参数生成，模型给不出 `modified`、`sessi
   - 锁类键（`allowManaged*Only`、`disableAutoMode`、`permissions.enableBypassPermissions: false`、`permissions.enableAutoMode: false`）取最严：任一来源开启即开启。
   - 其他标量按来源顺序，高者胜出。
   - 列表拼接去重；但 `allowedMcpServers` 与 `sandbox.network.allowedDomains` 在对应的 `allowManaged*Only` 开启时取设置了它的最高来源的整份，不做并集（并集会放宽白名单）。
+  - `allowedHttpHookUrls` 和 `httpHookAllowedEnvVars` 各自取设置该键的最高托管来源的整份值，空列表也接管。类型或元素错误时记录诊断并对该名单按空值列表执行。移除所有托管来源中的该键后恢复普通层合并（ADR-0065）。
   - `mcpServers` 同名取高者的整条定义。
 - 理由：同一台电脑上的几个来源都由管理员放置，合并让每一份的 deny 与锁都生效；只取一份会让较低来源的限制悄悄失效。Claude Code 默认只取一份，它的 `managedSourcesBehavior` 在 PiArc 里忽略。
 - 配置诊断按来源各列一份报告（第 8.3 节），合并后的值在"企业"层下显示。

@@ -241,6 +241,7 @@ impl Settings {
         let mut ignored_auto = Vec::new();
         let mut ignored_managed_only = Vec::new();
         let mut ignored_memory = Vec::new();
+        let managed = self.loaded(crate::layers::ids::ENTERPRISE);
         let effective: Vec<Option<Value>> = self
             .table
             .layers()
@@ -250,10 +251,14 @@ impl Settings {
                 let mut value = state.value.clone()?;
                 let project = spec.scope == Scope::Project;
                 if spec.scope != Scope::Enterprise {
-                    for pointer in crate::managed::ONLY {
+                    for pointer in crate::managed::ONLY
+                        .iter()
+                        .copied()
+                        .chain(crate::managed::managed_http_lists(managed))
+                    {
                         if value.pointer(pointer).is_some() {
                             remove_pointer(&mut value, pointer);
-                            ignored_managed_only.push((spec.id, (*pointer).to_owned()));
+                            ignored_managed_only.push((spec.id, pointer.to_owned()));
                         }
                     }
                 }

@@ -1,6 +1,6 @@
 //! `http` handlers (Claude Code's semantics, ADR-0055):
 //!
-//! - `allowedHttpHookUrls`, when set (merged across settings files), admits only URLs that match
+//! - `allowedHttpHookUrls`, when set (resolved by piarc-config, ADR-0065), admits only URLs that match
 //!   one of its patterns: `*` matches any text, the scheme and host compare without case and a
 //!   trailing dot of the host is ignored. Other URLs get no request; that is a non-blocking error.
 //! - Header values interpolate `$VAR` and `${VAR}` only for variables the handler's

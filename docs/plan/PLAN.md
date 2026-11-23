@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 部分完成（A13 等全量 verify 与 Windows CI） | — |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中 | — |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -309,7 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T47 自动记忆与企业托管配置（macOS，设计关口）：
+T47 自动记忆与企业托管配置（macOS 收尾）：
 
 - [x] 开工检查：基线 `npm run verify -- --baseline` 通过（复用 84a4d07 的全量结果）；CI 运行 45036807604 核对：T39-A12、T42-A07 通过并关闭，Windows verify 的 clippy 死代码已修，其余失败登记 I227
 - [x] 设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`（八部分 + 第 11 节 10 个需要确认的要点）；用户确认全部按推荐（A01）
@@ -321,7 +321,8 @@ T47 自动记忆与企业托管配置（macOS，设计关口）：
 - [x] 只允许托管 hooks（审计跳过的 hooks）与增补纳入的其他托管键接入 MCP、插件、沙箱、权限、Auto 模式（A08 的 Core 部分；172cb41，L2 待补）
 - [x] 设置界面的托管锁定标识与不可编辑（A12，截图在 `tmp/evidence/T47/`）
 - [x] L2 场景 `memory-auto-*`、`managed-*` 与能力 ID（全量 L2 239 通过）；[ ] `npm run verify` 全量未在最终提交上运行，`docs/product/capabilities.md` 未重新生成（A13 blocked）
-- [x] 收尾：各目录 AGENTS.md、验收与看板；[ ] `coding-standards.md` 复用表、S10 报告第 20 行、增补的实现细化一节未写（用户要求快速收尾）
+- [x] I169：用户委托裁决，采纳 ADR-0065。两份 HTTP hook 白名单逐键由最高托管来源决定。新增两个回归测试在修复前失败，修复后 `cargo test -p piarc-config --lib` 75 项通过。
+- [ ] 收尾：复用表、S10 第 20 项、增补的实现细化与 I156/I157 评估。
 
 ## 登记事项
 
@@ -497,7 +498,7 @@ T47 自动记忆与企业托管配置（macOS，设计关口）：
 | I166 | R4 | W2 推送后的 CI 运行 44887344674（`windows/dev` 0ad961c）Windows 失败：① `piarc-store` `tests/index.rs:196` 同长度改写在同一时间戳刻度内完成时 mtime 不变，同步判为未变（Windows runner 的时间戳粒度）；② L4 `terminal.e2e.ts:44`（dev）停拉后多收到 2 帧（11 > 9）；③ L4 `t19-composer.e2e.ts:138`（packaged）断言时最后一个请求还是上一条文本。W2 本机 verify 15/15 | W3：①给测试显式设不同的 mtime 或在同步判据里加入内容哈希（评估成本）；②③按 CI trace 定位，计时类断言改为等条件；**已落地（W3）**：①用例显式设定 mtime；② `terminal.e2e` 等 cmd 的提示符后再数帧；③ R4 已改，本机通过 |
 | I167 | R4 | 子 agent 的低风险项（R4 S5、S7–S10）：`#reopen` 期间结束的后台子 agent 丢报告与状态条目；每个子 agent 在 Core 留一个等连接关闭的任务；空闲时后台子 agent 的写入记在主会话最后一个回合的检查点；对已结束子会话的审批作答返回 `sessionNotFound` 而不是 `stale`；注册失败时仍发 `subagent/finish` | T48 |
 | I168 | R4 | 子 agent 自己的后台通知（R4 S4 的余项）：S4 修复后子 agent 的后台命令结束通知送到主会话、子 agent 结束时其 Monitor 停止；子 agent 运行期间收不到自己的 Monitor 新行与命令结束通知（Core 没有子会话的会话 actor，`session/remind` 只到主会话） | T48：经 Agent Host 的子会话送达，或把子 agent 的 Monitor 归主会话并在工具结果里说明 |
-| I169 | R4 | `allowedHttpHookUrls`、`httpHookAllowedEnvVars` 按 Claude Code 语义跨层合并，项目层能放宽用户层的限制；`http` hook 不做 SSRF 检查（R4 E4，ADR-0055 第 8 条与否决项）。R4 不改：放宽只影响用户已在信任对话框确认的项目 hook，E3 修复后 `allowedEnvVars` 已进条目名 | T47：企业托管配置把这两个键作为策略时只读托管层 |
+| I169 | R4 | `allowedHttpHookUrls`、`httpHookAllowedEnvVars` 按 Claude Code 语义跨层合并，项目层能放宽用户层的限制；`http` hook 不做 SSRF 检查（R4 E4，ADR-0055 第 8 条与否决项）。R4 不改：放宽只影响用户已在信任对话框确认的项目 hook，E3 修复后 `allowedEnvVars` 已进条目名 | **已落地（T47，ADR-0065）**：两份名单逐键取最高托管来源的整份值，空名单仍生效。移除托管键时恢复跨层合并。回归见 `piarc-config` 的 `managed_http_hook_lists` 测试。 |
 | I170 | R4 | Windows 上 `piarc://open?path=` 接受 UNC 路径，打开前没有确认：Core 打开工作区时会访问 `\\host\share`（可能泄露 NetNTLM）（R4 E6） | W3 核对 Core 对 UNC 工作区的处理；T45 对来自链接的路径先经主进程原生确认，或拒绝 UNC 与 `\\?\`；**已落地（T45）**：`piarc://open?path=` 拒绝以两个分隔符开头的路径（UNC、`\\?\`、`\\.\`、`//host`），`launch.test.ts` 的 THR-13 用例；命令行与拖入的文件夹不变，W3 在 Windows 上核对 Core 对 UNC 工作区的处理；**W3**：Windows 实机 `piarc://open?path=%5C%5Cw3-nohost%5Cshare` 被主进程拒绝，Core 与 Agent Host 的日志里都没有该主机 |
 | I171 | R4 | 配置诊断没有"将要运行什么"的总览：生效的 hooks（三种 handler）、skill 与子 agent 定义里的 hooks 与 `allowed-tools`、插件不在一处（R4 E7） | T41（配置诊断完善） |
 | I172 | R4 | MCP 与终端的加固项（R4 M4–M9）：OSC 52 写剪贴板默认允许（架构 6.11 的决定），对模型运行命令的终端也一样，没有提示；终端写入、共享的"近期真实输入"按窗口而不是按终端与动作，`allowUnsafe` 由渲染进程给；取消共享与屏幕文件写入的竞态（`write_view` 与 `remove_view` 不共用锁，取消后文件可能被重写）；未共享的用户终端也保存明文 snapshot、默认权限、崩溃后遗留；MCP 结果的图片没有总量上限、server 的 stderr 尾部进工具错误；stdio server 的后代按关闭时的 PID 快照结束 | T45；**T45 评估，交 R5**：逐项处理（OSC 52 默认允许、真实输入按终端与动作、取消共享与屏幕文件写入的竞态、未共享终端的 snapshot、MCP 图片总量与 stderr、stdio 后代按 PID 快照）；**R5**：交 T48，逐项处理；其中"未共享终端的明文 snapshot"与"取消共享与屏幕文件写入的竞态"进入 R6 前完成 |

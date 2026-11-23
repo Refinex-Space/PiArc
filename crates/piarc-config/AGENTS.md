@@ -30,6 +30,7 @@
 ## 托管设置（`src/managed.rs`，T47，设计增补 `T47-auto-memory-and-managed-settings.md` 第 5–8 节）
 
 - `Managed::build(来源, 上一份)` 是托管设置唯一的解析与合并：来源由 Core 按从高到低排好（PiArc 的策略、PiArc 的文件与 `managed-settings.d/`、Claude Code 的策略、Claude Code 的文件），Claude Code 文档只保留映射表里 `Active` 与 `Managed` 的键（`claude::project_managed`，`disableBypassPermissionsMode: "disable"` 变成 `enableBypassPermissions: false`）。单个键类型错只丢该键，锁类键（`LOCKS`）类型错按最严值；锁取所有文档里最严的值；`allowManagedMcpServersOnly`、`allowManagedDomainsOnly` 开启时对应列表取最高文档的整条；不是 JSON 对象的文档进 `errors()`（启动时 Core 据此拒绝启动），运行中变坏的保留上一份内容（`stale`）。
+- HTTP hook 的 `allowedHttpHookUrls` 与 `httpHookAllowedEnvVars`（ADR-0065）逐键接管，取设置该键的最高托管来源的整份名单。空名单仍锁定，类型错误时记诊断并按空名单处理。普通层只参与未托管键的合并，删掉托管键后普通层的值恢复。
 - 只有托管层能设的键是 `ONLY`（四个 `allowManaged*Only`），其他层的这些值在合并中去掉。锁定判断只用 `managed::locked(托管值, 指针)` 与 `taken`（被托管锁接管的列表）；设置窗口经 Core 的 `managed::view` 取同一份结果（渲染进程的 `isManaged` 按同一规则）。写入经 `write_value`、`append_unique`、`edit_permission_rule` 时被锁定的指针返回 `WriteError::Managed`（Core 映射为 `permissionDenied`，`details.reason: "managed"`）。
 - `Settings::user_value`（跳过权限与 Auto 模式这类只读用户层的开关）先取托管值；`is_locked`、`managed_rules_only` 给 Core 用。`mcp::McpPolicy::from_settings` 按 `allowedMcpServers`、`deniedMcpServers` 与 `allowManagedMcpServersOnly` 排除 server（企业作用域不经允许列表）；`auto_mode::available` 读托管层的 `disableAutoMode` 与 `permissions.enableAutoMode`。
 - 诊断：`Managed::reports()` 每个文档一份 `FileReport`（`kind: enterprise`），Claude Code 文档里不支持的键报"已忽略"。

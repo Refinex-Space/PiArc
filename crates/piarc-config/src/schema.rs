@@ -455,8 +455,8 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         shape: Shape::Bool,
     },
     // `http` hooks (T38, ADR-0055), Claude Code's keys: URL patterns (`*` wildcard) an `http`
-    // hook may post to, and the variables its headers may interpolate; lists merge across
-    // files, unset means no restriction.
+    // hook may post to, and the variables its headers may interpolate. Each list merges across
+    // files unless managed settings supply it (ADR-0065).
     Field {
         name: "allowedHttpHookUrls",
         shape: Shape::ListOf(&STRINGS),

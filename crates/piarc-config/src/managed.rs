@@ -40,6 +40,15 @@ pub const ONLY: &[&str] = &[
     "/sandbox/network/allowManagedDomainsOnly",
 ];
 
+const HTTP_HOOK_LISTS: [&str; 2] = ["/allowedHttpHookUrls", "/httpHookAllowedEnvVars"];
+
+/// HTTP hook allowlists explicitly set by the administrator, including empty lists (ADR-0065).
+pub(super) fn managed_http_lists(managed: Option<&Value>) -> impl Iterator<Item = &'static str> {
+    HTTP_HOOK_LISTS
+        .into_iter()
+        .filter(move |pointer| managed.and_then(|v| v.pointer(pointer)).is_some())
+}
+
 /// Lock keys and their restrictive value: when any managed document sets the restrictive
 /// value, the merged value is restrictive (section 6.3); a wrong type reads as restrictive
 /// (section 8.1).
@@ -243,7 +252,7 @@ impl Managed {
         let (mut effective, mut overridden) = (Vec::new(), Vec::new());
         if let Some(value) = &source.value {
             for (pointer, own) in leaves(value) {
-                let decider = if own.is_array() {
+                let decider = if own.is_array() && !HTTP_HOOK_LISTS.contains(&pointer.as_str()) {
                     None
                 } else {
                     self.sources.iter().take(index + 1).find(|s| {
@@ -344,6 +353,7 @@ pub fn taken(managed: Option<&Value>) -> Vec<&'static str> {
     .into_iter()
     .filter(|(lock, _)| on(lock))
     .map(|(_, list)| list)
+    .chain(managed_http_lists(Some(managed)))
     .collect()
 }
 
@@ -539,6 +549,15 @@ fn check_value(state: &SourceState, raw: &Value) -> (Value, Vec<IgnoredKey>, Vec
 /// Fixes the value an error points at: a lock becomes restrictive, an MCP policy entry is
 /// dropped, anything else is removed.
 fn repair(value: &mut Value, pointer: &str) {
+    if let Some(list) = HTTP_HOOK_LISTS.into_iter().find(|list| {
+        pointer == *list
+            || pointer
+                .strip_prefix(list)
+                .is_some_and(|rest| rest.starts_with('/'))
+    }) {
+        set_at(value, list, Value::Array(Vec::new()));
+        return;
+    }
     if let Some((lock, restrictive)) = LOCKS
         .iter()
         .find(|(lock, _)| pointer == *lock || pointer.starts_with(&format!("{lock}/")))
@@ -593,6 +612,11 @@ fn merge_sources(states: &[SourceState]) -> Value {
     let mut merged = Value::Object(Map::new());
     for value in values.iter().rev() {
         merge_into(&mut merged, value);
+    }
+    for list in HTTP_HOOK_LISTS {
+        if let Some(highest) = values.iter().find_map(|v| v.pointer(list)) {
+            set_at(&mut merged, list, highest.clone());
+        }
     }
     for (lock, restrictive) in LOCKS {
         let strict = restrictive.value();
