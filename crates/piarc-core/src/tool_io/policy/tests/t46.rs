@@ -279,25 +279,26 @@ async fn unsure_and_failures_go_back_to_the_user() {
             "unavailable",
         ),
     ];
-    let mut script = vec![None];
-    script.extend(cases.iter().map(|(reply, ..)| reply.clone()));
+    // Hold each reply until the test has observed that call's reviewing revision.
+    let mut script = Vec::new();
+    for (reply, ..) in &cases {
+        script.extend([None, reply.clone()]);
+    }
     let reviewer = Reviewer::new(script);
     let f = Fixture::auto(ENABLED, &reviewer).await;
     for (n, (_, fallback, outcome)) in cases.iter().enumerate() {
         let call = format!("f{n}");
         let (result, card) = tokio::join!(f.command(&call), async {
             let reviewing = f.card().await;
-            if n == 0 {
-                let review = reviewing.review.clone().expect("review");
-                assert_eq!(review.state, ReviewState::Reviewing);
-                // No answer while the reviewer works.
-                let stale =
-                    f.io.answer_approval(answer(&reviewing, ApprovalDecision::AllowOnce))
-                        .await
-                        .expect("answer");
-                assert_eq!(stale["status"], "stale");
-                reviewer.release();
-            }
+            let review = reviewing.review.as_ref().expect("review");
+            assert_eq!(review.state, ReviewState::Reviewing);
+            // No answer while the reviewer works.
+            let stale =
+                f.io.answer_approval(answer(&reviewing, ApprovalDecision::AllowOnce))
+                    .await
+                    .expect("answer");
+            assert_eq!(stale["status"], "stale");
+            reviewer.release();
             let card = tokio::time::timeout(Duration::from_secs(10), async {
                 loop {
                     let card = f.pending().await;

@@ -13,7 +13,7 @@ impl Temp {
             crate::storage::now_ms()
         ));
         std::fs::create_dir_all(&dir).expect("temp dir");
-        Self(dir.canonicalize().expect("canonical"))
+        Self(piarc_git::canonical(&dir).expect("canonical"))
     }
 }
 
