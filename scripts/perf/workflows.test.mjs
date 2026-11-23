@@ -23,6 +23,7 @@ async function job(file, job) {
   const matrix =
     isRecord(found.strategy) && isRecord(found.strategy.matrix) ? found.strategy.matrix : {};
   return {
+    steps: steps.filter(isRecord),
     runs: steps.flatMap((step) =>
       isRecord(step) && typeof step.run === 'string' ? [step.run] : [],
     ),
@@ -45,4 +46,22 @@ describe('performance pipelines', () => {
     expect(nightly.runs).toContain('node scripts/perf/run.mjs --lane long');
     expect(nightly.env).toContainEqual({ PIARC_LONG_RUN_HOURS: '1' });
   });
+});
+
+it('keeps release checks scheduled when an independent desktop test fails', async () => {
+  const { steps } = await job('ci.yml', 'desktop');
+  const development = steps.find((step) => step.name === 'Package the development flavor');
+  const release = steps.find((step) => step.name === 'Package the release flavor');
+  expect(development?.id).toBe('development');
+  expect(release?.id).toBe('release');
+  expect(release?.if).toBe("${{ !cancelled() && steps.development.outcome == 'success' }}");
+  for (const command of [
+    'npm run check:fuses',
+    'node scripts/ci/check-release-runtime.mjs',
+    'node scripts/ci/check-app-layout.mjs --flavor release',
+  ]) {
+    expect(steps.find((step) => step.run === command)?.if).toBe(
+      "${{ !cancelled() && steps.release.outcome == 'success' }}",
+    );
+  }
 });

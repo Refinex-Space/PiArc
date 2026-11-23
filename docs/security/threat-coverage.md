@@ -20,7 +20,7 @@
 | THR-10 | 应用文件被篡改 | 3 | 1 | 1 | 1 | 0 | 3 |
 | THR-11 | 渲染进程注入（XSS） | 7 | 7 | 0 | 0 | 0 | 25 |
 | THR-12 | 应用被当作通用运行时滥用 | 3 | 3 | 0 | 0 | 0 | 10 |
-| THR-13 | 恶意链接与导航 | 4 | 4 | 0 | 0 | 0 | 13 |
+| THR-13 | 恶意链接与导航 | 4 | 4 | 0 | 0 | 0 | 14 |
 | THR-14 | 同一用户的进程向 PiArc 注入代码 | 3 | 2 | 0 | 1 | 0 | 4 |
 
 ## THR-01 提示注入导致破坏性操作
@@ -141,7 +141,7 @@
 |---|---|---|
 | 导航与重定向只允许应用自身的 origin | 自动化 | Vitest `apps/desktop/src/main/security/navigation.test.ts` · blocks other origins, including look-alike prefixes<br>Vitest `apps/desktop/src/main/security/navigation.test.ts` · THR-13 cancels main-frame, subframe and redirect navigations away from the app origin<br>L4 `apps/desktop/e2e/navigation.e2e.ts` · blocks changing location to an external address<br>L4 `apps/desktop/e2e/navigation.e2e.ts` · blocks a redirect from an app page to an external address |
 | window.open 与 target=_blank 被拒 | 自动化 | L4 `apps/desktop/e2e/external-links.e2e.ts` · denies window.open and target=_blank links |
-| 外链经主进程原生确认，只放行 https、http、mailto 且不带用户信息 | 自动化 | Vitest `apps/desktop/src/main/external-links.test.ts` · rejects every other scheme<br>Vitest `apps/desktop/src/main/external-links.test.ts` · rejects URLs with user information, which hide the real host<br>L4 `apps/desktop/e2e/external-links.e2e.ts` · rejects javascript:, file: and other schemes without asking<br>L4 `apps/desktop/e2e/t34-terminal.e2e.ts` · OSC 8 links and plain URLs show their address and open only when confirmed<br>L4 `apps/desktop/e2e/t45-xss.e2e.ts` · THR-13 OSC 8 links with script and data targets in the terminal neither open nor navigate<br>L4 `apps/desktop/e2e/transcript-security.e2e.ts` · opens links only through the main process confirmation |
+| 外链经主进程原生确认，只放行 https、http、mailto 且不带用户信息 | 自动化 | Vitest `apps/desktop/src/main/external-links.test.ts` · rejects every other scheme<br>Vitest `apps/desktop/src/main/external-links.test.ts` · rejects URLs with user information, which hide the real host<br>L4 `apps/desktop/e2e/external-links.e2e.ts` · rejects javascript:, file: and other schemes without asking<br>L4 `apps/desktop/e2e/t34-terminal.e2e.ts` · OSC 8 links and plain URLs show their address and open only when confirmed<br>L4 `apps/desktop/e2e/t34-terminal-windows.e2e.ts` · the find bar counts matches; links open only when confirmed<br>L4 `apps/desktop/e2e/t45-xss.e2e.ts` · THR-13 OSC 8 links with script and data targets in the terminal neither open nor navigate<br>L4 `apps/desktop/e2e/transcript-security.e2e.ts` · opens links only through the main process confirmation |
 | piarc:// 链接只做定位，不带可执行内容，不打开网络共享与设备路径 | 自动化 | Vitest `apps/desktop/src/main/launch.test.ts` · carry nothing that runs<br>Vitest `apps/desktop/src/main/launch.test.ts` · THR-13 open no network share or device path, which would make Core reach another host |
 
 ## THR-14 同一用户的进程向 PiArc 注入代码

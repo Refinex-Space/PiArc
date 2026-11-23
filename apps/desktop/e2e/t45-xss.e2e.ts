@@ -278,14 +278,27 @@ test('THR-13 OSC 8 links with script and data targets in the terminal neither op
   page,
   workspaces,
 }) => {
-  test.skip(process.platform === 'win32', 'POSIX printf in the shell; the Windows variant is W3');
+  // cmd prints the fixture through ConPTY. The disallowed protocols have inert targets.
+  const windows = process.platform === 'win32';
+  const files: Record<string, string> = {};
+  if (windows) {
+    const link = (target: string, label: string) => `\x1b]8;;${target}\x07${label}\x1b]8;;\x07`;
+    files['blocked-links.txt'] = [
+      link('javascript:0', 'js'),
+      link('data:text/plain,example', 'data'),
+      link('vbscript:0', 'vb'),
+      'end\r\n',
+    ].join(' ');
+  }
   test.setTimeout(120_000);
-  await openPanel(app, page, workspaces);
+  await openPanel(app, page, workspaces, files);
   await watchMarkup(page);
   const url = page.url();
   await run(
     page,
-    "printf '\\033]8;;javascript:window.__piarcXssSentinel=4\\033\\\\js\\033]8;;\\033\\\\ \\033]8;;data:text/html,x\\033\\\\data\\033]8;;\\033\\\\ \\033]8;;vbscript:x\\033\\\\vb\\033]8;;\\033\\\\ end\\n'",
+    windows
+      ? 'type blocked-links.txt'
+      : "printf '\\033]8;;javascript:window.__piarcXssSentinel=4\\033\\\\js\\033]8;;\\033\\\\ \\033]8;;data:text/html,x\\033\\\\data\\033]8;;\\033\\\\ \\033]8;;vbscript:x\\033\\\\vb\\033]8;;\\033\\\\ end\\n'",
   );
   const line = 'js data vb end';
   await waitForPanel(page, (text) => text.split('\n').includes(line), 'the links');

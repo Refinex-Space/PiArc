@@ -462,6 +462,7 @@ threats:
           - vitest:apps/desktop/src/main/external-links.test.ts::rejects URLs with user information, which hide the real host
           - 'l4:apps/desktop/e2e/external-links.e2e.ts::rejects javascript:, file: and other schemes without asking'
           - l4:apps/desktop/e2e/t34-terminal.e2e.ts::OSC 8 links and plain URLs show their address and open only when confirmed
+          - l4:apps/desktop/e2e/t34-terminal-windows.e2e.ts::the find bar counts matches; links open only when confirmed
           - l4:apps/desktop/e2e/t45-xss.e2e.ts::THR-13 OSC 8 links with script and data targets in the terminal neither open nor navigate
           - l4:apps/desktop/e2e/transcript-security.e2e.ts::opens links only through the main process confirmation
       - measure: piarc:// 链接只做定位，不带可执行内容，不打开网络共享与设备路径

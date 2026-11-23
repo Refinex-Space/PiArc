@@ -114,21 +114,28 @@ jobs:
 
       # package:desktop builds the Core module of the flavor before packaging.
       - name: Package the development flavor
+        id: development
         run: npm run package:desktop -- --flavor development
 
       - name: L4 smoke and security tests (dev form and packaged app)
         run: npm run test:e2e -w @piarc/desktop
 
+      # An unrelated L4 failure must not suppress the release security checks.
       - name: Package the release flavor
+        id: release
+        if: ${{ !cancelled() && steps.development.outcome == 'success' }}
         run: npm run package:desktop -- --flavor release
 
       - name: Check the fuses of the release package
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
         run: npm run check:fuses
 
       - name: Probe the release package (ELECTRON_RUN_AS_NODE, NODE_OPTIONS, --inspect, remote debugging)
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
         run: node scripts/ci/check-release-runtime.mjs
 
       - name: Check the release layout (no test hooks, no test pages)
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
         run: node scripts/ci/check-app-layout.mjs --flavor release
 
       # T44: the PR subset of chapter 11, three-run medians, judged against this runner class's
