@@ -180,7 +180,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 部分完成 | 03b7ed1 |
-| T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
+| T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 进行中 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | W4 | [Windows：M4 达标与 Beta 同步](tasks/W4-windows-m4-parity-and-beta.md) | 6 | R5、T50 | Windows | high / 高 | 中 | 无 | 未开始 | — |
 | T51 | [Beta 端到端验收](tasks/T51-beta-acceptance.md) | 6 | W4 | macOS 与 Windows | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,6 +308,16 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
+
+### T49 侧边对话与平台快捷操作
+
+- [x] 开工基线复用 750d144，772 项验收清单通过。T48 的会话历史与缓存前缀已有验证，待补的原生桌面与 Windows CI 证据可单独追踪。
+- [x] ADR-0069 记录外部草稿的约束，用户委托裁决。
+- [x] 侧边会话、工具拒绝与计量已实现。真实 Pi 的 mock 请求与文件比对通过，见 ADR-0070、`tmp/evidence/T49/final-feature-tests.log`、`side-store-tests.log`。A03 的完整 L2 在 mock 绑定回环端口时被环境阻断。
+- [x] 停靠面板、停止、复制、快捷键和内置命令通过实际 Shell 的 DOM 测试。A04–A05 的原生 Playwright 与截图待复验。
+- [x] App Intents 原型与正式包、签名与实机清单已准备好。用户确认原型可发现并运行，正式动作进入正确工作区、草稿原样显示且未自动发送。A08 待 macOS CI，A09 待截图。
+- [x] 外部预填与 Windows 跳转列表通过本地单测。A11 待 Windows CI，实机步骤登记到 I229。
+- [ ] 全量检查、证据与文档（A12）。
 
 ## 登记事项
 
@@ -543,6 +553,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I226 | T46 | `audit_events` 没有统一的保留期限：T46 的 `autoReview` 行（每次送审一行，含截断的理由与输入哈希）与其他审计行一样随数据库保留，不自动清理（设计增补第 4.3 节） | R6 评估审计的统一保留期限与清理方式 |
 | I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy。**bbc6b60 复核**：[Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936) 的会话归档通过。T34 的 dev 用例等不到 PowerShell 报告子进程 PID；dev 和 packaged 两种形态重新显示面板后均只读到 tick 1。三项继续由 W4 核对。 **T47 收尾**：[9212335 的 Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677946) 仅终端隐藏后重显用例在 dev 和 packaged 各失败一次。此前 [8d31bf2 的 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45141919344/job/137581947186) 还出现过 T18 会话归档与 T35 worktree 归档后目录仍在。W4 实机复核这些行为。Windows clippy、Git Bash 语法诊断及完整 verify 已通过。 |
 | I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。**bbc6b60 复核**：[macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807623) 的 L2 为 239 通过、3 项仅 Windows；权限裁决 p95 为 2.544375 ms，仍超 2 ms 预算，沿 I103 跟进。 **9212335 复核**：[macOS CI](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677879) 的 L2 全部适用场景通过。权限裁决 p95 为 3.011083 ms；T33 的终端任务快照还出现一次 shell 提示符先后到达导致的不一致。本机同提交全量 verify 通过。 |
+| I229 | T49 | Windows 跳转列表的任务栏和开始菜单实机验收 | W4：安装 Velopack 构建后依次打开两个测试工作区。右键任务栏与开始菜单中的 PiArc，核对最近顺序。依次选一个工作区、“新建会话”和“打开文件夹”，确认复用进程、原窗口草稿保留、没有自动发送。移除一个最近条目，再打开其他工作区，确认被移除的条目没有被重新添加。 |
+
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
