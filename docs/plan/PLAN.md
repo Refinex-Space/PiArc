@@ -179,7 +179,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
-| T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 进行中 | — |
+| T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 部分完成 | 03b7ed1 |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | W4 | [Windows：M4 达标与 Beta 同步](tasks/W4-windows-m4-parity-and-beta.md) | 6 | R5、T50 | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -308,25 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-### T48 M5 Harness 补全
-
-- 本次按 T48 任务文件的 12 项验收收尾（用户委托裁决）。R5 另登记的 I56、I94、I121、I123、I126、I172、I173、I175、I176、I178、I197、I199 保留原编号与 R6 跟进要求。
-- [x] 开工基线：macOS arm64，工作区干净，T47 已完成；`npm run verify -- --baseline` 复用 9212335 的全量结果，两项增量检查通过。gh 当前登录无效，未更新旧任务的 Windows CI 记录。
-- 已核对 pi-mcp 1.5.2：公开接口支持声明 `elicitation` 并注册 `elicitation/create` handler。通过内存传输在初始化时断言 form 与 URL 两种能力，再由 server 发请求，分别收到 `form accept` 和 `url decline`。A10 走客户端对话框、原生确认与 hooks 实现路径。
-- 开工检查点已提交（b92ac7c）。续做时恢复了 GitHub 访问，核对了 9212335 的原生 CI 日志，关闭 T46-A13 与 R5-A01；T45-A02 仍缺完整的映射测试通过记录。
-- [ ] A01–A02：服务端按模型选择与失败回退已接入；真实 Pi/Anthropic SDK、设置 UI 及既有回归共 24 项通过。两种协议与故障注入的正式 L2 待可启动 macOS 沙箱的环境复验。
-- [x] A03：真实 SessionManager 在重启后从分支恢复 Anthropic compaction 块到原 assistant 位置，原 JSONL 的字节前缀不变。`npx vitest run agent-host/src/runtime/server-compaction.test.ts`。
-- [x] A04：真实 Pi 父/子会话由 mock 捕获已序列化的 HTTP，逐字节比对 system 和工具、核对消息前缀、fork 发起消息和缓存断点；含服务端压缩的组合回归亦通过（`tmp/evidence/T48/fork-wire.log`）。[ADR-0066](../adr/0066-fork-tool-declarations.md) 已接受。
-- [ ] A05：Core 授权与回退、SDK 递归 fork 拒绝均已验证，L2 和 Electron 原生界面仍待复验。
-- [ ] A06：fork skill 的 agent 选择、后台执行与正文隔离。[ADR-0067](../adr/0067-fork-skill-index-and-grants.md) 已接受，缺省时索引只列名称，授权绑定实际执行者。
-  - 真实 SDK 已验证前后台选定 agent、父请求正文隔离；Core 验证了子会话绑定授权，配置解析与非法字段测试已通过（`cargo test -p piarc-config --lib skills`，15 项）。
-- [ ] A07：worktree 创建与移除 hooks。hook 返回的目录会成为文件工具根，非 Git 目录无法用现有状态检查保护改动。[ADR-0068](../adr/0068-worktree-hook-ownership.md) 已接受。工作区会话、子会话、恢复与清理已接入；`cargo test -p piarc-hooks` 55/55、`cargo test -p piarc-store --test migrations` 4/4。Core 实际运行创建与移除 hook，验证非零退出、确认、归属和目录替换、恢复，1/1 通过。修复了 hook 已完成移除后重试的幂等性（先复现再修复）。L2 场景已添加，待真实工作区运行。
-- [ ] A08：真实 Core 的切换拒绝与询问、成功后追加上下文均已实现。2 项 Core 测试、真实 Pi 的下一请求断言及旧预览契约 round-trip 通过，待 L2。
-- [ ] A09：Core 已在审查拒绝后分发 PermissionDenied。真实 hook 的定向测试验证拒绝不执行、输入与理由、再次调用重新送审；`cargo test -p piarc-core --lib tool_io::policy::tests::t46` 8/8，`cargo test -p piarc-hooks` 54/54。L2 场景已写；沙箱内的 macOS `sandbox-exec` 无法启动 Agent Host，尚缺端到端证据。
-- [ ] A10：表单、URL 原生确认、单次询问的取消、Elicitation / ElicitationResult 均已接入；真实 stdio、控件和 Core 审批测试通过。L2 与 Electron 原生操作待复验。
-- [ ] A11：已登记 10 项 T48 能力；第一次完整执行报告（253 场景，后新增后台 skill 场景）生成 MISSING 0，250 场景执行失败、3 仅 Windows，环境报告在 `tmp/evidence/T48/`。正式能力文档待完整复验后生成。
-- [ ] A12：架构与目录文档、界面验收、全量 verify 及 Windows CI 核对。
 
 ## 登记事项
 
@@ -1231,3 +1212,13 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 修复复验中发现的问题：配置诊断核对覆盖来源的完整路径（8d31bf2）；共享 MCP 进程的测试按规范路径核对工作区并校验两个会话得到同一非零 PID（c333144）。MCP hook 的 Agent Host 超时先于 Core 返回时，原来报告普通中断，审计也失去超时标记；9212335 透传 AHP 的 `timeout`，两端都生成同一通知及审计。远端先超时的回归和 L2 `hooks-m4-mcp-tool` 在 Windows 均通过，期限与中断行为保留。
 - [Windows 桌面 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677946) 的 T47 相关 7 项全部通过。整个作业 343 通过、2 失败、28 跳过，剩余的两项均是 T34 终端恢复，继续由 I227/W4 跟进。macOS CI 的独立问题见 I228。
 - 看板下一项为 T48（M5 Harness 补全，macOS）。
+
+### 2026-11-23 T48 部分完成（实现提交 03b7ed1，待原生环境验收）
+
+- 压缩设置按模型选择 `client` 或 `anthropic-server`；恢复时保留原始 JSONL，失败回退。fork 子会话、`/subtask` 与隔离 skill 已接入。Core 分发七个 M5 hooks，pi-mcp 1.5.2 的公开接口支持表单与 URL 询问。目录归属在 schema v12 登记。协议正反样本覆盖 217 个契约。没有调用付费模型、提交上游 issue 或推送本分支。
+- 用户委托本次会话裁决 ADR-0066、0067、0068，三者均已接受：fork 保留声明而执行权受限，隔离 skill 的授权绑定实际执行者，hook 目录在无法核实改动时保留。本次按任务文件的 12 项验收收尾；R5 另派的 I56、I94、I121、I123、I126、I172、I173、I175、I176、I178、I197、I199 仍按登记记录跟进。
+- **通过 A01、A03、A04**：真实 SessionRegistry 对两个协议的严格 mock 发出 14 个请求；上下文 21,000 越过 14,904 阈值，两种服务端策略各 0 次本地摘要，两个客户端对照各 1 次。重启后恢复摘要所在位置，旧文件字节前缀保留。fork 逐字节比较实际 HTTP 的 system 与工具，并检查助手发起消息、父历史和缓存标记。证据在 `tmp/evidence/T48/compaction-high-water.json`、`fork-wire.log`。
+- **阻塞 A02、A05–A12**：权限、hook 目录操作、模型切换、MCP 表单与 URL 已有实际 Core、SDK 或 DOM 定向测试。macOS 原生 Seatbelt 在本会话中返回 `sandbox_apply: Operation not permitted`。最终独立完整 L2 共 254 项：247 项打开工作区超时，4 项启动设置 Host 失败，3 项仅适用 Windows。Electron Playwright 启动收到 SIGABRT，ego-browser 无法建立 macOS XPC 连接。无桌面验收截图。Windows x64 的全工作区交叉 Clippy 通过，T48 的原生 Windows CI 未运行。
+- 在干净提交 03b7ed1 运行 `npm run verify` 为 12/17（`tmp/evidence/T48/verify.log`）。同提交独立构建两种 Core 模块、API 声明快照及 renderer 通过；Core 单测 237 项通过，独立计时测试也通过。受限模块涉及 NAPI 与 bundle 目录清理、进程检查、真实 Seatbelt、L2 和缺少其报告的威胁映射。单独核对威胁映射通过（14 条威胁、59 个对策、170 个测试 ID）。
+- A11 的 10 项能力均已登记，本次生成与漂移复核均为 MISSING 0；环境生成稿保存在 `tmp/evidence/T48/capabilities-final.md`，报告在 `l2-final.json`。在可运行 Seatbelt 与 Electron 的 macOS 会话中重新跑全量 L2 和 T48 Playwright，用成功的 L2 报告重新生成 `docs/product/capabilities.md`，提交后执行 `npm run verify` 并核对对应 Windows CI。开工时还按协议用既有 CI 原始日志关闭了 T46-A13 和 R5-A01。
+- 看板下一项 T49 在 macOS 执行。当前环境不能建立绿色开工基线，优先复验 T48。

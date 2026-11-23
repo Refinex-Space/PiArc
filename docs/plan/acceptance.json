@@ -4619,85 +4619,85 @@
       "id": "T48-A01",
       "task": "T48",
       "description": "对支持的 Anthropic 模型开启服务端策略后，请求带上配置的 context editing 或 compaction 参数，客户端压缩不触发；关闭时或非 Anthropic 模型沿用客户端压缩。验证：mock provider 请求断言（两种线格式各一个场景）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "03b7ed1，tmp/evidence/T48/compaction-high-water.json：真实 SessionRegistry、Pi SDK 和两种线格式的本地严格 mock。上下文达到 21,000 token，超过实际阈值 14,904；Anthropic compact、clearTools 各 3 次请求、0 次本地摘要，请求的 beta 与 edits 正确。关闭服务端和 OpenAI 对照各 4 次请求、1 次本地摘要，下一主请求含摘要；合计 12 回合完成，14 次 HTTP 请求均通过严格校验。"
     },
     {
       "id": "T48-A02",
       "task": "T48",
       "description": "服务端策略返回错误或模型不支持时退回客户端压缩并提示用户。验证：L2 场景（故障注入）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "SDK 故障注入验证拒绝时选回 client，未支持模型同样回退；设置页与用量卡反馈已有定向测试。正式 ctx-server-fallback L2 在打开工作区时 30 秒超时，未执行故障注入断言。证据：tmp/evidence/T48/compaction-l2.json。"
     },
     {
       "id": "T48-A03",
       "task": "T48",
       "description": "服务端压缩后的会话重启恢复，恢复后的请求前缀与历史一致，本地 JSONL 未被改写。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "03b7ed1，npx vitest run agent-host/src/runtime/server-compaction.test.ts：真实 SessionManager 重开 JSONL 后，服务端 compaction block 随原 assistant 消息出现在下一请求；比对旧文件字节前缀不变，首问仍在本地。与严格 mock 的高水位复验见 tmp/evidence/T48/compaction-high-water.json、tmp/evidence/T48/compaction-vitest.log。"
     },
     {
       "id": "T48-A04",
       "task": "T48",
       "description": "fork 子 agent 首个请求的 system 与工具定义和父会话最近一次请求逐字节一致，消息前缀等于父会话截至 fork 点的历史，缓存断点符合第 6.15 节。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "03b7ed1，npx vitest run agent-host/src/runtime/fork-context.test.ts 3/3：拦截真实父、子 Pi 会话序列化后的 Anthropic HTTP，逐字节匹配父子相同的 system 与 tools JSON，检查缓存标记、历史与发起 fork 的助手调用；另覆盖服务端压缩与 fork 联用。tmp/evidence/T48/fork-wire.log。"
     },
     {
       "id": "T48-A05",
       "task": "T48",
       "description": "fork 子 agent 不能再 fork；其编辑可回退；其审批在主会话显示并标明来源。验证：L2 场景与 Playwright。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "真实 SDK 拒绝递归 fork 及主会话专用操作。Core 用例 fork_approval_and_write_belong_to_the_invoking_parent_turn 验证审批来源及写入后的父回合回退。subagent-fork L2 在打开工作区时超时，Playwright 的 Electron 启动即 SIGABRT，未进入界面断言。见 tmp/evidence/T48/fork-wire.log、fork-l2.json、fork-l4.log。"
     },
     {
       "id": "T48-A06",
       "task": "T48",
       "description": "`context: fork` 的 skill 在子 agent 中运行，`agent` 与 `background` 字段生效，主会话请求中不含 skill 正文。验证：L2 场景与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "真实父子会话的 mock 请求和 Core 授权测试覆盖指定 agent、前台/后台、父请求无 skill 正文以及授权绑定到子会话；见 tmp/evidence/T48/fork-wire.log、fork-skill-grant.log。正式 skill-fork 与 skill-fork-background L2 需在可启动 Agent Host 的环境复验。"
     },
     {
       "id": "T48-A07",
       "task": "T48",
       "description": "配置 WorktreeCreate/WorktreeRemove hook 后，worktree 路径取自 hook 输出，非 0 退出使创建或移除失败并显示原因。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "Core 真实运行 WorktreeCreate/WorktreeRemove，测试核对返回路径、创建或移除非零退出原因、非 Git 目录确认、错属与替换拒绝、重试与恢复。cargo test -p piarc-core --lib worktree_hooks_bind 1/1；store migrations 4/4。见 tmp/evidence/T48/remove-retry-green.log、store-migrations.log。正式 hooks-m5-worktree L2 需复验。"
     },
     {
       "id": "T48-A08",
       "task": "T48",
       "description": "PreModelSwitch 的输入含原模型、目标模型、上下文 token、缓存状态与估算成本，拒绝时切换取消、询问时显示确认；PostModelSwitch 的 `additionalContext` 出现在下一个请求中。验证：L2 场景与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "Core 模型切换 hooks 测试 2/2；真实 Pi 的 PostModelSwitch 上下文进入下一请求。旧 AHP 预览和热缓存样本 round-trip 通过。正式 hooks-m5-model-switch 在打开工作区时超时，Electron 无法启动。见 tmp/evidence/T48/model-switch-core.log、model-switch-vitest.log、model-switch-l2.json、model-switch-l4.log。"
     },
     {
       "id": "T48-A09",
       "task": "T48",
       "description": "审查模型拒绝时触发 PermissionDenied；hook 返回 `retry: true` 时，给模型的工具结果说明可以重试。验证：L2 场景与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "cargo test -p piarc-core --lib tool_io::policy::tests::t46 8/8。实际运行 PermissionDenied，校验工具名、调用 ID、参数、理由、retry 提示及第二次独立送审；没有执行被拒操作。正式 hooks-m5-permission-denied L2 的 Agent Host 未能启动，严格 mock 的下一请求仍需复验。见 tmp/evidence/T48/root-core.log、l2-environment-run.json。"
     },
     {
       "id": "T48-A10",
       "task": "T48",
       "description": "MCP elicitation 表单与 URL 两种模式可完成接受、拒绝、取消，Elicitation hook 可代答或阻断，ElicitationResult 可修改回答；pi-mcp 锁定版本不支持时，上游 issue 已按规则处理、`PLAN.md` 已登记、MCP 设置页显示\"暂不支持\"，本项标 `blocked` 并写明原因。验证：L2 场景与 Playwright，或登记记录与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "pi-mcp 1.5.2 支持能力协商与请求 handler。真实 stdio、DOM 表单、Core 的 URL 精确绑定、无关卡片拒绝、单次询问取消和父调用结束撤卡均通过定向验证。正式 L2 的工作区启动超时，Playwright Electron 在启动时 SIGABRT，ego-browser 的系统 XPC 连接无效。本项等待运行环境。见 tmp/evidence/T48/elicitation-checks.log、elicitation-guards.log、browser-launch.log。"
     },
     {
       "id": "T48-A11",
       "task": "T48",
       "description": "本任务新增的能力全部登记在 `tests/capabilities.yaml`，生成的 `capabilities.md` 中除已登记的上游阻塞项外没有 MISSING。验证：生成命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "T48 的 10 项能力已登记。03b7ed1 的独立完整 L2 报告覆盖 254 个场景；node scripts/plan/check-capabilities.mjs --results <报告> --doc write / check 在该提交的临时源码目录均通过，MISSING 0。生成结果见 tmp/evidence/T48/capabilities-final.md 和 capabilities-final.log。251 个失败均发生在工作区或设置 Agent Host 启动时；直接发布该环境生成稿会将 197 个此前已实现的能力标为失败。仓库正式 docs/product/capabilities.md 待正常环境重跑后更新。"
     },
     {
       "id": "T48-A12",
       "task": "T48",
       "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "03b7ed1，干净工作区：CARGO_TARGET_DIR=<临时构建目录> RUST_TEST_THREADS=2 npm run verify 12/17。第 4 步 NAPI 临时目录清理 EPERM，同提交在独立源码目录校验两种构建及声明通过。第 5 步 Vitest 1818 项通过，bundle 清理和两项 MCP 进程测试失败（变更前复测同样受限）。第 8 步 piarc-core 单元 237 项与独立计时测试通过，真实 Seatbelt 测试 3 项失败。第 14 步无法构建 bundle，第 17 步缺该轮 L2 报告；独立运行威胁映射通过。Windows x64 交叉 Clippy 通过；本地提交未推送，尚无 T48 Windows 原生 CI。证据：tmp/evidence/T48/verify.log、core-snapshot-isolated.log、pre-t48-mcp-controls.log、windows-cross-clippy.log。"
     },
     {
       "id": "T49-A01",
