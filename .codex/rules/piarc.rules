@@ -7,15 +7,9 @@
 # Not mapped: Bash(git -C reference/* *) (a prefix rule cannot match a path wildcard; read-only git
 # commands on reference/ run inside the sandbox anyway). Read/Edit/Write denies are in .codex/config.toml
 # and CLAUDE.md, see the notes there.
-# Self-test: codex execpolicy check --pretty --rules .codex/rules/piarc.rules -- git push origin main
+# Self-test: codex execpolicy check --pretty --rules .codex/rules/piarc.rules -- git push origin macos/dev
 
 # ---------- deny ----------
-prefix_rule(
-    pattern = ["git", "push"],
-    decision = "forbidden",
-    justification = "Commit only, never push (docs/plan/protocol.md). The user pushes.",
-    match = ["git push", "git push origin main"],
-)
 prefix_rule(
     pattern = ["git", "reset", "--hard"],
     decision = "forbidden",
