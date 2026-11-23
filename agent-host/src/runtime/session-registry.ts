@@ -802,6 +802,8 @@ export class SessionRegistry {
         : workspace.modelRuntime.getModel(restored.provider, restored.modelId));
     if (offerWebSearch === undefined) await harness.prepareWebSearch(predicted);
     else harness.webSearchOffered = offerWebSearch;
+    // And Memory when auto memory is on for a trusted project (T47).
+    await harness.prepareMemory();
     // The packages' Pi extensions (T40), as Core confirmed them for this directory.
     const { hostTools } = this.#options;
     const extensions =

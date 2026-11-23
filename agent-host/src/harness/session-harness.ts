@@ -51,6 +51,7 @@ import { createWebFetchTool } from './web-fetch.js';
 import { createWebSearchTool } from './web-search.js';
 import type { SessionSkills } from './skills/session-skills.js';
 import { createSkillTool } from './skills/skill-tool.js';
+import { createMemoryTool } from './auto-memory.js';
 
 /** What Core enabled for the host tools in the handshake. */
 export interface HostToolCapabilities {
@@ -74,6 +75,8 @@ export interface HostToolCapabilities {
   readonly skills?: boolean;
   /** `plugins` (T40): the extension packages' Pi extensions (`plugins/extensions`). */
   readonly plugins?: boolean;
+  /** `autoMemory` (T47): `memory/status` and `memory/apply` for the `Memory` tool. */
+  readonly autoMemory?: boolean;
 }
 
 /** The plan and task list at the head of a branch, or undefined when it has neither. */
@@ -133,6 +136,9 @@ export class SessionHarness {
   /** Whether the session offers WebSearch (T38); decided by `prepareWebSearch` before
    * `tools()`. */
   webSearchOffered = false;
+  /** Whether the session offers the `Memory` tool (T47); decided by `prepareMemory` before
+   * `tools()`. */
+  memoryOffered = false;
   readonly #o: SessionHarnessOptions;
   #compaction: SessionCompaction | undefined;
   #memory: SessionMemory | undefined;
@@ -247,6 +253,26 @@ export class SessionHarness {
     return this.webSearchOffered;
   }
 
+  /**
+   * Decides whether the session offers the `Memory` tool (T47): Core enables auto memory, the
+   * project is trusted and the session is a main session (Core's `memory/status`). The tool set
+   * stays for the session; a change takes effect when it is opened again. Call before `tools()`.
+   */
+  async prepareMemory(): Promise<boolean> {
+    const io = this.#o.io;
+    if (this.#o.core?.autoMemory !== true || io === undefined) {
+      this.memoryOffered = false;
+      return false;
+    }
+    try {
+      this.memoryOffered = (await io.memoryStatus()).tool;
+    } catch (error) {
+      this.#o.log(`memory/status failed; no Memory tool: ${String(error)}`);
+      this.memoryOffered = false;
+    }
+    return this.memoryOffered;
+  }
+
   /** The host tools this session gets. */
   tools(): ToolDefinition[] {
     const profile = this.#o.profile;
@@ -286,6 +312,15 @@ export class SessionHarness {
       // Registered when the session opens with skills the model may load: the tool set stays
       // the same for the whole session (prompt cache).
       ...(this.skills?.modelSkills === true ? [createSkillTool(profile.Skill, this.skills)] : []),
+      // Auto memory (T47): decided when the session opens, like the skills.
+      ...(this.memoryOffered && this.#o.io !== undefined
+        ? [
+            createMemoryTool(profile.Memory, {
+              io: this.#o.io,
+              changed: (index) => this.#memory?.acknowledge(index),
+            }),
+          ]
+        : []),
     ];
   }
 

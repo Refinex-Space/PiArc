@@ -9,6 +9,9 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  MemoryApplyParams,
+  MemoryApplyResult,
+  MemoryStatusResult,
   WebFetchResult,
   WebSearchBackendResult,
   WebSearchResult,
@@ -33,6 +36,7 @@ import type {
   SandboxReport,
 } from '@piarc/protocol';
 
+import { parseMemoryFile } from '../harness/memory-io.js';
 import { AhpError } from '../protocol/errors.js';
 import { wellFormedJson } from '../protocol/well-formed.js';
 import type { CoreBridge } from '../runtime/core-bridge.js';
@@ -577,6 +581,22 @@ export class CoreIo {
     }
   }
 
+  /** What auto memory offers this session (`memory/status`, T47). */
+  async memoryStatus(signal?: AbortSignal): Promise<MemoryStatusResult> {
+    return this.#request('memory/status', {}, parseMemoryStatus, signal);
+  }
+
+  /**
+   * Runs one `Memory` call in Core (`memory/apply`, T47): Core consumes the call's permission
+   * (none for a `restore` read after a compaction).
+   */
+  async memoryApply(
+    params: Omit<MemoryApplyParams, 'sessionId'>,
+    signal?: AbortSignal,
+  ): Promise<MemoryApplyResult> {
+    return this.#request('memory/apply', { ...params }, parseMemoryApply, signal);
+  }
+
   /** The third-party search backend Core can use now (`web/searchBackend`, T38). */
   async searchBackend(signal?: AbortSignal): Promise<WebSearchBackendResult> {
     return this.#options.bridge.requestTyped('web/searchBackend', {}, parseSearchBackend, {
@@ -1006,6 +1026,26 @@ export function parseWebSearch(v: unknown): WebSearchResult | undefined {
     results.push(source);
   }
   return { backend: v.backend, results };
+}
+
+/** A `memory/status` result, or undefined when it is malformed. */
+export function parseMemoryStatus(v: unknown): MemoryStatusResult | undefined {
+  if (!isRecord(v) || typeof v.enabled !== 'boolean' || typeof v.tool !== 'boolean') {
+    return undefined;
+  }
+  return { enabled: v.enabled, tool: v.tool };
+}
+
+/** A `memory/apply` result, or undefined when it is malformed. */
+export function parseMemoryApply(v: unknown): MemoryApplyResult | undefined {
+  if (!isRecord(v) || typeof v.text !== 'string') return undefined;
+  const index = v.index == null ? undefined : parseMemoryFile(v.index);
+  if (v.index != null && index === undefined) return undefined;
+  return {
+    text: v.text,
+    ...(index === undefined ? {} : { index }),
+    ...(v.changed === true ? { changed: true } : {}),
+  } satisfies MemoryApplyResult;
 }
 
 /** A `web/searchBackend` result, or undefined when it is malformed. */

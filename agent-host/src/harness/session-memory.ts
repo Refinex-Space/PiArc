@@ -330,6 +330,14 @@ export class SessionMemory {
     return restored;
   }
 
+  /**
+   * The session changed its own auto memory (T47): `index` is the index as it is now, which the
+   * model already knows from the tool's result, so the next run does not send it again.
+   */
+  acknowledge(index: MemoryFile): void {
+    this.#versions.set(index.path, digest(index));
+  }
+
   /** Records the versions a restore delivered. */
   restored(reminders: readonly KeyedReminder[]): void {
     for (const reminder of reminders) this.#apply(reminder.data);

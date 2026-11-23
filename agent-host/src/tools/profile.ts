@@ -8,6 +8,7 @@
 // The descriptions are PiArc's own text (ADR-0006): they describe the behavior of these tools
 // (Pi's tool implementations behind Core's I/O), not Claude Code's.
 
+import { MEMORY_DESCRIPTION } from '../harness/prompts/auto-memory.js';
 import { SKILL_DESCRIPTION } from '../harness/prompts/skills.js';
 import { AGENT_DESCRIPTION } from '../harness/prompts/subagents.js';
 import { TOOL_GUIDANCE } from '../harness/prompts/tools.js';
@@ -45,6 +46,9 @@ export const AGENT_TOOLS = ['Agent'] as const;
 /** The skill tool (T37, `harness/skills/skill-tool.ts`): Core loads the skill. */
 export const SKILL_TOOLS = ['Skill'] as const;
 
+/** The auto memory tool (T47, `harness/auto-memory.ts`): Core keeps the notes. */
+export const MEMORY_TOOLS = ['Memory'] as const;
+
 /** Background task tools (T32, `harness/task-tools.ts`): Core's task manager runs them. */
 export const TASK_TOOLS = ['KillShell', 'Monitor'] as const;
 
@@ -56,6 +60,7 @@ export const CANONICAL_TOOLS = [
   ...HOST_TOOLS,
   ...AGENT_TOOLS,
   ...SKILL_TOOLS,
+  ...MEMORY_TOOLS,
 ] as const;
 
 /** A tool whose I/O Core performs. */
@@ -298,6 +303,11 @@ export const DEFAULT_PROFILE: ToolProfile = {
     name: 'Skill',
     description: SKILL_DESCRIPTION,
     ...TOOL_GUIDANCE.Skill,
+  },
+  Memory: {
+    name: 'Memory',
+    description: MEMORY_DESCRIPTION,
+    ...TOOL_GUIDANCE.Memory,
   },
 };
 

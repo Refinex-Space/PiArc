@@ -1,6 +1,7 @@
 // The default Tool Profile's contributions to the prompt. An overridden presentation can
 // supply its own snippet and guidelines for the same canonical operation.
 import type { CanonicalTool, ToolPresentation } from '../../tools/profile.js';
+import { MEMORY_GUIDANCE } from './auto-memory.js';
 
 export const TOOL_GUIDANCE = {
   Read: {
@@ -113,4 +114,5 @@ export const TOOL_GUIDANCE = {
       'Load a skill when the request matches its description, before doing the work, and then follow its instructions.',
     ],
   },
+  Memory: MEMORY_GUIDANCE,
 } satisfies Record<CanonicalTool, Pick<ToolPresentation, 'snippet' | 'guidelines'>>;

@@ -18,6 +18,7 @@ import {
   restoredSkill,
   restoredTodos,
 } from './prompts/notices.js';
+import { restoredMemory } from './prompts/auto-memory.js';
 import type { KeyedReminder, ReminderCategory } from './reminders.js';
 import { estimateTokens, truncateToTokens } from './tokens.js';
 
@@ -33,6 +34,9 @@ export const RESTORE_LIMITS = {
   files: 5,
   file: 20_000,
   filesTotal: 50_000,
+  /** Auto memory notes the session read or saved (T47): the most recent ones, together. */
+  notes: 5,
+  notesTotal: 10_000,
 } as const;
 
 /** Custom entry of an invoked skill (`{ name, content }`): T37's Skill tool writes it. */
@@ -83,6 +87,25 @@ export function recentFiles(
   return files;
 }
 
+/** The auto memory notes the branch's `Memory` calls read or saved, most recent first, each
+ * once (T47). */
+export function recentNotes(
+  entries: readonly SessionEntry[],
+  canonical: (tool: string) => string,
+): string[] {
+  const notes: string[] = [];
+  for (const entry of entries.toReversed()) {
+    if (entry.type !== 'message' || entry.message.role !== 'assistant') continue;
+    for (const part of entry.message.content.toReversed()) {
+      if (part.type !== 'toolCall' || canonical(part.name) !== 'Memory') continue;
+      const { action, name } = part.arguments;
+      if ((action !== 'read' && action !== 'save') || typeof name !== 'string') continue;
+      if (name.length > 0 && !notes.includes(name)) notes.push(name);
+    }
+  }
+  return notes;
+}
+
 /** A file read for a restore: its text, too long for the limit, or not readable. */
 export type RestoredRead =
   | { readonly kind: 'text'; readonly text: string }
@@ -99,6 +122,10 @@ export interface RestoreSources {
   readonly files: readonly string[];
   /** A file's current text, at most `maxChars` UTF-16 code units of it. */
   readonly readFile: (file: string, maxChars: number) => Promise<RestoredRead>;
+  /** Auto memory notes the branch read or saved, most recent first (T47). */
+  readonly notes?: readonly string[];
+  /** A note as Core reads it now, or undefined when it is gone or auto memory is off. */
+  readonly readNote?: (name: string) => Promise<string | undefined>;
 }
 
 function section(
@@ -160,6 +187,14 @@ export async function restoreSections(sources: RestoreSources): Promise<KeyedRem
       RESTORE_LIMITS.skillsTotal,
     ),
   );
+  const notes: KeyedReminder[] = [];
+  for (const name of (sources.notes ?? []).slice(0, RESTORE_LIMITS.notes)) {
+    const text = await sources.readNote?.(name);
+    if (text !== undefined) {
+      notes.push(section(`restore:note:${name}`, name, restoredMemory(text), 'memory'));
+    }
+  }
+  sections.push(...limited(notes, RESTORE_LIMITS.notesTotal, RESTORE_LIMITS.notesTotal));
   let left: number = RESTORE_LIMITS.filesTotal;
   const omitted: string[] = [];
   for (const file of sources.files.slice(0, RESTORE_LIMITS.files)) {

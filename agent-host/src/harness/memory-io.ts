@@ -24,23 +24,35 @@ function isStrings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
+/** One memory document from Core, or undefined when it is malformed. */
+export function parseMemoryFile(file: unknown): MemoryFile | undefined {
+  if (
+    !isObject(file) ||
+    typeof file.path !== 'string' ||
+    typeof file.content !== 'string' ||
+    (file.paths != null && !isStrings(file.paths)) ||
+    (file.kind != null && file.kind !== 'managed' && file.kind !== 'autoMemory')
+  ) {
+    return undefined;
+  }
+  return {
+    path: file.path,
+    content: file.content,
+    ...(file.paths == null ? {} : { paths: file.paths }),
+    // A managed CLAUDE.md or the auto memory index (T47).
+    ...(file.kind === 'managed' || file.kind === 'autoMemory' ? { kind: file.kind } : {}),
+  };
+}
+
 function parseFiles(value: unknown): MemoryFile[] {
   if (!Array.isArray(value))
     throw new AhpError('invalidRequest', 'fs/memory returned an invalid file list');
   return value.map((file: unknown) => {
-    if (
-      !isObject(file) ||
-      typeof file.path !== 'string' ||
-      typeof file.content !== 'string' ||
-      (file.paths != null && !isStrings(file.paths))
-    ) {
+    const parsed = parseMemoryFile(file);
+    if (parsed === undefined) {
       throw new AhpError('invalidRequest', 'fs/memory returned an invalid file');
     }
-    return {
-      path: file.path,
-      content: file.content,
-      ...(file.paths == null ? {} : { paths: file.paths }),
-    };
+    return parsed;
   });
 }
 

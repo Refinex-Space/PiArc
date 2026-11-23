@@ -63,7 +63,13 @@ import {
   summaryPrompt,
   type SummaryRequest,
 } from './prompts/compaction.js';
-import { invokedSkills, recentFiles, restoreSections, type RestoredRead } from './reinjection.js';
+import {
+  invokedSkills,
+  recentFiles,
+  recentNotes,
+  restoreSections,
+  type RestoredRead,
+} from './reinjection.js';
 import {
   REMINDER_ENTRY,
   reminderMessage,
@@ -399,6 +405,22 @@ export class SessionCompaction {
       todos: currentTodos(entries, this.#o.canonical),
       skills: invokedSkills(entries),
       files: io === undefined ? [] : recentFiles(entries, this.#o.canonical, this.#o.cwd),
+      notes: io === undefined ? [] : recentNotes(entries, this.#o.canonical),
+      readNote: async (name) => {
+        if (io === undefined) return undefined;
+        try {
+          const read = await io.memoryApply({
+            toolCallId: `restore-${randomUUID()}`,
+            action: 'read',
+            name,
+            restore: true,
+          });
+          return read.text;
+        } catch {
+          // Gone since, or auto memory is off now.
+          return undefined;
+        }
+      },
       readFile: async (file, maxChars): Promise<RestoredRead> => {
         if (io === undefined) return { kind: 'unreadable' };
         try {

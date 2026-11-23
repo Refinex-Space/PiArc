@@ -2,6 +2,7 @@
 // project context, skills index (T37), MCP servers (T36), environment.
 import type { MemoryFile } from '@piarc/protocol';
 import { CANONICAL_TOOLS, type ToolProfile } from '../../tools/profile.js';
+import { MEMORY_PREAMBLE, managedSource } from './auto-memory.js';
 
 export const IDENTITY = [
   'You are PiArc, a coding agent working alongside the person who opened this workspace.',
@@ -10,6 +11,11 @@ export const IDENTITY = [
 ].join('\n');
 
 export function sourced(file: MemoryFile): string {
+  // The organization's instructions and the auto memory index say what they are (T47).
+  if (file.kind === 'managed') return `${managedSource(file.path)}\n${file.content}`;
+  if (file.kind === 'autoMemory') {
+    return `${MEMORY_PREAMBLE}\nSource: ${file.path}\n${file.content}`;
+  }
   return `Source: ${file.path}\n${file.content}`;
 }
 

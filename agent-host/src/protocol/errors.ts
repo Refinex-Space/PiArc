@@ -34,6 +34,7 @@ const CODES: Record<ErrorKind, number> = {
   permissionDenied: -32021,
   unencodableText: -32022,
   cancelled: -32023,
+  managedSettingsInvalid: -32024,
 };
 
 /** An error with an AHP kind; thrown by request handlers and the Core bridge. */

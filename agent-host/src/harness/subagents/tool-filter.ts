@@ -19,12 +19,14 @@ import type { AgentDefinition } from '@piarc/protocol';
 
 import { toolNotAvailable } from '../prompts/subagents.js';
 
-/** Tools no subagent gets: they talk to the user or switch the main session's mode. */
+/** Tools no subagent gets: they talk to the user or switch the main session's mode, or keep
+ * the main session's auto memory (T47: a subagent neither sees nor writes it). */
 export const PARENT_ONLY_TOOLS: ReadonlySet<string> = new Set([
   'AskUserQuestion',
   'EnterPlanMode',
   'ExitPlanMode',
   'SuggestNextSteps',
+  'Memory',
 ]);
 
 /**
