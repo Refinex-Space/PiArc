@@ -4,17 +4,19 @@
 //   Resources/agent-host/
 //   ├── node/                 Node.js (macOS: bin/node, bin/npm, bin/npx, lib/node_modules/npm;
 //   │                         Windows: node.exe, npm(.cmd), npx(.cmd), node_modules/npm)
-//   ├── agent-host.mjs        the bundle (scripts/dev/build-agent-host.mjs)
+//   ├── agent-host.mjs        stable Node entry; bundle-files.json lists this build
+//   ├── chunks/               static and dynamically imported local ESM modules
 //   ├── pi-assets/            PI_PACKAGE_DIR
 //   ├── node_modules/         the bundle's external packages (agent-host/CLAUDE.md)
 //   └── bin/                  rg, fd (`.exe` on Windows)
 //
 // Core resolves the same relative paths at run time (`piarc_core::agent_host::BundledRuntime`);
 // scripts/ci/check-app-layout.mjs checks a packaged app against them.
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import { BUNDLE_MANIFEST, CHUNK_DIR, entrySource, verifiedBundle } from './agent-bundle.mjs';
 import { keepInNodeRuntime } from './trim.mjs';
 
 /** Directory name under the app's resources directory. */
@@ -81,6 +83,7 @@ export async function copyAgentHostResources({ repoRoot, resourcesDir, platform,
         'package-desktop.mjs prepares them; run it instead of electron-forge directly.',
     );
   }
+  const manifest = verifiedBundle(bundleDir);
   const target = path.join(resourcesDir, AGENT_HOST_DIR);
   await rm(target, { recursive: true, force: true });
   await mkdir(target, { recursive: true });
@@ -93,7 +96,13 @@ export async function copyAgentHostResources({ repoRoot, resourcesDir, platform,
     filter: keepInNodeRuntime,
   });
   await cp(path.join(runtime, 'bin'), path.join(target, layout.toolsBin), { recursive: true });
-  await cp(path.join(bundleDir, layout.bundle), path.join(target, layout.bundle));
+  await mkdir(path.join(target, CHUNK_DIR));
+  for (const name of Object.keys(manifest.files)) {
+    await cp(path.join(bundleDir, CHUNK_DIR, name), path.join(target, CHUNK_DIR, name));
+  }
+  // Use the entry from the same manifest, even when another development build just finished.
+  await writeFile(path.join(target, layout.bundle), entrySource(manifest.entry));
+  await writeFile(path.join(target, BUNDLE_MANIFEST), JSON.stringify(manifest) + '\n');
   await cp(path.join(bundleDir, layout.piAssets), path.join(target, layout.piAssets), {
     recursive: true,
   });

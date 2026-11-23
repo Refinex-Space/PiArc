@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.61（2026-11-24） |
+| 版本 | 2.62（2026-11-24） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -282,6 +282,7 @@ PiArc/
 | [0066](../adr/0066-fork-tool-declarations.md) | fork 保留父请求的工具声明，调用进入子会话权限闸门 | 保持 Anthropic 前缀缓存，限制主会话专用操作与递归 fork |
 | [0067](../adr/0067-fork-skill-index-and-grants.md) | 隔离 skill 的正文、临时授权和 hooks 只交给执行它的子会话 | 父会话只需索引和运行结果 |
 | [0068](../adr/0068-worktree-hook-ownership.md) | 在 Core 登记 hook 创建的目录及其文件系统身份 | 清理与恢复能核实所有者，无法判断改动时保留目录 |
+| [0071](../adr/0071-local-esm-chunks.md) | Agent Host 的本地 ESM 分块 | 冷模块按需加载，完整模块清单随包校验 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -383,7 +384,7 @@ T21（ADR-0032）把非密钥配置保存在用户级设置中，由 Core 生成
 
 运行时决策见 ADR-0015：Agent Host 用单独内置的 Node LTS，由 Core 直接启动，不经过 Electron。
 
-- 构建：esbuild 把 Agent Host 打成单个 bundle（目标与 Pi 一致：node22.19+），外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。T06 的 `npm run build:agent-host` 输出 `agent-host/dist/bundle/agent-host.mjs` 与 `pi-assets/package.json`（Pi 从中读版本与配置目录名，经 `PI_PACKAGE_DIR` 指定）；外部依赖为 `@silvia-odwyer/photon-node`（wasm）与四个可选原生加速包，清单见 `agent-host/CLAUDE.md`。Bedrock 的懒加载适配已随 T21 打入，OAuth 流程模块随 T29 经 `registerLazyOAuthFlows` 打入；codemode worker 与图片缩放 worker 尚未打包，接入对应功能时补上。
+- 构建：esbuild 以与 Pi 一致的 node22.19+ 为目标，生成稳定的 `agent-host.mjs` 入口和按需加载的本地 ESM 分块（ADR-0071）。外部依赖只保留 Pi 要求的原生/wasm 资源（photon、quickjs wasm 等）。T06 的 `npm run build:agent-host` 输出 `agent-host/dist/bundle/agent-host.mjs` 与 `pi-assets/package.json`（Pi 从中读版本与配置目录名，经 `PI_PACKAGE_DIR` 指定）；外部依赖为 `@silvia-odwyer/photon-node`（wasm）与四个可选原生加速包，清单见 `agent-host/CLAUDE.md`。Bedrock 的懒加载适配已随 T21 打入，OAuth 流程模块随 T29 经 `registerLazyOAuthFlows` 打入；codemode worker 与图片缩放 worker 尚未打包，接入对应功能时补上。
 - 应用内布局（macOS；Windows 在安装目录的 `resources\` 下是同样的结构）：
 
 ```
@@ -395,7 +396,9 @@ PiArc.app/Contents/
     ├── app.asar.unpacked/      # piarc-core 的 .node 原生模块
     └── agent-host/             # 不进 asar：独立的 node 读不了 asar
         ├── node/               # Node LTS 发行包：bin/node、bin/npm、bin/npx（保留 Node.js 官方签名）
-        ├── agent-host.mjs      # bundle
+        ├── agent-host.mjs      # 启动同一构建的入口模块
+        ├── bundle-files.json   # 入口文件名与各模块的 SHA-256
+        ├── chunks/             # esbuild 的入口、共享与动态导入模块
         ├── pi-assets/          # Pi 运行时需要的资源（经 PI_PACKAGE_DIR 指定）
         ├── node_modules/       # bundle 的外部依赖（photon-node，加载自己目录下的 wasm）
         └── bin/ rg fd          # 预置，避免 Pi 运行时下载（ad-hoc 签名）
@@ -1888,6 +1891,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
+| 2.62 | 2026-11-24 | M4 性能收尾：第 5.6 节采用随应用分发、按清单校验的 Agent Host 本地 ESM 分块（ADR-0071）。 |
 | 2.61 | 2026-11-24 | I185：第 6 章补充设置文件的复查、诊断页的刷新时机，以及会话运行前对技能和输出风格的核对。 |
 | 2.60 | 2026-11-23 | T48：第 6 章补充服务端压缩、fork 及隔离 skill 的缓存和权限规则、M5 hooks 与 MCP elicitation。ADR-0066、0067、0068 记录工具声明、授权和目录归属的调整。 |
 | 2.56 | 2026-11-22 | T45（ADR-0062）补充第 4 章 ADR-0062；10.1 节第 9–11 行的对策改用分号分隔（措辞不变，便于逐条映射），恶意插件一行加"Pi 自己设置里的包清单不由 Agent Host 安装或加载"，通用运行时一行加远程调试开关；10.5 节 T45 落地（外连清单、日志脱敏、诊断包、威胁映射与 Electron 清单复核）。 |

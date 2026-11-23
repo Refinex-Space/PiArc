@@ -6,7 +6,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 | 命令 | 用途 |
 |---|---|
-| `npm run build:agent-host` | esbuild 打包到 `agent-host/dist/bundle/agent-host.mjs`，并写 `pi-assets/package.json`；`@piarc/protocol` 从源码打包，不依赖 `tsc` 产物 |
+| `npm run build:agent-host` | esbuild 打包到 `agent-host/dist/bundle/agent-host.mjs`，并写 `chunks/`、`bundle-files.json` 和 `pi-assets/package.json`（ADR-0071）；`@piarc/protocol` 从源码打包，不依赖 `tsc` 产物 |
 | `npx vitest run agent-host` | 单元测试：出站队列（含回放缓冲、单帧上限）、投影与 golden 测试（`projector.golden.test.ts` 打印覆盖矩阵）、排队表、工具批次、中断补齐、Core 桥接、工具层、凭据存储、信任接管、MCP 连接池（`src/mcp/pool.test.ts`，手动时钟） |
 | `npx vitest run agent-host -u` | golden 录制更新后重写投影的期望输出（`test/golden/*.expected.json`，提交前逐个审阅） |
 | `PIARC_UPDATE_GOLDEN=1 cargo test -p piarc-testkit --test agent_host golden` | 用真实 Agent Host 与 mock 重新录制 golden 输入（`test/golden/*.events.json`）；不带变量时只核对 Pi 产生的事件类型没有变化 |

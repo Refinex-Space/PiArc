@@ -1,4 +1,4 @@
-// Bundles the Agent Host into one ESM file for Node (architecture section 5.6):
+// Builds the Agent Host as local ESM chunks for Node (architecture section 5.6):
 // agent-host/dist/bundle/agent-host.mjs, plus pi-assets/ (Pi's package.json, which Pi reads
 // for its version and config directory name; Core points PI_PACKAGE_DIR at it).
 //
@@ -9,13 +9,28 @@
 // `PI_BUNDLED_NODE`, and photon-node left external because it loads its wasm file from its
 // package directory. Everything else is inlined; the build fails if any other package stays
 // external. The list of externals is documented in agent-host/AGENTS.md.
-import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { isBuiltin } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { build } from 'esbuild';
 
+import {
+  BUNDLE_MANIFEST,
+  CHUNK_DIR,
+  CHUNK_NAME,
+  digest,
+  entrySource,
+} from '../../apps/desktop/packaging/agent-bundle.mjs';
 import { isMain, repoRoot } from '../lib/repo.mjs';
 
 /** Packages left external, each because Pi loads a native or wasm asset next to it. */
@@ -30,12 +45,42 @@ export const PI_ASSETS_DIR = path.join(BUNDLE_DIR, 'pi-assets');
 
 /** Builds the bundle and returns its path. */
 export async function buildAgentHost() {
-  rmSync(BUNDLE_DIR, { recursive: true, force: true });
-  mkdirSync(BUNDLE_DIR, { recursive: true });
+  mkdirSync(path.join(BUNDLE_DIR, CHUNK_DIR), { recursive: true });
+  const staging = mkdtempSync(path.join(BUNDLE_DIR, '.build-'));
+  try {
+    return await buildInto(staging);
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+/** Publish a complete file on the same volume; an already published identical file can stay
+ * open (including on Windows).
+ * @param {string} staged
+ * @param {string} target
+ */
+function publish(staged, target) {
+  const same = () => existsSync(target) && readFileSync(staged).equals(readFileSync(target));
+  if (same()) return;
+  try {
+    renameSync(staged, target);
+  } catch (error) {
+    if (!same()) throw error;
+  }
+}
+
+/** @param {string} staging */
+async function buildInto(staging) {
   const result = await build({
     absWorkingDir: repoRoot,
     entryPoints: [path.join(repoRoot, 'agent-host', 'src', 'main.ts')],
-    outfile: BUNDLE_FILE,
+    outdir: staging,
+    outExtension: { '.js': '.mjs' },
+    entryNames: 'entry-[hash]',
+    chunkNames: 'chunk-[hash]',
+    splitting: true,
+    minifySyntax: true,
+    minifyWhitespace: true,
     bundle: true,
     format: 'esm',
     platform: 'node',
@@ -76,8 +121,37 @@ export async function buildAgentHost() {
   const piEntry = fileURLToPath(import.meta.resolve('@earendil-works/pi-coding-agent'));
   const piPackageJson = path.join(path.dirname(path.dirname(piEntry)), 'package.json');
   mkdirSync(PI_ASSETS_DIR, { recursive: true });
-  cpSync(piPackageJson, path.join(PI_ASSETS_DIR, 'package.json'));
+  writeFileSync(path.join(staging, 'package.json'), readFileSync(piPackageJson));
+  publish(path.join(staging, 'package.json'), path.join(PI_ASSETS_DIR, 'package.json'));
+
+  publishModules(staging, Object.keys(result.metafile.outputs));
   return BUNDLE_FILE;
+}
+
+/** @param {string} staging @param {string[]} outputs */
+function publishModules(staging, outputs) {
+  // Publish the immutable modules first. Hosts which are running during a rebuild may still
+  // import an older chunk later; packaging copies only the manifest's current generation.
+  /** @type {Record<string, string>} */
+  const files = {};
+  let entry;
+  for (const output of outputs.sort()) {
+    const name = path.basename(output);
+    if (!CHUNK_NAME.test(name)) throw new Error(`Unexpected Agent Host build output: ${name}`);
+    const file = path.join(staging, name);
+    files[name] = digest(readFileSync(file));
+    publish(file, path.join(BUNDLE_DIR, CHUNK_DIR, name));
+    if (name.startsWith('entry-')) {
+      if (entry !== undefined) throw new Error('esbuild emitted two Agent Host entries');
+      entry = name;
+    }
+  }
+  if (entry === undefined) throw new Error('esbuild did not emit an Agent Host entry');
+  writeFileSync(path.join(staging, BUNDLE_MANIFEST), JSON.stringify({ entry, files }) + '\n');
+  publish(path.join(staging, BUNDLE_MANIFEST), path.join(BUNDLE_DIR, BUNDLE_MANIFEST));
+  const loader = path.join(staging, 'agent-host.mjs');
+  writeFileSync(loader, entrySource(entry));
+  publish(loader, BUNDLE_FILE);
 }
 
 if (isMain(import.meta.url)) {

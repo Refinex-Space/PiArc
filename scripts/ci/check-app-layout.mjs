@@ -35,6 +35,11 @@ import {
   agentHostLayout,
 } from '../../apps/desktop/packaging/agent-host-layout.mjs';
 import { ENTITLEMENTS } from '../../apps/desktop/packaging/macos-sign.mjs';
+import {
+  CHUNK_DIR,
+  entrySource,
+  verifiedBundle,
+} from '../../apps/desktop/packaging/agent-bundle.mjs';
 import { isMain, isRecord, readJsonFile } from '../lib/repo.mjs';
 import { packagedAppPath, productName } from './check-fuses.mjs';
 
@@ -183,10 +188,23 @@ export function checkAppLayout({ app, platform, arch, flavor }) {
     const full = path.join(agentHost, relative);
     add(`agent-host/${label} present outside app.asar`, existsSync(full), full);
   }
+  try {
+    const manifest = verifiedBundle(agentHost);
+    const entry = readFileSync(path.join(agentHost, layout.bundle), 'utf8');
+    const count = Object.keys(manifest.files).length;
+    add(
+      'Agent Host ESM chunks',
+      entry === entrySource(manifest.entry) &&
+        readdirSync(path.join(agentHost, CHUNK_DIR)).length === count,
+      String(count),
+    );
+  } catch (error) {
+    add('Agent Host ESM chunks', false, String(error));
+  }
   const asar = path.join(resources, 'app.asar');
   const inAsar = existsSync(asar)
     ? listPackage(asar, { isPack: false }).filter((p) =>
-        /agent-host\.mjs|[\\/]rg(\.exe)?$|[\\/]fd(\.exe)?$/.test(p),
+        /agent-host\.mjs|[\\/]agent-host[\\/]chunks[\\/]|[\\/]rg(\.exe)?$|[\\/]fd(\.exe)?$/.test(p),
       )
     : ['app.asar missing'];
   add('app.asar holds no Agent Host resources', inAsar.length === 0, inAsar.join(', '));

@@ -32,7 +32,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `PIARC_EVIDENCE_TASK=T43 npx playwright test -c apps/desktop/playwright.config.ts t43- --project dev` | T43 无障碍：状态清单全部状态的 axe（亮暗，报告在 `tmp/evidence/T43/axe/`）、审批卡焦点、只用键盘的流程与系统偏好、中英文截图与溢出检查 |
 | `node scripts/dev/check-prompt-originality.mjs` | 修改 Harness 英文提示词或工具指引后，在含本地参考副本的机器上做连续 10 词比对，更新 `docs/engineering/prompt-originality.md` |
 | `npm run gen:protocol` | 由 `piarc-protocol` 重新生成 `packages/protocol/schema/` 与 `src/generated/`；改了协议类型后运行并提交 |
-| `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs`（另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
+| `npm run build:agent-host` | esbuild 把 Agent Host 打成 `agent-host/dist/bundle/agent-host.mjs` 和离线 ESM 分块 `chunks/`（清单 `bundle-files.json`；另写 `pi-assets/package.json`，运行时以 `PI_PACKAGE_DIR` 指向它） |
 | `npm run build:core` | 用 `@napi-rs/cli` 构建本机的 Core 开发版 `.node`（`target/piarc-core/development/`）并更新 `.d.ts` 快照；`-- --flavor all` 两种构建都出 |
 | `npm run format` | Prettier 写入格式（不处理 Markdown） |
 | `npm run lint` | ESLint（类型感知） |
