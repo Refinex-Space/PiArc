@@ -114,3 +114,41 @@ test('approval notifications answer through the ledger', async ({ app, page, wor
   await settings.screenshot({ path: path.join(EVIDENCE, 'settings-notifications-dark.png') });
   await prefer(page, { key: 'appearance.theme', value: 'light' });
 });
+
+test('an unavailable system notification leaves the approval in the window and explains the fallback', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  await mkdir(EVIDENCE, { recursive: true });
+  await app.evaluate(({ Notification }) => {
+    Notification.isSupported = () => false;
+  });
+  await prefer(page, { key: 'language', value: 'en' });
+  const ws = await makeWorkspace(workspaces, 'notification fallback', {});
+  await openFolder(page, app, ws);
+  await startSession(page, 'Check the environment', 't42-notify');
+  await page.getByRole('button', { name: 'Allow once', exact: true }).first().click();
+  const opening = app.waitForEvent('window');
+  await page.getByTestId('open-settings').click();
+  const settings = await opening;
+  await settings.getByTestId('settings-nav-general').click();
+  const note = settings.getByTestId('setting-notifications-note');
+  await expect(note).toContainText("This system does not show PiArc's notifications");
+  await expect
+    .poll(() =>
+      app.evaluate(() => {
+        const attention = globalThis.__piarcTestHooks?.attention();
+        return (
+          attention?.notified.some(
+            (entry) => entry.body.includes('printenv HOME') && !entry.shown,
+          ) && attention.bounces > 0
+        );
+      }),
+    )
+    .toBe(true);
+  await expect(
+    page.locator('[data-approval-card="command"]').filter({ hasText: 'printenv HOME' }),
+  ).toBeVisible();
+  await settings.screenshot({ path: path.join(EVIDENCE, 'notification-unavailable.png') });
+});

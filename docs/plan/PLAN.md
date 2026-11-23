@@ -172,7 +172,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
-| T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 部分完成 | 868065b |
+| T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 已完成 | 1b15296 |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
@@ -501,7 +501,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I184 | T41 | 用量的目录价只在 Core 见过某模型的 `models/list` 之后才有（打开过会话、设置页或生成报告时有运行中的 Agent Host）；从未出现在这些列表里的模型在用量页显示"未知"，直到再次列出 | 可接受的现状；需要时让生成报告在没有运行中 Agent Host 时临时起设置 Host 取一次目录，交 R5 评估 |
 | I185 | T41 | 全量 L2 并行时，T13 的设置监听（FSEvents）事件可能迟到几十秒：ConfigChange 已改为每个输入前核对，不受影响；配置诊断页的自动刷新、skills 与命令变化后的 `resources/reload` 仍依赖它 | R5 评估是否让这些消费方在使用前同样核对（或改为轮询少量固定文件）；**R5**：负载下（本机负载均值约 5–6）`crates/piarc-core/tests/state.rs` 的 `editing_settings_while_running…` 在 3 次全量 verify 中超时 2 次（20 s 内没有设置事件），单独运行通过：设置监听本身在负载下迟到，不只是 L2 并行。交 T48：配置诊断与 `resources/reload` 的消费方在使用前核对文件（同 ConfigChange 的做法），测试改为等确定的信号；不放宽等待时间 **已关闭（1b15296）**。注册监听目录期间，Core 继续重载设置和投递事件，每 2 秒核对设置层文件。Agent Host 在运行前核对技能与输出风格，打开的诊断页在恢复焦点时重读，可见期间定时复查。阻塞监听注册的回归、原先超时的两条配置编辑用例和默认并发全量均通过。 |
 | I186 | T42 | 代码高亮的明暗配色跟随系统的 `prefers-color-scheme`（`transcript/use-color-scheme.ts`），不跟随应用的主题选择：系统为浅色、应用选深色时，Changes 面板与 transcript 代码块的 token 用浅色配色画在深色底上，对比度不足（`tmp/evidence/T42/` 的 `comments-saved-dark.png` 可见） | T43（无障碍与对比度）：让 `useDarkScheme` 读 `<html>` 的 `data-color-mode`，或在主进程按偏好设置 `nativeTheme.themeSource`；**已落地（T43）**：`useDarkScheme` 按应用的主题选择（`system` 时才看系统），代码高亮另换为高对比度主题（`transcript/highlight/themes.ts`，ADR-0061） |
-| I187 | T42 | 可操作通知的实机核对：macOS 横幅与按钮的截图需要终端有"屏幕录制"权限（本机 `screencapture` 报 could not create image from display，T42-A06 标 blocked）；Windows Toast 按钮的实机点击 | macOS 截图由用户授权屏幕录制后用 `PIARC_CAPTURE_NOTIFICATION=1 PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-notify --project dev` 补拍；Windows 并入 W4 |
+| I187 | T42 | 可操作通知的实机核对：macOS 横幅与按钮的截图需要终端有"屏幕录制"权限（本机 `screencapture` 报 could not create image from display，T42-A06 标 blocked）；Windows Toast 按钮的实机点击 | macOS 截图由用户授权屏幕录制后用 `PIARC_CAPTURE_NOTIFICATION=1 PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-notify --project dev` 补拍；Windows 并入 W4 **已关闭**。macOS 正式通知横幅和展开按钮截图、原生点击及通知不可用时的独立降级测试均已补齐，见 T42-A06。 |
 | I188 | T43 | VoiceOver 实际操作核对未做：`docs/engineering/accessibility.md` 第 3 节的 10 项读屏清单需要人在 macOS 上开 VoiceOver 逐项操作，T43 时用户不在场（T43-A10 标 blocked）；自动化已覆盖行名称、节流播报、审批卡焦点与 axe | 用户按清单操作后把结论填入 VoiceOver 一列，问题登记后由 R5 或后续任务修；Narrator 与 NVDA 由 W3 按同一清单执行；**W3**：讲述人与 NVDA 两列由用户实机核对，全部通过；VoiceOver 一列仍待用户 **2026-11-24**：已有四项的部分 macOS 原生字幕，按用户要求结束旁白；逐项结果及剩余实测范围见无障碍文档第 3 节。 |
 | I189 | T44 | 渲染进程重载或崩溃后，transcript 0.1–0.2 s 内重新可见、回合不中断，但正在流式输出的那条回复要到回合结束（约 7 s 后）才重新出现：新文档只拿到快照里已完成的条目，没有补上进行中条目已流出的文字（`scripts/perf/probe-recovery.mjs` 的 `streamingReplyMs`） | 第 11 章"≤ 2 s、会话不中断"按 transcript 可见计，已达标；进行中条目的补齐交 R5 评估（Core 快照带进行中条目的已有文字，或渲染进程重连后请求补齐） |
 | I190 | T44 | 空闲 CPU：会话打开、终端面板显示 shell、什么都不运行时，应用全部进程加 Agent Host 合计约 3.6%（一个核心），其中 GPU 进程约 1.7%、渲染进程约 1.5%，窗口隐藏后几乎不变（隐藏时 rAF 回调与终端帧都是 0）；第 11 章阈值定为 ≤ 5% | R5 定位隐藏窗口下 GPU 与渲染进程仍在做的工作（`--cpu-prof`、CDP 追踪），目标是隐藏时接近 0；收紧阈值须有两个平台的数据；**R5**：在预算内（≤ 5%），并入 I222 的性能任务定位隐藏时 GPU 与渲染进程的工作 |
@@ -1249,3 +1249,7 @@ W3-A12 已由 1e24074 的 Windows CI 17/17 补齐。按 ADR-0063 回看旧内存
 ### 2026-11-24 T44 补记全量验证
 
 A09 已由后继代码上的两次全量 17/17 补齐。A04 按同一提交连续五次 PR 性能冒烟单独判定。
+
+### 2026-11-24 T42 已完成
+
+macOS 系统显示了模拟会话的审批标题和命令，展开后两项可操作，原生“Allow once”作答通过。通知不可用的用例验证了设置说明及应用内审批。Windows 通知验收沿用 W3 的既有记录。证据见 `acceptance.json` 的 T42-A06。

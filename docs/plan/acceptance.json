@@ -4164,8 +4164,8 @@
       "id": "T42-A06",
       "task": "T42",
       "description": "macOS 按 S6 结论走带操作或降级的路径，实际可用的路径有实测截图，另一条路径有测试；降级时设置页说明原因。验证：截图（`tmp/evidence/T42/`）与测试输出。",
-      "status": "blocked",
-      "evidence": "测试与降级说明已完成：macOS 走带按钮的路径（Electron 45 `actions`，`attention.test.ts` 与 L4 `t42-notify` 经测试钩子按下按钮）；系统不支持通知时设置页说明原因（`settings-notifications-light/dark.png`）。缺系统横幅的实测截图：本机终端没有\"屏幕录制\"权限，`screencapture` 报 could not create image from display。登记 I187：授权后用 `PIARC_CAPTURE_NOTIFICATION=1 PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-notify --project dev` 补拍"
+      "status": "passing",
+      "evidence": "macOS 26.5.2 arm64，隔离的签名开发包 cn.piarc.desktop。用 packaged t42-notify 和本地 t42-notify mock 请求产生真正的系统审批通知；展开系统“选项”后看到 Allow once、Deny，实际点 Allow once 后通过审批并进入下一条请求。截图 tmp/evidence/T42/macos-notification-banner.png、macos-notification-actions.png，原生点击记录 tmp/evidence/partial-closure/t42-native/system-actions.log、banner-native-3.log。独立 Electron 用例将 Notification.isSupported() 置为 false，在系统通知开关打开时核对 shown=false、Dock 提醒、窗口里保留命令审批卡、设置说明原因；截图 tmp/evidence/T42/notification-unavailable.png，输出 tmp/evidence/partial-closure/t42-fallback.log。"
     },
     {
       "id": "T42-A07",
