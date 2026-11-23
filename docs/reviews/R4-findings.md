@@ -1,5 +1,7 @@
 # R4 · M3 macOS 阶段评审
 
+**2026-11-24 复核：M3（macOS）达标。** Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。 逐项核对 T31–T38 和 W2 的 120 个验收项，全部为 passing。此前的 T34-A03 已实测通过，T35-A11 按 ADR-0063 完成物理内存复测。 Windows 私有工作集的正式稳态最大值交 W4 实机补验。下文保留初次评审采用 RSS 的记录。
+
 **M3（macOS）未达标，阻塞项只有内存一项。** 第 16 章的退出标准是"3 个并行会话 + 子 agent 场景满足第 11 章内存预算"：Agent Host 达标（4 个活动会话最大 236 MB，上限 270 MB），应用其余进程合计 580 MB，超出 macOS 预算 510 MB。超出的主体是没有会话时就有的基线（约 511 MB），而 RSS 合计把各进程映射的同一份 Electron 框架代码页各算一次：同一负载下这些进程的物理占用（phys_footprint）合计约 250 MB。第 11 章只能收紧，改口径等于放宽，本任务不做。M3 的能力都已交付：能力清单里 M3 及之前没有 `planned` 的能力，L2 174 个通过、0 个失败（2 个 Windows 专属）。四个独立审查共提出 37 条发现，修复其中 10 项缺陷，每项都先有失败的测试；其中 3 项高风险：worktree 与上级目录的 skill、命令和子 agent 定义借用主工作区的信任（E1），项目文件经链接把任意本机文件带进 system prompt（E2），控制字符让终端执行的命令与裁决的文本不同（M1）。其余发现逐条写明不同意的理由，或登记到具体任务（I165–I176）。W2 的 Windows 分支已合并进主线，W2 为"已完成"。
 
 **进入 M4 的前提条件**（不阻塞 T39、W3 开工）：

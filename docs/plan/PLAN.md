@@ -167,7 +167,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T36 | [MCP 共享连接池](tasks/T36-mcp-connection-pool.md) | 4 | T35 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | ca3d873 |
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
-| R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 部分完成 | 8a1b0cf |
+| R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 已完成 | 1b15296 |
 | W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 部分完成 | 9879474 |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
@@ -1257,3 +1257,7 @@ macOS 系统显示了模拟会话的审批标题和命令，展开后两项可�
 ### 2026-11-24 T35 已完成
 
 Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。
+
+### 2026-11-24 R4 已完成
+
+逐项核对 T31–T38 和 W2 的 120 个验收项，全部为 passing。此前的 T34-A03 已实测通过，T35-A11 按 ADR-0063 完成物理内存复测。 内存原始数据、预算和 macOS 退出结论见 `docs/reviews/R4-findings.md` 收尾复核。

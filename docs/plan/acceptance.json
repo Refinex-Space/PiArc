@@ -244,8 +244,8 @@
       "id": "R4-A01",
       "task": "R4",
       "description": "当前主线上，同一工作区 3 个并行会话加 1 个子 agent（共享 1 个 stdio MCP server、已加载 skills 索引）的稳态内存满足第 11 章预算。验证：测量脚本输出与 `docs/reviews/R4-findings.md` 中的数据。",
-      "status": "failing",
-      "evidence": "npm run perf:m3 -- --out tmp/evidence/R4/m3-memory-{1,2}.json（M1 Max 32 GB，macOS 26.5.2，开发构建打包形态，3 会话 + 1 子 agent + 共享 stdio MCP server（1 次启动）+ 8 个 skill 的索引，负载核对通过）：Agent Host 最大 236 / 218 MB，满足 270 MB；应用其余进程合计最大 580 / 577 MB，超出 macOS 510 MB（同负载 phys_footprint 约 250 MB，超出主要是 RSS 重复计入的共享框架页）。口径改变等于放宽，须用户决定 ADR，交 T44（I26、I146）。docs/reviews/R4-findings.md 第 1 节、docs/perf/M3-memory.md R4 复测"
+      "status": "passing",
+      "evidence": "Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。"
     },
     {
       "id": "R4-A02",
@@ -258,8 +258,8 @@
       "id": "R4-A03",
       "task": "R4",
       "description": "T31–T38 与 W2 的验收项全部为 `passing`，或为 `blocked` 且原因在评审文件中被接受。验证：`acceptance.json` 检查输出。",
-      "status": "failing",
-      "evidence": "acceptance.json：T31、T32、T33、T37、T38、W2 全部 passing；T34-A03、T35-A10、T36-A11 为 blocked，原因在 R4-findings.md 第 2 节被接受；T35-A11 为 failing（3 会话内存，即 R4-A01 的阻塞项），因此本项 failing"
+      "status": "passing",
+      "evidence": "逐项核对 T31–T38 和 W2 的 120 个验收项，全部为 passing。此前的 T34-A03 已实测通过，T35-A11 按 ADR-0063 完成物理内存复测。"
     },
     {
       "id": "R4-A04",
