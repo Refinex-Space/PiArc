@@ -3,8 +3,8 @@
 // the `Skill` tool.
 //
 // - The catalog comes from Core (`skills/list` with the session's id: Core then lets the
-//   session's file tools read the skills' directories). It is kept until Core says files or
-//   settings changed (`resources/reload`, `invalidate`) and read again before the next run.
+//   session's file tools read the skills' directories). The next run checks it again even if
+//   the workspace notification has not arrived. Within a run, reads share the catalog.
 // - The index lists the skills the model may load: not `disable-model-invocation`, not hidden
 //   by `skillOverrides` or a `Skill` deny rule, and for a `paths` skill only once a Read, Write
 //   or Edit touched a matching file (`skills/match`). Each description is cut to
@@ -124,8 +124,11 @@ export class SessionSkills {
 
   /** The catalog, read from Core when it is stale. A failed read keeps the last one. */
   async catalog(signal?: AbortSignal): Promise<SkillsCatalog | undefined> {
+    if (this.#loading !== undefined) return this.#loading;
     if (!this.#stale && this.#catalog !== undefined) return this.#catalog;
-    this.#loading ??= this.#o.bridge
+    // An invalidation that arrives during this read must survive its completion.
+    this.#stale = false;
+    this.#loading = this.#o.bridge
       .requestTyped(
         'skills/list',
         { sessionId: this.#o.sessionId },
@@ -135,10 +138,10 @@ export class SessionSkills {
       .then(
         (catalog) => {
           this.#catalog = catalog;
-          this.#stale = false;
           return catalog;
         },
         (error: unknown) => {
+          this.#stale = true;
           this.#o.log(
             `[session ${this.#o.sessionId}] skills/list failed: ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -226,7 +229,9 @@ export class SessionSkills {
 
   /** Before a run: what changed since the model last heard goes out as reminders. */
   async #update(signal?: AbortSignal): Promise<void> {
-    if (this.#stale) await this.catalog(signal);
+    await this.#loading;
+    this.invalidate();
+    await this.catalog(signal);
     if (this.#catalog === undefined) return;
     const { now, added, removed } = this.#diff();
     if (added.length > 0 || removed.length > 0) {

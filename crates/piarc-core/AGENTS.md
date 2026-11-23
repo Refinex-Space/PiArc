@@ -72,7 +72,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 有序关闭的最后关闭数据库（`Storage::close`）：NAPI 的 `CoreRuntime` 对象要等 GC 才释放，Windows 不能删除打开着的文件（I66）。关闭后 `Storage::with`/`run` 返回 `ShuttingDown`。
 - `Storage` 是 `Store` 加互斥锁，经阻塞线程池使用；不要在异步任务里拿着锁等待。
 - 信任（`trust`）：`TrustService::trust_get` 应答 `trust/get`，任何失败（包括清单不完整、快照损坏、目录解析不了、数据库错、任务 panic）都答 `trusted: false`，只有参数格式错时回 `invalidParams`；查询一律经 `piarc_config::project_trust`。肯定决定须带用户看到的清单版本；遇到版本变化向客户端返回最新视图，保持原决定。同一项目的 linked worktree 需要反向登记（ADR-0034）。成功的 `decide`、`revoke` 广播 `TrustChange`；`agent_host::restart_on_trust_change` 订阅它，对同一主 checkout 调 `HostSupervisor::restart`（不计入崩溃退避，会话自动恢复）。T14 的工作区 actor 负责为每个工作区启动这个任务。
-- 设置（`workspace_settings`）：`CoreRuntime::open_settings(workspace)` 加载四层并用 `piarc_fs::watch` 监听各层文件所在目录（`.piarc/` 不存在时监听工作区本身），去抖 150 ms 后重载；有变化键或问题变化时向 `core/settings` 发 `{ workspace, changed, issues }`。信任变化同样触发重新合并。
+- 设置（`workspace_settings`）：`CoreRuntime::open_settings(workspace)` 加载四层并用 `piarc_fs::watch` 监听各层文件所在目录（`.piarc/` 不存在时监听工作区本身），去抖 150 ms 后重载。目录注册和补注册独立于通知投递，注册到新目录后补读；每 2 秒只核对设置层文件的存在、大小与修改时间，变化时也重载。重载后向 `core/settings` 发 `{ workspace, changed, issues }`。信任变化同样触发重新合并。
 
 ## 后台任务（`tasks`，T32，ADR-0049）
 

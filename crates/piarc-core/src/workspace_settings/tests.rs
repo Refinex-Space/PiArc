@@ -31,6 +31,7 @@ impl EventSink for Settings {
 /// watcher's first registration is still running. FSEvents can take tens of seconds to start a
 /// stream under load, and the workspace does not wait for it on macOS; managed settings must
 /// not wait behind it (the L2 scenario `managed-change` waited 16–30 s under the full suite).
+/// I185 also requires ordinary project edits to propagate without a native notification.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[expect(
     clippy::await_holding_lock,
@@ -100,11 +101,11 @@ async fn a_managed_change_is_reported_while_the_first_registration_runs() {
             resources: (dirs.data().to_path_buf(), None),
             trust: trust.clone(),
             events: sender,
-            notifications,
             changed,
             layer_changes,
             managed: managed.clone(),
         },
+        notifications,
         trust.subscribe(),
         managed.changes(),
         registered,
@@ -138,6 +139,32 @@ async fn a_managed_change_is_reported_while_the_first_registration_runs() {
         matches!(ready.try_recv(), Err(oneshot::error::TryRecvError::Empty)),
         "the registration was still waiting"
     );
+
+    // I185: a project settings file can change while the OS has delivered no notification
+    // and registering the directory is still blocked. Both consumers must hear that change.
+    let project = workspace.join(".piarc");
+    std::fs::create_dir_all(&project).expect("settings directory");
+    std::fs::write(project.join("settings.json"), r#"{ "model": "updated" }"#)
+        .expect("project settings");
+    let event = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = events.recv().await.expect("settings event");
+            if event["changed"] == serde_json::json!(["/model"]) {
+                break event;
+            }
+        }
+    })
+    .await
+    .expect("project settings must reach diagnostics without a native notification");
+    assert_eq!(event["workspace"], workspace.to_string_lossy().as_ref());
+    assert_eq!(
+        heard.try_recv().expect("project layer change").layer,
+        piarc_config::ids::PROJECT
+    );
+    assert!(matches!(
+        ready.try_recv(),
+        Err(oneshot::error::TryRecvError::Empty)
+    ));
 
     drop(held);
     tokio::time::timeout(Duration::from_secs(30), &mut ready)

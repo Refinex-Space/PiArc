@@ -153,6 +153,18 @@ describe('SessionSkills', () => {
     expect(back).toContain('switched the output style back to the default');
   });
 
+  it('picks up edits before the next run when the workspace notification is late', async () => {
+    const state = { calls: [], catalog: catalog([skill('old')]) };
+    const { skills, run } = setup(state);
+    await skills.sections();
+    state.catalog = catalog([skill('new')], 'teacher', 'Show the steps.');
+    const reminder = await run();
+    expect(reminder).toContain('new: Use new');
+    expect(reminder).toContain('no longer available: old');
+    expect(reminder).toContain('Show the steps.');
+    expect(await run()).toBeUndefined();
+  });
+
   it('makes a paths skill available once a matching file is touched (T37-A06)', async () => {
     const state = {
       calls: [] as [string, unknown][],

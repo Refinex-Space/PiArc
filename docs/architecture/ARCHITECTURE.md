@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.60（2026-11-23） |
+| 版本 | 2.61（2026-11-24） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -791,7 +791,7 @@ T37 落地（ADR-0054）：
 | 斜杠命令 | 内置命令（`/compact`、`/clear`、`/model`、`/rewind`、`/context`、`/output-style`、`/help`）在客户端执行已有功能；命令文件与 skill 由 Core 在 UserPromptSubmit 之前展开（`expand_command`，UserPromptExpansion 的挂载点在其后），`session/prompt` 带 `command`，转录显示用户输入的原文 |
 | 授权与 hooks | `allowed-tools` 是调用所在会话当前回合的 allow 来源 `skill`，回合结束、中断、断连或输入进入排队即撤回；skill 的 hooks 以层 `skill` 登记在会话上直到会话关闭；两者都要求项目来源的项目受信任，项目 skill 与命令的 `allowed-tools`、`hooks` 计入可执行项 |
 | 输出风格 | 内置 `Default`、`Concise`、`Explanatory`、`Proactive`（指令在 `agent-host/src/harness/prompts/output-styles.ts`），设置键 `outputStyle`；`/output-style` 写 `.piarc/settings.local.json`，设置窗口写用户级 `settings.json`；中途变化经 `outputStyle` 提醒送达，`piarc.outputStyle` 记下已送达的风格 |
-| 重新加载 | Core 的设置监听同时监听 skills、命令与输出风格目录，任何变化（及信任变化）后发 `resources/reload`，Agent Host 在下一次运行前重新取 `skills/list` |
+| 重新加载 | Core 的设置监听同时监听 skills、命令与输出风格目录，变化（含信任变化）后发 `resources/reload`；Agent Host 在每次运行前经 `skills/list` 核对技能索引与输出风格 |
 | 信任与链接（R4） | 项目信任只覆盖信任清单列出的文件：`<根>/{.piarc,.claude,.pi,.agents}/{skills,commands,output-styles,prompts,agents}/`（`piarc_config::executables::covered_by_trust`）；worktree 里的副本、子目录与根以上目录的项目文件只作为指令加载，`allowed-tools`、hooks 与子 agent 的内联 MCP 不生效。项目来源的 skill、命令、输出风格与子 agent 定义解析链接后须仍在项目目录内（`stays_in_project`），否则不读并报问题 |
 
 T40 落地（ADR-0058）：
@@ -970,7 +970,7 @@ T24 落地（ADR-0038）：
 - 读取的文件与层级：`~/.claude/settings.json`（`claudeUser`）、`.claude/settings.json`（`claudeProject`）、`.claude/settings.local.json`（`claudeProjectLocal`）按 ADR-0005 第 3 条与 PiArc 的三个文件同表合并；`~/.claude.json` 不是设置层，配置诊断只列出它的键名。家目录由 Core 注入（`CoreConfig.home`），测试一律用临时目录。
 - 键映射表是唯一判断（`piarc_config::claude::SETTINGS_KEYS`，按官方 settings 索引逐键归类）。M2 实际生效的键：`permissions.allow`、`permissions.ask`、`permissions.deny`、`permissions.defaultMode`、`permissions.additionalDirectories`，T25 起加上 `hooks`、`disableAllHooks`（ADR-0039），T27 起加上 `autoCompactEnabled`、`autoCompactWindow`（ADR-0043），T28 起加上 `fileCheckpointingEnabled`（ADR-0044），T31 起加上 `model`、`effortLevel`（新会话的默认模型与 effort，`model` 可以是别名，ADR-0048），T36 起加上 `disabledMcpjsonServers` 与 `~/.claude.json` 的 MCP 段（ADR-0053；`enableAllProjectMcpServers`、`enabledMcpjsonServers` 标为忽略，项目 server 由 PiArc 的信任对话框决定），T37 起加上 `outputStyle`、`skillOverrides`（ADR-0054；`disableBundledSkills`、`disableSkillShellExecution` 标为忽略：PiArc 没有随附 skill，也从不执行 skill 中的命令）。由后续任务支持的键：`plansDirectory`（T48：批准时把计划另存到该目录，计划仍以会话 entry 为准；T26 只存 entry，R3 决定，I104）；`agent`（T48：主线程以某个子 agent 的身份运行）；`worktree`（T35）；`allowedMcpServers`、`deniedMcpServers`（T47，企业策略）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars`（T38）；`sandbox`（T39）；`enabledPlugins`、`extraKnownMarketplaces`（T40）；`autoMode`、`disableAutoMode`、`useAutoModeDuringPlan`（T46）；`autoMemoryEnabled`、`autoMemoryDirectory`（T47）。其余键（含 `env`、`theme`、`language` 等终端偏好、账号与遥测、只在托管设置中有效的键，以及 T31 判定的 `advisorModel`：它是 Anthropic 服务端的 advisor 工具所用的模型，PiArc 没有这个工具）标为"已忽略"，表外的键为"未知"，都在诊断中逐个列出。
 - 信任约束与 PiArc 项目层相同：信任前项目层的 allow、`additionalDirectories`、`acceptEdits` 不生效，deny 与 ask 照常生效；项目层的 `bypassPermissions`、`auto` 始终不生效，诊断注明原因。生效键类型错误时整份文件跳过并给出 JSON Pointer，JSON 语法错误给出行列，其他文件照常加载。
-- `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`；新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
+- `.claude/` 文件与 PiArc 设置一起被监听，变化后重新加载并发 `core/settings`。Core 独立注册监听目录，并每 2 秒核对设置层文件的元数据。诊断页在恢复可见、重新获得焦点和收到设置事件时重读，可见期间每次请求结束 5 秒后再读一次。新增的可执行项沿用第 10.2 节的快照确认。PiArc 的写接口拒绝 `.claude/` 下与 `.claude.json` 的任何路径（`permissionDenied`），L2 运行器在每个场景前后比对 Claude Code 配置的快照。
 - 配置诊断的 Core API 为 `config_diagnostics`（NAPI `configDiagnostics`），与权限裁决用同一次加载；设置窗口"配置诊断"页按文件列出并可展开每个键的本文件取值、最终取值与来源。T41 在此基础上补全插件与企业来源。
 
 T41 落地（ADR-0059）：诊断报告的每个来源都是同一种文件报告（`piarc_config::FileReport`），以 `kind` 区分：设置文件与 `~/.claude.json`（T24），`.mcp.json`、memory 文件及其 `@` 导入（已读取的生效，工作区外待批准的与超过深度的列为忽略）、rules（带 `paths:` 的标为条件加载）、子 agent 定义、skills、命令、输出风格（被同名来源覆盖的文件为"已忽略"并写明覆盖它的文件）、插件与 Pi 包（组件、待确认的可执行项、不支持的组件）以及企业来源（预留，"未配置"）。状态为已加载、不存在、解析错误、未信任未生效、本平台不生效、已忽略、未配置；每个来源都由该功能自己的加载器给出。设置监听另外监听工作区根目录与两级 `.claude/rules`、`.claude/agents`、`.piarc/agents`、数据目录的 `agents`，每次重载都发 `core/settings`，诊断页随之刷新。
@@ -1888,6 +1888,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
+| 2.61 | 2026-11-24 | I185：第 6 章补充设置文件的复查、诊断页的刷新时机，以及会话运行前对技能和输出风格的核对。 |
 | 2.60 | 2026-11-23 | T48：第 6 章补充服务端压缩、fork 及隔离 skill 的缓存和权限规则、M5 hooks 与 MCP elicitation。ADR-0066、0067、0068 记录工具声明、授权和目录归属的调整。 |
 | 2.56 | 2026-11-22 | T45（ADR-0062）补充第 4 章 ADR-0062；10.1 节第 9–11 行的对策改用分号分隔（措辞不变，便于逐条映射），恶意插件一行加"Pi 自己设置里的包清单不由 Agent Host 安装或加载"，通用运行时一行加远程调试开关；10.5 节 T45 落地（外连清单、日志脱敏、诊断包、威胁映射与 Electron 清单复核）。 |
 | 2.55 | 2026-11-22 | T44 补充第 11 章：每一行由 `scripts/perf/` 自动测量（PR 冒烟、Nightly 两平台、长跑；绝对预算与按平台、机器类别、流水线分存的基线两道判定，覆盖检查），说明见[性能测量](../engineering/performance.md)；原"未测"的 macOS 格子补上 T44 在 M1 Max 上的实测，其余行加 T44 数值并标出超出项（I191–I194，I26 附物理占用读数）；空闲 CPU 由"接近 0%"定为可见与隐藏时应用全部进程加 Agent Host 合计 ≤ 5%（一个核心、60 s 平均）并要求隐藏时无 rAF 回调与终端帧，依据是实测 3.5–3.6%（I190）；体积按 I41 裁剪后安装后 446.6 MB；8 小时长会话一行仍未测（用户决定不在 T44 做本机长跑，I195）。只有 macOS 数据，按本章收紧规则不收紧任何预算。 |

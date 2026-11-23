@@ -7,7 +7,7 @@
 // regular expressions reject) are listed after the files (T25). T41 adds every other source
 // (`.mcp.json`, memory files and imports, rules, subagent definitions, skills, commands, output
 // styles, extension packages, the enterprise place), grouped by kind after the settings files.
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
@@ -493,34 +493,71 @@ function McpIssues({ issues }: { issues: readonly McpIssue[] }) {
   );
 }
 
+// Only the visible diagnostics page checks for source edits missed by the native watcher.
+const REPORT_REFRESH_MS = 5_000;
+
 export function ConfigDiagnosticsPage() {
   const { t } = useApp();
   const selectId = useId();
+  const refresh = useRef<() => void>(null);
   const [view, setView] = useState<DiagnosticsView | undefined>(undefined);
   const [chosen, setChosen] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const load = useCallback(() => {
-    window.piarc
-      .configDiagnostics(chosen)
-      .then((raw) => {
-        setError('');
-        setView(parseDiagnostics(raw));
-      })
-      .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
-      });
-  }, [chosen]);
-  useEffect(load, [load]);
   useEffect(() => {
-    // A settings file of an open workspace changed: ask Core again.
+    let active = true;
+    let loading = false;
+    let pending = false;
+    let previous: string | undefined;
+    let timer: number | undefined;
+
+    const load = () => {
+      if (!active || document.visibilityState === 'hidden') return;
+      if (loading) {
+        pending = true;
+        return;
+      }
+      loading = true;
+      window.clearTimeout(timer);
+      void window.piarc
+        .configDiagnostics(chosen)
+        .then((raw) => {
+          if (active) {
+            if (previous !== raw) setView(parseDiagnostics(raw));
+            previous = raw;
+            setError('');
+          }
+        })
+        .catch(reportError)
+        .finally(() => {
+          loading = false;
+          if (!active) return;
+          if (pending) {
+            pending = false;
+            load();
+          } else {
+            timer = window.setTimeout(load, REPORT_REFRESH_MS);
+          }
+        });
+    };
+    function reportError(e: unknown) {
+      if (active) setError(e instanceof Error ? e.message : String(e));
+    }
+
+    refresh.current = load;
+    load();
+    window.addEventListener('focus', load);
+    document.addEventListener('visibilitychange', load);
     const route = 'core/settings';
-    window.piarc.subscribeEvents(route, load).catch((e: unknown) => {
-      setError(e instanceof Error ? e.message : String(e));
-    });
+    window.piarc.subscribeEvents(route, load).catch(reportError);
     return () => {
+      active = false;
+      refresh.current = null;
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', load);
+      document.removeEventListener('visibilitychange', load);
       void window.piarc.unsubscribeEvents(route);
     };
-  }, [load]);
+  }, [chosen]);
   if (view === undefined) {
     return error === '' ? null : (
       <p className="error-text" role="alert">
@@ -557,7 +594,7 @@ export function ConfigDiagnosticsPage() {
             <button
               type="button"
               className="button"
-              onClick={load}
+              onClick={() => refresh.current?.()}
               data-testid="diagnostics-refresh"
             >
               {t('permissions.audit.refresh')}

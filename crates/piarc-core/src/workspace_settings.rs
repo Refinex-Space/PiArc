@@ -17,7 +17,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use piarc_config::{Issue, Settings, TrustState};
 use piarc_fs::watch::{WatchEvent, Watcher};
@@ -36,6 +36,9 @@ pub const SETTINGS_ROUTE: &str = "core/settings";
 
 /// Quiet time after the last file notification before the files are read again.
 pub const DEBOUNCE: Duration = Duration::from_millis(150);
+
+/// Check the fixed settings files even when a native directory notification is late (I185).
+const SETTINGS_POLL: Duration = Duration::from_secs(2);
 
 /// One settings layer whose file changed (T41: what `ConfigChange` hooks hear).
 #[derive(Debug, Clone, PartialEq)]
@@ -124,11 +127,11 @@ impl WorkspaceSettings {
                 ),
                 trust,
                 events,
-                notifications: rx,
                 changed,
                 layer_changes: layer_changes.clone(),
                 managed,
             },
+            rx,
             trust_changes,
             managed_changes,
             registered,
@@ -207,7 +210,6 @@ struct Loop {
     resources: (PathBuf, Option<PathBuf>),
     trust: TrustService,
     events: EventSender,
-    notifications: mpsc::UnboundedReceiver<()>,
     changed: watch::Sender<u64>,
     layer_changes: broadcast::Sender<LayerChange>,
     /// Core's managed settings (T47): their changes replace the `enterprise` layer.
@@ -215,48 +217,57 @@ struct Loop {
 }
 
 async fn run(
-    mut state: Loop,
+    state: Loop,
+    mut notifications: mpsc::UnboundedReceiver<()>,
     mut trust_changes: broadcast::Receiver<crate::trust::TrustChange>,
     mut managed_changes: watch::Receiver<u64>,
     registered: oneshot::Sender<()>,
 ) {
-    // FSEvents can block in the system daemon while several streams start or stop.
-    // Establish the watch off the runtime workers; then pick up edits made since load.
-    let (watcher, inner, workspace, resources) = (
-        state.watcher.clone(),
-        state.inner.clone(),
-        state.workspace.clone(),
-        state.resources.clone(),
-    );
-    let mut registration = tokio::task::spawn_blocking(move || {
-        watch_dirs(&watcher, &inner, &workspace, &resources);
-    });
-    // Managed settings do not wait for the registration (T47): under load it can take tens of
-    // seconds, and their change must reach the workspace within the poll.
+    let (rescan, mut rescans) = mpsc::channel(1);
+    let registration = state.register_directories(rescan);
+    tokio::pin!(registration);
+    let mut ready = Some(registered);
+    let mut poll = tokio::time::interval(SETTINGS_POLL);
+    poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    // Managed policy has its own change signal. File-backed user and project layers are fixed.
+    let files: Arc<[PathBuf]> = lock(&state.inner)
+        .table()
+        .files()
+        .map(Path::to_owned)
+        .collect();
+    let mut stamps = None;
+    let debounce = tokio::time::sleep(DEBOUNCE);
+    tokio::pin!(debounce);
+    let mut pending = false;
     loop {
         tokio::select! {
-            result = &mut registration => {
-                if let Err(error) = result {
-                    tracing::error!(target:"piarc_core::settings","settings registration failed: {error}");
-                    return;
-                }
-                break;
-            }
-            Ok(()) = managed_changes.changed() => state.remanage().await,
-        }
-    }
-    state.reload().await;
-    let _ = registered.send(());
-
-    loop {
-        tokio::select! {
-            notified = state.notifications.recv() => {
-                if notified.is_none() {
-                    return;
-                }
-                // Debounce: wait until no notification arrived for DEBOUNCE.
-                while let Ok(Some(())) = tokio::time::timeout(DEBOUNCE, state.notifications.recv()).await {}
+            () = &mut registration => return,
+            Some(()) = rescans.recv() => {
+                // A registration can restart the native stream. Catch up before acknowledging it.
                 state.reload().await;
+                if let Some(tx) = ready.take() {
+                    let _ = tx.send(());
+                }
+            }
+            notified = notifications.recv() => {
+                if notified.is_none() { return; }
+                pending = true;
+                debounce.as_mut().reset(tokio::time::Instant::now() + DEBOUNCE);
+            }
+            () = &mut debounce, if pending => {
+                pending = false;
+                state.reload().await;
+            }
+            _ = poll.tick() => {
+                let files = Arc::clone(&files);
+                match tokio::task::spawn_blocking(move || layer_stamps(&files)).await {
+                    Ok(now) if stamps.as_ref() != Some(&now) => {
+                        stamps = Some(now);
+                        state.reload().await;
+                    }
+                    Ok(_) => {}
+                    Err(error) => tracing::error!(target: "piarc_core::settings", "checking settings files failed: {error}"),
+                }
             }
             change = trust_changes.recv() => match change {
                 Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => state.retrust().await,
@@ -269,26 +280,53 @@ async fn run(
 }
 
 impl Loop {
+    /// At most one native registration is in flight. Reading settings, reporting changes and
+    /// handling trust or managed policy continue while the OS starts or replaces its stream.
+    async fn register_directories(&self, rescan: mpsc::Sender<()>) {
+        let mut updates = self.changed.subscribe();
+        let mut first = true;
+        loop {
+            let watcher = Arc::clone(&self.watcher);
+            let inner = Arc::clone(&self.inner);
+            let workspace = self.workspace.clone();
+            let resources = self.resources.clone();
+            let registration = tokio::task::spawn_blocking(move || {
+                watch_dirs(&watcher, &inner, &workspace, &resources)
+            })
+            .await;
+            match registration {
+                Ok(added) if first || added => {
+                    if rescan.send(()).await.is_err() {
+                        return;
+                    }
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    tracing::error!(target: "piarc_core::settings", "registering directories failed: {error}");
+                    return;
+                }
+            }
+            first = false;
+            if updates.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+
     async fn reload(&self) {
         let inner = Arc::clone(&self.inner);
-        let watcher = Arc::clone(&self.watcher);
-        let workspace = self.workspace.clone();
-        let resources = self.resources.clone();
         let managed_file = self.managed.snapshot().primary().map(Path::to_owned);
         let result = tokio::task::spawn_blocking(move || {
             let before = lock(&inner).issues().to_vec();
             let layers_before = lock(&inner).loaded_layers();
             let change = lock(&inner).reload();
             let layers = layer_changes(&lock(&inner), layers_before, managed_file.as_deref());
-            // `.piarc/` or a skill directory may have been created since: watch it now.
-            watch_dirs(&watcher, &inner, &workspace, &resources);
             (before, change, layers)
         })
         .await;
-        // Skills, commands and styles have no event of their own: the Agent Host reloads.
-        self.changed.send_modify(|n| *n += 1);
         match result {
             Ok((before, change, layers)) => {
+                self.changed.send_modify(|n| *n += 1);
                 for layer in layers {
                     // Nobody listening (no open session) is fine.
                     let _ = self.layer_changes.send(layer);
@@ -409,6 +447,22 @@ fn layer_changes(
         .collect()
 }
 
+/// Poll only the files in the layer table. Unchanged workspaces do not parse JSON, traverse
+/// resource directories or send a reload on a timer. Native events still catch replacements
+/// with identical timestamps and sizes.
+fn layer_stamps(
+    files: &[PathBuf],
+) -> Vec<std::result::Result<(u64, SystemTime), std::io::ErrorKind>> {
+    files
+        .iter()
+        .map(|file| {
+            std::fs::metadata(file)
+                .and_then(|meta| Ok((meta.len(), meta.modified()?)))
+                .map_err(|error| error.kind())
+        })
+        .collect()
+}
+
 /// Watches the directories of the layer files; for a directory that does not exist yet
 /// (`.piarc/`, `.claude/`, `~/.claude/`), its nearest existing ancestor, so its creation is
 /// noticed.
@@ -417,7 +471,7 @@ fn watch_dirs(
     settings: &Mutex<Settings>,
     workspace: &Path,
     (data, home): &(PathBuf, Option<PathBuf>),
-) {
+) -> bool {
     let mut dirs: Vec<PathBuf> = {
         let settings = lock(settings);
         settings
@@ -462,9 +516,12 @@ fn watch_dirs(
         .collect();
     roots.sort();
     roots.dedup();
-    for error in lock(watcher).watch_dirs(&roots) {
+    let mut watcher = lock(watcher);
+    roots.retain(|dir| !watcher.is_watching(dir));
+    for error in watcher.watch_dirs(&roots) {
         tracing::warn!(target: "piarc_core::settings", "{error}");
     }
+    roots.iter().any(|dir| watcher.is_watching(dir))
 }
 
 fn log_issue(issue: &Issue) {
