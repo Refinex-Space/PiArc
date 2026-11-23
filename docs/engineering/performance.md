@@ -169,6 +169,38 @@ Nightly 运行 1 小时的缩短版（`PIARC_LONG_RUN_HOURS=1`：预热 10 分�
 
 同一台机器、同一命令（不含体积两项），报告 `tmp/evidence/R5/perf-nightly-report.json`，逐行对照与环境说明在 [R5 评审](../reviews/R5-findings.md)第 1.2 节。超出预算的是主进程增量 35.6 MB、Agent Host 196 MB、流式帧 p99 16.2 ms；应用全部进程合计按 RSS 为 530 MB，ADR-0063 采纳后按物理占用另测 208 MB（3 次中位，`tmp/evidence/R5/app-memory-adr0063.txt`），达标，并按新口径更新了这一项的基线。3 会话 + 子 agent 场景（`npm run perf:m3`）：应用其余进程物理占用最大 264 MB（RSS 584 MB）、Agent Host 最大 229 MB，都在预算内（`tmp/evidence/R5/m3-memory.json`）。"打开工作区到 Agent Host 就绪"按改回的口径（10 次最大，R5 性能审查 P3）为 982 ms。测量时机器有负载（IDE 与远程桌面），冷启动 666 ms 与事件循环 5.0 ms 相对基线的回归未确认；没有更新基线。
 
+### 5.2.2 M4 性能收尾复核（2026-11-24）
+
+Apple M1 Max / 32 GB、macOS arm64、接电。提交 0cbecdc 执行 node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g，25/25 个指标同时通过绝对预算及已有相对基线，无错误。打包运行时代码与 0cbecdc 一致。主进程 RSS 增量 23.10/24 MB，单活动会话 Agent Host 142.97/150 MB，流式帧 p99 8.41/12 ms。结果在 tmp/evidence/partial-closure/nightly-full-results/report.json。Windows 数据及 W4 归属见 R5-findings.md 第 1.2 节与 W4 清单。 本次实跑的是本机 Nightly 指标流水线；GitHub 的定时作业由默认分支管理。第 5.4 节单列的 8 小时发布前长跑仍由 I195 跟踪。
+
+| 指标 | 测量值 | 预算 | 重复次数 |
+|---|---:|---:|---:|
+| 冷启动到可交互窗口（`cold-start`） | 453.00 ms | 1000 ms | 1 |
+| 打开工作区到 Agent Host 就绪（`workspace-ready`） | 903.90 ms | 1000 ms | 1 |
+| PiArc 引入的首 token 额外延迟（`first-token-overhead`） | 28.76 ms | 50 ms | 1 |
+| 主进程内存（`main-memory-delta`） | 23.10 MB | 24 MB | 1 |
+| 渲染进程内存（`renderer-memory`） | 167.30 MB | 220 MB | 3 |
+| 应用全部进程合计（`app-memory`） | 187.52 MB | 510 MB | 3 |
+| Agent Host 内存（`agent-host-memory`） | 142.97 MB | 150 MB | 3 |
+| 每增加一个活动会话的 Agent Host 内存增量（`agent-host-per-session`） | 7.49 MB | 40 MB | 3 |
+| 主进程事件循环延迟（`main-loop-p99`） | 1.66 ms | 16 ms | 3 |
+| 流式渲染（`stream-frame-p99`） | 8.41 ms | 12 ms | 1 |
+| 流式渲染（`stream-long-tasks`） | 0.00 tasks | 0 tasks | 1 |
+| 万条 item 的 transcript 滚动（`scroll-fps`） | 119.00 fps | 60 fps | 1 |
+| 会话切换（`switch-cached`） | 16.80 ms | 100 ms | 1 |
+| 会话切换（`switch-cold`） | 45.70 ms | 170 ms | 1 |
+| Core 事件到渲染进程（`core-to-renderer-p95`） | 0.22 ms | 1.1 ms | 1 |
+| AHP 往返（`ahp-round-trip-p95`） | 0.28 ms | 5 ms | 3 |
+| 无需用户参与的权限裁决（`policy-decision-p95`） | 0.81 ms | 2 ms | 3 |
+| 终端键入回显的额外延迟（`terminal-echo-p95`） | 0.77 ms | 5 ms | 1 |
+| 安装包体积（`installer-size`） | 177.88 MB | 200 MB | 1 |
+| 安装后体积（`installed-size`） | 447.56 MB | 450 MB | 1 |
+| 空闲 CPU（`idle-cpu-visible`） | 2.73 % | 5 % | 1 |
+| 空闲 CPU（`idle-cpu-hidden`） | 2.65 % | 5 % | 1 |
+| 空闲 CPU（`hidden-frames`） | 0.00 frames | 0 frames | 1 |
+| Agent Host 崩溃后恢复（`agent-host-recovery`） | 1345.00 ms | 3000 ms | 3 |
+| 渲染进程崩溃或重载后恢复（`renderer-recovery`） | 207.00 ms | 2000 ms | 3 |
+
 ### 5.3 PR 冒烟的稳定性
 
 提交 0cbecdc，Mac M1 Max / 32 GB、接电、打包开发构建，连续执行 5 次 node scripts/perf/run.mjs --lane pr --runs 3 --machine m1-max-32g。五次退出码均为 0，每次 10 个指标均取得 3 轮结果，无探针错误和回归。打包后独占运行性能测量，最终全仓验证另外串行执行。每次执行前后核对 Git HEAD，完整日志与逐轮 report.json 保存在 tmp/evidence/partial-closure/pr-five-0cbecdcbb5e7752bce441f9f2851097c724b742d。

@@ -328,8 +328,8 @@
       "id": "R5-A02",
       "task": "R5",
       "description": "macOS 上第 11 章全部预算达标、最近一次 Nightly 完整测量通过；W3 的 Windows 数据逐项列出，未达标项已归入 W4。验证：`docs/engineering/performance.md`、Nightly 输出与发现文件。",
-      "status": "failing",
-      "evidence": "macOS 未全部达标：R5 复测本机 Nightly（`node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g`，不含体积，`tmp/evidence/R5/perf-nightly.txt`）主进程增量 35.6 MB > 24、Agent Host 196 MB > 150、流式帧 p99 16.2 ms > 12（交 I222）；\"应用全部进程合计\"在用户采纳 ADR-0063 后按物理占用另测 208 MB（`tmp/evidence/R5/app-memory-adr0063.txt`），达标；其余行达标。CI 上的 Nightly 从未运行（只在默认分支定时触发），且 R5 前 CI 门禁不判值（9f5ec0a 修复）。W3 的 Windows 数据逐项列在发现文件第 1.2 节与文末 W4 清单（I207）。`docs/engineering/performance.md` 第 5.2.1 节。"
+      "status": "passing",
+      "evidence": "Apple M1 Max / 32 GB、macOS arm64、接电。提交 0cbecdc 执行 node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g，25/25 个指标同时通过绝对预算及已有相对基线，无错误。打包运行时代码与 0cbecdc 一致。主进程 RSS 增量 23.10/24 MB，单活动会话 Agent Host 142.97/150 MB，流式帧 p99 8.41/12 ms。结果在 tmp/evidence/partial-closure/nightly-full-results/report.json。Windows 数据及 W4 归属见 R5-findings.md 第 1.2 节与 W4 清单。"
     },
     {
       "id": "R5-A03",
@@ -378,14 +378,14 @@
       "task": "R5",
       "description": "结论明确写出 M4（macOS）是否达标、进入 M5 的前提条件，以及 W4 的 M4 验收清单。验证：`docs/reviews/R5-findings.md` 的结论段。",
       "status": "passing",
-      "evidence": "`docs/reviews/R5-findings.md` 开头与\"结论\"段：M4（macOS）未达标（性能一条），进入 M5 的前提条件 1–5（ADR-0063、ADR-0064、性能达标任务 I222、推送看 CI 并记录基线、用户核对项）；文末\"W4 需要在 Windows 上验收的 M4 项\"表。"
+      "evidence": "2026-11-24 的 macOS 退出结论、M5 前提与 W4 的独立 Windows 清单分别见 docs/reviews/R5-findings.md 的“结论”和 W4 表。"
     },
     {
       "id": "R5-A10",
       "task": "R5",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "`npm run verify` 于 4b7c223（工作区干净）All 17 steps passed（`tmp/evidence/R5/verify-final-2.txt`，`target/verify/last-pass.json` 记录 4b7c223）：Vitest 1,758 passed（1 个 Windows 专属跳过），cargo test 通过，L2 213 passed / 0 failed / 3 平台跳过，MISSING 0，威胁映射通过。前一次全量 `state.rs` 的设置监听用例在负载下超时一次（I185），单独连跑 3 次通过。"
+      "evidence": "提交 0cbecdc 在 macOS 上运行默认 npm run verify，17/17 通过。逐步结果见 tmp/evidence/partial-closure/final-verify.log。"
     },
     {
       "id": "R6-A01",

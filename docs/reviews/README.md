@@ -8,7 +8,7 @@
 | R2 | M1（macOS）达标 | [R2-findings.md](R2-findings.md) | **macOS 达标，可进入 M2**（2026-11-19）。双协议工作流、真实百炼与 61 个 macOS L2 场景通过，Windows 实机检查见 W1 清单。 |
 | R3 | M2（macOS）达标 | [R3-findings.md](R3-findings.md) | **macOS 达标，可进入 M3**（2026-11-20）。M2 能力 46 项全部有 L2 场景，L3 对 Claude Code 2.1.318 的权限与 hooks 场景 0 个未解释差异；四个独立审查的 40 条发现中修复 16 项缺陷，用户确认的 ADR-0047 已实现，其余登记 I120–I128；Windows 由 W2 验收（含 W1 遗留的 UNC）。 |
 | R4 | M3 达标 | [R4-findings.md](R4-findings.md) | **M3（macOS）已达标**。采用 ADR-0063 的物理占用口径，3 个并行会话与子 agent 满足第 11 章内存预算，T31–T38 和 W2 的验收全部通过。原四个独立审查的发现与处理保存在 R4 报告。Windows 的私有工作集复测交 W4。 |
-| R5 | M4 达标 | [R5-findings.md](R5-findings.md) | **M4（macOS）未达标，阻塞在性能一条**（2026-11-22）：九项 M4 目标都已交付并有验收证据，M4 及之前没有 `planned` 的能力；第 10.1 节 14 条威胁、59 个对策都映射到测试并本地通过（两个平台 CI 等推送），每条抽查一个测试；四个独立审查的 57 条发现中修复或部分修复 21 项（含 Agent Host 子进程往 Pi 自动加载的目录放代码、克隆的包经 `.npmrc` 让 npm 运行程序、性能门禁在 CI 上不判值三项安全与门禁缺陷），其余登记 I211–I222；本机 Nightly 的流式帧、主进程增量、Agent Host 内存超出（交性能达标任务 I222）；用户采纳 ADR-0063（应用内存按物理占用，208 MB 达标，M3 的 3 会话场景 264 MB 也达标）与 ADR-0064（信任经原生确认，实现 I223）；W3 确认，ADR-0057 已接受并同步。 |
+| R5 | M4 达标 | [R5-findings.md](R5-findings.md) | **M4（macOS）已达标（2026-11-24）**。双平台 CI 通过威胁映射检查，完整本机 Nightly 的 25 项预算达标，M4 及之前没有 planned 能力。原四个独立审查的 57 条发现、处理与 Windows 实机清单见评审报告。新增威胁用例的双平台执行证据由 T45-A02 跟踪。 |
 | R6 | 公开 Beta | `R6-findings.md` | 未开始 |
 
 Windows 达标任务（W0–W4）的报告也放在本目录，命名 `Wn-windows-<短标题>.md`，例如 `W1-windows-m1-parity.md`。

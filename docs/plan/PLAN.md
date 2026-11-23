@@ -176,7 +176,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 已完成 | 0cbecdc |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
-| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
+| R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 已完成 | 0cbecdc |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 已完成 | 1b15296 |
@@ -308,13 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T44、R5 性能补验
-
-- [x] 复现并修正短场景速率不足仍被外层接受的问题。旧提交 ab27901 的五份外层通过报告均包含速率不足的内层失败，保留原始证据，不计入 A04。
-- [x] 对照单文件、压缩单文件与本地 ESM 分块的真实单会话内存；分块方案纳入 ADR-0071。补齐缺块、损坏、旧块排除的打包测试，并减少空首页和流式渲染的无效工作。
-- [x] 签名开发包的单会话 Agent Host 为 140.18 MB。主进程的签名包对照低于 24 MB，安全头和方法契约通过；完整流式基准 102.13 token/s、帧工作 p99 8.397 ms、长任务 0。发布安装包和安装后体积均达标。
-- [ ] 在最终提交上完成有效的五次 PR 冒烟、完整 Nightly 及全量验证。T45 双平台发布证据、W3 实机稳态峰值、T43 未核对的播报分别保留原始状态。
 
 ## 登记事项
 
@@ -512,10 +505,10 @@ T44、R5 性能补验
 | I188 | T43 | VoiceOver 实际操作核对未做：`docs/engineering/accessibility.md` 第 3 节的 10 项读屏清单需要人在 macOS 上开 VoiceOver 逐项操作，T43 时用户不在场（T43-A10 标 blocked）；自动化已覆盖行名称、节流播报、审批卡焦点与 axe | 用户按清单操作后把结论填入 VoiceOver 一列，问题登记后由 R5 或后续任务修；Narrator 与 NVDA 由 W3 按同一清单执行；**W3**：讲述人与 NVDA 两列由用户实机核对，全部通过；VoiceOver 一列仍待用户 **2026-11-24**：已有四项的部分 macOS 原生字幕，按用户要求结束旁白；逐项结果及剩余实测范围见无障碍文档第 3 节。 |
 | I189 | T44 | 渲染进程重载或崩溃后，transcript 0.1–0.2 s 内重新可见、回合不中断，但正在流式输出的那条回复要到回合结束（约 7 s 后）才重新出现：新文档只拿到快照里已完成的条目，没有补上进行中条目已流出的文字（`scripts/perf/probe-recovery.mjs` 的 `streamingReplyMs`） | 第 11 章"≤ 2 s、会话不中断"按 transcript 可见计，已达标；进行中条目的补齐交 R5 评估（Core 快照带进行中条目的已有文字，或渲染进程重连后请求补齐） |
 | I190 | T44 | 空闲 CPU：会话打开、终端面板显示 shell、什么都不运行时，应用全部进程加 Agent Host 合计约 3.6%（一个核心），其中 GPU 进程约 1.7%、渲染进程约 1.5%，窗口隐藏后几乎不变（隐藏时 rAF 回调与终端帧都是 0）；第 11 章阈值定为 ≤ 5% | R5 定位隐藏窗口下 GPU 与渲染进程仍在做的工作（`--cpu-prof`、CDP 追踪），目标是隐藏时接近 0；收紧阈值须有两个平台的数据；**R5**：在预算内（≤ 5%），并入 I222 的性能任务定位隐藏时 GPU 与渲染进程的工作 |
-| I191 | T44 | 流式渲染（100 token/s、60 s）每帧主线程工作 p99 16.4 ms，超出预算 12 ms（T19 时 8.8 ms、T20 时 7.3 ms；15 s 的 PR 冒烟版 9.7 ms，回复越长越慢）。CPU profile 的热点是 TanStack Virtual 的 `_retryClampedAdjustment → getMaxScrollOffset`（读 `scrollHeight` 强制布局，行尺寸每变一次就读一次）。只替换渲染进程代码二分：T29（c575995）、T35（30f35f8）、T43 前后（b9a8045、当前）都是 p99 约 15.5 ms，回归不在 T29 之后的渲染进程代码；更早的渲染进程与当前主进程不兼容，没能测 | 交 R5：二分 T20–T29 之间的 Core 与主进程（事件批次的节奏与大小），并让跟随底部时的行增高不走被夹住的滚动调整（或每帧只调整一次）；修复后更新 Nightly 基线；**R5**：仍超出，阻塞 M4 的性能退出标准；并入 I222。性能审查 P10 指出 `LiveRegion` 每次行变更对整段文本 `words()`、`row-label.ts` 的 `excerpt` 先规整后截取，作为候选一并测量 |
-| I192 | T44 | 主进程内存（含 Core，空闲）相对裸 Electron 的增量 31 MiB（32.5 MB），超出预算 24 MB（M0 为 5–8 MB）：M1–M4 加进 Core 的子系统空闲时就常驻 | R5 逐项定位空闲时常驻的 Core 子系统（`vmmap`、`footprint`），能延后初始化的延后；预算不放宽；**R5**：仍超出，阻塞 M4 的性能退出标准；并入 I222 |
-| I193 | T44 | 打开工作区到 Agent Host 就绪（含恢复会话）0.96 s，在预算 1.0 s 内但只余 4%；T14 时 0.28–0.32 s（同为 release 构建，10 次） | R5 定位变慢的步骤（16.5 MB 的 Agent Host bundle 加载，MCP、skills、插件与 Pi 扩展的发现），Nightly 基线持续监控；**R5**：性能审查 P3 发现探针把汇总行算作第 11 个样本并取中位，而 T14 与第 11 章按 10 次最大判定；9f5ec0a 改为取最大。R5 的本机 Nightly 结果见 R5 评审第 1.2 节；并入 I222 |
-| I194 | T44 | Agent Host 内存（1 个会话持续运行 mock 回合）202 MB，超出预算 150 MB（M0 为 165–168 MB，无会话 157 MB）；每多一个活动会话只加约 10 MB，超出部分在没有会话时就已存在（16.5 MB 的 bundle、Pi 与依赖的模块图） | R5 定位 Agent Host 启动后的常驻量（`--heap-prof`、按需加载 MCP、插件与扩展相关模块）；预算不放宽，技术债第 5 条；**R5**：仍超出，阻塞 M4 的性能退出标准；并入 I222 |
+| I191 | T44 | 流式渲染（100 token/s、60 s）每帧主线程工作 p99 16.4 ms，超出预算 12 ms（T19 时 8.8 ms、T20 时 7.3 ms；15 s 的 PR 冒烟版 9.7 ms，回复越长越慢）。CPU profile 的热点是 TanStack Virtual 的 `_retryClampedAdjustment → getMaxScrollOffset`（读 `scrollHeight` 强制布局，行尺寸每变一次就读一次）。只替换渲染进程代码二分：T29（c575995）、T35（30f35f8）、T43 前后（b9a8045、当前）都是 p99 约 15.5 ms，回归不在 T29 之后的渲染进程代码；更早的渲染进程与当前主进程不兼容，没能测 | 交 R5：二分 T20–T29 之间的 Core 与主进程（事件批次的节奏与大小），并让跟随底部时的行增高不走被夹住的滚动调整（或每帧只调整一次）；修复后更新 Nightly 基线；**R5**：仍超出，阻塞 M4 的性能退出标准；并入 I222。性能审查 P10 指出 `LiveRegion` 每次行变更对整段文本 `words()`、`row-label.ts` 的 `excerpt` 先规整后截取，作为候选一并测量 **macOS 已达标（R5 收尾复核）**：8.41 ms，预算 12 ms。原始结果见 performance.md 第 5.2.2 节。 |
+| I192 | T44 | 主进程内存（含 Core，空闲）相对裸 Electron 的增量 31 MiB（32.5 MB），超出预算 24 MB（M0 为 5–8 MB）：M1–M4 加进 Core 的子系统空闲时就常驻 | R5 逐项定位空闲时常驻的 Core 子系统（`vmmap`、`footprint`），能延后初始化的延后；预算不放宽；**R5**：仍超出，阻塞 M4 的性能退出标准；并入 I222 **macOS 已达标（R5 收尾复核）**：23.10 MB，预算 24 MB。原始结果见 performance.md 第 5.2.2 节。 |
+| I193 | T44 | 打开工作区到 Agent Host 就绪（含恢复会话）0.96 s，在预算 1.0 s 内但只余 4%；T14 时 0.28–0.32 s（同为 release 构建，10 次） | R5 定位变慢的步骤（16.5 MB 的 Agent Host bundle 加载，MCP、skills、插件与 Pi 扩展的发现），Nightly 基线持续监控；**R5**：性能审查 P3 发现探针把汇总行算作第 11 个样本并取中位，而 T14 与第 11 章按 10 次最大判定；9f5ec0a 改为取最大。R5 的本机 Nightly 结果见 R5 评审第 1.2 节；并入 I222 **macOS 已达标（R5 收尾复核）**：903.90 ms，预算 1000 ms。原始结果见 performance.md 第 5.2.2 节。 |
+| I194 | T44 | Agent Host 内存（1 个会话持续运行 mock 回合）202 MB，超出预算 150 MB（M0 为 165–168 MB，无会话 157 MB）；每多一个活动会话只加约 10 MB，超出部分在没有会话时就已存在（16.5 MB 的 bundle、Pi 与依赖的模块图） | R5 定位 Agent Host 启动后的常驻量（`--heap-prof`、按需加载 MCP、插件与扩展相关模块）；预算不放宽，技术债第 5 条；**R5**：仍超出，阻塞 M4 的性能退出标准；并入 I222 **macOS 已达标（R5 收尾复核）**：142.97 MB，预算 150 MB。原始结果见 performance.md 第 5.2.2 节。 |
 | I195 | T44 | 8 小时长会话内存增长（第 11 章 ≤ 10%）没有本机实测：用户于 2026-11-22 决定去除 T44 的 8 小时长跑验收项（原 T44-A06）。负载、采样与判定已实现（`scripts/perf/long-run.mjs`，`node scripts/perf/run.mjs --lane long --absolute`），Nightly 每天在两个平台跑 1 小时的缩短版（预热 10 分钟、每 5 分钟采样）做趋势监控；几小时后才显现的缓慢泄漏可能发现不了 | 发布前（R6 或 M5 退出前）在本机或自托管 runner 上补跑一次完整 8 小时，结果写入 `docs/engineering/performance.md` 第 5.4 节 |
 | I196 | T45 | Electron 45.4.1 于 2026-11-19 发布（锁定的是 45.3.2，2026-11-13），同一大版本的补丁 | R5 按架构第 13.4 节评估升级（四个目标的 L1/L2/L4 与性能），T45 未升级以免作废 L4 与性能基线；**R5**：不在评审中升级（会作废 L4 与性能基线）；随 T50 发布流水线或 I222 的性能任务升级，两者先到者做，按第 13.4 节复测四个目标 |
 | I197 | T45 | L2、会话测试与 agent_host 测试给 Agent Host 设 `PI_OFFLINE=1`，应用不设：Pi 只在联网时才走的路径（包自动安装、远程模型目录）在这些测试里看不到，T45 修的 Pi 包安装缺口因此一直没被测到 | R5 评估 L2 去掉 `PI_OFFLINE`（mock 场景没有内置服务商的凭据，不会请求远程目录）；`crates/piarc-testkit/tests/egress.rs` 已按应用方式运行；**R5**：交 T48 评估（L2 去掉 `PI_OFFLINE` 后 mock 场景是否仍不请求远程目录） |
@@ -543,7 +536,7 @@ T44、R5 性能补验
 | I219 | R5 | 插件模块的同步 I/O 与静默忽略（工程质量审查 Q2、Q11、Q12）：`plugins/mod.rs`、`fetch.rs` 在 async 函数里直接 `remove_dir_all`、`canonicalize`、读写文件，`let _ =` 没有注释，卸载时删数据目录失败不进结果；`FileWatch.paths` 只给测试读、`SandboxTestNetwork` 与 `open_sandboxed_session` 在生产代码里导出；整文件 macOS 门控的测试没有 NOT RUN 说明 | T48 |
 | I220 | R5 | THR-13 的 OSC 8 对策在 Windows 上没有运行的测试（工程质量审查 Q3，同 I209）：映射的 `t34-terminal` 与 `t45-xss` 的 OSC 8 用例在 Windows 跳过，`t45-xss` 的跳过理由写"Windows 变体在 W3"但没有变体；`t34-terminal-windows.e2e.ts` 的链接用例没进映射 | W4：补 `t45-xss` 的 Windows 变体（PowerShell 或 node 输出转义序列）、把 Windows 用例加进 THR-13 的映射并更新跳过理由 **已补实现及映射**：Windows 正常链接和拒绝未知协议的真实终端用例已接入，发布探针独立于 L4 结果。双平台 CI 证据由 T45-A02 跟踪。 |
 | I221 | R5 | 超长的说明与源文件（工程质量审查 Q8、Q9）：`crates/piarc-core/AGENTS.md` 138 行、`apps/desktop/AGENTS.md` 122 行（上限 120）；`piarc-store/src/index.rs` 1,017 行（M4 越线）、`piarc-config/src/skills.rs` 1,271 行；T42 的 Core 侧约定（`policy/notify.rs`、`policy/notebook.rs`、通知答复只能仅本次允许或拒绝、审计来源 `notification`）没进 AGENTS.md | 下一个往这些文件加内容的任务先拆分（同 I165 的约定）；T42 的约定由 T48 补进 `crates/piarc-core/src/tool_io/AGENTS.md` |
-| I222 | R5 | M4 的性能退出标准未达标的行（macOS 本机，非基准机型）：流式帧 p99 16.4 ms > 12 ms（I191）、主进程增量 32.5 MB > 24 MB（I192）、Agent Host 202 MB > 150 MB（I194）、打开工作区到就绪按 10 次最大判定（I193，R5 的测量见评审第 1.2 节）；应用全部进程合计按 RSS 超出（I26，口径见 ADR-0063）。PR 与 Nightly 门禁在 CI 上原来不判任何值（性能审查 P1，9f5ec0a 修复），CI 两个 runner 类别还没有基线 | 新增一个性能达标任务（计划变更，需用户确认排期；建议在 T46 之前或与 M5 并行、R6 之前完成），处理 I190–I194、I216，并在推送后从 CI 工件记录 `github-arm64`、`github-x64` 的 PR 与 Nightly 基线 |
+| I222 | R5 | M4 的性能退出标准未达标的行（macOS 本机，非基准机型）：流式帧 p99 16.4 ms > 12 ms（I191）、主进程增量 32.5 MB > 24 MB（I192）、Agent Host 202 MB > 150 MB（I194）、打开工作区到就绪按 10 次最大判定（I193，R5 的测量见评审第 1.2 节）；应用全部进程合计按 RSS 超出（I26，口径见 ADR-0063）。PR 与 Nightly 门禁在 CI 上原来不判任何值（性能审查 P1，9f5ec0a 修复），CI 两个 runner 类别还没有基线 | 新增一个性能达标任务（计划变更，需用户确认排期；建议在 T46 之前或与 M5 并行、R6 之前完成），处理 I190–I194、I216，并在推送后从 CI 工件记录 `github-arm64`、`github-x64` 的 PR 与 Nightly 基线 **macOS 预算已闭环**，五次 PR 和本机完整 Nightly 通过。GitHub 托管 runner 的基线及 W4 实机项仍按平台跟踪。 |
 | I223 | R5 | 实现 ADR-0064（用户采纳）："信任"项目的决定经主进程原生确认，列出将生效的可执行项（取自 Core 的信任视图，同一版本），信任对话框的"信任"直接触发它，取消答 `cancelled`；暂不信任与撤销不确认；`t45-ipc-hardening` 加入伪造的信任决定，THR-02、THR-11 的映射各加一行，`t18-trust` 等用例代答原生确认 | M5 内的单独小任务或并入 T48，R6 之前完成（实现前 I79 的残余风险仍在） |
 | I224 | T46 | `npm run l3`（Claude Code 2.1.318）在 T46 之前就有的缺口：`config-diag-sources` 与 `hooks-m4-*` 六个 L2 场景（T41）既没有 L3 镜像也没有在 `tests/l3-allowlist.yaml` 排除；`perm-plan` 有 5 条未解释差异，都是 PiArc 请求里的 `NotebookEdit` 工具（T42 加入，Claude Code 在 `-p` 下不声明它）。L3 不在 verify 中，只在 Nightly 运行，所以 Nightly 目前会失败。T46 只为自己的 `perm-auto-*` 场景加了排除 | R6 或下一个运行 L3 的任务：为这七个场景写 L3 镜像或排除理由，为 `NotebookEdit` 补 allowlist 条目（确认 Claude Code 该版本的对应工具） |
 | I225 | T46 | T48 的 `PermissionDenied` hook 接入点：Core `crates/piarc-core/src/tool_io/policy/review.rs` 的 `ToolIo::reviewer_refused`（审查模型答 `deny`、`autoReview` 审计已写、拒绝结果交回模型之前；参数是本次调用的 `Call` 与审查结论 `ToolReview`）。只有审查模型的拒绝触发；超时、服务商错误、无法解析、不可用都转人工，不触发 | T48 在这里运行 `PermissionDenied` hooks（输入带审查模型、理由与类别），hook 的 `retry` 等输出按 Claude Code 的语义接入 |
@@ -1276,3 +1269,7 @@ Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m
 ### 2026-11-24 R5 补齐 M4 能力与依赖验收
 
 逐项核对 T39–T45、W3 的 95 项，92 项通过；有证据边界的阻塞项为 T43-A10（未实测的 VoiceOver 操作与播报）、T45-A02（新增 Windows 终端用例和双平台发布探针的 CI 记录）、W3-A01（Windows 实机的新版私有工作集时间序列）。第 16 章 M4 九项与任务证据见 R5-findings.md 第 1.3 节。完整 L2 的能力覆盖 MISSING 0，M4 及之前 planned 0。 全部性能预算由 R5-A02 单独判定。
+
+### 2026-11-24 R5 已完成（macOS）
+
+Apple M1 Max / 32 GB、macOS arm64、接电。提交 0cbecdc 执行 node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g，25/25 个指标同时通过绝对预算及已有相对基线，无错误。打包运行时代码与 0cbecdc 一致。主进程 RSS 增量 23.10/24 MB，单活动会话 Agent Host 142.97/150 MB，流式帧 p99 8.41/12 ms。结果在 tmp/evidence/partial-closure/nightly-full-results/report.json。Windows 数据及 W4 归属见 R5-findings.md 第 1.2 节与 W4 清单。 第 16 章及评审索引已同步。

@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.63（2026-11-24） |
+| 版本 | 2.64（2026-11-24） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -1824,7 +1824,7 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 | **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
 | **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，并按用户确认的 ADR-0047 让带通配的命令规则不放行越界路径（L3 少了这条差异），见 [R3 评审](../reviews/R3-findings.md)。**Windows 已达标（W2，2026-11-21）**：L2 145 个通过（4 个 macOS 专属），L3 对 Claude Code 2.1.318 的 12 个场景 0 个未解释差异（allowlist 按平台限定 Windows 版的工具集差异），W1 遗留的 UNC 补验通过，修复 7 个 Windows 平台缺陷，见 [W2 报告](../reviews/W2-windows-m2-parity.md)。 |
 | **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算。**macOS 按 ADR-0063 的口径达标（R5，2026-11-22）**：3 会话 + 子 agent + 共享 MCP 的场景中应用其余进程的物理占用最大 264 MB（≤ 510 MB）、Agent Host 最大 229 MB（≤ 270 MB），见 [R5 评审](../reviews/R5-findings.md)第 1.2 节；Windows 的 W3 实测私有工作集 256 MB（≤ 450 MB），由 W4 按同一脚本复测确认。此前的判定：**macOS 未达标（R4，2026-11-21）**：M3 能力全部有 L2 场景（L2 174 个通过、2 个 Windows 专属），四个独立审查的发现中修复 10 项缺陷；内存一项 Agent Host 达标（最大 236 MB，上限 270 MB），应用其余进程合计 580 MB 超出 510 MB（RSS 口径，phys_footprint 约 250 MB），阻塞进入 M4 的退出判定，见 [R4 评审](../reviews/R4-findings.md)。**Windows 未达标（W3，2026-11-22）**：M3 能力在 Windows 11 实机可用（ConPTY 终端与输入法、内置 Node 的 MCP、长路径与中文路径的 worktree、托盘、多窗口、`piarc://` 与右键菜单、讲述人与 NVDA），修复 10 个 Windows 缺陷；内存一项与 macOS 相同：Agent Host 最大 163 MB（达标），应用其余进程最大 576 MB 超出 450 MB（私有工作集合计 256 MB），见 [W3 报告](../reviews/W3-windows-m3-parity.md)。 |
-| **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标。**macOS 未达标（R5，2026-11-22）**：九项目标都已交付并有验收证据，M4 及之前没有 `planned` 的能力（L2 213 个通过、3 个按平台跳过）；第 10.1 节 14 条威胁、59 个对策都映射到测试且本地通过（两个平台 CI 的结果等推送），四个独立审查的发现中修复 3 项安全缺陷（Agent Host 的子进程能往 Pi 自动加载的目录放代码、克隆的包经自带 `.npmrc` 让 npm 运行程序、性能门禁在 CI 上不判值）等 21 项；性能一条不满足：本机 Nightly 的流式帧 p99、主进程增量、Agent Host 内存超出（交性能达标任务，I222）；应用全部进程合计按 ADR-0063（用户采纳）的物理占用口径为 208 MB，达标，见 [R5 评审](../reviews/R5-findings.md)。Windows 的 M4 由 W4 验收。 |
+| **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标。**macOS 已达标（R5，2026-11-24）**。九项目标均有验收证据。M4 及之前没有 planned 能力；第 10.1 节 14 条威胁、59 个对策均已映射，macOS 与 Windows CI 通过威胁映射检查。本机完整 Nightly 的 25 项指标均达标。新安全用例双平台执行记录由 T45 跟踪，Windows M4 实机验收归 W4。见 [R5 评审](../reviews/R5-findings.md)。 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
 
 终端（ADR-0017）是 M3 中工作量最大的单项，估计 1 人 5.5–7 周。后台任务与 Monitor（T32）先用管道与输出文件实现，无头终端（T33）再加入"终端承载"的任务类型，渲染器（T34）最后接上；M0 的 S7 是开工前的闸门，不通过就直接启用 xterm.js 退路。
@@ -1894,6 +1894,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
+| 2.64 | 2026-11-24 | R5 收尾复核，第 16 章记录 macOS M4 达标与 Windows 的实机复测归属。 |
 | 2.63 | 2026-11-24 | M4 性能收尾：第 10.3 节明确 macOS 本地资源协议和打包模块的符号处理（ADR-0072）。 |
 | 2.62 | 2026-11-24 | M4 性能收尾：第 5.6 节采用随应用分发、按清单校验的 Agent Host 本地 ESM 分块（ADR-0071）。 |
 | 2.61 | 2026-11-24 | I185：第 6 章补充设置文件的复查、诊断页的刷新时机，以及会话运行前对技能和输出风格的核对。 |
