@@ -5,8 +5,8 @@
 //   npm only to install packages, ADR-0058);
 // - on macOS, Electron's UI locales other than the app's languages (English and Chinese):
 //   Chromium falls back to English for any other system language, like the app itself;
-// - on macOS, the local symbols of the release Core module (`strip -x`; the development build
-//   keeps them for tests and backtraces). Windows keeps symbols in separate PDB files.
+// - on macOS, the packaged Core module's local symbols (strip -x before signing; the
+//   original build output keeps them for source-tree debugging).
 //
 // The bundle is signed again afterwards (packaging/macos-sign.mjs), so the changed files are
 // sealed like the rest.

@@ -87,3 +87,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0069](0069-external-session-drafts.md) | 外部快捷操作打开可编辑草稿，用户手动发送（修订 ADR-0052 第 10 条） | 已接受 |
 | [0070](0070-in-memory-side-conversations.md) | 独立的内存侧边对话、工具拒绝和无转录来源的用量 | 已接受（补充） |
 | [0071](0071-local-esm-chunks.md) | Agent Host 按本地 ESM 分块构建与校验 | 已接受，修订架构第 5.6 节 |
+| [0072](0072-macos-local-asset-responses.md) | macOS 通过原生缓冲区交付本地应用资源 | 已接受，升级 Electron 时重新评估 |

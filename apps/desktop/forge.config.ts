@@ -49,8 +49,9 @@ async function copyCoreModule(buildPath: string, platform: string, arch: string)
   const destination = path.join(buildPath, 'native', name);
   await mkdir(path.dirname(destination), { recursive: true });
   await copyFile(source, destination);
-  // The release module ships without local symbols (packaging/trim.mjs, I41).
-  if (platform === 'darwin' && flavor === 'release') {
+  // Trim only the packaged copy. The development package measures the same Core layout as
+  // the release package, while the build:core output retains local symbols for debugging.
+  if (platform === 'darwin') {
     await stripLocalSymbols(destination);
   }
   if (platform === 'win32') {

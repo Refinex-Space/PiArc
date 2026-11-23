@@ -149,3 +149,38 @@ test('blocks an external image', async ({ page }) => {
     violation: 'img-src https://example.com/pixel.png',
   });
 });
+
+test('GET, HEAD, a missing asset and an unsupported method retain the app response policy', async ({
+  page,
+}) => {
+  const results = await page.evaluate(async () => {
+    const checks = [
+      ['/index.html', 'GET'],
+      ['/index.html', 'HEAD'],
+      ['/missing-piarc-test-asset.js', 'GET'],
+      ['/index.html', 'POST'],
+    ] as const;
+    return Promise.all(
+      checks.map(async ([asset, method]) => {
+        const response = await fetch(asset, { method, cache: 'no-store' });
+        return {
+          status: response.status,
+          mime: response.headers.get('content-type'),
+          csp: response.headers.get('content-security-policy'),
+          nosniff: response.headers.get('x-content-type-options'),
+          bytes: (await response.arrayBuffer()).byteLength,
+        };
+      }),
+    );
+  });
+  expect(results.map((r) => r.status)).toEqual([200, 200, 404, 405]);
+  expect(results[0]?.mime).toContain('text/html');
+  expect(results[1]?.mime).toBe(results[0]?.mime);
+  expect(results[0]?.bytes).toBeGreaterThan(0);
+  expect(results.slice(1).map((r) => r.bytes)).toEqual([0, 0, 0]);
+  for (const response of results) {
+    expect(response.csp).toBe(results[0]?.csp);
+    expect(response.csp).toContain("script-src 'self'");
+    expect(response.nosniff).toBe('nosniff');
+  }
+});

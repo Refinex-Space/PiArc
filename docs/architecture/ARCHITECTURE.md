@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.62（2026-11-24） |
+| 版本 | 2.63（2026-11-24） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -283,6 +283,7 @@ PiArc/
 | [0067](../adr/0067-fork-skill-index-and-grants.md) | 隔离 skill 的正文、临时授权和 hooks 只交给执行它的子会话 | 父会话只需索引和运行结果 |
 | [0068](../adr/0068-worktree-hook-ownership.md) | 在 Core 登记 hook 创建的目录及其文件系统身份 | 清理与恢复能核实所有者，无法判断改动时保留目录 |
 | [0071](../adr/0071-local-esm-chunks.md) | Agent Host 的本地 ESM 分块 | 冷模块按需加载，完整模块清单随包校验 |
+| [0072](../adr/0072-macos-local-asset-responses.md) | macOS 在应用协议上直接返回资源字节 | 保留请求边界和响应头，减少主进程内存占用 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -1540,6 +1541,8 @@ T20 起，项目层的 `acceptEdits` 和 `additionalDirectories` 也纳入信任
 
 ### 10.3 进程加固
 
+macOS 通过 Electron 的原生缓冲区回调交付 `app:` 资源，Windows 继续使用 Fetch 适配器。文件范围、请求方法、MIME 和 CSP 由两个传输共用的处理函数决定。macOS 开发包与发布包均剥除包内 Core 副本的本地符号，源构建产物保留调试信息（ADR-0072）。
+
 **渲染进程**（按 Electron 官方安全清单逐项落实，清单原文见 `docs/research/electron-stack.md` 第 3 节）：
 
 - 所有窗口开启 `sandbox` 与 `contextIsolation`，关闭 `nodeIntegration`；不使用 `<webview>`；不开启实验特性与 `enableBlinkFeatures`；不关闭 `webSecurity`。
@@ -1891,6 +1894,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
+| 2.63 | 2026-11-24 | M4 性能收尾：第 10.3 节明确 macOS 本地资源协议和打包模块的符号处理（ADR-0072）。 |
 | 2.62 | 2026-11-24 | M4 性能收尾：第 5.6 节采用随应用分发、按清单校验的 Agent Host 本地 ESM 分块（ADR-0071）。 |
 | 2.61 | 2026-11-24 | I185：第 6 章补充设置文件的复查、诊断页的刷新时机，以及会话运行前对技能和输出风格的核对。 |
 | 2.60 | 2026-11-23 | T48：第 6 章补充服务端压缩、fork 及隔离 skill 的缓存和权限规则、M5 hooks 与 MCP elicitation。ADR-0066、0067、0068 记录工具声明、授权和目录归属的调整。 |
