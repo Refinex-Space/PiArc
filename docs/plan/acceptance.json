@@ -4703,22 +4703,22 @@
       "id": "T49-A01",
       "task": "T49",
       "description": "侧边对话的请求包含主会话当前已完成的历史。验证：mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run agent-host/src/runtime/fork-context.test.ts：真实 Pi 会话序列化后的 Anthropic 请求包含主会话已完成问答。主回合进行中不带入未完成内容，system/tools 的序列化前缀一致。证据 tmp/evidence/T49/final-feature-tests.log、side-isolation-native.json。"
     },
     {
       "id": "T49-A02",
       "task": "T49",
       "description": "一次侧边对话问答前后，主会话的 JSONL 字节不变，主会话下一个请求中不含侧边对话的任何内容。验证：文件比对与 mock provider 请求断言。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "fork-context.test.ts 在侧边问答前后读取同一个主 JSONL，逐字节比对相等，并确认仅有一份 JSONL。后续主请求不含侧边问题、回答或工具拒绝。正式 L2 side-chat-isolation 通过，证据 tmp/evidence/T49/side-isolation-native.json。"
     },
     {
       "id": "T49-A03",
       "task": "T49",
       "description": "侧边对话中模型发出工具调用时，工具不执行，Core 没有收到 fs、exec 或审批请求。验证：L2 场景。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "cargo test -p piarc-testkit --test scenarios -- side-chat-isolation --exact：1/1 passed。严格 mock 在侧边请求中发出 Write 和 Bash，两次工具调用得到本地拒绝；no_core_io 核对调用未抵达 Core，两个目标文件均不存在。证据 tmp/evidence/T49/side-isolation-native.json。"
     },
     {
       "id": "T49-A04",
@@ -4738,43 +4738,43 @@
       "id": "T49-A06",
       "task": "T49",
       "description": "侧边对话的 token 用量计入统计并单独列出。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "side-chat-isolation 的 check_cost 核对父会话总计 4 个请求，其中 2 个列在 auxiliary/sideChat。cargo test -p piarc-store --test usage --test migrations 7/7；用量在主会话 JSONL 创建前可查询，重建索引保持，删除会话清理。证据 tmp/evidence/T49/side-isolation-native.json、side-store-tests.log。"
     },
     {
       "id": "T49-A07",
       "task": "T49",
       "description": "App Intents 可行性结论已写入 `docs/engineering/app-intents.md`；不可行时 ADR 提议已写。验证：文件内容。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "docs/engineering/app-intents.md 记录 Xcode 26.3 ExtensionKit 原型、元数据、分层签名和实机结论。用户找到 Open PiArc 并成功运行。arm64 与 x86_64 扩展构建成功。"
     },
     {
       "id": "T49-A08",
       "task": "T49",
       "description": "App Intents 原生模块在 macOS CI 上构建并打入应用包，ad-hoc 重签后应用正常启动，fuse 检查通过。验证：CI 输出与 `check-fuses.mjs` 输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "本地正式包的三项动作元数据、布局 28/28、发布 fuse 9/9、严格递归签名和隔离窗口启动均通过，见 tmp/evidence/T49/intents-unrestricted-layout.json、intents-unrestricted-fuses.log、intents-unrestricted-launch.log。macOS package-macos 作业已接入；本任务未推送，缺少包含 T49 的远端 CI 输出。"
     },
     {
       "id": "T49-A09",
       "task": "T49",
       "description": "用户在\"快捷指令\"中能看到 PiArc 的动作，运行\"新建会话\"后 PiArc 打开对应工作区并预填文字，未自动发送。验证：用户实机操作记录与截图。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "2026-11-23 用户在实机快捷指令运行正式包的 New Session in PiArc，确认打开正确工作区、输入框原样显示 T49 + 草稿 & 待确认、未自动发送。用户明确接受以本次实机文字记录代替截图。见 docs/engineering/app-intents.md。"
     },
     {
       "id": "T49-A10",
       "task": "T49",
       "description": "App Intents 与跳转列表触发的启动只预填输入，不发送消息。验证：测试。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "npx vitest run apps/desktop/src/main/launch.test.ts apps/desktop/src/main/platform/jump-list.test.ts apps/desktop/src/renderer/shell/external-draft.test.tsx：旧路由忽略额外参数，draft 路由与两个固定任务在实际 Shell 中预填或定位，createSession 与 prompt 均为 0 调用。Swift 路由测试通过；正式快捷指令经用户实机确认。证据 tmp/evidence/T49/shortcuts-vitest.log、final-feature-tests.log。"
     },
     {
       "id": "T49-A11",
       "task": "T49",
       "description": "跳转列表条目的生成与启动参数路由有单元测试，并在 Windows CI 上通过；实机显示与点击由 W4 验证。验证：Windows CI 测试输出。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "blocked",
+      "evidence": "本地运行跳转列表分类、排序、条目移除、固定任务、路径转义、AUMID 一致性和单实例路由的定向用例通过，见 tmp/evidence/T49/shortcuts-vitest.log。Windows CI 尚无包含本任务的运行；W4 的实机步骤见 PLAN.md 的 I229。"
     },
     {
       "id": "T49-A12",

@@ -20,7 +20,7 @@ macOS CI 的 `package-macos` 作业通过同一入口构建两个架构，再运
 
 本机从当前任务源码编译了 release Core、Agent Host 与三个 Electron 进程的代码。Forge 尝试下载 Electron 时网络受限，随后在独立临时源码目录让同一 Forge 打包入口使用本地缓存的 Electron 45.3.2 arm64 ZIP，SHA-256 与已锁定 Electron 包的 `checksums.json` 相符。产物在 `tmp/evidence/T49/shortcuts-final/PiArc.app`。其 main、preload、38 个 renderer 资源和 Agent Host bundle 与本轮编译输出逐字节相符；从包内成功加载发布版 Core 并核对了侧边对话方法。扩展面向 macOS 13 及以上，arm64 和 x86_64 均已编译，用户实机包为 arm64。
 
-包内的三个动作均生成可发现元数据。严格递归签名和发布 fuse 9/9 通过。布局检查 26/28，仍有上述两项 Node 签名错误；从已校验的 Node 发行包暂存目录到最终应用，Node 文件字节相同。本会话用独立数据目录启动正式包收到 `SIGABRT`，实机窗口行为由下列清单确认。证据见 `tmp/evidence/T49/intents-forge-offline.log`、`intents-final-fuses.log`、`intents-final-layout.json` 和 `intents-final-metadata.json`。
+包内的三个动作均生成了可发现元数据。初次在受限会话中核对签名时，系统未提供签名者证书链，布局检查为 26/28。2026-11-23 在原生 macOS 26.5.2 桌面上对同一个正式包复验，`check-app-layout.mjs` 28/28 通过，其中包括内置 Node 的官方签名。发布 fuses 9/9 通过，`codesign --verify --deep --strict` 通过。以独立临时数据目录启动新实例后，WindowServer 报告该 PID 拥有可见的 1280 × 800 主窗口。证据在 `tmp/evidence/T49/` 下的 `intents-unrestricted-layout.json`、`intents-unrestricted-fuses.log`、`intents-unrestricted-codesign.log` 和 `intents-unrestricted-launch.log`。
 
 ## 工作区与新会话动作
 
@@ -34,4 +34,4 @@ macOS CI 的 `package-macos` 作业通过同一入口构建两个架构，再运
 3. 新建另一个快捷指令，添加“在 PiArc 中新建会话”。同样粘贴工作区绝对路径，“草稿文字”填 `T49 + 草稿 & 待确认`，运行并截取 PiArc 窗口。期望对应工作区的新会话输入框完整显示这些文字，可继续编辑，transcript 中没有新用户消息，且没有运行中的回合。无需发送该草稿或配置模型。
 4. 退出 PiArc 后再运行“新建会话”，检查冷启动也能显示相同草稿。请记录系统版本、动作名称、应用已运行及冷启动结果，附上动作列表及带草稿的窗口截图。没有找到动作时请提供搜索页；运行失败时请附完整错误文字。
 
-2026-11-23，用户运行正式包的“在 PiArc 中新建会话”后确认：工作区正确，`T49 + 草稿 & 待确认` 原样显示，未自动发送。用户也已确认最小动作“打开 PiArc”能被发现并运行。动作和窗口截图尚未取得；冷启动、单独运行“打开工作区”及 CI 结果没有独立的实机记录。
+2026-11-23，用户运行正式包的“在 PiArc 中新建会话”后确认：工作区正确，`T49 + 草稿 & 待确认` 原样显示，未自动发送。用户也已确认最小动作“打开 PiArc”能被发现并运行。用户明确接受本次以实机文字记录代替动作和窗口截图。冷启动、单独运行“打开工作区”及 CI 结果没有独立的实机记录。
