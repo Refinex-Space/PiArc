@@ -331,7 +331,9 @@ async fn heredocs_and_syntax_errors_through_eval_on_windows() {
         .await;
     assert_eq!(heredoc["exitCode"], 0, "{}", head(&heredoc));
     assert_eq!(head(&heredoc), "first 第一\n  second $HOME\nafter\n");
-    let broken = f.bash("echo start\nif then fi\necho never").await;
+    // ADR-0028 merges the two pipes in arrival order. Put the marker on the diagnostic's
+    // pipe so starts_with checks Bash's execution order independently of pipe scheduling.
+    let broken = f.bash("echo start >&2\nif then fi\necho never").await;
     assert_eq!(broken["exitCode"], 2, "{}", head(&broken));
     let text = head(&broken);
     assert!(text.starts_with("start\n"), "{text}");

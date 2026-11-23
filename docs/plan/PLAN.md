@@ -313,7 +313,9 @@ T47 推送后复验（Windows CI 45119779192，bbc6b60）：
 
 - [x] 上一轮 Windows L4 中两处 T47 回归已在本机复现。命令面板断言补上第八项 `/memory`；打包版 Agent Host 探针按生产顺序登记会话，并断言 `memory/status` 成功调用一次。重新打开发包后，在 Electron 的 dev 与 packaged 形态重跑面板、探针及 T47 用例，7/7 通过。
 - [x] [Windows 桌面 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936)：记忆页和托管锁定各 2 项、命令面板 2 项、打包探针 1 项，共 7/7 通过。
-- [ ] 核对 Windows worktree 隔离、两项注册表测试和完整 verify，按运行证据更新 A04、A13。
+- [x] [Windows verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807884)：A04 的 worktree 共享与跨仓库隔离通过，已标 passing。两项注册表测试、T46 审查版本用例和全部适用 L2 也通过。
+- [x] 定位 A13 的唯一失败：Windows Git Bash 在 stderr 输出语法诊断，stdout 的标记有时后到。ADR-0028 以到达顺序合并两条管道。夹具把标记写入诊断所在的 stderr，继续断言输出以标记开头、报错行号为 2、退出码为 2 且未执行后续命令。macOS Bash 对照及 Windows x64 交叉 Clippy 通过。
+- [ ] 核对修复后的 Windows verify 并更新 A13。
 
 ## 登记事项
 
