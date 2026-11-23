@@ -113,6 +113,11 @@ pub struct Settings {
     pub(crate) ignored_sandbox: Vec<(&'static str, String)>,
     /// Auto mode values of project layers (T46), left out: `(layer, JSON Pointer)`.
     pub(crate) ignored_auto: Vec<(&'static str, String)>,
+    /// Values only managed settings may set, left out of the other layers (T47):
+    /// `(layer, JSON Pointer)`.
+    pub(crate) ignored_managed_only: Vec<(&'static str, String)>,
+    /// Project layers that turned auto memory on, which only the user may do (T47).
+    pub(crate) ignored_memory: Vec<&'static str>,
     /// The extension packages in effect (T40), set by Core after the load
     /// ([`Settings::set_packages`]): the settings name them, Core's records say where they are.
     pub(crate) packages: crate::plugins::Packages,
@@ -139,6 +144,8 @@ impl Settings {
             ignored_modes: Vec::new(),
             ignored_sandbox: Vec::new(),
             ignored_auto: Vec::new(),
+            ignored_managed_only: Vec::new(),
+            ignored_memory: Vec::new(),
             packages: crate::plugins::Packages::default(),
         };
         settings.reload();
@@ -186,6 +193,38 @@ impl Settings {
         }
     }
 
+    /// Replaces the layer `id` with `spec` (`None` removes it), reads the layers again and
+    /// merges: the managed settings changed (T47). The other layers keep their state.
+    pub fn set_layer(&mut self, id: &str, spec: Option<LayerSpec>) -> Change {
+        let mut states: Vec<(&'static str, LayerState)> = self
+            .table
+            .layers()
+            .iter()
+            .map(|l| l.id)
+            .zip(std::mem::take(&mut self.states))
+            .collect();
+        match spec {
+            Some(spec) => self.table.insert(spec),
+            None => self.table.remove(id),
+        }
+        self.states = self
+            .table
+            .layers()
+            .iter()
+            .map(|layer| {
+                states.iter().position(|(old, _)| *old == layer.id).map_or(
+                    LayerState {
+                        status: LayerStatus::Missing,
+                        value: None,
+                        raw: None,
+                    },
+                    |at| states.swap_remove(at).1,
+                )
+            })
+            .collect();
+        self.reload()
+    }
+
     /// Changes the project's trust and merges again.
     pub fn set_trust(&mut self, trust: TrustState) -> Change {
         self.trust = trust;
@@ -200,6 +239,8 @@ impl Settings {
         let mut ignored = Vec::new();
         let mut ignored_sandbox = Vec::new();
         let mut ignored_auto = Vec::new();
+        let mut ignored_managed_only = Vec::new();
+        let mut ignored_memory = Vec::new();
         let effective: Vec<Option<Value>> = self
             .table
             .layers()
@@ -208,6 +249,18 @@ impl Settings {
             .map(|(spec, state)| {
                 let mut value = state.value.clone()?;
                 let project = spec.scope == Scope::Project;
+                if spec.scope != Scope::Enterprise {
+                    for pointer in crate::managed::ONLY {
+                        if value.pointer(pointer).is_some() {
+                            remove_pointer(&mut value, pointer);
+                            ignored_managed_only.push((spec.id, (*pointer).to_owned()));
+                        }
+                    }
+                }
+                if project && value.pointer("/autoMemoryEnabled") == Some(&Value::Bool(true)) {
+                    remove_pointer(&mut value, "/autoMemoryEnabled");
+                    ignored_memory.push(spec.id);
+                }
                 let mode = value
                     .pointer("/permissions/defaultMode")
                     .and_then(Value::as_str)
@@ -249,13 +302,46 @@ impl Settings {
         self.ignored_modes = ignored;
         self.ignored_sandbox = ignored_sandbox;
         self.ignored_auto = ignored_auto;
+        self.ignored_managed_only = ignored_managed_only;
+        self.ignored_memory = ignored_memory;
         changed
     }
 
+    /// The `enterprise` layer's value (T47), when managed settings set anything.
+    #[must_use]
+    pub fn managed(&self) -> Option<&Value> {
+        self.layer(crate::layers::ids::ENTERPRISE)
+            .filter(|v| v.as_object().is_some_and(|m| !m.is_empty()))
+    }
+
+    /// A setting Core reads from the user's own file only (the bypass and Auto mode switches,
+    /// T23, T46): the managed value when managed settings set it (T47), else the user file's.
+    #[must_use]
+    pub fn user_value(&self, pointer: &str) -> Option<&Value> {
+        self.managed()
+            .and_then(|m| m.pointer(pointer))
+            .or_else(|| self.layer(crate::layers::ids::USER)?.pointer(pointer))
+    }
+
+    /// Whether managed settings lock the setting at `pointer` (T47, [`crate::managed::locked`]).
+    #[must_use]
+    pub fn is_locked(&self, pointer: &str) -> bool {
+        crate::managed::locked(self.managed(), pointer)
+    }
+
+    /// Whether managed settings turned `allowManagedPermissionRulesOnly` on: only their rules
+    /// take part in decisions (T47).
+    #[must_use]
+    pub fn managed_rules_only(&self) -> bool {
+        self.get("/allowManagedPermissionRulesOnly") == Some(&Value::Bool(true))
+    }
+
     /// The permission rule lists of every layer, highest precedence first, as they apply:
-    /// an untrusted project's allow rules are left out (deny and ask always apply).
+    /// an untrusted project's allow rules are left out (deny and ask always apply); with
+    /// `allowManagedPermissionRulesOnly` only the managed layer's rules (T47).
     #[must_use]
     pub fn permission_lists(&self) -> Vec<PermissionLists> {
+        let managed_only = self.managed_rules_only();
         let strings = |value: &Value, key: &str| -> Vec<String> {
             value
                 .pointer(&format!("/permissions/{key}"))
@@ -272,6 +358,7 @@ impl Settings {
             .iter()
             .zip(&self.effective)
             .rev()
+            .filter(|(spec, _)| !managed_only || spec.scope == Scope::Enterprise)
             .filter_map(|(spec, value)| {
                 let value = value.as_ref()?;
                 Some(PermissionLists {

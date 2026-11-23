@@ -259,6 +259,11 @@ impl LayerTable {
         self.layers.insert(at, spec);
     }
 
+    /// Removes the layer with `id`.
+    pub fn remove(&mut self, id: &str) {
+        self.layers.retain(|l| l.id != id);
+    }
+
     /// The layers from the lowest precedence to the highest.
     #[must_use]
     pub fn layers(&self) -> &[LayerSpec] {

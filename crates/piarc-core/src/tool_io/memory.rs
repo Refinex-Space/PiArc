@@ -108,13 +108,8 @@ impl ToolIo {
     ) -> Result<memory_reader::Collection, ErrorObject> {
         let config = Arc::clone(&self.config);
         let scope = session.scope.clone();
-        let project = session.project().to_owned();
+        let table = self.layers(session.project());
         tokio::task::spawn_blocking(move || {
-            let table = piarc_config::LayerTable::workspace(
-                &config.data_dir,
-                &project,
-                config.home.as_deref(),
-            );
             // This setting governs the choice of two documents; project code is never enabled.
             let settings = piarc_config::Settings::load(table, piarc_config::TrustState::Untrusted);
             let both = settings.get("/memory/readBoth").and_then(Value::as_bool) == Some(true);

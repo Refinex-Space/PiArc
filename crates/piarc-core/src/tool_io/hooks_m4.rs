@@ -265,11 +265,10 @@ impl ToolIo {
             return;
         };
         let mut seen = s.config_seen.lock().await;
-        let data = self.config.data_dir.clone();
-        let home = self.config.home.clone();
-        let project = s.project().to_owned();
+        let table = self.layers(s.project());
+        // The managed layer has no file of its own: `file_path` names its first document.
+        let managed = self.managed().snapshot().primary().map(Path::to_owned);
         let Ok(now) = tokio::task::spawn_blocking(move || {
-            let table = piarc_config::LayerTable::workspace(&data, &project, home.as_deref());
             let settings = piarc_config::Settings::load(table, piarc_config::TrustState::Untrusted);
             settings
                 .loaded_layers()
@@ -278,7 +277,12 @@ impl ToolIo {
                     let file = settings
                         .table()
                         .get(layer)
-                        .and_then(|spec| spec.file().map(Path::to_owned));
+                        .and_then(|spec| spec.file().map(Path::to_owned))
+                        .or_else(|| {
+                            (layer == piarc_config::ids::ENTERPRISE)
+                                .then(|| managed.clone())
+                                .flatten()
+                        });
                     (layer, file, value)
                 })
                 .collect::<Vec<SeenLayer>>()
@@ -297,6 +301,15 @@ impl ToolIo {
                     && previous != *value
                 {
                     self.config_change(id, layer, file, previous).await;
+                }
+            }
+            // A layer that is gone (the managed settings removed, T47) changed too.
+            for (layer, file, value) in before {
+                if let Some(file) = file
+                    && value.is_some()
+                    && !now.iter().any(|(l, _, _)| l == layer)
+                {
+                    self.config_change(id, layer, file, value.clone()).await;
                 }
             }
         }

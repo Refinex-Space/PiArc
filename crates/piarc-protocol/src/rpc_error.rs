@@ -85,6 +85,8 @@ pub mod code {
     pub const UNENCODABLE_TEXT: i64 = -32022;
     /// The client cancelled the request or replaced it with a newer one.
     pub const CANCELLED: i64 = -32023;
+    /// A managed settings document is not valid; Core did not start.
+    pub const MANAGED_SETTINGS_INVALID: i64 = -32024;
 }
 
 /// JSON-RPC 2.0 error object with PiArc's mandatory structured `data`.
@@ -194,6 +196,9 @@ pub enum ErrorKind {
     /// reason, operation }` with `reason` `outsideWorkspace` or `protectedPath` and
     /// `operation` `read` or `write`.
     PermissionDenied,
+    /// A managed (enterprise) settings document is not a JSON object, so Core does not start
+    /// (T47). Core API only. `details`: `{ location, reason, line?, column? }`.
+    ManagedSettingsInvalid,
     /// The new text has characters the file's encoding cannot represent; the file is
     /// unchanged. `details`: `{ path, encoding, line }` (1-based line of the first such
     /// character).
@@ -237,6 +242,7 @@ impl ErrorKind {
             Self::PermissionDenied => code::PERMISSION_DENIED,
             Self::UnencodableText => code::UNENCODABLE_TEXT,
             Self::Cancelled => code::CANCELLED,
+            Self::ManagedSettingsInvalid => code::MANAGED_SETTINGS_INVALID,
         }
     }
 }
@@ -261,7 +267,7 @@ impl ErrorObject {
 mod tests {
     use super::*;
 
-    const ALL_KINDS: [ErrorKind; 29] = [
+    const ALL_KINDS: [ErrorKind; 30] = [
         ErrorKind::ParseError,
         ErrorKind::InvalidRequest,
         ErrorKind::MethodNotFound,
@@ -291,6 +297,7 @@ mod tests {
         ErrorKind::PermissionDenied,
         ErrorKind::UnencodableText,
         ErrorKind::Cancelled,
+        ErrorKind::ManagedSettingsInvalid,
     ];
 
     #[test]

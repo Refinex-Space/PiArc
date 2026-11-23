@@ -116,6 +116,9 @@ pub struct CoreConfig {
     /// How long an Auto mode review may take (T46): `piarc_policy::review::REVIEW_TIMEOUT`,
     /// not a setting; L2's fault injection shortens it.
     pub review_timeout: Duration,
+    /// Where managed (enterprise) settings are read and how often (T47). None by default;
+    /// the app passes the system's places, tests a directory of their own.
+    pub managed: crate::managed::ManagedConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -154,6 +157,7 @@ impl Default for CoreConfig {
             worktrees: crate::worktrees::WorktreeConfig::default(),
             sandbox: crate::tool_io::SandboxConfig::default(),
             review_timeout: piarc_policy::review::REVIEW_TIMEOUT,
+            managed: crate::managed::ManagedConfig::default(),
         }
     }
 }
@@ -613,7 +617,7 @@ fn open_state(
         }
         Err(error) => return Err(io("cannot open the log directory", error)),
     }
-    let storage = Storage::open(dirs.with_home(config.home.clone()))?;
+    let storage = open_storage(dirs, config, handle, cancel)?;
     let trust = TrustService::new(storage.clone());
     let data = storage.dirs().data().to_owned();
     let secrets = match &config.secret_store {
@@ -680,6 +684,20 @@ fn open_state(
     })
 }
 
+/// Reads the managed settings and opens the database. The managed settings come first: the
+/// first decision already sees them, and a broken managed document stops Core here (T47,
+/// design addendum section 8.1).
+fn open_storage(
+    dirs: DataDirs,
+    config: &CoreConfig,
+    handle: &Handle,
+    cancel: &CancellationToken,
+) -> Result<Storage> {
+    let managed = crate::managed::ManagedSettings::load(&config.managed)?;
+    managed.spawn_poll(handle, cancel.child_token());
+    Storage::open(dirs.with_home(config.home.clone()).with_managed(managed))
+}
+
 /// The tool I/O of Core's state: commands with the login shell's environment, policy, hooks.
 fn state_tool_io(
     config: &CoreConfig,
@@ -700,6 +718,7 @@ fn state_tool_io(
             clock: config.sessions.clock.clone(),
             web: config.web.clone(),
             sandbox: config.sandbox.clone(),
+            managed: storage.dirs().managed().clone(),
             ..ToolIoConfig::new(data)
         },
         Some(events.clone()),

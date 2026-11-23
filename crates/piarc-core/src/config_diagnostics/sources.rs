@@ -30,6 +30,8 @@ pub(crate) struct Inputs<'a> {
     pub settings: &'a piarc_config::Settings,
     /// The installed packages as the workspace sees them.
     pub packages: Option<&'a PackagesList>,
+    /// Core's managed settings (T47).
+    pub managed: &'a crate::managed::Snapshot,
 }
 
 fn report(kind: SourceKind, layer: &'static str, file: PathBuf, scope: Scope) -> FileReport {
@@ -116,7 +118,7 @@ pub(crate) fn reports(inputs: &Inputs<'_>) -> Vec<FileReport> {
     if let Some(list) = inputs.packages {
         out.extend(packages(list, inputs.settings.trust().is_trusted()));
     }
-    out.push(enterprise());
+    out.extend(enterprise(inputs.managed));
     out
 }
 
@@ -130,7 +132,12 @@ fn mcp_json(inputs: &Inputs<'_>) -> Option<FileReport> {
         return Some(r);
     }
     let shown = file.display().to_string();
-    let config = crate::mcp::merged_config(inputs.settings, inputs.root, inputs.home);
+    let config = crate::mcp::merged_config(
+        inputs.settings,
+        inputs.root,
+        inputs.home,
+        inputs.managed.mcp.as_ref(),
+    );
     for server in config.servers.iter().filter(|s| s.source == shown) {
         let pointer = format!("/mcpServers/{}", server.name);
         match server.availability {
@@ -572,16 +579,49 @@ fn packages(list: &PackagesList, trusted: bool) -> Vec<FileReport> {
         .collect()
 }
 
-/// The place for enterprise settings: read from T47, not configured until then.
-fn enterprise() -> FileReport {
-    let mut r = report(
-        SourceKind::Enterprise,
-        "enterprise",
-        PathBuf::new(),
-        Scope::Enterprise,
-    );
-    r.status = FileStatus::NotConfigured;
-    r
+/// The managed settings (T47, design addendum section 8.3): one report per document, then
+/// Claude Code's `managed-mcp.json`; "not configured" when the administrator placed nothing.
+fn enterprise(managed: &crate::managed::Snapshot) -> Vec<FileReport> {
+    let mut out = managed.managed.reports();
+    if let Some(mcp) = &managed.mcp {
+        let mut r = report(
+            SourceKind::Enterprise,
+            "enterprise",
+            mcp.location.clone(),
+            Scope::Enterprise,
+        );
+        r.format = Format::ClaudeCode;
+        r.status = if mcp.servers.is_some() {
+            FileStatus::Loaded
+        } else {
+            FileStatus::Invalid
+        };
+        for name in mcp
+            .servers
+            .iter()
+            .filter_map(Value::as_object)
+            .flat_map(|m| m.keys())
+        {
+            let mut pointer = "/mcpServers".to_owned();
+            piarc_config::schema::push_token(&mut pointer, name);
+            r.effective.push(item(pointer, json!("exclusive")));
+        }
+        if let Some(problem) = &mcp.problem {
+            r.issues.push(issue(&mcp.location, problem.clone(), None));
+        }
+        out.push(r);
+    }
+    if out.is_empty() && managed.memory.is_empty() {
+        let mut r = report(
+            SourceKind::Enterprise,
+            "enterprise",
+            PathBuf::new(),
+            Scope::Enterprise,
+        );
+        r.status = FileStatus::NotConfigured;
+        out.push(r);
+    }
+    out
 }
 
 #[cfg(test)]

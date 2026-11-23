@@ -85,6 +85,8 @@ impl WorkspaceSettings {
         wait_for_registration: bool,
     ) -> Result<Self> {
         let trust_changes = trust.subscribe();
+        let managed = dirs.managed().clone();
+        let managed_changes = managed.changes();
         let state = trust.state(&workspace).await;
         let table = dirs.layers(&workspace);
         let settings = tokio::task::spawn_blocking(move || Settings::load(table, state))
@@ -125,8 +127,10 @@ impl WorkspaceSettings {
                 notifications: rx,
                 changed,
                 layer_changes: layer_changes.clone(),
+                managed,
             },
             trust_changes,
+            managed_changes,
             registered,
         ));
         let settings = Self {
@@ -206,11 +210,14 @@ struct Loop {
     notifications: mpsc::UnboundedReceiver<()>,
     changed: watch::Sender<u64>,
     layer_changes: broadcast::Sender<LayerChange>,
+    /// Core's managed settings (T47): their changes replace the `enterprise` layer.
+    managed: crate::managed::ManagedSettings,
 }
 
 async fn run(
     mut state: Loop,
     mut trust_changes: broadcast::Receiver<crate::trust::TrustChange>,
+    mut managed_changes: watch::Receiver<u64>,
     registered: oneshot::Sender<()>,
 ) {
     // FSEvents can block in the system daemon while several streams start or stop.
@@ -246,6 +253,8 @@ async fn run(
                 Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => state.retrust().await,
                 Err(broadcast::error::RecvError::Closed) => return,
             },
+            // The loop holds the managed settings, so their sender outlives this receiver.
+            Ok(()) = managed_changes.changed() => state.remanage().await,
         }
     }
 }
@@ -256,11 +265,12 @@ impl Loop {
         let watcher = Arc::clone(&self.watcher);
         let workspace = self.workspace.clone();
         let resources = self.resources.clone();
+        let managed_file = self.managed.snapshot().primary().map(Path::to_owned);
         let result = tokio::task::spawn_blocking(move || {
             let before = lock(&inner).issues().to_vec();
             let layers_before = lock(&inner).loaded_layers();
             let change = lock(&inner).reload();
-            let layers = layer_changes(&lock(&inner), layers_before);
+            let layers = layer_changes(&lock(&inner), layers_before, managed_file.as_deref());
             // `.piarc/` or a skill directory may have been created since: watch it now.
             watch_dirs(&watcher, &inner, &workspace, &resources);
             (before, change, layers)
@@ -285,6 +295,33 @@ impl Loop {
             }
             Err(error) => {
                 tracing::error!(target: "piarc_core::settings", "reloading settings failed: {error}");
+            }
+        }
+    }
+
+    /// The managed settings changed (T47): the `enterprise` layer is replaced and merged, its
+    /// change reported like a file's (`ConfigChange` hears `policy_settings`).
+    async fn remanage(&self) {
+        let snapshot = self.managed.snapshot();
+        let inner = Arc::clone(&self.inner);
+        let result = tokio::task::spawn_blocking(move || {
+            let before = lock(&inner).issues().to_vec();
+            let layers_before = lock(&inner).loaded_layers();
+            let change = lock(&inner).set_layer(piarc_config::ids::ENTERPRISE, snapshot.layer());
+            let layers = layer_changes(&lock(&inner), layers_before, snapshot.primary());
+            (before, change, layers)
+        })
+        .await;
+        self.changed.send_modify(|n| *n += 1);
+        match result {
+            Ok((_, change, layers)) => {
+                for layer in layers {
+                    let _ = self.layer_changes.send(layer);
+                }
+                self.emit(change.changed, change.issues).await;
+            }
+            Err(error) => {
+                tracing::error!(target: "piarc_core::settings", "applying managed settings failed: {error}");
             }
         }
     }
@@ -318,21 +355,42 @@ impl Loop {
     }
 }
 
-/// The layers whose loaded value differs from `before`, with their file and earlier value.
+/// The layers whose loaded value differs from `before`, with their file and earlier value. The
+/// managed layer has no file: `managed_file` (its first document) stands for it (T47); a layer
+/// that came or went counts as changed.
 fn layer_changes(
     settings: &Settings,
     before: Vec<(&'static str, Option<Value>)>,
+    managed_file: Option<&Path>,
 ) -> Vec<LayerChange> {
     let after = settings.loaded_layers();
-    before
-        .into_iter()
-        .zip(after)
-        .filter(|((_, old), (_, new))| old != new)
-        .filter_map(|((layer, previous), _)| {
+    let value_of = |layers: &[(&'static str, Option<Value>)], id: &str| {
+        layers
+            .iter()
+            .find(|(l, _)| *l == id)
+            .and_then(|(_, v)| v.clone())
+    };
+    let mut ids: Vec<&'static str> = before.iter().map(|(l, _)| *l).collect();
+    for (layer, _) in &after {
+        if !ids.contains(layer) {
+            ids.push(layer);
+        }
+    }
+    ids.into_iter()
+        .filter_map(|layer| {
+            let previous = value_of(&before, layer);
+            if previous == value_of(&after, layer) {
+                return None;
+            }
             let file = settings
                 .table()
                 .get(layer)
-                .and_then(|spec| spec.file().map(Path::to_owned))?;
+                .and_then(|spec| spec.file().map(Path::to_owned))
+                .or_else(|| {
+                    (layer == piarc_config::ids::ENTERPRISE)
+                        .then(|| managed_file.map(Path::to_owned))
+                        .flatten()
+                })?;
             Some(LayerChange {
                 layer,
                 file,

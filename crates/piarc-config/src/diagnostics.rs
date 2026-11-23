@@ -123,6 +123,13 @@ pub enum IgnoreReason {
     NotApproved,
     /// The value is not valid; it is left out.
     Invalid,
+    /// Only managed settings may set it (T47): `allowManagedHooksOnly` and the other locks.
+    ManagedOnly,
+    /// A project file may only turn auto memory off (T47).
+    ProjectMemory,
+    /// Managed settings decide it (T47): a managed lock leaves this file's permission rules,
+    /// hooks or allowlist out.
+    Managed,
 }
 
 /// One key that is not used.
@@ -307,7 +314,16 @@ impl Settings {
                 *layer == spec.id
                     && (pointer == *removed || pointer.starts_with(&format!("{removed}/")))
             });
-            let reason = if project_mode {
+            let managed_only = self
+                .ignored_managed_only
+                .iter()
+                .any(|(layer, removed)| *layer == spec.id && *removed == pointer);
+            let memory = self.ignored_memory.contains(&spec.id) && pointer == "/autoMemoryEnabled";
+            let reason = if managed_only {
+                IgnoreReason::ManagedOnly
+            } else if memory {
+                IgnoreReason::ProjectMemory
+            } else if project_mode {
                 IgnoreReason::ProjectMode
             } else if project_sandbox {
                 IgnoreReason::ProjectSandbox
@@ -360,6 +376,7 @@ fn classify_raw(spec: &LayerSpec, raw: &Value, out: &mut Vec<IgnoredKey>) {
     for class in claude::classify(raw, claude::SETTINGS_KEYS) {
         let (reason, task) = match (class.row.is_some(), class.status()) {
             (_, KeyStatus::Active) => continue,
+            (true, KeyStatus::Managed) => (IgnoreReason::ManagedOnly, None),
             (false, _) => (IgnoreReason::Unknown, None),
             (true, KeyStatus::Planned(task)) => (IgnoreReason::Planned, Some(task)),
             (true, KeyStatus::Ignored) => (IgnoreReason::Ignored, None),

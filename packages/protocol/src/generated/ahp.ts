@@ -267,6 +267,7 @@ export type ErrorKind =
   | 'fileNotRead'
   | 'fileModified'
   | 'permissionDenied'
+  | 'managedSettingsInvalid'
   | 'unencodableText'
   | 'cancelled';
 /**

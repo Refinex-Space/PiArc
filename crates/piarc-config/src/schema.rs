@@ -260,6 +260,23 @@ const HOOK_MATCHER: Shape = Shape::Object(&[
 
 const HOOK_GROUPS: Shape = Shape::ListOf(&HOOK_MATCHER);
 
+/// One entry of `allowedMcpServers` or `deniedMcpServers` (T47): exactly one of the three keys
+/// (checked by `crate::mcp::policy`).
+const MCP_POLICY_ENTRY: Shape = Shape::Object(&[
+    Field {
+        name: "serverName",
+        shape: Shape::String,
+    },
+    Field {
+        name: "serverCommand",
+        shape: Shape::ListOf(&STRINGS),
+    },
+    Field {
+        name: "serverUrl",
+        shape: Shape::String,
+    },
+]);
+
 /// The PiArc settings file (`settings.json` in the data directory, `.piarc/settings.json`,
 /// `.piarc/settings.local.json`), first version. Hooks use Claude Code's format (ADR-0005);
 /// their meaning is T25's, permission rules are T20's and T23's.
@@ -502,10 +519,18 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             },
             Field {
                 name: "network",
-                shape: Shape::Object(&[Field {
-                    name: "allowedDomains",
-                    shape: Shape::ListOf(&STRINGS),
-                }]),
+                shape: Shape::Object(&[
+                    Field {
+                        name: "allowedDomains",
+                        shape: Shape::ListOf(&STRINGS),
+                    },
+                    // Managed settings only (T47): the proxy lets through the managed
+                    // `allowedDomains` alone and never asks about another domain.
+                    Field {
+                        name: "allowManagedDomainsOnly",
+                        shape: Shape::Bool,
+                    },
+                ]),
             },
         ]),
     },
@@ -513,6 +538,38 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
     Field {
         name: "disabledMcpjsonServers",
         shape: Shape::ListOf(&STRINGS),
+    },
+    // Claude Code's MCP policy lists (T47), in any settings file: entries name a server
+    // (`serverName`), a stdio command line (`serverCommand`) or a URL pattern (`serverUrl`).
+    // A deny entry always wins; once any file sets the allowlist, a server must match it.
+    Field {
+        name: "allowedMcpServers",
+        shape: Shape::ListOf(&MCP_POLICY_ENTRY),
+    },
+    Field {
+        name: "deniedMcpServers",
+        shape: Shape::ListOf(&MCP_POLICY_ENTRY),
+    },
+    // Managed settings only (T47, `crate::managed`): run only the managed hooks; take
+    // permission rules only from managed settings; take the MCP allowlist only from managed
+    // settings.
+    Field {
+        name: "allowManagedHooksOnly",
+        shape: Shape::Bool,
+    },
+    Field {
+        name: "allowManagedPermissionRulesOnly",
+        shape: Shape::Bool,
+    },
+    Field {
+        name: "allowManagedMcpServersOnly",
+        shape: Shape::Bool,
+    },
+    // Auto memory (T47), Claude Code's key: on unless a file turns it off; a project file can
+    // only turn it off.
+    Field {
+        name: "autoMemoryEnabled",
+        shape: Shape::Bool,
     },
     // The MCP pool (T36): disconnect a server after this many seconds without a call from any
     // session; defer MCP tools behind `ToolSearch` when a session has more than this many.

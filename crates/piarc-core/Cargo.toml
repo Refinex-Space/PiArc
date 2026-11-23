@@ -38,6 +38,16 @@ tracing.workspace = true
 
 unicode-normalization.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Managed preferences (T47): the property list files of /Library/Managed Preferences, and the
+# login user's name from the account database for the user channel's file.
+nix = { workspace = true, features = ["user"] }
+plist.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# Managed settings (T47): the HKLM policy key and the Program Files directory.
+windows-registry.workspace = true
+
 [dev-dependencies]
 encoding_rs.workspace = true
 rusqlite.workspace = true

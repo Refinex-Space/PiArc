@@ -2238,6 +2238,11 @@
           "type": "string"
         },
         {
+          "const": "managedSettingsInvalid",
+          "description": "A managed (enterprise) settings document is not a JSON object, so Core does not start\n(T47). Core API only. `details`: `{ location, reason, line?, column? }`.",
+          "type": "string"
+        },
+        {
           "const": "unencodableText",
           "description": "The new text has characters the file's encoding cannot represent; the file is\nunchanged. `details`: `{ path, encoding, line }` (1-based line of the first such\ncharacter).",
           "type": "string"

@@ -51,6 +51,19 @@ pub enum Error {
     /// Core was started without a data directory, so it has no database or settings.
     #[error("Core was started without a data directory")]
     NoDataDirectory,
+    /// A managed (enterprise) settings document is not a JSON object (T47): Core does not
+    /// start until the administrator fixes it.
+    #[error("the managed settings at {location} are not valid: {reason}")]
+    ManagedSettings {
+        /// The file or registry value.
+        location: String,
+        /// What is wrong.
+        reason: String,
+        /// 1-based line of a JSON syntax error.
+        line: Option<usize>,
+        /// 1-based column of a JSON syntax error.
+        column: Option<usize>,
+    },
     /// A feature crate (store, settings, git) failed; carries its structured error.
     #[error("{message}")]
     Feature {
@@ -90,6 +103,7 @@ impl Error {
             | Self::RuntimeStart { .. }
             | Self::Internal { .. }
             | Self::NoDataDirectory => ErrorKind::InternalError,
+            Self::ManagedSettings { .. } => ErrorKind::ManagedSettingsInvalid,
             Self::Feature { kind, .. } => *kind,
         }
     }
@@ -117,6 +131,17 @@ impl Error {
             Self::Feature { details, .. } => details
                 .as_deref()
                 .and_then(|text| serde_json::from_str(text).ok()),
+            Self::ManagedSettings {
+                location,
+                reason,
+                line,
+                column,
+            } => Some(serde_json::json!({
+                "location": location,
+                "reason": reason,
+                "line": line,
+                "column": column,
+            })),
             Self::Terminal(_)
             | Self::NoDataDirectory
             | Self::ShuttingDown

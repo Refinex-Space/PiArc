@@ -16,6 +16,7 @@ pub struct DataDirs {
     data: PathBuf,
     cache: PathBuf,
     home: Option<PathBuf>,
+    managed: crate::managed::ManagedSettings,
 }
 
 impl DataDirs {
@@ -37,6 +38,7 @@ impl DataDirs {
             data,
             cache,
             home: None,
+            managed: crate::managed::ManagedSettings::none(),
         })
     }
 
@@ -48,17 +50,31 @@ impl DataDirs {
         self
     }
 
+    /// The same directories with Core's managed settings (T47): their `enterprise` layer joins
+    /// every settings table.
+    #[must_use]
+    pub fn with_managed(mut self, managed: crate::managed::ManagedSettings) -> Self {
+        self.managed = managed;
+        self
+    }
+
+    /// Core's managed settings.
+    #[must_use]
+    pub fn managed(&self) -> &crate::managed::ManagedSettings {
+        &self.managed
+    }
+
     /// The home directory; `None` reads no user-level Claude Code file.
     #[must_use]
     pub fn home(&self) -> Option<&Path> {
         self.home.as_deref()
     }
 
-    /// The settings layers of `workspace`: PiArc's and Claude Code's (ADR-0005). Every Core
-    /// consumer of settings uses this table.
+    /// The settings layers of `workspace`: PiArc's, Claude Code's and the managed settings'
+    /// (ADR-0005, T47). Every Core consumer of settings uses this table.
     #[must_use]
     pub fn layers(&self, workspace: &Path) -> piarc_config::LayerTable {
-        piarc_config::LayerTable::workspace(&self.data, workspace, self.home())
+        layers(&self.data, workspace, self.home(), &self.managed)
     }
 
     /// The data directory.
@@ -140,4 +156,19 @@ impl DataDirs {
         }
         Ok(())
     }
+}
+
+/// The settings layers of `workspace` with the managed settings' `enterprise` layer (T47).
+#[must_use]
+pub fn layers(
+    data: &Path,
+    workspace: &Path,
+    home: Option<&Path>,
+    managed: &crate::managed::ManagedSettings,
+) -> piarc_config::LayerTable {
+    let mut table = piarc_config::LayerTable::workspace(data, workspace, home);
+    if let Some(layer) = managed.snapshot().layer() {
+        table.insert(layer);
+    }
+    table
 }

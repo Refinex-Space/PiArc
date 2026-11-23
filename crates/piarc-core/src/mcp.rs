@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+use piarc_config::mcp::policy::McpPolicy;
 use piarc_config::mcp::{self as config, MergeOptions, SourceEntries};
 use piarc_config::{TrustState, ids};
 use piarc_protocol::mcp::{
@@ -23,6 +24,7 @@ use piarc_protocol::mcp::{
 use serde_json::Value;
 
 use crate::error::{Error, Result};
+use crate::managed::ManagedMcp;
 use crate::storage::Storage;
 use crate::tool_io::ToolIo;
 use crate::trust::TrustService;
@@ -68,8 +70,16 @@ impl McpConfigSource {
         let expansion = self.tool_io.expansion_environment().await;
         let base = self.tool_io.command_environment().await;
         let home = self.storage.dirs().home().map(Path::to_owned);
+        let managed = self.storage.dirs().managed().snapshot();
         let merged = tokio::task::spawn_blocking(move || {
-            merge_for(&settings, &canonical, home.as_deref(), &choices, &expansion)
+            merge_for(
+                &settings,
+                &canonical,
+                home.as_deref(),
+                managed.mcp.as_ref(),
+                &choices,
+                &expansion,
+            )
         })
         .await
         .map_err(|error| Error::Internal {
@@ -98,7 +108,7 @@ impl McpConfigSource {
             return Vec::new();
         }
         let expansion = self.tool_io.expansion_environment().await;
-        inline_servers(source, inline, trusted, &expansion)
+        inline_servers(source, inline, trusted, &expansion, None)
     }
 
     /// Stores the user's choice for server `name` of `workspace`.
@@ -133,6 +143,7 @@ pub(crate) fn inline_servers(
     inline: &serde_json::Map<String, Value>,
     trusted: bool,
     expansion: &[(OsString, OsString)],
+    policy: Option<&McpPolicy>,
 ) -> Vec<McpServerDefinition> {
     let lookup = lookup_in(expansion);
     let options = MergeOptions {
@@ -141,6 +152,7 @@ pub(crate) fn inline_servers(
         disabled: &[],
         enabled: &[],
         lookup: &lookup,
+        policy,
     };
     let entries = SourceEntries {
         // Checked like a project's servers, so untrusted ones wait.
@@ -176,6 +188,7 @@ pub(crate) async fn settings_file_servers(io: &ToolIo, file: &Path) -> McpServer
             disabled: &[],
             enabled: &[],
             lookup: &lookup,
+            policy: None,
         },
     );
     issues.append(&mut merged.issues);
@@ -198,20 +211,54 @@ pub(crate) fn merged_config(
     settings: &piarc_config::Settings,
     workspace: &Path,
     home: Option<&Path>,
+    managed: Option<&ManagedMcp>,
 ) -> config::McpConfig {
-    merge_for(settings, workspace, home, &[], &[]).0
+    merge_for(settings, workspace, home, managed, &[], &[]).0
+}
+
+/// The managed servers (T47, design addendum sections 5.5 and 7), the highest scope: PiArc's
+/// managed `mcpServers`, then Claude Code's `managed-mcp.json`.
+fn enterprise_sources(
+    settings: &piarc_config::Settings,
+    managed: Option<&ManagedMcp>,
+    sources: &mut Vec<SourceEntries>,
+    issues: &mut Vec<piarc_protocol::mcp::McpConfigIssue>,
+) {
+    sources.push(layer_source(
+        settings,
+        ids::ENTERPRISE,
+        McpScope::Enterprise,
+    ));
+    if let Some(mcp) = managed {
+        let source = mcp.location.display().to_string();
+        if let Some(problem) = &mcp.problem {
+            issues.push(piarc_protocol::mcp::McpConfigIssue {
+                source: source.clone(),
+                pointer: String::new(),
+                message: problem.clone(),
+            });
+        }
+        sources.push(SourceEntries {
+            scope: McpScope::Enterprise,
+            source,
+            servers: mcp.servers.clone(),
+            pointer: "/mcpServers".to_owned(),
+        });
+    }
 }
 
 fn merge_for(
     settings: &piarc_config::Settings,
     workspace: &Path,
     home: Option<&Path>,
+    managed: Option<&ManagedMcp>,
     choices: &[(String, bool)],
     expansion: &[(OsString, OsString)],
 ) -> Merged {
     let trusted = settings.trust() == TrustState::Trusted;
     let mut issues = Vec::new();
     let mut sources = Vec::new();
+    enterprise_sources(settings, managed, &mut sources, &mut issues);
     let state = home.map(|home| {
         let file = home.join(piarc_config::claude::CLAUDE_STATE_FILE);
         let read = config::claude_state_servers(home, workspace).unwrap_or_else(|message| {
@@ -262,6 +309,7 @@ fn merge_for(
     let enabled: Vec<String> = on.into_iter().map(|(n, _)| n.clone()).collect();
     let disabled: Vec<String> = off.into_iter().map(|(n, _)| n.clone()).collect();
     let lookup = lookup_in(expansion);
+    let policy = McpPolicy::from_settings(settings, managed.is_some(), &lookup);
     let mut merged = config::merge(
         &sources,
         &MergeOptions {
@@ -270,6 +318,7 @@ fn merge_for(
             disabled: &disabled,
             enabled: &enabled,
             lookup: &lookup,
+            policy: Some(&policy),
         },
     );
     issues.append(&mut merged.issues);
@@ -370,7 +419,7 @@ fn file_source(
 }
 
 /// `${VAR}` lookup in an environment (Windows names case-insensitively).
-fn lookup_in(env: &[(OsString, OsString)]) -> impl Fn(&str) -> Option<String> + '_ {
+pub(crate) fn lookup_in(env: &[(OsString, OsString)]) -> impl Fn(&str) -> Option<String> + '_ {
     move |name: &str| {
         env.iter()
             .find(|(k, _)| {
@@ -398,8 +447,9 @@ pub fn diagnostics(
     settings: &piarc_config::Settings,
     workspace: &Path,
     home: Option<&Path>,
+    managed: Option<&ManagedMcp>,
 ) -> Value {
-    let (config, _, _) = merge_for(settings, workspace, home, &[], &[]);
+    let (config, _, _) = merge_for(settings, workspace, home, managed, &[], &[]);
     let unsupported: Vec<Value> = config
         .servers
         .iter()

@@ -81,6 +81,8 @@ pub struct MergeOptions<'a> {
     pub enabled: &'a [String],
     /// Looks up a variable for `${VAR}`.
     pub lookup: &'a dyn Fn(&str) -> Option<String>,
+    /// `allowedMcpServers`, `deniedMcpServers` and an exclusive managed set (T47).
+    pub policy: Option<&'a policy::McpPolicy>,
 }
 
 /// The `.mcp.json` file of a workspace.
@@ -274,6 +276,8 @@ fn apply_availability(
         off("enabled is false in its definition", def);
     } else if at.source.ends_with(MCP_JSON) && named(options.disabled_mcpjson) {
         off("listed in disabledMcpjsonServers", def);
+    } else if let Some(reason) = options.policy.and_then(|p| p.refusal(def)) {
+        off(reason, def);
     }
     if def.availability != McpAvailability::Ready {
         // Only servers that may run carry their program or endpoint (and any expanded secret).
@@ -605,6 +609,8 @@ pub fn trust_item_name(name: &str, raw: &Value) -> String {
     }
     out
 }
+
+pub mod policy;
 
 #[cfg(test)]
 mod tests;

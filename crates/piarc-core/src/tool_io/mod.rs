@@ -109,6 +109,9 @@ pub struct ToolIoConfig {
     pub web: WebConfig,
     /// The Bash sandbox's platform, network and enterprise values (T39).
     pub sandbox: SandboxConfig,
+    /// Core's managed settings (T47): their `enterprise` layer joins the settings this module
+    /// reads, their memory documents lead the memory snapshot.
+    pub managed: crate::managed::ManagedSettings,
 }
 
 impl std::fmt::Debug for ToolIoConfig {
@@ -136,6 +139,7 @@ impl ToolIoConfig {
             clock: Arc::new(crate::clock::SystemClock),
             web: WebConfig::default(),
             sandbox: SandboxConfig::default(),
+            managed: crate::managed::ManagedSettings::none(),
         }
     }
 }
@@ -552,6 +556,22 @@ impl ToolIo {
     /// The environment commands inherit (the user's login shell, T17).
     pub(crate) async fn command_environment(&self) -> Vec<(OsString, OsString)> {
         self.exec.hook_launch().await.env
+    }
+
+    /// The settings layers of `workspace` (PiArc's, Claude Code's and the managed settings',
+    /// T47), for the readers that load settings without the trust service.
+    pub(crate) fn layers(&self, workspace: &Path) -> piarc_config::LayerTable {
+        crate::dirs::layers(
+            &self.config.data_dir,
+            workspace,
+            self.config.home.as_deref(),
+            &self.config.managed,
+        )
+    }
+
+    /// Core's managed settings (T47).
+    pub(crate) fn managed(&self) -> &crate::managed::ManagedSettings {
+        &self.config.managed
     }
 
     /// What `${VAR}` in MCP server definitions expands from (T36): the user's login shell

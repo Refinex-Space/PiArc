@@ -99,7 +99,13 @@ pub async fn report_with(
     let hooks = hook_diagnostics(&settings);
     // MCP servers PiArc cannot use and entries it leaves out (T36): read without expanding
     // variables, so no value of the user's environment reaches the report.
-    let mcp = crate::mcp::diagnostics(&settings, &root, storage.dirs().home());
+    let managed = storage.dirs().managed().snapshot();
+    let mcp = crate::mcp::diagnostics(
+        &settings,
+        &root,
+        storage.dirs().home(),
+        managed.mcp.as_ref(),
+    );
     let trusted = settings.trust().is_trusted();
     let others = other_sources(storage, settings, &root, packages).await?;
     if let Value::Array(list) = &mut files {
@@ -163,6 +169,7 @@ async fn other_sources(
     let home = storage.dirs().home().map(std::path::Path::to_owned);
     let data = storage.dirs().data().to_owned();
     let packages = packages.cloned();
+    let managed = storage.dirs().managed().snapshot();
     tokio::task::spawn_blocking(move || {
         sources::reports(&sources::Inputs {
             root: &root,
@@ -170,6 +177,7 @@ async fn other_sources(
             data: &data,
             settings: &settings,
             packages: packages.as_ref(),
+            managed: &managed,
         })
     })
     .await

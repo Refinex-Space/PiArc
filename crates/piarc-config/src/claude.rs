@@ -31,6 +31,9 @@ pub enum KeyStatus {
     Active,
     /// Not used yet; the named task implements the feature.
     Planned(&'static str),
+    /// Used only from managed settings (T47, `crate::managed`); in any other file it is
+    /// ignored.
+    Managed,
     /// Never used by PiArc.
     Ignored,
 }
@@ -64,6 +67,14 @@ const fn planned(key: &'static str, task: &'static str, target: &'static str) ->
     }
 }
 
+const fn managed(key: &'static str, target: &'static str) -> ClaudeKey {
+    ClaudeKey {
+        key,
+        status: KeyStatus::Managed,
+        target,
+    }
+}
+
 const fn ignored(key: &'static str, why: &'static str) -> ClaudeKey {
     ClaudeKey {
         key,
@@ -92,15 +103,14 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("allowClaudeInChromeWithManagedMcp", MANAGED),
     ignored("allowedChannelPlugins", MANAGED),
     active("allowedHttpHookUrls", "/allowedHttpHookUrls"),
-    planned(
-        "allowedMcpServers",
-        "T47",
-        "MCP server allowlist with the managed MCP configuration",
-    ),
+    active("allowedMcpServers", "/allowedMcpServers"),
     ignored("allowedProviders", MANAGED),
-    ignored("allowManagedHooksOnly", MANAGED),
-    ignored("allowManagedMcpServersOnly", MANAGED),
-    ignored("allowManagedPermissionRulesOnly", MANAGED),
+    managed("allowManagedHooksOnly", "/allowManagedHooksOnly"),
+    managed("allowManagedMcpServersOnly", "/allowManagedMcpServersOnly"),
+    managed(
+        "allowManagedPermissionRulesOnly",
+        "/allowManagedPermissionRulesOnly",
+    ),
     ignored("alwaysThinkingEnabled", NONE),
     ignored("apiKeyHelper", ACCOUNT),
     ignored("appendPlugins", NONE),
@@ -111,8 +121,11 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("autoConnectIde", GLOBAL),
     ignored("autoContinueAtUsageLimit", ACCOUNT),
     ignored("autoInstallIdeExtension", GLOBAL),
-    planned("autoMemoryDirectory", "T47", "auto memory"),
-    planned("autoMemoryEnabled", "T47", "auto memory"),
+    ignored(
+        "autoMemoryDirectory",
+        "PiArc keeps auto memory in its data directory, by the repository's main checkout (T47)",
+    ),
+    active("autoMemoryEnabled", "/autoMemoryEnabled"),
     active("autoMode.allow", "/autoMode/allow"),
     ignored(
         "autoMode.classifyAllShell",
@@ -144,11 +157,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("crossSessionInbound", NONE),
     ignored("defaultShell", NONE),
     ignored("defaultToAgentsView", GLOBAL),
-    planned(
-        "deniedMcpServers",
-        "T47",
-        "MCP server denylist with the managed MCP configuration",
-    ),
+    active("deniedMcpServers", "/deniedMcpServers"),
     ignored("deniedModels", MANAGED),
     ignored("desktopSessionCleanupPeriodDays", NONE),
     ignored("dialogExpiry", UI),
@@ -252,7 +261,7 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
     ignored("permissions.denyInsteadOfPrompting", NONE),
     ignored(
         "permissions.disableBypassPermissionsMode",
-        "bypass needs PiArc's own user-level switch",
+        "bypass needs PiArc's own user-level switch; managed settings turn it off (T47)",
     ),
     planned("plansDirectory", "T48", "plan files (R3: I104)"),
     ignored("pluginConfigs", NONE),
@@ -327,10 +336,9 @@ pub const SETTINGS_KEYS: &[ClaudeKey] = &[
         "sandboxed commands cannot listen on ports (T39)",
     ),
     ignored("sandbox.network.allowMachLookup", NONE),
-    planned(
+    managed(
         "sandbox.network.allowManagedDomainsOnly",
-        "T47",
-        "the managed sandbox network allowlist",
+        "/sandbox/network/allowManagedDomainsOnly",
     ),
     ignored(
         "sandbox.network.allowUnixSockets",
@@ -467,9 +475,34 @@ fn walk(
 /// the same pointers.
 #[must_use]
 pub fn project(value: &Value) -> Value {
+    project_with(value, &[KeyStatus::Active])
+}
+
+/// The part of a Claude Code managed settings document PiArc merges into the `enterprise`
+/// layer (T47): the active keys and the [`KeyStatus::Managed`] ones;
+/// `permissions.disableBypassPermissionsMode: "disable"` becomes PiArc's
+/// `permissions.enableBypassPermissions: false`.
+#[must_use]
+pub fn project_managed(value: &Value) -> Value {
+    let mut out = project_with(value, &[KeyStatus::Active, KeyStatus::Managed]);
+    if value
+        .pointer("/permissions/disableBypassPermissionsMode")
+        .and_then(Value::as_str)
+        == Some("disable")
+    {
+        insert(
+            &mut out,
+            "/permissions/enableBypassPermissions",
+            Value::Bool(false),
+        );
+    }
+    out
+}
+
+fn project_with(value: &Value, kept: &[KeyStatus]) -> Value {
     let mut out = Value::Object(Map::new());
     for class in classify(value, SETTINGS_KEYS) {
-        if class.status() != KeyStatus::Active {
+        if !kept.contains(&class.status()) {
             continue;
         }
         if let Some(found) = value.pointer(&class.pointer) {

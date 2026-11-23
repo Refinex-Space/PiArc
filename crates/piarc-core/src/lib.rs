@@ -83,6 +83,7 @@ pub(crate) mod hooks;
 pub mod host_probe;
 pub mod identity;
 pub mod keychain_probe;
+pub mod managed;
 pub mod mcp;
 pub mod plugins;
 pub mod providers;

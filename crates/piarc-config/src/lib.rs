@@ -22,6 +22,9 @@
 //!   items the user confirmed.
 //! - The Bash sandbox's settings ([`sandbox`], T39): project files only tighten, allowed
 //!   domains from the user and enterprise sources, `denyRead` paths resolved per file.
+//! - Managed (enterprise) settings ([`managed`], T47): checking and merging the documents
+//!   Core reads from the administrator's places into the `enterprise` layer, its locks and
+//!   which settings it locks.
 //!
 //! # Not responsible for
 //!
@@ -45,6 +48,7 @@ pub mod diagnostics;
 pub mod executables;
 pub mod frontmatter;
 pub mod layers;
+pub mod managed;
 pub mod mcp;
 pub mod merge;
 pub mod plugins;

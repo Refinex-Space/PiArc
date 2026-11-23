@@ -29,6 +29,7 @@ fn options<'a>(trusted: bool) -> MergeOptions<'a> {
         disabled: &[],
         enabled: &[],
         lookup: &lookup,
+        policy: None,
     }
 }
 
@@ -263,6 +264,7 @@ fn disabled_servers_keep_their_name_and_reason_only() {
             disabled: &disabled,
             enabled: &enabled,
             lookup: &lookup,
+            policy: None,
         },
     );
     let state: Vec<(&str, McpAvailability, bool)> = config

@@ -26,14 +26,18 @@
 //!   clock (T06).
 //! - [`SecretStore`]: one secret per [`SecretName`] in the system credential store, used for
 //!   the credential vault's master key (T08; `piarc-secrets` implements it over `keyring-core`).
+//! - [`PolicyStore`]: the administrator's places for an application's managed settings (T47;
+//!   `piarc-core::managed` implements it for macOS and Windows).
 //!
 //! `FileSystem` and `AgentHostTransport` arrive with the tasks that need them.
 
 mod clock;
+mod policy;
 mod process;
 mod secret;
 
 pub use clock::Clock;
+pub use policy::{PolicyBody, PolicyDocument, PolicyProduct, PolicyStore};
 pub use process::{
     BoxFuture, ExitStatus, ProcessControl, ProcessSpawner, SpawnSpec, SpawnedProcess,
 };

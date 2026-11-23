@@ -195,6 +195,14 @@ impl ToolIo {
         } else {
             Vec::new()
         };
+        // The MCP policy (T47) applies to inline servers too: a denied server cannot come back
+        // as part of a definition, and managed-mcp.json leaves only the managed servers.
+        let lookup = crate::mcp::lookup_in(&expansion);
+        let mcp_policy = piarc_config::mcp::policy::McpPolicy::from_settings(
+            &settings,
+            self.managed().snapshot().mcp.is_some(),
+            &lookup,
+        );
         let mut agents = Vec::with_capacity(loaded.definitions.len());
         for definition in loaded.definitions {
             let mut agent = definition.view;
@@ -204,8 +212,13 @@ impl ToolIo {
             // A worktree's copy or a directory above the root is not covered (R4 E1).
             let trusted = !is_project(agent.source)
                 || (project_trusted && covered_by_trust(workspace, Path::new(&source)));
-            agent.mcp_inline =
-                crate::mcp::inline_servers(&source, &definition.mcp_inline, trusted, &expansion);
+            agent.mcp_inline = crate::mcp::inline_servers(
+                &source,
+                &definition.mcp_inline,
+                trusted,
+                &expansion,
+                Some(&mcp_policy),
+            );
             agents.push(agent);
         }
         let list = AgentsList {

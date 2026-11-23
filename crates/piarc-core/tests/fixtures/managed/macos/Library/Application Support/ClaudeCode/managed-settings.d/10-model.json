@@ -1,0 +1,5 @@
+{
+  "model": "anthropic/claude-sonnet-5-5",
+  "permissions": { "deny": ["Read(./.env)"] },
+  "policyHelper": { "path": "/usr/local/bin/policy" }
+}
