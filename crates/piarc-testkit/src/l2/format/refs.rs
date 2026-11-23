@@ -216,6 +216,7 @@ fn check_references(spec: &ScenarioSpec, action: &Action, field: &str, problems:
             }
         }
         Action::WriteFile { path, .. } => check_path(&format!("{field}/path"), path, problems),
+        Action::WriteManaged { path, .. } => check_path(&format!("{field}/path"), path, problems),
         Action::Search(search) => {
             let sessions = spec.sessions();
             for label in &search.sessions {

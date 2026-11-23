@@ -1,0 +1,36 @@
+id: managed-claude-code-macos
+description: Claude Code's managed files in the macos layout (managed-settings.json and a drop-in) are read; their supported keys apply (a deny refuses the command, the drop-in's ask rule merges in) and the keys PiArc does not support are listed as ignored in the diagnostics (T47).
+capabilities: [CAP-CONFIG-MANAGED-CLAUDE-001]
+managed:
+  layout: macos
+  files:
+    ClaudeCode/managed-settings.json: '{"permissions": {"deny": ["Bash(sed -n 1p a.txt)"]}, "cleanupPeriodDays": 30, "forceLoginMethod": "console"}'
+    ClaudeCode/managed-settings.d/10-ask.json: '{"permissions": {"ask": ["Bash(awk *)"]}, "policyHelper": {"path": "/usr/local/bin/policy"}}'
+workspace:
+  trusted: true
+  files:
+    a.txt: "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: sed, name: Bash, input: { command: sed -n 1p a.txt } }]
+      - text: Done.
+actions:
+  - prompt: { text: Print the first line., turn: one }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results: [{ id: sed, is_error: true }]
+  config_diagnostics:
+    files:
+      enterprise:managed-settings.json:
+        format: claudeCode
+        status: loaded
+        ignored:
+          - { pointer: /cleanupPeriodDays, reason: ignored }
+          - { pointer: /forceLoginMethod, reason: ignored }
+      enterprise:10-ask.json:
+        status: loaded
+        ignored: [{ pointer: /policyHelper, reason: ignored }]

@@ -1,0 +1,61 @@
+id: memory-auto-save
+description: The model saves a note with the Memory tool; Core writes it to the repository's auto memory and audits the save with the call, and a later session gets the index in its system prompt (with the preamble saying what it is) while the note's body enters the context only once it is read (T47).
+capabilities: [CAP-MEM-AUTO-001]
+workspace:
+  trusted: true
+  files:
+    a.txt: "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: save
+            name: Memory
+            input:
+              action: save
+              name: build-check
+              type: project
+              description: Run the workspace check before committing
+              content: Always run the l2 build check before every commit of this repository.
+      - text: Saved.
+      - tool_calls:
+          - { id: read, name: Memory, input: { action: read, name: build-check } }
+      - text: Done.
+sessions:
+  first: { provider: main }
+  later: { provider: main, deferred: true }
+actions:
+  - prompt: { session: first, text: Remember how we build., turn: one }
+  - wait: { session: first, method: turn/completed, turn: one }
+  - prompt: { session: later, text: What do you remember?, turn: two }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 0
+      tools_include: [Memory]
+      not_contains: ['Auto memory: notes saved']
+    - index: 1
+      tool_results: [{ id: save, is_error: false, contains: 'Saved memory "build-check"' }]
+    - index: 2
+      tools_include: [Memory]
+      contains:
+        - 'Auto memory: notes saved with the Memory tool in earlier sessions of this repository.'
+        - '- [build-check](build-check.md) (project, '
+        - 'Run the workspace check before committing'
+      not_contains: ['l2 build check before every commit']
+    - index: 3
+      tool_results:
+        - { id: read, is_error: false, contains: 'l2 build check before every commit' }
+  audit:
+    - kind: memory
+      detail:
+        {
+          action: save,
+          name: build-check,
+          type: project,
+          created: true,
+          by: agent,
+          toolCallId: save,
+        }
+      count: 1

@@ -326,6 +326,9 @@ providers:                        # mock 端点，可定义多个；名称为小
     strict_tools: true            # 可选（T46）：模型声明严格的工具参数，目录记为 verified（可当审查模型）
     steps: [...]                  # 与第 10.3 节的 steps 相同
 review_timeout_ms: 300            # 可选（T46）：缩短 Auto 模式的审查时限（超时场景），缺省 30 s
+managed:                          # 可选（T47）：管理员放置的托管设置文件
+  layout: windows                 #   托管文件根的布局：macos（<根>/Library/Application Support/<产品>）或 windows（<根>/Program Files/<产品>），缺省为本平台
+  files: { PiArc/managed-settings.json: '{...}', ClaudeCode/managed-settings.d/10.json: '{...}' }   # 键为 <产品>/<文件>；Core 每 100 ms 重新读取
 web:                              # 可选（T29）：本地网页服务器，见下
   pages: { /docs: { content_type: text/html, body: '<h1>Docs</h1>' }, /old: { status: 301, location: '{{web_alt}}/docs' } }
 oauth: { flow: authorization_code } # 可选（T29）：mock 授权服务器与测试服务商 piarc-test-oauth，配合 sign_in 动作
@@ -335,7 +338,7 @@ sessions:                         # 可选；缺省为一个会话 main，使用
   a: { provider: one, cwd: 'alpha dir' }   # settings_model: true（T31）：建会话不指定模型，设置的 model、effortLevel 生效
 actions: [...]                    # 见 12.2
 approvals: []                     # 见 12.3
-expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics, json_lines, absent_on_disk }   # 见 12.4
+expect: { events, files, fixtures, requests, request_counts, tool_batches, core_io, config_diagnostics, json_lines, absent_on_disk, audit }   # 见 12.4
 ```
 
 - 每个端点有自己的 `MockProvider` 与自己的 Pi provider（`mock-<端点名>`，唯一的模型 `mock-model`）；预置模型夹具经 `x-piarc-scenario` 请求头选择脚本。两个会话要并发请求时用两个端点，各自的步数互不影响。
@@ -387,6 +390,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | `mcp_sign_in` | `server`、`outcome`（`succeeded`/`failed`/`cancelled`） | 经 Core 的 `mcp_login` 登录 `mcp_http` 中带 OAuth 的 server（T36）：运行器代替浏览器跟随授权页，按 `core/login` 的结束状态比对 |
 | `check_commands` | `present`、`absent`（命令名列表） | 经 Core 的 `list_commands` 反复取工作区的斜杠命令，直到列出的都在、`absent` 的都不在（至多 10 s；MCP prompts 在 server 的通知后异步刷新，T40） |
 | `set_output_style` | `name`（可省略） | 经 Core 的 `set_output_style` 设置工作区的输出风格（写 `.piarc/settings.local.json`，省略即删除该键），运行中的 Agent Host 随即重新取 skills 与风格（T37） |
+| `write_managed` | `path`（键同 `managed.files`）、`content`（`null` 删除） | 写或删一个托管设置文件，然后等到 Core 配置诊断里的托管报告发生变化（Core 每 100 ms 读一次，不靠计时）；场景必须有 `managed` 段（T47） |
 | `set_web_search_key` | `backend`（`brave`）、`key`（可省略） | 经 Core 的 `set_web_search_key` 把 WebSearch 第三方后端的 API key 存进保险箱（省略即删除）；`WebSearch` 是否提供在会话打开时决定，所以用到它的会话设为 `deferred`（T38）。场景有 `web` 段时 Brave Search 的端点指向本地网页服务器，`/res/v1/web/search` 页面就是搜索回答 |
 | `advance_clock` | `seconds` | 推进任务管理器的时钟（T32）：前台命令的超时转后台、Monitor 的超时与唤醒都按它计时，场景不靠真实等待 |
 | `stop_task` | `kind`（可选） | 停止该会话（主会话）最新的运行中后台任务，同面板的停止按钮（T32） |
@@ -422,9 +426,10 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 | （总是检查） | 每个请求都通过严格 mock 的校验；被拒的请求列出规则 ID。运行根下 Claude Code 的配置（任何 `.claude/` 目录内的条目与 `.claude.json`）在 Core 启动前与关闭后逐字节相同，否则以 `claude_config` 失败列出新增、修改、删除的路径（T24，ADR-0005 第 2 条） |
 | `tool_batches` | 工具调用 id 的分批：Core 收到的委托请求按这些批次成组到达。运行器经 Core 的 `ToolIoObserver` 扣住下一批的请求，整批到齐才一起放行；另一批的调用提前到达即失败。不靠计时 |
 | `core_io` | `{ call, method }`：Core 为该工具调用回答过这个 AHP 方法（例如 `fs/read`、`exec/run`），证明工具经 Core 执行 |
+| `audit` | 列表：每项 `kind`（`memory`、`hook`、`permission`、`sandbox`、`autoReview`）、`detail`（行 `detail` 的字段子集）、可选 `count`；运行结束后经 Core 的 `audit_events` 取本工作区该类的行，缺省至少一行匹配，有 `count` 时匹配行数恰好相等（T47） |
 | `absent_on_disk` | 字符串列表（每个至少 8 个字符）：运行结束后用 `plaintext::scan` 逐字节扫描数据目录、工作区、家目录与缓存目录，任何文件含有其中之一即失败，一个文件都没读到也失败（T38：只该在保险箱里的 key） |
 | `json_lines` | 工作区路径 → 期望的行：文件每行一个 JSON 值，行数恰好相等，逐行按字段子集比较（T25 的 hook 夹具把收到的 stdin 记成 `{types, input}`，`types` 是每个字段值的类型，用来断言值无法预知的字段存在）；断言前等文件写满期望的行数（30 s 安全网），后台运行的 hook 由此不必另加等待 |
-| `config_diagnostics` | 回合结束后 Core 对该工作区的配置诊断（T24）：`trusted` 与按层 id 索引的 `files`，每个文件是报告的子集（`status`、`effective`、`overridden`、`ignored`、`issues`；列表逐项比较，长度必须相等，元素取子集） |
+| `config_diagnostics` | 回合结束后 Core 对该工作区的配置诊断（T24）：`trusted` 与按层 id 索引的 `files`，每个文件是报告的子集（`status`、`effective`、`overridden`、`ignored`、`issues`；列表逐项比较，长度必须相等，元素取子集）；托管文档（T47，层都是 `enterprise`）以 `enterprise:<文件名>` 为键 |
 
 失败输出：事件给出第一个未匹配的期望项、上一个匹配的位置、乱序时匹配事件的实际位置、同方法事件中第一个不符的字段，以及该会话附近的实际事件（去掉 `seq`、`sessionId`、`ts`）；文件给出第一处不同的行号与两边的全文（带行号）；请求给出端点、序号与不符的字段。一个场景的全部失败一起报告。
 

@@ -22,6 +22,96 @@ impl Driver<'_> {
         }
     }
 
+    /// Writes or removes a managed settings file (T47) and waits until Core's managed reports
+    /// change: Core reads the files again every 100 ms.
+    pub(super) async fn write_managed(
+        &self,
+        path: &str,
+        content: Option<&str>,
+    ) -> Result<(), String> {
+        let Some((base, _)) = &self.env.managed else {
+            return Err("write_managed needs a managed section".into());
+        };
+        let before = self.managed_reports().await?;
+        match content {
+            Some(content) => write_file(base, path, content)?,
+            None => {
+                let file = path.split('/').fold(base.clone(), |p, part| p.join(part));
+                std::fs::remove_file(&file).map_err(|e| format!("{}: {e}", file.display()))?;
+            }
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            if self.managed_reports().await? != before {
+                return Ok(());
+            }
+            if std::time::Instant::now() > deadline {
+                return Err(format!(
+                    "write_managed {path}: Core did not pick the change up in 10 s"
+                ));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+
+    /// The managed documents' reports of the configuration diagnostics.
+    async fn managed_reports(&self) -> Result<Vec<Value>, String> {
+        let report = call(
+            |done| {
+                self.core
+                    .config_diagnostics(Some(self.env.workspace.clone()), done)
+            },
+            "reading the configuration diagnostics",
+        )
+        .await?;
+        Ok(report["files"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|f| f["kind"] == "enterprise")
+            .cloned()
+            .collect())
+    }
+
+    /// `expect.audit` (T47): every entry matches rows of its kind in the workspace's audit.
+    pub(super) async fn check_audit(&self) -> Result<(), String> {
+        for (n, expected) in self.spec.expect.audit.iter().enumerate() {
+            let query =
+                json!({ "kind": expected.kind, "workspace": self.env.workspace, "limit": 1000 });
+            let rows = call(
+                |done| self.core.audit_events(query.to_string(), done),
+                "reading the audit",
+            )
+            .await?;
+            let rows = rows["events"].as_array().cloned().unwrap_or_default();
+            let matching = rows
+                .iter()
+                .filter(|row| {
+                    crate::l2::matcher::subset_mismatch(&expected.detail, &row["detail"], "detail")
+                        .is_none()
+                })
+                .count();
+            let ok = match expected.count {
+                Some(count) => matching == count,
+                None => matching > 0,
+            };
+            if !ok {
+                let shown: Vec<&Value> = rows.iter().map(|r| &r["detail"]).take(12).collect();
+                return Err(format!(
+                    "expect/audit/{n}: {} {} row(s) match {}, expected {}; rows: {}",
+                    matching,
+                    expected.kind,
+                    expected.detail,
+                    expected
+                        .count
+                        .map_or_else(|| "at least 1".to_owned(), |c| c.to_string()),
+                    serde_json::to_string(&shown).unwrap_or_default()
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub(super) async fn configure_providers(&self) -> Result<(), String> {
         let mut configs: Vec<_> = self
             .spec

@@ -1,0 +1,42 @@
+id: managed-precedence
+description: The managed settings are the highest layer; a managed deny refuses a command the user's and the project's allow rules permit, their other allow rules still merge in, and a managed scalar overrides the project's value, which the diagnostics report as overridden (T47).
+capabilities: [CAP-CONFIG-MANAGED-001]
+managed:
+  files:
+    PiArc/managed-settings.json: '{"permissions": {"deny": ["Bash(sed -n 1p a.txt)"]}, "autoCompactWindow": 200000}'
+workspace:
+  trusted: true
+  files:
+    a.txt: "alpha\n"
+    .piarc/settings.json: '{"permissions": {"allow": ["Bash(sed -n 1p a.txt)", "Bash(awk *)"]}, "autoCompactWindow": 500000}'
+  run_files:
+    data 数据/settings.json: '{"permissions": {"allow": ["Bash(sed -n 1p a.txt)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: sed, name: Bash, input: { command: sed -n 1p a.txt } }
+      - tool_calls:
+          - { id: awk, name: Bash, input: { command: "awk 'NR==1' a.txt" } }
+      - text: Done.
+actions:
+  - prompt: { text: Print the first line., turn: one }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 1
+      tool_results: [{ id: sed, is_error: true }]
+    - index: 2
+      tool_results: [{ id: sed, is_error: true }, { id: awk, is_error: false, contains: alpha }]
+  config_diagnostics:
+    files:
+      enterprise:managed-settings.json:
+        kind: enterprise
+        status: loaded
+        scope: enterprise
+      project:
+        overridden: [{ pointer: /autoCompactWindow, finalValue: 200000, source: enterprise }]
+  audit:
+    - kind: permission
+      detail: { tool: Bash, conclusion: deny, step: enterpriseDeny, ruleSource: enterprise }

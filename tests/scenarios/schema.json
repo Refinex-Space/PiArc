@@ -115,6 +115,23 @@
         }
       }
     },
+    "managed": {
+      "description": "Managed (enterprise) settings an administrator placed (T47): files below the managed files' root of the chosen layout, keyed PiArc/<file> or ClaudeCode/<file> (managed-settings.json, managed-settings.d/*.json, CLAUDE.md, managed-mcp.json). Core reads them through a test policy store and checks them again every 100 ms.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "description": "The layout of the managed files' root: macos (<root>/Library/Application Support/<product>) or windows (<root>/Program Files/<product>); this platform's when absent.",
+          "enum": ["macos", "windows"]
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "review_timeout_ms": {
       "description": "A shorter Auto mode review limit in milliseconds (T46's timeout scenario); 30 s when absent.",
       "type": "integer",
@@ -760,6 +777,20 @@
             },
             "content": {
               "type": "string"
+            }
+          }
+        },
+        "write_managed": {
+          "description": "Writes (content) or removes (content null) a managed settings file below the managed root, keyed like managed.files (T47).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "content"],
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/relativePath"
+            },
+            "content": {
+              "type": ["string", "null"]
             }
           }
         },
@@ -1702,6 +1733,27 @@
               },
               "method": {
                 "type": "string"
+              }
+            }
+          }
+        },
+        "audit": {
+          "description": "Audit rows Core recorded in the workspace (T47): each entry's kind (memory, hook, permission, sandbox, autoReview) and a field subset of the row's detail; every entry must match a row, count rows when given.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "detail"],
+            "properties": {
+              "kind": {
+                "enum": ["memory", "hook", "permission", "sandbox", "autoReview"]
+              },
+              "detail": {
+                "type": "object"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
               }
             }
           }

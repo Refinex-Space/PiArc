@@ -30,6 +30,9 @@ pub(super) struct Env {
     /// The scenario's Monitor limits (T32).
     pub(super) task_limits: Option<crate::l2::format::TaskLimitsSpec>,
     pub(super) review_timeout: Option<std::time::Duration>,
+    /// The managed files' root and its layout (T47): `managed.files` and `write_managed` go
+    /// below `.0` (`Library/Application Support` or `Program Files` of a fake system root).
+    pub(super) managed: Option<(PathBuf, piarc_core::managed::store::Layout)>,
 }
 
 impl Env {
@@ -82,17 +85,7 @@ impl Env {
             }
             mocks.insert(name.clone(), mock);
         }
-        let pi = data.join("pi");
-        write_json(&pi.join("models.json"), &json!({ "providers": providers }))?;
-        // Retries wait milliseconds, not seconds; other keys a scenario's `run_files` wrote stay.
-        let settings_file = pi.join("settings.json");
-        let mut settings = std::fs::read_to_string(&settings_file)
-            .ok()
-            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-            .filter(Value::is_object)
-            .unwrap_or_else(|| json!({}));
-        settings["retry"] = json!({ "baseDelayMs": 5 });
-        write_json(&settings_file, &settings)?;
+        write_pi_files(&data, providers)?;
         let (auth, oauth_file) = login::oauth_setup(spec, &mocks, root).await?;
         let gate = Arc::new(Gate::new(spec.expect.tool_batches.clone()));
         let home = root.join("home 家");
@@ -115,6 +108,11 @@ impl Env {
             clock: piarc_core::clock::ManualClock::new(),
             task_limits: spec.task_limits,
             review_timeout: spec.review_timeout_ms.map(std::time::Duration::from_millis),
+            managed: spec
+                .managed
+                .as_ref()
+                .map(|m| prepare_managed(m, root))
+                .transpose()?,
         })
     }
 
@@ -173,6 +171,20 @@ impl Env {
             review_timeout: self
                 .review_timeout
                 .unwrap_or_else(|| CoreConfig::default().review_timeout),
+            managed: self
+                .managed
+                .as_ref()
+                .map_or_else(Default::default, |(_, layout)| {
+                    piarc_core::managed::ManagedConfig {
+                        store: Some(Arc::new(piarc_core::managed::store::FixedPolicy {
+                            layout: Some(layout.clone()),
+                            preferences: None,
+                            user: None,
+                            registry: None,
+                        })),
+                        poll: MANAGED_POLL,
+                    }
+                }),
             ..CoreConfig::default()
         }
     }
@@ -189,6 +201,58 @@ impl Env {
             .map(|(name, mock)| (name.clone(), mock.records()))
             .collect()
     }
+}
+
+/// Pi's `models.json` with the scenario's endpoints and its `settings.json` with millisecond
+/// retries (other keys a scenario's `run_files` wrote stay).
+fn write_pi_files(data: &Path, providers: serde_json::Map<String, Value>) -> Result<(), String> {
+    let pi = data.join("pi");
+    write_json(&pi.join("models.json"), &json!({ "providers": providers }))?;
+    // Retries wait milliseconds, not seconds; other keys a scenario's `run_files` wrote stay.
+    let settings_file = pi.join("settings.json");
+    let mut settings = std::fs::read_to_string(&settings_file)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .filter(Value::is_object)
+        .unwrap_or_else(|| json!({}));
+    settings["retry"] = json!({ "baseDelayMs": 5 });
+    write_json(&settings_file, &settings)?;
+    Ok(())
+}
+
+/// How often L2's Core reads the managed settings again (T47): a `write_managed` applies
+/// within this.
+const MANAGED_POLL: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// The managed files' root below `root` in the scenario's layout, with its files written.
+fn prepare_managed(
+    managed: &crate::l2::format::ManagedSpec,
+    root: &Path,
+) -> Result<(PathBuf, piarc_core::managed::store::Layout), String> {
+    use crate::l2::format::Platform;
+    use piarc_core::managed::store::Layout;
+    let system = root.join("admin 管理");
+    let layout = match managed.layout {
+        Some(Platform::Windows) => Platform::Windows,
+        Some(Platform::Macos) => Platform::Macos,
+        None if cfg!(windows) => Platform::Windows,
+        None => Platform::Macos,
+    };
+    let (base, layout) = match layout {
+        Platform::Macos => (
+            system.join("Library").join("Application Support"),
+            Layout::MacOs(system.clone()),
+        ),
+        Platform::Windows => (
+            system.join("Program Files"),
+            Layout::Windows(system.join("Program Files")),
+        ),
+    };
+    for (path, content) in &managed.files {
+        write_file(&base, path, content)?;
+    }
+    std::fs::create_dir_all(&base).map_err(|e| format!("{}: {e}", base.display()))?;
+    Ok((base, layout))
 }
 
 /// Replaces `{{workspace}}` in the strings of `value` with the workspace's absolute path.

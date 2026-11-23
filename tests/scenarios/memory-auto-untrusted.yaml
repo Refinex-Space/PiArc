@@ -1,0 +1,27 @@
+id: memory-auto-untrusted
+description: A project that is not trusted gets no Memory tool, so nothing it reads can make the agent keep notes for later sessions; a project file cannot turn auto memory on against the user's choice (T47).
+capabilities: [CAP-MEM-AUTO-OFF-001]
+workspace:
+  trusted: false
+  files:
+    .piarc/settings.json: '{"autoMemoryEnabled": true}'
+    a.txt: "alpha\n"
+  run_files:
+    data 数据/settings.json: '{"autoMemoryEnabled": false}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Hello.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Hello., turn: one }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - { index: 0, tools_exclude: [Memory], not_contains: ['Auto memory: notes saved'] }
+  config_diagnostics:
+    files:
+      project:
+        ignored: [{ pointer: /autoMemoryEnabled, reason: projectMemory }]

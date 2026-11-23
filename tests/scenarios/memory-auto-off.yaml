@@ -1,0 +1,39 @@
+id: memory-auto-off
+description: With autoMemoryEnabled false in the project's settings a session gets neither the index nor the Memory tool, although the repository keeps notes; turning it off in a project file works without trust (T47).
+capabilities: [CAP-MEM-AUTO-OFF-001]
+workspace:
+  trusted: true
+  files:
+    a.txt: "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: save
+            name: Memory
+            input:
+              {
+                action: save,
+                name: style,
+                type: feedback,
+                description: Prefer short answers,
+                content: Keep answers short.,
+              }
+      - text: Saved.
+      - text: Off now.
+sessions:
+  first: { provider: main }
+  later: { provider: main, deferred: true }
+actions:
+  - prompt: { session: first, text: Remember my style., turn: one }
+  - wait: { session: first, method: turn/completed, turn: one }
+  - write_file: { path: .piarc/settings.local.json, content: '{"autoMemoryEnabled": false}' }
+  - prompt: { session: later, text: Hello again., turn: two }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - { index: 0, tools_include: [Memory] }
+    - index: 2
+      tools_exclude: [Memory]
+      not_contains: ['Auto memory: notes saved', 'Prefer short answers']

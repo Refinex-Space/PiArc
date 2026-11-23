@@ -464,13 +464,25 @@ pub fn text_diff(expected: &str, actual: &str) -> String {
 }
 
 /// `expected` (`trusted`, `files` keyed by layer id) against Core's configuration diagnostics,
-/// whose `files` are a list; `None` when it holds.
+/// whose `files` are a list; `None` when it holds. A managed document (T47; several share the
+/// layer `enterprise`) is keyed `enterprise:<file name>`.
 pub(super) fn config_diagnostics_mismatch(expected: &Value, report: &Value) -> Option<String> {
     let files: serde_json::Map<String, Value> = report["files"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|f| Some((f["layer"].as_str()?.to_owned(), f.clone())))
+        .filter_map(|f| {
+            let layer = f["layer"].as_str()?;
+            let name = f["file"]
+                .as_str()
+                .and_then(|file| file.rsplit(['/', '\\']).next())
+                .filter(|name| !name.is_empty());
+            let key = match (f["kind"].as_str(), name) {
+                (Some("enterprise"), Some(name)) => format!("{layer}:{name}"),
+                _ => layer.to_owned(),
+            };
+            Some((key, f.clone()))
+        })
         .collect();
     let mut actual = report.clone();
     actual["files"] = Value::Object(files);

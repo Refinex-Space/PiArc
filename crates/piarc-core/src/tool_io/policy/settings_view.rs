@@ -295,6 +295,9 @@ impl ToolIo {
                 Some("sandbox") => "sandbox".into(),
                 // T46: one row per Auto mode review.
                 Some("autoReview") => "autoReview".into(),
+                // T47: auto memory changes and hooks (managed-only skips among them).
+                Some("memory") => "memory".into(),
+                Some("hook") => "hook".into(),
                 Some(other) => {
                     return Err(ErrorObject::new(
                         ErrorKind::InvalidParams,

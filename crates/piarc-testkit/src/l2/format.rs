@@ -97,6 +97,9 @@ pub struct ScenarioSpec {
     /// absent.
     #[serde(default)]
     pub review_timeout_ms: Option<u64>,
+    /// Managed settings an administrator placed (T47).
+    #[serde(default)]
+    pub managed: Option<ManagedSpec>,
     /// A local web server for WebFetch (T29); see [`crate::l2::web`].
     #[serde(default)]
     pub web: Option<crate::l2::web::WebSpec>,
@@ -135,6 +138,19 @@ impl ScenarioSpec {
         name.split('/')
             .fold(self.fixture_dir.clone(), |path, part| path.join(part))
     }
+}
+
+/// Managed settings files (T47): below the managed files' root of `layout`, keyed
+/// `PiArc/<file>` or `ClaudeCode/<file>`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ManagedSpec {
+    /// The managed files' layout; this platform's when absent.
+    #[serde(default)]
+    pub layout: Option<Platform>,
+    /// Relative path to content.
+    #[serde(default)]
+    pub files: BTreeMap<String, String>,
 }
 
 /// One HTTP MCP fixture server of a scenario (T36, `crate::mcp_server`).
@@ -461,6 +477,13 @@ pub enum Action {
         /// Content.
         content: String,
     },
+    /// Writes (or removes, `None`) a managed settings file below the managed root (T47).
+    WriteManaged {
+        /// Relative path, keyed like `managed.files`.
+        path: String,
+        /// Content; `None` removes the file.
+        content: Option<String>,
+    },
     /// Lists the workspace's slash commands through Core (`listCommands`, T37) until the named
     /// ones are present and the others absent (T40: package commands, MCP prompts).
     CheckCommands {
@@ -600,6 +623,7 @@ impl Action {
             Self::CheckTrust { .. } => "check_trust",
             Self::Wait(_) => "wait",
             Self::WriteFile { .. } => "write_file",
+            Self::WriteManaged { .. } => "write_managed",
             Self::SetOutputStyle { .. } => "set_output_style",
             Self::CheckCommands { .. } => "check_commands",
             Self::SetWebSearchKey { .. } => "set_web_search_key",
@@ -673,6 +697,7 @@ impl Action {
             | Self::CheckGit(_)
             | Self::Search(_)
             | Self::WriteFile { .. }
+            | Self::WriteManaged { .. }
             | Self::SetOutputStyle { .. }
             | Self::CheckCommands { .. }
             | Self::SetWebSearchKey { .. }

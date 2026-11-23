@@ -124,6 +124,22 @@ pub struct Expect {
     /// vault).
     #[serde(default)]
     pub absent_on_disk: Vec<String>,
+    /// Audit rows of the workspace (T47): each must match a row of its kind.
+    #[serde(default)]
+    pub audit: Vec<AuditExpect>,
+}
+
+/// One audit expectation (T47).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuditExpect {
+    /// `memory`, `hook`, `permission`, `sandbox` or `autoReview`.
+    pub kind: String,
+    /// A field subset of the row's detail.
+    pub detail: Value,
+    /// How many rows match; at least one when absent.
+    #[serde(default)]
+    pub count: Option<usize>,
 }
 
 /// One request assertion; every field present must hold.

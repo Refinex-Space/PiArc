@@ -1,0 +1,42 @@
+id: memory-auto-compact
+description: After a compaction the request still carries the index (the frozen system prompt) and the restore brings back the note the session read before it, at its current content (T47).
+capabilities: [CAP-MEM-AUTO-001]
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    a.txt: "alpha\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: save
+            name: Memory
+            input:
+              {
+                action: save,
+                name: deploy,
+                type: project,
+                description: How staging deploys run,
+                content: Staging deploys go through the release script only.,
+              }
+      - tool_calls:
+          - { id: read, name: Memory, input: { action: read, name: deploy } }
+      - text: Noted.
+      - text: Summary.
+      - text: Done.
+actions:
+  - prompt: { text: Keep the deploy note., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - compact: {}
+  - wait: { method: turn/completed, count: 2 }
+  - prompt: { text: Continue., turn: after }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      user_message_contains:
+        - '[PiArc reminder]'
+        - 'A note from auto memory you read or saved before the compaction:'
+        - 'Staging deploys go through the release script only.'

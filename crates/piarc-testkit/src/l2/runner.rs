@@ -338,7 +338,8 @@ impl Driver<'_> {
             .await?;
         }
         self.check_provider_settings().await?;
-        self.check_config_diagnostics().await
+        self.check_config_diagnostics().await?;
+        self.check_audit().await
     }
 
     async fn open(&mut self) -> Result<(), String> {
@@ -486,6 +487,9 @@ impl Driver<'_> {
             Action::CheckTrust { fields } => self.check_trust(fields).await,
             Action::Wait(wait) => self.wait_for_event(wait).await,
             Action::WriteFile { path, content } => write_file(&self.env.workspace, path, content),
+            Action::WriteManaged { path, content } => {
+                self.write_managed(path, content.as_deref()).await
+            }
             Action::SetWebSearchKey { backend, key } => call(
                 |done| {
                     self.core
@@ -809,6 +813,15 @@ impl Driver<'_> {
                     .as_str()
                     .and_then(|id| labels.get(&format!("session/{id}")))
                 {
+                    result.push(ObservedEvent {
+                        session: (*label).clone(),
+                        method: route.clone(),
+                        params: event.clone(),
+                    });
+                }
+            } else if route == "core/settings" {
+                // A workspace's settings changed (T47: managed settings): every session's event.
+                for label in labels.values() {
                     result.push(ObservedEvent {
                         session: (*label).clone(),
                         method: route.clone(),
