@@ -76,6 +76,8 @@ pub struct Decision {
     pub request: Option<RequestAnswer>,
     /// A PermissionDenied handler invited the model to submit a fresh call.
     pub retry: bool,
+    /// Directory reported by a successful WorktreeCreate handler.
+    pub worktree_path: Option<String>,
     /// Text for the model's context, in handler order.
     pub context: Vec<String>,
     /// `PostToolUse` and `PostToolUseFailure`: feedback the model reads next to the result.
@@ -136,7 +138,9 @@ impl Merger {
         match &o.kind {
             Kind::Error(message) => {
                 self.d.errors.push(message.clone());
-                if o.handler.block_on_failure {
+                if o.handler.block_on_failure
+                    || matches!(event, HookEvent::WorktreeCreate | HookEvent::WorktreeRemove)
+                {
                     return self.fail_closed(event, message);
                 }
                 if o.timed_out {
@@ -236,6 +240,8 @@ impl Merger {
         match event {
             HookEvent::PreToolUse => self.pre_tool_use(o),
             HookEvent::PermissionRequest => self.permission_request(o),
+            HookEvent::WorktreeCreate => self.worktree_path(o),
+            HookEvent::WorktreeRemove => "none",
             HookEvent::PermissionDenied => {
                 if o.specific().and_then(|v| v.get("retry")) == Some(&Value::Bool(true)) {
                     self.d.retry = true;
@@ -304,6 +310,38 @@ impl Merger {
                     _ => {}
                 }
                 verdict
+            }
+        }
+    }
+
+    fn worktree_path(&mut self, o: &Outcome) -> &'static str {
+        let path = o
+            .text
+            .as_deref()
+            .or_else(|| o.specific_field("worktreePath"))
+            .map(str::trim);
+        match path {
+            Some(path) if !path.is_empty() && !path.contains(['\r', '\n']) => {
+                if self
+                    .d
+                    .worktree_path
+                    .as_deref()
+                    .is_some_and(|old| old != path)
+                {
+                    self.d.block.get_or_insert_with(|| {
+                        "WorktreeCreate handlers returned different directories".into()
+                    });
+                    "block"
+                } else {
+                    self.d.worktree_path = Some(path.to_owned());
+                    "path"
+                }
+            }
+            _ => {
+                self.d
+                    .block
+                    .get_or_insert_with(|| "WorktreeCreate did not return one directory".into());
+                "block"
             }
         }
     }

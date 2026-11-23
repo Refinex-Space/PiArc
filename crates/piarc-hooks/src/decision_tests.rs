@@ -629,3 +629,36 @@ fn elicitation_hooks_can_answer_edit_or_block() {
         assert_eq!(blocked.block.as_deref(), Some("refused"));
     }
 }
+
+#[test]
+fn worktree_hooks_choose_one_path_and_fail_on_any_error() {
+    let create = HookEvent::WorktreeCreate;
+    let remove = HookEvent::WorktreeRemove;
+    let first = out(create, 0, "/repo/worktrees/one\n", "");
+    let same = json_out(
+        create,
+        &specific(create, json!({"worktreePath":"/repo/worktrees/one"})),
+    );
+    let d = Decision::merge(create, &[first.clone(), same]);
+    assert_eq!(d.worktree_path.as_deref(), Some("/repo/worktrees/one"));
+    assert_eq!(d.block, None);
+    let other = out(create, 0, "/repo/worktrees/two", "");
+    assert!(Decision::merge(create, &[first, other]).block.is_some());
+    for invalid in ["", "one\ntwo"] {
+        assert!(
+            Decision::merge(create, &[out(create, 0, invalid, "")])
+                .block
+                .is_some()
+        );
+    }
+    for event in [create, remove] {
+        for status in [1, 2, 17] {
+            assert!(
+                Decision::merge(event, &[out(event, status, "", "hook failed")])
+                    .block
+                    .unwrap()
+                    .contains("hook failed")
+            );
+        }
+    }
+}

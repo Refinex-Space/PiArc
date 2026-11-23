@@ -83,4 +83,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0065](0065-managed-http-hook-allowlists.md) | HTTP hook 的 URL 和请求头变量白名单按键取最高托管来源的整份值，支持空名单。未托管的键继续跨层合并。 | 已接受（修订 ADR-0055 第 8 条） |
 | [0066](0066-fork-tool-declarations.md) | fork 继承父会话的工具声明，调用仍受子会话权限及深度限制（修订 ADR-0048 第 4 条） | 已接受 |
 | [0067](0067-fork-skill-index-and-grants.md) | 隔离 skill 的索引只用显式描述或名称；授权与 hooks 只交给实际执行的子会话（修订 ADR-0054） | 已接受 |
-| [0068](0068-worktree-hook-ownership.md) | hook 创建目录的文件边界、归属登记与非 Git 清理（拟修订 ADR-0052） | 提议 |
+| [0068](0068-worktree-hook-ownership.md) | hook 创建目录的文件边界、归属登记与非 Git 清理（修订 ADR-0052） | 已接受 |

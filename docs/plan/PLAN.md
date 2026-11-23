@@ -179,7 +179,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
-| T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 阻塞（等待用户确认 ADR-0068，独立项继续） | — |
+| T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 进行中 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | W4 | [Windows：M4 达标与 Beta 同步](tasks/W4-windows-m4-parity-and-beta.md) | 6 | R5、T50 | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -318,7 +318,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [ ] A04–A05：fork 子 agent 的历史、缓存、审批与检查点。父子工具声明一致涉及 ADR-0048 第 4 条，[ADR-0066](../adr/0066-fork-tool-declarations.md) 已接受，仅声明可见性例外，执行仍受限。
 - [ ] A06：fork skill 的 agent 选择、后台执行与正文隔离。[ADR-0067](../adr/0067-fork-skill-index-and-grants.md) 已接受，缺省时索引只列名称，授权绑定实际执行者。
   - 配置解析与非法字段测试已通过（`cargo test -p piarc-config --lib skills`，15 项）。
-- [ ] A07：worktree 创建与移除 hooks。hook 返回的目录会成为文件工具根，非 Git 目录无法用现有状态检查保护改动。生命周期变更等待 [ADR-0068](../adr/0068-worktree-hook-ownership.md) 决定。
+- [ ] A07：worktree 创建与移除 hooks。hook 返回的目录会成为文件工具根，非 Git 目录无法用现有状态检查保护改动。[ADR-0068](../adr/0068-worktree-hook-ownership.md) 已接受。hook 的路径、失败与多结果合并已实现，`cargo test -p piarc-hooks` 55/55。
 - [ ] A08：切换模型前的决策与切换后的上下文。
 - [ ] A09：Core 已在审查拒绝后分发 PermissionDenied。真实 hook 的定向测试验证拒绝不执行、输入与理由、再次调用重新送审；`cargo test -p piarc-core --lib tool_io::policy::tests::t46` 8/8，`cargo test -p piarc-hooks` 54/54。L2 场景已写；沙箱内的 macOS `sandbox-exec` 无法启动 Agent Host，尚缺端到端证据。
 - [ ] A10：核对 pi-mcp 能力，按结果接入 elicitation 或记录上游阻塞，验证两个 hook。

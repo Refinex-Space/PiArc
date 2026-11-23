@@ -668,7 +668,7 @@ mod tests {
                     {"type": "prompt", "prompt": "start?"}
                 ]}],
                 "SubagentStart": [{"hooks": [{"type": "prompt", "prompt": "go?"}]}],
-                "WorktreeCreate": [],
+                "TaskCreated": [],
                 "BeforeEverything": [],
                 "Stop": [{"hooks": [{"type": "command", "command": "c", "if": "Bash(*)"}]}]
             }),
@@ -727,7 +727,7 @@ mod tests {
                     DiagnosticKind::UnsupportedType,
                     "/hooks/SubagentStart/0/hooks/0/type"
                 ),
-                (DiagnosticKind::LaterEvent, "/hooks/WorktreeCreate"),
+                (DiagnosticKind::LaterEvent, "/hooks/TaskCreated"),
             ]
         );
         assert!(config.diagnostics()[0].message.contains("not a hook event"));

@@ -17,6 +17,10 @@ pub enum HookEvent {
     PreToolUse,
     /// Before the user is asked to approve a tool call (step 8 of the decision ladder).
     PermissionRequest,
+    /// A configured hook creates the session worktree.
+    WorktreeCreate,
+    /// A configured hook removes its previously registered worktree.
+    WorktreeRemove,
     /// The Auto reviewer refused a tool call.
     PermissionDenied,
     /// After a tool call succeeded.
@@ -134,13 +138,15 @@ impl Default for Timeouts {
 
 impl HookEvent {
     /// Every event, in Claude Code's documentation order.
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 25] = [
         Self::SessionStart,
         Self::SessionEnd,
         Self::UserPromptSubmit,
         Self::PreToolUse,
         Self::PermissionRequest,
         Self::PermissionDenied,
+        Self::WorktreeCreate,
+        Self::WorktreeRemove,
         Self::PostToolUse,
         Self::PostToolUseFailure,
         Self::Stop,
@@ -170,6 +176,8 @@ impl HookEvent {
             Self::PreToolUse => "PreToolUse",
             Self::PermissionRequest => "PermissionRequest",
             Self::PermissionDenied => "PermissionDenied",
+            Self::WorktreeCreate => "WorktreeCreate",
+            Self::WorktreeRemove => "WorktreeRemove",
             Self::PostToolUse => "PostToolUse",
             Self::PostToolUseFailure => "PostToolUseFailure",
             Self::Stop => "Stop",
@@ -204,7 +212,12 @@ impl HookEvent {
     pub fn uses_matcher(self) -> bool {
         !matches!(
             self,
-            Self::UserPromptSubmit | Self::Stop | Self::PostToolBatch | Self::CwdChanged
+            Self::UserPromptSubmit
+                | Self::Stop
+                | Self::PostToolBatch
+                | Self::CwdChanged
+                | Self::WorktreeCreate
+                | Self::WorktreeRemove
         )
     }
 
@@ -296,6 +309,8 @@ impl HookEvent {
             | Self::PreCompact
             | Self::PostToolBatch
             | Self::UserPromptExpansion
+            | Self::WorktreeCreate
+            | Self::WorktreeRemove
             | Self::ConfigChange
             | Self::Elicitation
             | Self::ElicitationResult => ExitTwo::Blocks,
@@ -342,8 +357,6 @@ impl HookEvent {
 /// Events of Claude Code's set that PiArc recognizes but does not run yet, with the task that
 /// adds them ("unscheduled" when none does). Configuration naming them is reported, not run.
 pub const LATER_EVENTS: &[(&str, &str)] = &[
-    ("WorktreeCreate", "T48"),
-    ("WorktreeRemove", "T48"),
     ("PreModelSwitch", "T48"),
     ("PostModelSwitch", "T48"),
     ("TaskCreated", "unscheduled"),
