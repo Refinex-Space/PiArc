@@ -4613,7 +4613,7 @@
       "task": "T47",
       "description": "`npm run verify` 通过（含 Windows CI 上的注册表读取测试）。验证：命令输出。",
       "status": "blocked",
-      "evidence": "macOS arm64 在干净提交 bbc6b60 上 RUST_TEST_THREADS=2 npm run verify 为 17/17。Windows x64 同提交两项原生注册表测试及 worktree 共享测试通过，L2 227 通过、0 失败、15 项按平台跳过。Windows verify 其余 16 步通过，cargo test 唯一失败为 heredocs_and_syntax_errors_through_eval_on_windows 的跨管道顺序断言。夹具已按 ADR-0028 调整，等待新提交的 Windows verify。https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807884"
+      "evidence": "macOS arm64 在干净提交 7ab91c5 上 RUST_TEST_THREADS=2 npm run verify 为 17/17。Windows x64 在 bbc6b60 上两项原生注册表测试及 worktree 共享测试通过，L2 227 通过、0 失败、15 项按平台跳过。Windows verify 其余 16 步通过，cargo test 唯一失败为 heredocs_and_syntax_errors_through_eval_on_windows 的跨管道顺序断言。7ab91c5 按 ADR-0028 将测试标记和语法诊断送到同一管道，原断言保留；Windows x64 交叉 Clippy 通过。待含 7ab91c5 的 Windows 原生 verify。https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807884"
     },
     {
       "id": "T48-A01",

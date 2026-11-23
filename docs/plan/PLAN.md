@@ -178,7 +178,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
-| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 进行中（跟进 Windows CI） | e2ffefa |
+| T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 部分完成（仅 A13 待 Windows CI） | 7ab91c5 |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
@@ -308,14 +308,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ## 当前任务检查点
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
-
-T47 推送后复验（Windows CI 45119779192，bbc6b60）：
-
-- [x] 上一轮 Windows L4 中两处 T47 回归已在本机复现。命令面板断言补上第八项 `/memory`；打包版 Agent Host 探针按生产顺序登记会话，并断言 `memory/status` 成功调用一次。重新打开发包后，在 Electron 的 dev 与 packaged 形态重跑面板、探针及 T47 用例，7/7 通过。
-- [x] [Windows 桌面 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936)：记忆页和托管锁定各 2 项、命令面板 2 项、打包探针 1 项，共 7/7 通过。
-- [x] [Windows verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807884)：A04 的 worktree 共享与跨仓库隔离通过，已标 passing。两项注册表测试、T46 审查版本用例和全部适用 L2 也通过。
-- [x] 定位 A13 的唯一失败：Windows Git Bash 在 stderr 输出语法诊断，stdout 的标记有时后到。ADR-0028 以到达顺序合并两条管道。夹具把标记写入诊断所在的 stderr，继续断言输出以标记开头、报错行号为 2、退出码为 2 且未执行后续命令。macOS Bash 对照及 Windows x64 交叉 Clippy 通过。
-- [ ] 核对修复后的 Windows verify 并更新 A13。
 
 ## 登记事项
 
@@ -1206,3 +1198,10 @@ T47 推送后复验（Windows CI 45119779192，bbc6b60）：
 - Windows 新发现的两项失败均已定位。A04 的工作树夹具把 verbatim 路径传给 Git，创建 worktree 时即报错，尚未执行记忆共享断言。夹具现复用 `piarc_git::canonical`。T46 审查回退用例可能在读取“审查中”卡片前收到脚本回复，版本断言比较了同一个版本；现每轮读取初始版本后才放行回复，仍逐项检查版本递增和拒绝过期答复。生产代码无改动。旧提交的 macOS CI 另有两项待复核，见 I228。
 - 修复后在 macOS 定向重跑两项用例均通过，`piarc-core` 的 Windows x64 交叉 Clippy 通过。在干净提交 e2ffefa 上，`RUST_TEST_THREADS=2 npm run verify` 17/17 PASS，L2 239 通过、3 项仅 Windows，MISSING 0。完整日志在 `tmp/evidence/T47/verify-windows-followup.log`。
 - A01–A03、A05–A12 通过；A04 和 A13 等待含 e2ffefa 的 Windows 原生 CI。看板下一项为 T48（macOS），两项遗留仅涉及 Windows 验收。
+
+### 2026-11-23 T47：Windows worktree 验收通过，A13 待复验
+
+- [Windows verify 45119779192](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807884) 对应 bbc6b60。worktree 共享与仓库隔离、两项原生注册表测试及 T46 审查状态测试通过，Windows L2 为 227 通过、15 项按平台跳过。A04 已标 passing。
+- [Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936) 中 T47 的记忆页、托管锁定、命令面板及打包探针 7/7 通过。整项 342 通过、3 失败、28 跳过。3 个失败均在 T34 终端，详见 I227，继续由 W4 跟进。
+- Windows verify 16/17，唯一失败是 I227 中 Git Bash 语法错误用例的输出前缀。7ab91c5 只调整测试夹具，将前置标记和语法诊断送入同一管道，继续检查前缀、行号、退出码和后续命令未执行。根据 ADR-0028，跨管道输出按到达顺序合并。
+- 本机在干净提交 7ab91c5 上运行 `RUST_TEST_THREADS=2 npm run verify` 17/17 PASS，L2 239 通过、3 项仅 Windows；Windows x64 的 `exec_commands` 交叉 Clippy 通过。原生 Windows 验收仍需包含该提交的 verify。A01–A12 passing，A13 blocked。
