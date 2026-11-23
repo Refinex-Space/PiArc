@@ -14,7 +14,7 @@ Apple 支持在独立的 App Intents 扩展里提供动作；扩展在后台执�
 
 Forge 的 macOS 打包流程通过 `xcodebuild` 构建 `apps/desktop/native/app-intents/PiArcShortcuts.xcodeproj`。Xcode 以对应的架构生成元数据并 ad-hoc 签名扩展。Forge 完成 Electron 的第一轮深度重签后，将扩展放入 `PiArc.app/Contents/Extensions/PiArcShortcuts.appex`，装入 Agent Host 资源，最后用已有签名流程封存外层应用。内置 Node 保留其官方签名。扩展只声明 App Sandbox entitlement。
 
-macOS CI 的 `package-macos` 作业通过同一入口构建两个架构，再运行 `check-app-layout.mjs` 与 `check-fuses.mjs`。原生路由测试核对工作区和草稿的编码、长度与本地路径限制；布局检查验证扩展身份、签名和三个可发现动作的元数据。CI 的通过状态应以包含 T49 提交的运行记录为准。
+macOS CI 的 `package-macos` 作业通过同一入口构建两个架构，再运行 `check-app-layout.mjs` 与 `check-fuses.mjs`。原生路由测试核对工作区和草稿的编码、长度与本地路径限制；布局检查验证扩展身份、签名和三个可发现动作的元数据。提交 cdb81a0 的两项发布打包 CI 均通过。日志逐项确认三个动作的元数据和扩展签名，arm64 布局 28/28，x64 布局 27/27，两个架构均通过 9 项 fuse 校验。[arm64 作业](https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269610)、[x64 作业](https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269505)。
 
 ## 正式构建验证
 
@@ -34,4 +34,4 @@ macOS CI 的 `package-macos` 作业通过同一入口构建两个架构，再运
 3. 新建另一个快捷指令，添加“在 PiArc 中新建会话”。同样粘贴工作区绝对路径，“草稿文字”填 `T49 + 草稿 & 待确认`，运行并截取 PiArc 窗口。期望对应工作区的新会话输入框完整显示这些文字，可继续编辑，transcript 中没有新用户消息，且没有运行中的回合。无需发送该草稿或配置模型。
 4. 退出 PiArc 后再运行“新建会话”，检查冷启动也能显示相同草稿。请记录系统版本、动作名称、应用已运行及冷启动结果，附上动作列表及带草稿的窗口截图。没有找到动作时请提供搜索页；运行失败时请附完整错误文字。
 
-2026-11-23，用户运行正式包的“在 PiArc 中新建会话”后确认：工作区正确，`T49 + 草稿 & 待确认` 原样显示，未自动发送。用户也已确认最小动作“打开 PiArc”能被发现并运行。用户明确接受本次以实机文字记录代替动作和窗口截图。冷启动、单独运行“打开工作区”及 CI 结果没有独立的实机记录。
+2026-11-23，用户运行正式包的“在 PiArc 中新建会话”后确认：工作区正确，`T49 + 草稿 & 待确认` 原样显示，未自动发送。用户也已确认最小动作“打开 PiArc”能被发现并运行。用户明确接受本次以实机文字记录代替动作和窗口截图。冷启动、单独运行“打开工作区”没有独立的用户实机记录。

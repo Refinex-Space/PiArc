@@ -4752,8 +4752,8 @@
       "id": "T49-A08",
       "task": "T49",
       "description": "App Intents 原生模块在 macOS CI 上构建并打入应用包，ad-hoc 重签后应用正常启动，fuse 检查通过。验证：CI 输出与 `check-fuses.mjs` 输出。",
-      "status": "blocked",
-      "evidence": "本地正式包的三项动作元数据、布局 28/28、发布 fuse 9/9、严格递归签名和隔离窗口启动均通过，见 tmp/evidence/T49/intents-unrestricted-layout.json、intents-unrestricted-fuses.log、intents-unrestricted-launch.log。macOS package-macos 作业已接入；本任务未推送，缺少包含 T49 的远端 CI 输出。"
+      "status": "passing",
+      "evidence": "cdb81a0 的发布打包 CI 经 Forge 构建、嵌入并签署扩展，确认三个动作的元数据。arm64 布局 28/28，x64 布局 27/27，均通过全部 9 个 fuse：https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269610 与 https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269505。同实现的本地 arm64 正式包以隔离数据目录启动，观察到 1280×800 的正常层窗口。证据 tmp/evidence/T49/intents-unrestricted-launch.log、ci-shortcuts-arm64.log、ci-shortcuts-x64.log。"
     },
     {
       "id": "T49-A09",
