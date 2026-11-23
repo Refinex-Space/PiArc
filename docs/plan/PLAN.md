@@ -179,7 +179,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
-| T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 部分完成 | 03b7ed1 |
+| T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 已完成 | 1b15296 |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 已完成 | f11a450 |
 | T50 | [发布流水线与更新](tasks/T50-release-pipeline-and-updates.md) | 6 | T49 | macOS | high / 高 | 大 | 无 | 未开始 | — |
 | W4 | [Windows：M4 达标与 Beta 同步](tasks/W4-windows-m4-parity-and-beta.md) | 6 | R5、T50 | Windows | high / 高 | 中 | 无 | 未开始 | — |
@@ -1237,3 +1237,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 14/14 项通过。W2 补验了 Windows 全量；本次补齐正式终端面板的 macOS 简体拼音。shell 与 Vim 均逐键输入、空格选词，shell 写出的文件精确等于“你好世界测试”。Vim 中 Esc 只取消新的合成，继续输入 x，保存后只有“你好世界测试x”及换行。9 张系统截图和逐次光标位置在 `tmp/evidence/T34/native-ime/`。
 - I185 的失败先在阻塞监听注册、未送达资源通知、诊断页未收到文件事件三种情况下复现。修复后的定向 Vitest 9/9，Core 状态集成 8/8，诊断页 T24/T41 Electron 用例、ego-browser 的可见与回窗刷新均通过。T34 初次面板回归 11/11；修复后一次 Vim 用例在初始屏幕超时，原样复跑通过。
 - `1b15296` 的默认并发 `npm run verify` 17/17；修复前的两次全量均为 16/17。输出分别在 `tmp/evidence/T34/native-ime/verify-i185.log`、`verify.log`、`verify-final.log`。
+
+### 2026-11-24 T48 已完成
+
+12/12 项通过。macOS 全量 L2 已跑过原来受环境阻塞的故障回退、fork、M5 hooks、MCP elicitation 等全部 12 个专项场景。fork 和 elicitation 的 Electron 用例本轮通过，model-switch 首次在夹具启动时超时，单独复跑通过。cdb81a0 的两个平台 CI 也分别在 dev 和 packaged 通过上述三个桌面用例。[Windows L2](https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269417)。

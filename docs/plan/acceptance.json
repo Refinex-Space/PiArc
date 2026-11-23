@@ -4626,8 +4626,8 @@
       "id": "T48-A02",
       "task": "T48",
       "description": "服务端策略返回错误或模型不支持时退回客户端压缩并提示用户。验证：L2 场景（故障注入）。",
-      "status": "blocked",
-      "evidence": "SDK 故障注入验证拒绝时选回 client，未支持模型同样回退；设置页与用量卡反馈已有定向测试。正式 ctx-server-fallback L2 在打开工作区时 30 秒超时，未执行故障注入断言。证据：tmp/evidence/T48/compaction-l2.json。"
+      "status": "passing",
+      "evidence": "1b15296 默认全量 L2 通过：ctx-server-fallback。故障注入触发本地压缩及回退提示。 报告 target/l2/results.json；专项摘录及桌面日志在 tmp/evidence/partial-closure/。"
     },
     {
       "id": "T48-A03",
@@ -4647,57 +4647,57 @@
       "id": "T48-A05",
       "task": "T48",
       "description": "fork 子 agent 不能再 fork；其编辑可回退；其审批在主会话显示并标明来源。验证：L2 场景与 Playwright。",
-      "status": "blocked",
-      "evidence": "真实 SDK 拒绝递归 fork 及主会话专用操作。Core 用例 fork_approval_and_write_belong_to_the_invoking_parent_turn 验证审批来源及写入后的父回合回退。subagent-fork L2 在打开工作区时超时，Playwright 的 Electron 启动即 SIGABRT，未进入界面断言。见 tmp/evidence/T48/fork-wire.log、fork-l2.json、fork-l4.log。"
+      "status": "passing",
+      "evidence": "1b15296 默认全量 L2 通过：subagent-fork。验证禁止再次 fork、子调用审批在父会话显示以及按父回合回退写入。macOS Electron t48-fork 通过。 报告 target/l2/results.json；专项摘录及桌面日志在 tmp/evidence/partial-closure/。"
     },
     {
       "id": "T48-A06",
       "task": "T48",
       "description": "`context: fork` 的 skill 在子 agent 中运行，`agent` 与 `background` 字段生效，主会话请求中不含 skill 正文。验证：L2 场景与 mock provider 请求断言。",
-      "status": "blocked",
-      "evidence": "真实父子会话的 mock 请求和 Core 授权测试覆盖指定 agent、前台/后台、父请求无 skill 正文以及授权绑定到子会话；见 tmp/evidence/T48/fork-wire.log、fork-skill-grant.log。正式 skill-fork 与 skill-fork-background L2 需在可启动 Agent Host 的环境复验。"
+      "status": "passing",
+      "evidence": "1b15296 默认全量 L2 通过：skill-fork skill-fork-background。严格 mock 检查前后台 fork skill 的 agent、返回值和父会话请求隔离。 报告 target/l2/results.json；专项摘录及桌面日志在 tmp/evidence/partial-closure/。"
     },
     {
       "id": "T48-A07",
       "task": "T48",
       "description": "配置 WorktreeCreate/WorktreeRemove hook 后，worktree 路径取自 hook 输出，非 0 退出使创建或移除失败并显示原因。验证：L2 场景。",
-      "status": "blocked",
-      "evidence": "Core 真实运行 WorktreeCreate/WorktreeRemove，测试核对返回路径、创建或移除非零退出原因、非 Git 目录确认、错属与替换拒绝、重试与恢复。cargo test -p piarc-core --lib worktree_hooks_bind 1/1；store migrations 4/4。见 tmp/evidence/T48/remove-retry-green.log、store-migrations.log。正式 hooks-m5-worktree L2 需复验。"
+      "status": "passing",
+      "evidence": "1b15296 默认全量 L2 通过：hooks-m5-worktree。Core 的 worktree_hooks_bind 定向结果还覆盖目录归属及非零退出，证据见 tmp/evidence/T48/remove-retry-green.log。 报告 target/l2/results.json；专项摘录及桌面日志在 tmp/evidence/partial-closure/。"
     },
     {
       "id": "T48-A08",
       "task": "T48",
       "description": "PreModelSwitch 的输入含原模型、目标模型、上下文 token、缓存状态与估算成本，拒绝时切换取消、询问时显示确认；PostModelSwitch 的 `additionalContext` 出现在下一个请求中。验证：L2 场景与 mock provider 请求断言。",
-      "status": "blocked",
-      "evidence": "Core 模型切换 hooks 测试 2/2；真实 Pi 的 PostModelSwitch 上下文进入下一请求。旧 AHP 预览和热缓存样本 round-trip 通过。正式 hooks-m5-model-switch 在打开工作区时超时，Electron 无法启动。见 tmp/evidence/T48/model-switch-core.log、model-switch-vitest.log、model-switch-l2.json、model-switch-l4.log。"
+      "status": "passing",
+      "evidence": "1b15296 默认全量 L2 通过：hooks-m5-model-switch。严格 mock 核对切换和后续请求。macOS Electron t48-model-switch 单独复跑通过，首次组合运行因 mock 夹具启动超时。 报告 target/l2/results.json；专项摘录及桌面日志在 tmp/evidence/partial-closure/。"
     },
     {
       "id": "T48-A09",
       "task": "T48",
       "description": "审查模型拒绝时触发 PermissionDenied；hook 返回 `retry: true` 时，给模型的工具结果说明可以重试。验证：L2 场景与 mock provider 请求断言。",
-      "status": "blocked",
-      "evidence": "cargo test -p piarc-core --lib tool_io::policy::tests::t46 8/8。实际运行 PermissionDenied，校验工具名、调用 ID、参数、理由、retry 提示及第二次独立送审；没有执行被拒操作。正式 hooks-m5-permission-denied L2 的 Agent Host 未能启动，严格 mock 的下一请求仍需复验。见 tmp/evidence/T48/root-core.log、l2-environment-run.json。"
+      "status": "passing",
+      "evidence": "1b15296 默认全量 L2 通过：hooks-m5-permission-denied。验证拒绝后下一次请求里的重试说明及工具结果。 报告 target/l2/results.json；专项摘录及桌面日志在 tmp/evidence/partial-closure/。"
     },
     {
       "id": "T48-A10",
       "task": "T48",
       "description": "MCP elicitation 表单与 URL 两种模式可完成接受、拒绝、取消，Elicitation hook 可代答或阻断，ElicitationResult 可修改回答；pi-mcp 锁定版本不支持时，上游 issue 已按规则处理、`PLAN.md` 已登记、MCP 设置页显示\"暂不支持\"，本项标 `blocked` 并写明原因。验证：L2 场景与 Playwright，或登记记录与截图。",
-      "status": "blocked",
-      "evidence": "pi-mcp 1.5.2 支持能力协商与请求 handler。真实 stdio、DOM 表单、Core 的 URL 精确绑定、无关卡片拒绝、单次询问取消和父调用结束撤卡均通过定向验证。正式 L2 的工作区启动超时，Playwright Electron 在启动时 SIGABRT，ego-browser 的系统 XPC 连接无效。本项等待运行环境。见 tmp/evidence/T48/elicitation-checks.log、elicitation-guards.log、browser-launch.log。"
+      "status": "passing",
+      "evidence": "1b15296 默认全量 L2 通过：mcp-elicitation mcp-elicitation-hooks。真实 stdio MCP、表单和 URL 的接受、拒绝、取消以及 hook 代答均有场景，macOS Electron t48-elicitation 通过。 报告 target/l2/results.json；专项摘录及桌面日志在 tmp/evidence/partial-closure/。"
     },
     {
       "id": "T48-A11",
       "task": "T48",
       "description": "本任务新增的能力全部登记在 `tests/capabilities.yaml`，生成的 `capabilities.md` 中除已登记的上游阻塞项外没有 MISSING。验证：生成命令输出。",
-      "status": "blocked",
-      "evidence": "T48 的 10 项能力已登记。03b7ed1 的独立完整 L2 报告覆盖 254 个场景；node scripts/plan/check-capabilities.mjs --results <报告> --doc write / check 在该提交的临时源码目录均通过，MISSING 0。生成结果见 tmp/evidence/T48/capabilities-final.md 和 capabilities-final.log。251 个失败均发生在工作区或设置 Agent Host 启动时；直接发布该环境生成稿会将 197 个此前已实现的能力标为失败。仓库正式 docs/product/capabilities.md 待正常环境重跑后更新。"
+      "status": "passing",
+      "evidence": "1b15296 全量 L2 与生成文档漂移检查通过，255 个场景，252 个通过、3 个仅适用 Windows；210 项 active，MISSING 0。见 tmp/evidence/T34/native-ime/verify-i185.log、tmp/evidence/partial-closure/capabilities.log。"
     },
     {
       "id": "T48-A12",
       "task": "T48",
       "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "03b7ed1，干净工作区：CARGO_TARGET_DIR=<临时构建目录> RUST_TEST_THREADS=2 npm run verify 12/17。第 4 步 NAPI 临时目录清理 EPERM，同提交在独立源码目录校验两种构建及声明通过。第 5 步 Vitest 1818 项通过，bundle 清理和两项 MCP 进程测试失败（变更前复测同样受限）。第 8 步 piarc-core 单元 237 项与独立计时测试通过，真实 Seatbelt 测试 3 项失败。第 14 步无法构建 bundle，第 17 步缺该轮 L2 报告；独立运行威胁映射通过。Windows x64 交叉 Clippy 通过；本地提交未推送，尚无 T48 Windows 原生 CI。证据：tmp/evidence/T48/verify.log、core-snapshot-isolated.log、pre-t48-mcp-controls.log、windows-cross-clippy.log。"
+      "status": "passing",
+      "evidence": "1b15296，macOS arm64 默认 npm run verify 17/17。包含 T48 的后继提交 cdb81a0 在 Windows CI 第 14 步的 12 个 T48 L2 场景全部通过；整个 Windows L2 为 240 passed、0 failed、15 平台跳过。该次 Windows 整体 16/17，唯一失败的 Rust 内置命令清单断言已在 6a562f6 修正。https://github.com/Refinex-Space/PiArc/actions/runs/45201604327/job/137786269417"
     },
     {
       "id": "T49-A01",
