@@ -180,11 +180,11 @@ describe('Anthropic server context management', () => {
     });
     expect(h.fallback).toHaveBeenCalledOnce();
     expect(h.strategy.fallback).toBe(true);
-    expect(h.strategy.select(model, 'compact', true)).toBe(false);
-    expect(h.strategy.select({ ...model, provider: 'other' }, 'compact', true)).toBe(false);
-    expect(h.strategy.select({ ...model, id: 'claude-haiku-4-5' }, 'compact', true)).toBe(false);
-    expect(h.strategy.select(model, 'compact', true)).toBe(true);
-    expect(h.strategy.select(model, 'compact', false)).toBe(false);
-    expect(h.strategy.select(model, undefined, true)).toBe(false);
+    expect(h.strategy.select(model, 'compact', true)).toBe('client');
+    expect(h.strategy.select({ ...model, provider: 'other' }, 'compact', true)).toBe('client');
+    expect(h.strategy.select({ ...model, id: 'claude-haiku-4-5' }, 'compact', true)).toBe('client');
+    expect(h.strategy.select(model, 'compact', true)).toBe('anthropic-server');
+    expect(h.strategy.select(model, 'compact', false)).toBe('client');
+    expect(h.strategy.select(model, undefined, true)).toBe('client');
   });
 });

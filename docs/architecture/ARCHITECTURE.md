@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.59（2026-11-22） |
+| 版本 | 2.60（2026-11-23） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -279,6 +279,9 @@ PiArc/
 | [0062](../adr/0062-security-hardening-threat-map-redaction-and-diagnostics.md) | 威胁映射（`tests/security/threats.yaml`）进 verify；日志写入时脱敏；诊断包先预览后经原生保存对话框写出；发布构建拒绝远程调试开关、不带测试页；Pi 自己设置里的包清单不生效；依赖审计流水线；审批卡与 diff 显示双向控制字符 | 每条威胁的对策要有能失败的检查；凭据与会话内容不出本机；Pi 不能绕开扩展包的安装规则 |
 | [0063](../adr/0063-app-memory-physical-footprint.md) | "应用全部进程合计"按各进程物理占用之和测量，预算数值不变，RSS 合计只作参考 | RSS 相加重复计入各 Chromium 进程映射的同一份框架代码页，这一行从 M0 起在两个平台超出而独占内存约为其 40–50%；属放宽，用户在 R5 采纳 |
 | [0064](../adr/0064-trust-decision-native-confirmation.md) | "信任"项目的决定经主进程原生确认，列出将生效的可执行项 | 信任一次启用项目的全部可执行配置，其他放宽操作都已经原生确认；渲染进程被注入时不能静默信任 |
+| [0066](../adr/0066-fork-tool-declarations.md) | fork 保留父请求的工具声明，调用进入子会话权限闸门 | 保持 Anthropic 前缀缓存，限制主会话专用操作与递归 fork |
+| [0067](../adr/0067-fork-skill-index-and-grants.md) | 隔离 skill 的正文、临时授权和 hooks 只交给执行它的子会话 | 父会话只需索引和运行结果 |
+| [0068](../adr/0068-worktree-hook-ownership.md) | 在 Core 登记 hook 创建的目录及其文件系统身份 | 清理与恢复能核实所有者，无法判断改动时保留目录 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -648,7 +651,10 @@ T38 落地（ADR-0055）：
 | Notification | Core 发出通知时 | M2 |
 | PostToolBatch | Pi `turn_end` | M3 |
 | UserPromptExpansion、InstructionsLoaded、CwdChanged、FileChanged、ConfigChange、StopFailure | 对应 Core / Harness Kit 时机（T41 已实现，见下） | M4 |
-| WorktreeCreate / WorktreeRemove、PreModelSwitch / PostModelSwitch、Elicitation / ElicitationResult、PermissionDenied | 对应时机 | M5 |
+| WorktreeCreate / WorktreeRemove | Core 创建和移除会话或子 agent 的工作目录，归属与失败语义见第 6.12 节 | M5 |
+| PreModelSwitch / PostModelSwitch | Core 切换会话模型时询问或阻断，成功后的上下文送往下一次请求，见第 6.13 节 | M5 |
+| Elicitation / ElicitationResult | Core 收到已授权 MCP 调用的询问以及用户的答复，支持表单代答和修改答复，URL 另经原生确认，见第 6.8 节 | M5 |
+| PermissionDenied | Core 写入 Auto 审查拒绝记录后；输入含工具、参数、调用 ID 与理由。`retry: true` 让模型收到可重试提示，新调用重新裁决 | M5 |
 | TaskCreated / TaskCompleted、MessageDisplay、Setup、DirectoryAdded、TeammateIdle | 视需求 | 未排期 |
 
 handler 类型：`command`（M2）→ `http`、`prompt`（M3）→ `mcp_tool`（M4）→ `agent`（未排期）。
@@ -673,6 +679,8 @@ T41 落地（ADR-0059）：
 - 子 agent 的文件编辑同样进入快照（Core 统一入口），这一点比 Claude Code 更完整。
 
 T31 落地（ADR-0048）：定义由 Core 的 `piarc_config::agents` 发现、解析与合并（来源顺序同上，项目两级从 cwd 向上、越近越优先；同名取整条；不认识的字段、`skills`（T37 前暂未生效；`isolation` 自 T35 生效、`mcpServers` 自 T36 生效）、项目级 `bypassPermissions`/`auto` 都作为警告列出，解析错误带行号），Agent Host 经 `agents/list` 取得并加上三个内置类型（`Explore`、`Plan` 只读、不加载 memory 与 git 状态，`Explore` 默认 `fast`）。子会话在 `agent-host/src/runtime/subagent-session.ts` 创建、`runtime/subagents.ts` 的 `SubagentRunner` 运行与计数（每棵树一份，超过并发上限立即报错，不排队），运行前经 `subagent/start` 在 Core 登记自己的会话 id（独立的文件状态表）并链接主会话：生效模式取定义与主会话当前模式中更严的一个，"本会话允许"的规则存于主会话，写入记在主会话当前回合的检查点下（带子会话 id），定义的 hooks 作为只在子会话运行期间生效的来源（项目级的要求项目受信任）。工具过滤顺序：父会话当前工具 → `tools` → `disallowedTools`（优先）→ 去掉 `AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps` → 到达深度上限时去掉 `Agent`；集合外的工具经 Pi 的 `prepareLoadout` 隐藏声明从请求中隐藏，调用到达 `tool_call` 闸门被拒绝（`setActiveTools` 移除的工具在闸门前就以 "not found" 结束）。后台运行立即返回运行 id，结束后经 `backgroundTask` 提醒回报，不随主会话中断结束，关闭会话或卡片上的停止按钮结束它；运行中的子会话让工作区保持忙碌，空闲计时不回收其 Agent Host。子会话 JSONL 首条 `piarc.subagent` 记父会话与类型，`sessions` 表由它派生父子关系（schema v6），会话列表不含子会话。
+
+T48（ADR-0066）：模型用 `Agent({ subagent_type: "fork", description, prompt })` 派生会话，用户用 `/subtask <任务>` 在后台派生。fork 继承父会话当前模型与 effort，默认后台，显式 `run_in_background: false` 等待结果。新 JSONL 的首条 `piarc.subagent` 记录父会话及 fork 点，随后写入当时活动分支投影的消息。父响应中仍在执行的工具调用在子文件中补上状态说明，父文件继续独立追加。复制的消息带 `piarcInherited`，重建索引时只计算新请求的用量。子会话首个请求复用父会话已发送的 system 与工具声明；主会话专用工具在执行闸门拒绝，fork 再次请求 fork 也会得到错误。审批卡与编辑回退沿用 ADR-0048。原生 Anthropic 的 message threads 会把后续 HTTP 请求缩减为服务端续传增量；能执行 fork 的会话使用 SDK 的 `disableContinuation` 发送完整上下文，因此请求体可能更大，prompt cache 断点照常生效。
 
 T40（ADR-0058）：生效的插件的子 agent 定义排在所有来源之后，类型名为 `<plugin>:<名称>`（`AgentSource::Plugin`，带 `plugin`），正文中的插件变量已替换；定义里的 hooks 与内联 MCP server 只保留用户确认过的。
 
@@ -767,7 +775,7 @@ T27 落地（ADR-0043）：`agent-host/src/harness/context-usage.ts` 在每次�
 
 ### 6.7 Skills、命令、插件、输出风格
 
-- **Skills**：遵循 Agent Skills 标准。发现路径在 Pi 默认路径之外增加 `.claude/skills`、`~/.claude/skills`、`.piarc/skills`、插件 skills（经 `resources_discover`）。system prompt 只列索引，模型用 `Skill` 工具或读取 SKILL.md 加载正文。支持 frontmatter 的 `allowed-tools`（本回合免审批，由 Core 裁决时参考）、`disable-model-invocation`、`user-invocable`、`arguments`、`paths`；`context: fork` 列为 M5。
+- **Skills**：遵循 Agent Skills 标准。发现路径在 Pi 默认路径之外增加 `.claude/skills`、`~/.claude/skills`、`.piarc/skills`、插件 skills（经 `resources_discover`）。system prompt 只列索引，模型用 `Skill` 工具或读取 SKILL.md 加载正文。支持 frontmatter 的 `allowed-tools`（本回合免审批，由 Core 裁决时参考）、`disable-model-invocation`、`user-invocable`、`arguments`、`paths`；`context: fork` 把 skill 的正文交给独立子会话（T48，ADR-0067）。
 - **斜杠命令**：来源合并为一个列表：内置命令（Core 实现，如 `/compact`、`/clear`、`/model`、`/rewind`、`/context`）、`.claude/commands` 与 Pi prompt templates、skills、MCP prompts。客户端的命令面板按来源分组、支持模糊搜索。
 - **插件**：识别 Claude Code 插件目录结构（`.claude-plugin/plugin.json` + commands/agents/skills/hooks/`.mcp.json`）与 Pi 包（npm/git）。安装、启用、作用域（用户/项目）由 Core 管理；插件内的可执行代码（Pi 扩展、hooks、MCP server）在启用前展示来源与权限并要求确认。Claude Code 插件中的 JS "mods"（直接改 Claude Code UI 的函数式 hook）不支持。
 - **输出风格**：内置若干风格（默认、简洁、讲解等），支持 Markdown + frontmatter 自定义；切换以消息形式送达。
@@ -777,7 +785,7 @@ T37 落地（ADR-0054）：
 | 部分 | 实现 |
 |---|---|
 | 发现 | `piarc_config::skills::load`：skills 依次读 `.piarc/skills/`、`.claude/skills/`（cwd 向上）、Pi 的项目目录（`.pi/skills/`、`.agents/skills/`）、PiArc 用户 `skills/`、`~/.claude/skills/`、Pi 的用户目录（`<数据目录>/pi/skills/`、`~/.agents/skills/`）；命令依次读 `.piarc/commands/`、`.claude/commands/`、`.pi/prompts/`、用户 `commands/`、`~/.claude/commands/`、`<数据目录>/pi/prompts/`；输出风格读 `.piarc/output-styles/`、`.claude/output-styles/`、用户 `output-styles/`、`~/.claude/output-styles/`。同名取第一份，其余列为覆盖。Pi 自带的 skills 与 prompt templates 关掉（`noSkills`、`noPromptTemplates`）。未信任的项目照常加载 skills，只是 `allowed-tools` 与 hooks 不生效 |
-| frontmatter | `name`、`description`、`when_to_use`、`argument-hint`、`arguments`、`disable-model-invocation`、`user-invocable`、`allowed-tools`、`paths`、`hooks` 生效；`context`、`agent`、`background`、`model`、`effort` 标暂不支持（T48），其余标忽略；YAML 无效时字段全部视为未设置；正文中的 `` !`命令` `` 不执行、原文保留并标出 |
+| frontmatter | `name`、`description`、`when_to_use`、`argument-hint`、`arguments`、`disable-model-invocation`、`user-invocable`、`allowed-tools`、`paths`、`hooks` 生效；T48 起，`context: fork` 支持 `agent`、`background`、`model`、`effort`，按 ADR-0067 运行；普通 skill 的 `model`、`effort` 仍提示未支持，其他未知字段标忽略；YAML 无效时字段全部视为未设置；正文中的 `` !`命令` `` 不执行、原文保留并标出 |
 | 参数 | `piarc_config::skills::args`：`$ARGUMENTS`/`$@`、`$1` 起的位置参数、`$ARGUMENTS[N]`（从 0 起）、`arguments` 声明的 `$名称`、Pi 的 `${N:-默认}`、`${@:N}`；没有占位接收参数时追加 `ARGUMENTS:` 行；`${CLAUDE_SKILL_DIR}`、`${CLAUDE_SESSION_ID}`、`${CLAUDE_PROJECT_DIR}` |
 | 索引与 `Skill` | 第 5 段列模型可调用的 skill（描述截断到 1,536 字符，`skillOverrides` 与 `Skill(名称)` deny 生效），`paths` skill 在 `skills/match` 命中之后经提醒列出；`Skill` 只读、经 `skills/invoke` 消费同一调用的授权，正文是工具结果，`piarc.skillInvoked` 供压缩后重注入。skill 目录对 Read、Glob、Grep 只读放行 |
 | 斜杠命令 | 内置命令（`/compact`、`/clear`、`/model`、`/rewind`、`/context`、`/output-style`、`/help`）在客户端执行已有功能；命令文件与 skill 由 Core 在 UserPromptSubmit 之前展开（`expand_command`，UserPromptExpansion 的挂载点在其后），`session/prompt` 带 `command`，转录显示用户输入的原文 |
@@ -797,6 +805,8 @@ T40 落地（ADR-0058）：
 | 组件 | 命令与 skill 为 `<plugin>:<名称>`，子 agent 为 `<plugin>:<名称>`，MCP server 为 `plugin_<plugin>_<server>`，都排在项目与用户来源之后、不覆盖同名组件；Pi 包的 skill 与模板不加命名空间。插件 skill 与命令的 `allowed-tools`、hooks 不生效。Pi 扩展由 Agent Host 经 `plugins/extensions` 取得已确认的入口文件后交给 Pi 的资源加载器，不写进 `pi/settings.json`（Pi 会为缺失的包运行带安装脚本的 npm） |
 | 设置页 | "Skills 与插件"页的插件部分：已安装列表（类型、来源、作用域、开关状态、组件、不支持的组件、等待确认的项）、从文件夹、git、npm 安装、开启与关闭、更新、查看新增项、卸载 |
 
+T48（ADR-0067）：`context: fork` skill 运行在指定 `agent` 的独立上下文中，缺省为 `general-purpose`。缺少显式描述时，父会话索引只列名称。`background` 缺省为 true，false 时调用等待子会话报告；`model` 与 `effort` 覆盖子 agent 的选择，模型别名走第 6.13 节的解析器。用户的斜杠命令与模型的 `Skill` 调用共享执行路径。Core 签发一次性子会话 id，把已信任的 `allowed-tools` 与 hooks 绑定到选定的子会话，并在登记时复核来源和信任。父会话只接收启动状态或结果，其输入记录和压缩重注入均不保存展开的 skill 正文。
+
 ### 6.8 MCP
 
 - 配置来源：`.mcp.json`（项目，需信任）、`~/.claude.json` 中的 user/local 级 server、PiArc 自己的配置、插件、企业策略；同名按"企业 > 本地 > 项目 > 用户 > 插件"取整条定义。
@@ -804,7 +814,8 @@ T40 落地（ADR-0058）：
 - **连接池**：PiArc 的 MCP 扩展替换 Pi 内置 MCP 扩展，在 Agent Host 内按工作区维护共享连接池，同一 server 只启动一份，按需连接、空闲断开（ADR-0010）。stdio server 的进程由 Agent Host 启动，PATH 中前置内置 Node，使 `npx` 类 server 开箱即用。
 - OAuth：使用 pi-mcp 的 OAuth 流程；浏览器授权由客户端发起；token 存凭据保险箱（经 Core），不写明文文件。
 - 工具暴露：工具总数较少时直接暴露；超过阈值（默认 30 个）时改为延迟加载，经 `ToolSearch` 检索。
-- 缺口：elicitation、sampling、prompts、resources/subscribe（pi-mcp 不支持）。prompts 可以在扩展层基于通用请求实现为斜杠命令（M4）；elicitation 需要扩展 pi-mcp 的 handler，先提上游 issue（M5）。T40 已补上 prompts（ADR-0058）：连接池对声明 `prompts` 能力的 server 用 `prompts/list` 取全并在 `notifications/prompts/list_changed` 后重取，每个 prompt 是斜杠命令 `mcp__<server>__<prompt>`（只有已连接的 server 提供）；输入 `/mcp__…` 时 Agent Host 按声明顺序对应空白切分的参数、检查必填参数，以 `prompts/get` 各条消息的文本作为本次输入，其他内容类型给出明确提示。
+- Elicitation（T48）：pi-mcp 1.5.2 的公开接口支持声明 `elicitation: {form: {}, url: {}}` 与注册 `elicitation/create`。工作区共用连接，仅在请求能归属到唯一在途工具调用时转发。Core 校验工具授权并运行 Elicitation hook，阻断时答 `decline`，表单代答时校验 schema。用户答复经会话审批账本，ElicitationResult 可以改答复；用户接受 URL 时还需主进程原生确认后才打开系统浏览器。取消、中断与工具结束撤回待答卡片。表单的字段值只随答复送往对应 server 及配置的结果 hook。
+- 保留缺口为 sampling 与 resources/subscribe。T40 已补上 prompts（ADR-0058）：连接池对声明 `prompts` 能力的 server 用 `prompts/list` 取全并在 `notifications/prompts/list_changed` 后重取，每个 prompt 是斜杠命令 `mcp__<server>__<prompt>`（只有已连接的 server 提供）；输入 `/mcp__…` 时 Agent Host 按声明顺序对应空白切分的参数、检查必填参数，以 `prompts/get` 各条消息的文本作为本次输入，其他内容类型给出明确提示。
 
 T36 落地（ADR-0053）：
 
@@ -923,6 +934,8 @@ T48 增补（ADR-0068）：受信任的 `WorktreeCreate` 可以接管创建，st
 - **effort 统一**：UI 提供 off / low / medium / high / xhigh / max，映射到 Pi 的 thinking level，再由 pi-ai 映射到各服务商参数；模型不支持的档位不显示。
 - **按能力降级**：不支持视觉的模型不接收图片附件（UI 提示）；工具调用可靠性低的模型使用更保守的 Tool Profile（更少工具、更明确的描述、启用任务清单）。
 - **切换代价提示**：会话中途切换模型会导致 prompt cache 失效、部分服务商的 thinking 块被丢弃；切换前显示预计影响（上下文 token 数、估算的缓存写入成本）。PreModelSwitch hook 可介入（M5）。
+- T48 模型切换 hooks：T21 的代价预览只查询。在用户选好模型与 effort 并确认后，Core 向 Host 取当前成本与缓存状态，再对目标模型 ID 分发一次 PreModelSwitch；直接调用设置模型也经过这里。拒绝保留原模型，询问在审批账本发一次性问题，选择目标模型后继续，允许沿用已确认的选择。Core 在运行期间独占该会话的模型变更与回合启动；成功切换后分发 PostModelSwitch。它的 `additionalContext` 或纯文本输出追加为 `piarc.reminder`，下一次请求可见，会话重开后也保留。两次事件均含 `from_model`、`to_model`、`requested_model`、来源、上下文 token、缓存是否仍热、缓存 TTL（如 `5m` 或 `1h`）、预计缓存写入美元成本与定价来源（目录价格用 `catalog`，缺少价格用 `unknown`）。缓存热度按上一条同模型成功响应实际报告的缓存用量、时间戳与模型 TTL 估算。恢复原选中模型和服务商单次响应的 fallback 不改变会话选择；交互行为差异见 L3 排除表。
+
 - **消息保真**：会话历史保留各服务商返回的原始 thinking 块与签名（由 Pi 负责），不按模型维护多份历史。
 
 T29 落地（ADR-0045）：每模型设置（显示名、上下文窗口、图片输入、默认 effort、Tool Profile）与辅助模型存在用户级 `settings.json` 的 `modelProviders.models`、`modelProviders.auxiliary`，经 `setModelPreferences` 修改，Core 组装为 `ModelPreferences` 随 `core/welcome` 与 `models/reload` 交给 Agent Host（`providers/preferences.ts`）。生效点：`models/list`（名称、窗口、`vision`、`defaultEffort`、`toolProfile`）、压缩阈值与用量环（窗口）、输入检查与请求策略（图片）、`session/setModel` 未指定档位时（默认 effort）。工具调用可靠性新增 `low`：无密钥本地端点的模型由 Core 标为 `low`；`low` 的模型默认用保守 Tool Profile（Read、Write、Edit、Bash、PowerShell、Glob、Grep、TodoWrite，逐步写明参数的描述，规范名不变，任务清单提醒 3 轮起且无清单也提醒），用户可改回默认。Profile 在会话打开时按其模型决定，模型或偏好改变 Profile 时会话空闲后在同一 id 下重开；已冻结的 system prompt 不改写。辅助模型通道 `AuxiliaryModel.complete` 做一次无工具调用，未设置辅助模型或其服务商无凭据时用会话模型，用量计入当前回合并写 `piarc.auxiliaryUsage`。
@@ -943,7 +956,7 @@ T21 的 `models/list` 返回可用模型的 `provider`、`id`、`name`、`contex
 | `.claude/settings*.json` → `hooks` | 部分 | 事件按 6.3.2 分期；handler 类型分期（T38 起 `command`、`http`、`prompt`）；`allowedHttpHookUrls`、`httpHookAllowedEnvVars` 生效（T38） |
 | `.claude/settings*.json` 其他键 | 部分 | 只读取与 PiArc 功能对应的键，其余在设置诊断页列为"已忽略" |
 | `.claude/agents/` | 完整（字段子集） | 见 6.4 |
-| `.claude/skills/` | 完整 | `context: fork` 在 M5 |
+| `.claude/skills/` | 完整 | `context: fork`、`agent`、`background` 已接入隔离子会话（ADR-0067） |
 | `.claude/commands/` | 完整 | |
 | `.mcp.json`、`~/.claude.json` 的 MCP 段 | 部分 | 不支持 SSE、WebSocket 传输；`headersHelper` 不执行（T36，ADR-0053） |
 | 插件（`.claude-plugin/`） | 部分 | 不支持 mods、LSP、Channels、Monitors、themes、output styles、`bin/`、`userConfig` 与插件市场；`enabledPlugins`、`extraKnownMarketplaces` 忽略，PiArc 以自己的 `plugins` 键开关（T40，ADR-0058） |
@@ -978,7 +991,7 @@ T41 落地（ADR-0059）：诊断报告的每个来源都是同一种文件报�
 | 工具结果截断 | 单个结果超过 50K 字符落盘，模型收到约 2KB 预览与路径；单条消息内工具结果合计上限 200K 字符（T16：`agent-host/src/harness/tool-results.ts` 的 `TOOL_RESULT_LIMITS`，Read 不参与） |
 | 重复读取 | 文件自上次读取后未变化、且读取范围相同时，`Read` 返回简短存根而非全文（T16：Core 的文件状态表判断） |
 | 缓存断点 | system prompt 分为静态段与动态段并分别缓存；动态信息走 system-reminder；每个请求只放一个消息级缓存断点（Anthropic）；其他服务商按 pi-ai 的缓存策略 |
-| 子 agent 隔离 | 默认不继承父会话对话历史，只接收任务描述；fork 模式（继承历史、共享缓存）列为 M5 |
+| 子 agent 隔离 | 默认不继承父会话对话历史，只接收任务描述；fork 模式按当前分支继承历史、冻结的 system 与工具声明，共享 prompt cache（T48、ADR-0066） |
 | plan 模式 | 硬拦截：写工具与非只读命令在 `tool_call` 闸门处拒绝；工具列表保持不变以免缓存失效；不能只靠提示词约束 |
 | 子 agent 上限 | 默认嵌套 3 层、每个主会话并发 8，可由 `subagents.maxDepth`、`subagents.maxConcurrent` 调整；超限立即失败不排队（T31：Core `DEFAULT_MAX_DEPTH`、`DEFAULT_MAX_CONCURRENT`，Agent Host 的 `DEFAULT_LIMITS` 只是取不到 Core 回答时的兜底） |
 | Stop 续跑与任务清单提醒 | Stop / SubagentStop hook 的阻断至多让回合续跑 8 次（`piarc_hooks::STOP_CONTINUATION_LIMIT`）；任务清单 8 轮未更新时提醒（`TODO_REMINDER_ROUNDS`） |
@@ -1870,6 +1883,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
+| 2.60 | 2026-11-23 | T48：第 6 章补充服务端压缩、fork 及隔离 skill 的缓存和权限规则、M5 hooks 与 MCP elicitation。ADR-0066、0067、0068 记录工具声明、授权和目录归属的调整。 |
 | 2.56 | 2026-11-22 | T45（ADR-0062）补充第 4 章 ADR-0062；10.1 节第 9–11 行的对策改用分号分隔（措辞不变，便于逐条映射），恶意插件一行加"Pi 自己设置里的包清单不由 Agent Host 安装或加载"，通用运行时一行加远程调试开关；10.5 节 T45 落地（外连清单、日志脱敏、诊断包、威胁映射与 Electron 清单复核）。 |
 | 2.55 | 2026-11-22 | T44 补充第 11 章：每一行由 `scripts/perf/` 自动测量（PR 冒烟、Nightly 两平台、长跑；绝对预算与按平台、机器类别、流水线分存的基线两道判定，覆盖检查），说明见[性能测量](../engineering/performance.md)；原"未测"的 macOS 格子补上 T44 在 M1 Max 上的实测，其余行加 T44 数值并标出超出项（I191–I194，I26 附物理占用读数）；空闲 CPU 由"接近 0%"定为可见与隐藏时应用全部进程加 Agent Host 合计 ≤ 5%（一个核心、60 s 平均）并要求隐藏时无 rAF 回调与终端帧，依据是实测 3.5–3.6%（I190）；体积按 I41 裁剪后安装后 446.6 MB；8 小时长会话一行仍未测（用户决定不在 T44 做本机长跑，I195）。只有 macOS 数据，按本章收紧规则不收紧任何预算。 |
 | 2.54 | 2026-11-21 | T43（ADR-0061）补充第 4 章 ADR-0061；8.7 节无障碍与本地化的落地（状态清单与 axe、feed 与行名称、节流播报、审批卡焦点、键盘与焦点环、强制颜色、i18n 检查与按应用语言格式化）。 |

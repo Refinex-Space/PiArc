@@ -20,7 +20,7 @@ use piarc_config::Settings;
 use piarc_config::skills::{self as config, Catalog, ResourceDirs, args::Arguments, is_project};
 use piarc_host::Peer;
 use piarc_protocol::skills::{
-    CommandKind, CurrentOutputStyle, PromptCommand, ResourceSource, ResourceWarning,
+    CommandKind, CurrentOutputStyle, ForkSkillRun, PromptCommand, ResourceSource, ResourceWarning,
     ResourceWarningKind, SkillsCatalog, SkillsInvokeParams, SkillsInvokeResult, SkillsListParams,
     SkillsMatchParams, SkillsMatchResult,
 };
@@ -78,7 +78,114 @@ fn warning(kind: ResourceWarningKind) -> ResourceWarning {
     }
 }
 
+/// Executable effects approved for exactly one forked skill in this parent session.
+pub(super) struct PendingForkSkill {
+    name: String,
+    agent: String,
+    background: bool,
+    source: ResourceSource,
+    file: String,
+    dir: PathBuf,
+    allowed: Vec<String>,
+    hooks: Option<Value>,
+}
+
 impl ToolIo {
+    fn prepare_fork_skill(
+        parent: &SessionIo,
+        settings: &Settings,
+        skill: &config::Skill,
+        fork: &config::SkillFork,
+    ) -> Result<ForkSkillRun, ErrorObject> {
+        let session_id = crate::sessions::new_session_id().map_err(|e| e.to_error_object())?;
+        let agent = fork
+            .agent
+            .as_deref()
+            .unwrap_or("general-purpose")
+            .to_owned();
+        if (!skill.info.allowed_tools.is_empty() || skill.hooks.is_some())
+            && covered(
+                skill.info.source,
+                &skill.info.path,
+                parent.project(),
+                settings.trust().is_trusted(),
+            )
+        {
+            lock(&parent.fork_skills).insert(
+                session_id.clone(),
+                PendingForkSkill {
+                    name: skill.info.name.clone(),
+                    agent: agent.clone(),
+                    background: fork.background,
+                    source: skill.info.source,
+                    file: skill.info.path.clone(),
+                    dir: PathBuf::from(&skill.info.dir),
+                    allowed: skill.info.allowed_tools.clone(),
+                    hooks: skill.hooks.clone(),
+                },
+            );
+        }
+        Ok(ForkSkillRun {
+            model: fork.model.clone(),
+            effort: fork.effort,
+            session_id,
+            agent,
+            background: fork.background,
+        })
+    }
+
+    pub(crate) fn discard_fork_effects(&self, id: &str, child: &str) {
+        if let Ok(parent) = self.session(id) {
+            lock(&parent.fork_skills).remove(child);
+        }
+    }
+
+    /// Consume the grant once and recheck trust at the time of the child's registration.
+    pub(super) async fn activate_fork_skill(
+        &self,
+        p: &piarc_protocol::subagent::SubagentStartParams,
+        parent: &SessionIo,
+    ) -> Result<(), ErrorObject> {
+        let grant = lock(&parent.fork_skills).remove(&p.session_id);
+        if let Some(g) = grant {
+            if g.agent != p.agent_type || g.background != p.background {
+                return Err(policy::denied("The skill did not authorize this subagent."));
+            }
+            let (catalog, settings) = self
+                .resource_catalog(parent.project(), parent.scope.cwd())
+                .await?;
+            if !catalog.skill(&g.name).is_some_and(|skill| {
+                skill.info.path == g.file
+                    && skill.info.source == g.source
+                    && skill.info.allowed_tools == g.allowed
+                    && skill.hooks == g.hooks
+                    && skill.fork.as_ref().is_some_and(|fork| {
+                        fork.agent.as_deref().unwrap_or("general-purpose") == g.agent
+                            && fork.background == g.background
+                    })
+            }) {
+                return Err(policy::denied(
+                    "The skill changed before its subagent started.",
+                ));
+            }
+            let child = self.session(&p.session_id)?;
+            self.activate(
+                &child,
+                &p.session_id,
+                &settings,
+                &Effects {
+                    name: &g.name,
+                    source: g.source,
+                    file: &g.file,
+                    dir: Some(&g.dir),
+                    allowed: &g.allowed,
+                    hooks: g.hooks.as_ref(),
+                },
+            );
+        }
+        Ok(())
+    }
+
     /// The settings `project`'s skills follow (with its trust).
     async fn resource_settings(&self, project: &Path) -> Result<Settings, ErrorObject> {
         self.services()?
@@ -254,14 +361,30 @@ impl ToolIo {
             ));
         }
         let dir = PathBuf::from(&skill.info.dir);
+        let fork = skill
+            .fork
+            .as_ref()
+            .map(|options| Self::prepare_fork_skill(&s, &settings, skill, options))
+            .transpose()?;
         let content = render(
             &skill.body,
             p.arguments.as_deref().unwrap_or_default(),
             &skill.info.arguments,
             Some(&dir),
-            &p.session_id,
+            fork.as_ref().map_or(&p.session_id, |f| &f.session_id),
             s.project(),
         );
+        if fork.is_some() {
+            return Ok(SkillsInvokeResult {
+                fork,
+                name: skill.info.name.clone(),
+                content,
+                dir: skill.info.dir.clone(),
+                allowed_tools: Vec::new(),
+                hooks: false,
+                warnings: skill.info.warnings.clone(),
+            });
+        }
         let activated = self.activate(
             &s,
             &p.session_id,
@@ -276,6 +399,7 @@ impl ToolIo {
             },
         );
         Ok(SkillsInvokeResult {
+            fork: None,
             name: skill.info.name.clone(),
             content,
             dir: skill.info.dir.clone(),
@@ -384,68 +508,67 @@ impl ToolIo {
         else {
             return Ok(None);
         };
-        let (body, names, dir, file, hooks) = match entry.kind {
-            CommandKind::Skill => {
-                let Some(skill) = catalog.skill(name) else {
-                    return Ok(None);
-                };
-                (
-                    &skill.body,
-                    &skill.info.arguments,
-                    Some(PathBuf::from(&skill.info.dir)),
-                    skill.info.path.clone(),
-                    skill.hooks.as_ref(),
-                )
-            }
-            CommandKind::Command => {
-                let Some(command) = catalog.command(name) else {
-                    return Ok(None);
-                };
-                let file = command.info.path.clone().unwrap_or_default();
-                (
-                    &command.body,
-                    &command.info.arguments,
-                    Path::new(&file).parent().map(Path::to_owned),
-                    file,
-                    command.hooks.as_ref(),
-                )
-            }
-            CommandKind::BuiltIn | CommandKind::McpPrompt => return Ok(None),
+        if entry.kind == CommandKind::BuiltIn && entry.name == "subtask" {
+            return subtask(&entry, text, arguments).map(Some);
+        }
+        let Some(file) = ExpansionFile::from_catalog(&catalog, &entry) else {
+            return Ok(None);
         };
-        let project = s.project();
-        let expanded = render(body, arguments, names, dir.as_deref(), session_id, project);
-        // UserPromptExpansion (T41) before anything of the command applies: a block refuses
-        // the input and turns nothing on.
+        let fork = file
+            .skill
+            .and_then(|skill| skill.fork.as_ref().map(|options| (skill, options)))
+            .map(|(skill, options)| Self::prepare_fork_skill(&s, &settings, skill, options))
+            .transpose()?;
+        let expanded = render(
+            file.body,
+            arguments,
+            file.names,
+            file.dir,
+            fork.as_ref()
+                .map_or(session_id, |run| run.session_id.as_str()),
+            s.project(),
+        );
         let context = self
             .user_prompt_expansion(
                 session_id,
                 expansion_fields(&entry, name, arguments, &expanded),
             )
             .await
-            .map_err(|reason| expansion_blocked(name, &reason))?;
-        let activated = self.activate(
-            &s,
-            session_id,
-            &settings,
-            &Effects {
-                name,
-                source: entry.source,
-                file: &file,
-                dir: dir.as_deref(),
-                allowed: &entry.allowed_tools,
-                hooks,
-            },
-        );
+            .map_err(|reason| {
+                if let Some(run) = &fork {
+                    self.discard_fork_effects(session_id, &run.session_id);
+                }
+                expansion_blocked(name, &reason)
+            })?;
+        let grant = if fork.is_some() {
+            None
+        } else {
+            self.activate(
+                &s,
+                session_id,
+                &settings,
+                &Effects {
+                    name,
+                    source: entry.source,
+                    file: file.path,
+                    dir: file.dir,
+                    allowed: &entry.allowed_tools,
+                    hooks: file.hooks,
+                },
+            )
+            .grant
+        };
         Ok(Some(Expansion {
             text: expanded,
             command: PromptCommand {
+                fork,
                 name: name.to_owned(),
                 kind: entry.kind,
                 source: entry.source,
                 arguments: arguments.to_owned(),
                 input: text.trim().to_owned(),
             },
-            grant: activated.grant,
+            grant,
             context,
         }))
     }
@@ -464,6 +587,83 @@ impl ToolIo {
             .map(|s| lock(&s.skill_dirs).clone())
             .unwrap_or_default()
     }
+}
+
+/// The body and scoped effects of a command or a skill from the selected catalog.
+struct ExpansionFile<'a> {
+    body: &'a str,
+    names: &'a [String],
+    dir: Option<&'a Path>,
+    path: &'a str,
+    hooks: Option<&'a Value>,
+    skill: Option<&'a config::Skill>,
+}
+
+impl<'a> ExpansionFile<'a> {
+    fn from_catalog(
+        catalog: &'a Catalog,
+        entry: &piarc_protocol::skills::CommandInfo,
+    ) -> Option<Self> {
+        match entry.kind {
+            CommandKind::Skill => {
+                let s = catalog.skill(&entry.name)?;
+                Some(Self {
+                    body: &s.body,
+                    names: &s.info.arguments,
+                    dir: Some(Path::new(&s.info.dir)),
+                    path: &s.info.path,
+                    hooks: s.hooks.as_ref(),
+                    skill: Some(s),
+                })
+            }
+            CommandKind::Command => {
+                let c = catalog.command(&entry.name)?;
+                let path = c.info.path.as_deref().unwrap_or_default();
+                Some(Self {
+                    body: &c.body,
+                    names: &c.info.arguments,
+                    dir: Path::new(path).parent(),
+                    path,
+                    hooks: c.hooks.as_ref(),
+                    skill: None,
+                })
+            }
+            CommandKind::BuiltIn | CommandKind::McpPrompt => None,
+        }
+    }
+}
+
+fn subtask(
+    entry: &piarc_protocol::skills::CommandInfo,
+    text: &str,
+    arguments: &str,
+) -> Result<Expansion, ErrorObject> {
+    if arguments.trim().is_empty() {
+        return Err(ErrorObject::new(
+            ErrorKind::InvalidParams,
+            "/subtask requires a task.",
+            false,
+        ));
+    }
+    Ok(Expansion {
+        text: arguments.to_owned(),
+        grant: None,
+        context: None,
+        command: PromptCommand {
+            name: entry.name.clone(),
+            kind: entry.kind,
+            source: entry.source,
+            arguments: arguments.to_owned(),
+            input: text.trim().to_owned(),
+            fork: Some(ForkSkillRun {
+                model: None,
+                effort: None,
+                session_id: crate::sessions::new_session_id().map_err(|e| e.to_error_object())?,
+                agent: "fork".to_owned(),
+                background: true,
+            }),
+        },
+    })
 }
 
 /// The error of an input whose expansion a `UserPromptExpansion` hook blocked (T41).

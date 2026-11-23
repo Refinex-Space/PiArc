@@ -336,3 +336,89 @@ request!(
     /// and the server reconnected, with its state.
     McpLogin, "mcp/login", McpLoginParams, McpServerStatus
 );
+
+/// A server asks for an editable form or consent to open a URL (MCP 2025-11-25).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(
+    tag = "mode",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum Elicitation {
+    /// Flat JSON Schema object presented to the user.
+    Form {
+        /// Why this server needs the information.
+        message: String,
+        /// The server's requested schema.
+        requested_schema: serde_json::Map<String, serde_json::Value>,
+    },
+    /// Out-of-band interaction; form data never traverses this transport.
+    Url {
+        /// Why this server requests navigation.
+        message: String,
+        /// The full external address displayed by the native confirmation.
+        url: String,
+        /// Server-chosen id of the out-of-band interaction.
+        elicitation_id: String,
+    },
+}
+
+/// The server's request, bound to the session and tool call that owns it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct McpElicitParams {
+    /// Owning session id.
+    pub session_id: String,
+    /// Parent tool call.
+    pub tool_call_id: String,
+    /// One-based sequence of this server question within the tool call.
+    pub interaction: std::num::NonZeroU64,
+    /// Configured server name.
+    pub server: String,
+    /// Original name of the tool on the server.
+    pub server_tool: String,
+    /// What the server requests.
+    pub request: Elicitation,
+}
+
+/// The decision sent back to the server. Only an accepted form carries answers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "action", rename_all = "camelCase")]
+pub enum ElicitationReply {
+    /// The user agreed to answer or open the URL.
+    Accept {
+        /// Form values, absent for URL mode.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        content: Option<serde_json::Map<String, serde_json::Value>>,
+    },
+    /// Explicit refusal.
+    Decline,
+    /// Dismissal, interruption or lost session.
+    Cancel,
+}
+
+request!(
+    /// An MCP server requests input from the user (Agent Host → Core).
+    McpElicit, "mcp/elicit", McpElicitParams, ElicitationReply
+);
+
+/// Identifies one question on a live MCP tool call, regardless of its form or URL contents.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct McpCancelElicitationParams {
+    /// Owning session.
+    pub session_id: String,
+    /// Parent tool call.
+    pub tool_call_id: String,
+    /// The interaction number from `mcp/elicit`.
+    pub interaction: std::num::NonZeroU64,
+}
+
+/// Cancellation reached Core. The tool may already have finished.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct McpElicitationCancelled {}
+
+request!(
+    /// Withdraw one nested MCP question without cancelling its parent tool invocation.
+    McpCancelElicitation, "mcp/cancelElicitation", McpCancelElicitationParams, McpElicitationCancelled
+);

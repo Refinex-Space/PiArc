@@ -434,3 +434,56 @@ async fn parameter_rules_deny_and_ask_by_argument() {
     assert_eq!(card.tool, "Agent");
     assert_eq!(asked["allowed"], false);
 }
+
+/// T48-A05: the actual approval ledger and file write for a conversation fork use its own
+/// session id, while the write remains reversible from the invoking parent turn.
+#[tokio::test]
+async fn fork_approval_and_write_belong_to_the_invoking_parent_turn() {
+    let mut f = Fixture::new().await;
+    let checkpoints = crate::checkpoints::Checkpoints::open(f.storage.clone(), Default::default())
+        .expect("checkpoint store");
+    f.io = f.io.clone().with_checkpoints(checkpoints);
+    f.io.turn_started(SESSION, "fork-invocation");
+    f.start(CHILD, SESSION, "fork", false).await;
+    let requested = f.evaluate_as(
+        CHILD,
+        "write-fork",
+        "Write",
+        json!({"path": f.work.join("fork-note.txt"),"content":"private change"}),
+    );
+    let authorize = async {
+        let card = f.pending_of(CHILD).await;
+        let origin = card.subagent.as_ref().expect("named fork");
+        assert_eq!(origin.parent_session_id, SESSION);
+        assert_eq!(origin.agent_type, "fork");
+        f.io.answer_approval(answer(&card, ApprovalDecision::AllowOnce))
+            .await
+            .expect("allow");
+    };
+    let (result, ()) = tokio::join!(requested, authorize);
+    assert_eq!(result["allowed"], true);
+    let path = f.work.join("fork-note.txt");
+    let params = json!({"sessionId":CHILD,"path":path,"content":"private change","lineEndings":"matchFile","origin":{"tool":"Write","toolCallId":"write-fork"}});
+    f.io.dispatch(
+        "fs/write",
+        params.as_object().unwrap().clone(),
+        f.peer.clone(),
+    )
+    .await
+    .expect("written");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "private change");
+    assert!(f.io.finish_subagent(CHILD));
+    let preview =
+        f.io.rewind_preview(SESSION, "fork-invocation")
+            .await
+            .unwrap();
+    assert_eq!(preview.files.len(), 1);
+    assert_eq!(
+        preview.files[0].action,
+        piarc_protocol::checkpoint::RewindAction::Delete
+    );
+    f.io.rewind_code(SESSION, "fork-invocation", Vec::new())
+        .await
+        .expect("rewind");
+    assert!(!path.exists());
+}

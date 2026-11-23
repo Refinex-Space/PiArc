@@ -43,10 +43,12 @@ import {
   startable,
   type AgentCatalog,
 } from '../harness/subagents/definitions.js';
+import { preflight } from '../harness/policy.js';
 import { allowedTools } from '../harness/subagents/tool-filter.js';
 import type { SessionHarness } from '../harness/session-harness.js';
 import { isObject } from './items.js';
 import type { ProjectionSink } from './projector.js';
+import { forkContext } from './fork-context.js';
 import { ChildSession, finishInCore } from './subagent-session.js';
 import type { RegistryOptions } from './session-types.js';
 
@@ -61,6 +63,7 @@ export interface ParentSession {
   readonly harness: SessionHarness;
   /** Its notifications; a subagent's session has none. */
   readonly sink: ProjectionSink;
+  readonly extensions?: readonly string[];
   /** Canonical names of the tools it may use now. */
   tools(): readonly string[];
 }
@@ -75,6 +78,7 @@ interface Run {
   readonly depth: number;
   readonly toolCallId: string;
   readonly background: boolean;
+  readonly fork: boolean;
   readonly controller: AbortController;
   readonly allowed: ReadonlySet<string>;
   state: SubagentState;
@@ -272,6 +276,47 @@ export class SubagentRunner {
           : `Unknown subagent type "${call.type}". Available: ${types.map((t) => t.name).join(', ')}.`,
       );
     }
+    const fork = definition.name === 'fork' && definition.source === 'builtIn';
+    if (call.conversationFork !== undefined && call.conversationFork !== fork) {
+      return refuse(
+        call.conversationFork
+          ? 'A custom agent named fork shadows the conversation fork.'
+          : 'An isolated skill requires a regular subagent type.',
+      );
+    }
+    if (fork && this.#runs.get(parentId)?.fork === true) {
+      return refuse('A fork cannot start another conversation fork.');
+    }
+    if (call.sessionId && this.#runs.get(parentId)?.allowed.has('Agent') === false) {
+      return refuse('This subagent is not allowed to delegate a skill to another agent.');
+    }
+    if (call.sessionId && this.#options.tools.kind === 'core') {
+      const decision = await preflight(
+        this.#options.tools.bridge,
+        parentId,
+        parent.cwd,
+        {
+          tool: 'Agent',
+          toolCallId: `delegate-${call.sessionId}`,
+          input: {
+            subagent_type: call.type,
+            ...(call.model ? { model: call.model } : {}),
+            ...(call.effort ? { effort: call.effort } : {}),
+            ...(call.isolation ? { isolation: call.isolation } : {}),
+            description: call.description,
+            prompt: call.prompt,
+            run_in_background: call.background ?? false,
+          },
+        },
+        signal,
+      );
+      if (decision.reason) return refuse(decision.reason);
+      if (decision.updatedInput)
+        return refuse(
+          'A hook changed the approved delegation; the configured task was not started.',
+        );
+    }
+    const inherited = fork ? forkContext(parent.session) : undefined;
     const rootId = this.rootOf(parentId);
     const depth = this.depthOf(parentId) + 1;
     const { maxDepth, maxConcurrent } = catalog.limits;
@@ -286,13 +331,23 @@ export class SubagentRunner {
     this.#starting.set(rootId, (this.#starting.get(rootId) ?? 0) + 1);
     let chosen;
     try {
-      chosen = await this.#model(parent, definition, call, catalog);
+      chosen =
+        fork && parent.session.model
+          ? {
+              ok: true as const,
+              model: parent.session.model as Model<Api>,
+              effort: parent.session.thinkingLevel as EffortLevel,
+              warnings: [],
+            }
+          : await this.#model(parent, definition, call, catalog);
     } finally {
       this.#starting.set(rootId, (this.#starting.get(rootId) ?? 1) - 1);
     }
     if (!chosen.ok) return refuse(chosen.message);
-    const id = randomUUID();
-    const background = call.background ?? definition.background === true;
+    const id = call.sessionId ?? randomUUID();
+    if (this.#runs.has(id) || this.#main(id))
+      return refuse('The delegated session is already running.');
+    const background = call.background ?? (fork || definition.background === true);
     const run: Run = {
       id,
       parentId,
@@ -301,6 +356,7 @@ export class SubagentRunner {
       depth,
       toolCallId,
       background,
+      fork,
       controller: new AbortController(),
       allowed: allowedTools(parent.tools(), definition, depth, maxDepth),
       task: { description: call.description, prompt: call.prompt },
@@ -335,6 +391,7 @@ export class SubagentRunner {
         background,
         isolated: call.isolation === 'worktree' || definition.isolation === 'worktree',
         allowed: run.allowed,
+        ...(inherited === undefined ? {} : { inherited, extensions: parent.extensions ?? [] }),
         agents: await this.hostFor(id, parent.cwd),
         log: this.#options.log,
       });
@@ -421,6 +478,7 @@ export class SubagentRunner {
               publish(run.state.activity ?? '');
             }, wait);
         },
+        call.images,
       );
     } finally {
       if (timer !== undefined) clearTimeout(timer);

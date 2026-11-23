@@ -74,6 +74,10 @@ export function ModelMenus({
     if (!chosen || !level || busy) return;
     setBusy(true);
     try {
+      // A PreModelSwitch hook may ask a question in the session's approval ledger. Release
+      // this modal's focus trap before waiting for the confirmed operation.
+      setOpen(false);
+      setChosen(undefined);
       await window.piarc.setSessionModel(id, chosen.model.provider, chosen.model.id, level);
       onChange();
       close();
@@ -92,7 +96,7 @@ export function ModelMenus({
         type="button"
         className="row-action"
         ref={modelButton}
-        disabled={running}
+        disabled={running || busy}
         data-testid="session-model"
         aria-haspopup="dialog"
         onClick={() => {
@@ -106,7 +110,7 @@ export function ModelMenus({
         type="button"
         className="row-action"
         ref={effortButton}
-        disabled={running || !current?.efforts.length}
+        disabled={running || busy || !current?.efforts.length}
         data-testid="session-effort"
         aria-haspopup="menu"
         aria-expanded={Boolean(menu.open)}

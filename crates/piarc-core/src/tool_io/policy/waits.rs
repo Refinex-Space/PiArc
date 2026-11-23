@@ -95,7 +95,7 @@ pub(super) fn withdraw_card(
 
 /// Puts a network-domain card (T39) in the session's ledger: no Agent Host call waits on it,
 /// so there is no `policy/pending` and no connection to watch. False when the id is taken.
-pub(in crate::tool_io) fn post_network_card(
+pub(in crate::tool_io) fn post_local_card(
     s: &SessionIo,
     services: &Services,
     card: &ApprovalRequest,
@@ -107,7 +107,7 @@ pub(in crate::tool_io) fn post_network_card(
     let inserted = state.ledger.insert(
         shown,
         Pending {
-            call: format!("network:{}", card.request_id),
+            call: format!("local:{}", card.request_id),
             reply: tx,
             peer: None,
         },
@@ -118,8 +118,8 @@ pub(in crate::tool_io) fn post_network_card(
     inserted
 }
 
-/// Takes an unanswered network-domain card back out of the ledger.
-pub(in crate::tool_io) fn withdraw_network_card(
+/// Removes an unanswered Core-originated card.
+pub(in crate::tool_io) fn withdraw_local_card(
     s: &SessionIo,
     services: &Services,
     card: &ApprovalRequest,

@@ -1,6 +1,6 @@
 id: hooks-m5-permission-denied
 description: A PermissionDenied hook sees the refused call and offers a retry without executing it (T48).
-capabilities: [CAP-HOOK-PERMISSIONDENIED-001]
+capabilities: [CAP-HOOK-PERMISSIONDENIED-001, CAP-HOOK-M5-001]
 workspace:
   trusted: true
   fixtures:

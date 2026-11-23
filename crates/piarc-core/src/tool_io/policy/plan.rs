@@ -151,6 +151,8 @@ mod tests {
 
     fn answer(decision: ApprovalDecision) -> ApprovalAnswer {
         ApprovalAnswer {
+            elicitation: None,
+            confirmed_url: None,
             request_id: "r".into(),
             session_id: "s".into(),
             revision: 1,
@@ -169,6 +171,7 @@ mod tests {
 
     fn card(plan: &str) -> ApprovalRequest {
         ApprovalRequest {
+            elicitation: None,
             request_id: "r".into(),
             session_id: "s".into(),
             revision: 1,

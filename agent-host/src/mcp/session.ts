@@ -366,9 +366,10 @@ export class McpSession {
         aliases: [server],
         ...(def?.description == null ? {} : { description: def.description }),
       },
-      async execute(_toolCallId, params, signal, onUpdate) {
+      async execute(toolCallId, params, signal, onUpdate) {
         const args = isObject(params) ? params : {};
         const result = await pool.call(sessionId, server, tool.name, args, {
+          toolCallId,
           ...(signal === undefined ? {} : { signal }),
           onProgress: (progress) => {
             onUpdate?.({

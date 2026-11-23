@@ -317,14 +317,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - 开工检查点已提交（b92ac7c）。续做时恢复了 GitHub 访问，核对了 9212335 的原生 CI 日志，关闭 T46-A13 与 R5-A01；T45-A02 仍缺完整的映射测试通过记录。
 - [ ] A01–A02：服务端按模型选择与失败回退已接入；真实 Pi/Anthropic SDK、设置 UI 及既有回归共 24 项通过。两种协议与故障注入的正式 L2 待可启动 macOS 沙箱的环境复验。
 - [x] A03：真实 SessionManager 在重启后从分支恢复 Anthropic compaction 块到原 assistant 位置，原 JSONL 的字节前缀不变。`npx vitest run agent-host/src/runtime/server-compaction.test.ts`。
-- [ ] A04–A05：fork 子 agent 的历史、缓存、审批与检查点。父子工具声明一致涉及 ADR-0048 第 4 条，[ADR-0066](../adr/0066-fork-tool-declarations.md) 已接受，仅声明可见性例外，执行仍受限。
+- [x] A04：真实 Pi 父/子会话由 mock 捕获已序列化的 HTTP，逐字节比对 system 和工具、核对消息前缀、fork 发起消息和缓存断点；含服务端压缩的组合回归亦通过（`tmp/evidence/T48/fork-wire.log`）。[ADR-0066](../adr/0066-fork-tool-declarations.md) 已接受。
+- [ ] A05：Core 授权与回退、SDK 递归 fork 拒绝均已验证，L2 和 Electron 原生界面仍待复验。
 - [ ] A06：fork skill 的 agent 选择、后台执行与正文隔离。[ADR-0067](../adr/0067-fork-skill-index-and-grants.md) 已接受，缺省时索引只列名称，授权绑定实际执行者。
-  - 配置解析与非法字段测试已通过（`cargo test -p piarc-config --lib skills`，15 项）。
+  - 真实 SDK 已验证前后台选定 agent、父请求正文隔离；Core 验证了子会话绑定授权，配置解析与非法字段测试已通过（`cargo test -p piarc-config --lib skills`，15 项）。
 - [ ] A07：worktree 创建与移除 hooks。hook 返回的目录会成为文件工具根，非 Git 目录无法用现有状态检查保护改动。[ADR-0068](../adr/0068-worktree-hook-ownership.md) 已接受。工作区会话、子会话、恢复与清理已接入；`cargo test -p piarc-hooks` 55/55、`cargo test -p piarc-store --test migrations` 4/4。Core 实际运行创建与移除 hook，验证非零退出、确认、归属和目录替换、恢复，1/1 通过。修复了 hook 已完成移除后重试的幂等性（先复现再修复）。L2 场景已添加，待真实工作区运行。
-- [ ] A08：切换模型前的决策与切换后的上下文。
+- [ ] A08：真实 Core 的切换拒绝与询问、成功后追加上下文均已实现。2 项 Core 测试、真实 Pi 的下一请求断言及旧预览契约 round-trip 通过，待 L2。
 - [ ] A09：Core 已在审查拒绝后分发 PermissionDenied。真实 hook 的定向测试验证拒绝不执行、输入与理由、再次调用重新送审；`cargo test -p piarc-core --lib tool_io::policy::tests::t46` 8/8，`cargo test -p piarc-hooks` 54/54。L2 场景已写；沙箱内的 macOS `sandbox-exec` 无法启动 Agent Host，尚缺端到端证据。
-- [ ] A10：核对 pi-mcp 能力，按结果接入 elicitation 或记录上游阻塞，验证两个 hook。
-- [ ] A11：登记能力，运行 L2 并生成能力文档。
+- [ ] A10：表单、URL 原生确认、单次询问的取消、Elicitation / ElicitationResult 均已接入；真实 stdio、控件和 Core 审批测试通过。L2 与 Electron 原生操作待复验。
+- [ ] A11：已登记 10 项 T48 能力；第一次完整执行报告（253 场景，后新增后台 skill 场景）生成 MISSING 0，250 场景执行失败、3 仅 Windows，环境报告在 `tmp/evidence/T48/`。正式能力文档待完整复验后生成。
 - [ ] A12：架构与目录文档、界面验收、全量 verify 及 Windows CI 核对。
 
 ## 登记事项

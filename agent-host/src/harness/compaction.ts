@@ -332,12 +332,12 @@ export class SessionCompaction {
       return;
     }
     const enabled = this.#settings?.autoCompactEnabled !== false;
-    const server = this.#server.select(model, this.#o.serverContextEdit?.(model), enabled);
+    const strategy = this.#server.select(model, this.#o.serverContextEdit?.(model), enabled);
     const reserveTokens = piReserveTokens(model.contextWindow, autoCompactThreshold(input));
     session.settingsManager.applyOverrides({
       retry,
       compaction: {
-        enabled: enabled && !server && this.#stopped === undefined,
+        enabled: enabled && strategy === 'client' && this.#stopped === undefined,
         reserveTokens,
         modelOverrides: { [`${model.provider}/${model.id}`]: { reserveTokens } },
       },

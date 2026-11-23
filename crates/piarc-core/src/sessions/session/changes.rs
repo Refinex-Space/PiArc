@@ -61,18 +61,7 @@ impl Request {
                 )
                 .await
             }
-            ModelOp::Set(model, effort) => {
-                self.call::<models::SessionSetModel>(
-                    supervisor,
-                    None,
-                    models::SetModelParams {
-                        session_id: self.id.clone(),
-                        model,
-                        effort,
-                    },
-                )
-                .await
-            }
+            ModelOp::Set(model, effort) => self.switch_model(supervisor, model, effort).await,
             ModelOp::Effort(effort) => {
                 self.call::<models::SessionSetEffort>(
                     supervisor,
@@ -85,6 +74,84 @@ impl Request {
                 .await
             }
         }
+    }
+
+    async fn switch_model(
+        &self,
+        supervisor: &HostSupervisor,
+        model: piarc_protocol::session::ModelRef,
+        effort: Option<models::EffortLevel>,
+    ) -> Result<Value> {
+        // Preview is passive. Only the confirmed request runs the hooks, including
+        // callers that skipped the UI preview. The actor holds its idle exclusion
+        // through the confirmation, the switch and the post-hook reminder.
+        let preview = supervisor
+            .session_call::<models::SessionPreviewModelSwitch>(
+                &self.id,
+                None,
+                models::ModelSwitchParams {
+                    session_id: self.id.clone(),
+                    model: model.clone(),
+                },
+            )
+            .await
+            .map_err(host_error)?;
+        self.tool_io
+            .model_switch_hook(
+                &self.id.0,
+                piarc_hooks::HookEvent::PreModelSwitch,
+                &model,
+                &preview,
+                &self.cancel,
+            )
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        if self.cancel.is_cancelled() {
+            return Err(Error::feature(&piarc_protocol::ErrorObject::new(
+                piarc_protocol::ErrorKind::Cancelled,
+                "The session closed during the model switch.",
+                false,
+            )));
+        }
+        let selected = self
+            .call::<models::SessionSetModel>(
+                supervisor,
+                None,
+                models::SetModelParams {
+                    session_id: self.id.clone(),
+                    model: model.clone(),
+                    effort,
+                },
+            )
+            .await?;
+        if let Some(text) = self
+            .tool_io
+            .model_switch_hook(
+                &self.id.0,
+                piarc_hooks::HookEvent::PostModelSwitch,
+                &model,
+                &preview,
+                &self.cancel,
+            )
+            .await
+            .map_err(|e| Error::feature(&e))?
+        {
+            use piarc_protocol::context::{ReminderType, SessionRemind, SessionRemindParams};
+            self.call::<SessionRemind>(
+                supervisor,
+                None,
+                SessionRemindParams {
+                    session_id: self.id.clone(),
+                    kind: ReminderType::HookContext,
+                    source: "PostModelSwitch".into(),
+                    text,
+                    key: None,
+                    wake: false,
+                },
+            )
+            .await?;
+        }
+        Ok(selected)
     }
 
     pub(super) async fn queue(

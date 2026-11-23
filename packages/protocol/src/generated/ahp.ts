@@ -215,6 +215,10 @@ export type AhpMessage =
   | McpReconnectResponse
   | McpSetEnabledRequest
   | McpSetEnabledResponse
+  | McpCancelElicitationRequest
+  | McpCancelElicitationResponse
+  | McpElicitRequest
+  | McpElicitResponse
   | McpLoginRequest
   | McpLoginResponse
   | McpStatusChangedNotification
@@ -1062,6 +1066,61 @@ export type McpConnectionState =
   | 'unsupported'
   | 'untrusted';
 /**
+ * Cancellation reached Core. The tool may already have finished.
+ */
+export type McpElicitationCancelled = Record<string, never>;
+/**
+ * A server asks for an editable form or consent to open a URL (MCP 2025-11-25).
+ */
+export type Elicitation =
+  | {
+      /**
+       * Why this server needs the information.
+       */
+      message: string;
+      mode: 'form';
+      /**
+       * The server's requested schema.
+       */
+      requestedSchema: {
+        [k: string]: unknown;
+      };
+    }
+  | {
+      /**
+       * Server-chosen id of the out-of-band interaction.
+       */
+      elicitationId: string;
+      /**
+       * Why this server requests navigation.
+       */
+      message: string;
+      mode: 'url';
+      /**
+       * The full external address displayed by the native confirmation.
+       */
+      url: string;
+    };
+/**
+ * The decision sent back to the server. Only an accepted form carries answers.
+ */
+export type ElicitationReply =
+  | {
+      action: 'accept';
+      /**
+       * Form values, absent for URL mode.
+       */
+      content?: {
+        [k: string]: unknown;
+      } | null;
+    }
+  | {
+      action: 'decline';
+    }
+  | {
+      action: 'cancel';
+    };
+/**
  * Something about a skill, command or style the user should know; the client words it.
  */
 export type ResourceWarningKind =
@@ -1088,7 +1147,8 @@ export type ResourcesReloadResult = Record<string, never>;
 /**
  * Presentation of a pending approval.
  */
-export type ApprovalKind = 'command' | 'fileChange' | 'permissionExpansion' | 'question' | 'plan';
+export type ApprovalKind =
+  'command' | 'fileChange' | 'permissionExpansion' | 'question' | 'elicitation' | 'plan';
 /**
  * Why an Auto mode call came back to the user (T46).
  */
@@ -1850,6 +1910,10 @@ export interface PromptCommand {
    */
   arguments?: string;
   /**
+   * Run the rendered body in this isolated subagent, returning only the outcome.
+   */
+  fork?: ForkSkillRun | null;
+  /**
    * What the user typed (`/name arguments`), shown in the transcript.
    */
   input: string;
@@ -1865,6 +1929,31 @@ export interface PromptCommand {
    * Where it came from.
    */
   source: ResourceSource;
+}
+/**
+ * A Core-issued subagent id and the execution mode selected by a forked skill.
+ */
+export interface ForkSkillRun {
+  /**
+   * Subagent definition, or general-purpose by default.
+   */
+  agent: string;
+  /**
+   * Continue the parent while the isolated task runs.
+   */
+  background: boolean;
+  /**
+   * Optional skill-specific reasoning effort.
+   */
+  effort?: EffortLevel | null;
+  /**
+   * Optional skill-specific model (a model id or an alias).
+   */
+  model?: string | null;
+  /**
+   * Fresh id to use for this child.
+   */
+  sessionId: string;
 }
 /**
  * Successful response to `session/prompt`.
@@ -2326,6 +2415,10 @@ export interface ModelSwitchPreviewResult {
    */
   cacheInvalidated: boolean;
   /**
+   * TTL in seconds of the last known cache write or read.
+   */
+  cacheTtl?: number | null;
+  /**
    * Estimated USD to write the cache, null when unpriced.
    */
   cacheWriteUsd?: number | null;
@@ -2337,6 +2430,14 @@ export interface ModelSwitchPreviewResult {
    * Thinking content may be discarded during conversion.
    */
   dropsThinking: boolean;
+  /**
+   * The model being left, if the session already has a model.
+   */
+  fromModel?: ModelRef | null;
+  /**
+   * The current model has a recent cached response. Absent means cold.
+   */
+  promptCacheWarm?: boolean;
 }
 /**
  * Request for `session/setModel`.
@@ -7871,6 +7972,88 @@ export interface McpSetEnabledResponse {
   result: McpServerStatus;
 }
 /**
+ * Request for `mcp/cancelElicitation`.
+ */
+export interface McpCancelElicitationRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/cancelElicitation';
+  params: McpCancelElicitationParams;
+}
+/**
+ * Identifies one question on a live MCP tool call, regardless of its form or URL contents.
+ */
+export interface McpCancelElicitationParams {
+  /**
+   * The interaction number from `mcp/elicit`.
+   */
+  interaction: number;
+  /**
+   * Owning session.
+   */
+  sessionId: string;
+  /**
+   * Parent tool call.
+   */
+  toolCallId: string;
+}
+/**
+ * Successful response to `mcp/cancelElicitation`.
+ */
+export interface McpCancelElicitationResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: McpElicitationCancelled;
+}
+/**
+ * Request for `mcp/elicit`.
+ */
+export interface McpElicitRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'mcp/elicit';
+  params: McpElicitParams;
+}
+/**
+ * The server's request, bound to the session and tool call that owns it.
+ */
+export interface McpElicitParams {
+  /**
+   * One-based sequence of this server question within the tool call.
+   */
+  interaction: number;
+  /**
+   * What the server requests.
+   */
+  request: Elicitation;
+  /**
+   * Configured server name.
+   */
+  server: string;
+  /**
+   * Original name of the tool on the server.
+   */
+  serverTool: string;
+  /**
+   * Owning session id.
+   */
+  sessionId: string;
+  /**
+   * Parent tool call.
+   */
+  toolCallId: string;
+}
+/**
+ * Successful response to `mcp/elicit`.
+ */
+export interface McpElicitResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ElicitationReply;
+}
+/**
  * Request for `mcp/login`.
  */
 export interface McpLoginRequest {
@@ -8230,6 +8413,10 @@ export interface SkillsInvokeResult {
    */
   dir: string;
   /**
+   * Run the rendered body in this isolated subagent, returning only the outcome.
+   */
+  fork?: ForkSkillRun | null;
+  /**
    * Whether its hooks now apply to the session.
    */
   hooks?: boolean;
@@ -8464,6 +8651,10 @@ export interface ApprovalRequest {
    */
   domain?: string | null;
   /**
+   * An MCP elicitation. The server is named by `tool`.
+   */
+  elicitation?: Elicitation | null;
+  /**
    * Which card to show.
    */
   kind: ApprovalKind;
@@ -8583,6 +8774,10 @@ export interface ApprovalAnswer {
    */
   comments?: PlanComment[];
   /**
+   * Original URL confirmed by the main process before accepting a URL request.
+   */
+  confirmedUrl?: string | null;
+  /**
    * Agent Host connection that made the call.
    */
   connectionEpoch: number;
@@ -8599,6 +8794,10 @@ export interface ApprovalAnswer {
    * `allowAlways` (T39): it must be the card's `domain`.
    */
   domain?: string | null;
+  /**
+   * The user's answer to an MCP server.
+   */
+  elicitation?: ElicitationReply | null;
   /**
    * Feedback to return on refusal.
    */

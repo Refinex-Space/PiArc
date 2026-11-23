@@ -321,3 +321,56 @@ async fn paths_skills_match_touched_files() {
         .expect("match");
     assert_eq!(matched["matched"], json!(["rust-style"]));
 }
+
+/// A forked skill's scoped allow belongs to its one registered child. A user command
+/// takes the same route as a model invocation; another child of the same type has no grant.
+#[tokio::test]
+async fn fork_skill_binds_its_effects_to_one_child() {
+    let f = Fixture::with_env(fixed_path()).await;
+    f.skill(".claude/skills/check/SKILL.md",
+        "---\ncontext: fork\nagent: Explore\nbackground: false\nallowed-tools: Bash(printenv *)\n---\nONLY-CHILD ${CLAUDE_SESSION_ID} $ARGUMENTS");
+    f.trust_now().await;
+    let loaded = f.invoke("invoke-fork", "check", "via-tool").await;
+    let id = loaded["fork"]["sessionId"].as_str().expect("child id");
+    assert_eq!(loaded["content"], format!("ONLY-CHILD {id} via-tool"));
+    assert_eq!(loaded["fork"]["agent"], "Explore");
+    assert_eq!(loaded["fork"]["background"], false);
+    assert!(loaded.get("allowedTools").is_none());
+    f.asks("Bash", json!({"command":"printenv HOME"})).await;
+    f.start(id, SESSION, "Explore", false).await;
+    assert_eq!(
+        f.evaluate_as(id, "cb", "Bash", json!({"command":"printenv HOME"}))
+            .await["allowed"],
+        true
+    );
+    assert!(f.io.finish_subagent(id));
+    let expanded =
+        f.io.expand_command(SESSION, "/check via-command")
+            .await
+            .unwrap()
+            .unwrap();
+    let next = expanded.command.fork.unwrap();
+    assert_ne!(next.session_id, id);
+    assert_eq!(
+        expanded.text,
+        format!("ONLY-CHILD {} via-command", next.session_id)
+    );
+    assert!(expanded.grant.is_none());
+    f.io.discard_fork_effects(SESSION, &next.session_id);
+    f.start(&next.session_id, SESSION, "Explore", false).await;
+    let tool = f.evaluate_as(
+        &next.session_id,
+        "after-cancel",
+        "Bash",
+        json!({"command":"printenv HOME"}),
+    );
+    let answer = async {
+        let card = f.pending_of(&next.session_id).await;
+        f.io.answer_approval(answer(&card, ApprovalDecision::Deny))
+            .await
+            .expect("answer");
+    };
+    let (result, ()) = tokio::join!(tool, answer);
+    assert_eq!(result["allowed"], false);
+    assert!(f.io.finish_subagent(&next.session_id));
+}

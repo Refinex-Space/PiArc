@@ -34,6 +34,8 @@ const extra = Number.parseInt(env.MCP_ECHO_TOOLS ?? '0', 10);
 const added: string[] = [];
 const prompts = env.MCP_ECHO_PROMPTS === '1';
 const addedPrompts: string[] = [];
+const elicit = env.MCP_ECHO_ELICIT === '1';
+const nested = new Map<string, unknown>();
 
 if (env.MCP_ECHO_PID_FILE !== undefined) writeFileSync(env.MCP_ECHO_PID_FILE, String(process.pid));
 if (env.MCP_ECHO_START_LOG !== undefined) {
@@ -100,6 +102,17 @@ function tools(): unknown[] {
       inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
     },
   ];
+  if (elicit) {
+    list.push({
+      name: 'elicit',
+      description: 'Ask the client for input and report its response.',
+      inputSchema: {
+        type: 'object',
+        properties: { mode: { type: 'string', enum: ['form', 'url'] } },
+        required: ['mode'],
+      },
+    });
+  }
   if (env.MCP_ECHO_REPLY === '1') {
     list.push({
       name: 'reply',
@@ -229,12 +242,37 @@ for await (const line of createInterface({ input: process.stdin })) {
     continue;
   }
   const message: unknown = JSON.parse(line);
+  if (
+    isRecord(message) &&
+    typeof message.id === 'string' &&
+    nested.has(message.id) &&
+    !('method' in message)
+  ) {
+    const parent = nested.get(message.id);
+    nested.delete(message.id);
+    if ('error' in message) fail(parent, -32603, JSON.stringify(message.error));
+    else reply(parent, text(JSON.stringify(message.result)));
+    continue;
+  }
   if (!isRecord(message) || typeof message.method !== 'string' || !('id' in message)) {
     continue; // notifications (`notifications/initialized`) and responses need no answer
   }
   const params = isRecord(message.params) ? message.params : {};
   switch (message.method) {
     case 'initialize':
+      if (elicit) {
+        const capabilities = isRecord(params.capabilities)
+          ? params.capabilities.elicitation
+          : undefined;
+        if (
+          !isRecord(capabilities) ||
+          !isRecord(capabilities.form) ||
+          !isRecord(capabilities.url)
+        ) {
+          fail(message.id, -32602, 'Both elicitation modes are required.');
+          break;
+        }
+      }
       reply(message.id, {
         protocolVersion:
           typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-11-25',
@@ -269,6 +307,31 @@ for await (const line of createInterface({ input: process.stdin })) {
     }
     case 'tools/call': {
       const args = isRecord(params.arguments) ? params.arguments : {};
+      if (params.name === 'elicit' && elicit) {
+        const id = 'elicit-' + String(message.id);
+        nested.set(id, message.id);
+        const form = {
+          message: 'Choose a release name.',
+          requestedSchema: {
+            type: 'object',
+            properties: { release: { type: 'string', title: 'Release name', minLength: 2 } },
+            required: ['release'],
+          },
+        };
+        const url = {
+          mode: 'url',
+          message: 'Open the preview in your browser.',
+          url: 'https://example.invalid/mcp/preview',
+          elicitationId: id,
+        };
+        send({
+          jsonrpc: '2.0',
+          id,
+          method: 'elicitation/create',
+          params: args.mode === 'url' ? url : form,
+        });
+        break;
+      }
       if (params.name === 'reply' && env.MCP_ECHO_REPLY === '1') {
         const answer = {
           content: [{ type: 'text', text: typeof args.text === 'string' ? args.text : '' }],

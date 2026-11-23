@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 getrandom.workspace = true
 http.workspace = true
+jsonschema.workspace = true
 minisign-verify.workspace = true
 piarc-checkpoint.workspace = true
 piarc-config.workspace = true

@@ -17,7 +17,11 @@ pub enum HookEvent {
     PreToolUse,
     /// Before the user is asked to approve a tool call (step 8 of the decision ladder).
     PermissionRequest,
-    /// A configured hook creates the session worktree.
+    /// Before the user changes a session model.
+    PreModelSwitch,
+    /// After a confirmed session model change.
+    PostModelSwitch,
+    /// Before creating an isolated worktree.
     WorktreeCreate,
     /// A configured hook removes its previously registered worktree.
     WorktreeRemove,
@@ -138,13 +142,15 @@ impl Default for Timeouts {
 
 impl HookEvent {
     /// Every event, in Claude Code's documentation order.
-    pub const ALL: [Self; 25] = [
+    pub const ALL: [Self; 27] = [
         Self::SessionStart,
         Self::SessionEnd,
         Self::UserPromptSubmit,
         Self::PreToolUse,
         Self::PermissionRequest,
         Self::PermissionDenied,
+        Self::PreModelSwitch,
+        Self::PostModelSwitch,
         Self::WorktreeCreate,
         Self::WorktreeRemove,
         Self::PostToolUse,
@@ -176,6 +182,8 @@ impl HookEvent {
             Self::PreToolUse => "PreToolUse",
             Self::PermissionRequest => "PermissionRequest",
             Self::PermissionDenied => "PermissionDenied",
+            Self::PreModelSwitch => "PreModelSwitch",
+            Self::PostModelSwitch => "PostModelSwitch",
             Self::WorktreeCreate => "WorktreeCreate",
             Self::WorktreeRemove => "WorktreeRemove",
             Self::PostToolUse => "PostToolUse",
@@ -263,7 +271,9 @@ impl HookEvent {
     #[must_use]
     pub fn default_timeout(self, timeouts: &Timeouts) -> Duration {
         match self {
-            Self::UserPromptSubmit => timeouts.user_prompt_submit,
+            Self::UserPromptSubmit | Self::PreModelSwitch | Self::PostModelSwitch => {
+                timeouts.user_prompt_submit
+            }
             Self::SessionEnd => timeouts.session_end,
             _ => timeouts.default,
         }
@@ -290,9 +300,10 @@ impl HookEvent {
     #[must_use]
     pub fn plain_stdout(self) -> PlainStdout {
         match self {
-            Self::SessionStart | Self::UserPromptSubmit | Self::UserPromptExpansion => {
-                PlainStdout::Context
-            }
+            Self::SessionStart
+            | Self::UserPromptSubmit
+            | Self::UserPromptExpansion
+            | Self::PostModelSwitch => PlainStdout::Context,
             Self::PreCompact => PlainStdout::Instructions,
             _ => PlainStdout::Ignored,
         }
@@ -313,6 +324,7 @@ impl HookEvent {
             | Self::WorktreeRemove
             | Self::ConfigChange
             | Self::Elicitation
+            | Self::PreModelSwitch
             | Self::ElicitationResult => ExitTwo::Blocks,
             Self::PostToolUse | Self::PostToolUseFailure => ExitTwo::ToModel,
             Self::SessionStart
@@ -321,7 +333,8 @@ impl HookEvent {
             | Self::SubagentStart
             | Self::InstructionsLoaded
             | Self::CwdChanged
-            | Self::FileChanged => ExitTwo::ToUser,
+            | Self::FileChanged
+            | Self::PostModelSwitch => ExitTwo::ToUser,
             Self::PermissionRequest
             | Self::PermissionDenied
             | Self::Notification
@@ -357,8 +370,6 @@ impl HookEvent {
 /// Events of Claude Code's set that PiArc recognizes but does not run yet, with the task that
 /// adds them ("unscheduled" when none does). Configuration naming them is reported, not run.
 pub const LATER_EVENTS: &[(&str, &str)] = &[
-    ("PreModelSwitch", "T48"),
-    ("PostModelSwitch", "T48"),
     ("TaskCreated", "unscheduled"),
     ("TaskCompleted", "unscheduled"),
     ("MessageDisplay", "unscheduled"),

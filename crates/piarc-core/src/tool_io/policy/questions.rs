@@ -202,6 +202,7 @@ impl ToolIo {
         let timeout = timeout_of(&settings);
         let generation = lock(&s.policy).generation.clone();
         let card = ApprovalRequest {
+            elicitation: None,
             request_id: crate::sessions::new_session_id().map_err(|e| e.to_error_object())?,
             session_id: p.session_id.clone(),
             revision: 1,
@@ -301,6 +302,7 @@ mod tests {
 
     fn card(questions: Vec<Question>) -> ApprovalRequest {
         ApprovalRequest {
+            elicitation: None,
             request_id: "r".into(),
             session_id: "s".into(),
             revision: 1,
@@ -326,6 +328,8 @@ mod tests {
 
     fn reply(decision: ApprovalDecision, answers: Vec<QuestionAnswer>) -> ApprovalAnswer {
         ApprovalAnswer {
+            elicitation: None,
+            confirmed_url: None,
             request_id: "r".into(),
             session_id: "s".into(),
             revision: 1,

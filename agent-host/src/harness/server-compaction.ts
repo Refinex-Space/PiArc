@@ -34,6 +34,9 @@ function restoreBlocks(payload: Record<string, unknown>, summaries: ReadonlyMap<
   });
 }
 
+/** Exactly one strategy owns automatic compaction while it is enabled. */
+export type CompactionStrategy = 'client' | 'anthropic-server';
+
 export class ServerCompaction {
   #active: ServerContextEdit | undefined;
   #rejected: string | undefined;
@@ -46,14 +49,18 @@ export class ServerCompaction {
   fallback = false;
 
   /** Rejection latches for the current selection until the user changes model/strategy. */
-  select(model: Model<Api>, edit: ServerContextEdit | null | undefined, enabled: boolean): boolean {
+  select(
+    model: Model<Api>,
+    edit: ServerContextEdit | null | undefined,
+    enabled: boolean,
+  ): CompactionStrategy {
     const key = JSON.stringify([model.provider, model.id, edit, enabled]);
     if (this.#selection !== key) this.#rejected = undefined;
     this.#selection = key;
     const supported = edit != null && serverContextEdits(model).serverContextEdits?.includes(edit);
     this.fallback = enabled && edit != null && (!supported || this.#rejected === key);
     this.#active = enabled && supported && !this.fallback ? edit : undefined;
-    return this.#active !== undefined;
+    return this.#active === undefined ? 'client' : 'anthropic-server';
   }
 
   #context(messages: AgentMessage[], model: Model<Api>) {

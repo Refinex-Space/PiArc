@@ -448,6 +448,9 @@ pub enum Action {
         provider: String,
         /// Fields required in the preview.
         preview: Value,
+        /// Expected rejection when a PreModelSwitch hook refuses the change.
+        #[serde(default)]
+        rejected: Option<String>,
     },
     /// Sets the current session's thinking effort.
     SetEffort {

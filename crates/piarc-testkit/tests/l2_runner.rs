@@ -206,6 +206,7 @@ fn broken_expectations_fail_with_readable_differences() {
 fn declared_approvals_without_approval_requests_fail() {
     let mut spec = scenario("chat-basic");
     spec.approvals = vec![Approval {
+        elicitation: None,
         decision: ApprovalDecision::Allow,
         kind: None,
         feedback: None,

@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "mcp/cancelElicitation",
+  "params": {
+    "sessionId": "s",
+    "toolCallId": "t",
+    "interaction": 0
+  }
+}

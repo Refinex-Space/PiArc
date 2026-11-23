@@ -310,3 +310,49 @@ describe('the workspace MCP pool', () => {
     await expect(pool.call('other', 'scratch', 'echo', {}, {})).rejects.toThrow(/not configured/);
   });
 });
+
+it('routes a nested form and URL request from a real stdio server back to their owning calls', async () => {
+  const data = config([server('alpha', { MCP_ECHO_ELICIT: '1' })]);
+  const seen: unknown[] = [];
+  const bridge = new CoreBridge((message) => {
+    const p = message as { id: number; method: string; params: { request?: { mode: string } } };
+    const result =
+      p.method === 'mcp/servers'
+        ? data
+        : p.params.request?.mode === 'form'
+          ? { action: 'accept', content: { release: 'Local' } }
+          : { action: 'decline' };
+    if (p.method === 'mcp/elicit') seen.push(p.params);
+    queueMicrotask(() => bridge.handleResponse({ jsonrpc: '2.0', id: p.id, result }));
+  });
+  const pool = new McpPool({
+    workspace: WORKSPACE,
+    bridge,
+    log: () => undefined,
+    notify: () => undefined,
+  });
+  pools.push(pool);
+  await pool.refresh();
+  pool.attach('one', WORKSPACE);
+  pool.attach('two', WORKSPACE);
+  const first = await pool.call('one', 'alpha', 'elicit', { mode: 'form' }, { toolCallId: 'c1' });
+  const second = await pool.call('two', 'alpha', 'elicit', { mode: 'url' }, { toolCallId: 'c2' });
+  expect(textOf(first)).toContain('"release":"Local"');
+  expect(textOf(second)).toContain('"action":"decline"');
+  expect(seen).toMatchObject([
+    {
+      sessionId: 'one',
+      toolCallId: 'c1',
+      server: 'alpha',
+      serverTool: 'elicit',
+      request: { mode: 'form' },
+    },
+    {
+      sessionId: 'two',
+      toolCallId: 'c2',
+      server: 'alpha',
+      serverTool: 'elicit',
+      request: { mode: 'url' },
+    },
+  ]);
+});

@@ -2,7 +2,7 @@
 // Core (`subagent/start`), created in this process with its own SessionManager and JSONL, its
 // tools filtered, its model and effort resolved, and run on the task alone. The parent's
 // history never reaches it: its first request holds the system prompt and the task.
-import type { Api, Model } from '@earendil-works/pi-ai';
+import type { Api, ImageContent, Model } from '@earendil-works/pi-ai';
 import {
   SessionManager,
   type AgentSession,
@@ -31,6 +31,7 @@ import { conservativeProfile, ToolNameMap } from '../tools/profile.js';
 import { contentText, isObject } from './items.js';
 import type { CoreBridge } from './core-bridge.js';
 import type { ProjectionSink } from './projector.js';
+import { seedFork, trackForkContext, type ForkContext } from './fork-context.js';
 import { sessionParts } from './session-parts.js';
 import { createSessionRuntime } from './session-runtime.js';
 import type { RegistryOptions } from './session-types.js';
@@ -53,6 +54,8 @@ export interface ChildSpec {
   readonly model: Model<Api>;
   readonly effort: EffortLevel | undefined;
   readonly background: boolean;
+  readonly inherited?: ForkContext;
+  readonly extensions?: readonly string[];
   /** Runs in a temporary worktree Core creates (T35). */
   readonly isolated: boolean;
   /** Canonical names of the tools it may use. */
@@ -204,11 +207,13 @@ export class ChildSession {
     const manager = SessionManager.create(spec.cwd, undefined, { id: spec.id });
     manager.appendCustomEntry(SUBAGENT_ENTRY, {
       parentSessionId: spec.parentId,
+      ...(spec.inherited ? { forkedAt: spec.inherited.leaf } : {}),
       agentType: definition.name,
       toolCallId: spec.toolCallId,
       description: spec.description,
       ...(spec.background ? { background: true } : {}),
     });
+    if (spec.inherited) seedFork(manager, spec.inherited);
     const kind = workspace.preferences.profile(
       spec.model,
       capabilities(spec.model).toolReliability,
@@ -240,7 +245,7 @@ export class ChildSession {
       opened,
       log,
       child: {
-        persona,
+        ...(spec.inherited ? {} : { persona }),
         ...(definition.mcpInline === undefined ? {} : { mcpInline: definition.mcpInline }),
       },
       ...(spec.agents === undefined ? {} : { agents: spec.agents }),
@@ -265,12 +270,14 @@ export class ChildSession {
       model: spec.model,
       declined: () => undefined,
       log,
+      ...(spec.extensions === undefined ? {} : { extensions: spec.extensions }),
       child: {
         wrap: (tool) => hidingOthers(tool, spec.allowed, canonical),
         gate: toolGate(spec.allowed, canonical),
       },
     });
     opened.session = runtime.session;
+    if (spec.agents || spec.inherited) trackForkContext(runtime.session, spec.inherited);
     if (spec.effort !== undefined) runtime.session.setThinkingLevel(spec.effort);
     parts.harness.compaction.apply();
     try {
@@ -315,8 +322,11 @@ export class ChildSession {
     signal: AbortSignal,
     maxTurns: number | undefined,
     onProgress: (progress: Progress) => void,
+    images?: readonly ImageContent[],
   ): Promise<Ending> {
     const { session } = this;
+    let lastAnswer: unknown;
+    let latestReport: string | undefined;
     let turns = 0;
     let toolCalls = 0;
     // Set from the event handler (an object, so the checks below read its current value).
@@ -339,6 +349,7 @@ export class ChildSession {
         case 'message_end': {
           const message: unknown = event.message;
           if (isObject(message) && message.role === 'assistant') {
+            lastAnswer = message;
             const usage: unknown = message.usage;
             if (isObject(usage)) {
               const n = (key: string) => (typeof usage[key] === 'number' ? usage[key] : 0);
@@ -348,7 +359,10 @@ export class ChildSession {
               tokens.cacheWrite += n('cacheWrite');
             }
             const text = textOf(message);
-            if (text !== undefined) activity = text.split('\n')[0]?.slice(0, 200) ?? '';
+            if (text !== undefined) {
+              latestReport = text;
+              activity = text.split('\n')[0]?.slice(0, 200) ?? '';
+            }
             report();
           }
           break;
@@ -389,20 +403,19 @@ export class ChildSession {
       // An abort during the preparation finds no run to stop: check again before asking the
       // model (R4 S2).
       signal.throwIfAborted();
-      if (ready) await session.prompt(task);
+      if (ready) await session.prompt(task, images?.length ? { images: [...images] } : undefined);
     } catch (failure) {
       if (!signal.aborted && !limit.reached) error = describeError(failure);
     } finally {
       signal.removeEventListener('abort', stop);
       unsubscribe();
     }
-    const messages: readonly unknown[] = session.messages;
-    const last = messages.findLast((m) => isObject(m) && m.role === 'assistant');
+    const last = lastAnswer;
     if (error === undefined && isObject(last) && last.stopReason === 'error' && !limit.reached) {
       error =
         typeof last.errorMessage === 'string' ? last.errorMessage : 'The model request failed.';
     }
-    const text = messages.map(textOf).findLast((t) => t !== undefined) ?? EMPTY_REPORT;
+    const text = latestReport ?? EMPTY_REPORT;
     const status: SubagentStatus = limit.reached
       ? 'partial'
       : signal.aborted

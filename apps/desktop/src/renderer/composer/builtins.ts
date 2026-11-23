@@ -5,7 +5,15 @@ import type { MessageId } from '../../shared/i18n/index.js';
 
 /** What a built-in command does in the client. */
 export type BuiltinAction =
-  'newSession' | 'compact' | 'rewind' | 'help' | 'model' | 'context' | 'outputStyle' | 'memory';
+  | 'newSession'
+  | 'subtask'
+  | 'compact'
+  | 'rewind'
+  | 'help'
+  | 'model'
+  | 'context'
+  | 'outputStyle'
+  | 'memory';
 
 interface Builtin {
   readonly action: BuiltinAction;
@@ -14,6 +22,7 @@ interface Builtin {
 
 const BUILTINS: Readonly<Record<string, Builtin>> = {
   clear: { action: 'newSession', label: 'composer.command.clear' },
+  subtask: { action: 'subtask', label: 'composer.command.subtask' },
   compact: { action: 'compact', label: 'composer.command.compact' },
   rewind: { action: 'rewind', label: 'composer.command.rewind' },
   help: { action: 'help', label: 'composer.command.help' },

@@ -21,7 +21,7 @@ use piarc_protocol::policy::{
 use serde_json::json;
 use tokio::sync::oneshot;
 
-use super::super::policy::{Services, post_network_card, withdraw_network_card};
+use super::super::policy::{Services, post_local_card, withdraw_local_card};
 use super::super::{SessionIo, lock};
 use super::audit;
 
@@ -43,6 +43,7 @@ pub(super) async fn ask(a: &Ask<'_>) -> bool {
         return false;
     };
     let card = ApprovalRequest {
+        elicitation: None,
         request_id,
         session_id: a.session_id.to_owned(),
         revision: 1,
@@ -65,7 +66,7 @@ pub(super) async fn ask(a: &Ask<'_>) -> bool {
         review: None,
     };
     let (tx, rx) = oneshot::channel();
-    if !post_network_card(a.s, a.services, &card, tx) {
+    if !post_local_card(a.s, a.services, &card, tx) {
         return false;
     }
     let answered = tokio::time::timeout(a.timeout, rx).await;
@@ -80,7 +81,7 @@ pub(super) async fn ask(a: &Ask<'_>) -> bool {
         }
         // No answer in time, or the session closed with the card.
         _ => {
-            withdraw_network_card(a.s, a.services, &card);
+            withdraw_local_card(a.s, a.services, &card);
             (false, "timeout")
         }
     };

@@ -96,7 +96,11 @@ export async function prepareInput(
 
 /** The same input with new text: mentions are dropped (their spans no longer match). */
 export function withText(prepared: PreparedInput, text: string): PreparedInput {
-  return { ...prepared, input: { ...prepared.input, text, mentions: [] } };
+  const { command, ...input } = prepared.input;
+  return {
+    ...prepared,
+    input: { ...input, ...(command && !command.fork ? { command } : {}), text, mentions: [] },
+  };
 }
 
 /** A PDF's pages as the model reads them after the user's text. */
@@ -154,12 +158,40 @@ const isKind = (value: unknown): value is PromptCommand['kind'] =>
 const isSource = (value: unknown): value is PromptCommand['source'] =>
   SOURCES.some((source) => source === value);
 
+/** Core chooses the child id and validates the skill's executable effects. */
+export function forkRun(value: unknown): NonNullable<PromptCommand['fork']> | undefined {
+  if (
+    !isObject(value) ||
+    typeof value.agent !== 'string' ||
+    !value.agent ||
+    typeof value.sessionId !== 'string' ||
+    !value.sessionId ||
+    (value.model != null && typeof value.model !== 'string') ||
+    (value.effort != null &&
+      (typeof value.effort !== 'string' ||
+        !['low', 'medium', 'high', 'xhigh', 'max'].includes(value.effort))) ||
+    typeof value.background !== 'boolean'
+  )
+    return undefined;
+  return {
+    sessionId: value.sessionId,
+    agent: value.agent,
+    background: value.background,
+    ...(typeof value.model === 'string' ? { model: value.model } : {}),
+    ...(value.effort == null
+      ? {}
+      : { effort: value.effort as NonNullable<NonNullable<PromptCommand['fork']>['effort']> }),
+  };
+}
+
 /** A slash command of an input (`session/prompt` and `piarc.input`, T37). */
 export function commandOf(value: unknown): PromptCommand | undefined {
+  const fork = isObject(value) ? forkRun(value.fork) : undefined;
   if (
     !isObject(value) ||
     typeof value.name !== 'string' ||
     typeof value.input !== 'string' ||
+    (value.fork != null && !fork) ||
     !isKind(value.kind) ||
     !isSource(value.source) ||
     !(value.arguments == null || typeof value.arguments === 'string')
@@ -169,6 +201,7 @@ export function commandOf(value: unknown): PromptCommand | undefined {
   return {
     name: value.name,
     kind: value.kind,
+    ...(fork ? { fork } : {}),
     source: value.source,
     input: value.input,
     ...(typeof value.arguments === 'string' && value.arguments !== ''

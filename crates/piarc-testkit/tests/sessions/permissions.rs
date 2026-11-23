@@ -32,6 +32,8 @@ async fn pending(events: &Events, id: &str) -> (ApprovalRequest, u64) {
 
 fn allow(card: &ApprovalRequest) -> ApprovalAnswer {
     ApprovalAnswer {
+        elicitation: None,
+        confirmed_url: None,
         request_id: card.request_id.clone(),
         session_id: card.session_id.clone(),
         revision: card.revision,

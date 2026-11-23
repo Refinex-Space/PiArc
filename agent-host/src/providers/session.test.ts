@@ -44,6 +44,7 @@ describe('session model selection', () => {
     });
     const id = 'switch-test';
     const seen: { id: string; effort?: string }[] = [];
+    let carriedSwitchContext = false;
     let requestsWithImages = 0;
     faux.setResponses([
       async () => {
@@ -52,6 +53,9 @@ describe('session model selection', () => {
         return fauxAssistantMessage('one');
       },
       (context, options, _state, model) => {
+        carriedSwitchContext = JSON.stringify(context.messages).includes(
+          'Only after changing models.',
+        );
         requestsWithImages += context.messages.filter(
           (m) =>
             m.role === 'user' &&
@@ -93,10 +97,18 @@ describe('session model selection', () => {
         model: ref('reasoner'),
         effort: 'high',
       });
+      expect(
+        registry.remind(id, {
+          type: 'hookContext',
+          source: 'PostModelSwitch',
+          text: 'Only after changing models.',
+        }),
+      ).toEqual({ delivered: true });
       settled = Promise.withResolvers<undefined>();
       await registry.prompt(id, 'second', plainInput('two').input);
       await settled.promise;
       expect(seen).toEqual([{ id: 'reasoner', effort: 'high' }]);
+      expect(carriedSwitchContext).toBe(true);
       expect(requestsWithImages).toBe(0);
       await registry.close(id);
       const file = SessionManager.findById(dir, id);

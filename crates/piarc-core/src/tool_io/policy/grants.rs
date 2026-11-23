@@ -7,6 +7,8 @@ use super::*;
 
 pub(in crate::tool_io) struct Grant {
     pub(super) tool: String,
+    /// Cleared with the MCP grant, waking any nested form or hook still waiting on that call.
+    pub(super) elicitation: Option<super::elicitation::Interactions>,
     /// The tool call: a `NotebookEdit`'s new cell id derives from it (T42).
     call: String,
     pub(super) path: Option<PathBuf>,
@@ -34,6 +36,10 @@ impl Grant {
     pub(super) fn new(p: &PolicyEvaluateParams, peer: Peer) -> Self {
         Self {
             tool: p.tool.clone(),
+            elicitation: p
+                .tool
+                .starts_with("mcp__")
+                .then(super::elicitation::Interactions::default),
             call: p.tool_call_id.clone(),
             path: None,
             binding: None,
@@ -95,7 +101,7 @@ impl Grant {
         Ok(upload.is_none_or(|u| u["last"].as_bool() == Some(true)))
     }
 
-    fn belongs(&self, tool: &str, peer: &Peer) -> bool {
+    pub(super) fn belongs(&self, tool: &str, peer: &Peer) -> bool {
         self.tool == tool && !peer.is_closed() && self.peer.same_connection(peer)
     }
 

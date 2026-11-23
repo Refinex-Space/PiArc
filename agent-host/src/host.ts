@@ -399,12 +399,14 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const fields = paramsObject(method, params);
     const sessionId = stringField(method, fields, 'sessionId');
     const type = fields.type;
-    if (type !== 'backgroundTask' && type !== 'monitorOutput') {
-      throw new AhpError(
-        'invalidParams',
-        `${method}: type must be backgroundTask or monitorOutput`,
-        { details: { member: 'type' } },
-      );
+    if (
+      type !== 'backgroundTask' &&
+      type !== 'monitorOutput' &&
+      (type !== 'hookContext' || fields.wake === true)
+    ) {
+      throw new AhpError('invalidParams', `${method}: unsupported reminder type or wake request`, {
+        details: { member: 'type' },
+      });
     }
     const key = optionalString(method, fields, 'key');
     return (await sessions(method)).remind(sessionId, {

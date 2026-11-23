@@ -452,8 +452,9 @@ impl Driver<'_> {
                 session,
                 provider,
                 preview,
+                rejected,
             } => {
-                self.switch_model(session.as_deref(), provider, preview)
+                self.switch_model(session.as_deref(), provider, preview, rejected.as_deref())
                     .await
             }
             Action::SetEffort { session, effort } => self
@@ -610,10 +611,11 @@ impl Driver<'_> {
     }
 
     async fn switch_model(
-        &self,
+        &mut self,
         session: Option<&str>,
         provider: &str,
         expected: &Value,
+        rejected: Option<&str>,
     ) -> Result<(), String> {
         let model = piarc_protocol::session::ModelRef {
             provider: pi_provider(provider),
@@ -630,9 +632,30 @@ impl Driver<'_> {
         if let Some(why) = subset_mismatch(expected, &preview, "preview") {
             return Err(why);
         }
-        self.op(session, Op::Model(ModelOp::Set(model, None)))
-            .await
-            .map(drop)
+        let id = self.session_id(session)?;
+        let (tx, rx) = oneshot::channel();
+        self.core
+            .session_op(
+                id,
+                Op::Model(ModelOp::Set(model, None)),
+                Box::new(move |r| {
+                    let _ = tx.send(r);
+                }),
+            )
+            .map_err(|e| e.to_string())?;
+        let result = answer("the model switch", rx);
+        tokio::pin!(result);
+        let outcome = loop {
+            let events = Arc::clone(self.events);
+            let notified = events.arrived.notified();
+            self.answer_visible().await?;
+            tokio::select! { result=&mut result=>break result, ()=notified=>{} }
+        };
+        match (outcome, rejected) {
+            (Err(message), Some(expected)) if message.contains(expected) => Ok(()),
+            (Ok(_), Some(expected)) => Err(format!("expected model switch rejection: {expected}")),
+            (other, _) => other.map(drop),
+        }
     }
 
     async fn input(&mut self, input: &InputAction, op: fn(UserInput) -> Op) -> Result<(), String> {

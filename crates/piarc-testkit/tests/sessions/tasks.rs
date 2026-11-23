@@ -78,6 +78,8 @@ async fn approve(core: &piarc_core::CoreRuntime, events: &crate::support::Events
     let card: ApprovalRequest =
         serde_json::from_value(session["approvals"][0].clone()).expect("a card");
     let answer = ApprovalAnswer {
+        elicitation: None,
+        confirmed_url: None,
         request_id: card.request_id,
         session_id: card.session_id,
         revision: card.revision,

@@ -288,6 +288,12 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'approval.kind.command': '允许执行命令？',
   'approval.kind.fileChange': '允许修改文件？',
   'approval.kind.permissionExpansion': '允许访问工作区外的路径？',
+  'approval.kind.elicitation': 'MCP 请求',
+  'mcp.elicit.review': '查看请求',
+  'mcp.elicit.accept': '接受',
+  'mcp.elicit.decline': '拒绝',
+  'mcp.elicit.yes': '是',
+  'mcp.elicit.no': '否',
   'approval.kind.question': '提问表单',
   'approval.kind.plan': '审阅计划',
   'approval.cwd': '工作目录 · {path}',
@@ -617,6 +623,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'composer.commands.source.mcp': 'MCP 提示',
   'composer.commands.kind.skill': 'skill',
   'composer.command.clear': '在这个文件夹里开始新的对话',
+  'composer.command.subtask': '让后台子会话继承当前对话并执行任务',
   'composer.command.compact': '总结对话，腾出上下文',
   'composer.command.help': '显示命令与快捷键',
   'composer.queue.label': '已排队',
@@ -1113,7 +1120,10 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
     '{hours, plural, =0 {{minutes, plural, =0 {{seconds} 秒} other {{minutes} 分 {seconds} 秒}}} other {{hours} 小时 {minutes} 分}}',
 
   'dialog.archiveWorktree.message': '会话的 worktree 有 {count} 处未提交的改动。仍要归档吗？',
-  'dialog.archiveWorktree.uninspected': 'PiArc 无法核实 hook 创建的目录里有哪些改动。归档时保留它吗？',
+  'dialog.archiveWorktree.uninspected':
+    'PiArc 无法核实 hook 创建的目录里有哪些改动。归档时保留它吗？',
+  'dialog.archiveWorktree.hookDetail':
+    '保留目录会保留其中的文件。选择移除会运行工作区配置的移除 hook。',
   'dialog.archiveWorktree.detail':
     '保留 worktree：会话归档，worktree 保留；30 天后清理时如果仍有改动会再次询问。丢弃：改动被丢弃，worktree 被删除。两种选择都保留分支。',
   'dialog.archiveWorktree.keep': '保留 worktree 并归档',

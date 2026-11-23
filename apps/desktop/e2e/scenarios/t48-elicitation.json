@@ -1,0 +1,8 @@
+{
+  "id": "t48-elicitation",
+  "steps": [
+    { "tool_calls": [{ "id": "form", "name": "mcp__alpha__elicit", "input": { "mode": "form" } }] },
+    { "tool_calls": [{ "id": "url", "name": "mcp__alpha__elicit", "input": { "mode": "url" } }] },
+    { "text": "Finished interaction." }
+  ]
+}

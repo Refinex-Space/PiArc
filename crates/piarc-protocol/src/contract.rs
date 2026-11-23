@@ -29,7 +29,8 @@ use crate::hooks::{HooksMcpTool, HooksPrompt, HooksRun};
 use crate::host::{HostPing, HostShutdown};
 use crate::jsonrpc::{ErrorResponse, Notification, Request, SuccessResponse};
 use crate::mcp::{
-    McpLogin, McpReconnect, McpServersMethod, McpSetEnabled, McpStatusChanged, McpStatusMethod,
+    McpCancelElicitation, McpElicit, McpLogin, McpReconnect, McpServersMethod, McpSetEnabled,
+    McpStatusChanged, McpStatusMethod,
 };
 use crate::memory::{FsMemory, MemoryApply, MemoryStatus};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
@@ -369,6 +370,10 @@ pub static CONTRACTS: &[Contract] = &[
     response::<McpReconnect>("mcp/reconnect/result"),
     request::<McpSetEnabled>(McpSetEnabled::NAME),
     response::<McpSetEnabled>("mcp/setEnabled/result"),
+    request::<McpCancelElicitation>(McpCancelElicitation::NAME),
+    response::<McpCancelElicitation>("mcp/cancelElicitation/result"),
+    request::<McpElicit>(McpElicit::NAME),
+    response::<McpElicit>("mcp/elicit/result"),
     request::<McpLogin>(McpLogin::NAME),
     response::<McpLogin>("mcp/login/result"),
     notification::<McpStatusChanged>(),

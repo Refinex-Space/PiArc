@@ -106,6 +106,8 @@ export interface HostedSession {
   readonly delivering: PreparedInput[];
   /** The running turn and the leaf before it: where a rewind continues (T28). */
   turnFrom?: { readonly turnId: string; readonly from: string | null };
+  /** Foreground child started by a slash command before Pi owns the parent turn. */
+  delegation?: AbortController;
   changingModel: boolean;
   closed: boolean;
   /** The Tool Profile the session's tools were made with (T29). */

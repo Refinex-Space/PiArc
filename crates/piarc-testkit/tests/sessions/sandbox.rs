@@ -112,6 +112,8 @@ async fn answer_card(
         .find(|card| pick(card))
         .expect("the card");
     let answer = ApprovalAnswer {
+        elicitation: None,
+        confirmed_url: None,
         request_id: card.request_id.clone(),
         session_id: card.session_id.clone(),
         revision: card.revision,

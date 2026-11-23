@@ -23,6 +23,7 @@ import type {
 } from '@earendil-works/pi-coding-agent';
 import type { PromptCommand, SkillInfo, SkillsCatalog } from '@piarc/protocol';
 
+import { runDelegation, type AgentToolHost } from '../subagents/agent-tool.js';
 import { isObject } from '../../runtime/items.js';
 import type { CoreBridge } from '../../runtime/core-bridge.js';
 import { resolveToolPath } from '../../tools/paths.js';
@@ -79,6 +80,7 @@ function lastData(entries: readonly SessionEntry[], type: string): unknown {
 }
 
 export interface SessionSkillsOptions {
+  readonly agents?: AgentToolHost;
   readonly sessionId: string;
   readonly manager: SessionManager;
   readonly bridge: CoreBridge;
@@ -297,6 +299,17 @@ export class SessionSkills {
       parseInvokeResult,
       signal === undefined ? undefined : { signal },
     );
+    if (result.fork) {
+      const text = await runDelegation(
+        this.#o.agents,
+        result.fork,
+        toolCallId,
+        `/${result.name}`,
+        result.content,
+        signal,
+      );
+      return { name: result.name, text };
+    }
     const already = this.#o.manager
       .getBranch()
       .some(
@@ -319,7 +332,7 @@ export class SessionSkills {
 
   /** The user started a skill with `/name`: its text is the message, kept for compactions. */
   invokedByUser(command: PromptCommand, text: string): void {
-    if (command.kind !== 'skill') return;
+    if (command.kind !== 'skill' || command.fork) return;
     this.#o.manager.appendCustomEntry(SKILL_ENTRY, { name: command.name, content: text });
   }
 

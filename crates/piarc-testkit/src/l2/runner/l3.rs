@@ -44,6 +44,8 @@ impl Driver<'_> {
             json!({"tool": card.tool, "call": pending, "decision": "deny", "scripted": false}),
         );
         let answer = ApprovalAnswer {
+            elicitation: None,
+            confirmed_url: None,
             request_id: card.request_id.clone(),
             session_id: card.session_id,
             revision: card.revision,

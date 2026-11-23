@@ -919,3 +919,78 @@ describe('subagent card (T31-A13)', () => {
     );
   });
 });
+
+it('submits a typed MCP form through the real approval row and keeps its server visible', async () => {
+  const store = new AppStore();
+  store.applySessions({
+    revision: 1,
+    sessions: [
+      {
+        id: 's',
+        pendingApprovals: 1,
+        approvals: [
+          {
+            requestId: 'el',
+            sessionId: 's',
+            revision: 1,
+            connectionEpoch: 2,
+            kind: 'elicitation',
+            tool: 'alpha',
+            elicitation: {
+              mode: 'form',
+              message: 'Choose a release.',
+              requestedSchema: {
+                type: 'object',
+                properties: {
+                  release: { type: 'string', title: 'Name', default: 'Alpha' },
+                  number: { type: 'integer', default: 3 },
+                  ready: { type: 'boolean', default: false },
+                  colors: {
+                    type: 'array',
+                    items: { type: 'string', enum: ['red', 'green'] },
+                    default: ['green'],
+                  },
+                },
+                required: ['release'],
+              },
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const transcript = store.transcript('s');
+  transcript.load([], 0);
+  const root = await render(transcript, transcript.rowIds());
+  const button = root.querySelector<HTMLButtonElement>('[data-approval-card="elicitation"] button');
+  expect(button?.textContent).toBe('Review request');
+  act(() => {
+    button?.click();
+  });
+  const dialog = root.querySelector('[role="dialog"]');
+  expect(dialog?.textContent).toContain('alpha');
+  const input = dialog?.querySelector<HTMLInputElement>('input[name="release"]');
+  if (!input) throw new Error('missing release name field');
+  input.value = 'Beta';
+  const answerApproval = vi
+    .fn<Window['piarc']['answerApproval']>()
+    .mockResolvedValue('{"status":"applied"}');
+  Object.assign(window.piarc, { answerApproval });
+  await act(async () => {
+    dialog
+      ?.querySelector('form')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+  });
+  expect(answerApproval).toHaveBeenCalledWith({
+    sessionId: 's',
+    requestId: 'el',
+    revision: 1,
+    connectionEpoch: 2,
+    decision: 'allowOnce',
+    elicitation: {
+      action: 'accept',
+      content: { release: 'Beta', number: 3, ready: false, colors: ['green'] },
+    },
+  });
+});

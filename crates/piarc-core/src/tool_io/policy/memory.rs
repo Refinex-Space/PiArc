@@ -39,7 +39,7 @@ pub(in crate::tool_io) async fn approve(
         requires_user_interaction: false,
         effort: None,
     };
-    let mut card = new_request(&p, peer)?;
+    let mut card = new_request(&p.session_id, &p.tool, peer)?;
     card.kind = ApprovalKind::PermissionExpansion;
     card.path = Some(display(target));
     card.rules = vec![format!("MemoryImport({})", display(target))];

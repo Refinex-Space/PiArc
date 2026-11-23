@@ -235,7 +235,11 @@ export class McpPool {
     server: string,
     tool: string,
     args: Record<string, unknown>,
-    options: { signal?: AbortSignal; onProgress?: (progress: ProgressNotification) => void },
+    options: {
+      signal?: AbortSignal;
+      onProgress?: (progress: ProgressNotification) => void;
+      toolCallId?: string;
+    },
   ): Promise<CallToolResult> {
     const entry = this.#entries.get(`${id}\0${server}`) ?? this.#entries.get(server);
     if (entry === undefined) throw new Error(`MCP server "${server}" is not configured`);
@@ -243,7 +247,12 @@ export class McpPool {
     entry.lastUsed = this.#clock.now();
     entry.cancelIdle?.();
     try {
-      return await entry.connection.callTool(tool, args, options);
+      return await entry.connection.callTool(tool, args, {
+        ...options,
+        ...(options.toolCallId === undefined
+          ? {}
+          : { owner: { sessionId: id, toolCallId: options.toolCallId, serverTool: tool } }),
+      });
     } finally {
       entry.inFlight--;
       entry.lastUsed = this.#clock.now();

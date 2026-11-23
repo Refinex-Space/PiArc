@@ -42,7 +42,7 @@ function itemOf(itemId: string, kind: QueueKind, prepared: PreparedInput): Queue
   return {
     itemId,
     kind,
-    text: text.toWellFormed(),
+    text: (prepared.input.command?.input ?? text).toWellFormed(),
     ...(mentions.length === 0 ? {} : { mentions: [...mentions] }),
     ...(attachments.length === 0 ? {} : { attachments: [...attachments] }),
   };

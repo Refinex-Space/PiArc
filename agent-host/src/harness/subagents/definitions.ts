@@ -55,6 +55,10 @@ function builtIn(
 /** The built-in types: their identities and descriptions are PiArc's own (ADR-0006). */
 export const BUILT_IN_TYPES: readonly AgentDefinition[] = [
   builtIn(DEFAULT_TYPE, GENERAL_PURPOSE, { model: 'inherit' }),
+  builtIn('fork', {
+    description: 'Continue a side task with the current conversation and its model.',
+    identity: '',
+  }),
   builtIn('Explore', EXPLORE, {
     tools: [...READ_ONLY_TOOLS],
     model: 'fast',

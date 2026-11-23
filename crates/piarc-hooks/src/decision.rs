@@ -238,6 +238,24 @@ impl Merger {
             }
         }
         match event {
+            HookEvent::PreModelSwitch => {
+                let reason = o
+                    .specific_field("permissionDecisionReason")
+                    .or_else(|| o.field("reason"))
+                    .map(str::to_owned);
+                let decision = match (o.field("decision"), o.specific_field("permissionDecision")) {
+                    (Some("block"), _) | (_, Some("deny")) => Permission::Deny,
+                    (_, Some("ask")) => Permission::Ask,
+                    (_, Some("allow")) => Permission::Allow,
+                    _ => return "none",
+                };
+                self.permit(decision, reason);
+                match decision {
+                    Permission::Deny => "deny",
+                    Permission::Ask => "ask",
+                    Permission::Allow => "allow",
+                }
+            }
             HookEvent::PreToolUse => self.pre_tool_use(o),
             HookEvent::PermissionRequest => self.permission_request(o),
             HookEvent::WorktreeCreate => self.worktree_path(o),
@@ -255,63 +273,66 @@ impl Merger {
             | HookEvent::Notification
             | HookEvent::StopFailure
             | HookEvent::InstructionsLoaded => "none",
-            _ => {
-                let mut verdict = "none";
-                if o.field("decision") == Some("block")
-                    && !matches!(
-                        event,
-                        HookEvent::SessionStart
-                            | HookEvent::SubagentStart
-                            | HookEvent::CwdChanged
-                            | HookEvent::FileChanged
-                    )
-                {
-                    let reason = o.field("reason").unwrap_or_default().to_owned();
-                    verdict = "block";
-                    if event.exit_two() == ExitTwo::ToModel {
-                        if !reason.is_empty() {
-                            self.d.feedback.push(reason);
-                        }
-                    } else {
-                        let reason = if reason.is_empty() {
-                            format!("Blocked by a {} hook.", event.name())
-                        } else {
-                            reason
-                        };
-                        self.d.block.get_or_insert(reason);
-                    }
+            _ => self.context_and_feedback(event, o),
+        }
+    }
+
+    fn context_and_feedback(&mut self, event: HookEvent, o: &Outcome) -> &'static str {
+        let mut verdict = "none";
+        if o.field("decision") == Some("block")
+            && !matches!(
+                event,
+                HookEvent::SessionStart
+                    | HookEvent::SubagentStart
+                    | HookEvent::CwdChanged
+                    | HookEvent::PostModelSwitch
+                    | HookEvent::FileChanged
+            )
+        {
+            let reason = o.field("reason").unwrap_or_default().to_owned();
+            verdict = "block";
+            if event.exit_two() == ExitTwo::ToModel {
+                if !reason.is_empty() {
+                    self.d.feedback.push(reason);
                 }
-                if matches!(event, HookEvent::Elicitation | HookEvent::ElicitationResult) {
-                    if verdict == "block" {
-                        return verdict;
-                    }
-                    return self.elicitation(o);
-                }
-                if self.context_of(o) && verdict == "none" {
-                    verdict = "context";
-                }
-                if event == HookEvent::PostToolUse
-                    && let Some(output) = o.specific().and_then(|s| s.get("updatedToolOutput"))
-                {
-                    self.d.updated_output.get_or_insert_with(|| output.clone());
-                    verdict = "updated";
-                }
-                match (event.plain_stdout(), &o.text) {
-                    (PlainStdout::Context, Some(text)) => {
-                        self.d.context.push(text.clone());
-                        if verdict == "none" {
-                            verdict = "context";
-                        }
-                    }
-                    (PlainStdout::Instructions, Some(text)) => {
-                        self.d.instructions.push(text.clone());
-                        verdict = "instructions";
-                    }
-                    _ => {}
-                }
-                verdict
+            } else {
+                let reason = if reason.is_empty() {
+                    format!("Blocked by a {} hook.", event.name())
+                } else {
+                    reason
+                };
+                self.d.block.get_or_insert(reason);
             }
         }
+        if matches!(event, HookEvent::Elicitation | HookEvent::ElicitationResult) {
+            if verdict == "block" {
+                return verdict;
+            }
+            return self.elicitation(o);
+        }
+        if self.context_of(o) && verdict == "none" {
+            verdict = "context";
+        }
+        if event == HookEvent::PostToolUse
+            && let Some(output) = o.specific().and_then(|s| s.get("updatedToolOutput"))
+        {
+            self.d.updated_output.get_or_insert_with(|| output.clone());
+            verdict = "updated";
+        }
+        match (event.plain_stdout(), &o.text) {
+            (PlainStdout::Context, Some(text)) => {
+                self.d.context.push(text.clone());
+                if verdict == "none" {
+                    verdict = "context";
+                }
+            }
+            (PlainStdout::Instructions, Some(text)) => {
+                self.d.instructions.push(text.clone());
+                verdict = "instructions";
+            }
+            _ => {}
+        }
+        verdict
     }
 
     fn worktree_path(&mut self, o: &Outcome) -> &'static str {

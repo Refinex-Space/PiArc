@@ -105,7 +105,7 @@ export const TOOL_GUIDANCE = {
   Agent: {
     snippet: 'Agent: hand a self-contained task to a subagent and get its report',
     guidelines: [
-      'Write the task so it stands alone; the subagent sees none of this conversation. Start independent subagents in one response so they run together.',
+      'Include the necessary background in a delegated task unless the selected type inherits this conversation. Start independent subagents in one response so they run together.',
     ],
   },
   Skill: {

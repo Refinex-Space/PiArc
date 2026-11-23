@@ -185,16 +185,13 @@ fn skill_frontmatter_fields() {
         .iter()
         .map(|w| (w.kind, w.field.as_deref(), w.task.as_deref()))
         .collect();
-    assert!(kinds.contains(&(
-        ResourceWarningKind::UnsupportedField,
-        Some("context"),
-        Some("T48")
-    )));
-    assert!(kinds.contains(&(
-        ResourceWarningKind::UnsupportedField,
-        Some("model"),
-        Some("T48")
-    )));
+    assert!(fix.fork.as_ref().is_some_and(|fork| fork.background));
+    assert!(!kinds.iter().any(|(_, field, _)| *field == Some("context")));
+    assert_eq!(
+        fix.fork.as_ref().and_then(|f| f.model.as_deref()),
+        Some("fast")
+    );
+    assert!(!kinds.iter().any(|(_, field, _)| *field == Some("model")));
     assert!(kinds.contains(&(ResourceWarningKind::IgnoredField, Some("license"), None)));
     // T37-A12: the dynamic command is flagged and stays in the body as written.
     assert!(kinds.contains(&(ResourceWarningKind::DynamicCommand, None, None)));
@@ -215,6 +212,8 @@ fn fork_skill_frontmatter_validates_agent_and_background() {
         parse("context: fork").fork,
         Some(SkillFork {
             agent: None,
+            model: None,
+            effort: None,
             background: true
         })
     );
@@ -222,10 +221,23 @@ fn fork_skill_frontmatter_validates_agent_and_background() {
         parse("context: fork\nagent: Explore\nbackground: false").fork,
         Some(SkillFork {
             agent: Some("Explore".into()),
+            model: None,
+            effort: None,
             background: false
         })
     );
     assert!(parse("agent: Explore\nbackground: true").fork.is_none());
+    let inline = parse("model: fast");
+    assert!(
+        inline
+            .info
+            .warnings
+            .iter()
+            .any(|w| w.kind == ResourceWarningKind::UnsupportedField
+                && w.field.as_deref() == Some("model"))
+    );
+    let private = parse("context: fork");
+    assert!(private.info.description.is_empty());
     let invalid = parse("context: fork\nagent: [Explore]\nbackground: later");
     for field in ["agent", "background"] {
         assert!(invalid.info.warnings.iter().any(|warning| {
@@ -323,6 +335,7 @@ fn merged_command_list_and_conflicts() {
         names,
         [
             ("compact", CommandKind::BuiltIn, ResourceSource::BuiltIn),
+            ("subtask", CommandKind::BuiltIn, ResourceSource::BuiltIn),
             ("clear", CommandKind::BuiltIn, ResourceSource::BuiltIn),
             ("model", CommandKind::BuiltIn, ResourceSource::BuiltIn),
             ("rewind", CommandKind::BuiltIn, ResourceSource::BuiltIn),

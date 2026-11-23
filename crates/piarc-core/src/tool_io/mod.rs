@@ -40,6 +40,7 @@ mod hooks;
 mod hooks_m4;
 mod memory;
 mod memory_reader;
+mod model_switch;
 pub(crate) use memory::memory_documents;
 pub(crate) mod policy;
 mod sandbox;
@@ -194,6 +195,8 @@ struct SessionIo {
     subagent: Option<subagents::Link>,
     /// The directories of the skills the session sees (T37): read-only for its file tools.
     skill_dirs: Mutex<Vec<PathBuf>>,
+    /// One-use grants held by Core until the selected skill's child registers.
+    fork_skills: Mutex<HashMap<String, skills::PendingForkSkill>>,
     /// Settings layers a `ConfigChange` hook kept at their earlier value for this session
     /// (T41): layer id → the value it had.
     config_pins: Mutex<HashMap<&'static str, Option<serde_json::Value>>>,
@@ -328,6 +331,8 @@ impl ToolIo {
                     | "policy/inputChunk"
                     | "policy/tools"
                     | "ui/ask"
+                    | "mcp/elicit"
+                    | "mcp/cancelElicitation"
                     | "context/settings"
                     | "web/fetch"
                     | "web/search"
@@ -544,6 +549,7 @@ impl ToolIo {
                 sandbox,
                 turn: Mutex::default(),
                 skill_dirs: Mutex::default(),
+                fork_skills: Mutex::default(),
                 subagent,
                 config_pins: Mutex::default(),
                 file_watch: Mutex::default(),
@@ -690,6 +696,10 @@ impl ToolIo {
             "policy/inputChunk" => return self.stage_input(parse(method, params)?, &peer),
             "policy/evaluate" => return self.evaluate(parse(method, params)?, peer).await,
             "policy/tools" => return self.denied_tools(parse(method, params)?).await,
+            "mcp/cancelElicitation" => {
+                return self.cancel_elicitation(parse(method, params)?, &peer);
+            }
+            "mcp/elicit" => return self.elicit(parse(method, params)?, peer).await,
             "ui/ask" => return self.ask(parse(method, params)?, peer).await,
             "web/fetch" => return self.web_fetch(parse(method, params)?, peer).await,
             "web/search" => return self.web_search(parse(method, params)?, peer).await,

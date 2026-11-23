@@ -2,6 +2,8 @@
 
 仅测试用的支持 crate：严格校验请求的 mock provider（架构第 12.2 节）、L2 场景运行器与事件断言（`src/l2/`，T15，架构第 12.3 节），以及 Agent Host 与会话层的端到端测试（`tests/agent_host/`、`tests/sessions/`）。发布的 crate 不得依赖它（`crates/deps-rules.json` 的 testsupport 层）。完整说明（端点、场景选择、脚本格式、规则表、记录字段）在 `docs/engineering/testing.md` 第 10 节，crate 文档（`src/lib.rs`）有同一份脚本格式。
 
+T48 的 fork 场景用 `same_system_as`、`same_tools_as` 核对原始请求字节，`message_prefix_as` 比较较早的请求是否是消息前缀。消息级缓存标记会移到新尾部，字符串和只有一个文本块的等价表示在该前缀断言里统一处理。
+
 ## 命令
 
 | 命令 | 用途 |

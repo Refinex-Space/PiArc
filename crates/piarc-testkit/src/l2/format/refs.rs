@@ -310,6 +310,7 @@ fn check_expect(spec: &ScenarioSpec, problems: &mut Vec<String>) {
         for (key, earlier) in [
             ("same_system_as", request.same_system_as),
             ("same_tools_as", request.same_tools_as),
+            ("message_prefix_as", request.message_prefix_as),
         ] {
             if earlier.is_some_and(|index| index >= request.index) {
                 problems.push(format!(

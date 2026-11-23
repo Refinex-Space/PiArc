@@ -24,6 +24,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 - schema v8（T35，ADR-0052）：`sessions` 加 Core 自己的 worktree 列（`worktree_branch`、`worktree_cleanup_at`、`worktree_confirm`、`worktree_removed_at`，读写在 `src/worktrees.rs`）；`session_text`（会话、entry id、角色、时间、正文）与外部内容 FTS5 表 `session_fts`（`tokenize = 'trigram'`，触发器同步）；迁移清空 `session_files`，升级后首次同步重扫全部会话以填入正文。
 - schema v7（T32，ADR-0049）：重建从未写过的 `background_tasks`（主会话、工作区、标题、cwd、输出字节数，其余在 `metadata` JSON；`kind` 不设 CHECK，T33 加终端类型），读写在 `src/background_tasks.rs`（`put_task`、`task`、`recent_tasks`、`interrupt_running_tasks`、`delete_session_tasks`），状态机与通知在 `piarc-core::tasks`。
 - schema v6（T31，ADR-0048）：`sessions.subagent_parent`、`subagent_type`（从子会话 JSONL 的 `piarc.subagent` 自定义条目派生，`pi_session.rs` 宽松解析，属于重建时清空重读的派生列）、`checkpoint_files.subagent_session`（写入来自哪个子会话）。会话列表不含子会话由 Core 的快照过滤，索引照常收录。
+- T48：fork 子会话复制的父消息带 `piarcInherited: true`。这些行在父会话已计入用量、请求数和索引；增量读取与重建时跳过重复记录。
 - schema v4 在 `session_files` 保存文件标识与修改时间：同长度重写或文件替换时重扫。迁移后的空值在首次同步时补齐。
 - schema v3 的 `memory_imports` 以工作区和规范文件路径为组合主键。永久 memory 导入许可独立于工具规则和 checkout 的项目信任。
 

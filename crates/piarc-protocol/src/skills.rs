@@ -299,10 +299,31 @@ pub struct SkillsInvokeParams {
     pub arguments: Option<String>,
 }
 
+/// A Core-issued subagent id and the execution mode selected by a forked skill.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ForkSkillRun {
+    /// Optional skill-specific model (a model id or an alias).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Optional skill-specific reasoning effort.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<crate::models::EffortLevel>,
+    /// Fresh id to use for this child.
+    pub session_id: String,
+    /// Subagent definition, or general-purpose by default.
+    pub agent: String,
+    /// Continue the parent while the isolated task runs.
+    pub background: bool,
+}
+
 /// Result of `skills/invoke`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsInvokeResult {
+    /// Run the rendered body in this isolated subagent, returning only the outcome.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork: Option<ForkSkillRun>,
     /// The skill's name.
     pub name: String,
     /// Its body with the arguments substituted.
@@ -416,6 +437,9 @@ request!(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptCommand {
+    /// Run the rendered body in this isolated subagent, returning only the outcome.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork: Option<ForkSkillRun>,
     /// The command's name.
     pub name: String,
     /// A command file, a template or a skill.

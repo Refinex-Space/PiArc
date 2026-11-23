@@ -35,7 +35,7 @@ export interface SessionPartsInput {
   /** Set for a subagent's session (T31): its identity and context choice; the MCP servers its
    * definition defines inline (T36). */
   readonly child?: {
-    readonly persona: Persona;
+    readonly persona?: Persona;
     readonly mcpInline?: readonly McpServerDefinition[];
   };
 }
@@ -139,6 +139,7 @@ export function sessionParts(input: SessionPartsInput): SessionParts {
   const skills =
     tools.kind === 'core' && options.hostTools?.skills === true
       ? new SessionSkills({
+          ...(input.agents ? { agents: input.agents } : {}),
           sessionId: manager.getSessionId(),
           manager,
           bridge: options.hostTools.bridge,

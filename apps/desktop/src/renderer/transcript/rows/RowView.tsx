@@ -11,6 +11,7 @@ import { useListActions } from './list-actions.js';
 import { AgentMessageRow, OptimisticRow, ThinkingRow, UserMessageRow } from './messages.js';
 import { ApprovalCard } from './ApprovalCard.js';
 import { PlanApprovalCard } from '../../approvals/PlanApprovalCard.js';
+import { ElicitationCard } from '../../approvals/ElicitationCard.js';
 import { QuestionForm } from '../../approvals/QuestionForm.js';
 import { OWN_ROW_TOOLS } from '../../store/transcript.js';
 import { HostToolRow } from './harness.js';
@@ -91,6 +92,8 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
       switch (row.request.kind) {
         case 'plan':
           return <PlanApprovalCard request={row.request} />;
+        case 'elicitation':
+          return <ElicitationCard request={row.request} />;
         case 'question':
           return <QuestionForm request={row.request} />;
         default:

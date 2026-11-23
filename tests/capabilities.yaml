@@ -762,11 +762,11 @@ capabilities:
     task: T31
     status: active
   - id: CAP-AGENT-FORK-001
-    title: 'fork 模式子 agent 继承父会话历史并共享缓存'
+    title: 'fork 子 agent 继承分支历史及父会话的 system 与工具前缀，审批和检查点归主会话'
     milestone: M5
-    refs: [ARCH-6.15]
+    refs: [FR-HN-04, ARCH-6.4, ARCH-6.15]
     task: T48
-    status: planned
+    status: active
   - id: CAP-STYLE-001
     title: '输出风格切换与自定义'
     milestone: M3
@@ -889,12 +889,36 @@ capabilities:
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T48
     status: active
+  - id: CAP-HOOK-WORKTREE-001
+    title: 'WorktreeCreate 与 WorktreeRemove 接管受管理 worktree 的创建和移除，失败时保留原因'
+    milestone: M5
+    refs: [FR-HN-05, ARCH-6.3.2, ARCH-6.12]
+    task: T48
+    status: active
+  - id: CAP-HOOK-PREMODELSWITCH-001
+    title: 'PreModelSwitch 提供模型、上下文与缓存成本，可允许、拒绝或询问'
+    milestone: M5
+    refs: [FR-HN-05, ARCH-6.3.2, ARCH-6.13]
+    task: T48
+    status: active
+  - id: CAP-HOOK-POSTMODELSWITCH-001
+    title: 'PostModelSwitch 的补充上下文随下一次模型请求送达'
+    milestone: M5
+    refs: [FR-HN-05, ARCH-6.3.2, ARCH-6.13]
+    task: T48
+    status: active
+  - id: CAP-HOOK-ELICITATION-001
+    title: 'Elicitation 可代答或阻断 MCP 请求，ElicitationResult 可修改用户的回答'
+    milestone: M5
+    refs: [FR-HN-05, FR-EX-03, ARCH-6.3.2, ARCH-6.8]
+    task: T48
+    status: active
   - id: CAP-HOOK-M5-001
     title: 'WorktreeCreate、WorktreeRemove、PreModelSwitch、PostModelSwitch、Elicitation、ElicitationResult、PermissionDenied hooks'
     milestone: M5
     refs: [FR-HN-05, ARCH-6.3.2]
     task: T48
-    status: planned
+    status: active
 
   # Context and memory
   - id: CAP-CTX-PROMPT-001
@@ -1056,11 +1080,11 @@ capabilities:
     task: T37
     status: active
   - id: CAP-SKILL-FORK-001
-    title: 'skill 的 `context: fork`'
+    title: '带 `context: fork` 的 skill 在指定子 agent 中执行，主会话只接收结果'
     milestone: M5
-    refs: [ARCH-6.14]
+    refs: [FR-EX-01, ARCH-6.7]
     task: T48
-    status: planned
+    status: active
   - id: CAP-CMD-001
     title: '自定义斜杠命令（`.claude/commands`、Pi prompt templates）'
     milestone: M3
@@ -1084,6 +1108,12 @@ capabilities:
     milestone: M3
     refs: [FR-EX-03, ARCH-6.8]
     task: T36
+    status: active
+  - id: CAP-MCP-ELICITATION-001
+    title: 'MCP 表单与 URL 请求从所属会话接收接受、拒绝、取消结果，打开 URL 需原生确认'
+    milestone: M5
+    refs: [FR-EX-03, ARCH-6.8]
+    task: T48
     status: active
   - id: CAP-MCP-POOL-001
     title: 'MCP 工作区共享连接池'

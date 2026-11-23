@@ -292,6 +292,15 @@ pub struct SetEffortParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSwitchPreviewResult {
+    /// The model being left, if the session already has a model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_model: Option<ModelRef>,
+    /// The current model has a recent cached response. Absent means cold.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub prompt_cache_warm: bool,
+    /// TTL in seconds of the last known cache write or read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_ttl: Option<u64>,
     /// Estimated context tokens, null when unknown.
     pub context_tokens: Option<u64>,
     /// Cached input loses its identity.

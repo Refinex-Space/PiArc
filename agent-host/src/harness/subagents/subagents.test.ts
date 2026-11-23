@@ -83,9 +83,10 @@ describe('definitions', () => {
       ['Explore', 'projectClaude', false],
       ['reviewer', 'user', true],
       ['general-purpose', 'builtIn', false],
+      ['fork', 'builtIn', false],
       ['Plan', 'builtIn', true],
     ]);
-    expect(startable(catalog).map((a) => a.name)).toEqual(['Explore', 'general-purpose']);
+    expect(startable(catalog).map((a) => a.name)).toEqual(['Explore', 'general-purpose', 'fork']);
     expect(catalog.aliases).toEqual({ fast: 'p/m' });
   });
 

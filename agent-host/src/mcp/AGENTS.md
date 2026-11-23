@@ -20,3 +20,4 @@ Agent Host 的 MCP 连接池与每会话的 MCP 扩展（T36，ADR-0053）。配
 - `mcp/statusChanged` 没有会话头：新增类似的工作区级通知要加进 `piarc-host` 的 `HOST_NOTIFICATIONS`，否则 Core 当作无效通知丢弃。客户端收到 `core/mcp` 后不要再请求 `mcp/status`（它会 `refresh` 再发 `statusChanged`，形成循环）。
 - OAuth 状态在保险箱键 `mcp/<server>`；刷新前取 `secrets/lock`，失效的锁写入得到 `secretLockLost`。pi-mcp 只使用 `serverUrl` 相同的状态。
 - 子 agent 的内联 server 经 `pool.addTemporary(子会话 id, defs)` 加入（键为 `owner\0name`），子会话结束即关闭；`tool-filter.ts` 的 `WithInlineServers` 让它们的 `mcp__<server>__…` 通过过滤。
+- Elicitation（T48）：连接在 initialize 时声明 form 与 URL 能力。pi-mcp 1.5.2 的请求 handler 只给参数和中断信号，协议不提供父请求 ID。`elicitation.ts` 通过连接上唯一的在途工具调用绑定会话与调用，多个并行调用归属不明确、没有在途调用、hook 调用或同一调用已有询问时答 `cancel`。工具结束撤下正在等待的交互；server 取消单个询问时，经 `mcp/cancelElicitation` 只撤下匹配该会话、工具调用和交互序号的等待。Core 经 `mcp/elicit` 核对该连接的工具授权、执行 Elicitation/ElicitationResult hooks 并发布审批卡。URL 接受经主进程原生确认，Core 确认卡片仍有效后才把同一地址交给系统浏览器。

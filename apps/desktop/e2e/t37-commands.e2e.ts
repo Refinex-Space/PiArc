@@ -217,7 +217,7 @@ test('the Skills & plugins page lists skills with source, overrides and warnings
   await openSession(app, page, workspaces, 'skills 技能', 't37-chat#skills', 'Hello', {
     ...FILES,
     '.claude/skills/fix/SKILL.md':
-      '---\ndescription: Fix an issue\nallowed-tools: Bash(git *)\ncontext: fork\n---\nBranch: !`git branch`\n',
+      '---\ndescription: Fix an issue\nallowed-tools: Bash(git *)\ncontext: fork\nunknown-setting: custom\n---\nBranch: !`git branch`\n',
   });
   await idle(page);
   const settings = await openSettings(app, page);
@@ -226,7 +226,8 @@ test('the Skills & plugins page lists skills with source, overrides and warnings
   await expect(list.locator('[data-name="greet"]')).toBeVisible();
   const fix = list.locator('[data-name="fix"]');
   await expect(fix.getByTestId('skill-allowed')).toContainText('Bash(git *)');
-  await expect(fix.getByTestId('skill-warnings')).toContainText('context');
+  await expect(fix.getByTestId('skill-warnings')).toContainText('unknown-setting');
+  await expect(fix.getByTestId('skill-warnings')).not.toContainText('context');
   await expect(fix.getByTestId('skill-warnings')).toContainText('!`command`');
   await expect(settings.getByTestId('output-style-section')).toBeVisible();
   await settings.screenshot({ path: info.outputPath('skills-page.png'), fullPage: true });

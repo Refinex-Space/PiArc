@@ -12,6 +12,8 @@
 // never touches `process.cwd()` or `process.env`; Pi resolves relative tool paths against each
 // session's cwd. The few Pi defaults that read the process-global agent directory
 // (`getAgentDir()`) are pinned to PiArc's directory once, in main.ts.
+import { runDelegation } from '../harness/subagents/agent-tool.js';
+import { trackForkContext } from './fork-context.js';
 import { randomUUID } from 'node:crypto';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import path from 'node:path';
@@ -55,6 +57,7 @@ import { expandInput, withPromptCommands } from '../mcp/prompts.js';
 import { changedExtensions, pluginExtensions } from './plugin-extensions.js';
 import { stopFailureType } from './turn-errors.js';
 import { CONCURRENCY_SAFE_TOOLS, ToolBatches } from '../harness/tool-batches.js';
+import { reminderMessage } from '../harness/reminders.js';
 import { AhpError, describeError } from '../protocol/errors.js';
 import { DEFAULT_PROFILE, ToolNameMap } from '../tools/index.js';
 import { conservativeProfile } from '../tools/profile.js';
@@ -134,6 +137,7 @@ export class SessionRegistry {
         session,
         harness: hosted.harness,
         sink: options.sinkFor(id),
+        ...(hosted.extensions === undefined ? {} : { extensions: hosted.extensions }),
         tools: () => session.getActiveToolNames().map(hosted.toCanonical),
       };
     });
@@ -448,7 +452,7 @@ export class SessionRegistry {
           disposition: 'started',
           turnId: this.#startTurn(sessionId, hosted, { kind: 'prompt', prepared }),
         };
-      } else if (kind === 'steer') {
+      } else if (kind === 'steer' && !prepared.input.command?.fork) {
         this.#options.onPiEvent?.(sessionId, { control: 'steer', text });
         answer = { disposition: 'queued', itemId: await hosted.queue.steer(prepared) };
         hosted.hooks?.addContext(prepared.hookContext);
@@ -479,6 +483,7 @@ export class SessionRegistry {
     const turnId = hosted.projector.activeTurnId;
     this.#options.onPiEvent?.(sessionId, { control: 'markAborting' });
     hosted.projector.markAborting();
+    hosted.delegation?.abort();
     hosted.memory.cancel();
     const returned = hosted.queue.takeAll();
     await hosted.runtime.session.abort();
@@ -494,6 +499,7 @@ export class SessionRegistry {
     const turnId = hosted.projector.activeTurnId;
     hosted.closed = true;
     // Its subagents end with it, background ones included (T31).
+    hosted.delegation?.abort();
     this.subagents.abortBelow(sessionId);
     hosted.projector.markAborting();
     hosted.memory.cancel();
@@ -649,6 +655,25 @@ export class SessionRegistry {
     params: Pick<SessionRemindParams, 'type' | 'source' | 'text' | 'key' | 'wake'>,
   ): SessionRemindResult {
     const hosted = this.#get(sessionId);
+    if (params.type === 'hookContext') {
+      // A confirmed model switch happens between turns. Persist its hook context now so a
+      // profile reopen or an app restart cannot drop the next request's input.
+      const message = reminderMessage([
+        {
+          key: params.key ?? params.source,
+          type: params.type,
+          source: params.source,
+          text: params.text,
+        },
+      ]);
+      hosted.runtime.session.sessionManager.appendCustomMessageEntry(
+        message.customType,
+        message.content,
+        message.display,
+        message.details,
+      );
+      return { delivered: true };
+    }
     const queued = hosted.harness.remind({
       type: params.type,
       source: params.source,
@@ -850,6 +875,7 @@ export class SessionRegistry {
       return this.#open(cwd, manager, model, source, this.#profileKind(session.model), offer);
     }
     opened.session = session;
+    if (agents) trackForkContext(session);
     harness.compaction.apply();
     const sessionId = session.sessionId;
     const log = (line: string): void => {
@@ -1060,7 +1086,7 @@ export class SessionRegistry {
             await session.sendCustomMessage(message, { triggerTurn: true });
           }
         } else {
-          const { prepared } = next.job;
+          let { prepared } = next.job;
           this.#checkImageInput(sessionId, prepared.input);
           // An interrupt while an external memory import awaits approval ends this turn
           // before Pi owns it. The abort handler publishes the interrupted outcome.
@@ -1069,6 +1095,37 @@ export class SessionRegistry {
             hosted.projector.activeTurnId !== next.turnId
           )
             return;
+          const command = prepared.input.command;
+          if (command?.fork) {
+            const controller = new AbortController();
+            hosted.delegation = controller;
+            try {
+              const host = await this.subagents.hostFor(sessionId, session.sessionManager.getCwd());
+              controller.signal.throwIfAborted();
+              const result = await runDelegation(
+                host,
+                command.fork,
+                command.fork.sessionId,
+                command.kind === 'builtIn'
+                  ? (command.arguments ?? command.name)
+                  : `/${command.name}`,
+                composedText(prepared),
+                controller.signal,
+                prepared.images,
+                command.kind === 'builtIn',
+              );
+              if (controller.signal.aborted || hosted.projector.activeTurnId !== next.turnId)
+                return;
+              prepared = {
+                ...prepared,
+                sections: '',
+                images: [],
+                input: { ...prepared.input, text: command.input + '\n\n' + result, mentions: [] },
+              };
+            } finally {
+              delete hosted.delegation;
+            }
+          }
           hosted.delivering.push(prepared);
           hosted.hooks?.addContext(prepared.hookContext);
           await session.prompt(

@@ -249,7 +249,9 @@ interface WorktreeChoice {
   readonly setBase: (base: string) => void;
   /** `undefined` before the answer, `false` outside a repository's top level. */
   readonly branches:
-    { readonly current?: string; readonly list: readonly string[] } | false | undefined;
+    | { readonly current?: string; readonly list: readonly string[]; readonly hookOnly: boolean }
+    | false
+    | undefined;
   /** What to send: nothing (no worktree), the options, or `invalid` for a bad name. */
   readonly options: WorktreeOptions | undefined | 'invalid';
 }
@@ -281,6 +283,7 @@ function useWorktreeChoice(workspace: string | undefined): WorktreeChoice {
         setBranches({
           ...(typeof answer.current === 'string' ? { current: answer.current } : {}),
           list,
+          hookOnly: answer.repository !== true && answer.hook === true,
         });
       },
       () => {
@@ -345,32 +348,36 @@ function WorktreeFields({ choice, disabled }: { choice: WorktreeChoice; disabled
               choice.setName(event.currentTarget.value);
             }}
           />
-          <label htmlFor={baseId} className="field-label">
-            {t('home.worktreeBase')}
-          </label>
-          <select
-            id={baseId}
-            className="input"
-            value={choice.base}
-            disabled={disabled || branches === undefined}
-            data-testid="home-worktree-base"
-            onChange={(event) => {
-              choice.setBase(event.currentTarget.value);
-            }}
-          >
-            <option value="">
-              {branches?.current === undefined
-                ? t('home.worktreeBaseDetached')
-                : t('home.worktreeBaseHead', { branch: branches.current })}
-            </option>
-            {branches?.list
-              .filter((branch) => branch !== branches.current)
-              .map((branch) => (
-                <option key={branch} value={branch}>
-                  {branch}
+          {!branches?.hookOnly && (
+            <>
+              <label htmlFor={baseId} className="field-label">
+                {t('home.worktreeBase')}
+              </label>
+              <select
+                id={baseId}
+                className="input"
+                value={choice.base}
+                disabled={disabled || branches === undefined}
+                data-testid="home-worktree-base"
+                onChange={(event) => {
+                  choice.setBase(event.currentTarget.value);
+                }}
+              >
+                <option value="">
+                  {branches?.current === undefined
+                    ? t('home.worktreeBaseDetached')
+                    : t('home.worktreeBaseHead', { branch: branches.current })}
                 </option>
-              ))}
-          </select>
+                {branches?.list
+                  .filter((branch) => branch !== branches.current)
+                  .map((branch) => (
+                    <option key={branch} value={branch}>
+                      {branch}
+                    </option>
+                  ))}
+              </select>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -27,6 +27,9 @@ pub struct Approval {
     /// Inline comments sent with a declined plan (T26).
     #[serde(default)]
     pub comments: Vec<crate::l2::harness_spec::PlanCommentSpec>,
+    /// The structured answer to an MCP elicitation.
+    #[serde(default)]
+    pub elicitation: Option<piarc_protocol::mcp::ElicitationReply>,
     /// One answer per question of a question card (T26).
     #[serde(default)]
     pub answers: Vec<crate::l2::harness_spec::QuestionAnswerSpec>,
@@ -188,6 +191,9 @@ pub struct RequestExpect {
     /// Compare the complete system content with an earlier request on the same endpoint.
     #[serde(default)]
     pub same_system_as: Option<usize>,
+    /// The earlier request's messages form a prefix; cache breakpoints move to the new tail.
+    #[serde(default)]
+    pub message_prefix_as: Option<usize>,
     /// Compare the tool definitions byte for byte with an earlier request (T26).
     #[serde(default)]
     pub same_tools_as: Option<usize>,

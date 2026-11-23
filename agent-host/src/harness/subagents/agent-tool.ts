@@ -2,8 +2,9 @@
 // parameters follow Claude Code's tool (as T30's L3 recordings show its structure); the
 // description and the parameter texts are PiArc's. The run itself is the runtime's
 // (`runtime/subagents.ts`): this module only validates the call and forwards it.
+import type { ImageContent } from '@earendil-works/pi-ai';
 import { defineTool, type ToolDefinition } from '@earendil-works/pi-coding-agent';
-import type { AgentDefinition, SubagentState } from '@piarc/protocol';
+import type { AgentDefinition, PromptCommand, SubagentState } from '@piarc/protocol';
 import { Type, type Static } from 'typebox';
 
 import { isObject } from '../../runtime/items.js';
@@ -63,6 +64,10 @@ const agentSchema = Type.Object({
 
 /** One `Agent` call, as the runtime receives it. */
 export interface AgentCall {
+  /** Core-issued id for a user command or isolated skill invocation. */
+  readonly sessionId?: string;
+  readonly images?: readonly ImageContent[];
+  readonly conversationFork?: boolean;
   readonly description: string;
   readonly prompt: string;
   readonly type: string;
@@ -87,6 +92,38 @@ export interface AgentToolHost {
     signal: AbortSignal | undefined,
     progress: (state: SubagentState, activity: string) => void,
   ): Promise<{ text: string; isError: boolean; details: AgentDetails }>;
+}
+
+/** A typed command or Skill call starts the same runner as the Agent tool. */
+export async function runDelegation(
+  host: AgentToolHost | undefined,
+  run: NonNullable<PromptCommand['fork']>,
+  toolCallId: string,
+  description: string,
+  prompt: string,
+  signal?: AbortSignal,
+  images?: readonly ImageContent[],
+  conversationFork = false,
+): Promise<string> {
+  if (!host) throw new Error('This session cannot start another subagent.');
+  const outcome = await host.run(
+    toolCallId,
+    {
+      sessionId: run.sessionId,
+      ...(images?.length ? { images } : {}),
+      conversationFork,
+      ...(run.model ? { model: run.model } : {}),
+      ...(run.effort ? { effort: run.effort } : {}),
+      type: run.agent,
+      background: run.background,
+      description,
+      prompt,
+    },
+    signal,
+    () => undefined,
+  );
+  if (outcome.isError) throw new Error(outcome.text);
+  return outcome.text;
 }
 
 export function createAgentTool(

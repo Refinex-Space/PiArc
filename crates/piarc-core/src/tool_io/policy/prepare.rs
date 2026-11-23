@@ -3,15 +3,17 @@
 use super::*;
 
 pub(super) fn new_request(
-    p: &PolicyEvaluateParams,
+    session_id: &str,
+    tool: &str,
     peer: &Peer,
 ) -> Result<ApprovalRequest, ErrorObject> {
     Ok(ApprovalRequest {
+        elicitation: None,
         request_id: crate::sessions::new_session_id().map_err(|e| e.to_error_object())?,
-        session_id: p.session_id.clone(),
+        session_id: session_id.to_owned(),
         revision: 1,
         connection_epoch: peer.epoch(),
-        tool: p.tool.clone(),
+        tool: tool.to_owned(),
         kind: ApprovalKind::Command,
         command: None,
         cwd: None,
@@ -64,7 +66,7 @@ pub(super) async fn prepare(
             }
         }
         let places = assess::Places::new(&scope);
-        let mut card = new_request(&p, &peer)?;
+        let mut card = new_request(&p.session_id, &p.tool, &peer)?;
         let mut grant = Grant::new(&p, peer);
         let mut preview = None;
         let mut boundary = Boundary::Inside;

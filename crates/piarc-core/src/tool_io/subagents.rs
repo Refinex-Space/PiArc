@@ -293,6 +293,10 @@ impl ToolIo {
                 }
                 Ok(())
             });
+        let opened = match opened {
+            Ok(()) => self.activate_fork_skill(&p, &parent).await,
+            Err(error) => Err(error),
+        };
         if let Err(error) = opened {
             self.finish_subagent(&p.session_id);
             self.settle_worktree(worktree).await;

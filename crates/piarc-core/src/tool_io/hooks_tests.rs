@@ -886,3 +886,6 @@ mod m3;
 
 #[path = "hooks_m4_tests.rs"]
 mod m4;
+
+#[path = "hooks_model_switch_tests.rs"]
+mod model_switch;

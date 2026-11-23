@@ -217,6 +217,8 @@ fn system_clock() -> Arc<dyn piarc_ports::Clock> {
 
 fn answer(r: &ApprovalRequest, decision: ApprovalDecision) -> ApprovalAnswer {
     ApprovalAnswer {
+        elicitation: None,
+        confirmed_url: None,
         request_id: r.request_id.clone(),
         session_id: r.session_id.clone(),
         revision: r.revision,
@@ -662,6 +664,7 @@ mod t38;
 mod t42;
 mod t46;
 mod t47;
+mod t48_elicitation;
 mod worktree_hooks;
 
 /// W1 (architecture 15.2): Windows paths through the whole production path, preflight, grant

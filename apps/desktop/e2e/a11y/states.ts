@@ -112,6 +112,13 @@ export const A11Y_STATES = [
   { id: 'approval:command', area: 'approval', note: 'command card' },
   { id: 'approval:fileChange', area: 'approval', note: 'file change card with its diff' },
   { id: 'approval:permissionExpansion', area: 'approval', note: 'directory outside the workspace' },
+  { id: 'approval:elicitation', area: 'approval', note: 'MCP server input request' },
+  {
+    id: 'dialog:elicitation',
+    area: 'dialog',
+    source: 'approvals/ElicitationCard.tsx',
+    note: 'MCP elicitation form or URL',
+  },
   { id: 'approval:question', area: 'approval', note: 'question form' },
   { id: 'approval:plan', area: 'approval', note: 'plan card' },
   // Rail cards and dock panels, one per registered panel.

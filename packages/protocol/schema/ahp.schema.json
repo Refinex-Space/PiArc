@@ -412,6 +412,10 @@
           },
           "type": "array"
         },
+        "confirmedUrl": {
+          "description": "Original URL confirmed by the main process before accepting a URL request.",
+          "type": ["string", "null"]
+        },
         "connectionEpoch": {
           "description": "Agent Host connection that made the call.",
           "format": "uint64",
@@ -429,6 +433,17 @@
         "domain": {
           "description": "The host the native confirmation dialog showed for a network-domain card's\n`allowAlways` (T39): it must be the card's `domain`.",
           "type": ["string", "null"]
+        },
+        "elicitation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElicitationReply"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The user's answer to an MCP server."
         },
         "feedback": {
           "description": "Feedback to return on refusal.",
@@ -530,6 +545,11 @@
           "type": "string"
         },
         {
+          "const": "elicitation",
+          "description": "An MCP server requests form input or consent to visit a URL.",
+          "type": "string"
+        },
+        {
           "const": "plan",
           "description": "A plan submitted with `ExitPlanMode` (T26): approved with the mode to continue in, or\ndeclined with feedback and comments to keep planning.",
           "type": "string"
@@ -594,6 +614,17 @@
         "domain": {
           "description": "The host a sandboxed command asks to reach outside the network allowlist (a\n`permissionExpansion` card for tool [`NETWORK_TOOL`], T39). `allowOnce` lets this\nconnection through, `allowSession` the host for the session, `allowAlways` adds it to\nthe user's allowlist; `deny` and no answer within the timeout refuse the connection.",
           "type": ["string", "null"]
+        },
+        "elicitation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Elicitation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "An MCP elicitation. The server is named by `tool`."
         },
         "kind": {
           "$ref": "#/$defs/ApprovalKind",
@@ -2092,6 +2123,97 @@
         }
       ]
     },
+    "Elicitation": {
+      "description": "A server asks for an editable form or consent to open a URL (MCP 2025-11-25).",
+      "oneOf": [
+        {
+          "description": "Flat JSON Schema object presented to the user.",
+          "properties": {
+            "message": {
+              "description": "Why this server needs the information.",
+              "type": "string"
+            },
+            "mode": {
+              "const": "form",
+              "type": "string"
+            },
+            "requestedSchema": {
+              "additionalProperties": true,
+              "description": "The server's requested schema.",
+              "type": "object"
+            }
+          },
+          "required": ["mode", "message", "requestedSchema"],
+          "type": "object"
+        },
+        {
+          "description": "Out-of-band interaction; form data never traverses this transport.",
+          "properties": {
+            "elicitationId": {
+              "description": "Server-chosen id of the out-of-band interaction.",
+              "type": "string"
+            },
+            "message": {
+              "description": "Why this server requests navigation.",
+              "type": "string"
+            },
+            "mode": {
+              "const": "url",
+              "type": "string"
+            },
+            "url": {
+              "description": "The full external address displayed by the native confirmation.",
+              "type": "string"
+            }
+          },
+          "required": ["mode", "message", "url", "elicitationId"],
+          "type": "object"
+        }
+      ]
+    },
+    "ElicitationReply": {
+      "description": "The decision sent back to the server. Only an accepted form carries answers.",
+      "oneOf": [
+        {
+          "description": "The user agreed to answer or open the URL.",
+          "properties": {
+            "action": {
+              "const": "accept",
+              "type": "string"
+            },
+            "content": {
+              "additionalProperties": true,
+              "description": "Form values, absent for URL mode.",
+              "type": ["object", "null"]
+            }
+          },
+          "required": ["action"],
+          "type": "object"
+        },
+        {
+          "description": "Explicit refusal.",
+          "properties": {
+            "action": {
+              "const": "decline",
+              "type": "string"
+            }
+          },
+          "required": ["action"],
+          "type": "object"
+        },
+        {
+          "description": "Dismissal, interruption or lost session.",
+          "properties": {
+            "action": {
+              "const": "cancel",
+              "type": "string"
+            }
+          },
+          "required": ["action"],
+          "type": "object"
+        }
+      ]
+    },
     "ErrorData": {
       "description": "Structured part of an [`ErrorObject`].",
       "properties": {
@@ -3010,6 +3132,40 @@
         }
       },
       "required": ["path", "kind", "size", "readonly"],
+      "type": "object"
+    },
+    "ForkSkillRun": {
+      "description": "A Core-issued subagent id and the execution mode selected by a forked skill.",
+      "properties": {
+        "agent": {
+          "description": "Subagent definition, or general-purpose by default.",
+          "type": "string"
+        },
+        "background": {
+          "description": "Continue the parent while the isolated task runs.",
+          "type": "boolean"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EffortLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional skill-specific reasoning effort."
+        },
+        "model": {
+          "description": "Optional skill-specific model (a model id or an alias).",
+          "type": ["string", "null"]
+        },
+        "sessionId": {
+          "description": "Fresh id to use for this child.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "agent", "background"],
       "type": "object"
     },
     "FsChangesRequest": {
@@ -6247,6 +6403,64 @@
         }
       ]
     },
+    "McpCancelElicitationParams": {
+      "description": "Identifies one question on a live MCP tool call, regardless of its form or URL contents.",
+      "properties": {
+        "interaction": {
+          "description": "The interaction number from `mcp/elicit`.",
+          "format": "uint64",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sessionId": {
+          "description": "Owning session.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "Parent tool call.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "interaction"],
+      "type": "object"
+    },
+    "McpCancelElicitationRequest": {
+      "description": "Request for `mcp/cancelElicitation`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/cancelElicitation",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpCancelElicitationParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "McpCancelElicitationResponse": {
+      "description": "Successful response to `mcp/cancelElicitation`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/McpElicitationCancelled"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "McpConfigIssue": {
       "description": "A configuration problem: the entry is left out or a value is not used.",
       "properties": {
@@ -6310,6 +6524,80 @@
           "type": "string"
         }
       ]
+    },
+    "McpElicitParams": {
+      "description": "The server's request, bound to the session and tool call that owns it.",
+      "properties": {
+        "interaction": {
+          "description": "One-based sequence of this server question within the tool call.",
+          "format": "uint64",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "request": {
+          "$ref": "#/$defs/Elicitation",
+          "description": "What the server requests."
+        },
+        "server": {
+          "description": "Configured server name.",
+          "type": "string"
+        },
+        "serverTool": {
+          "description": "Original name of the tool on the server.",
+          "type": "string"
+        },
+        "sessionId": {
+          "description": "Owning session id.",
+          "type": "string"
+        },
+        "toolCallId": {
+          "description": "Parent tool call.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "interaction", "server", "serverTool", "request"],
+      "type": "object"
+    },
+    "McpElicitRequest": {
+      "description": "Request for `mcp/elicit`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "mcp/elicit",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/McpElicitParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "McpElicitResponse": {
+      "description": "Successful response to `mcp/elicit`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ElicitationReply"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "McpElicitationCancelled": {
+      "description": "Cancellation reached Core. The tool may already have finished.",
+      "type": "object"
     },
     "McpHttp": {
       "description": "A Streamable HTTP server. Values are expanded.",
@@ -7400,6 +7688,12 @@
           "description": "Cached input loses its identity.",
           "type": "boolean"
         },
+        "cacheTtl": {
+          "description": "TTL in seconds of the last known cache write or read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "cacheWriteUsd": {
           "description": "Estimated USD to write the cache, null when unpriced.",
           "format": "double",
@@ -7413,6 +7707,21 @@
         },
         "dropsThinking": {
           "description": "Thinking content may be discarded during conversion.",
+          "type": "boolean"
+        },
+        "fromModel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model being left, if the session already has a model."
+        },
+        "promptCacheWarm": {
+          "description": "The current model has a recent cached response. Absent means cold.",
           "type": "boolean"
         }
       },
@@ -9061,6 +9370,17 @@
         "arguments": {
           "description": "The arguments as typed.",
           "type": "string"
+        },
+        "fork": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ForkSkillRun"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Run the rendered body in this isolated subagent, returning only the outcome."
         },
         "input": {
           "description": "What the user typed (`/name arguments`), shown in the transcript.",
@@ -12587,6 +12907,17 @@
         "dir": {
           "description": "Its directory.",
           "type": "string"
+        },
+        "fork": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ForkSkillRun"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Run the rendered body in this isolated subagent, returning only the outcome."
         },
         "hooks": {
           "description": "Whether its hooks now apply to the session.",
@@ -16347,6 +16678,18 @@
     },
     {
       "$ref": "#/$defs/McpSetEnabledResponse"
+    },
+    {
+      "$ref": "#/$defs/McpCancelElicitationRequest"
+    },
+    {
+      "$ref": "#/$defs/McpCancelElicitationResponse"
+    },
+    {
+      "$ref": "#/$defs/McpElicitRequest"
+    },
+    {
+      "$ref": "#/$defs/McpElicitResponse"
     },
     {
       "$ref": "#/$defs/McpLoginRequest"

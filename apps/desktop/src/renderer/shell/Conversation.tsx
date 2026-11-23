@@ -393,6 +393,9 @@ export function Conversation({
         case 'newSession':
           ui.show({ kind: 'home', workspace: session?.workspace });
           break;
+        case 'subtask':
+          setFill({ text: '/subtask ', nonce: Date.now() + Math.random() });
+          break;
         case 'compact':
           window.piarc.compact(id, args === '' ? undefined : args).catch(failed);
           break;
@@ -458,7 +461,7 @@ export function Conversation({
         const plain =
           draft.mentions.length === 0 && draft.pending.length === 0 && draft.stored.length === 0;
         const typed = plain ? typedBuiltin(draft.text) : undefined;
-        if (typed !== undefined && typed.action !== 'compact') {
+        if (typed !== undefined && typed.action !== 'compact' && typed.action !== 'subtask') {
           runBuiltin(typed.action, typed.args);
           return;
         }

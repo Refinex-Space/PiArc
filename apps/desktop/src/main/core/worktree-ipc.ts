@@ -93,7 +93,14 @@ async function archive(
         status.changes === null
           ? t.t('dialog.archiveWorktree.uninspected')
           : t.t('dialog.archiveWorktree.message', { count: String(status.changes) }),
-      detail: [status.path, t.t('dialog.archiveWorktree.detail')].join('\n'),
+      detail: [
+        status.path,
+        t.t(
+          status.changes === null
+            ? 'dialog.archiveWorktree.hookDetail'
+            : 'dialog.archiveWorktree.detail',
+        ),
+      ].join('\n'),
       buttons: [
         t.t('dialog.archiveWorktree.keep'),
         t.t('dialog.archiveWorktree.discard'),

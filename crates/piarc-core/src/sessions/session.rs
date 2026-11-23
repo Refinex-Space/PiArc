@@ -140,8 +140,9 @@ pub(crate) enum OpKind {
 impl OpKind {
     fn of(op: &Op) -> Self {
         match op {
-            Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_) => Self::Starting,
+            Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_) | Op::Compact(_) => Self::Starting,
             Op::Checkpoint(checkpoint) if checkpoint.needs_idle() => Self::Exclusive,
+            Op::Model(ModelOp::Set(_, _) | ModelOp::Effort(_)) => Self::Exclusive,
             _ => Self::Other,
         }
     }
@@ -663,11 +664,11 @@ impl SessionActor {
         }
         let kind = OpKind::of(&op);
         let refusal = match kind {
-            OpKind::Exclusive if self.active_turn.is_some() || self.starting > 0 => {
-                Some("Stop the running turn before rewinding or switching branches")
-            }
+            OpKind::Exclusive if self.active_turn.is_some() || self.starting > 0 => Some(
+                "Stop the running turn before rewinding, switching branches or changing the model",
+            ),
             OpKind::Exclusive | OpKind::Starting if self.exclusive => {
-                Some("Wait for the rewind or branch switch to finish")
+                Some("Wait for the history or model change to finish")
             }
             _ => None,
         };
@@ -860,6 +861,12 @@ impl Request {
                 let context = self.prompt_hooks(&input.text).await;
                 if let Some(expanded) = &expansion {
                     input.text.clone_from(&expanded.text);
+                    if context.is_err()
+                        && let Some(fork) = &expanded.command.fork
+                    {
+                        self.tool_io
+                            .discard_fork_effects(&self.id.0, &fork.session_id);
+                    }
                     // A blocked input starts no turn: its grant must not reach the next one.
                     if let (Err(_), Some(grant)) = (&context, expanded.grant) {
                         self.tool_io.revoke_turn_grant(&self.id.0, grant);
@@ -876,7 +883,18 @@ impl Request {
         };
         let command = expansion.as_ref().map(|e| e.command.clone());
         let grant = expansion.as_ref().and_then(|e| e.grant);
+        let fork = command
+            .as_ref()
+            .and_then(|c| c.fork.as_ref())
+            .map(|f| f.session_id.clone());
         let result = self.send(op, hook_context, command).await;
+        if let Some(child) = fork
+            && result.as_ref().map_or(true, |v| {
+                v.get("disposition").and_then(Value::as_str) == Some("queued")
+            })
+        {
+            self.tool_io.discard_fork_effects(&self.id.0, &child);
+        }
         // A command's `allowed-tools` belong to the turn its input starts or joins: none when
         // the input failed or waits in the queue.
         if let Some(grant) = grant

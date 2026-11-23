@@ -1886,6 +1886,7 @@ dependencies = [
  "encoding_rs",
  "getrandom 0.4.3",
  "http",
+ "jsonschema",
  "minisign-verify",
  "nix",
  "piarc-checkpoint",

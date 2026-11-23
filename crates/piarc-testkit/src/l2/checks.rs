@@ -85,6 +85,30 @@ impl RequestView {
         Ok(tools.is_some() && tools == self.tools_raw()?)
     }
 
+    fn message_prefix_as(&self, earlier: &RequestRecord) -> Result<bool, String> {
+        fn messages(body: &Value) -> Result<Vec<Value>, String> {
+            let mut items = body
+                .get("messages")
+                .and_then(Value::as_array)
+                .cloned()
+                .ok_or("request did not contain a message array")?;
+            for item in &mut items {
+                if let Some(text) = item.get("content").and_then(Value::as_str) {
+                    item["content"] = serde_json::json!([{"type": "text", "text": text}]);
+                }
+                if let Some(content) = item.get_mut("content").and_then(Value::as_array_mut) {
+                    for block in content.iter_mut().filter_map(Value::as_object_mut) {
+                        block.remove("cache_control");
+                    }
+                }
+            }
+            Ok(items)
+        }
+        let previous = Self::of(earlier)?;
+        let prefix = messages(&previous.body)?;
+        Ok(!prefix.is_empty() && messages(&self.body)?.starts_with(&prefix))
+    }
+
     fn roles(&self) -> Vec<String> {
         self.request
             .messages
@@ -260,7 +284,12 @@ fn check_context(
             "user_message_contains: no user message contains all of {parts:?}"
         ));
     }
-    let comparisons: [(&str, Option<usize>, Same); 2] = [
+    let comparisons: [(&str, Option<usize>, Same); 3] = [
+        (
+            "message_prefix_as",
+            expect.message_prefix_as,
+            RequestView::message_prefix_as,
+        ),
         (
             "same_system_as",
             expect.same_system_as,

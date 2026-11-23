@@ -31,6 +31,7 @@ import { PROTOCOL_VERSION, type McpServerDefinition } from '@piarc/protocol';
 
 import type { CoreBridge } from '../runtime/core-bridge.js';
 import { usesOAuth } from './config.js';
+import { Elicitations, type ElicitationOwner } from './elicitation.js';
 import { StdioServerTransport } from './stdio.js';
 import { vaultStore } from './vault-store.js';
 
@@ -156,6 +157,7 @@ export class ServerConnection {
   readonly #context: ConnectionContext;
   readonly #changed: (tools: boolean) => void;
   readonly #auth: McpAuthProvider | undefined;
+  readonly #elicitations = new Elicitations();
   #client: McpClient | undefined;
   #opening: Promise<McpClient> | undefined;
   #ended = false;
@@ -208,10 +210,15 @@ export class ServerConnection {
   async callTool(
     tool: string,
     args: Record<string, unknown>,
-    options: { signal?: AbortSignal; onProgress?: (progress: ProgressNotification) => void },
+    options: {
+      signal?: AbortSignal;
+      onProgress?: (progress: ProgressNotification) => void;
+      owner?: ElicitationOwner;
+    },
   ): Promise<CallToolResult> {
     for (let attempt = 1; ; attempt++) {
       const client = await this.client();
+      const finish = this.#elicitations.begin(options.owner);
       try {
         return await client.callTool(tool, args, {
           ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -234,6 +241,8 @@ export class ServerConnection {
           );
         }
         throw error;
+      } finally {
+        finish();
       }
     }
   }
@@ -394,11 +403,14 @@ export class ServerConnection {
       name: CLIENT_NAME,
       version: PROTOCOL_VERSION,
       requestTimeoutMs: CONNECT_TIMEOUT_MS,
-      capabilities: { roots: { listChanged: true } },
+      capabilities: { roots: { listChanged: true }, elicitation: { form: {}, url: {} } },
       roots: () => this.#context.roots(),
     });
     let transport: McpTransport | undefined;
     try {
+      client.setRequestHandler('elicitation/create', (params, { signal }) =>
+        this.#elicitations.handle(this.#context.bridge, this.def.name, params, signal),
+      );
       transport = this.#transport(cwd);
       await client.connect(transport);
       client.onNotification('notifications/tools/list_changed', () => {

@@ -23,6 +23,8 @@ import {
   isWorktreeName,
 } from '../../shared/ipc.js';
 import type { Translator } from '../../shared/i18n/index.js';
+import { electronExternalLinkPort } from '../external-link-port.js';
+import { LinkConfirmations, parseExternalUrl } from '../external-links.js';
 import type { RegisterHandler } from '../ipc/register.js';
 import type { CoreRuntime } from './native/piarc-core.js';
 
@@ -371,6 +373,33 @@ function approvalAnswer(value: unknown): ApprovalAnswer {
     connectionEpoch: nonnegative(a.connectionEpoch, 'connectionEpoch'),
     decision,
   } satisfies ApprovalAnswer;
+  if (a.elicitation !== undefined) {
+    const reply = a.elicitation;
+    if (typeof reply !== 'object' || reply === null || !('action' in reply))
+      throw new TypeError('invalid MCP response');
+    if (decision === 'deny' && (reply.action === 'decline' || reply.action === 'cancel')) {
+      return { ...fields, elicitation: { action: reply.action } };
+    }
+    if (decision !== 'allowOnce' || reply.action !== 'accept')
+      throw new TypeError('invalid MCP response action');
+    if (a.confirmedUrl !== undefined) {
+      const raw = text(a.confirmedUrl, 'confirmedUrl');
+      const url = parseExternalUrl(raw);
+      if (url === null || !['http:', 'https:'].includes(url.protocol))
+        throw new TypeError('invalid MCP URL');
+      return { ...fields, elicitation: { action: 'accept' }, confirmedUrl: raw };
+    }
+    const content = 'content' in reply ? reply.content : undefined;
+    if (typeof content !== 'object' || content === null || Array.isArray(content))
+      throw new TypeError('invalid MCP form response');
+    return {
+      ...fields,
+      elicitation: {
+        action: 'accept',
+        content: Object.fromEntries(Object.entries(content)),
+      },
+    };
+  }
   if (decision === 'allowAlways') {
     const rules = a.rules === undefined ? [] : ruleList(a.rules);
     // T39: a network-domain card's "add to allowlist" names its host instead.
@@ -491,8 +520,41 @@ export function registerSessionHandlers(
     }
     await core.setPermissionMode(sessionId(id), mode);
   });
+  const elicitationLinks = new LinkConfirmations();
   registerHandler(IPC_CHANNELS.approvalAnswer, async (event, [raw]) => {
     const answer = approvalAnswer(raw);
+    if (answer.confirmedUrl != null) {
+      const port = electronExternalLinkPort(
+        BrowserWindow.fromWebContents(event.sender),
+        translator(),
+      );
+      let status: string | undefined;
+      const confirmed = await elicitationLinks.open(event.sender.id, answer.confirmedUrl, {
+        confirm: (url) => port.confirm(url),
+        open: async (url) => {
+          // The card may have been withdrawn while the native dialog was open.
+          status = await core.answerApproval(JSON.stringify(answer));
+          const result: unknown = JSON.parse(status);
+          if (
+            typeof result === 'object' &&
+            result !== null &&
+            'status' in result &&
+            result.status === 'applied'
+          ) {
+            await port.open(url);
+          }
+        },
+      });
+      if (confirmed && status !== undefined) return status;
+      return core.answerApproval(
+        JSON.stringify({
+          ...answer,
+          confirmedUrl: undefined,
+          decision: 'deny',
+          elicitation: { action: 'cancel' },
+        }),
+      );
+    }
     if (answer.decision === 'allowAlways') {
       const t = translator();
       const window = BrowserWindow.fromWebContents(event.sender);

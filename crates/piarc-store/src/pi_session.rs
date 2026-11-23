@@ -309,6 +309,9 @@ struct RawCost {
 
 #[derive(Debug, Deserialize)]
 struct Message {
+    /// A fork copied this message from its parent; its usage belongs to the original.
+    #[serde(default, rename = "piarcInherited")]
+    inherited: bool,
     #[serde(default)]
     role: Option<String>,
     #[serde(default)]
@@ -401,7 +404,7 @@ impl SessionMeta {
                     self.model_id = entry.model_id;
                 }
             }
-            "message" => {
+            "message" if !entry.message.as_ref().is_some_and(|m| m.inherited) => {
                 self.message_count += 1;
                 if let Some(message) = entry.message {
                     if let Some(ms) = message.timestamp.as_ref().and_then(Timestamp::millis) {
@@ -620,6 +623,20 @@ mod tests {
 
     fn entry(json: &str) -> Entry {
         serde_json::from_str(json).expect("valid entry")
+    }
+
+    #[test]
+    fn inherited_fork_messages_do_not_charge_the_parent_twice() {
+        let mut meta = SessionMeta::default();
+        meta.fold(entry(r#"{"type":"custom","customType":"piarc.subagent","data":{"parentSessionId":"main","agentType":"fork"}}"#));
+        let assistant = r#"{"type":"message","id":"a","message":{"role":"assistant","provider":"p","model":"m","content":[{"type":"text","text":"Prior result"}],"usage":{"input":4,"output":2},"piarcInherited":true}}"#;
+        let inherited = meta.fold(entry(assistant));
+        assert!(inherited.usage.is_none() && inherited.text.is_none());
+        assert_eq!(meta.message_count, 0);
+        assert_eq!(meta.last_entry_id.as_deref(), Some("a"));
+        let local = meta.fold(entry(&assistant.replace("true", "false")));
+        assert_eq!(local.usage.expect("new request").input, 4);
+        assert_eq!(meta.message_count, 1);
     }
 
     #[test]

@@ -46,6 +46,8 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 ## 子 agent（T31，ADR-0048）
 
+- T48（ADR-0066）：`runtime/fork-context.ts` 从 Pi 的活动分支和最后一次请求取得 fork 前缀，复制到独立子会话；`piarcInherited` 消息的账归父会话。能 fork 的 Anthropic 主请求用 `disableContinuation` 发送完整前缀并保留缓存断点。工具声明可见性与执行权限分开，`toolGate`、Core 权限、深度上限照常检查。跨会话复制、恢复分支或修改工具注册时，运行 `npx vitest run agent-host/src/runtime/fork-context.test.ts`，与 mock 实收的 HTTP 比较 system、工具、消息前缀。
+
 - 位置：`harness/subagents/` 是工具侧（`agent-tool.ts` 的 `Agent` 工具、`definitions.ts` 的内置类型与 `agents/list` 解析、`tool-filter.ts` 的过滤），`runtime/subagents.ts` 的 `SubagentRunner` 是运行与计数，`runtime/subagent-session.ts` 的 `ChildSession` 是一个子会话（打开、运行、结束），`runtime/session-runtime.ts` 是主会话与子会话共用的 Pi 运行时工厂。提示词在 `harness/prompts/subagents.ts`（改后跑原创性检查）。
 - 工具过滤顺序：父会话当前工具 → 定义的 `tools` → 减去 `disallowedTools`（优先）→ 减去 `PARENT_ONLY_TOOLS`（`AskUserQuestion`、`EnterPlanMode`、`ExitPlanMode`、`SuggestNextSteps`）→ 深度到上限时减去 `Agent`。实现是每个工具的 `prepareLoadout` 返回 `hiddenDeclarations` 加 `tool_call` 闸门，不要改成 `setActiveTools`：被它移除的工具，调用在闸门之前就以 "Tool X not found" 结束，后注册的 MCP 工具默认激活。
 - 深度与并发只在 `SubagentRunner` 计数（`#runs` 树加启动中的 `#starting` 占位，同一回复里并行的 `Agent` 调用不会一起越过上限）；上限来自 Core 的 `agents/list`。超限立即返回错误结果，不排队（前台子 agent 各自等自己的子 agent，排队会死锁）。
@@ -63,6 +65,8 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 - 后台子 agent 的通知仍由 Agent Host 排队（ADR-0048），Core 只登记与停止它的任务。
 
 ## Skills、命令与输出风格（T37，ADR-0054）
+
+- T48（ADR-0067）：隔离 skill 的正文只发往 Core 为它分配 id 的子会话；主会话的 `Skill` 结果、斜杠命令记录、排队和重注入都不应携带它的正文。命令 `/subtask` 创建继承父历史的后台 fork，`context: fork` skill 按自己的 agent 类型在独立上下文运行。
 
 - 发现在 Core（`piarc_config::skills`）：项目优先于用户，同级 `.piarc` > `.claude` > Pi 的目录（`.pi/skills`、`.agents/skills`、`<数据目录>/pi/skills`、`~/.agents/skills`；命令另有 `.pi/prompts`、`<数据目录>/pi/prompts`），项目目录从 cwd 向上。Agent Host 只经 `skills/list`（带会话 id）取结果：会话运行时传 `noSkills: true`、`noPromptTemplates: true`，Pi 不加载、不列出、不展开 `/skill:` 与模板。不要在 Agent Host 读 skill 或命令文件，也不要改回 Pi 的资源加载器（`allowed-tools` 与 hooks 要由 Core 判断）。
 - `harness/skills/session-skills.ts` 的 `SessionSkills`（能力 `skills`，每会话一个，`session-parts.ts` 建）：`catalog()` 缓存 Core 的回答，`resources/reload`（`SessionRegistry.reloadResources`）只让它失效，下一次运行前重新取；`sections()` 在冻结 system prompt 时给出第 3 段（输出风格）与第 5 段（索引，描述截断到 `SKILL_INDEX_DESCRIPTION_CHARS`），并写 `piarc.skillsIndex`、`piarc.outputStyle`；它的扩展在 `before_agent_start` 比对分支上的记录，变化以 `skillsChanged`（键 `skills:index`）、`outputStyle`（键 `style`）提醒送达，在 `tool_result` 对 Read、Write、Edit 的文件经 `skills/match` 激活 `paths` skill（`piarc.skillsActive`，提醒键 `skills:paths`）。扩展排在 `harness.extensions()` 最前（memory 之后、提醒送达之前）。
@@ -93,6 +97,10 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 - `Memory` 工具在 `harness/auto-memory.ts`：会话打开时按 Core 的 `memory/status` 决定是否给（能力 `autoMemory`、受信任项目、主会话；子 agent 的工具过滤去掉它），每次调用原样经 `memory/apply` 交给 Core，不碰文件；本会话的保存或删除经 `changed` 记进会话 memory 的基线，下一轮不把索引当作新变化提醒。模型可见的文字只在 `prompts/auto-memory.ts`（工具描述、指引、索引前的说明、托管 `CLAUDE.md` 的来源标注、压缩后恢复的笔记开头），改动后跑原创性检查。
 - 注入：索引是 Core `fs/memory` 快照的最后一个文件（`kind: "autoMemory"`），托管的 `CLAUDE.md` 排在最前（`kind: "managed"`），都经 `prompts/system.ts` 的 `sourced` 进项目上下文，不另写消息类型。压缩后恢复本会话读过或存过的笔记（`reinjection.ts` 的 `RESTORE_LIMITS.notes` 与 `notesTotal`，经 `memory/apply` 的 `read` 取当前内容）。
+
+## 自动压缩策略（T48）
+
+按模型选择的自动压缩策略由 `harness/compaction.ts` 和 `harness/server-compaction.ts` 统一决定。服务端接管时关闭 Pi 本地自动压缩，回退时恢复客户端策略。Anthropic 正式响应里的压缩块随所属 assistant 消息追加到 JSONL，恢复时按同一分支重建请求。修改策略或 Pi 适配器后运行 `npx vitest run agent-host/src/runtime/server-compaction.test.ts`。
 
 ## 子目录说明
 

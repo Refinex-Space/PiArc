@@ -47,6 +47,7 @@ pub const DEFAULT_STYLE: &str = "Default";
 /// A built-in command: name, aliases, argument hint (ADR-0054 rule 13).
 pub const BUILT_IN_COMMANDS: &[(&str, &[&str], Option<&str>)] = &[
     ("compact", &[], Some("[focus]")),
+    ("subtask", &[], Some("<task>")),
     ("clear", &["reset", "new"], None),
     ("model", &[], Some("[model]")),
     ("rewind", &["checkpoint"], None),
@@ -109,6 +110,10 @@ pub struct Skill {
 /// How a skill requests an isolated execution context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillFork {
+    /// Model alias, provider/model id, or `inherit`, resolved by the Agent Host.
+    pub model: Option<String>,
+    /// Requested reasoning effort.
+    pub effort: Option<piarc_protocol::models::EffortLevel>,
     /// The subagent definition to use. When omitted, the Agent tool's default type applies.
     pub agent: Option<String>,
     /// Whether the parent can continue while the child runs.
@@ -846,7 +851,18 @@ impl<'t> Front<'t> {
             self.invalid("context");
             return None;
         }
+        let effort = self.text("effort").and_then(|v| {
+            match serde_json::from_value::<piarc_protocol::models::EffortLevel>(Value::String(v)) {
+                Ok(level) if level != piarc_protocol::models::EffortLevel::Off => Some(level),
+                _ => {
+                    self.invalid("effort");
+                    None
+                }
+            }
+        });
         Some(SkillFork {
+            model: self.text("model"),
+            effort,
             agent: self.text("agent"),
             background: self.flag("background").unwrap_or(true),
         })
@@ -956,7 +972,12 @@ pub fn parse_skill(
             format!("invalid skill name {name:?}: 1-64 letters, digits, '-', '_', '.' or ':'"),
         ));
     }
-    let mut description = front.description();
+    let fork = front.skill_fork();
+    let mut description = if fork.is_some() {
+        front.text("description").unwrap_or_default()
+    } else {
+        front.description()
+    };
     if let Some(when) = front.text("when_to_use") {
         description = if description.is_empty() {
             when
@@ -971,8 +992,12 @@ pub fn parse_skill(
     let allowed_tools = front.list("allowed-tools", split_tools);
     let paths = front.list("paths", split_commas);
     let hooks = front.hooks();
-    let fork = front.skill_fork();
-    front.remaining(SKILL_FIELDS);
+    let mut fields = SKILL_FIELDS.to_vec();
+    fields.extend(["context", "agent", "background"]);
+    if fork.is_some() {
+        fields.extend(["model", "effort"]);
+    }
+    front.remaining(&fields);
     let info = SkillInfo {
         plugin: None,
         name,

@@ -12,6 +12,7 @@ import type {
   SkillsMatchResult,
 } from '@piarc/protocol';
 
+import { forkRun } from '../../runtime/input.js';
 import { isObject } from '../../runtime/items.js';
 
 const isString = (value: unknown): value is string => typeof value === 'string';
@@ -93,12 +94,14 @@ export function parseSkillsCatalog(value: unknown): SkillsCatalog | undefined {
 
 /** `skills/invoke`'s result, or undefined when it is not one. */
 export function parseInvokeResult(value: unknown): SkillsInvokeResult | undefined {
+  const fork = isObject(value) ? forkRun(value.fork) : undefined;
   const allowed = value === null || !isObject(value) ? undefined : value.allowedTools;
   if (
     !isObject(value) ||
     !isString(value.name) ||
     !isString(value.content) ||
     !isString(value.dir) ||
+    (value.fork != null && !fork) ||
     !(allowed == null || isStrings(allowed)) ||
     !(value.hooks == null || typeof value.hooks === 'boolean') ||
     !(value.warnings == null || Array.isArray(value.warnings))
@@ -109,6 +112,7 @@ export function parseInvokeResult(value: unknown): SkillsInvokeResult | undefine
     name: value.name,
     content: value.content,
     dir: value.dir,
+    ...(fork ? { fork } : {}),
     ...(isStrings(allowed) ? { allowedTools: allowed } : {}),
     ...(value.hooks == null ? {} : { hooks: value.hooks }),
     ...(Array.isArray(value.warnings)

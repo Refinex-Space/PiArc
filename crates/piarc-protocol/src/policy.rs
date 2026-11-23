@@ -135,6 +135,8 @@ pub enum ApprovalKind {
     PermissionExpansion,
     /// `AskUserQuestion`'s form (`ui/ask`, T26): answered with `answers`.
     Question,
+    /// An MCP server requests form input or consent to visit a URL.
+    Elicitation,
     /// A plan submitted with `ExitPlanMode` (T26): approved with the mode to continue in, or
     /// declined with feedback and comments to keep planning.
     Plan,
@@ -208,6 +210,9 @@ pub struct ApprovalRequest {
     /// The plan of a `plan` card (Markdown).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan: Option<String>,
+    /// An MCP elicitation. The server is named by `tool`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elicitation: Option<crate::mcp::Elicitation>,
     /// The questions of a `question` card.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub questions: Vec<crate::harness::Question>,
@@ -392,6 +397,12 @@ pub struct ApprovalAnswer {
     /// Inline comments on a plan, returned to the model with a refusal (keep planning).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comments: Vec<crate::harness::PlanComment>,
+    /// The user's answer to an MCP server.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elicitation: Option<crate::mcp::ElicitationReply>,
+    /// Original URL confirmed by the main process before accepting a URL request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confirmed_url: Option<String>,
     /// One answer per question of a `question` card, with `allowOnce`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub answers: Vec<crate::harness::QuestionAnswer>,

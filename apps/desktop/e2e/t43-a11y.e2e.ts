@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import type { ElectronApplication, Page } from '@playwright/test';
 
+import { exerciseElicitation } from './elicitation.js';
 import { AXE_DIR, checkState } from './a11y.js';
 import { A11Y_STATES } from './a11y/states.js';
 import { expect, focusMain, makeWorkspace, openFolder, test } from './sessions.js';
@@ -438,6 +439,13 @@ test.describe('sign in', () => {
     } finally {
       auth.stop();
     }
+  });
+});
+
+test('MCP asks for a form and an external URL', async ({ app, page, workspaces }) => {
+  test.setTimeout(120_000);
+  await exerciseElicitation(app, page, workspaces, async (state) => {
+    await checkState(page, state);
   });
 });
 

@@ -51,11 +51,21 @@ export function isApproval(value: unknown, sessionId: string): value is Approval
   )
     return false;
   if (
-    !['command', 'fileChange', 'permissionExpansion', 'question', 'plan'].some(
+    !['command', 'fileChange', 'permissionExpansion', 'question', 'plan', 'elicitation'].some(
       (kind) => kind === value.kind,
     )
   )
     return false;
+  if (value.kind === 'elicitation') {
+    const request = value.elicitation;
+    if (!record(request) || typeof request.message !== 'string') return false;
+    if (
+      request.mode === 'url'
+        ? typeof request.url !== 'string'
+        : request.mode !== 'form' || !record(request.requestedSchema)
+    )
+      return false;
+  }
   if (value.kind === 'plan' && typeof value.plan !== 'string') return false;
   if (value.kind === 'question' && !questionsOf(value.questions)) return false;
   if (

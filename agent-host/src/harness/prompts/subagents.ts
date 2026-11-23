@@ -55,7 +55,7 @@ export interface ListedType {
 /** The `Agent` tool's description without its list of types (the default profile's). */
 export const AGENT_DESCRIPTION = [
   'Hand a task to a subagent: a separate agent with its own context window that works on it ' +
-    'with its own tools and reports back. It starts with nothing from this conversation, so ' +
+    'with its own tools and reports back. Only the fork type inherits this conversation. For other types, ' +
     '`prompt` must say everything it needs: the goal, what you already know, where to look ' +
     'and what the report should contain. `description` is a short title, in a few words, ' +
     'for the user.',

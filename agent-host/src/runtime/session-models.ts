@@ -51,7 +51,27 @@ function target(workspace: Workspace, ref: ModelRef) {
 }
 
 export function previewSwitch(workspace: Workspace, session: AgentSession, ref: ModelRef) {
-  return switchPreview(session, target(workspace, ref), workspace.unpriced);
+  const current: Model<Api> | undefined = session.model;
+  const preview = switchPreview(session, target(workspace, ref), workspace.unpriced);
+  const last = session.messages.findLast(
+    (message) =>
+      message.role === 'assistant' &&
+      message.provider === current?.provider &&
+      message.model === current.id &&
+      message.stopReason !== 'error' &&
+      message.stopReason !== 'aborted',
+  );
+  const used =
+    last?.role === 'assistant' && (last.usage.cacheRead > 0 || last.usage.cacheWrite > 0);
+  const ttl =
+    used && last.usage.cacheWrite1h ? current?.promptCache?.long : current?.promptCache?.short;
+  const age = last?.role === 'assistant' ? Date.now() - last.timestamp : Infinity;
+  return {
+    ...preview,
+    ...(current === undefined ? {} : { fromModel: { provider: current.provider, id: current.id } }),
+    ...(used && ttl && age >= 0 && age < ttl * 1000 ? { promptCacheWarm: true } : {}),
+    ...(ttl ? { cacheTtl: ttl } : {}),
+  };
 }
 
 /** Switches `session` to `ref`, keeping the effort when the model supports it. */

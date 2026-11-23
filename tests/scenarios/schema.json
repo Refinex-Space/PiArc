@@ -671,6 +671,7 @@
             "provider": {
               "$ref": "#/$defs/label"
             },
+            "rejected": { "type": "string", "minLength": 1 },
             "preview": {
               "type": "object",
               "minProperties": 1
@@ -1413,7 +1414,14 @@
       "required": ["decision"],
       "properties": {
         "kind": {
-          "enum": ["command", "fileChange", "permissionExpansion", "question", "plan"]
+          "enum": [
+            "command",
+            "fileChange",
+            "permissionExpansion",
+            "question",
+            "plan",
+            "elicitation"
+          ]
         },
         "feedback": {
           "type": "string"
@@ -1455,6 +1463,16 @@
               "type": "string"
             }
           }
+        },
+        "elicitation": {
+          "description": "The answer sent to an MCP server.",
+          "type": "object",
+          "properties": {
+            "action": { "enum": ["accept", "decline", "cancel"] },
+            "content": { "type": "object" }
+          },
+          "required": ["action"],
+          "additionalProperties": false
         },
         "answers": {
           "description": "One answer per question of a question card (T26).",
@@ -1595,6 +1613,10 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "message_prefix_as": {
+          "type": "integer",
+          "minimum": 0
         },
         "same_system_as": {
           "type": "integer",

@@ -1,0 +1,54 @@
+id: skill-fork
+description: A skill runs in its configured isolated agent, through a Skill call and a user command; the body stays out of the parent and its compactable skill entries.
+capabilities: [CAP-SKILL-FORK-001]
+workspace:
+  files:
+    .piarc/settings.json: '{"modelAliases":{"fast":"mock-child/mock-model"}}'
+    .claude/agents/researcher.md: "---\nname: researcher\ndescription: Investigates.\nmodel: inherit\n---\nLook into the task."
+    .claude/skills/investigate/SKILL.md: "---\ncontext: fork\nagent: researcher\nmodel: fast\nbackground: false\n---\nISOLATED-INSTRUCTIONS inspect $ARGUMENTS."
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: load, name: Skill, input: { skill: investigate, args: 'from-tool' } }]
+      - text: Received first result.
+      - text: Received slash result.
+  child:
+    wire: anthropic
+    steps:
+      - text: First finding.
+      - text: Second finding.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Use the investigator for PARENT-ONLY-FACT., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - prompt: { text: /investigate from-slash }
+expect:
+  request_counts: { main: 3, child: 2 }
+  requests:
+    - { provider: main, index: 0, not_contains: [ISOLATED-INSTRUCTIONS] }
+    - {
+        provider: main,
+        index: 1,
+        not_contains: [ISOLATED-INSTRUCTIONS],
+        tool_results: [{ id: load, is_error: false, contains: First finding. }],
+      }
+    - {
+        provider: child,
+        index: 0,
+        contains: [ISOLATED-INSTRUCTIONS inspect from-tool., Look into the task.],
+        not_contains: [PARENT-ONLY-FACT],
+      }
+    - {
+        provider: child,
+        index: 1,
+        contains: [ISOLATED-INSTRUCTIONS inspect from-slash.],
+        not_contains: [PARENT-ONLY-FACT, First finding.],
+      }
+    - {
+        provider: main,
+        index: 2,
+        not_contains: [ISOLATED-INSTRUCTIONS],
+        contains: [Second finding.],
+      }

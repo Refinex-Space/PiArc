@@ -97,6 +97,13 @@ impl Driver<'_> {
         }
         let comments = harness::plan_comments(&card, expected)?;
         let answer = ApprovalAnswer {
+            elicitation: expected.elicitation.clone(),
+            confirmed_url: match (&card.elicitation, expected.decision) {
+                (Some(piarc_protocol::mcp::Elicitation::Url { url, .. }), Choice::Allow) => {
+                    Some(url.clone())
+                }
+                _ => None,
+            },
             request_id: card.request_id.clone(),
             session_id: card.session_id,
             revision: card.revision,

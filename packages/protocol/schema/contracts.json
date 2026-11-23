@@ -1179,6 +1179,30 @@
     },
     {
       "kind": "request",
+      "method": "mcp/cancelElicitation",
+      "name": "mcp/cancelElicitation",
+      "schema": "McpCancelElicitationRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/cancelElicitation",
+      "name": "mcp/cancelElicitation/result",
+      "schema": "McpCancelElicitationResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/elicit",
+      "name": "mcp/elicit",
+      "schema": "McpElicitRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/elicit",
+      "name": "mcp/elicit/result",
+      "schema": "McpElicitResponse"
+    },
+    {
+      "kind": "request",
       "method": "mcp/login",
       "name": "mcp/login",
       "schema": "McpLoginRequest"

@@ -44,6 +44,7 @@ struct Pending {
 
 mod assess;
 mod edit;
+mod elicitation;
 mod grants;
 pub(crate) mod hooks;
 mod inputs;
@@ -64,7 +65,7 @@ use reasons::{
     refusal_of,
 };
 use waits::{post_card, wait_for_user, withdraw_card};
-pub(super) use waits::{post_network_card, withdraw_network_card};
+pub(super) use waits::{post_local_card, withdraw_local_card};
 pub(crate) mod settings_view;
 use grants::Grant;
 pub(super) use grants::{
@@ -307,6 +308,7 @@ impl ToolIo {
                 lock(&s.files).discard_pending(None);
                 lock(&s.policy).cancel(id, services, cause);
                 lock(&s.uploads).cancel_writes(None);
+                lock(&s.fork_skills).clear();
             }
         }
     }
@@ -387,6 +389,15 @@ impl ToolIo {
                 .pending()
                 .find(|r| r.request_id == answer.request_id)
             {
+                if request.kind != ApprovalKind::Elicitation
+                    && (answer.elicitation.is_some() || answer.confirmed_url.is_some())
+                {
+                    return Err(ErrorObject::new(
+                        ErrorKind::InvalidRequest,
+                        "MCP response fields require an elicitation card.",
+                        false,
+                    ));
+                }
                 // The reviewer is deciding the card (T46): no answer is taken.
                 if request
                     .review
@@ -396,6 +407,7 @@ impl ToolIo {
                     return Ok(json!({"status": AnswerStatus::Stale}));
                 }
                 match request.kind {
+                    ApprovalKind::Elicitation => elicitation::check_answer(request, &answer)?,
                     ApprovalKind::Question => questions::check_answer(request, &answer)?,
                     ApprovalKind::Plan => plan::check_answer(request, &answer)?,
                     _ => {}

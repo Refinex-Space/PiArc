@@ -107,7 +107,12 @@ export function useModelCatalog(target: string | undefined, session: boolean) {
   };
 }
 
-export type SwitchPreview = Required<ModelSwitchPreviewResult>;
+export type SwitchPreview = Required<
+  Pick<
+    ModelSwitchPreviewResult,
+    'contextTokens' | 'cacheWriteUsd' | 'cacheInvalidated' | 'dropsThinking'
+  >
+>;
 export function parsePreview(text: string): SwitchPreview {
   const v: unknown = JSON.parse(text);
   if (

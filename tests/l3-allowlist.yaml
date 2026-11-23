@@ -7,6 +7,9 @@
 # follow_up names the task that revisits an entry (listed in docs/plan/PLAN.md's registry).
 # excluded: compared L2 scenarios (perm-, policy-, hooks-, config-) that no L3 scenario mirrors,
 # with the reason `claude -p` cannot reproduce them.
+# T48's mcp-elicitation cases use a desktop form and native consent to visit a URL. A URL
+# acceptance from a hook still requires native confirmation; an ambiguous request on a shared
+# connection returns cancel. The compared scenario prefixes above do not include mcp-.
 
 differences:
   # ── Request structure: tool set ──────────────────────────────────────────────────────────
@@ -286,3 +289,7 @@ excluded:
     reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
   - scenario: hooks-m5-permission-denied
     reason: The L3 classifier cannot be scripted to deny a specific call. PiArc runs PermissionDenied after a validated refusal and falls back to human approval when its reviewer has no verdict.
+  - scenario: hooks-m5-model-switch
+    reason: Single-model headless runs cannot operate PiArc's session model picker or answer its switch confirmation. ADR-0032 keeps the cost preview and explicit model and effort confirmation after a hook allows the switch. PostModelSwitch reports an actual session selection change; restoring an unchanged selection or receiving a provider's per-response fallback does not change the selected model. PiArc reports unknown pricing or TTL on unpriced and non-caching providers, and uses its T21 context estimate across providers.
+  - scenario: hooks-m5-worktree
+    reason: This scenario advances the Core retention clock after archiving a session and answers native cleanup confirmation for its hook-managed directory. A single headless prompt cannot exercise that lifecycle.

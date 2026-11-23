@@ -293,6 +293,12 @@ export const en = {
   'approval.kind.command': 'Run command?',
   'approval.kind.fileChange': 'Allow file change?',
   'approval.kind.permissionExpansion': 'Allow access outside the workspace?',
+  'approval.kind.elicitation': 'MCP request',
+  'mcp.elicit.review': 'Review request',
+  'mcp.elicit.accept': 'Accept',
+  'mcp.elicit.decline': 'Decline',
+  'mcp.elicit.yes': 'Yes',
+  'mcp.elicit.no': 'No',
   'approval.kind.question': 'Question',
   'approval.kind.plan': 'Review the plan',
   'approval.cwd': 'Working directory · {path}',
@@ -321,7 +327,8 @@ export const en = {
   'context.tokens': '{tokens, number} of {window, number} tokens',
   'context.threshold': 'Compacts automatically at {threshold, number} tokens',
   'context.autoOff': 'Automatic compaction is off in the settings',
-  'context.serverFallback': 'Server context management is unavailable. This session is using client compaction.',
+  'context.serverFallback':
+    'Server context management is unavailable. This session is using client compaction.',
   'context.autoStopped':
     'Automatic compaction stopped: {reason, select, ineffective {the context stayed above the limit} other {it failed three times}}',
   'context.source.estimate': 'Estimated',
@@ -634,6 +641,7 @@ export const en = {
   'composer.commands.source.mcp': 'MCP prompts',
   'composer.commands.kind.skill': 'skill',
   'composer.command.clear': 'Start a new conversation in this folder',
+  'composer.command.subtask': 'Start a background fork with this conversation',
   'composer.command.compact': 'Summarize the conversation to free up context',
   'composer.command.help': 'Show commands and keyboard shortcuts',
   'composer.queue.label': 'Queued',
@@ -1150,7 +1158,10 @@ export const en = {
 
   'dialog.archiveWorktree.message':
     '{count, plural, one {The session’s worktree has # uncommitted change. Archive it anyway?} other {The session’s worktree has # uncommitted changes. Archive it anyway?}}',
-  'dialog.archiveWorktree.uninspected': 'PiArc cannot inspect changes in this hook-created directory. Keep it when archiving?',
+  'dialog.archiveWorktree.uninspected':
+    'PiArc cannot inspect changes in this hook-created directory. Keep it when archiving?',
+  'dialog.archiveWorktree.hookDetail':
+    'Keeping the directory preserves its contents. Removing it runs the workspace’s removal hook.',
   'dialog.archiveWorktree.detail':
     'Keep the worktree: the session is archived and the worktree stays; its cleanup 30 days later asks again if it still has changes. Discard: the changes are thrown away and the worktree is removed. Its branch stays either way.',
   'dialog.archiveWorktree.keep': 'Keep worktree and archive',
