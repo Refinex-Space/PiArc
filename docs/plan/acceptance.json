@@ -4339,8 +4339,8 @@
       "id": "T44-A09",
       "task": "T44",
       "description": "`npm run verify` 通过。验证：命令输出。",
-      "status": "not_started",
-      "evidence": "用户要求停止并以部分完成收尾，未运行 npm run verify。a5f6146 上已运行：npx prettier --check .、npx tsc --build、ESLint（scripts/perf、apps/desktop/packaging、forge.config.ts）、npx vitest run scripts/perf apps/desktop/packaging（17 passed）、node scripts/plan/check-acceptance.mjs，均通过。"
+      "status": "passing",
+      "evidence": "T44 之后的提交 f11a450（tmp/evidence/T49/verify-final.log）以及完成 I185 修复的 1b15296，均在 macOS arm64 使用 npm run verify 全量 17/17 通过。最近的命令输出 tmp/evidence/T34/native-ime/verify-i185.log。"
     },
     {
       "id": "T45-A01",
