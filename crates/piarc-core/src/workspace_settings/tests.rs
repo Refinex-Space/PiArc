@@ -36,6 +36,10 @@ impl EventSink for Settings {
     clippy::await_holding_lock,
     reason = "the test holds the watcher's lock on purpose: the registration must wait for it"
 )]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one scenario: the loop built as `open` builds it, a change, then the release"
+)]
 async fn a_managed_change_is_reported_while_the_first_registration_runs() {
     let root = std::env::temp_dir().join(format!(
         "piarc-settings-managed-{}",
