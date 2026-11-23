@@ -174,7 +174,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
 | T42 | [NotebookEdit、可操作通知与 diff 行内评论](tasks/T42-notebook-notifications-diff-comments.md) | 5 | T41 | macOS | high / 高 | 中 | 无 | 已完成 | 1b15296 |
 | T43 | [无障碍与本地化](tasks/T43-accessibility-and-localization.md) | 5 | T42 | macOS | high / 高 | 中 | 无 | 部分完成 | 00b452b |
-| T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
+| T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 已完成 | 0cbecdc |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
 | T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
@@ -1268,3 +1268,7 @@ Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m
 ### 2026-11-24 R4 已完成
 
 逐项核对 T31–T38 和 W2 的 120 个验收项，全部为 passing。此前的 T34-A03 已实测通过，T35-A11 按 ADR-0063 完成物理内存复测。 内存原始数据、预算和 macOS 退出结论见 `docs/reviews/R4-findings.md` 收尾复核。
+
+### 2026-11-24 T44 已完成
+
+提交 0cbecdc，Mac M1 Max / 32 GB、接电、打包开发构建，连续执行 5 次 node scripts/perf/run.mjs --lane pr --runs 3 --machine m1-max-32g。五次退出码均为 0，每次 10 个指标均取得 3 轮结果，无探针错误和回归。打包后独占运行性能测量，最终全仓验证另外串行执行。每次执行前后核对 Git HEAD，完整日志与逐轮 report.json 保存在 tmp/evidence/partial-closure/pr-five-0cbecdcbb5e7752bce441f9f2851097c724b742d。 结合已通过的 A09，T44 的 8 项验收全部 passing。

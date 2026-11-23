@@ -4311,8 +4311,8 @@
       "id": "T44-A04",
       "task": "T44",
       "description": "在同一提交上连续运行 PR 性能冒烟 5 次全部通过。验证：5 次运行的输出。",
-      "status": "failing",
-      "evidence": "83726bc/69c1359（两者只差文档）上连续 5 次 PR 冒烟（--runs 3）全部失败（tmp/evidence/T44/pr-smoke-disturbed/）：第 1、2 次是回归下限小于同提交的自然波动（policy、workspace-ready），已按实测调大（a5f6146），按新下限重新判定这两次通过；第 3–5 次在 UURemote 远程桌面运行时，冷启动 685–756 ms（基线 464 ms）、事件循环 4.9–5.3 ms（基线 3.85 ms），属环境负载；第 2 次 transcript 探针有 1 次流式回合 120 s 未结束。用户要求停止，未在安静环境下重跑；重跑命令：node scripts/perf/run.mjs --lane pr --runs 3 --machine m1-max-32g（5 次）。"
+      "status": "passing",
+      "evidence": "提交 0cbecdc，Mac M1 Max / 32 GB、接电、打包开发构建，连续执行 5 次 node scripts/perf/run.mjs --lane pr --runs 3 --machine m1-max-32g。五次退出码均为 0，每次 10 个指标均取得 3 轮结果，无探针错误和回归。打包后独占运行性能测量，最终全仓验证另外串行执行。每次执行前后核对 Git HEAD，完整日志与逐轮 report.json 保存在 tmp/evidence/partial-closure/pr-five-0cbecdcbb5e7752bce441f9f2851097c724b742d。"
     },
     {
       "id": "T44-A05",
@@ -4340,7 +4340,7 @@
       "task": "T44",
       "description": "`npm run verify` 通过。验证：命令输出。",
       "status": "passing",
-      "evidence": "T44 之后的提交 f11a450（tmp/evidence/T49/verify-final.log）以及完成 I185 修复的 1b15296，均在 macOS arm64 使用 npm run verify 全量 17/17 通过。最近的命令输出 tmp/evidence/T34/native-ime/verify-i185.log。"
+      "evidence": "最终代码提交 0cbecdc 的默认 npm run verify 17/17。日志 tmp/evidence/partial-closure/final-verify.log。此前 f11a450、1b15296 也在 macOS 通过全量检查。"
     },
     {
       "id": "T45-A01",
