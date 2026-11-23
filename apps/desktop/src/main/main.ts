@@ -22,6 +22,7 @@ import { registerSandboxHandlers } from './core/sandbox-ipc.js';
 import { registerUsageHandlers } from './core/usage-ipc.js';
 import { registerDiagnosticsHandlers } from './core/diagnostics-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
+import { startupFailure } from './core/startup-error.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
@@ -37,6 +38,7 @@ import { confirmQuit } from './platform/quit.js';
 import { TrayIcon, parseActivity, trayIconDirectory } from './platform/tray.js';
 import { WindowStateFile } from './platform/window-state.js';
 import type { LaunchTarget } from '../shared/ipc.js';
+import { resolveLocale, Translator } from '../shared/i18n/index.js';
 import { runVelopackStartup } from './platform/velopack.js';
 import { PRODUCTION_CSP } from './security/csp.js';
 import { guardWebContents } from './security/navigation.js';
@@ -111,7 +113,10 @@ function startCoreOrExit(dirs: DataDirs): CoreHost | undefined {
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.error(`[core] failed to start: ${reason}`);
-    dialog.showErrorBox('PiArc could not start', `PiArc Core failed to load.\n\n${reason}`);
+    // Core reads the language setting; before it runs, the system's language decides.
+    const t = new Translator(resolveLocale('system', app.getPreferredSystemLanguages()));
+    const failure = startupFailure(error, t);
+    dialog.showErrorBox(failure.title, failure.message);
     app.exit(1);
     return undefined;
   }

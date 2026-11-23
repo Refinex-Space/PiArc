@@ -13,6 +13,7 @@ import {
 } from '../../shared/ipc.js';
 import { useApp } from '../app/app-context.js';
 import { AutoReviewSection } from './AutoReviewSection.js';
+import { ManagedBadge, useIsManaged } from './managed.js';
 import { revealBidi } from '../transcript/reveal.js';
 
 const BEHAVIORS: readonly RuleBehavior[] = ['deny', 'ask', 'allow'];
@@ -178,6 +179,7 @@ function sourceTitle(id: string): MessageId | undefined {
     case 'claudeProject':
     case 'user':
     case 'claudeUser':
+    case 'enterprise':
       return `permissions.source.${id}`;
     default:
       return undefined;
@@ -315,6 +317,10 @@ function SourceSection({
   const { t } = useApp();
   const [editing, setEditing] = useState<string | undefined>(undefined);
   const [adding, setAdding] = useState(false);
+  // T47: with `allowManagedPermissionRulesOnly` only the organization's rules apply; the
+  // other files' rules stay listed (inactive) but are not edited here.
+  const taken = useIsManaged('/permissions/allow');
+  const writable = source.writable && !taken;
   const layer = isLayer(source.id) ? source.id : undefined;
   const title = sourceTitle(source.id);
   const change = (behavior: RuleBehavior, old?: string, rule?: string) => {
@@ -342,6 +348,9 @@ function SourceSection({
         {title === undefined ? source.id : t(title)}
         {source.sessionId !== undefined && <span className="muted"> · {source.sessionId}</span>}
         {!source.writable && <span className="muted"> · {t('permissions.readOnly')}</span>}
+        {(source.id === 'enterprise' || (source.writable && taken)) && (
+          <ManagedBadge testId={`managed-rules-${source.id}`} />
+        )}
       </h3>
       {source.file !== undefined && <div className="muted approval-path">{source.file}</div>}
       {source.rules.length === 0 && <p className="muted">{t('permissions.empty')}</p>}
@@ -391,7 +400,7 @@ function SourceSection({
                         {t('permissions.neverMatches', { rule: r.suggestion })}
                       </span>
                     )}
-                    {source.writable && (
+                    {writable && (
                       <span className="permission-actions">
                         <button
                           type="button"
@@ -420,7 +429,7 @@ function SourceSection({
           })}
         </ul>
       )}
-      {source.writable &&
+      {writable &&
         (adding ? (
           <RuleEditor
             initial=""
@@ -707,6 +716,7 @@ export function PermissionsPage() {
   const [view, setView] = useState<PermissionView | undefined>(undefined);
   const [error, setError] = useState('');
   const workspaceId = useId();
+  const managedBypass = useIsManaged('/permissions/enableBypassPermissions');
   const report = (e: unknown) => {
     setError(e instanceof Error ? e.message : String(e));
   };
@@ -724,11 +734,15 @@ export function PermissionsPage() {
   return (
     <div className="settings-section" data-testid="permissions-page">
       <div className="setting">
-        <span className="setting-label">{t('approval.modeMenu')}</span>
+        <span className="setting-label">
+          {t('approval.modeMenu')}
+          {managedBypass && <ManagedBadge testId="managed-bypass" />}
+        </span>
         <label className="checkbox">
           <input
             type="checkbox"
             checked={preferences.permissions.enableBypassPermissions}
+            disabled={managedBypass}
             data-testid="setting-enable-bypass"
             onChange={(event) => {
               window.piarc

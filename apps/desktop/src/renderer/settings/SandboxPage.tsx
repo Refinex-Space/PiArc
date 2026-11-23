@@ -11,6 +11,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import type { SandboxChange } from '../../shared/ipc.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
+import { ManagedBadge, useIsManaged } from './managed.js';
 
 type Origin = 'user' | 'claudeUser' | 'project' | 'enterprise';
 
@@ -118,6 +119,7 @@ function EntryList({
   placeholder,
   testId,
   disabled,
+  managed,
   onSave,
 }: {
   readonly title: MessageId;
@@ -127,6 +129,8 @@ function EntryList({
   readonly placeholder: MessageId;
   readonly testId: string;
   readonly disabled: boolean;
+  /** Only the organization's entries apply (T47, `allowManagedDomainsOnly`). */
+  readonly managed: boolean;
   readonly onSave: (list: string[]) => void;
 }) {
   const { t } = useApp();
@@ -137,7 +141,10 @@ function EntryList({
   const ownRows = own;
   return (
     <section className="settings-subsection" data-testid={testId}>
-      <h2 className="permission-heading">{t(title)}</h2>
+      <h2 className="permission-heading">
+        {t(title)}
+        {managed && <ManagedBadge testId={`${testId}-managed`} />}
+      </h2>
       <p className="muted">{t(hint)}</p>
       <ul className="permission-rules">
         {ownRows.map((value) => (
@@ -210,6 +217,10 @@ export function SandboxPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const workspaceId = useId();
+  // T47: settings the organization manages stay read-only here.
+  const managedEnabled = useIsManaged('/sandbox/enabled');
+  const managedMode = useIsManaged('/sandbox/autoAllowBashIfSandboxed');
+  const managedDomains = useIsManaged('/sandbox/network/allowedDomains');
   const show = useCallback((raw: string) => {
     const value: unknown = JSON.parse(raw);
     // A cancelled native confirmation leaves the view as it is.
@@ -278,11 +289,12 @@ export function SandboxPage() {
       )}
       {view.workspace === null && <p className="muted">{t('sandbox.noWorkspace')}</p>}
       <div className="setting">
+        {managedEnabled && <ManagedBadge testId="managed-sandbox-enabled" />}
         <label className="checkbox">
           <input
             type="checkbox"
             checked={view.supported && view.enabled}
-            disabled={off || busy}
+            disabled={off || busy || managedEnabled}
             aria-describedby="sandbox-enabled-hint"
             data-testid="sandbox-enabled"
             onChange={(e) => {
@@ -300,8 +312,15 @@ export function SandboxPage() {
           </p>
         )}
       </div>
-      <fieldset className="setting" data-testid="sandbox-mode" disabled={off || busy}>
-        <legend className="setting-label">{t('sandbox.mode')}</legend>
+      <fieldset
+        className="setting"
+        data-testid="sandbox-mode"
+        disabled={off || busy || managedMode}
+      >
+        <legend className="setting-label">
+          {t('sandbox.mode')}
+          {managedMode && <ManagedBadge testId="managed-sandbox-mode" />}
+        </legend>
         <div className="segmented" role="radiogroup">
           {(['ask', 'auto'] as const).map((mode) => {
             const selected = (mode === 'auto') === view.autoAllow;
@@ -336,7 +355,8 @@ export function SandboxPage() {
         own={view.userDomains}
         placeholder="sandbox.newDomain"
         testId="sandbox-domains"
-        disabled={off || busy}
+        disabled={off || busy || managedDomains}
+        managed={managedDomains}
         onSave={(list) => {
           save({ allowedDomains: list });
         }}
@@ -349,6 +369,7 @@ export function SandboxPage() {
         placeholder="sandbox.newPath"
         testId="sandbox-deny-read"
         disabled={off || busy}
+        managed={false}
         onSave={(list) => {
           save({ denyRead: list });
         }}

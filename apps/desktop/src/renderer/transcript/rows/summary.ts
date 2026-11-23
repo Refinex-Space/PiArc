@@ -5,7 +5,19 @@ import type { Item, ItemStatus } from '@piarc/protocol';
 
 import type { MessageId } from '../../../shared/i18n/index.js';
 
-export type ToolVerb = 'read' | 'search' | 'find' | 'edit' | 'fetch' | 'mcp' | 'agent' | 'other';
+export type ToolVerb =
+  | 'read'
+  | 'search'
+  | 'find'
+  | 'edit'
+  | 'fetch'
+  | 'mcp'
+  | 'agent'
+  | 'memorySave'
+  | 'memoryRead'
+  | 'memoryIndex'
+  | 'memoryDelete'
+  | 'other';
 
 export interface ToolPart {
   readonly verb: ToolVerb;
@@ -30,6 +42,10 @@ const VERB_ORDER: readonly ToolVerb[] = [
   'fetch',
   'mcp',
   'agent',
+  'memorySave',
+  'memoryRead',
+  'memoryIndex',
+  'memoryDelete',
   'other',
 ];
 
@@ -66,8 +82,22 @@ export function verbOf(item: Item): ToolVerb {
       return 'search';
     case 'Glob':
       return 'find';
+    case 'Memory':
+      return memoryVerb(item);
     default:
       return 'other';
+  }
+}
+
+/** What a `Memory` call does (T47, design addendum section 4.1). */
+function memoryVerb(item: Item): ToolVerb {
+  switch (argument(item, 'action')) {
+    case 'save':
+      return 'memorySave';
+    case 'delete':
+      return 'memoryDelete';
+    default:
+      return argument(item, 'name') === undefined ? 'memoryIndex' : 'memoryRead';
   }
 }
 
@@ -105,6 +135,10 @@ export function targetOf(item: Item): string {
     case 'search':
     case 'find':
       return argument(item, 'pattern') ?? toolOf(item);
+    case 'memorySave':
+    case 'memoryRead':
+    case 'memoryDelete':
+      return argument(item, 'name')?.trim() ?? toolOf(item);
     default:
       return toolOf(item);
   }
@@ -155,6 +189,10 @@ export const VERB_MESSAGE: Record<ToolVerb, MessageId> = {
   fetch: 'transcript.tool.fetch',
   mcp: 'transcript.tool.mcp',
   agent: 'transcript.tool.agent',
+  memorySave: 'transcript.tool.memorySave',
+  memoryRead: 'transcript.tool.memoryRead',
+  memoryIndex: 'transcript.tool.memoryIndex',
+  memoryDelete: 'transcript.tool.memoryDelete',
   other: 'transcript.tool.other',
 };
 

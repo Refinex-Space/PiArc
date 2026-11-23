@@ -592,6 +592,19 @@ const api: PiarcApi = {
   setWebSearchKey: async (backend, key) => {
     await ipcRenderer.invoke(IPC_CHANNELS.webSearchKeySet, backend, key);
   },
+  managedSettings: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.managedSettings).then((value: unknown) => expectString(value)),
+  memoryView: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.memoryView, workspace)
+      .then((value: unknown) => expectString(value)),
+  memoryEdit: (workspace, edit) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.memoryEdit, workspace, edit)
+      .then((value: unknown) => expectString(value)),
+  revealMemory: async (workspace) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.memoryReveal, workspace);
+  },
   resendSnapshots: async () => {
     await ipcRenderer.invoke(IPC_CHANNELS.snapshotsResend);
   },

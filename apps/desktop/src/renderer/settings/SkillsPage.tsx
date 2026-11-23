@@ -12,6 +12,7 @@ import { parseCommandsList, type CommandsList } from '../composer/commands-list.
 import { sourceLabel } from '../composer/Composer.js';
 import { styleDescription } from '../shell/OutputStyleDialog.js';
 import { parseWorkspaces } from './AgentsPage.js';
+import { ManagedBadge, useIsManaged } from './managed.js';
 import { PluginsSection } from './PluginsSection.js';
 
 interface SkillsView {
@@ -125,6 +126,7 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
   const [list, setList] = useState<CommandsList | undefined>(undefined);
   const [error, setError] = useState('');
   const [userStyle, setUserStyle] = useState(preferences.outputStyle);
+  const managed = useIsManaged('/outputStyle');
   const load = useCallback(() => {
     window.piarc
       .listCommands(workspace, null)
@@ -150,10 +152,12 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
       </p>
       <label htmlFor={selectId} className="permission-filter-label">
         {t('skills.style.default')}
+        {managed && <ManagedBadge testId="managed-output-style" />}
       </label>
       <select
         id={selectId}
         className="input"
+        disabled={managed}
         data-testid="output-style-select"
         value={userStyle}
         onChange={(e) => {

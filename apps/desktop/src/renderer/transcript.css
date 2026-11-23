@@ -1337,3 +1337,8 @@
 .row-web-search.is-failed .bash-head {
   color: var(--piarc-text-danger);
 }
+
+/* T47: a `Memory` call links to its note on the settings window's memory page. */
+.tool-call-link {
+  margin-inline-start: var(--piarc-space-5);
+}

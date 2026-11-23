@@ -7,7 +7,12 @@ import type { DiffHunk, Item, ItemStatus } from '@piarc/protocol';
 import { memo } from 'react';
 
 import { useApp, useT } from '../../app/app-context.js';
-import { useExpanded, useTranscriptRow, useTranscriptRows } from '../services.js';
+import {
+  useExpanded,
+  useTranscriptRow,
+  useTranscriptRows,
+  useTranscriptView,
+} from '../services.js';
 import { useElapsedText, useNow } from './common.js';
 import { revealBidi } from '../reveal.js';
 import { ReviewNote } from './review.js';
@@ -128,6 +133,7 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
   const label = useToolLabel();
   const t = useT();
   const [open, setOpen] = useExpanded(`call:${id}`, false);
+  const { openMemory } = useTranscriptView().actions;
   if (row?.kind !== 'item') {
     return null;
   }
@@ -136,6 +142,11 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
     return <FileChangeCard id={id} item={item} />;
   }
   const output = ('output' in item ? item.output : undefined) ?? undefined;
+  // A `Memory` call links to the note on the settings window's memory page (T47).
+  const memory =
+    item.type === 'dynamicToolCall' && item.tool === 'Memory' && openMemory !== undefined
+      ? memoryNoteOf(item)
+      : null;
   return (
     <div className="tool-call" data-testid="tool-call" data-row-id={id} data-status={item.status}>
       <button
@@ -150,6 +161,18 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
         <StatusMark status={item.status} />
         <span className="tool-call-label">{label(item)}</span>
       </button>
+      {memory !== null && openMemory !== undefined ? (
+        <button
+          type="button"
+          className="button button-small tool-call-link"
+          data-testid="memory-open-settings"
+          onClick={() => {
+            openMemory(memory.note);
+          }}
+        >
+          {t('transcript.memory.openSettings')}
+        </button>
+      ) : null}
       {'review' in item ? <ReviewNote review={item.review} /> : null}
       {open && output !== undefined ? (
         <pre className="tool-output" aria-label={t('transcript.tool.output')}>
@@ -159,6 +182,16 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
     </div>
   );
 });
+
+/** The note a `Memory` call names (`undefined` for the index), for "Open in settings". */
+function memoryNoteOf(item: Extract<Item, { type: 'dynamicToolCall' }>): {
+  note: string | undefined;
+} {
+  const name = item.arguments.name;
+  const note = typeof name === 'string' ? name.trim() : '';
+  // A deleted note has nothing to show; the page opens on the list.
+  return { note: note === '' || item.arguments.action === 'delete' ? undefined : note };
+}
 
 function lastLines(text: string, count: number): string {
   const lines = text.replace(/\n$/u, '').split('\n');

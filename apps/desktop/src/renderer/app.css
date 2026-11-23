@@ -2263,3 +2263,101 @@ textarea.input {
   display: flex;
   gap: var(--piarc-space-2);
 }
+
+/* T47: the managed settings' marks and the memory page. */
+.managed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-inline-start: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  vertical-align: middle;
+}
+.managed-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin: 0 0 var(--piarc-space-4);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+}
+.managed-banner > .managed-badge {
+  margin-inline-start: 0;
+}
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.memory-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+.memory-note-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+.memory-disclosure {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--piarc-text-accent);
+  font: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+  cursor: pointer;
+}
+.memory-type {
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-selected);
+  font-size: var(--piarc-font-size-caption);
+}
+.memory-note-description {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.memory-note-body {
+  margin: 0;
+  padding: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-code-background);
+  color: var(--piarc-code-text);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.memory-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+}
+.memory-body-input {
+  font-family: var(--piarc-font-mono);
+  resize: vertical;
+}
+.memory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+}
+.memory-start {
+  align-self: flex-start;
+}

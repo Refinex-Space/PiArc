@@ -13,6 +13,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
+import { ManagedBadge, pointerToken, useIsManaged } from './managed.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -151,6 +152,8 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
   ]
     .filter((part) => part !== '')
     .join(' · ');
+  // T47: a package the organization's settings switch on or off stays as they say.
+  const managed = useIsManaged(`/plugins/${pointerToken(pkg.id)}`);
   return (
     <li className="agent-row" data-testid="package-row" data-id={pkg.id}>
       <div className="agent-row-head">
@@ -198,12 +201,13 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
         </div>
       ))}
       <div className="dialog-actions mcp-actions">
+        {managed && <ManagedBadge testId="managed-package" />}
         {pkg.enabled ? (
           <button
             type="button"
             className="button"
             data-testid="package-off"
-            disabled={busy}
+            disabled={busy || managed}
             onClick={() => {
               act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, false, scope, where));
             }}
@@ -215,7 +219,7 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
             type="button"
             className="button button-primary"
             data-testid="package-on"
-            disabled={busy}
+            disabled={busy || managed}
             onClick={() => {
               act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, true, scope, where));
             }}

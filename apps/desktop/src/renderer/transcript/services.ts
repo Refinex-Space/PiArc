@@ -108,6 +108,8 @@ export interface TranscriptActions {
   ) => Promise<string>;
   /** Stops a running subagent (T31). */
   readonly stopSubagent?: (child: string) => void;
+  /** Opens the settings window's memory page, at `note` when given (T47). */
+  readonly openMemory?: (note: string | undefined) => void;
 }
 
 /** One session's transcript as a view shows it. */

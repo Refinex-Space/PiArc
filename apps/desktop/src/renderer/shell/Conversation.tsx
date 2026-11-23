@@ -56,6 +56,7 @@ import { OutputStyleDialog } from './OutputStyleDialog.js';
 import { showPanel } from './registry.js';
 import { onCommandRequest, takeCommand } from './command-requests.js';
 import { parseWindow } from '../store/history-window.js';
+import { rememberMemoryTarget } from '../settings/memory-target.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -337,6 +338,7 @@ export function Conversation({
     }
   }, [id, unread, focused]);
 
+  const sessionWorkspace = session?.workspace;
   const view = useMemo<TranscriptView>(
     () => ({
       services: ui.transcriptServices,
@@ -361,9 +363,21 @@ export function Conversation({
             console.error('[conversation] cannot stop the subagent', failure);
           });
         },
+        // A `Memory` call's "Open in settings" (T47): the memory page on this workspace's note.
+        openMemory: (note) => {
+          if (sessionWorkspace !== undefined) {
+            rememberMemoryTarget({
+              workspace: sessionWorkspace,
+              ...(note === undefined ? {} : { note }),
+            });
+          }
+          window.piarc.openSettings('memory').catch((failure: unknown) => {
+            console.error('[conversation] cannot open the memory page', failure);
+          });
+        },
       },
     }),
-    [ui.transcriptServices, transcript, input, branchActions],
+    [ui.transcriptServices, transcript, input, branchActions, sessionWorkspace],
   );
   const mentions = useMemo(
     () => coreMentions(session?.cwd ?? session?.workspace, ui.composer?.maxSearchResults ?? 20),
@@ -404,6 +418,12 @@ export function Conversation({
               setError(t('outputStyle.unknown', { name: args }));
             }
           });
+          break;
+        case 'memory':
+          // T47: the settings window's memory page, on this session's workspace.
+          if (session?.workspace !== undefined)
+            rememberMemoryTarget({ workspace: session.workspace });
+          window.piarc.openSettings('memory').catch(failed);
           break;
       }
     },

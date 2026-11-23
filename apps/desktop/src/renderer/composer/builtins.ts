@@ -5,7 +5,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 
 /** What a built-in command does in the client. */
 export type BuiltinAction =
-  'newSession' | 'compact' | 'rewind' | 'help' | 'model' | 'context' | 'outputStyle';
+  'newSession' | 'compact' | 'rewind' | 'help' | 'model' | 'context' | 'outputStyle' | 'memory';
 
 interface Builtin {
   readonly action: BuiltinAction;
@@ -20,6 +20,7 @@ const BUILTINS: Readonly<Record<string, Builtin>> = {
   model: { action: 'model', label: 'composer.command.model' },
   context: { action: 'context', label: 'composer.command.context' },
   'output-style': { action: 'outputStyle', label: 'composer.command.outputStyle' },
+  memory: { action: 'memory', label: 'composer.command.memory' },
 };
 
 /** Aliases Core lists for built-in commands, by name. */

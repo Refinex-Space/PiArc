@@ -99,6 +99,10 @@ export const IPC_CHANNELS = {
   skillsList: 'piarc:skills.list',
   outputStyleSet: 'piarc:outputStyle.set',
   webSearchSettings: 'piarc:webSearch.settings',
+  managedSettings: 'piarc:managed.settings',
+  memoryView: 'piarc:memory.view',
+  memoryEdit: 'piarc:memory.edit',
+  memoryReveal: 'piarc:memory.reveal',
   webSearchBackendSet: 'piarc:webSearch.backend.set',
   webSearchKeySet: 'piarc:webSearch.key.set',
   snapshotsResend: 'piarc:snapshots.resend',
@@ -858,6 +862,23 @@ export interface PiarcApi {
   setWebSearchBackend(backend: string | null): Promise<void>;
   /** Saves a WebSearch backend's API key in the vault; null removes it (T38). */
   setWebSearchKey(backend: string, key: string | null): Promise<void>;
+  /**
+   * What the organization's managed settings lock, as JSON `{ configured, sources, locked,
+   * values, entries, taken }` (T47): the settings window marks those controls and keeps them read-only.
+   */
+  managedSettings(): Promise<string>;
+  /**
+   * The memory page of a workspace as JSON (T47): its repository's auto memory notes, the
+   * switches and Claude Code's memory available to import.
+   */
+  memoryView(workspace: string): Promise<string>;
+  /**
+   * One edit of the memory page, JSON `{ op: save | delete | deleteAll | import | setEnabled, … }`;
+   * answers the page anew (T47).
+   */
+  memoryEdit(workspace: string, edit: string): Promise<string>;
+  /** Shows the workspace repository's memory folder in Finder or File Explorer (T47). */
+  revealMemory(workspace: string): Promise<void>;
   /** Asks Core to send the workspace and session snapshots again. */
   resendSnapshots(): Promise<void>;
   /** The trust view of a directory as JSON (`TrustView`). */

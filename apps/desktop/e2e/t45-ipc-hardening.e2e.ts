@@ -18,6 +18,7 @@ const NO_PARAMETERS = new Set([
   'providerSettings',
   'composerInfo',
   'webSearchSettings',
+  'managedSettings',
   'resendSnapshots',
   'takeLaunchTargets',
 ]);

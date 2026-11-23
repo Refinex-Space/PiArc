@@ -43,6 +43,12 @@ export const A11Y_STATES = [
     page: 'skills',
     note: 'Skills and plugins with an installed plugin (off)',
   },
+  {
+    id: 'settings:memory',
+    area: 'settings',
+    page: 'memory',
+    note: 'Memory: the switches and the empty list of a workspace (T47)',
+  },
   { id: 'settings:mcp', area: 'settings', page: 'mcp', note: 'MCP servers' },
   { id: 'settings:usage', area: 'settings', page: 'usage', note: 'Usage' },
   {

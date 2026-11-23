@@ -126,6 +126,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     'sandbox',
     'agents',
     'skills',
+    'memory',
     'mcp',
     'usage',
     'diagnostics',

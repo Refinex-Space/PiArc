@@ -12,6 +12,7 @@ import {
   type AutoModeList,
 } from '../../shared/preferences.js';
 import { useApp } from '../app/app-context.js';
+import { ManagedBadge, useIsManaged } from './managed.js';
 import { parseDiagnostics } from './ConfigDiagnosticsPage.js';
 import { parseSettings, type CatalogEntry } from './provider-form.js';
 
@@ -70,6 +71,10 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
       .catch(onError);
   }, []);
   const choices = models ?? [];
+  // T47: the organization may manage the switch (or turn the mode off) and the reviewer.
+  const managedSwitch =
+    useIsManaged('/permissions/enableAutoMode') || useIsManaged('/disableAutoMode');
+  const managedModel = useIsManaged('/autoMode/model');
   const chosenKnown = choices.some((m) => `${m.provider}/${m.id}` === auto.model);
   return (
     <section className="auto-review" data-testid="auto-review-section">
@@ -78,11 +83,13 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
       <div className="setting">
         <label htmlFor={modelId} className="setting-label">
           {t('permissions.auto.model')}
+          {managedModel && <ManagedBadge testId="managed-auto-model" />}
         </label>
         <select
           id={modelId}
           className="input"
           value={auto.model}
+          disabled={managedModel}
           data-testid="auto-review-model"
           onChange={(e) => {
             const value = e.currentTarget.value;
@@ -110,11 +117,12 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
         )}
       </div>
       <div className="setting">
+        {managedSwitch && <ManagedBadge testId="managed-auto-switch" />}
         <label className="checkbox">
           <input
             type="checkbox"
             checked={enabled}
-            disabled={!enabled && auto.model === ''}
+            disabled={managedSwitch || (!enabled && auto.model === '')}
             data-testid="setting-enable-auto"
             onChange={(event) => {
               window.piarc
@@ -160,6 +168,7 @@ function PolicyList({
   const { t } = useApp();
   const [draft, setDraft] = useState('');
   const inputId = useId();
+  const managed = useIsManaged(`/autoMode/${list}`);
   const save = (next: readonly string[]) => {
     window.piarc.setPreference({ key: 'autoMode.list', list, value: next }).catch(onError);
   };
@@ -168,6 +177,7 @@ function PolicyList({
     <div className="setting auto-review-list" data-testid={`auto-review-list-${list}`}>
       <label htmlFor={inputId} className="setting-label">
         {t(LIST_LABEL[list])}
+        {managed && <ManagedBadge testId={`managed-auto-list-${list}`} />}
       </label>
       <p className="muted">{t(LIST_HINT[list])}</p>
       <ul className="auto-review-entries">
@@ -177,6 +187,7 @@ function PolicyList({
             <button
               type="button"
               className="row-action"
+              disabled={managed}
               aria-label={t('permissions.auto.remove', { value })}
               onClick={() => {
                 save(entries.filter((_, i) => i !== index));
@@ -207,13 +218,14 @@ function PolicyList({
           className="input"
           value={draft}
           maxLength={AUTO_MODE_ENTRY_CHARS}
+          disabled={managed}
           placeholder={t('permissions.auto.addPlaceholder')}
           data-testid={`auto-review-input-${list}`}
           onChange={(e) => {
             setDraft(e.currentTarget.value);
           }}
         />
-        <button type="submit" className="button" disabled={entry === ''}>
+        <button type="submit" className="button" disabled={managed || entry === ''}>
           {t('permissions.auto.add')}
         </button>
       </form>

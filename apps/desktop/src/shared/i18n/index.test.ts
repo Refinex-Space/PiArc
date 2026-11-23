@@ -120,6 +120,9 @@ describe('i18n', () => {
             text: 'Fix the parser',
             kind: 'Run command?',
             status: 'Done',
+            date: '2026-11-22',
+            location: '/Library/Application Support/PiArc/managed-settings.json',
+            position: 'Line 3, column 7',
           }),
         ).not.toThrow();
       }

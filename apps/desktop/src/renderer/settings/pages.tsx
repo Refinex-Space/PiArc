@@ -27,9 +27,11 @@ import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { SandboxPage } from './SandboxPage.js';
 import { ProvidersPage } from './ProvidersPage.js';
+import { ManagedBadge, useIsManaged } from './managed.js';
 import { registerSettingsPage } from './registry.js';
 import { AgentsPage } from './AgentsPage.js';
 import { McpPage } from './McpPage.js';
+import { MemoryPage } from './MemoryPage.js';
 import { SkillsPage } from './SkillsPage.js';
 import { UsagePage } from '../usage/UsagePage.js';
 
@@ -54,6 +56,7 @@ function useSave(): { save: (change: PreferenceChange) => void; error: string | 
 function Choice<T extends string>({
   label,
   name,
+  pointer,
   options,
   value,
   labelOf,
@@ -61,6 +64,8 @@ function Choice<T extends string>({
 }: {
   readonly label: MessageId;
   readonly name: string;
+  /** The setting it writes (T47: read-only when managed settings lock it). */
+  readonly pointer: string;
   readonly options: readonly T[];
   readonly value: T;
   readonly labelOf: (option: T) => MessageId;
@@ -68,10 +73,12 @@ function Choice<T extends string>({
 }) {
   const { t } = useApp();
   const id = useId();
+  const managed = useIsManaged(pointer);
   return (
-    <fieldset className="setting" data-testid={`setting-${name}`}>
+    <fieldset className="setting" data-testid={`setting-${name}`} disabled={managed}>
       <legend id={id} className="setting-label">
         {t(label)}
+        {managed && <ManagedBadge testId={`managed-${name}`} />}
       </legend>
       <div className="segmented" role="radiogroup" aria-labelledby={id}>
         {options.map((option) => (
@@ -98,16 +105,21 @@ function GeneralPage() {
   const { t, preferences, notificationsSupported } = useApp();
   const { save, error } = useSave();
   const languageId = useId();
+  const managedLanguage = useIsManaged('/language');
+  const managedNotifications = useIsManaged('/notifications/enabled');
+  const managedReadBoth = useIsManaged('/memory/readBoth');
   return (
     <div className="settings-section">
       <div className="setting">
         <label htmlFor={languageId} className="setting-label">
           {t('settings.language')}
+          {managedLanguage && <ManagedBadge testId="managed-language" />}
         </label>
         <select
           id={languageId}
           className="input"
           value={preferences.language}
+          disabled={managedLanguage}
           data-testid="setting-language"
           onChange={(event) => {
             const value = LANGUAGES.find((l) => l === event.currentTarget.value);
@@ -124,11 +136,15 @@ function GeneralPage() {
         </select>
       </div>
       <div className="setting">
-        <span className="setting-label">{t('settings.notifications')}</span>
+        <span className="setting-label">
+          {t('settings.notifications')}
+          {managedNotifications && <ManagedBadge testId="managed-notifications" />}
+        </span>
         <label className="checkbox">
           <input
             type="checkbox"
             checked={preferences.notifications.enabled}
+            disabled={managedNotifications}
             data-testid="setting-notifications"
             onChange={(event) => {
               save({ key: 'notifications.enabled', value: event.currentTarget.checked });
@@ -145,11 +161,15 @@ function GeneralPage() {
         </p>
       </div>
       <div className="setting">
-        <span className="setting-label">{t('settings.memory')}</span>
+        <span className="setting-label">
+          {t('settings.memory')}
+          {managedReadBoth && <ManagedBadge testId="managed-read-both" />}
+        </span>
         <label className="checkbox">
           <input
             type="checkbox"
             checked={preferences.memory.readBoth}
+            disabled={managedReadBoth}
             data-testid="setting-memory-read-both"
             onChange={(event) => {
               save({ key: 'memory.readBoth', value: event.currentTarget.checked });
@@ -176,6 +196,7 @@ function AppearancePage() {
       <Choice
         label="settings.theme"
         name="theme"
+        pointer="/appearance/theme"
         options={THEMES}
         value={appearance.theme}
         labelOf={(o) => `settings.theme.${o}`}
@@ -186,6 +207,7 @@ function AppearancePage() {
       <Choice
         label="settings.contrast"
         name="contrast"
+        pointer="/appearance/contrast"
         options={CONTRASTS}
         value={appearance.contrast}
         labelOf={(o) => `settings.contrast.${o}`}
@@ -196,6 +218,7 @@ function AppearancePage() {
       <Choice
         label="settings.density"
         name="density"
+        pointer="/appearance/density"
         options={DENSITY_PREFERENCES}
         value={appearance.density}
         labelOf={(o) => `settings.density.${o}`}
@@ -206,6 +229,7 @@ function AppearancePage() {
       <Choice
         label="settings.reduceMotion"
         name="reduceMotion"
+        pointer="/appearance/reduceMotion"
         options={MOTIONS}
         value={appearance.reduceMotion}
         labelOf={(o) => `settings.reduceMotion.${o}`}
@@ -397,6 +421,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.skills',
     order: 45,
     component: SkillsPage,
+  });
+  registerSettingsPage({
+    id: 'memory',
+    title: 'settings.autoMemory',
+    order: 47,
+    component: MemoryPage,
   });
   registerSettingsPage({
     id: 'mcp',

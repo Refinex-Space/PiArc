@@ -5,7 +5,7 @@
 // 10.3): a page cannot delete a session without the user's click in that dialog.
 import path from 'node:path';
 
-import { BrowserWindow, dialog } from 'electron';
+import { BrowserWindow, dialog, shell } from 'electron';
 import {
   isPermissionMode,
   type DiscardRequest,
@@ -89,6 +89,9 @@ export type SessionCore = Pick<
   | 'webSearchSettings'
   | 'setWebSearchBackend'
   | 'setWebSearchKey'
+  | 'managedSettings'
+  | 'memoryView'
+  | 'memoryEdit'
   | 'resendSnapshots'
   | 'projectTrust'
   | 'decideProjectTrust'
@@ -759,6 +762,24 @@ export function registerSessionHandlers(
     await core.setOutputStyle(dir === null ? null : absolutePath(dir), name);
   });
   registerHandler(IPC_CHANNELS.webSearchSettings, () => core.webSearchSettings());
+  registerHandler(IPC_CHANNELS.managedSettings, () => core.managedSettings());
+  registerHandler(IPC_CHANNELS.memoryView, (_event, [dir]) => core.memoryView(absolutePath(dir)));
+  registerHandler(IPC_CHANNELS.memoryEdit, (_event, [dir, edit]) => {
+    if (typeof edit !== 'string' || edit.length > 64 * 1024) {
+      throw new TypeError('edit must be a JSON text of at most 64 KiB');
+    }
+    return core.memoryEdit(absolutePath(dir), edit);
+  });
+  registerHandler(IPC_CHANNELS.memoryReveal, async (_event, [dir]) => {
+    // The folder Core names for this workspace's repository, never a path from the page.
+    const view: unknown = JSON.parse(await core.memoryView(absolutePath(dir)));
+    const directory: unknown =
+      typeof view === 'object' && view !== null && 'directory' in view ? view.directory : undefined;
+    if (typeof directory !== 'string' || !path.isAbsolute(directory)) {
+      throw new Error('Core named no memory directory');
+    }
+    shell.showItemInFolder(directory);
+  });
   const backendId = (value: unknown): string => {
     if (typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/u.test(value)) {
       throw new TypeError('backend must be a search backend id');

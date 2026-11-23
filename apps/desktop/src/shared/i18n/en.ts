@@ -16,6 +16,7 @@ export const en = {
   'permissions.source.claudeProjectLocal': '.claude/settings.local.json (Claude Code)',
   'permissions.source.claudeProject': '.claude/settings.json (Claude Code)',
   'permissions.source.claudeUser': '~/.claude/settings.json (Claude Code)',
+  'permissions.source.enterprise': 'Managed by your organization',
   'permissions.behavior.deny': 'Deny',
   'permissions.behavior.ask': 'Ask',
   'permissions.behavior.allow': 'Allow',
@@ -1387,6 +1388,64 @@ export const en = {
   'autoReview.status.total': 'Auto review paused after 20 refusals',
   'diagnostics.reason.projectAutoMode': 'Auto review settings apply from your user settings only',
   'usage.purpose.autoReview': 'Review',
+  'settings.autoMemory': 'Memory',
+  'memory.hint':
+    'Auto memory keeps notes the agent writes for later sessions of the same repository: how to build and test, your preferences, decisions. A short index of them is in every new session; a note itself is read when needed. Worktrees of a repository share its notes.',
+  'memory.switches': 'Auto memory',
+  'memory.userEnabled': 'Use auto memory',
+  'memory.projectEnabled': 'Use it in this project',
+  'memory.state.on': 'On: new sessions here see the index and can save notes.',
+  'memory.state.off': 'Off: new sessions here get no notes and no Memory tool.',
+  'memory.state.untrusted':
+    'This project is not trusted: sessions see the index but cannot save or delete notes.',
+  'memory.directory': 'Stored in {path}',
+  'memory.reveal': 'Show in folder',
+  'memory.import.found':
+    '{count, plural, one {Claude Code has # memory file for this project in {path}.} other {Claude Code has # memory files for this project in {path}.}}',
+  'memory.import.button': 'Import from Claude Code',
+  'memory.notes': 'Notes',
+  'memory.empty':
+    'No notes yet. When the agent learns something worth keeping for this repository, it saves a note here, and you can edit or delete it.',
+  'memory.filter': 'Type',
+  'memory.filter.all': 'All types',
+  'memory.type': 'Type',
+  'memory.type.user': 'You',
+  'memory.type.feedback': 'Feedback',
+  'memory.type.project': 'Project',
+  'memory.type.reference': 'Reference',
+  'memory.description': 'Description',
+  'memory.body': 'Note',
+  'memory.by.session': 'Saved by a session · {date}',
+  'memory.by.user': 'Edited by you · {date}',
+  'memory.by.import': 'Imported · {date}',
+  'memory.edit': 'Edit',
+  'memory.save': 'Save',
+  'memory.cancel': 'Cancel',
+  'memory.delete': 'Delete',
+  'memory.deleteConfirm': 'Click again to delete',
+  'memory.deleteAll': 'Delete all notes of this project',
+  'memory.deleteAllConfirm': 'Click again to delete all notes',
+  'managed.badge': 'Managed',
+  'managed.badgeHint': 'Your organization manages this setting; it cannot be changed here.',
+  'managed.banner': 'Some settings are managed by your organization.',
+  'managed.bannerProblem':
+    'Some settings are managed by your organization, and a managed settings source has a problem.',
+  'managed.bannerLink': 'See configuration diagnostics',
+  'composer.command.memory': 'Open the memory page',
+  'transcript.tool.memorySave':
+    '{count, plural, one {Saved memory · {target}} other {Saved # memories}}',
+  'transcript.tool.memoryRead':
+    '{count, plural, one {Recalled memory · {target}} other {Recalled # memories}}',
+  'transcript.tool.memoryIndex':
+    '{count, plural, one {Viewed the memory index} other {Viewed the memory index # times}}',
+  'transcript.tool.memoryDelete':
+    '{count, plural, one {Deleted memory · {target}} other {Deleted # memories}}',
+  'transcript.memory.openSettings': 'Open in settings',
+  'startup.failed.title': 'PiArc could not start',
+  'startup.failed.core': 'PiArc Core failed to load.\n\n{reason}',
+  'startup.managed.message':
+    'Your organization’s managed settings are not valid. PiArc does not start until an administrator fixes them.\n\nSource: {location}\n{position}\nProblem: {reason}',
+  'startup.managed.position': 'Line {line}, column {column}',
 } as const;
 
 export type MessageId = keyof typeof en;

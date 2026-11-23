@@ -47,6 +47,35 @@ describe('tool summaries', () => {
     expect([summary.added, summary.removed, summary.status]).toEqual([13, 1, 'failed']);
   });
 
+  it('says what Memory calls did, merging repeated ones (T47)', () => {
+    const memory = (id: string, args: Record<string, string>): Item => ({
+      type: 'dynamicToolCall',
+      itemId: id,
+      status: 'completed',
+      tool: 'Memory',
+      arguments: args,
+    });
+    expect(
+      summarize([
+        memory('1', { action: 'save', name: 'build' }),
+        memory('2', { action: 'read', name: ' style ' }),
+        memory('3', { action: 'read' }),
+        memory('4', { action: 'delete', name: 'old' }),
+      ]).parts,
+    ).toEqual([
+      { verb: 'memorySave', count: 1, target: 'build' },
+      { verb: 'memoryRead', count: 1, target: 'style' },
+      { verb: 'memoryIndex', count: 1, target: 'Memory' },
+      { verb: 'memoryDelete', count: 1, target: 'old' },
+    ]);
+    expect(
+      summarize([
+        memory('1', { action: 'save', name: 'a' }),
+        memory('2', { action: 'save', name: 'b' }),
+      ]).parts,
+    ).toEqual([{ verb: 'memorySave', count: 2, target: undefined }]);
+  });
+
   it('reports a group in progress while one call runs', () => {
     expect(summarize([read('1', 'a'), read('2', 'b', 'inProgress')]).status).toBe('inProgress');
   });
