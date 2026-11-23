@@ -4724,15 +4724,15 @@
       "id": "T49-A04",
       "task": "T49",
       "description": "主会话运行中打开侧边对话并完成问答，主会话的回合事件与排队项不受影响。验证：Playwright 与 mock provider。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "T49 Playwright 在 dev、packaged 上均通过。主回合执行期间用真实键盘加入 followUp，随后保持审批卡和队列可见并完成侧聊；5 个严格 mock 请求证实父会话继续完成且没有侧聊正文。证据 tmp/evidence/T49/native-playwright-final.log 与 l4/ 中 side-chat-while-main-waits 的亮暗截图。"
     },
     {
       "id": "T49-A05",
       "task": "T49",
       "description": "快捷键与 `/btw` 都能打开侧边对话，快捷键可自定义，关闭后内容丢弃。验证：Playwright 与截图（`tmp/evidence/T49/`）。",
-      "status": "not_started",
-      "evidence": ""
+      "status": "passing",
+      "evidence": "T49 Playwright 双形态验证 Mod+;、/btw、关闭再开为空、改键后仅新组合能打开。相关 L4 24/24，证据 tmp/evidence/T49/native-playwright-final.log、l4/。另用 ego-browser 在隔离的测试 renderer 完成提问、停止、关闭与 /btw 重开，见 tmp/evidence/T49/ego-native-side-chat.png。"
     },
     {
       "id": "T49-A06",
