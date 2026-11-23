@@ -299,21 +299,10 @@ pub fn locked(managed: Option<&Value>, pointer: &str) -> bool {
     let Some(managed) = managed else {
         return false;
     };
-    let on = |lock: &str| managed.pointer(lock) == Some(&Value::Bool(true));
-    let taken = [
-        ("/allowManagedPermissionRulesOnly", "/permissions/allow"),
-        ("/allowManagedPermissionRulesOnly", "/permissions/ask"),
-        ("/allowManagedPermissionRulesOnly", "/permissions/deny"),
-        ("/allowManagedHooksOnly", "/hooks"),
-        ("/allowManagedMcpServersOnly", "/allowedMcpServers"),
-        (
-            "/sandbox/network/allowManagedDomainsOnly",
-            "/sandbox/network/allowedDomains",
-        ),
-    ];
-    if taken.iter().any(|(lock, list)| {
-        on(lock) && (pointer == *list || pointer.starts_with(&format!("{list}/")))
-    }) {
+    if taken(Some(managed))
+        .iter()
+        .any(|list| pointer == *list || pointer.starts_with(&format!("{list}/")))
+    {
         return true;
     }
     let mut prefix = String::new();
@@ -331,6 +320,74 @@ pub fn locked(managed: Option<&Value>, pointer: &str) -> bool {
     managed
         .pointer(pointer)
         .is_some_and(|v| v.as_object().is_some_and(|m| !m.is_empty()))
+}
+
+/// The settings a managed lock takes over (section 5.3): the user's and the project's values
+/// of these no longer apply.
+#[must_use]
+pub fn taken(managed: Option<&Value>) -> Vec<&'static str> {
+    let Some(managed) = managed else {
+        return Vec::new();
+    };
+    let on = |lock: &str| managed.pointer(lock) == Some(&Value::Bool(true));
+    [
+        ("/allowManagedPermissionRulesOnly", "/permissions/allow"),
+        ("/allowManagedPermissionRulesOnly", "/permissions/ask"),
+        ("/allowManagedPermissionRulesOnly", "/permissions/deny"),
+        ("/allowManagedHooksOnly", "/hooks"),
+        ("/allowManagedMcpServersOnly", "/allowedMcpServers"),
+        (
+            "/sandbox/network/allowManagedDomainsOnly",
+            "/sandbox/network/allowedDomains",
+        ),
+    ]
+    .into_iter()
+    .filter(|(lock, _)| on(lock))
+    .map(|(_, list)| list)
+    .collect()
+}
+
+/// What the settings window shows (section 5.4): the documents, the settings the managed
+/// settings lock (scalars and objects, by JSON Pointer), the entries they add to lists, and the
+/// lists a lock takes over.
+#[must_use]
+pub fn view(managed: &Managed) -> Value {
+    let mut locked = Vec::new();
+    let mut values = Map::new();
+    let mut entries = Map::new();
+    for (pointer, value) in leaves(&managed.value) {
+        match value {
+            Value::Array(_) => {
+                entries.insert(pointer, value.clone());
+            }
+            _ => {
+                values.insert(pointer.clone(), value.clone());
+                locked.push(pointer);
+            }
+        }
+    }
+    locked.sort();
+    let sources: Vec<Value> = managed
+        .sources
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "location": s.location.display().to_string(),
+                "family": s.family,
+                "channel": s.channel,
+                "status": s.status,
+                "issues": s.issues.iter().map(|i| i.message.clone()).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    serde_json::json!({
+        "configured": !managed.sources.is_empty(),
+        "sources": sources,
+        "locked": locked,
+        "values": values,
+        "entries": entries,
+        "taken": taken(Some(&managed.value)),
+    })
 }
 
 fn check_source(raw: RawSource, before: Option<&SourceState>) -> SourceState {

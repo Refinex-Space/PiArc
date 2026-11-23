@@ -132,7 +132,9 @@ impl CoreRuntime {
         #[napi(ts_arg_type = "(batches: CoreEventBatch[]) => void")] on_events: EventListener,
     ) -> napi::Result<Self> {
         boundary::call(&env, "CoreRuntime.create", move || {
-            let config = config_of(options)?;
+            let mut config = config_of(options)?;
+            // The administrator's places of this computer (T47); tests use createForTests.
+            config.managed = piarc_core::managed::ManagedConfig::system();
             let sink = Arc::new(JsEventSink::new(on_events));
             piarc_core::CoreRuntime::start(config, sink).map(|core| Self { core })
         })

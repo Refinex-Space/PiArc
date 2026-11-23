@@ -114,6 +114,27 @@ impl CoreRuntime {
                         .collect(),
                 });
             }
+            if let Some(root) = std::env::var_os("PIARC_TEST_MANAGED_ROOT") {
+                // A fake system root in this platform's layout (T47): `<root>/Library/
+                // Application Support/<product>` or `<root>/Program Files/<product>`.
+                let root = std::path::PathBuf::from(root);
+                let layout = if cfg!(windows) {
+                    piarc_core::managed::store::Layout::Windows(root.join("Program Files"))
+                } else {
+                    piarc_core::managed::store::Layout::MacOs(root)
+                };
+                config.managed = piarc_core::managed::ManagedConfig {
+                    store: Some(std::sync::Arc::new(
+                        piarc_core::managed::store::FixedPolicy {
+                            layout: Some(layout),
+                            preferences: None,
+                            user: None,
+                            registry: None,
+                        },
+                    )),
+                    poll: std::time::Duration::from_millis(200),
+                };
+            }
             if let Some(file) = std::env::var_os("PIARC_TEST_OAUTH_PROVIDER") {
                 config.sessions.tune_host = Some(std::sync::Arc::new(move |host| {
                     host.extra_args.push("--test-oauth-provider".into());

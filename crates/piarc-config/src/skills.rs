@@ -52,6 +52,7 @@ pub const BUILT_IN_COMMANDS: &[(&str, &[&str], Option<&str>)] = &[
     ("rewind", &["checkpoint"], None),
     ("context", &[], None),
     ("output-style", &[], Some("[style]")),
+    ("memory", &[], None),
     ("help", &[], None),
 ];
 

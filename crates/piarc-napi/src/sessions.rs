@@ -872,6 +872,40 @@ impl CoreRuntime {
         })
     }
 
+    /// What managed settings lock, JSON text `{ configured, sources, locked, entries, taken }`
+    /// (T47).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn managed_settings<'env>(&self, env: &'env Env) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.managedSettings", |core, done| {
+            core.managed_settings(done)
+        })
+    }
+
+    /// The memory page of a workspace, JSON text (T47).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn memory_view<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.memoryView", |core, done| {
+            core.memory_view(workspace.into(), done)
+        })
+    }
+
+    /// One edit of the memory page (JSON text `{ op, … }`); answers the page anew (T47).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn memory_edit<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+        edit: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.memoryEdit", |core, done| {
+            core.memory_edit(workspace.into(), edit, done)
+        })
+    }
+
     /// The WebSearch settings, JSON text `{ backend, backends: [{ id, name, hasKey }] }` (T38).
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn web_search_settings<'env>(&self, env: &'env Env) -> napi::Result<Object<'env>> {

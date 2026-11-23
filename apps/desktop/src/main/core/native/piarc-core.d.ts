@@ -292,6 +292,15 @@ export declare class CoreRuntime {
    * when null; a null name removes the choice (T37).
    */
   setOutputStyle(workspace?: string | null, name?: string | null): Promise<string>;
+  /**
+   * What managed settings lock, JSON text `{ configured, sources, locked, entries, taken }`
+   * (T47).
+   */
+  managedSettings(): Promise<string>;
+  /** The memory page of a workspace, JSON text (T47). */
+  memoryView(workspace: string): Promise<string>;
+  /** One edit of the memory page (JSON text `{ op, … }`); answers the page anew (T47). */
+  memoryEdit(workspace: string, edit: string): Promise<string>;
   /** The WebSearch settings, JSON text `{ backend, backends: [{ id, name, hasKey }] }` (T38). */
   webSearchSettings(): Promise<string>;
   /** Chooses WebSearch's third-party backend; null chooses none (T38). */

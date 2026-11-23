@@ -604,6 +604,54 @@ impl CoreRuntime {
         })
     }
 
+    /// What managed settings lock, for the settings window (T47): `{ configured, sources,
+    /// locked, entries, taken }`.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn managed_settings(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.managed_settings().await },
+        )
+    }
+
+    /// The memory page of `workspace` (T47): its repository's notes and the switches.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn memory_view(
+        &self,
+        workspace: std::path::PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.memory_view(workspace).await
+        })
+    }
+
+    /// One edit of the memory page (T47): `{ op: save | delete | deleteAll | import |
+    /// setEnabled, … }`; answers the page anew.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn memory_edit(
+        &self,
+        workspace: std::path::PathBuf,
+        edit_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.memory_edit(workspace, edit_json).await
+        })
+    }
+
     /// The WebSearch settings: the chosen third-party backend and which backends have a key
     /// (T38).
     ///
