@@ -366,7 +366,8 @@ export function MemoryPage() {
             <label className="checkbox">
               <input
                 type="checkbox"
-                checked={view.userEnabled}
+                // Locked: both show what the organization decided.
+                checked={locked ? view.enabled : view.userEnabled}
                 disabled={locked || busy}
                 data-testid="memory-user-enabled"
                 onChange={(e) => {
@@ -378,7 +379,7 @@ export function MemoryPage() {
             <label className="checkbox">
               <input
                 type="checkbox"
-                checked={view.projectEnabled}
+                checked={locked ? view.enabled : view.projectEnabled}
                 disabled={locked || busy}
                 data-testid="memory-project-enabled"
                 onChange={(e) => {
@@ -417,7 +418,7 @@ export function MemoryPage() {
               </p>
               <button
                 type="button"
-                className="button"
+                className="button memory-start"
                 disabled={busy}
                 data-testid="memory-import-button"
                 onClick={() => {

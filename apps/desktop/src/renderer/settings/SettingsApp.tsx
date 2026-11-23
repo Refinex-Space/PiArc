@@ -46,6 +46,9 @@ export function SettingsApp() {
                   data-testid={`settings-nav-${p.id}`}
                   onClick={() => {
                     setCurrent(p.id);
+                    // Keep the address in step with the page: the main process opens a page
+                    // by loading its hash, which only takes effect when the hash differs.
+                    window.history.replaceState(null, '', `#/settings/${p.id}`);
                   }}
                 >
                   {t(p.title)}

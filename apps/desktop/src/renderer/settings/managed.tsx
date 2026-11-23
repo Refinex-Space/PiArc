@@ -180,9 +180,16 @@ export function ManagedBanner() {
     <p className="managed-banner" role="note" data-testid="managed-banner">
       <ManagedBadge testId="managed-banner-badge" />
       <span>{t(broken ? 'managed.bannerProblem' : 'managed.banner')}</span>
-      <a href="#/settings/diagnostics" data-testid="managed-banner-link">
+      <button
+        type="button"
+        className="button button-small"
+        data-testid="managed-banner-link"
+        onClick={() => {
+          window.location.hash = '#/settings/diagnostics';
+        }}
+      >
         {t('managed.bannerLink')}
-      </a>
+      </button>
     </p>
   );
 }
