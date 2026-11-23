@@ -177,7 +177,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T44 | [性能预算进 CI 与长跑测试](tasks/T44-performance-budgets-in-ci.md) | 5 | T43 | macOS | high / 高 | 中 | 无 | 部分完成 | a5f6146 |
 | T45 | [安全收口：威胁模型逐条测试、隐私与诊断包](tasks/T45-security-hardening-and-privacy.md) | 5 | T44 | macOS | xhigh / 极高 | 中 | 无 | 部分完成 | c970cd6 |
 | R5 | [M4 评审](tasks/R5-m4-review.md) | 5 | T45、W3 | macOS | high / 高 | 中 | 无 | 部分完成 | f7b05b7 |
-| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 部分完成 | 84a4d07 |
+| T46 | [Auto 模式（审查模型）](tasks/T46-auto-mode.md) | 6 | R5 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 84a4d07 |
 | T47 | [自动记忆与企业托管配置](tasks/T47-auto-memory-and-managed-settings.md) | 6 | T46 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 9212335 |
 | T48 | [M5 Harness 补全](tasks/T48-m5-harness-completion.md) | 6 | T47 | macOS | high / 高 | 大 | 无 | 进行中 | — |
 | T49 | [侧边对话与平台快捷操作](tasks/T49-side-chat-and-platform-shortcuts.md) | 6 | T48 | macOS | high / 高 | 中 | 无 | 未开始 | — |
@@ -313,7 +313,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 - [x] 开工基线：macOS arm64，工作区干净，T47 已完成；`npm run verify -- --baseline` 复用 9212335 的全量结果，两项增量检查通过。gh 当前登录无效，未更新旧任务的 Windows CI 记录。
 - 已核对 pi-mcp 1.5.2：公开接口支持声明 `elicitation` 并注册 `elicitation/create` handler。通过内存传输在初始化时断言 form 与 URL 两种能力，再由 server 发请求，分别收到 `form accept` 和 `url decline`。A10 走客户端对话框、原生确认与 hooks 实现路径。
-- 开工检查点待提交：当前会话在 `git add` 时无法创建 `.git/index.lock`（`Operation not permitted`）。恢复仓库 Git 写权限后先提交本节，再开始功能实现。
+- 开工检查点已提交（b92ac7c）。续做时恢复了 GitHub 访问，核对了 9212335 的原生 CI 日志，关闭 T46-A13 与 R5-A01；T45-A02 仍缺完整的映射测试通过记录。
 - [ ] A01–A03：压缩策略选择、失败回退、会话恢复与前缀验证。
 - [ ] A04–A05：fork 子 agent 的历史、缓存、审批与检查点。
 - [ ] A06：fork skill 的 agent 选择、后台执行与正文隔离。

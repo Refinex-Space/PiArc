@@ -321,8 +321,8 @@
       "id": "R5-A01",
       "task": "R5",
       "description": "威胁检查在两个平台 CI 上通过，第 10.1 节每条威胁至少抽查一个测试并确认其断言对应对策，抽查记录写入发现文件。验证：检查输出与 `docs/reviews/R5-findings.md` 中的抽查记录。",
-      "status": "blocked",
-      "evidence": "本机通过、两个平台 CI 待推送：`node scripts/ci/check-threats.mjs --results target/l2/results.json` → threat map checks passed（14 条威胁、59 个对策）；verify 第 17 步在 4b7c223 通过。CI 只有 W3 的 de98771（运行 45024661885）两个平台跑完：macOS 与 Windows verify 的第 17 步都通过（两边失败的是 Prettier 与 Windows 的 `state::sources` 路径断言，R5 已修 a94a03c、e682784）；R5 新增的映射测试要等本分支推送后的 CI。14 条威胁各抽查一个测试并读断言，记录在 `docs/reviews/R5-findings.md` 第 1.1 节，抽查发现 THR-11、THR-14 的映射缺口已补（4f6de69）。"
+      "status": "passing",
+      "evidence": "gh run view 45159997698 --job <job> --log：9212335 的 verify 第 17 步在 macOS 与 Windows 均为 threat map checks passed（14 条威胁、59 个对策、170 个测试 ID）。macOS https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677879 ，Windows https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677414 。逐条抽查及修复记录见 docs/reviews/R5-findings.md 第 1.1 节。"
     },
     {
       "id": "R5-A02",
@@ -4521,8 +4521,8 @@
       "id": "T46-A13",
       "task": "T46",
       "description": "`npm run verify` 通过（含 Windows CI 上的 L2 场景）。验证：命令输出。",
-      "status": "blocked",
-      "evidence": "macOS：npm run verify 17/17 通过于 84a4d07（target/verify/last-pass.json，L2 230 passed、0 failed、3 个仅 Windows 场景跳过）。Windows CI 上的 L2（含 perm-auto-* 16 个跨平台场景）要等用户推送后由 CI 运行，本机无法验证"
+      "status": "passing",
+      "evidence": "macOS：84a4d07 全量 verify 17/17 通过。Windows：包含该提交的 9212335 上 gh run view 45159997698 --job 137642677414 --log 显示 All 17 steps passed；L2 227 passed、0 failed、15 项按平台跳过，16 个适用的 perm-auto 场景全部通过，perm-auto-unsandboxed 仅适用 macOS。https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677414"
     },
     {
       "id": "T47-A01",
