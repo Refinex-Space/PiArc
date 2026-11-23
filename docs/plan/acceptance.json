@@ -4277,7 +4277,7 @@
       "task": "T43",
       "description": "`docs/engineering/accessibility.md` 包含读屏核对清单，VoiceOver 一列逐项有结论，需要用户操作的项注明。验证：文件内容。",
       "status": "blocked",
-      "evidence": "docs/engineering/accessibility.md 第 3 节有 10 项读屏核对清单（VoiceOver、Narrator、NVDA 各一列），自动化一列写明已由测试覆盖的部分；VoiceOver 一列需要人在 macOS 上实际开启 VoiceOver 逐项操作，夜间自动模式下用户不在场，记为\"待用户核对\"，登记 I188"
+      "evidence": "macOS 26.5.2 原生 VoiceOver 的 15 张字幕截图证实清单 1、4、5、7 的部分行为（会话、命令卡、文件改动、提问），十项逐项注明了已观察和未验证的细节。按用户要求结束旁白并恢复系统状态，不能把其余播报计为实测通过。见 docs/engineering/accessibility.md 第 3 节及 tmp/evidence/partial-closure/t43-voiceover/results.md。Windows 两种读屏器的结果已由 W3 确认。"
     },
     {
       "id": "T43-A11",
