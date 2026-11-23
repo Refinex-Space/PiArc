@@ -309,10 +309,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-T47 推送后复验（Windows CI 45115969680，e95b4e6）：
+T47 推送后复验（Windows CI 45119779192，bbc6b60）：
 
 - [x] 上一轮 Windows L4 中两处 T47 回归已在本机复现。命令面板断言补上第八项 `/memory`；打包版 Agent Host 探针按生产顺序登记会话，并断言 `memory/status` 成功调用一次。重新打开发包后，在 Electron 的 dev 与 packaged 形态重跑面板、探针及 T47 用例，7/7 通过。
-- [ ] 核对 Windows worktree 隔离、两项注册表测试、17 步 verify 和 T47 桌面用例；按运行证据更新 A04、A13。
+- [x] [Windows 桌面 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936)：记忆页和托管锁定各 2 项、命令面板 2 项、打包探针 1 项，共 7/7 通过。
+- [ ] 核对 Windows worktree 隔离、两项注册表测试和完整 verify，按运行证据更新 A04、A13。
 
 ## 登记事项
 
@@ -546,8 +547,8 @@ T47 推送后复验（Windows CI 45115969680，e95b4e6）：
 | I224 | T46 | `npm run l3`（Claude Code 2.1.318）在 T46 之前就有的缺口：`config-diag-sources` 与 `hooks-m4-*` 六个 L2 场景（T41）既没有 L3 镜像也没有在 `tests/l3-allowlist.yaml` 排除；`perm-plan` 有 5 条未解释差异，都是 PiArc 请求里的 `NotebookEdit` 工具（T42 加入，Claude Code 在 `-p` 下不声明它）。L3 不在 verify 中，只在 Nightly 运行，所以 Nightly 目前会失败。T46 只为自己的 `perm-auto-*` 场景加了排除 | R6 或下一个运行 L3 的任务：为这七个场景写 L3 镜像或排除理由，为 `NotebookEdit` 补 allowlist 条目（确认 Claude Code 该版本的对应工具） |
 | I225 | T46 | T48 的 `PermissionDenied` hook 接入点：Core `crates/piarc-core/src/tool_io/policy/review.rs` 的 `ToolIo::reviewer_refused`（审查模型答 `deny`、`autoReview` 审计已写、拒绝结果交回模型之前；参数是本次调用的 `Call` 与审查结论 `ToolReview`）。只有审查模型的拒绝触发；超时、服务商错误、无法解析、不可用都转人工，不触发 | T48 在这里运行 `PermissionDenied` hooks（输入带审查模型、理由与类别），hook 的 `retry` 等输出按 Claude Code 的语义接入 |
 | I226 | T46 | `audit_events` 没有统一的保留期限：T46 的 `autoReview` 行（每次送审一行，含截断的理由与输入哈希）与其他审计行一样随数据库保留，不自动清理（设计增补第 4.3 节） | R6 评估审计的统一保留期限与清理方式 |
-| I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy |
-| I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。 |
+| I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy。**bbc6b60 复核**：[Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936) 的会话归档通过。T34 的 dev 用例等不到 PowerShell 报告子进程 PID；dev 和 packaged 两种形态重新显示面板后均只读到 tick 1。三项继续由 W4 核对。 |
+| I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。**bbc6b60 复核**：[macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807623) 的 L2 为 239 通过、3 项仅 Windows；权限裁决 p95 为 2.544375 ms，仍超 2 ms 预算，沿 I103 跟进。 |
 ## 技术债
 
 评审任务（R1–R6）汇总的技术债，按影响排序。每条的细节、负责任务与检查时间点在对应的登记事项中。
