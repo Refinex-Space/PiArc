@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { ToolHeaderProvider } from '../shell/ToolHeaderSlot.js';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -88,7 +89,7 @@ it('releases a mounted document preview when it becomes a background tab', async
     Promise.resolve(action === 'release' ? '' : 'about:blank'),
   );
   vi.stubGlobal('piarc', { onAppEvent: () => vi.fn(), projectFilePreview: preview });
-  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue(
+  const rectangles = vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue(
     Object.assign([new DOMRect(0, 0, 400, 300)], {
       item: (index: number) => (index === 0 ? new DOMRect(0, 0, 400, 300) : null),
     }),
@@ -102,7 +103,7 @@ it('releases a mounted document preview when it becomes a background tab', async
   const host = document.createElement('div');
   // Keep this unit fixture detached so the DOM emulator does not attempt to load a PDF.
   const root = createRoot(host);
-  async function show(visible: boolean) {
+  async function show(visible: boolean, placed = true) {
     await act(async () => {
       root.render(
         <AppProvider
@@ -114,12 +115,14 @@ it('releases a mounted document preview when it becomes a background tab', async
             preferences: DEFAULT_PREFERENCES,
           }}
         >
-          <FileViewer
-            visible={visible}
-            sessionId="visibility"
-            path="report.pdf"
-            onAttach={vi.fn()}
-          />
+          <ToolHeaderProvider visible={placed}>
+            <FileViewer
+              visible={visible}
+              sessionId="visibility"
+              path="report.pdf"
+              onAttach={vi.fn()}
+            />
+          </ToolHeaderProvider>
         </AppProvider>,
       );
       await Promise.resolve();
@@ -128,6 +131,11 @@ it('releases a mounted document preview when it becomes a background tab', async
   try {
     await show(true);
     expect(preview).toHaveBeenCalledWith('visibility', 'report.pdf', 'media');
+    expect(host.querySelector('iframe')).not.toBeNull();
+    await show(true, false);
+    expect(host.querySelector('iframe')).toBeNull();
+    rectangles.mockReturnValue(Object.assign([], { item: () => null }));
+    await show(true, true);
     expect(host.querySelector('iframe')).not.toBeNull();
     await show(false);
     expect(host.querySelector('iframe')).toBeNull();
