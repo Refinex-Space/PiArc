@@ -14,6 +14,7 @@ export function Dialog({
   children,
   testId,
   wide = false,
+  className,
   focusKey,
   dismissOnBackdrop = false,
 }: {
@@ -22,6 +23,7 @@ export function Dialog({
   readonly children: ReactNode;
   readonly testId?: string;
   readonly wide?: boolean;
+  readonly className?: string;
   /** Changes when the content is replaced in place. */
   readonly focusKey?: string;
   readonly dismissOnBackdrop?: boolean;
@@ -83,7 +85,7 @@ export function Dialog({
     >
       <div
         ref={ref}
-        className={wide ? 'dialog dialog-wide' : 'dialog'}
+        className={['dialog', wide && 'dialog-wide', className].filter(Boolean).join(' ')}
         role="dialog"
         tabIndex={-1}
         aria-modal="true"

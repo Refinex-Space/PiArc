@@ -10,7 +10,15 @@ import path from 'node:path';
 import type { Page, TestInfo } from '@playwright/test';
 
 import { expect, focusMain, test } from './sessions.js';
-import { idle, lastUserBlocks, openSession, requests, send, typeInComposer } from './t19.js';
+import {
+  idle,
+  lastUserBlocks,
+  openSession,
+  prefer,
+  requests,
+  send,
+  typeInComposer,
+} from './t19.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -142,6 +150,55 @@ test('built-in commands open their features and /output-style switches the style
   // /clear starts a new conversation in the same folder.
   await send(page, '/clear');
   await expect(page.getByTestId('home')).toBeVisible();
+});
+
+test('the toolbar palette dismisses to its opener and scrolls only its results', async ({
+  page,
+}, info) => {
+  await prefer(page, { key: 'language', value: 'en' });
+  await page.setViewportSize({ width: 680, height: 350 });
+  const opener = page
+    .locator('.main-titlebar')
+    .getByRole('button', { name: 'Command Palette', exact: true });
+  const dialog = page.getByTestId('command-palette');
+  const input = page.getByTestId('command-palette-input');
+  const list = page.getByTestId('command-palette-list');
+  await opener.click();
+  await expect(input).toBeFocused();
+  await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+  const headerTop = (await input.boundingBox())?.y;
+  await input.press('ArrowUp');
+  await expect(list.getByRole('option').last()).toBeInViewport({ ratio: 1 });
+  expect((await input.boundingBox())?.y).toBe(headerTop);
+  const geometry = await list.evaluate((el) => {
+    const option = el.querySelector('[aria-selected="true"]');
+    if (!option) throw new Error('No active command');
+    return {
+      scrolled: el.scrollTop,
+      trailingSpace: el.getBoundingClientRect().right - option.getBoundingClientRect().right,
+      dialogScroll: el.closest('[role="dialog"]')?.scrollTop,
+    };
+  });
+  expect(geometry.scrolled).toBeGreaterThan(0);
+  expect(geometry.trailingSpace).toBeGreaterThanOrEqual(12);
+  expect(geometry.dialogScroll).toBe(0);
+  await dialog.screenshot({ path: info.outputPath('scrolled-command-palette.png') });
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await opener.click();
+  await page.mouse.click(4, 4);
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await opener.click();
+  await input.fill('no matching action');
+  await input.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  await opener.click();
+  await page.keyboard.press(`${MOD}+KeyK`);
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
 });
 
 test('Mod+K runs actions, switches sessions and commands; its shortcut can change', async ({

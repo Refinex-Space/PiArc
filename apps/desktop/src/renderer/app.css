@@ -2599,46 +2599,101 @@ textarea.input {
   color: var(--piarc-text-primary);
 }
 
-/* the command palette (Mod+K) and the output style list (T37) */
-.palette-input {
-  width: 100%;
+/* Search stays in place while the palette's results scroll or shrink. */
+.scrim:has(> .command-palette) {
+  align-items: flex-start;
+  padding: clamp(var(--piarc-space-4), 16vh, 9rem) var(--piarc-space-4) var(--piarc-space-4);
+}
+.dialog.command-palette {
+  display: flex;
+  flex-direction: column;
+  width: min(36rem, 100%);
+  max-height: min(100%, 30rem);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--piarc-settings-radius);
+}
+.palette-search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: calc(var(--piarc-size-row-height) + var(--piarc-space-4));
   padding: var(--piarc-space-2) var(--piarc-space-3);
-  border: 1px solid var(--piarc-border-default);
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-surface-input);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .palette-search .palette-input {
+  flex: 1;
+  min-width: 0;
+  padding-inline: var(--piarc-space-1);
+  border: 0;
+  background: transparent;
   color: var(--piarc-text-primary);
-  font-size: var(--piarc-font-size-body);
+  font-size: var(--piarc-font-size-button);
+}
+.palette-list {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  list-style: none;
+  margin: 0;
+  padding: var(--piarc-space-2);
+  /* Overlay scrollbars draw inside the scrollport even with a stable gutter. */
+  padding-inline-end: var(--piarc-space-4);
+}
+.palette-list:empty {
+  padding: 0;
+}
+.palette-empty {
+  margin: 0;
+  padding: var(--piarc-space-5);
+  text-align: center;
+}
+.palette-group {
+  padding: var(--piarc-space-2) var(--piarc-space-2) var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.palette-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-3);
+  min-height: var(--piarc-size-row-height);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-radius: var(--piarc-radius-md);
+  cursor: default;
+}
+.palette-option.is-active {
+  background: var(--piarc-action-hover);
+}
+.palette-label,
+.palette-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-option .keycaps {
+  flex: none;
+  color: var(--piarc-text-secondary);
+}
+.palette-detail {
+  max-width: 50%;
+  font-size: var(--piarc-font-size-small);
+  text-align: end;
 }
 
-.palette-list,
 .style-list {
   max-height: 360px;
   margin: var(--piarc-space-2) 0 0;
   padding: 0;
   overflow-y: auto;
   list-style: none;
-}
-
-.palette-group {
-  padding: var(--piarc-space-2) var(--piarc-space-2) 2px;
-  color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-caption);
-  font-weight: 600;
-}
-
-.palette-option {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--piarc-space-3);
-  padding: var(--piarc-space-1) var(--piarc-space-2);
-  border-radius: var(--piarc-radius-sm);
-  cursor: default;
-}
-
-.palette-detail {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .style-choice {

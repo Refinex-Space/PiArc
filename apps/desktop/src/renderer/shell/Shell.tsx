@@ -2,6 +2,8 @@
 // Owns the window's presentation state (`ui.tsx`) and connects the store to Core's events.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { flushSync } from 'react-dom';
+
 import type { AppCommand, LaunchTarget } from '../../shared/ipc.js';
 import { parseComposerInfo, type ComposerInfo } from '../composer/attachments.js';
 import { isImeComposing } from '../composer/ime-guard.js';
@@ -206,6 +208,15 @@ export function Shell() {
     };
   }, []);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const paletteOpener = useRef<HTMLElement | null>(null);
+  const dismissPalette = () => {
+    // Commands can immediately focus a workbench control. Release its inert ancestor first.
+    flushSync(() => {
+      setPaletteOpen(false);
+    });
+    if (paletteOpener.current?.isConnected) paletteOpener.current.focus({ preventScroll: true });
+    paletteOpener.current = null;
+  };
   const [toasts, setToasts] = useState<readonly Toast[]>([]);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -458,7 +469,11 @@ export function Shell() {
         setShortcutsOpen(true);
         break;
       case 'app.commandPalette':
-        if (!shortcutsOpen) setPaletteOpen(true);
+        if (!shortcutsOpen) {
+          paletteOpener.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          setPaletteOpen(true);
+        }
         break;
       case 'changes.toggle':
         if (view.kind === 'session') {
@@ -485,8 +500,15 @@ export function Shell() {
         break;
     }
   };
-  runRef.current = run;
-  useCommands(run);
+  const dispatch = (command: AppCommand) => {
+    if (paletteOpen) {
+      if (command === 'app.commandPalette' || command === 'session.close') dismissPalette();
+      return;
+    }
+    run(command);
+  };
+  runRef.current = dispatch;
+  useCommands(dispatch);
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -661,18 +683,14 @@ export function Shell() {
                   }
                 : undefined
             }
-            run={(command) => {
-              runRef.current(command);
-            }}
+            run={run}
             open={(id) => {
               show({ kind: 'session', id });
             }}
             command={(name) => {
               if (view.kind === 'session') requestCommand(view.id, name);
             }}
-            onClose={() => {
-              setPaletteOpen(false);
-            }}
+            onClose={dismissPalette}
           />
         )}
         {shortcutsOpen && (

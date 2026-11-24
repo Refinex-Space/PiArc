@@ -1,8 +1,11 @@
 // The application's command palette (Mod+K, architecture section 8.5, T37): the registered
 // commands, switching to a session and the current session's slash commands, filtered with the
 // same fuzzy matcher as the `/` palette. Keys go through the input method guard.
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
+import { Keycaps } from '../app/Keycaps.js';
+import { IconButton } from '../app/IconButton.js';
+import { CloseIcon, SearchIcon } from './icons.js';
 import { revealListOption } from '../app/list-navigation.js';
 import { fuzzyFilter } from '../../shared/fuzzy.js';
 import type { AppCommand } from '../../shared/ipc.js';
@@ -21,6 +24,7 @@ interface Entry {
   readonly group: 'actions' | 'sessions' | 'commands';
   readonly label: string;
   readonly detail: string;
+  readonly binding?: string;
   readonly run: () => void;
 }
 
@@ -51,7 +55,6 @@ export function CommandPalette({
   const workspaces = useWorkspaces();
   const sessions = useSessions();
   const titleId = useId();
-  const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
   const [slash, setSlash] = useState<readonly { name: string; description: string }[]>([]);
@@ -88,6 +91,7 @@ export function CommandPalette({
       group: 'actions',
       label: t(c.label),
       detail: displayKey(bindings[c.id], keyPlatform),
+      binding: bindings[c.id],
       run: close(() => {
         run(c.id);
       }),
@@ -147,47 +151,58 @@ export function CommandPalette({
   };
 
   return (
-    <Dialog labelledBy={titleId} onCancel={onClose} testId="command-palette">
+    <Dialog
+      labelledBy={titleId}
+      onCancel={onClose}
+      dismissOnBackdrop
+      className="command-palette"
+      testId="command-palette"
+    >
       <h2 id={titleId} className="visually-hidden">
         {t('palette.title')}
       </h2>
-      <input
-        ref={input}
-        className="input palette-input"
-        data-autofocus
-        data-testid="command-palette-input"
-        role="combobox"
-        aria-expanded="true"
-        aria-controls={`${titleId}-list`}
-        aria-activedescendant={active === -1 ? undefined : `${titleId}-${String(active)}`}
-        placeholder={t('palette.placeholder')}
-        value={query}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setIndex(0);
-        }}
-        onKeyDown={(event) => {
-          if (isImeComposing(event.nativeEvent)) return;
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            const count = matches.length;
-            if (count > 0) {
-              const step = event.key === 'ArrowDown' ? 1 : -1;
-              setIndex((active + step + count) % count);
+      <div className="palette-search">
+        <SearchIcon />
+        <input
+          className="input palette-input"
+          data-autofocus
+          data-testid="command-palette-input"
+          role="combobox"
+          aria-label={t('palette.placeholder')}
+          aria-expanded="true"
+          aria-controls={`${titleId}-list`}
+          aria-activedescendant={active === -1 ? undefined : `${titleId}-${String(active)}`}
+          placeholder={t('palette.placeholder')}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setIndex(0);
+          }}
+          onKeyDown={(event) => {
+            if (isImeComposing(event.nativeEvent)) return;
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              const count = matches.length;
+              if (count > 0) {
+                const step = event.key === 'ArrowDown' ? 1 : -1;
+                setIndex((active + step + count) % count);
+              }
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              matches[active]?.run();
             }
-          } else if (event.key === 'Enter') {
-            event.preventDefault();
-            matches[active]?.run();
-          }
-        }}
-      />
+          }}
+        />
+        <IconButton label={t('shortcuts.close')} onClick={onClose}>
+          <CloseIcon />
+        </IconButton>
+      </div>
       <ul
         id={`${titleId}-list`}
         className="interactive-list palette-list"
         role="listbox"
         data-testid="command-palette-list"
       >
-        {matches.length === 0 ? <li className="muted">{t('palette.none')}</li> : null}
         {matches.map((entry, at) => (
           <li key={entry.key} role="presentation">
             {matches[at - 1]?.group === entry.group ? null : (
@@ -204,15 +219,30 @@ export function CommandPalette({
               data-entry={entry.key}
               onMouseDown={(event) => {
                 event.preventDefault();
-                entry.run();
               }}
+              onClick={entry.run}
             >
-              <span className="palette-label">{entry.label}</span>
-              <span className="palette-detail muted">{entry.detail}</span>
+              <span className="palette-label" title={entry.label}>
+                {entry.label}
+              </span>
+              {entry.binding ? (
+                <Keycaps binding={entry.binding} platform={keyPlatform} />
+              ) : (
+                entry.detail && (
+                  <span className="palette-detail muted" title={entry.detail}>
+                    {entry.detail}
+                  </span>
+                )
+              )}
             </div>
           </li>
         ))}
       </ul>
+      {matches.length === 0 && (
+        <p className="palette-empty muted" role="status">
+          {t('palette.none')}
+        </p>
+      )}
     </Dialog>
   );
 }
