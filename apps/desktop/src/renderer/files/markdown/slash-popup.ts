@@ -94,24 +94,28 @@ export function slashPopup(
     el.append(icon, title, hint);
     el.onpointermove = () => {
       const owner = state();
-      if (owner)
-        move(
-          view,
-          nested ? owner.active : index,
-          nested
-            ? index
-            : 'folderId' in item
-              ? owner.active === index
-                ? (owner.child ?? 0)
-                : 0
-              : null,
-        );
+      if (!owner) return;
+      if (nested) {
+        move(view, owner.active, index);
+        return;
+      }
+      // A replacement page needs a deliberate click: hovering over it must not swap
+      // the contents underneath the pointer while it crosses the parent list.
+      const cascade = 'folderId' in item && direction() !== 'inside';
+      move(view, index, cascade ? (owner.active === index ? (owner.child ?? 0) : 0) : null);
     };
     el.onclick = () => {
       const owner = state();
       if (owner) accept(view, item, nested ? owner.active : index);
     };
     return el;
+  }
+  function direction() {
+    if (!space) return 'inside';
+    const box = dom.getBoundingClientRect(),
+      width = Math.min(236, box.width);
+    if (space.right - box.right >= width + 8) return 'right';
+    return box.left - space.left >= width + 8 ? 'left' : 'inside';
   }
   function position() {
     if (!host || !child || !space) return;
@@ -120,21 +124,16 @@ export function slashPopup(
     const width = Math.min(236, b.width),
       gap = 4,
       margin = 4;
-    const direction =
-      space.right - b.right >= width + gap + margin
-        ? 'right'
-        : b.left - space.left >= width + gap + margin
-          ? 'left'
-          : 'inside';
-    dom.dataset.cascade = direction;
-    if (direction === 'inside') {
+    const side = direction();
+    dom.dataset.cascade = side;
+    if (side === 'inside') {
       child.style.top = '0px';
       child.style.left = '0px';
       child.style.width = '100%';
       return;
     }
     child.style.width = String(width) + 'px';
-    child.style.left = String(direction === 'right' ? b.width + gap : -width - gap) + 'px';
+    child.style.left = String(side === 'right' ? b.width + gap : -width - gap) + 'px';
     const top = Math.max(
       space.top + margin,
       Math.min(a.top - 4, space.bottom - margin - child.offsetHeight),

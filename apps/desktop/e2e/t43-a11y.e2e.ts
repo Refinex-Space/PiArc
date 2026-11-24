@@ -134,7 +134,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await author.press('Enter');
   await author.press('/');
   const slash = page.getByRole('listbox', { name: 'Insert Markdown' });
-  await slash.getByRole('option', { name: 'Mermaid diagram', exact: true }).hover();
+  await slash.getByRole('option', { name: 'Mermaid diagram', exact: true }).click();
   await expect(page.getByRole('listbox', { name: 'Mermaid diagram', exact: true })).toBeVisible();
   await checkState(page, 'state:md-slash');
   await author.press('Escape');

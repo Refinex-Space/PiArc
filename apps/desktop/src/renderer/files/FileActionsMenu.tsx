@@ -175,25 +175,27 @@ export function FileActionsMenu({
     }
   }
   return createPortal(
-    <MenuPopup
-      items={
-        documentItems
-          ? [
-              ...documentItems,
-              {
-                id: 'md-file',
-                label: t('md.selection.file'),
-                submenu: [...items, ...(extraItems ?? [])],
-              },
-            ]
-          : [...items, ...(extraItems ?? [])]
-      }
+    <div role="region" aria-label={t('tiles.files')}>
+      <MenuPopup
+        items={
+          documentItems
+            ? [
+                ...documentItems,
+                {
+                  id: 'md-file',
+                  label: t('md.selection.file'),
+                  submenu: [...items, ...(extraItems ?? [])],
+                },
+              ]
+            : [...items, ...(extraItems ?? [])]
+        }
 
-      at={at}
-      onClose={onClose}
-      label={t(documentItems ? 'md.selection.menu' : 'files.tree.actions')}
-      testId="file-actions-menu"
-    />,
+        at={at}
+        onClose={onClose}
+        label={t(documentItems ? 'md.selection.menu' : 'files.tree.actions')}
+        testId="file-actions-menu"
+      />
+    </div>,
     win.document.body,
   );
 }
