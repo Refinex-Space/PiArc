@@ -9,9 +9,12 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type ComponentProps,
+  type CSSProperties,
 } from 'react';
 
-import { CheckIcon, ChevronRightIcon } from './icons.js';
+import { useT } from '../app/app-context.js';
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from './icons.js';
 import { revealListOption } from '../app/list-navigation.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 
@@ -36,7 +39,12 @@ interface MenuPoint {
   readonly x: number;
   readonly y: number;
   readonly above?: boolean;
-  readonly flipLeft?: number;
+  /** The other edge and usable width for a submenu beside its parent. */
+  readonly cascade?: {
+    readonly leftEdge: number;
+    readonly rightRoom: number;
+    readonly maxWidth: number;
+  };
   readonly anchor?: HTMLElement;
 }
 
@@ -65,6 +73,7 @@ export function MenuPopup({
   heading,
   filterLabel,
   branch,
+  backLabel,
   onClose,
   label,
   testId,
@@ -74,6 +83,7 @@ export function MenuPopup({
   readonly at: MenuPoint;
   readonly heading?: string;
   readonly filterLabel?: string;
+  readonly backLabel?: string;
   readonly branch?: {
     readonly group: string;
     readonly dismiss: () => void;
@@ -86,38 +96,74 @@ export function MenuPopup({
   const ownerDoc = useSurfaceDocument();
   const win = documentWindow(ownerDoc);
   const ref = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(backLabel && choices.length ? 1 : 0);
   const [query, setQuery] = useState('');
   const filter = useRef<HTMLInputElement>(null);
   const filteredItems = useRef<HTMLDivElement>(null);
-  const items = query.trim()
+  const back: MenuItem | undefined = backLabel
+    ? { id: 'back-to-parent', label: backLabel, icon: <ChevronLeftIcon />, run: onClose }
+    : undefined;
+  const filtered = query.trim()
     ? choices.filter((item) =>
         `${item.label} ${item.hint ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
       )
     : choices;
+  const items = back ? [back, ...filtered] : filtered;
   const id = useId();
   const group = branch?.group ?? id;
   const dismiss = branch?.dismiss ?? onClose;
-  const [child, setChild] = useState<{ id: string; at: MenuPoint; keyboard: boolean }>();
+  const [child, setChild] = useState<{
+    id: string;
+    at: MenuPoint;
+    keyboard: boolean;
+    replacesParent: boolean;
+  }>();
   const [left, setLeft] = useState(at.x);
   const [top, setTop] = useState(at.y);
   useLayoutEffect(() => {
-    const width = ref.current?.offsetWidth ?? 0;
-    setLeft(
-      at.flipLeft !== undefined && at.x + width > win.innerWidth ? at.flipLeft - width : at.x,
-    );
+    const width = ref.current?.getBoundingClientRect().width ?? 0;
+    setLeft(at.cascade && width > at.cascade.rightRoom ? at.cascade.leftEdge - width : at.x);
   }, [at, choices, win]);
+  const returnToParent = useRef(false);
   const closeChild = useCallback(() => {
+    returnToParent.current = true;
     setChild(undefined);
-    (filter.current ?? ref.current)?.focus();
   }, []);
+  useLayoutEffect(() => {
+    if (!child && returnToParent.current) {
+      returnToParent.current = false;
+      (filter.current ?? ref.current)?.focus();
+    }
+  }, [child]);
   const activeChild = child && items.find((item) => item.id === child.id);
-  const openChild = (item: MenuItem, index: number, keyboard: boolean) => {
+  const openChild = (item: MenuItem, index: number, interaction: 'hover' | 'click' | 'key') => {
     if (!item.submenu || item.disabled) return;
     const anchor = ownerDoc.getElementById(`${id}-${String(index)}`);
-    if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    setChild({ id: item.id, at: { x: rect.right, y: rect.top, flipLeft: rect.left }, keyboard });
+    const menu = ref.current;
+    if (!anchor || !menu) return;
+    const row = anchor.getBoundingClientRect(),
+      panel = menu.getBoundingClientRect();
+    const css = win.getComputedStyle(menu);
+    const gap = parseFloat(css.getPropertyValue('--piarc-space-1')) || 4;
+    const inset = parseFloat(css.getPropertyValue('--piarc-space-2')) || 8;
+    const rightRoom = win.innerWidth - inset - panel.right - gap;
+    const leftRoom = panel.left - gap - inset;
+    const maxWidth = Math.max(leftRoom, rightRoom);
+    const replacesParent = maxWidth < (parseFloat(css.minWidth) || 128);
+    // A compact replacement is a navigation action. Hover can still inspect sibling rows.
+    if (replacesParent && interaction === 'hover') return;
+    setChild({
+      id: item.id,
+      replacesParent,
+      keyboard: interaction !== 'hover',
+      at: replacesParent
+        ? { x: panel.left, y: panel.top }
+        : {
+            x: panel.right + gap,
+            y: row.top - menu.clientTop - (parseFloat(css.paddingTop) || 0),
+            cascade: { leftEdge: panel.left - gap, rightRoom, maxWidth },
+          },
+    });
   };
   // Closing gives the focus back to what had it, when nothing else took it (an item that opens
   // a rename field keeps that field focused): otherwise it falls to the page body (R5).
@@ -177,7 +223,8 @@ export function MenuPopup({
   }, [at, dismiss, group, win, ownerDoc]);
   const run = (item: MenuItem | undefined, keyboard = true) => {
     if (item !== undefined && item.disabled !== true) {
-      if (item.submenu) openChild(item, items.indexOf(item), keyboard);
+      if (item === back) onClose();
+      else if (item.submenu) openChild(item, items.indexOf(item), keyboard ? 'key' : 'click');
       else {
         dismiss();
         item.run();
@@ -210,7 +257,7 @@ export function MenuPopup({
       case 'ArrowRight': {
         const item = items[active];
         if (!item?.submenu) return;
-        openChild(item, active, true);
+        openChild(item, active, 'key');
         break;
       }
       case 'ArrowLeft':
@@ -242,9 +289,11 @@ export function MenuPopup({
     event.stopPropagation();
   };
   // Percentages in translate resolve against the rendered menu, including gaps and wrapped hints.
-  const style = {
-    transform: `translate(clamp(0px, ${String(left)}px, calc(100vw - 100%)), clamp(0px, calc(${String(top)}px - ${at.above === true ? '100%' : '0%'}), calc(100vh - 100%)))`,
+  const style: CSSProperties = {
+    transform: `translate(clamp(var(--menu-edge), ${String(left)}px, calc(100vw - 100% - var(--menu-edge))), clamp(var(--menu-edge), calc(${String(top)}px - ${at.above === true ? '100%' : '0%'}), calc(100vh - 100% - var(--menu-edge))))`,
+    ...(at.cascade ? { maxWidth: `min(23rem, ${String(at.cascade.maxWidth)}px)` } : {}),
   };
+  const ChildMenu = child?.replacesParent ? CompactSubmenu : MenuPopup;
   const activeId = items[active] ? `${id}-${String(active)}` : undefined;
   const rows = items.map((item, i) => (
     <div
@@ -262,7 +311,7 @@ export function MenuPopup({
       data-testid={item.testId ?? `menu-${item.id}`}
       onMouseEnter={() => {
         setActive(i);
-        if (item.submenu) openChild(item, i, false);
+        if (item.submenu) openChild(item, i, 'hover');
         else setChild(undefined);
       }}
       onClick={() => {
@@ -292,6 +341,7 @@ export function MenuPopup({
       <div
         ref={ref}
         data-menu-tree={group}
+        hidden={!!child?.replacesParent && !!activeChild?.submenu}
         className="interactive-list menu"
         role={filterLabel === undefined ? 'menu' : 'dialog'}
         aria-label={label}
@@ -335,7 +385,7 @@ export function MenuPopup({
         )}
       </div>
       {child && activeChild?.submenu && (
-        <MenuPopup
+        <ChildMenu
           key={child.id}
           at={child.at}
           label={activeChild.label}
@@ -346,6 +396,11 @@ export function MenuPopup({
       )}
     </>
   );
+}
+
+function CompactSubmenu(props: ComponentProps<typeof MenuPopup>) {
+  const t = useT();
+  return <MenuPopup {...props} backLabel={t('nav.back')} />;
 }
 
 /** A button that opens a menu below itself. */

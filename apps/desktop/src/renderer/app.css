@@ -55,7 +55,7 @@ body,
 /* Paint one edge, including on controls whose actual focus target is invisible. Keeping it
    inside the bounds also protects the indicator in clipped menus, panels and virtual lists. */
 :root[data-app] :focus-visible:not(:where([data-focus-proxy])),
-:root[data-app] .settings-search:has(input:focus-visible),
+:root[data-app] :is(.settings-search, .project-filter):has(input:focus-visible),
 .segment:has(> input:focus-visible),
 .composer-attach:has(> input:focus-visible),
 .composer-box:has(.composer-editor:focus-visible),
@@ -88,7 +88,7 @@ body,
    This also covers implicit text inputs, multiline editors, and native selects. */
 :root[data-app][data-pointer-focus]
   :is(input:read-write, input[readonly], textarea, select):focus:not(:where([data-focus-proxy])),
-:root[data-app][data-pointer-focus] .settings-search:has(input:focus),
+:root[data-app][data-pointer-focus] :is(.settings-search, .project-filter):has(input:focus),
 :root[data-app][data-pointer-focus] .composer-box:has(.composer-editor:focus) {
   outline: 1px solid var(--piarc-c-focus-ring);
   outline-offset: -1px;
@@ -2925,7 +2925,7 @@ body[data-tool-window] {
   min-width: 0;
 }
 .workbench-header.has-session {
-  border-bottom: 1px solid var(--piarc-border-subtle);
+  box-shadow: inset 0 -1px var(--piarc-border-subtle);
 }
 .workbench-heading {
   min-width: 0;

@@ -364,6 +364,7 @@ function TreeBrowser({
         )}
         <input
           ref={filter}
+          data-focus-proxy
           value={query}
           type="text"
           autoComplete="off"

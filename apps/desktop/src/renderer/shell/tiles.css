@@ -54,6 +54,10 @@ body[data-tool-window] > #tool-root {
   user-select: none;
   touch-action: none;
 }
+.tool-tile-slot[data-window-top='true'] .tool-tile-header {
+  min-height: var(--piarc-c-window-titlebar-height);
+  border-bottom: 0;
+}
 .tool-tile-header:has([data-tile-grip]:enabled) {
   cursor: grab;
 }

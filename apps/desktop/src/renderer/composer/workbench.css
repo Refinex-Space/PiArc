@@ -222,8 +222,13 @@
   font: inherit;
 }
 .interactive-list.menu {
-  min-width: min(8rem, 94vw);
-  max-width: min(23rem, 100vw);
+  --menu-edge: var(--piarc-space-2);
+  min-width: min(8rem, calc(100vw - 2 * var(--menu-edge)));
+  max-width: min(23rem, calc(100vw - 2 * var(--menu-edge)));
+  max-height: min(58vh, 32rem, calc(100vh - 2 * var(--menu-edge)));
+}
+.interactive-list.menu[hidden] {
+  display: none;
 }
 .interactive-list.menu .menu-item {
   min-height: var(--piarc-space-5);

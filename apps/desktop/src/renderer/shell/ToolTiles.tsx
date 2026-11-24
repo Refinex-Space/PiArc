@@ -494,6 +494,7 @@ export function ToolTiles({
               hidden={!rect}
               style={rect ? boundsStyle(rect, miniNav ? 32 : 0) : undefined}
               data-compact-caption={rect !== undefined && rect.width < 380}
+              data-window-top={!miniNav && rect?.y === 0}
               data-top-left={!miniNav && rect?.x === 0 && rect.y === 0}
               data-overlay-edge={!miniNav && rect?.y === 0 && rect.x + rect.width === size.width}
             >
@@ -516,7 +517,6 @@ export function ToolTiles({
                     {detached && <h1 className="visually-hidden">{titleOf(id)}</h1>}
                     <header
                       className="tool-tile-header"
-
                       data-testid={`tile-header-${id}`}
                       onPointerDown={(event) => {
                         start(event, id);
