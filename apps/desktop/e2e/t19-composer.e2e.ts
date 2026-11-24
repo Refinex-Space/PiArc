@@ -153,10 +153,12 @@ test('the / palette lists Core’s commands; an input method composition trigger
   await idle(page);
   await typeInComposer(page, '/');
   const palette = page.getByTestId('command-popup');
-  // Core's built-in commands in palette order, including the memory settings entry.
-  await expect(palette.getByRole('option')).toHaveCount(8);
+  // Keep the exact order of Core's built-in commands, including side chat and subtask.
+  await expect(palette.getByRole('option')).toHaveCount(10);
   await expect(palette.locator('[data-command]')).toHaveText([
+    /\/btw/u,
     /\/compact/u,
+    /\/subtask/u,
     /\/clear/u,
     /\/model/u,
     /\/rewind/u,
@@ -165,6 +167,10 @@ test('the / palette lists Core’s commands; an input method composition trigger
     /\/memory/u,
     /\/help/u,
   ]);
+  await page.keyboard.press('ArrowUp');
+  const lastOption = palette.getByRole('option').last();
+  await expect(lastOption).toHaveAttribute('aria-selected', 'true');
+  await expect(lastOption).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath('command-palette.png') });
   await page.keyboard.type('hl');
   await expect(palette.locator('[data-command]')).toHaveText([/\/help/u]);
