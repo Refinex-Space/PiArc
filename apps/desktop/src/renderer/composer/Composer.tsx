@@ -10,6 +10,8 @@ import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { Fragment as ReactFragment, useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { fileMentionPath, type MentionScope } from '../files/file-path.js';
+import { onFileAttachment, droppedFiles, FILE_DRAG_TYPE } from '../files/navigation.js';
 import type { EditorDraft } from './session-draft.js';
 import { IconButton } from '../app/IconButton.js';
 import {
@@ -137,6 +139,26 @@ function pastePlainText(view: EditorView, text: string): void {
   view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(paragraphs), 1, 1)));
 }
 
+function insertFileMentions(
+  view: EditorView,
+  paths: readonly string[],
+  scope: MentionScope | undefined,
+) {
+  if (!paths.length) return;
+  const nodes = paths.flatMap((path) => [
+    composerSchema.node('mention', {
+      id: path,
+      label: path.split('/').at(-1) ?? path,
+      path: fileMentionPath(path, scope),
+    }),
+    composerSchema.text(' '),
+  ]);
+  view.dispatch(
+    view.state.tr.replaceSelection(new Slice(Fragment.from(nodes), 0, 0)).scrollIntoView(),
+  );
+  view.focus();
+}
+
 /** Files of a paste or drop. */
 function filesOf(transfer: DataTransfer | null): File[] {
   return transfer === null ? [] : [...transfer.files];
@@ -145,6 +167,8 @@ function filesOf(transfer: DataTransfer | null): File[] {
 export function Composer({
   running,
   savedDraft,
+  sessionId,
+  fileScope,
   firstTurn = false,
   disabled = false,
   handlers,
@@ -159,6 +183,8 @@ export function Composer({
 }: {
   running: boolean;
   savedDraft?: EditorDraft | undefined;
+  sessionId?: string;
+  fileScope?: MentionScope;
   firstTurn?: boolean;
   disabled?: boolean;
   handlers: ComposerHandlers;
@@ -207,6 +233,8 @@ export function Composer({
     commands,
     limits,
     supportsImages,
+    sessionId,
+    fileScope,
     results,
     pending,
   });
@@ -218,6 +246,8 @@ export function Composer({
     commands,
     limits,
     supportsImages,
+    sessionId,
+    fileScope,
     results,
     pending,
   };
@@ -351,7 +381,13 @@ export function Composer({
         // keyCode 229 keys that arrive before compositionstart, when ProseMirror itself does
         // not consider the editor composing yet.
         keydown: (editor, event) => isImeComposing(event, editor.composing),
-        drop: (_editor, event) => {
+        drop: (editor, event) => {
+          const paths = droppedFiles(event.dataTransfer, latest.current.sessionId);
+          if (paths) {
+            event.preventDefault();
+            insertFileMentions(editor, paths, latest.current.fileScope);
+            return true;
+          }
           const files = filesOf(event.dataTransfer);
           if (files.length === 0) {
             return false;
@@ -491,6 +527,16 @@ export function Composer({
   }, [fillText, fillNonce]);
 
   // Snippets attached elsewhere in the window (the terminal panel) go in at the cursor.
+  useEffect(
+    () =>
+      sessionId
+        ? onFileAttachment(sessionId, (paths) => {
+            if (viewRef.current)
+              insertFileMentions(viewRef.current, paths, latest.current.fileScope);
+          })
+        : undefined,
+    [sessionId],
+  );
   const insertNonce = insert?.nonce;
   const insertSnippets = insert?.snippets;
   useEffect(() => {
@@ -637,13 +683,22 @@ export function Composer({
       data-testid="composer"
       data-running={running}
       onDragOver={(event) => {
-        if (event.dataTransfer.types.includes('Files')) {
+        if (
+          event.dataTransfer.types.includes('Files') ||
+          event.dataTransfer.types.includes(FILE_DRAG_TYPE)
+        ) {
           event.preventDefault();
         }
       }}
       onDrop={(event) => {
         // A drop on the editor itself was taken by ProseMirror already.
         if (event.defaultPrevented) {
+          return;
+        }
+        const paths = droppedFiles(event.dataTransfer, sessionId);
+        if (paths && viewRef.current) {
+          event.preventDefault();
+          insertFileMentions(viewRef.current, paths, latest.current.fileScope);
           return;
         }
         const files = filesOf(event.dataTransfer);

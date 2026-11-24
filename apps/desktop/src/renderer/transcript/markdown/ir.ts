@@ -11,6 +11,8 @@ export type Span =
       readonly kind: 'link';
       /** An `https:`, `http:` or `mailto:` URL, or `null` when the target was not allowed. */
       readonly href: string | null;
+      /** A possible local path; the renderer checks it against this session. */
+      readonly projectTarget?: string;
       readonly title: string | null;
       readonly children: readonly Span[];
     }
@@ -18,6 +20,8 @@ export type Span =
       /** Images are never loaded: they render as a link to their source. */
       readonly kind: 'image';
       readonly href: string | null;
+      /** A possible local path; the renderer checks it against this session. */
+      readonly projectTarget?: string;
       readonly alt: string;
       readonly title: string | null;
     }

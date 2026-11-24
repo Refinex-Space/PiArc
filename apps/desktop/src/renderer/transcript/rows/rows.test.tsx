@@ -7,6 +7,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { takeFileLocation, type ProjectFileLinks } from '../../files/navigation.js';
 import { DEFAULT_PREFERENCES } from '../../../shared/preferences.js';
 import { AppProvider } from '../../app/app-context.js';
 import { AppStore } from '../../store/app-store.js';
@@ -101,6 +102,7 @@ async function render(
   ids: readonly string[],
   shared = services(),
   rowActions: TranscriptActions = actions,
+  fileLinks?: ProjectFileLinks,
 ): Promise<HTMLElement> {
   const container = document.createElement('div');
   document.body.append(container);
@@ -115,7 +117,14 @@ async function render(
         notificationsSupported: true,
       }}
     >
-      <TranscriptContext.Provider value={{ services: shared, transcript, actions: rowActions }}>
+      <TranscriptContext.Provider
+        value={{
+          services: shared,
+          transcript,
+          actions: rowActions,
+          ...(fileLinks ? { fileLinks } : {}),
+        }}
+      >
         {ids.map((id) => (
           <RowView key={id} id={id} />
         ))}
@@ -993,4 +1002,65 @@ it('submits a typed MCP form through the real approval row and keeps its server 
       content: { release: 'Beta', number: 3, ready: false, colors: ['green'] },
     },
   });
+});
+
+it('opens a reply’s local markdown and Read call in the session Files panel, while web links keep their native confirmation', async () => {
+  const links = { root: '/checkout', directory: 'docs', sessionId: 'project-link-session' };
+  const rendered = transcriptOf([
+    {
+      item: {
+        type: 'agentMessage',
+        itemId: 'reply',
+        status: 'completed',
+        text: '[Local](./guide.md#L2) [Outside](/unrelated/f) [Website](https://example.org/) [Bad](javascript:bad)',
+      },
+    },
+    {
+      item: {
+        type: 'dynamicToolCall',
+        itemId: 'read',
+        status: 'completed',
+        tool: 'Read',
+        arguments: { file_path: 'guide.md', offset: 5 },
+        output: 'line',
+      },
+    },
+  ]);
+  const openFile = vi.fn();
+  const root = await render(
+    rendered,
+    rendered.rowIds(),
+    services(),
+    { ...actions, openFile },
+    links,
+  );
+  const local = root.querySelector<HTMLButtonElement>('button[data-file-path]');
+  expect(local?.textContent).toBe('Local');
+  act(() => {
+    local?.click();
+  });
+  expect(takeFileLocation(links.sessionId)).toEqual({ path: 'docs/guide.md', line: 2 });
+  expect([...root.querySelectorAll('.md-link-blocked')].map((el) => el.textContent)).toEqual([
+    'Outside',
+    'Bad',
+  ]);
+  const original = Object.getOwnPropertyDescriptor(window.piarc, 'openExternal');
+  const external = vi.fn().mockResolvedValue(undefined);
+  Object.assign(window.piarc, { openExternal: external });
+  try {
+    act(() => {
+      root.querySelector<HTMLAnchorElement>('a.md-link')?.click();
+    });
+    expect(external).toHaveBeenCalledWith('https://example.org/');
+  } finally {
+    if (original) Object.defineProperty(window.piarc, 'openExternal', original);
+    else Reflect.deleteProperty(window.piarc, 'openExternal');
+  }
+  act(() => {
+    byTestId(root, 'tool-group-toggle').click();
+  });
+  act(() => {
+    byTestId(root, 'read-file-path').click();
+  });
+  expect(openFile).toHaveBeenCalledWith('guide.md', 5);
 });

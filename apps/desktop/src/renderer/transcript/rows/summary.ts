@@ -107,6 +107,13 @@ export function baseName(path: string): string {
   return parts.at(-1) ?? path;
 }
 
+/** Read accepts path; imported histories also use file_path. */
+export function readPath(item: Item): string | undefined {
+  return toolOf(item) === 'Read'
+    ? (argument(item, 'path') ?? argument(item, 'file_path'))
+    : undefined;
+}
+
 /** What a call acts on, as one short label. */
 export function targetOf(item: Item): string {
   switch (item.type) {
@@ -129,7 +136,7 @@ export function targetOf(item: Item): string {
   }
   switch (verbOf(item)) {
     case 'read': {
-      const path = argument(item, 'path') ?? argument(item, 'file_path');
+      const path = readPath(item);
       return path === undefined ? toolOf(item) : baseName(path);
     }
     case 'search':

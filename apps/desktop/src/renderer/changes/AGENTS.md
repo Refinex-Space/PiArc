@@ -28,6 +28,8 @@
 - L4：`PIARC_EVIDENCE_TASK=T28 npx playwright test -c apps/desktop/playwright.config.ts t28-rewind --project dev`（面板、hunk 与文件丢弃、CRLF 与 BOM、Mod+Shift+D、降级、回退与撤销、焦点、分支切换、从这里分支、`/rewind`），mock 脚本在 `e2e/scenarios/t28-*.json`。
 - 评论：单测 `comments.test.ts`（重新定位与失效、消息格式、快捷键）；L4 `PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-comments --project dev`（两侧与范围、跨文件、编辑与删除、Mod+Enter 一次发送并断言 mock 收到的消息、运行中排队，亮暗截图在 `tmp/evidence/T42/`）。
 
+改动面板的文件名在当前会话的 Files 中打开，展开箭头独立控制 diff。路径的可达范围由当前会话的工作树确定。
+
 ## 易错点
 
 - `.badge` 在 `app.css` 中有固定字号与颜色：面板与对话框的标签用自己的 `change-tag`。

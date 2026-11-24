@@ -35,6 +35,7 @@ export function guardWebContents(
   contents: WebContents,
   trustedOrigins: readonly string[],
   toolWindow?: (details: HandlerDetails) => WindowOpenHandlerResponse | undefined,
+  previewFrame?: (url: string) => boolean,
 ): void {
   contents.on('will-navigate', (event) => {
     if (!isTrustedUrl(event.url, trustedOrigins)) {
@@ -46,7 +47,11 @@ export function guardWebContents(
   // renderer's lack of `<iframe>` keep them out today, this keeps a frame off foreign pages too.
   // The main frame stays with `will-navigate` (this event comes first and would pre-empt it).
   contents.on('will-frame-navigate', (event) => {
-    if (!event.isMainFrame && !isTrustedUrl(event.url, trustedOrigins)) {
+    if (
+      !event.isMainFrame &&
+      !isTrustedUrl(event.url, trustedOrigins) &&
+      !previewFrame?.(event.url)
+    ) {
       event.preventDefault();
       console.warn(`[security] blocked frame navigation to ${originForLog(event.url)}`);
     }

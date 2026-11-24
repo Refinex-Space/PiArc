@@ -164,6 +164,15 @@ export const A11Y_STATES = [
   { id: 'panel:terminal', area: 'panel', panel: 'terminal', note: 'terminal panel' },
   { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
   { id: 'panel:files', area: 'panel', panel: 'files', note: 'workspace files tile' },
+  { id: 'state:files-source', area: 'state', note: 'file tabs, source lines and the file tree' },
+  { id: 'state:files-editor', area: 'state', note: 'editable project file' },
+  {
+    id: 'dialog:files-discard',
+    area: 'dialog',
+    source: 'files/FilesPanel.tsx',
+    note: 'dirty file close confirmation',
+  },
+
   { id: 'panel:preview', area: 'panel', panel: 'preview', note: 'session preview tile' },
   // Dialogs, one or more per file that renders `<Dialog>`.
   {

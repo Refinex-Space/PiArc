@@ -34,6 +34,7 @@ import './task-panels.js';
 import './SideChat.js';
 import '../changes/panels.js';
 import '../terminal/panels.js';
+import { requestFilesControl } from '../files/file-controls.js';
 import { toggleChangesPanel } from '../changes/panel-state.js';
 import { showPanel, togglePanel } from './registry.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
@@ -409,6 +410,16 @@ export function Shell() {
         }
         break;
       }
+      case 'files.toggle':
+        if (selected) togglePanel('files');
+        break;
+      case 'files.quick':
+      case 'files.tree':
+        if (selected) {
+          showPanel('files');
+          requestFilesControl(selected, command === 'files.quick' ? 'search' : 'tree');
+        }
+        break;
       case 'session.sideChat':
         if (selected && !shortcutsOpen) {
           showPanel('side-chat');

@@ -101,6 +101,12 @@ export class ToolWindows {
     });
   }
 
+  allowFileFrame?: (contents: WebContents, url: string) => boolean;
+  fileOwner(contents: WebContents): WebContents | undefined {
+    for (const { child, ticket } of this.#open.values())
+      if (ticket.panel === 'files' && child.webContents === contents) return ticket.owner;
+    return undefined;
+  }
   open(sender: WebContents, details: HandlerDetails): WindowOpenHandlerResponse | undefined {
     const ticket = this.#pending.get(details.frameName);
     if (
@@ -125,8 +131,8 @@ export class ToolWindows {
       this.#open.set(ticket.token, { ticket, child });
       const contents = child.webContents;
       const unbind =
-        ticket.panel === 'terminal'
-          ? this.input.bindToolInput(contents, sender, ticket.session)
+        ticket.panel === 'terminal' || ticket.panel === 'files'
+          ? this.input.bindToolInput(contents, sender, ticket.session, ticket.panel)
           : undefined;
       // The initial load is the single allowed document. Renderer navigation, redirects and
       // frame navigations are never part of the tool-window protocol.
@@ -138,6 +144,12 @@ export class ToolWindows {
         if (!initial || event.url !== ticket.url) event.preventDefault();
       });
       contents.on('will-frame-navigate', (event) => {
+        if (
+          !event.isMainFrame &&
+          ticket.panel === 'files' &&
+          this.allowFileFrame?.(contents, event.url)
+        )
+          return;
         if (!initial || !event.isMainFrame || event.url !== ticket.url) event.preventDefault();
       });
       contents.on('will-redirect', (event) => {

@@ -2,8 +2,11 @@
 // 10.3): no innerHTML, raw HTML shown as text, links opened through the main process's
 // confirmation (`window.piarc.openExternal`), images never loaded and shown as links. Blocks are
 // memoized by identity, so while a message streams only its changed tail re-renders.
-import { memo, type MouseEvent, type ReactNode } from 'react';
+import { memo, useContext, type MouseEvent, type ReactNode } from 'react';
 
+import { fileLocation, openProjectFile } from '../../files/navigation.js';
+import { TranscriptContext } from '../services.js';
+import { revealBidi } from '../reveal.js';
 import { useT } from '../../app/app-context.js';
 import { CodeBlock } from '../highlight/CodeBlock.js';
 import type { Align, Block, Span } from './ir.js';
@@ -17,14 +20,41 @@ function openLink(event: MouseEvent<HTMLAnchorElement>, href: string): void {
 
 function Link({
   href,
+  projectTarget,
   title,
   children,
 }: {
   href: string | null;
+  projectTarget?: string | undefined;
   title: string | null;
   children: ReactNode;
 }) {
   const t = useT();
+  const files = useContext(TranscriptContext)?.fileLinks;
+  if (projectTarget && files?.root) {
+    const target =
+      projectTarget.startsWith('#L') && files.document
+        ? files.document + projectTarget
+        : projectTarget;
+    const location =
+      !projectTarget.startsWith('#') || files.document
+        ? fileLocation(target, files.root, projectTarget.startsWith('#') ? '' : files.directory)
+        : undefined;
+    if (location)
+      return (
+        <button
+          type="button"
+          className="md-link file-document-link"
+          title={revealBidi(title ?? projectTarget)}
+          data-file-path={location.path}
+          onClick={() => {
+            openProjectFile(files.sessionId, location);
+          }}
+        >
+          {children}
+        </button>
+      );
+  }
   if (href === null) {
     return (
       <span className="md-link-blocked" title={t('markdown.linkBlocked')}>
@@ -79,15 +109,17 @@ function SpanView({ span }: { span: Span }): ReactNode {
       return <br />;
     case 'link':
       return (
-        <Link href={span.href} title={span.title}>
+        <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
           <Spans spans={span.children} />
         </Link>
       );
     case 'image':
       return (
-        <Link href={span.href} title={span.title}>
+        <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
           <span className="md-image-label">
-            {t('markdown.image', { name: span.alt === '' ? (span.href ?? '') : span.alt })}
+            {t('markdown.image', {
+              name: span.alt === '' ? (span.href ?? span.projectTarget ?? '') : span.alt,
+            })}
           </span>
         </Link>
       );

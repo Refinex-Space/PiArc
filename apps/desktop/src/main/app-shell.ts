@@ -152,6 +152,18 @@ export class AppShell {
     window.webContents.on('did-start-navigation', (details) => {
       if (details.isMainFrame && !details.isSameDocument) this.listening.delete(id);
     });
+    window.webContents.on('will-prevent-unload', (event) => {
+      const t = this.t();
+      const discard = dialog.showMessageBoxSync(window, {
+        type: 'question',
+        message: t.t('files.discardTitle'),
+        buttons: [t.t('dialog.cancel'), t.t('files.discard')],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      if (discard === 1) event.preventDefault();
+    });
     void window.loadURL(this.options.entryUrl);
     this.main = window;
     this.mains.add(window);

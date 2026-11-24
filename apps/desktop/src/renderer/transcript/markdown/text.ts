@@ -42,8 +42,8 @@ export const LINK_PROTOCOLS: readonly string[] = ['https:', 'http:', 'mailto:'];
 
 /**
  * The link target to keep, or `null`: only absolute `https:`, `http:` and `mailto:` URLs pass,
- * after character references are decoded (so `&#106;avascript:` is caught). Relative targets
- * have nothing to resolve against in the transcript and are dropped as well.
+ * after character references are decoded (so `&#106;avascript:` is caught). Project files
+ * are resolved separately and are never returned as navigable URLs.
  */
 export function safeHref(raw: string): string | null {
   const decoded = decodeCharacterReferences(raw).trim();
@@ -52,4 +52,32 @@ export function safeHref(raw: string): string | null {
   }
   const url = new URL(decoded);
   return LINK_PROTOCOLS.includes(url.protocol) ? url.href : null;
+}
+
+/** Local targets never become DOM hrefs or OS URLs. The renderer resolves them against
+ * the actual session root and Core checks the resulting file operation. */
+export function markdownTarget(raw: string): { href: string | null; projectTarget?: string } {
+  const href = safeHref(raw);
+  if (href) return { href };
+  const decoded = decodeCharacterReferences(raw).trim();
+  const hash = decoded.indexOf('#');
+  if (
+    !decoded ||
+    decoded.includes('?') ||
+    (hash !== -1 && !/^#L\d+(?:-L?\d+)?$/u.test(decoded.slice(hash)))
+  )
+    return { href: null };
+  let path: string;
+  try {
+    path = decodeURIComponent(decoded);
+  } catch {
+    return { href: null };
+  }
+  if (
+    path.startsWith('//') ||
+    Array.from(path).some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127) ||
+    (/^[a-z][a-z\d+.-]*:/iu.test(path) && !/^[a-z]:[\\/]/iu.test(path))
+  )
+    return { href: null };
+  return { href: null, projectTarget: path };
 }

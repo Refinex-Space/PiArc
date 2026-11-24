@@ -45,6 +45,8 @@ import { compactFocus, SessionInput } from './session-input.js';
 import { useUi } from './ui.js';
 import { OutputStyleDialog } from './OutputStyleDialog.js';
 import { showPanel } from './registry.js';
+import { projectPath } from '../files/file-path.js';
+import { openProjectFile, projectFileRoot } from '../files/navigation.js';
 import { onCommandRequest, takeCommand } from './command-requests.js';
 import { parseWindow } from '../store/history-window.js';
 import { rememberMemoryTarget } from '../settings/memory-target.js';
@@ -293,9 +295,12 @@ export function Conversation({
   }, [id, unread, focused, covered]);
 
   const sessionWorkspace = session?.workspace;
+  const fileRoot = projectFileRoot(session);
+  const fileDirectory = projectPath(session?.cwd ?? '', fileRoot) ?? '';
   const view = useMemo<TranscriptView>(
     () => ({
       services: ui.transcriptServices,
+      fileLinks: { sessionId: id, root: fileRoot, directory: fileDirectory },
       transcript,
       actions: {
         retry: (turnId) => {
@@ -317,6 +322,11 @@ export function Conversation({
             console.error('[conversation] cannot stop the subagent', failure);
           });
         },
+        openFile: (raw: string, line?: number) => {
+          const path = projectPath(raw, fileRoot, fileDirectory);
+          if (path) openProjectFile(id, { path, ...(line === undefined ? {} : { line }) });
+          else ui.addToast({ sessionId: id, text: t('files.outside') });
+        },
         // A `Memory` call's "Open in settings" (T47): the memory page on this workspace's note.
         openMemory: (note) => {
           if (sessionWorkspace !== undefined) {
@@ -331,7 +341,18 @@ export function Conversation({
         },
       },
     }),
-    [ui.transcriptServices, transcript, input, branchActions, sessionWorkspace],
+    [
+      ui,
+      transcript,
+      input,
+      branchActions,
+      sessionWorkspace,
+      session?.cwd,
+      fileRoot,
+      fileDirectory,
+      id,
+      t,
+    ],
   );
   const mentions = useMemo(
     () => coreMentions(session?.cwd ?? session?.workspace, ui.composer?.maxSearchResults ?? 20),
@@ -476,6 +497,8 @@ export function Conversation({
       </DetailContext.Provider>
       <div className="conversation-composer">
         <Composer
+          sessionId={id}
+          fileScope={{ root: fileRoot, directory: fileDirectory }}
           savedDraft={store.editorDraft('session', id)}
           running={turn.running}
           handlers={handlers}

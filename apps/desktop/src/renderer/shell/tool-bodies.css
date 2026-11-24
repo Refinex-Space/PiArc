@@ -139,7 +139,7 @@
   border-radius: var(--piarc-radius-lg);
   background: var(--piarc-surface-hover);
 }
-.changes-file-head .changes-toggle {
+.changes-file-head .changes-file-title {
   flex: 1;
   display: flex;
   align-items: center;
@@ -149,6 +149,7 @@
   padding-inline: var(--piarc-space-1);
   text-align: start;
 }
+.changes-file-title > svg,
 .changes-toggle > svg,
 .bg-task-icon svg {
   flex: none;
@@ -162,7 +163,7 @@
 .bg-task-disclosure[aria-expanded='false'] svg {
   transform: rotate(-90deg);
 }
-:root[data-app] .changes-toggle .changes-file-path {
+:root[data-app] .changes-file-title .changes-file-path {
   font-family: var(--piarc-font-ui);
 }
 .changes-panel .change-tag {
@@ -266,7 +267,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: 'file counts' 'kind discard';
   }
-  .changes-file-head .changes-toggle {
+  .changes-file-head .changes-file-title {
     grid-area: file;
   }
   .changes-file-head .change-tag {
@@ -317,4 +318,23 @@
 }
 .bg-tasks-card .bg-card-all {
   justify-self: start;
+}
+
+.changes-file-title .changes-toggle {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  height: var(--piarc-size-button-height);
+  width: var(--piarc-size-button-height);
+  padding: 0;
+}
+:root[data-app] .changes-file-title .file-path-action {
+  padding-inline: 0;
+  min-height: var(--piarc-size-button-height);
+  text-align: start;
+}
+.tool-open-file {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

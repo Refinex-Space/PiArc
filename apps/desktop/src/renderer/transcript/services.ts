@@ -12,6 +12,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import type { ProjectFileLinks } from '../files/navigation.js';
 import type { BranchPoint } from '@piarc/protocol';
 import type { SessionTranscript, TranscriptRow, TurnInfo } from '../store/transcript.js';
 import { HighlightClient } from './highlight/highlight-client.js';
@@ -109,6 +110,7 @@ export function createTranscriptServices(renderCounter: RenderCounter | null): T
 
 /** What the rows' buttons do; the session view (or the prototype page) decides. */
 export interface TranscriptActions {
+  readonly openFile?: (path: string, line?: number) => void;
   /** Sends the input of turn `turnId` again (error and uncertain cards). */
   readonly retry: (turnId: string) => void;
   /** Sends an input Core did not take again, with the same idempotency key. */
@@ -133,6 +135,7 @@ export interface TranscriptActions {
 
 /** One session's transcript as a view shows it. */
 export interface TranscriptView {
+  readonly fileLinks?: ProjectFileLinks;
   readonly services: TranscriptServices;
   readonly transcript: SessionTranscript;
   readonly actions: TranscriptActions;

@@ -21,7 +21,9 @@ test('sends the production CSP as a response header', async ({ page }) => {
       "default-src 'self'",
       "script-src 'self'",
       "connect-src 'self'",
-      "img-src 'self' data:",
+      "img-src 'self' data: piarc-document:",
+      'frame-src piarc-document:',
+      'media-src piarc-document:',
     ]),
   );
   expect(csp).not.toContain('unsafe');

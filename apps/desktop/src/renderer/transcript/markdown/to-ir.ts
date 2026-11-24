@@ -5,7 +5,7 @@
 import type { MarkedToken, Token, Tokens } from 'marked';
 
 import type { Align, Block, ListItem, Span } from './ir.js';
-import { decodeCharacterReferences, safeHref } from './text.js';
+import { decodeCharacterReferences, markdownTarget } from './text.js';
 
 const MARKED_TYPES: ReadonlySet<string> = new Set<MarkedToken['type']>([
   'blockquote',
@@ -88,7 +88,7 @@ function toSpan(token: Token): Span | null {
     case 'link':
       return {
         kind: 'link',
-        href: safeHref(token.href),
+        ...markdownTarget(token.href),
         title:
           token.title === undefined || token.title === null
             ? null
@@ -98,7 +98,7 @@ function toSpan(token: Token): Span | null {
     case 'image':
       return {
         kind: 'image',
-        href: safeHref(token.href),
+        ...markdownTarget(token.href),
         alt: decodeCharacterReferences(token.text),
         title: token.title === null ? null : decodeCharacterReferences(token.title),
       };

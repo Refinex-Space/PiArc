@@ -13,6 +13,9 @@ import {
   startCore,
   type CoreHost,
 } from './core/core-host.js';
+import { DOCUMENT_SCHEME, ProjectPreviews } from './core/project-preview.js';
+import { registerProjectWatch } from './core/project-file-watch.js';
+import { registerProjectFileHandlers } from './core/project-files-ipc.js';
 import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
 import { EventRouter } from './core/router.js';
@@ -164,11 +167,19 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
 
 function start(dirs: DataDirs): void {
   let toolWindows: ToolWindows | undefined;
+  let previews: ProjectPreviews | undefined;
+  const previewFrame = (contents: Electron.WebContents, url: string) =>
+    previews?.allowsFrame(toolWindows?.fileOwner(contents) ?? contents, url) ?? false;
   app.on('session-created', (created) => {
     applyPermissionPolicy(created, trustedOrigins);
   });
   app.on('web-contents-created', (_event, contents) => {
-    guardWebContents(contents, trustedOrigins, (details) => toolWindows?.open(contents, details));
+    guardWebContents(
+      contents,
+      trustedOrigins,
+      (details) => toolWindows?.open(contents, details),
+      (url) => previewFrame(contents, url),
+    );
   });
   app.on('second-instance', (_event, argv, workingDirectory) => {
     const targets = launchTargets(argv, process.defaultApp, workingDirectory);
@@ -270,6 +281,12 @@ function start(dirs: DataDirs): void {
       },
     );
     const terminalOwners = new TerminalOwners(core.runtime);
+    previews = new ProjectPreviews(core.runtime);
+    previews.register(registerHandler, terminalOwners);
+    registerProjectWatch(registerHandler, core.runtime);
+    registerProjectFileHandlers(registerHandler, core.runtime, terminalOwners, (child) =>
+      toolWindows?.fileOwner(child),
+    );
     toolWindows = new ToolWindows(
       terminalOwners,
       (sender) => appShell.mainWindows().some((win) => win.webContents === sender),
@@ -283,6 +300,7 @@ function start(dirs: DataDirs): void {
         );
       },
     );
+    toolWindows.allowFileFrame = previewFrame;
     toolWindows.register(registerHandler);
     // Every page is watched from its creation: terminal input needs the page's recent real
     // input (I51), so the first keystroke must already be seen.
@@ -315,7 +333,7 @@ runVelopackStartup();
 // privileges.
 applyAppIdentity();
 app.enableSandbox();
-protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION]);
+protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION, DOCUMENT_SCHEME]);
 // Before `ready` and before the single-instance lock, which lives in `userData`.
 const dataDirs = applyDataDirs(app, process.env, process.platform);
 

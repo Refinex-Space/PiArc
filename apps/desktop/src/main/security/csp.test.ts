@@ -19,7 +19,9 @@ describe('PRODUCTION_CSP', () => {
     expect(policy.get('default-src')).toBe("'self'");
     expect(policy.get('script-src')).toBe("'self'");
     expect(policy.get('connect-src')).toBe("'self'");
-    expect(policy.get('img-src')).toBe("'self' data:");
+    expect(policy.get('img-src')).toBe("'self' data: piarc-document:");
+    expect(policy.get('frame-src')).toBe('piarc-document:');
+    expect(policy.get('media-src')).toBe('piarc-document:');
     expect(policy.get('object-src')).toBe("'none'");
     expect(policy.get('base-uri')).toBe("'none'");
   });

@@ -1,0 +1,356 @@
+.file-viewer,
+.file-viewer-body {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+.file-viewer-toolbar,
+.file-find,
+.file-selection-bar,
+.file-viewer-notice {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+.file-viewer-toolbar {
+  min-height: var(--piarc-size-row-height);
+  box-sizing: border-box;
+  background: var(--piarc-surface-sidebar);
+}
+.file-viewer-crumb {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .file-viewer :is(.icon-button, .button-small) {
+  flex: none;
+  min-height: var(--piarc-space-5);
+  height: var(--piarc-space-5);
+}
+:root[data-app] .file-viewer .icon-button {
+  width: var(--piarc-space-5);
+  min-width: var(--piarc-space-5);
+}
+.file-find {
+  flex-wrap: wrap;
+}
+.file-find input,
+.file-selection-bar input {
+  min-width: 4ch;
+  flex: 1;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  color: var(--piarc-text-primary);
+  background: var(--piarc-surface-app);
+  font: inherit;
+}
+.file-find-options {
+  display: flex;
+  align-items: center;
+}
+.file-find-options .icon-button[aria-pressed='true'] {
+  background: var(--piarc-surface-selected);
+}
+.file-selection-bar {
+  border-block: 1px solid var(--piarc-border-subtle) 0;
+  flex-wrap: wrap;
+}
+.file-selection-bar form {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: var(--piarc-space-1);
+}
+.file-find small,
+.file-selection-bar small {
+  color: var(--piarc-text-secondary);
+}
+.file-selection-bar small {
+  margin-inline-end: auto;
+}
+.file-viewer-notice {
+  flex-wrap: wrap;
+}
+.file-viewer-notice span {
+  overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 8ch;
+}
+.file-source-scroll,
+.file-document,
+.file-media {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.file-source-scroll,
+:root[data-app] textarea.file-editor {
+  font: var(--piarc-font-size-body)/var(--piarc-line-height-button) var(--piarc-font-mono);
+  color: var(--piarc-text-primary);
+}
+.file-source-scroll {
+  padding-block: var(--piarc-space-2);
+  user-select: text;
+  direction: ltr;
+}
+.file-source-scroll[data-past='true']::after {
+  display: block;
+  content: '';
+  height: calc(100% - 1lh);
+}
+.file-source-canvas {
+  position: relative;
+  min-width: 100%;
+}
+.file-source-line {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  min-height: 1lh;
+}
+.file-source-line[data-selected] {
+  background: var(--piarc-surface-selected);
+}
+:root[data-app] .file-line-number {
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  align-self: start;
+  box-sizing: content-box;
+  user-select: none;
+  width: var(--file-number-width);
+  padding: 0 var(--piarc-space-3) 0 var(--piarc-space-3);
+  line-height: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--piarc-text-secondary);
+}
+.file-line-number::before {
+  content: attr(data-number);
+}
+:root[data-app] .file-line-number:hover {
+  color: var(--piarc-text-accent);
+}
+.file-line-text {
+  position: relative;
+  padding-inline-end: var(--piarc-space-2);
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+}
+.file-source-scroll[data-wrap='false'] .file-line-text {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.file-indent-guide,
+.file-whitespace {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.file-indent-guide {
+  color: transparent;
+  white-space: pre;
+  background: repeating-linear-gradient(
+    to right,
+    var(--piarc-border-subtle) 0 1px,
+    transparent 1px var(--file-tab-width)
+  );
+}
+.file-whitespace {
+  color: var(--piarc-text-secondary);
+}
+.file-line-text mark {
+  background: var(--piarc-surface-selected);
+  color: var(--piarc-text-primary);
+}
+.file-line-text mark[data-current] {
+  outline: 1px solid var(--piarc-c-focus-ring);
+}
+:root[data-app] textarea.file-editor {
+  flex: 1;
+  box-sizing: border-box;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 0;
+  resize: none;
+  border-radius: 0;
+  scrollbar-gutter: stable;
+  background: var(--piarc-surface-app);
+  direction: ltr;
+}
+.file-document {
+  padding: var(--piarc-space-4);
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+.file-prose :is(h1, h2, h3, p):first-child {
+  margin-block-start: 0;
+}
+.file-prose h1 {
+  font-size: var(--piarc-font-size-heading);
+}
+.file-prose h2 {
+  font-size: var(--piarc-settings-page-title);
+}
+.file-prose h3 {
+  font-size: var(--piarc-font-size-title);
+}
+.file-table-wrap table,
+.file-prose table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.file-table-wrap :is(th, td),
+.file-prose :is(th, td) {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  text-align: start;
+  vertical-align: top;
+}
+.file-table-wrap th {
+  background: var(--piarc-surface-sidebar);
+}
+.file-table-wrap td {
+  white-space: pre-wrap;
+}
+.file-media {
+  display: grid;
+  place-items: center;
+  padding: var(--piarc-space-3);
+}
+.file-media img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.file-document-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-accent);
+  text-align: inherit;
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+.file-markdown-chunk + .file-markdown-chunk {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100vh;
+}
+.file-frontmatter {
+  margin: 0 0 var(--piarc-space-4);
+  padding: var(--piarc-space-2) 0;
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+.file-frontmatter div {
+  display: grid;
+  grid-template-columns: minmax(6ch, 28%) 1fr;
+  gap: var(--piarc-space-3);
+  padding: var(--piarc-space-1) 0;
+}
+.file-frontmatter dt {
+  color: var(--piarc-text-secondary);
+}
+.file-frontmatter dd {
+  margin: 0;
+}
+.file-edit-surface {
+  --file-gutter: calc(var(--file-number-width) + 2 * var(--piarc-space-3));
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  isolation: isolate;
+  font: var(--piarc-font-size-body)/var(--piarc-line-height-button) var(--piarc-font-mono);
+}
+.file-editor-mirror,
+:root[data-app] .file-edit-surface textarea.file-editor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  letter-spacing: normal;
+  word-spacing: normal;
+  tab-size: inherit;
+  scrollbar-gutter: stable;
+}
+.file-editor-mirror {
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+  padding: var(--piarc-space-2) var(--piarc-space-3) var(--piarc-space-2) var(--file-gutter);
+}
+:root[data-app] .file-edit-surface[data-numbered='true'] textarea.file-editor {
+  padding-inline-start: var(--file-gutter);
+}
+:root[data-app] .file-edit-surface[data-painted='true'] textarea.file-editor {
+  color: transparent;
+  caret-color: var(--piarc-text-primary);
+  background: transparent;
+}
+.file-edit-surface[data-past='true'] .file-editor-mirror,
+:root[data-app] .file-edit-surface[data-past='true'] textarea.file-editor {
+  padding-block-end: 45%;
+}
+.file-editor-line {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  min-height: 1lh;
+  position: relative;
+}
+.file-edit-surface[data-wrap='false'] .file-editor-line {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.file-editor-line::before {
+  position: absolute;
+  right: calc(100% + var(--piarc-space-3));
+  width: var(--file-number-width);
+  text-align: right;
+  color: var(--piarc-text-secondary);
+  content: attr(data-number);
+}
+@media (forced-colors: active) {
+  :root[data-app] .file-edit-surface[data-painted='true'] textarea.file-editor {
+    color: CanvasText;
+    background: Canvas;
+    caret-color: CanvasText;
+  }
+}
+
+.file-preview-surface {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}

@@ -21,6 +21,7 @@ import {
   ChevronDownIcon,
 } from './icons.js';
 import { ChoiceButton, MenuPopup, useMenu } from './Menu.js';
+import { onPanelRequest } from './registry.js';
 import { ToolHeaderProvider, ToolHeaderTarget } from './ToolHeaderSlot.js';
 import { PopoutSurface, ToolWindowPin } from './PopoutSurface.js';
 import {
@@ -187,6 +188,23 @@ export function ToolTiles({
     state.scope === scope
       ? sync(state, openIds)
       : initial(scope, openIds, remembered.current.get(scope) ?? restore(scope));
+  useLayoutEffect(
+    () =>
+      onPanelRequest((request) => {
+        if (request.action !== 'show') return;
+        const target = request.id === 'conversation' ? '' : request.id;
+        setState((old) =>
+          target !== '' && !old.ids.includes(target)
+            ? old
+            : {
+                ...old,
+                focused: target,
+                maximized: target === old.maximized ? old.maximized : undefined,
+              },
+        );
+      }),
+    [],
+  );
   if (current !== state) setState(current);
   useLayoutEffect(() => {
     remembered.current.set(scope, current.layout);
@@ -459,7 +477,7 @@ export function ToolTiles({
           const rect = geo.panes.get(id);
           const detached = current.detached.includes(id);
           const expanded = current.maximized === id;
-          const customHeader = id === 'terminal' || id === 'side-chat';
+          const customHeader = ['terminal', 'side-chat', 'files'].includes(id);
           const showPicker =
             geo.compact && !geo.single && !detached && !expanded && docked.length > 1;
           const dock = () => {

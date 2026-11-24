@@ -9,8 +9,10 @@ import type { ChangesFile, ChangesView } from '@piarc/protocol';
 import { useState } from 'react';
 
 import { useApp, useT } from '../app/app-context.js';
-import { useChanges, useStore } from '../store/hooks.js';
+import { useChanges, useStore, useSession } from '../store/hooks.js';
 import { changesOf } from '../store/changes.js';
+import { projectPath } from '../files/file-path.js';
+import { openProjectFile, projectFileRoot } from '../files/navigation.js';
 import { reason } from '../shell/errors.js';
 import { useUi } from '../shell/ui.js';
 import { isSendKey } from './comments.js';
@@ -34,11 +36,13 @@ function Counts({ added, removed }: { readonly added: number; readonly removed: 
 /** One file: its header, and its diff when shown. */
 function FileRow({
   sessionId,
+  root,
   file,
   folded,
   onChanged,
 }: {
   readonly sessionId: string;
+  readonly root: string;
   readonly file: ChangesFile;
   /** The panel degraded: folded, and the diff fetched alone and shown as plain text. */
   readonly folded: boolean;
@@ -53,6 +57,7 @@ function FileRow({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const shown = alone ?? file;
+  const path = projectPath(file.path, root);
   const discard = (hunk: number | undefined) => {
     setBusy(true);
     setFailure(undefined);
@@ -104,23 +109,41 @@ function FileRow({
       data-kind={file.kind}
     >
       <div className="changes-file-head">
-        <button
-          type="button"
-          className="row-action changes-toggle"
-          aria-expanded={open}
-          data-testid="changes-toggle"
-          onClick={toggle}
-        >
-          <ChevronDownIcon />
-          <FileIcon />
-          <span
-            className="changes-file-path"
-            title={revealBidi(file.path)}
-            data-testid="changes-file-path"
+        <div className="changes-file-title">
+          <button
+            type="button"
+            className="row-action changes-toggle"
+            aria-expanded={open}
+            aria-label={t('files.tree.toggleDiff', { path: revealBidi(file.label) })}
+            data-testid="changes-toggle"
+            onClick={toggle}
           >
-            {revealBidi(file.label)}
-          </span>
-        </button>
+            <ChevronDownIcon />
+          </button>
+          <FileIcon />
+          {path ? (
+            <button
+              type="button"
+              className="changes-file-path file-path-action"
+              data-testid="changes-file-path"
+              title={revealBidi(file.path)}
+              aria-label={t('files.tree.openPath', { path: revealBidi(file.label) })}
+              onClick={() => {
+                openProjectFile(sessionId, { path });
+              }}
+            >
+              {revealBidi(file.label)}
+            </button>
+          ) : (
+            <span
+              className="changes-file-path"
+              title={revealBidi(file.path)}
+              data-testid="changes-file-path"
+            >
+              {revealBidi(file.label)}
+            </span>
+          )}
+        </div>
         <span className="change-tag">{t(`changes.kind.${file.kind}`)}</span>
         <Counts added={file.added} removed={file.removed} />
         <Button
@@ -169,12 +192,14 @@ function FileRow({
 function FileList({ sessionId, view }: { readonly sessionId: string; readonly view: ChangesView }) {
   const store = useStore();
   const changes = store.transcript(sessionId).changes;
+  const root = projectFileRoot(useSession(sessionId));
   return (
     <ul className="changes-files" data-testid="changes-files">
       {view.files.map((file) => (
         <FileRow
           key={`${file.path}:${file.version}`}
           sessionId={sessionId}
+          root={root}
           file={file}
           folded={view.degraded === true}
           onChanged={(path, next) => {

@@ -15,9 +15,12 @@ import {
 } from '../services.js';
 import { useElapsedText, useNow } from './common.js';
 import { revealBidi } from '../reveal.js';
+import { projectPath } from '../../files/file-path.js';
 import { ReviewNote } from './review.js';
 import {
   STATUS_MESSAGE,
+  readPath,
+  baseName,
   summarize,
   targetOf,
   VERB_MESSAGE,
@@ -133,7 +136,10 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
   const label = useToolLabel();
   const t = useT();
   const [open, setOpen] = useExpanded(`call:${id}`, false);
-  const { openMemory } = useTranscriptView().actions;
+  const {
+    actions: { openMemory, openFile },
+    fileLinks,
+  } = useTranscriptView();
   if (row?.kind !== 'item') {
     return null;
   }
@@ -142,6 +148,12 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
     return <FileChangeCard id={id} item={item} />;
   }
   const output = ('output' in item ? item.output : undefined) ?? undefined;
+  const rawPath = readPath(item);
+  const offset = 'arguments' in item ? item.arguments.offset : undefined;
+  const target =
+    rawPath && fileLinks && projectPath(rawPath, fileLinks.root, fileLinks.directory)
+      ? rawPath
+      : undefined;
   // A `Memory` call links to the note on the settings window's memory page (T47).
   const memory =
     item.type === 'dynamicToolCall' && item.tool === 'Memory' && openMemory !== undefined
@@ -159,8 +171,29 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
         }}
       >
         <StatusMark status={item.status} />
-        <span className="tool-call-label">{label(item)}</span>
+        <span className="tool-call-label">
+          {target && openFile ? t('files.tree.readAction') : label(item)}
+        </span>
       </button>
+      {target && openFile && (
+        <button
+          type="button"
+          className="file-path-action tool-open-file"
+          data-testid="read-file-path"
+          title={revealBidi(target)}
+          aria-label={t('files.tree.openPath', { path: revealBidi(target) })}
+          onClick={() => {
+            openFile(
+              target,
+              typeof offset === 'number' && Number.isSafeInteger(offset) && offset > 0
+                ? offset
+                : undefined,
+            );
+          }}
+        >
+          {revealBidi(baseName(target))}
+        </button>
+      )}
       {memory !== null && openMemory !== undefined ? (
         <button
           type="button"
@@ -335,6 +368,7 @@ export function FileChangeCard({
 }) {
   const t = useT();
   const diff = item.diff ?? undefined;
+  const { openFile } = useTranscriptView().actions;
   const [all, setAll] = useExpanded(`diff:${id}`, false);
   return (
     <div
@@ -345,9 +379,23 @@ export function FileChangeCard({
     >
       <div className="file-change-head">
         <StatusMark status={item.status} />
-        <span className="file-change-path" data-testid="file-change-path" title={item.path}>
-          {revealBidi(item.path)}
-        </span>
+        {openFile ? (
+          <button
+            type="button"
+            className="file-change-path file-path-action"
+            data-testid="file-change-path"
+            title={item.path}
+            onClick={() => {
+              openFile(item.path);
+            }}
+          >
+            {revealBidi(item.path)}
+          </button>
+        ) : (
+          <span className="file-change-path" data-testid="file-change-path" title={item.path}>
+            {revealBidi(item.path)}
+          </span>
+        )}
         {diff?.created === true ? (
           <span className="badge">{t('transcript.file.created')}</span>
         ) : null}

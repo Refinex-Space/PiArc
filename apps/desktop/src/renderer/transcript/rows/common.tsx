@@ -141,7 +141,9 @@ export function AttachmentChips({
 export function MentionText({
   text,
   mentions,
+  onOpen,
 }: {
+  readonly onOpen?: ((path: string) => void) | undefined;
   readonly text: string;
   readonly mentions: readonly InputMention[];
 }) {
@@ -157,15 +159,31 @@ export function MentionText({
       parts.push(text.slice(at, mention.start));
     }
     parts.push(
-      <span
-        key={`m${String(index)}`}
-        className="mention-chip"
-        data-testid="mention-chip"
-        data-path={mention.path}
-        title={t('transcript.mention', { path: mention.path })}
-      >
-        @{baseName(mention.path)}
-      </span>,
+      onOpen ? (
+        <button
+          type="button"
+          key={index}
+          data-testid="mention-chip"
+          className="mention-chip file-path-action"
+          data-path={mention.path}
+          title={mention.path}
+          onClick={() => {
+            onOpen(mention.path);
+          }}
+        >
+          @{baseName(mention.path)}
+        </button>
+      ) : (
+        <span
+          key={`m${String(index)}`}
+          className="mention-chip"
+          data-testid="mention-chip"
+          data-path={mention.path}
+          title={t('transcript.mention', { path: mention.path })}
+        >
+          @{baseName(mention.path)}
+        </span>
+      ),
     );
     at = mention.end;
   }

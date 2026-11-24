@@ -39,6 +39,7 @@ interface Presentation {
   setCompact: (compact: boolean) => void;
   openIds: readonly string[];
   closePanel: (id: string) => void;
+  guardClose: (id: string, guard: (proceed: () => void) => void) => () => void;
 }
 
 const PresentationContext = createContext<Presentation | null>(null);
@@ -93,17 +94,29 @@ function SessionPanels({ context, children }: PanelProps) {
     open.current = next;
     setIds(next);
   };
+  const guards = useRef(new Map<string, (proceed: () => void) => void>());
+  const guardClose = useCallback((id: string, guard: (proceed: () => void) => void) => {
+    guards.current.set(id, guard);
+    return () => {
+      guards.current.delete(id);
+    };
+  }, []);
   const closePanel = useCallback((id: string) => {
-    if (!open.current.includes(id)) return;
-    update(open.current.filter((p) => p !== id));
-    const source = origins.current.get(id)?.deref();
-    origins.current.delete(id);
-    requestAnimationFrame(() => {
-      const button = document.querySelector<HTMLElement>('[data-testid="tool-' + id + '"]');
-      const fallback = button ?? document.querySelector<HTMLElement>('[data-testid="tool-more"]');
-      const target = source?.isConnected && source.getClientRects().length ? source : fallback;
-      (target ?? document.querySelector<HTMLElement>('.composer-editor'))?.focus();
-    });
+    const proceed = () => {
+      if (!open.current.includes(id)) return;
+      update(open.current.filter((p) => p !== id));
+      const source = origins.current.get(id)?.deref();
+      origins.current.delete(id);
+      requestAnimationFrame(() => {
+        const button = document.querySelector<HTMLElement>('[data-testid="tool-' + id + '"]');
+        const fallback = button ?? document.querySelector<HTMLElement>('[data-testid="tool-more"]');
+        const target = source?.isConnected && source.getClientRects().length ? source : fallback;
+        (target ?? document.querySelector<HTMLElement>('.composer-editor'))?.focus();
+      });
+    };
+    const guard = guards.current.get(id);
+    if (guard) guard(proceed);
+    else proceed();
   }, []);
   useEffect(() => {
     if (!context.sessionId) return;
@@ -147,6 +160,7 @@ function SessionPanels({ context, children }: PanelProps) {
         setCompact,
         openIds: ids,
         closePanel,
+        guardClose,
       }}
     >
       {children}

@@ -11,6 +11,7 @@ import type {
   RewindRequest,
 } from '@piarc/protocol';
 
+import type { ProjectRequest } from './project-files.js';
 import type { CommandId } from './keybindings.js';
 import type { Locale } from './i18n/index.js';
 import type { PreferenceChange, Preferences } from './preferences.js';
@@ -72,6 +73,10 @@ export const IPC_CHANNELS = {
   queueEdit: 'piarc:session.queueEdit',
   queueDelete: 'piarc:session.queueDelete',
   attachmentStore: 'piarc:session.attachmentStore',
+  projectFileWatch: 'piarc:files.watch',
+  projectFilePreview: 'piarc:files.preview',
+  projectFiles: 'piarc:files.project',
+  projectFileAction: 'piarc:files.action',
   filesSearch: 'piarc:files.search',
   filesCancel: 'piarc:files.cancel',
   providerSettings: 'piarc:providers.list',
@@ -254,6 +259,7 @@ export interface AppState {
 
 /** Messages on `APP_EVENT_CHANNEL`. */
 export type AppEvent =
+  | { readonly type: 'projectFilesChanged'; readonly sessionId: string }
   | { readonly type: 'preferences'; readonly preferences: Preferences; readonly locale: Locale }
   | { readonly type: 'providersChanged' }
   | { readonly type: 'command'; readonly command: AppCommand }
@@ -593,7 +599,11 @@ export interface PiarcApi {
    * a reload and ends when it is closed, the session is archived or deleted, or PiArc quits.
    * Needs recent user input in this window; at most 16 per session.
    */
-  openSessionTerminal(sessionId: string, size: TerminalSize): Promise<TerminalOpened>;
+  openSessionTerminal(
+    sessionId: string,
+    size: TerminalSize,
+    directory?: string,
+  ): Promise<TerminalOpened>;
   /** Shares a user's terminal with the agent or stops sharing it (ADR-0050). */
   shareTerminal(id: number, shared: boolean): Promise<boolean>;
   /** Closes the terminal: its program and everything it started end. */
@@ -786,6 +796,15 @@ export interface PiarcApi {
    * search with the same `searchId` cancels this one. Resolves with `{ root, results: [{ path,
    * name, positions }], truncated }` as JSON.
    */
+  watchProjectFiles(sessionId: string, paths: readonly string[]): Promise<void>;
+  projectFilePreview(
+    sessionId: string,
+    path: string,
+    mode: 'static' | 'interactive' | 'media' | 'release',
+    token?: string,
+  ): Promise<string>;
+  projectFiles(sessionId: string, operation: ProjectRequest): Promise<string>;
+  projectFileAction(sessionId: string, path: string, action: string): Promise<string>;
   searchFiles(searchId: string, root: string, query: string, limit: number): Promise<string>;
   /** Stops a file search. */
   cancelFileSearch(searchId: string): Promise<void>;

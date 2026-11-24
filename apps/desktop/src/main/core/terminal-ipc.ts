@@ -16,6 +16,7 @@
 // input it delivers to the page (`input-event`); a script in the page cannot fake those. Each
 // session has at most `MAX_SESSION_TERMINALS` open terminals, and a window has at most one
 // frame request in flight per terminal.
+import { isProjectPath } from '../../shared/project-files.js';
 import {
   IPC_CHANNELS,
   MAX_TERMINAL_PASTE,
@@ -125,7 +126,10 @@ export class TerminalOwners {
   /** Per window, when it last got real user input (`now()` time). */
   readonly #input = new Map<number, number>();
   /** Native terminal windows, bound by the main process to their opener and one session. */
-  readonly #toolInputs = new Map<number, { owner: number; session: string }>();
+  readonly #toolInputs = new Map<
+    number,
+    { owner: number; session: string; panel: 'terminal' | 'files' }
+  >();
   /** `window:terminal` pairs with a frame request in flight. */
   readonly #pulling = new Set<string>();
   readonly #core: TerminalCore;
@@ -197,16 +201,25 @@ export class TerminalOwners {
     return at !== undefined && this.#now() - at <= INPUT_WINDOW_MS;
   }
 
-  bindToolInput(child: OwnerContents, owner: OwnerContents, session: string): () => void {
+  bindToolInput(
+    child: OwnerContents,
+    owner: OwnerContents,
+    session: string,
+    panel: 'terminal' | 'files' = 'terminal',
+  ): () => void {
     this.watch(child);
-    this.#toolInputs.set(child.id, { owner: owner.id, session });
+    this.#toolInputs.set(child.id, { owner: owner.id, session, panel });
     return () => {
       this.#toolInputs.delete(child.id);
     };
   }
 
   /** The opener's own input, or input in a still-open native terminal window for this session. */
-  requireInput(contents: OwnerContents, target?: string | number): void {
+  requireInput(
+    contents: OwnerContents,
+    target?: string | number,
+    panel: 'terminal' | 'files' = 'terminal',
+  ): void {
     this.watch(contents);
     if (this.hasRecentInput(contents.id)) return;
     if (target !== undefined) {
@@ -215,6 +228,7 @@ export class TerminalOwners {
         if (
           binding.owner === contents.id &&
           binding.session === session &&
+          binding.panel === panel &&
           this.hasRecentInput(child)
         )
           return;
@@ -377,22 +391,33 @@ function registerSessionHandlers(
   owners: TerminalOwners,
   use: Use,
 ): void {
-  registerHandler(IPC_CHANNELS.terminalOpenSession, async (event, [sessionId, requested]) => {
-    if (!isSessionId(sessionId)) {
-      throw new TypeError('sessionId must be a session id');
-    }
-    const { cols, rows, cellWidth, cellHeight } = size(requested);
-    owners.requireInput(event.sender, sessionId);
-    if (owners.openOf(sessionId) >= MAX_SESSION_TERMINALS) {
-      throw new Error(`A session has at most ${String(MAX_SESSION_TERMINALS)} terminals`);
-    }
-    const opened = await parsed(
-      core.openSessionTerminal(sessionId, { cols, rows, cellWidth, cellHeight }),
-      terminalOpenedOf,
-    );
-    owners.admitSession(opened.terminalId, sessionId);
-    return opened;
-  });
+  registerHandler(
+    IPC_CHANNELS.terminalOpenSession,
+    async (event, [sessionId, requested, directory]) => {
+      if (directory !== undefined && !isProjectPath(directory, true))
+        throw new TypeError('Invalid terminal directory');
+      if (!isSessionId(sessionId)) {
+        throw new TypeError('sessionId must be a session id');
+      }
+      const { cols, rows, cellWidth, cellHeight } = size(requested);
+      owners.requireInput(event.sender, sessionId, directory === undefined ? 'terminal' : 'files');
+      if (owners.openOf(sessionId) >= MAX_SESSION_TERMINALS) {
+        throw new Error(`A session has at most ${String(MAX_SESSION_TERMINALS)} terminals`);
+      }
+      const opened = await parsed(
+        core.openSessionTerminal(sessionId, {
+          cols,
+          rows,
+          cellWidth,
+          cellHeight,
+          ...(directory === undefined ? {} : { directory }),
+        }),
+        terminalOpenedOf,
+      );
+      owners.admitSession(opened.terminalId, sessionId);
+      return opened;
+    },
+  );
   registerHandler(IPC_CHANNELS.terminalShare, (event, [id, shared]) => {
     const terminal = use(event.sender, id);
     if (typeof shared !== 'boolean') {

@@ -257,9 +257,9 @@ const api: PiarcApi = {
     listeners.delete(route);
     await ipcRenderer.invoke(IPC_CHANNELS.eventsUnsubscribe, route);
   },
-  openSessionTerminal: (sessionId, size) =>
+  openSessionTerminal: (sessionId, size, directory) =>
     ipcRenderer
-      .invoke(IPC_CHANNELS.terminalOpenSession, sessionId, size)
+      .invoke(IPC_CHANNELS.terminalOpenSession, sessionId, size, directory)
       .then((value: unknown) => expectShape(value, terminalOpenedOf, 'an opened terminal')),
   shareTerminal: (id, shared) =>
     ipcRenderer.invoke(IPC_CHANNELS.terminalShare, id, shared).then(expectBoolean),
@@ -424,6 +424,21 @@ const api: PiarcApi = {
   storeAttachment: (id, name, mimeType, data) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.attachmentStore, id, name, mimeType, data)
+      .then((value: unknown) => expectString(value)),
+  watchProjectFiles: async (id, paths) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.projectFileWatch, id, paths);
+  },
+  projectFilePreview: (id, path, mode, token) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.projectFilePreview, id, path, mode, token)
+      .then((s: unknown) => expectString(s)),
+  projectFiles: (id, operation) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.projectFiles, id, operation)
+      .then((value: unknown) => expectString(value)),
+  projectFileAction: (id, path, action) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.projectFileAction, id, path, action)
       .then((value: unknown) => expectString(value)),
   searchFiles: (searchId, root, query, limit) =>
     ipcRenderer

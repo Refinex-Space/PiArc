@@ -135,6 +135,7 @@ function UserBubble({
   /** The branch switcher, shown at all times. */
   readonly branches?: ReactNode;
 }) {
+  const { openFile } = useTranscriptView().actions;
   const t = useT();
   const list = useListActions();
   return (
@@ -146,7 +147,7 @@ function UserBubble({
     >
       <div className="row-user-bubble" data-testid="user-message" data-state={state}>
         <div className="row-user-text">
-          <MentionText text={input.text} mentions={input.mentions} />
+          <MentionText text={input.text} mentions={input.mentions} onOpen={openFile} />
         </div>
         <AttachmentChips attachments={input.attachments} />
       </div>
