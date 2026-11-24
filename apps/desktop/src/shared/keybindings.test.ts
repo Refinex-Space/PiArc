@@ -6,6 +6,7 @@ import {
   commandForEvent,
   conflictFor,
   displayKey,
+  displayKeyParts,
   effectiveBindings,
   isAssignable,
   parseKey,
@@ -63,6 +64,10 @@ describe('keybindings', () => {
   it('formats accelerators and labels', () => {
     expect(toAccelerator('Mod+Shift+N')).toBe('CommandOrControl+Shift+N');
     expect(toAccelerator('Ctrl+Tab')).toBe('Control+Tab');
+    expect(displayKeyParts('Mod+Shift+N', 'mac')).toEqual(['⇧', '⌘', 'N']);
+    expect(displayKeyParts('Mod+Alt+Shift+F12', 'other')).toEqual(['Ctrl', 'Alt', 'Shift', 'F12']);
+    expect(displayKeyParts('Ctrl+Tab', 'mac')).toEqual(['⌃', '⇥']);
+    expect(displayKeyParts('', 'other')).toEqual([]);
     expect(displayKey('Mod+Shift+N', 'mac')).toBe('⇧⌘N');
     expect(displayKey('Ctrl+Tab', 'mac')).toBe('⌃⇥');
     expect(displayKey('Mod+/', 'other')).toBe('Ctrl+/');

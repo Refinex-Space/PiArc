@@ -2,9 +2,10 @@
 // and the composer's built-in slash commands (the others are in the `/` palette, T37).
 import { useId } from 'react';
 
-import { COMMANDS, displayKey, effectiveBindings } from '../../shared/keybindings.js';
+import { COMMANDS, effectiveBindings } from '../../shared/keybindings.js';
 import { BUILTIN_NAMES, builtin } from '../composer/builtins.js';
 import { useApp } from '../app/app-context.js';
+import { Keycaps } from '../app/Keycaps.js';
 import { Dialog } from './Dialog.js';
 
 export function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
@@ -19,12 +20,16 @@ export function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
       <table className="shortcut-table">
         <tbody>
           {COMMANDS.map((command) => {
-            const key = displayKey(bindings[command.id], keyPlatform);
+            const key = bindings[command.id];
             return (
               <tr key={command.id} data-command={command.id}>
                 <td>{t(command.label)}</td>
                 <td>
-                  <kbd>{key.length > 0 ? key : t('settings.shortcuts.unbound')}</kbd>
+                  {key ? (
+                    <Keycaps binding={key} platform={keyPlatform} />
+                  ) : (
+                    t('settings.shortcuts.unbound')
+                  )}
                 </td>
               </tr>
             );

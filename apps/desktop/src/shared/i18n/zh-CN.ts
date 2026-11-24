@@ -708,6 +708,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'settings.shortcuts.command': '命令',
   'settings.shortcuts.key': '快捷键',
   'settings.shortcuts.change': '修改“{command}”的快捷键',
+  'settings.shortcuts.hint': '点击快捷键后按下新的组合键，按 Esc 取消。',
   'settings.shortcuts.recording': '请按下新的快捷键…',
   'settings.shortcuts.unbound': '无',
   'settings.shortcuts.actions': '操作',

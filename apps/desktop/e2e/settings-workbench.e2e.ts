@@ -89,3 +89,47 @@ test('the settings frame leaves balanced margins as the workbench resizes', asyn
     await page.screenshot({ path: info.outputPath('settings-' + String(width) + '.png') });
   }
 });
+
+test('shortcut keys have individual keycaps and recording can be cancelled without closing settings', async ({
+  page,
+}, info) => {
+  await prefer(page, { key: 'language', value: 'zh-CN' });
+  await page.getByTestId('open-settings').click();
+  await page.getByTestId('settings-nav-shortcuts').click();
+  const editor = page.getByTestId('shortcut-key-session.new');
+  await expect(editor.locator('kbd')).toHaveCount(2);
+  await expect(editor.locator('kbd').last()).toHaveText('N');
+  await expect(editor.locator('kbd').first()).toHaveText(
+    process.platform === 'darwin' ? '⌘' : 'Ctrl',
+  );
+  await page.screenshot({ path: info.outputPath('shortcut-keycaps-zh.png') });
+  await editor.click();
+  await expect(editor).toHaveAttribute('aria-pressed', 'true');
+  await editor.press('Escape');
+  await expect(editor).toBeFocused();
+  await expect(editor).toHaveAttribute('aria-pressed', 'false');
+  await expect(editor.locator('kbd')).toHaveCount(2);
+  await editor.click();
+  await editor.press('Tab');
+  await expect(editor).not.toBeFocused();
+  await expect(editor).toHaveAttribute('aria-pressed', 'false');
+  await prefer(page, { key: 'appearance.density', value: 'compact' });
+  await prefer(page, { key: 'appearance.theme', value: 'dark' });
+  await editor.click();
+  await editor.press(
+    process.platform === 'darwin' ? 'Meta+Alt+Shift+KeyN' : 'Control+Alt+Shift+KeyN',
+  );
+  await expect(editor.locator('kbd')).toHaveCount(4);
+  await expect(editor).toHaveAttribute('aria-pressed', 'false');
+  const row = page.getByTestId('shortcut-session.new');
+  expect(
+    await row.evaluate((el) =>
+      [...el.querySelectorAll('kbd')].every(
+        (cap) => cap.clientWidth >= cap.scrollWidth && cap.clientHeight >= cap.scrollHeight,
+      ),
+    ),
+  ).toBe(true);
+  await row.screenshot({ path: info.outputPath('shortcut-long-dark.png') });
+  await row.getByTestId('shortcut-reset-session.new').click();
+  await expect(editor.locator('kbd')).toHaveCount(2);
+});

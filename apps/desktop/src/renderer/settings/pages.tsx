@@ -36,6 +36,8 @@ import { McpPage } from './McpPage.js';
 import { MemoryPage } from './MemoryPage.js';
 import { SkillsPage } from './SkillsPage.js';
 import { UsagePage } from '../usage/UsagePage.js';
+import { Keycaps } from '../app/Keycaps.js';
+import { isImeComposing } from '../composer/ime-guard.js';
 import { Button } from '../app/Button.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
@@ -347,10 +349,17 @@ function ShortcutsPage() {
   );
   const modifiers = keyPlatform === 'mac' ? '⌘, ⌃, ⌥' : 'Ctrl, Alt';
   const record = (command: CommandId, event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (event.nativeEvent.isComposing) {
+    if (isImeComposing(event.nativeEvent)) {
+      return;
+    }
+    if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      setRecording(undefined);
+      setProblem(undefined);
       return;
     }
     if (event.key === 'Escape' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.stopPropagation();
+      setProblem(undefined);
       event.preventDefault();
       setRecording(undefined);
       return;
@@ -383,77 +392,101 @@ function ShortcutsPage() {
     save({ key: 'keybinding', command, value: key });
   };
   return (
-    <div className="settings-section">
+    <div className="shortcut-preferences">
+      <p className="shortcut-help muted">{t('settings.shortcuts.hint')}</p>
       <table className="shortcut-table shortcut-editor">
         <thead>
           <tr>
-            <th>{t('settings.shortcuts.command')}</th>
-            <th>{t('settings.shortcuts.key')}</th>
-            <th>
-              <span className="visually-hidden">{t('settings.shortcuts.actions')}</span>
-            </th>
+            <th scope="col">{t('settings.shortcuts.command')}</th>
+            <th scope="col">{t('settings.shortcuts.key')}</th>
           </tr>
         </thead>
         <tbody>
           {COMMANDS.map((command) => {
-            const key = displayKey(bindings[command.id], keyPlatform);
+            const binding = bindings[command.id];
             const overridden = preferences.keybindings[command.id] !== undefined;
             const isRecording = recording === command.id;
+            const message = problem?.command === command.id ? problem.text : undefined;
+            const nameId = 'shortcut-label-' + command.id;
+            const valueId = 'shortcut-value-' + command.id;
+            const errorId = 'shortcut-error-' + command.id;
             return (
               <tr key={command.id} data-testid={`shortcut-${command.id}`}>
-                <td id={`shortcut-label-${command.id}`}>{t(command.label)}</td>
-                <td>
-                  <Button
-                    size="small"
-                    className={`key-button${isRecording ? ' is-recording' : ''}`}
-                    // The name is the command and the key as shown ("New session ⌘N");
-                    // what the button does is its description.
-                    id={`shortcut-key-${command.id}`}
-                    aria-labelledby={`shortcut-label-${command.id} shortcut-key-${command.id}`}
-                    title={t('settings.shortcuts.change', { command: t(command.label) })}
-                    data-testid={`shortcut-key-${command.id}`}
-                    onClick={() => {
-                      setProblem(undefined);
-                      setRecording(command.id);
-                    }}
-                    onBlur={() => {
-                      if (isRecording) {
-                        setRecording(undefined);
-                      }
-                    }}
-                    onKeyDown={(event) => {
-                      if (isRecording) {
-                        record(command.id, event);
-                      }
-                    }}
-                  >
-                    {isRecording ? (
-                      t('settings.shortcuts.recording')
-                    ) : key.length > 0 ? (
-                      <kbd>{key}</kbd>
-                    ) : (
-                      t('settings.shortcuts.unbound')
-                    )}
-                  </Button>
-                  {problem?.command === command.id && (
-                    <p className="error-text small" role="alert" data-testid="shortcut-problem">
-                      {problem.text}
+                <th scope="row">
+                  <span id={nameId}>{t(command.label)}</span>
+                  {message && (
+                    <p
+                      id={errorId}
+                      className="error-text small"
+                      role="alert"
+                      data-testid="shortcut-problem"
+                    >
+                      {message}
                     </p>
                   )}
-                </td>
+                </th>
                 <td>
-                  {overridden && (
-                    <Button
-                      variant="ghost"
-                      size="small"
-                      data-testid={`shortcut-reset-${command.id}`}
+                  <div className="shortcut-actions">
+                    {overridden && (
+                      <Button
+                        variant="ghost"
+                        size="small"
+                        data-testid={`shortcut-reset-${command.id}`}
+                        onClick={() => {
+                          save({ key: 'keybinding', command: command.id, value: null });
+                        }}
+                      >
+                        {t('settings.shortcuts.reset')}
+                      </Button>
+                    )}
+                    <button
+                      type="button"
+                      className="shortcut-recorder"
+                      aria-pressed={isRecording}
+                      aria-label={t('settings.shortcuts.change', { command: t(command.label) })}
+                      aria-describedby={message ? valueId + ' ' + errorId : valueId}
+                      data-testid={`shortcut-key-${command.id}`}
+                      title={t('settings.shortcuts.change', { command: t(command.label) })}
                       onClick={() => {
-                        save({ key: 'keybinding', command: command.id, value: null });
+                        setProblem(undefined);
+                        setRecording(command.id);
+                      }}
+                      onBlur={() => {
+                        if (isRecording) {
+                          setRecording(undefined);
+                          setProblem(undefined);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (isRecording) record(command.id, event);
                       }}
                     >
-                      {t('settings.shortcuts.reset')}
-                    </Button>
-                  )}
+                      {!isRecording && (
+                        <svg
+                          className="shortcut-edit-mark"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="m10.9 2.2 2.9 2.9-7.7 7.7-3.8.9.9-3.8z M9.5 3.6l2.9 2.9" />
+                        </svg>
+                      )}
+                      <span id={valueId}>
+                        {isRecording ? (
+                          t('settings.shortcuts.recording')
+                        ) : binding ? (
+                          <Keycaps binding={binding} platform={keyPlatform} />
+                        ) : (
+                          t('settings.shortcuts.unbound')
+                        )}
+                      </span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

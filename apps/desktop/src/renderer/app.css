@@ -1406,23 +1406,120 @@ textarea.input {
   }
 }
 
-.key-button {
-  min-width: 120px;
-  justify-content: flex-start;
-  text-align: left;
+.shortcut-help {
+  margin: 0 0 var(--piarc-space-4);
 }
-
-.key-button.is-recording {
-  --action-ink: var(--piarc-text-accent);
-  --action-surface: var(--piarc-accent-subtle);
+.shortcut-editor {
+  table-layout: fixed;
 }
-
-.key-button kbd {
+.shortcut-editor th:first-child {
+  width: 50%;
+}
+.shortcut-editor thead th:last-child {
+  text-align: end;
+}
+.shortcut-editor tbody th,
+.shortcut-editor td {
+  padding: var(--piarc-space-2) 0;
+  border-bottom: 1px solid var(--settings-divider);
+  vertical-align: middle;
+}
+.shortcut-editor tbody th {
+  font-weight: var(--piarc-font-weight-regular);
+  font-size: var(--piarc-c-button-font-size);
+  color: var(--piarc-text-primary);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.shortcut-editor th p {
+  margin: var(--piarc-space-1) 0 0;
+}
+.shortcut-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+}
+.shortcut-recorder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--piarc-space-2);
+  min-height: 32px;
+  max-width: 100%;
+  padding: 3px 4px;
   border: 0;
+  border-radius: var(--piarc-radius-md);
   background: transparent;
-  padding: 0;
+  cursor: pointer;
 }
-
+.shortcut-recorder > span {
+  min-width: 0;
+}
+.shortcut-edit-mark {
+  flex: none;
+  opacity: 0;
+  color: var(--piarc-text-secondary);
+}
+.shortcut-recorder:is(:hover, :focus-visible) .shortcut-edit-mark {
+  opacity: 1;
+}
+.shortcut-recorder:hover {
+  background: var(--piarc-action-surface);
+}
+:root[data-app] .shortcut-recorder[aria-pressed='true'] {
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  padding-inline: var(--piarc-space-2);
+}
+.shortcut-recorder[aria-pressed='true']::before {
+  content: '';
+  height: 1em;
+  border-inline-start: 2px solid currentColor;
+}
+.keycaps,
+.keycaps-visual {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  max-width: 100%;
+}
+.keycaps-visual {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+}
+:root[data-app] .keycaps-visual kbd {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--piarc-text-secondary) 28%, transparent);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-panel);
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+.keycap-joiner {
+  font-size: var(--piarc-font-size-caption);
+  color: var(--piarc-text-secondary);
+}
+@media (forced-colors: active) {
+  :root[data-app] .keycaps-visual kbd {
+    border-color: ButtonText;
+  }
+  .shortcut-recorder[aria-pressed='true'] {
+    outline: 1px dashed Highlight;
+  }
+}
 .provider-form {
   margin: 0;
   border: 0;

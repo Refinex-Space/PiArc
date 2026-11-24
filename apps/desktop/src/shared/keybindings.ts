@@ -363,15 +363,19 @@ const MAC_KEYS: Readonly<Record<string, string>> = {
 };
 
 /** How a key is shown to the user on `platform` (`⌘N`, `Ctrl+N`). */
-export function displayKey(key: string, platform: KeyPlatform): string {
+export function displayKeyParts(key: string, platform: KeyPlatform): string[] {
   const chord = parseKey(key);
   if (chord === undefined) {
-    return '';
+    return [];
   }
   if (platform === 'mac') {
     const order: Modifier[] = ['Ctrl', 'Alt', 'Shift', 'Mod'];
     const mods = order.filter((m) => chord.modifiers.includes(m)).map((m) => MAC_SYMBOLS[m]);
-    return [...mods, MAC_KEYS[chord.key] ?? chord.key].join('');
+    return [...mods, MAC_KEYS[chord.key] ?? chord.key];
   }
-  return [...chord.modifiers.map((m) => (m === 'Mod' ? 'Ctrl' : m)), chord.key].join('+');
+  return [...chord.modifiers.map((m) => (m === 'Mod' ? 'Ctrl' : m)), chord.key];
+}
+
+export function displayKey(key: string, platform: KeyPlatform): string {
+  return displayKeyParts(key, platform).join(platform === 'mac' ? '' : '+');
 }

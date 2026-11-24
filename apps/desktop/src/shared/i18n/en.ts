@@ -730,6 +730,8 @@ export const en = {
   'settings.shortcuts.command': 'Command',
   'settings.shortcuts.key': 'Shortcut',
   'settings.shortcuts.change': 'Change the shortcut of {command}',
+  'settings.shortcuts.hint':
+    'Select a shortcut and press a new key combination. Press Esc to cancel.',
   'settings.shortcuts.recording': 'Press the new shortcut…',
   'settings.shortcuts.unbound': 'None',
   'settings.shortcuts.actions': 'Actions',
