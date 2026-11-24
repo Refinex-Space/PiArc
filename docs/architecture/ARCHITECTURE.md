@@ -287,6 +287,7 @@ PiArc/
 | [0073](../adr/0073-settings-segmented-control-reference.md) | 桌面前端可复刻 Claude Desktop 的视觉与交互 | 分项校准 UI，内核与 Harness 独立演进 |
 | [0074](../adr/0074-workbench-settings.md) | 设置使用工作台内模态面板 | 对齐设置布局、焦点与导航行为 |
 | [0075](../adr/0075-session-tool-tiles.md) | 会话工具右侧分块与受控独立窗口 | 详情随主会话，工具可独立调整位置、大小和回停靠 |
+| [0076](../adr/0076-project-files.md) | 会话项目文件的浏览、保存与隔离预览 | 工作树、系统窗口和对话草稿各有明确归属 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -1291,7 +1292,7 @@ T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新�
 
 按 ADR-0073 对齐 OpenClaudeDesktop `next-4.16336.0` 的 Code 工作台。标题和会话工具位于同一条 44 px 顶栏。首次布局的侧栏宽 288 px，右栏宽 320 px，恢复窗口时优先采用已保存的尺寸。新会话以两行环境卡选择项目与运行位置；下方首条消息和会话内消息共用编辑器。舒适密度下环境卡宽 320 px，输入器宽度上限 768 px、单行高 46 px，卡片与输入器均随可用空间收窄。内容滚动与底部输入区域独立。
 
-项目组支持折叠、拖动排序与右键菜单，键盘也能调整顺序。搜索入口同时查询项目、会话标题和已索引的消息正文。标题栏的前进、后退只改变窗口当前显示的位置。右侧详情按环境、上下文、用量及会话实际产生的内容分节，工具按钮分别控制详情、终端、改动、后台任务与侧边对话。Core 的任务快照更新右栏摘要，用户主动打开任务面板查看分组、输出和停止操作。关闭任务面板后，运行中的命令继续由 Core 管理。ADR-0075 规定工具使用独立分块，标题可拖动、最大化、关闭以及在支持的工具上弹出本地独立窗口。布局操作保持终端任务与侧聊的逻辑身份；文件和预览在本期提供明确的占位状态。
+项目组支持折叠、拖动排序与右键菜单，键盘也能调整顺序。搜索入口同时查询项目、会话标题和已索引的消息正文。标题栏的前进、后退只改变窗口当前显示的位置。右侧详情按环境、上下文、用量及会话实际产生的内容分节，工具按钮分别控制详情、终端、改动、后台任务与侧边对话。Core 的任务快照更新右栏摘要，用户主动打开任务面板查看分组、输出和停止操作。关闭任务面板后，运行中的命令继续由 Core 管理。ADR-0075 规定工具使用独立分块，标题可拖动、最大化、关闭以及在支持的工具上弹出本地独立窗口。布局操作保持终端任务与侧聊的逻辑身份；Files 按 ADR-0076 提供项目文件树、文件名和内容搜索、分栏阅读与编辑、系统操作和加入对话草稿。独立的应用预览工具仍为占位。
 
 - **侧栏**：按工作区分组；会话状态徽标优先级：错误 > 等待审批 > 运行中 > 未读 > 空闲；支持过滤、置顶、归档、重命名；宽度 200–420 px，可折叠。
 - **新建会话**：选择工作区与分支（可选独立 worktree）→ 先显示乐观的用户消息 → 创建会话 → 发送首条输入；首条消息失败时回滚并保留输入内容。
@@ -1552,7 +1553,7 @@ macOS 通过 Electron 的原生缓冲区回调交付 `app:` 资源，Windows 继
 
 - 所有窗口开启 `sandbox` 与 `contextIsolation`，关闭 `nodeIntegration`；不使用 `<webview>`；不开启实验特性与 `enableBlinkFeatures`；不关闭 `webSecurity`。
 - 界面通过自定义协议（`app://` 一类，具体名称随应用标识确定；当前为 `app://piarc`，以 `standard`、`secure` 注册）从 app.asar 提供，不使用 `file://`，并关闭 `GrantFileProtocolExtraPrivileges` fuse。
-- CSP 由主进程以响应头下发：`default-src 'self'`，`script-src 'self'`（不允许内联脚本与 `eval`），`connect-src` 只允许应用自身协议，图片只允许应用自身协议与 `data:`。渲染进程不直接访问网络，模型请求都在 Agent Host 中发出。
+- CSP 由主进程以响应头下发：`default-src 'self'`，`script-src 'self'`（不允许内联脚本与 `eval`），`connect-src` 只允许应用自身协议，工作台图片只允许应用自身协议、`data:` 与 ADR-0076 的短期本地文档地址；媒体和预览子框架仅接受专用 `piarc-document:` 来源。子文档没有业务 preload、应用 IPC 或网络请求权限。渲染进程不直接访问网络，模型请求都在 Agent Host 中发出。
 - 模型输出与仓库内容一律当作不可信数据：Markdown 渲染不使用 `innerHTML` / `dangerouslySetInnerHTML`，原始 HTML 当文本显示；代码高亮与公式渲染只输出受控的元素和样式。
 - 导航与新窗口：`will-navigate` 中用 `new URL()` 比较 origin，只允许应用自身协议；`setWindowOpenHandler` 默认返回 `deny`；只为主进程已授权的一次性本地工具窗放行（ADR-0075，子窗口禁止创建后继窗口），外部链接由主进程在用户确认后用 `shell.openExternal` 打开，并只放行 `https:`、`http:`、`mailto:`。
 - 权限请求：`setPermissionRequestHandler` 与 `setPermissionCheckHandler` 默认拒绝，设备权限一律拒绝；只放行剪贴板写入等明确需要的权限，放行清单集中定义并逐条写理由（当前只有 `clipboard-sanitized-write`，供复制按钮使用，T09）。

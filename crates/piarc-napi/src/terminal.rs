@@ -41,6 +41,8 @@ pub struct SessionTerminalOptions {
     pub cell_height: Option<u32>,
     /// The task id of a terminal of this session saved earlier, to continue from its snapshot.
     pub restore: Option<String>,
+    /// Optional project-relative starting folder selected in Files.
+    pub directory: Option<String>,
 }
 
 /// A mouse event in pixels of the terminal's surface.
@@ -270,6 +272,7 @@ impl CoreRuntime {
                     options.cell_height.unwrap_or(16),
                 ),
                 restore: options.restore,
+                directory: options.directory,
             };
             self.core
                 .open_session_terminal(session_id, request, move |result| {

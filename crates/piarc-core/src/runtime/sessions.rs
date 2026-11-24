@@ -791,6 +791,22 @@ impl CoreRuntime {
         })
     }
 
+    /// Runs a Files panel operation against the directories belonging to this session.
+    ///
+    /// # Errors
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn project_files(
+        &self,
+        session_id: String,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&session_id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.project_files(session_id, request_json).await
+        })
+    }
+
     /// Searches the files below `root` for an `@` mention (ADR-0030).
     ///
     /// # Errors

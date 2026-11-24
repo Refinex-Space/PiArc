@@ -230,6 +230,8 @@ export declare class CoreRuntime {
    * are copied; the caller's buffer is not kept.
    */
   storeAttachment(id: string, name: string, mimeType: string, data: Uint8Array): Promise<string>;
+  /** Performs one bounded Files panel operation in the named session's project. */
+  projectFiles(sessionId: string, requestJson: string): Promise<string>;
   /**
    * Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most
    * `limit` matches. A newer search with the same `searchId` cancels this one, which then
@@ -610,6 +612,8 @@ export interface SessionTerminalOptions {
   cellHeight?: number;
   /** The task id of a terminal of this session saved earlier, to continue from its snapshot. */
   restore?: string;
+  /** Optional project-relative starting folder selected in Files. */
+  directory?: string;
 }
 
 /** A terminal's default colors as `0xRRGGBB` numbers (T34); absent keeps the built-in one. */

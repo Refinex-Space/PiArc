@@ -1954,6 +1954,7 @@ dependencies = [
 name = "piarc-fs"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "cap-fs-ext",
  "cap-std",
  "chardetng",

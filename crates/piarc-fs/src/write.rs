@@ -24,7 +24,6 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use piarc_checkpoint::{ObjectStore, Pin};
 use piarc_protocol::fs::{FileStat, LineEndings, ReadRange};
-use sha2::{Digest, Sha256};
 
 use crate::access::Access;
 use crate::encoding::{
@@ -117,18 +116,149 @@ pub(crate) fn write_with(
     matches: impl FnOnce(Option<&str>, &str) -> bool,
     put: impl FnOnce(&mut File, &[u8]) -> io::Result<()>,
 ) -> Result<Written> {
+    write_inner(scope, Writer::Agent(states), locks, spec, matches, put)
+}
+
+/// Uses the displayed byte revision as the editor's read snapshot. A human read or save never
+/// grants an agent permission to edit the same file without its own read.
+pub(crate) fn write_editor(
+    scope: &Scope,
+    locks: &PathLocks,
+    spec: &WriteSpec<'_>,
+    expected: Option<[u8; 32]>,
+    size_limit: u64,
+) -> Result<Written> {
+    write_inner(
+        scope,
+        Writer::Editor {
+            expected,
+            size_limit,
+        },
+        locks,
+        spec,
+        |_, _| true,
+        |file, bytes| file.write_all(bytes),
+    )
+}
+
+enum Writer<'a> {
+    Agent(&'a Mutex<FileStates>),
+    Editor {
+        expected: Option<[u8; 32]>,
+        size_limit: u64,
+    },
+}
+
+impl Writer<'_> {
+    fn record(&self, key: String, after_sha256: [u8; 32], written: &Metadata) {
+        if let Writer::Agent(states) = self {
+            lock(states).record_write(
+                key,
+                Snapshot {
+                    sha256: after_sha256,
+                    size: written.len(),
+                    modified: written.modified().ok(),
+                },
+            );
+        }
+    }
+    fn check(
+        &self,
+        scope: &Scope,
+        requested: &str,
+        bound: &crate::bound::BoundPath,
+        key: &str,
+        existing: Option<&(Metadata, Vec<u8>)>,
+        original: Option<[u8; 32]>,
+    ) -> Result<()> {
+        let path = bound.path();
+        match self {
+            Writer::Agent(states) => {
+                if let Some(current) = &original {
+                    check(lock(states).freshness(key, current), path)?;
+                }
+            }
+            Writer::Editor { expected, .. } => {
+                if *expected != original {
+                    return Err(Error::Changed {
+                        path: display(path),
+                    });
+                }
+                if let Some((_, bytes)) = existing
+                    && crate::project::safe_text(bytes).is_none()
+                {
+                    return Err(Error::coded(
+                        path,
+                        "EILSEQ",
+                        "file does not contain editable text",
+                    ));
+                }
+                if expected.is_none() && !crate::project::can_create_at(scope, requested, bound)? {
+                    return Err(Error::Changed {
+                        path: display(path),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn commit(
+        &self,
+        bound: &crate::bound::BoundPath,
+        metadata: Option<&Metadata>,
+        write: impl FnOnce(&mut File) -> io::Result<()>,
+    ) -> Result<Metadata> {
+        match self {
+            Writer::Editor { expected: None, .. } => crate::atomic::create_bound(bound, write),
+            Writer::Editor {
+                expected: Some(hash),
+                size_limit,
+            } => crate::atomic::replace_checked(bound, metadata, write, || {
+                let mut current = bound
+                    .open_file()
+                    .map_err(io::Error::other)?
+                    .take(*size_limit + 1);
+                let mut bytes = Vec::new();
+                current.read_to_end(&mut bytes)?;
+                if bytes.len() as u64 > *size_limit || piarc_checkpoint::hash_of(&bytes) != *hash {
+                    return Err(io::Error::other("the file changed during save"));
+                }
+                Ok(())
+            }),
+            Writer::Agent(_) => crate::atomic::replace_bound(bound, metadata, write),
+        }
+    }
+}
+
+fn write_inner(
+    scope: &Scope,
+    writer: Writer<'_>,
+    locks: &PathLocks,
+    spec: &WriteSpec<'_>,
+    matches: impl FnOnce(Option<&str>, &str) -> bool,
+    put: impl FnOnce(&mut File, &[u8]) -> io::Result<()>,
+) -> Result<Written> {
     let bound = scope.bind(spec.requested, Access::Write)?;
     let path = bound.path();
     let key = scope.key(path);
     let _guard = locks.lock(&key);
-    let existing = existing_file(&bound)?;
-    let before_sha256 = existing.as_ref().map(|(_, bytes)| {
-        let current: [u8; 32] = Sha256::digest(bytes).into();
-        current
-    });
-    if let Some(current) = &before_sha256 {
-        check(lock(states).freshness(&key, current), path)?;
-    }
+    let size_limit = match writer {
+        Writer::Agent(_) => None,
+        Writer::Editor { size_limit, .. } => Some(size_limit),
+    };
+    let existing = existing_limited(&bound, size_limit)?;
+    let before_sha256 = existing
+        .as_ref()
+        .map(|(_, bytes)| piarc_checkpoint::hash_of(bytes));
+    writer.check(
+        scope,
+        spec.requested,
+        &bound,
+        &key,
+        existing.as_ref(),
+        before_sha256,
+    )?;
     let (encoding, before) = match &existing {
         Some((_, bytes)) => {
             let (encoding, text) = decode_old(bytes, path)?;
@@ -136,22 +266,15 @@ pub(crate) fn write_with(
         }
         None => (TextEncoding::NEW_FILE, None),
     };
+    if matches!(writer, Writer::Editor { .. }) {
+        crate::project::check_editor_change(path, before.as_deref(), spec.text)?;
+    }
     if !matches(before.as_deref(), spec.text) {
         return Err(Error::ApprovalMismatch {
             path: display(path),
         });
     }
-    let ending = match spec.line_endings {
-        LineEndings::MatchFile => before.as_deref().and_then(dominant_line_ending),
-        LineEndings::AsWritten => None,
-    };
-    let addition = ending.map_or(Cow::Borrowed(spec.text), |e| {
-        with_line_endings(spec.text, e)
-    });
-    let after = match (&before, spec.append) {
-        (Some(old), true) => format!("{old}{addition}"),
-        _ => addition.into_owned(),
-    };
+    let after = replacement_text(spec, before.as_deref());
     let bytes = encode(encoding, &after).map_err(|u| Error::Unencodable {
         path: display(path),
         encoding: encoding.name(),
@@ -168,16 +291,16 @@ pub(crate) fn write_with(
         _ => None,
     };
     let metadata = existing.as_ref().map(|(m, _)| m);
-    let written = crate::atomic::replace_bound(&bound, metadata, |file| put(file, &bytes))?;
-    let after_sha256: [u8; 32] = Sha256::digest(&bytes).into();
-    lock(states).record_write(
-        key,
-        Snapshot {
-            sha256: after_sha256,
-            size: written.len(),
-            modified: written.modified().ok(),
-        },
-    );
+    if size_limit.is_some_and(|limit| bytes.len() as u64 > limit) {
+        return Err(Error::coded(
+            path,
+            "EFBIG",
+            "encoded file exceeds the editor limit",
+        ));
+    }
+    let written = writer.commit(&bound, metadata, |file| put(file, &bytes))?;
+    let after_sha256 = piarc_checkpoint::hash_of(&bytes);
+    writer.record(key, after_sha256, &written);
     Ok(Written {
         label: scope.label(path),
         path: path.to_owned(),
@@ -189,6 +312,20 @@ pub(crate) fn write_with(
         after_sha256,
         snapshot,
     })
+}
+
+fn replacement_text(spec: &WriteSpec<'_>, before: Option<&str>) -> String {
+    let ending = match spec.line_endings {
+        LineEndings::MatchFile => before.and_then(dominant_line_ending),
+        LineEndings::AsWritten => None,
+    };
+    let addition = ending.map_or(Cow::Borrowed(spec.text), |e| {
+        with_line_endings(spec.text, e)
+    });
+    match (before, spec.append) {
+        (Some(old), true) => format!("{old}{addition}"),
+        _ => addition.into_owned(),
+    }
 }
 
 /// Fails unless this session may change `requested` as it last saw it: the check of an `Edit`
@@ -282,6 +419,13 @@ fn check(freshness: Freshness, path: &Path) -> Result<()> {
 pub(crate) fn existing_file(
     bound: &crate::bound::BoundPath,
 ) -> Result<Option<(Metadata, Vec<u8>)>> {
+    existing_limited(bound, None)
+}
+
+fn existing_limited(
+    bound: &crate::bound::BoundPath,
+    size_limit: Option<u64>,
+) -> Result<Option<(Metadata, Vec<u8>)>> {
     let path = bound.path();
     bound.parent()?;
     let mut file = match bound.open_file() {
@@ -294,8 +438,16 @@ pub(crate) fn existing_file(
         return Err(Error::coded(path, "EACCES", "permission denied"));
     }
     let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)
+    if size_limit.is_some_and(|limit| metadata.len() > limit) {
+        return Err(Error::coded(path, "EFBIG", "file exceeds the editor limit"));
+    }
+    (&mut file)
+        .take(size_limit.map_or(u64::MAX, |n| n.saturating_add(1)))
+        .read_to_end(&mut bytes)
         .map_err(|e| Error::io(path, e))?;
+    if size_limit.is_some_and(|limit| bytes.len() as u64 > limit) {
+        return Err(Error::coded(path, "EFBIG", "file exceeds the editor limit"));
+    }
     bound.verify()?;
     Ok(Some((metadata, bytes)))
 }

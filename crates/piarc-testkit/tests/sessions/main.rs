@@ -9,6 +9,7 @@ mod mcp;
 mod metadata;
 mod models;
 mod permissions;
+mod project_files;
 mod provider_settings;
 mod queue;
 mod rewind;

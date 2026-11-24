@@ -22,6 +22,8 @@ pub struct UserTerminal {
     pub size: (u16, u16, u32, u32),
     /// The task id of a terminal saved earlier in this session, to continue from.
     pub restore: Option<String>,
+    /// Project-relative directory selected in Files for a new user terminal.
+    pub directory: Option<String>,
 }
 
 impl ToolIo {
@@ -57,7 +59,24 @@ impl ToolIo {
         // What the user types in their own terminal is theirs to run: never sandboxed (T39).
         let wrap = Wrap::default();
         let cwd = lock(&session.shell_cwd).clone();
-        let cwd = if cwd.is_dir() {
+        let cwd = if let Some(directory) = &request.directory {
+            let root = session.scope.root();
+            let selected = session
+                .scope
+                .resolve(&piarc_fs::display(&root.join(directory)))
+                .map_err(|error| error.to_error_object())?;
+            if std::path::Path::new(directory).is_absolute()
+                || !selected.starts_with(root)
+                || !selected.is_dir()
+            {
+                return Err(ErrorObject::new(
+                    ErrorKind::InvalidParams,
+                    "invalid terminal directory",
+                    false,
+                ));
+            }
+            selected
+        } else if cwd.is_dir() {
             cwd
         } else {
             session.scope.root().to_path_buf()

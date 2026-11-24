@@ -666,6 +666,11 @@ impl ToolIo {
         }
     }
 
+    /// The same mutation locks are shared by the editor, agent tools, and checkpoint restore.
+    pub(crate) fn file_locks(&self) -> Arc<piarc_fs::PathLocks> {
+        self.locks.clone()
+    }
+
     /// The registered scope of `session_id`.
     #[must_use]
     pub fn scope(&self, session_id: &str) -> Option<Scope> {

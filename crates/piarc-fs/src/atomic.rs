@@ -53,7 +53,7 @@ pub(crate) fn replace_with(
         .file_name()
         .ok_or_else(|| io::Error::other("missing target name"))?;
     let dir = Dir::open_ambient_dir(&parent, cap_std::ambient_authority())?;
-    replace_in(&dir, &parent, name, original, write, || Ok(())).map(drop)
+    replace_in(&dir, &parent, name, original, write, || Ok(()), false).map(drop)
 }
 
 pub(crate) fn replace_bound(
@@ -61,13 +61,45 @@ pub(crate) fn replace_bound(
     original: Option<&Metadata>,
     write: impl FnOnce(&mut File) -> io::Result<()>,
 ) -> crate::Result<Metadata> {
+    replace_checked(target, original, write, || Ok(()))
+}
+
+/// Rechecks an editor's revision immediately before the atomic commit.
+pub(crate) fn replace_checked(
+    target: &crate::bound::BoundPath,
+    original: Option<&Metadata>,
+    write: impl FnOnce(&mut File) -> io::Result<()>,
+    check: impl Fn() -> io::Result<()>,
+) -> crate::Result<Metadata> {
     let (dir, name) = target.parent()?;
     target.verify()?;
     let parent = target
         .path()
         .parent()
         .ok_or_else(|| crate::Error::coded(target.path(), "EINVAL", "no parent"))?;
-    replace_in(dir, parent, name, original, write, || target.verify_io())
+    replace_in(
+        dir,
+        parent,
+        name,
+        original,
+        write,
+        || {
+            target.verify_io()?;
+            check()
+        },
+        false,
+    )
+    .map_err(|e| crate::Error::io(target.path(), e))
+}
+
+/// Publishes a complete new file only while its destination name is still free.
+pub(crate) fn create_bound(
+    target: &crate::bound::BoundPath,
+    write: impl FnOnce(&mut File) -> io::Result<()>,
+) -> crate::Result<Metadata> {
+    let (dir, name) = target.parent()?;
+    let parent = target.path().parent().expect("bound parent");
+    replace_in(dir, parent, name, None, write, || target.verify_io(), true)
         .map_err(|e| crate::Error::io(target.path(), e))
 }
 
@@ -78,6 +110,7 @@ fn replace_in(
     original: Option<&Metadata>,
     write: impl FnOnce(&mut File) -> io::Result<()>,
     verify: impl Fn() -> io::Result<()>,
+    create_only: bool,
 ) -> io::Result<Metadata> {
     let temp = format!(
         ".{}.piarc-{}-{}.tmp",
@@ -92,10 +125,20 @@ fn replace_in(
         .and_then(|()| file.metadata());
     drop(file);
     let result = written.and_then(|metadata| {
-        rename(dir, parent, &temp, name, &verify)?;
+        if create_only {
+            verify()?;
+            #[cfg(windows)]
+            crate::bound::with_pinned_windows_path(dir, parent, |p| {
+                std::fs::hard_link(p.join(&temp), p.join(name))
+            })?;
+            #[cfg(not(windows))]
+            dir.hard_link(&temp, dir, name)?;
+        } else {
+            rename(dir, parent, &temp, name, &verify)?;
+        }
         Ok(metadata)
     });
-    if result.is_err() {
+    if create_only || result.is_err() {
         // The original directory also owns cleanup after it was moved.
         #[cfg(windows)]
         let _ = crate::bound::with_pinned_windows_path(dir, parent, |p| {

@@ -78,6 +78,21 @@ impl Scope {
         })
     }
 
+    /// Restricts a desktop file view to the retained project directory. Added directories,
+    /// temporary tool results and individual agent approvals do not travel into this view.
+    #[must_use]
+    pub fn project_root(&self) -> Self {
+        Self {
+            root: self.root.clone(),
+            root_binding: self.root_binding.clone(),
+            cwd: self.root.clone(),
+            extra: Vec::new(),
+            read_only: Vec::new(),
+            approved: None,
+            case_insensitive: self.case_insensitive,
+        }
+    }
+
     /// The scope with `dir` added: read and written like the workspace root.
     ///
     /// # Errors

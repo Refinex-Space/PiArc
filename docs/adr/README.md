@@ -91,3 +91,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0073](0073-settings-segmented-control-reference.md) | 桌面前端长期对标 Claude Desktop 的视觉与交互，首项为设置分段控件；PiArc 自有内核与 Harness | 已接受 |
 | [0074](0074-workbench-settings.md) | 设置在发起操作的工作台内打开，采用模态面板 | 已接受 |
 | [0075](0075-session-tool-tiles.md) | 会话工具右侧分块、比例与窗口生命周期 | 已接受 |
+| [0076](0076-project-files.md) | 工作树文件浏览、冲突安全的编辑和独立本地文档预览 | 已接受 |

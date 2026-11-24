@@ -64,6 +64,7 @@ mod grep;
 mod image;
 pub mod notebook;
 mod pdf;
+pub mod project;
 mod restore;
 mod scope;
 mod spill;

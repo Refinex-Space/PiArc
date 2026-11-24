@@ -8,6 +8,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+base64.workspace = true
 cap-std.workspace = true
 cap-fs-ext.workspace = true
 chardetng.workspace = true

@@ -13,6 +13,7 @@ impl Driver<'_> {
         let request = UserTerminal {
             size: (80, 24, 8, 16),
             restore: None,
+            directory: None,
         };
         let opened = call(
             |done| self.core.open_session_terminal(id.clone(), request, done),

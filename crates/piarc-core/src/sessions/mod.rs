@@ -40,6 +40,7 @@ mod login;
 mod mcp;
 mod memory;
 mod plugins;
+mod project_files;
 mod provider_settings;
 mod session;
 mod skills;
@@ -175,6 +176,7 @@ pub(crate) struct Hub {
 
 #[derive(Default)]
 struct Routes {
+    project_searches: HashMap<(String, String), CancellationToken>,
     workspaces: HashMap<PathBuf, workspace::WorkspaceHandle>,
     sessions: HashMap<String, session::SessionHandle>,
     closed: bool,

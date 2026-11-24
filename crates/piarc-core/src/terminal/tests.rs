@@ -129,6 +129,7 @@ impl Fixture {
                 UserTerminal {
                     size: SIZE,
                     restore,
+                    directory: None,
                 },
             )
             .await
