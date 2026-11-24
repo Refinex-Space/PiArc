@@ -449,11 +449,12 @@ threats:
           - vitest:apps/desktop/src/main/security/navigation.test.ts::THR-13 cancels main-frame, subframe and redirect navigations away from the app origin
           - l4:apps/desktop/e2e/navigation.e2e.ts::blocks changing location to an external address
           - l4:apps/desktop/e2e/navigation.e2e.ts::blocks a redirect from an app page to an external address
-      - arch: 新窗口一律拒绝
-        measure: window.open 与 target=_blank 被拒
+      - arch: 仅允许绑定工作台的一次性工具窗口，其余新窗口拒绝
+        measure: 主进程只受理绑定于发起页面的临时工具窗口凭据；普通 window.open 与 target=_blank 被拒
         type: automated
         tests:
           - l4:apps/desktop/e2e/external-links.e2e.ts::denies window.open and target=_blank links
+          - vitest:apps/desktop/src/main/tool-windows.test.ts::THR-13 restricts each native tool ticket to one page, document and use
       - arch: 外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:`
         measure: 外链经主进程原生确认，只放行 https、http、mailto 且不带用户信息
         type: automated

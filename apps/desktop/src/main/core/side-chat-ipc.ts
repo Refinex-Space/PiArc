@@ -3,30 +3,30 @@
 import { randomUUID } from 'node:crypto';
 import type { WebContents } from 'electron';
 
-import { IPC_CHANNELS, MAX_PROMPT_LENGTH, isSessionId } from '../../shared/ipc.js';
+import { IPC_CHANNELS, MAX_PROMPT_LENGTH, MAX_SIDE_CHATS, isSessionId } from '../../shared/ipc.js';
 import type { RegisterHandler } from '../ipc/register.js';
 import type { CoreRuntime } from './native/piarc-core.js';
 
 type SideCore = Pick<CoreRuntime, 'askSideChat' | 'controlSideChat'>;
 interface Panel {
   readonly session: string;
-  readonly clientId: string;
   readonly hostId: string;
 }
 
 export function registerSideChatHandlers(register: RegisterHandler, core: SideCore): void {
-  const panels = new WeakMap<WebContents, Panel>();
+  const panels = new WeakMap<WebContents, Map<string, Panel>>();
   const watched = new WeakSet<WebContents>();
   function watch(sender: WebContents): void {
     if (watched.has(sender)) return;
     watched.add(sender);
     const release = () => {
-      const panel = panels.get(sender);
-      if (panel === undefined) return;
+      const owned = panels.get(sender);
+      if (owned === undefined) return;
       panels.delete(sender);
-      core.controlSideChat(panel.session, panel.hostId, true).catch((failure: unknown) => {
-        console.error('[side chat] cannot release the closed page’s conversation', failure);
-      });
+      for (const panel of owned.values())
+        core.controlSideChat(panel.session, panel.hostId, true).catch((failure: unknown) => {
+          console.error('[side chat] cannot release the closed page’s conversation', failure);
+        });
     };
     sender.once('destroyed', release);
     sender.on('render-process-gone', release);
@@ -40,12 +40,15 @@ export function registerSideChatHandlers(register: RegisterHandler, core: SideCo
       throw new TypeError('invalid side question');
     }
     watch(sender);
-    let panel = panels.get(sender);
+    const owned = panels.get(sender) ?? new Map<string, Panel>();
+    let panel = owned.get(clientId);
     if (panel === undefined) {
-      panel = { session, clientId, hostId: randomUUID() };
-      panels.set(sender, panel);
-    } else if (panel.session !== session || panel.clientId !== clientId) {
-      throw new Error('close the previous side chat first');
+      if (owned.size >= MAX_SIDE_CHATS) throw new Error('Too many side chats');
+      panel = { session, hostId: randomUUID() };
+      owned.set(clientId, panel);
+      panels.set(sender, owned);
+    } else if (panel.session !== session) {
+      throw new Error('Side chat belongs to another session');
     }
     return core.askSideChat(session, panel.hostId, question);
   });
@@ -53,9 +56,10 @@ export function registerSideChatHandlers(register: RegisterHandler, core: SideCo
     if (!isSessionId(session) || !isSessionId(clientId) || typeof close !== 'boolean') {
       throw new TypeError('invalid side chat control');
     }
-    const panel = panels.get(sender);
-    if (panel?.session !== session || panel.clientId !== clientId) return;
-    if (close) panels.delete(sender);
+    const owned = panels.get(sender);
+    const panel = owned?.get(clientId);
+    if (panel?.session !== session) return;
+    if (close) owned?.delete(clientId);
     return core.controlSideChat(session, panel.hostId, close);
   });
 }

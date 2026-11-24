@@ -185,6 +185,44 @@ describe('terminal IPC', () => {
     expect(calls).toEqual(['open s1']);
   });
 
+  it('borrows native tool input only for the bound session and opener while attached', () => {
+    const { window, owners, advance } = setup();
+    const owner = window(1),
+      child = window(2),
+      other = window(3);
+    owners.admitSession(17, 'first');
+    owners.admitSession(18, 'second');
+    const release = owners.bindToolInput(child, owner, 'first');
+    expect(() => {
+      owners.requireInput(owner, 17);
+    }).toThrow('recent user input');
+    child.input();
+    expect(() => {
+      owners.requireInput(owner, 17);
+    }).not.toThrow();
+    expect(() => {
+      owners.requireInput(owner, 'first');
+    }).not.toThrow();
+    expect(() => {
+      owners.requireInput(owner, 18);
+    }).toThrow('recent user input');
+    expect(() => {
+      owners.requireInput(other, 17);
+    }).toThrow('recent user input');
+    expect(() => {
+      owners.requireInput(owner);
+    }).toThrow('recent user input');
+    advance(6000);
+    expect(() => {
+      owners.requireInput(owner, 17);
+    }).toThrow('recent user input');
+    child.input();
+    release();
+    expect(() => {
+      owners.requireInput(owner, 17);
+    }).toThrow('recent user input');
+  });
+
   it('limits the open terminals of a session', async () => {
     const { invoke, open, window } = setup();
     const win = window(1);

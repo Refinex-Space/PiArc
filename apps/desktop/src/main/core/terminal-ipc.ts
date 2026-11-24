@@ -124,6 +124,8 @@ export class TerminalOwners {
   readonly #pages = new Map<number, number>();
   /** Per window, when it last got real user input (`now()` time). */
   readonly #input = new Map<number, number>();
+  /** Native terminal windows, bound by the main process to their opener and one session. */
+  readonly #toolInputs = new Map<number, { owner: number; session: string }>();
   /** `window:terminal` pairs with a frame request in flight. */
   readonly #pulling = new Set<string>();
   readonly #core: TerminalCore;
@@ -195,12 +197,30 @@ export class TerminalOwners {
     return at !== undefined && this.#now() - at <= INPUT_WINDOW_MS;
   }
 
-  /** Throws unless `contents` got real user input recently. */
-  requireInput(contents: OwnerContents): void {
+  bindToolInput(child: OwnerContents, owner: OwnerContents, session: string): () => void {
+    this.watch(child);
+    this.#toolInputs.set(child.id, { owner: owner.id, session });
+    return () => {
+      this.#toolInputs.delete(child.id);
+    };
+  }
+
+  /** The opener's own input, or input in a still-open native terminal window for this session. */
+  requireInput(contents: OwnerContents, target?: string | number): void {
     this.watch(contents);
-    if (!this.hasRecentInput(contents.id)) {
-      throw new Error('Terminal input needs recent user input in this window');
+    if (this.hasRecentInput(contents.id)) return;
+    if (target !== undefined) {
+      const session = typeof target === 'string' ? target : this.#sessionOf(target);
+      for (const [child, binding] of this.#toolInputs) {
+        if (
+          binding.owner === contents.id &&
+          binding.session === session &&
+          this.hasRecentInput(child)
+        )
+          return;
+      }
     }
+    throw new Error('Terminal input needs recent user input in this window');
   }
 
   /** The session of terminal `id`, asking Core once for a terminal this module has not seen. */
@@ -362,7 +382,7 @@ function registerSessionHandlers(
       throw new TypeError('sessionId must be a session id');
     }
     const { cols, rows, cellWidth, cellHeight } = size(requested);
-    owners.requireInput(event.sender);
+    owners.requireInput(event.sender, sessionId);
     if (owners.openOf(sessionId) >= MAX_SESSION_TERMINALS) {
       throw new Error(`A session has at most ${String(MAX_SESSION_TERMINALS)} terminals`);
     }
@@ -378,7 +398,7 @@ function registerSessionHandlers(
     if (typeof shared !== 'boolean') {
       throw new TypeError('shared must be a boolean');
     }
-    owners.requireInput(event.sender);
+    owners.requireInput(event.sender, terminal);
     return core.setTerminalShared(terminal, shared);
   });
   registerHandler(IPC_CHANNELS.terminalClose, (event, [id]) => {
@@ -397,7 +417,7 @@ function registerInputHandlers(
   registerHandler(IPC_CHANNELS.terminalInput, (event, [id, input]) => {
     const terminal = use(event.sender, id);
     const value = text(input, MAX_TERMINAL_INPUT, 'text');
-    owners.requireInput(event.sender);
+    owners.requireInput(event.sender, terminal);
     core.terminalInput(terminal, value);
   });
   registerHandler(IPC_CHANNELS.terminalKey, (event, [id, key]) => {
@@ -405,7 +425,7 @@ function registerInputHandlers(
     if (!isTerminalKeyMessage(key)) {
       throw new TypeError('key must be a terminal key message');
     }
-    owners.requireInput(event.sender);
+    owners.requireInput(event.sender, terminal);
     core.terminalKey(terminal, key);
   });
   registerHandler(IPC_CHANNELS.terminalMouse, (event, [id, pointer]) => {
@@ -415,7 +435,7 @@ function registerInputHandlers(
     }
     // Presses and releases reach programs that track the mouse; motion only reports places.
     if (pointer.action !== 'motion') {
-      owners.requireInput(event.sender);
+      owners.requireInput(event.sender, terminal);
     }
     core.terminalMouse(terminal, {
       action: pointer.action,
@@ -439,7 +459,7 @@ function registerInputHandlers(
     if (typeof allowUnsafe !== 'boolean') {
       throw new TypeError('allowUnsafe must be a boolean');
     }
-    owners.requireInput(event.sender);
+    owners.requireInput(event.sender, terminal);
     return core.terminalPaste(terminal, value, allowUnsafe);
   });
 }

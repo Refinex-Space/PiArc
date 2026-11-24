@@ -222,6 +222,13 @@ function connectEvents(): Promise<void> {
 }
 
 const api: PiarcApi = {
+  prepareToolWindow: (sessionId, panelId) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.toolWindowPrepare, sessionId, panelId)
+      .then((value: unknown) => expectString(value)),
+  pinToolWindow: async (ticket, pinned) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.toolWindowPin, ticket, pinned);
+  },
   getAppVersion: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getAppVersion).then((value: unknown) => expectString(value)),
   openExternal: (url: string) =>

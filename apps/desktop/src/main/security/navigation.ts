@@ -1,6 +1,6 @@
 // Navigation, redirect and new-window rules applied to every webContents
 // (architecture section 10.3, Electron security checklist items 13 and 14).
-import type { WebContents } from 'electron';
+import type { HandlerDetails, WebContents, WindowOpenHandlerResponse } from 'electron';
 
 import { originOf } from './origin.js';
 
@@ -27,11 +27,15 @@ export function originForLog(url: string): string {
 }
 
 /**
- * Blocks navigation and redirects away from `trustedOrigins`, denies every new window and
+ * Blocks navigation and redirects away from `trustedOrigins`, denies unbound new windows and
  * every `<webview>`. Installed on all webContents from `app.on('web-contents-created')`, so
  * no window or embedded contents can miss it.
  */
-export function guardWebContents(contents: WebContents, trustedOrigins: readonly string[]): void {
+export function guardWebContents(
+  contents: WebContents,
+  trustedOrigins: readonly string[],
+  toolWindow?: (details: HandlerDetails) => WindowOpenHandlerResponse | undefined,
+): void {
   contents.on('will-navigate', (event) => {
     if (!isTrustedUrl(event.url, trustedOrigins)) {
       event.preventDefault();
@@ -53,7 +57,10 @@ export function guardWebContents(contents: WebContents, trustedOrigins: readonly
       console.warn(`[security] blocked redirect to ${originForLog(event.url)}`);
     }
   });
-  contents.setWindowOpenHandler(({ url }) => {
+  contents.setWindowOpenHandler((details) => {
+    const tool = toolWindow?.(details);
+    if (tool) return tool;
+    const { url } = details;
     console.warn(`[security] denied new window for ${originForLog(url)}`);
     return { action: 'deny' };
   });

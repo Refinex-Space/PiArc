@@ -45,6 +45,7 @@ import { PRODUCTION_CSP } from './security/csp.js';
 import { guardWebContents } from './security/navigation.js';
 import { applyPermissionPolicy } from './security/permissions.js';
 import { refuseRemoteDebugging } from './security/runtime-switches.js';
+import { ToolWindows } from './tool-windows.js';
 import { createMainWindow } from './window.js';
 
 // Release builds refuse Chromium's remote debugging before anything else runs (T45, I10): the
@@ -162,11 +163,12 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
 }
 
 function start(dirs: DataDirs): void {
+  let toolWindows: ToolWindows | undefined;
   app.on('session-created', (created) => {
     applyPermissionPolicy(created, trustedOrigins);
   });
   app.on('web-contents-created', (_event, contents) => {
-    guardWebContents(contents, trustedOrigins);
+    guardWebContents(contents, trustedOrigins, (details) => toolWindows?.open(contents, details));
   });
   app.on('second-instance', (_event, argv, workingDirectory) => {
     const targets = launchTargets(argv, process.defaultApp, workingDirectory);
@@ -268,6 +270,20 @@ function start(dirs: DataDirs): void {
       },
     );
     const terminalOwners = new TerminalOwners(core.runtime);
+    toolWindows = new ToolWindows(
+      terminalOwners,
+      (sender) => appShell.mainWindows().some((win) => win.webContents === sender),
+      async (sessionId) => {
+        const metadata: unknown = JSON.parse(await core.runtime.sessionDeletionTarget(sessionId));
+        return (
+          typeof metadata === 'object' &&
+          metadata !== null &&
+          'workspace' in metadata &&
+          typeof metadata.workspace === 'string'
+        );
+      },
+    );
+    toolWindows.register(registerHandler);
     // Every page is watched from its creation: terminal input needs the page's recent real
     // input (I51), so the first keystroke must already be seen.
     app.on('web-contents-created', (_event, contents) => {

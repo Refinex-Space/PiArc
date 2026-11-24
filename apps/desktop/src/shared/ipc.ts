@@ -20,6 +20,8 @@ export type { ApprovalAnswer, PermissionMode } from '@piarc/protocol';
 /** Channel names, one per `window.piarc` command. */
 export const IPC_CHANNELS = {
   getAppVersion: 'piarc:app.getVersion',
+  toolWindowPrepare: 'piarc:toolWindow.prepare',
+  toolWindowPin: 'piarc:toolWindow.pin',
   openExternal: 'piarc:shell.openExternal',
   eventsConnect: 'piarc:events.connect',
   eventsSubscribe: 'piarc:events.subscribe',
@@ -264,6 +266,11 @@ export type AppEvent =
   | { readonly type: 'focus'; readonly focused: boolean }
   /** The window was minimized or hidden (`false`), restored or shown (`true`) (T34). */
   | { readonly type: 'visibility'; readonly visible: boolean }
+  | {
+      readonly type: 'toolWindow';
+      readonly ticket: string;
+      readonly state: 'visible' | 'hidden' | 'closed';
+    }
   /** A link, a dropped folder or a second start asks to open something (T35). */
   | { readonly type: 'launch'; readonly target: LaunchTarget }
   /**
@@ -300,6 +307,9 @@ export interface AttentionNotice {
 }
 
 /** Longest text the renderer may send as one prompt (bytes of UTF-16 code units). */
+/** Independent in-memory side conversations per workbench page. */
+export const MAX_SIDE_CHATS = 8;
+
 export const MAX_PROMPT_LENGTH = 1_000_000;
 
 /**
@@ -560,6 +570,8 @@ export function isRouteKey(value: unknown): value is string {
 export interface PiarcApi {
   /** The application version (`app.getVersion()`). */
   getAppVersion(): Promise<string>;
+  prepareToolWindow(sessionId: string, panelId: string): Promise<string>;
+  pinToolWindow(ticket: string, pinned: boolean): Promise<void>;
   /**
    * Asks the main process to open `url` in the system browser. The main process accepts only
    * `https:`, `http:` and `mailto:` URLs and shows a native confirmation dialog first.
