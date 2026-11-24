@@ -1,0 +1,136 @@
+.workbench-rail .rail-section {
+  position: relative;
+  padding-block: var(--piarc-space-2);
+  border-color: color-mix(in srgb, var(--piarc-workbench-ink) 9%, transparent);
+}
+.rail-section .rail-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-block-size: calc(var(--piarc-space-4) * 2);
+}
+.rail-heading h2 {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+.rail-heading h2 > button {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  width: 100%;
+  min-height: calc(var(--piarc-space-4) * 2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: var(--piarc-workbench-ink);
+  font: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.rail-heading h2 svg {
+  width: var(--piarc-space-3);
+  height: var(--piarc-space-3);
+  color: var(--piarc-workbench-muted);
+  opacity: 0;
+  transition:
+    opacity var(--piarc-motion-fast),
+    transform var(--piarc-motion-fast);
+}
+.rail-heading .rail-grip {
+  flex: none;
+  width: var(--piarc-space-5);
+  height: var(--piarc-space-5);
+  opacity: 0;
+  cursor: grab;
+  transition: opacity var(--piarc-motion-fast);
+}
+.rail-heading .rail-grip svg {
+  width: var(--piarc-space-4);
+  height: var(--piarc-space-4);
+}
+.rail-heading:hover :is(.rail-grip, h2 svg),
+.rail-heading:focus-within :is(.rail-grip, h2 svg),
+.rail-heading:has([aria-pressed='true']) .rail-grip {
+  opacity: 1;
+}
+.rail-heading .rail-grip[aria-pressed='true'] {
+  cursor: grabbing;
+}
+.rail-section[data-insertion]::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--piarc-text-accent);
+  border-radius: var(--piarc-radius-pill);
+  pointer-events: none;
+}
+.rail-section[data-insertion='before']::after {
+  top: 0;
+}
+.rail-section[data-insertion='after']::after {
+  bottom: 0;
+}
+.rail-heading h2 button[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+  opacity: 1;
+}
+.rail-section-body[hidden] {
+  display: none;
+}
+.rail-section-body > .rail-environment-row {
+  min-height: calc(var(--piarc-space-4) * 2);
+}
+.rail-environment-row small {
+  min-width: 0;
+  font-size: inherit;
+}
+:root[data-app] .rail-section .context-summary strong {
+  font-weight: var(--piarc-font-weight-medium);
+}
+:root[data-app] .rail-section .context-categories {
+  gap: 0;
+  margin-block: var(--piarc-space-1);
+}
+:root[data-app] .rail-section .context-category {
+  min-block-size: var(--piarc-space-5);
+  grid-template-columns: var(--piarc-space-3) minmax(0, 1fr) auto minmax(5ch, auto);
+  column-gap: var(--piarc-space-2);
+  font-size: var(--piarc-font-size-body);
+}
+.rail-section .context-category .context-swatch {
+  width: var(--piarc-space-2);
+  height: var(--piarc-space-2);
+}
+.context-category .swatch-free {
+  background: var(--piarc-surface-active);
+}
+.context-meta {
+  color: var(--piarc-workbench-muted);
+  font-size: var(--piarc-font-size-small);
+}
+.rail-section .context-summary {
+  color: var(--piarc-workbench-ink);
+}
+.rail-section .context-share {
+  color: var(--piarc-workbench-ink);
+}
+.rail-section .context-meter {
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-active);
+}
+@media (hover: none) {
+  .rail-heading .rail-grip,
+  .rail-heading h2 svg {
+    opacity: 1;
+  }
+}
+@media (forced-colors: active) {
+  .rail-section[data-insertion]::after {
+    background: Highlight;
+  }
+}

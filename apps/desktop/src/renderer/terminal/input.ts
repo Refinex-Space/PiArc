@@ -1,3 +1,4 @@
+import { documentWindow } from '../app/surface-document.js';
 // Keyboard, input method, paste and copy of a terminal view (T34, architecture section 8.5).
 //
 // - While the terminal has the focus every key goes to it, except the few shortcuts the
@@ -57,6 +58,7 @@ export function keyIntent(
 
 /** Wires `textarea`; returns the function that unwires it. */
 export function attachInput(host: InputHost, textarea: HTMLTextAreaElement): () => void {
+  const realm = documentWindow(textarea.ownerDocument);
   let composing = false;
   /** Codes whose press went to the terminal, so only their releases follow. */
   const pressed = new Set<string>();
@@ -67,7 +69,11 @@ export function attachInput(host: InputHost, textarea: HTMLTextAreaElement): () 
   };
 
   const onKey = (event: Event) => {
-    if (!(event instanceof KeyboardEvent) || !host.attached() || isImeComposing(event, composing)) {
+    if (
+      !(event instanceof realm.KeyboardEvent) ||
+      !host.attached() ||
+      isImeComposing(event, composing)
+    ) {
       return;
     }
     if (event.type === 'keyup') {
@@ -106,20 +112,20 @@ export function attachInput(host: InputHost, textarea: HTMLTextAreaElement): () 
     composing = true;
   });
   on('compositionupdate', (event) => {
-    host.preedit(event instanceof CompositionEvent ? event.data : '');
+    host.preedit(event instanceof realm.CompositionEvent ? event.data : '');
   });
   on('compositionend', (event) => {
     composing = false;
     host.preedit('');
     textarea.value = '';
-    const text = event instanceof CompositionEvent ? event.data : '';
+    const text = event instanceof realm.CompositionEvent ? event.data : '';
     if (text !== '') {
       host.text(text);
     }
   });
   on('input', (event) => {
     // Text that arrived without a key event the view handled (the emoji picker, dictation).
-    const isComposing = event instanceof InputEvent && event.isComposing;
+    const isComposing = event instanceof realm.InputEvent && event.isComposing;
     if (composing || isComposing || textarea.value === '') {
       return;
     }
@@ -128,7 +134,7 @@ export function attachInput(host: InputHost, textarea: HTMLTextAreaElement): () 
     host.text(text);
   });
   on('paste', (event) => {
-    if (!(event instanceof ClipboardEvent)) return;
+    if (!(event instanceof realm.ClipboardEvent)) return;
     event.preventDefault();
     const text = event.clipboardData?.getData('text/plain') ?? '';
     textarea.value = '';

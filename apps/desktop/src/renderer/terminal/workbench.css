@@ -1,0 +1,221 @@
+/* One strip for session terminals. Fixed controls stay reachable while the tabs scroll. */
+:root[data-app] .workbench-terminal {
+  position: relative;
+  min-inline-size: 0;
+  background: var(--piarc-c-terminal-background);
+  color: var(--piarc-workbench-ink);
+}
+:root[data-app] .terminal-tabs {
+  flex: none;
+  align-items: center;
+  min-inline-size: 0;
+  min-block-size: var(--piarc-size-row-height);
+  padding: 0 var(--piarc-space-2);
+  overflow: visible;
+  gap: var(--piarc-space-1);
+  background: var(--piarc-workbench-canvas);
+}
+:root[data-app] .terminal-tabs .terminal-tablist {
+  align-self: stretch;
+  align-items: center;
+  max-width: 100%;
+  overflow: auto hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+:root[data-app] .terminal-tab-slot {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  max-inline-size: min(16rem, 100%);
+  min-inline-size: 0;
+  height: var(--piarc-size-button-height);
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+}
+:root[data-app] .terminal-tab-slot[data-selected] {
+  background: var(--piarc-surface-active);
+}
+:root[data-app] .terminal-tabs .terminal-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-inline-size: 0;
+  height: 100%;
+  padding: 0 var(--piarc-space-1) 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-md);
+  color: var(--piarc-workbench-muted);
+}
+:root[data-app] .terminal-tabs .terminal-tab[aria-selected='true'] {
+  color: var(--piarc-workbench-ink);
+}
+:root[data-app] .terminal-tabs .terminal-tab-slot:hover {
+  background: var(--piarc-surface-hover);
+}
+:root[data-app] .terminal-tabs .terminal-tab-name {
+  min-width: 0;
+}
+:root[data-app] .terminal-tabs .terminal-tab-close {
+  display: grid;
+  place-items: center;
+  width: var(--piarc-space-4);
+  height: var(--piarc-space-4);
+  padding: 0;
+  margin-inline-end: var(--piarc-space-1);
+  opacity: 0;
+  cursor: pointer;
+}
+:root[data-app] .terminal-tab-slot:is(:hover, :focus-within, [data-selected]) .terminal-tab-close {
+  opacity: 1;
+}
+:root[data-app] .terminal-tab-close .icon {
+  width: var(--piarc-space-3);
+  height: var(--piarc-space-3);
+}
+:root[data-app] .terminal-tabs .terminal-tab-rename {
+  width: min(12rem, 100%);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-c-input-background);
+  color: var(--piarc-c-input-text);
+}
+:root[data-app] .terminal-actions,
+:root[data-app] .terminal-tabs .terminal-share-state {
+  display: flex;
+  align-items: center;
+}
+:root[data-app] .terminal-actions {
+  flex: none;
+  gap: calc(var(--piarc-space-1) / 2);
+  margin-inline-start: auto;
+}
+:root[data-app] .terminal-tabs .terminal-share-state {
+  flex: none;
+  gap: var(--piarc-space-1);
+  min-height: var(--piarc-size-button-height);
+  padding-inline: var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-md);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+  background: transparent;
+  color: var(--piarc-workbench-muted);
+}
+:root[data-app] .terminal-tabs .terminal-share-state:hover {
+  background: var(--piarc-surface-hover);
+}
+:root[data-app] .terminal-share-state[aria-checked='true'] {
+  color: var(--piarc-text-accent);
+}
+:root[data-app] .terminal-share-indicator {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 1px;
+  width: calc(var(--piarc-space-2) + var(--piarc-space-3));
+  height: var(--piarc-space-3);
+  border: 1px solid currentColor;
+  border-radius: var(--piarc-radius-pill);
+}
+:root[data-app] .terminal-share-indicator::after {
+  content: '';
+  width: var(--piarc-size-badge);
+  height: var(--piarc-size-badge);
+  border-radius: 50%;
+  background: currentColor;
+}
+:root[data-app] .terminal-share-state[aria-checked='true'] .terminal-share-indicator {
+  justify-content: flex-end;
+}
+:root[data-app] .terminal-tabs .icon-button,
+:root[data-app] .workbench-terminal .terminal-find .icon-button {
+  flex: none;
+  width: var(--piarc-space-5);
+  min-width: 0;
+  height: var(--piarc-space-5);
+}
+:root[data-app] .terminal-tabs .terminal-agent-note {
+  font-size: var(--piarc-font-size-small);
+  color: var(--piarc-workbench-muted);
+}
+:root[data-app] .workbench-terminal .terminal-empty {
+  flex: 1;
+  align-content: center;
+  justify-items: center;
+  color: var(--piarc-workbench-muted);
+}
+:root[data-app] .workbench-terminal .terminal-empty > p {
+  margin: 0 0 var(--piarc-space-1);
+}
+:root[data-app] .workbench-terminal .terminal-empty > .icon {
+  height: var(--piarc-space-5);
+  width: var(--piarc-space-5);
+}
+:root[data-app] .workbench-terminal .terminal-find {
+  position: absolute;
+  inset: calc(var(--piarc-size-row-height) + var(--piarc-space-1)) var(--piarc-space-2) auto auto;
+  z-index: 1;
+  max-inline-size: calc(100% - var(--piarc-space-4));
+  padding: var(--piarc-space-1);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-button);
+  gap: var(--piarc-space-1);
+  background: var(--piarc-workbench-editor);
+  box-shadow: var(--piarc-shadow-overlay);
+}
+:root[data-app] .workbench-terminal .terminal-find > .icon {
+  flex: none;
+  margin-inline-start: var(--piarc-space-1);
+}
+:root[data-app] .workbench-terminal .terminal-find-input {
+  flex: 1 1 auto;
+  width: 11rem;
+  height: var(--piarc-size-button-height);
+  min-width: 0;
+  padding-inline: var(--piarc-space-1);
+  border-color: transparent;
+  background: transparent;
+}
+:root[data-app] .workbench-terminal .terminal-find-count {
+  min-width: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-app] .terminal-up {
+  display: inline-flex;
+  transform: rotate(180deg);
+}
+:root[data-app] .workbench-terminal .terminal-surface {
+  padding: var(--piarc-space-2);
+}
+:root[data-app] .terminal-screen-text {
+  margin-block: var(--piarc-space-3);
+  padding: var(--piarc-space-3);
+  border-radius: var(--piarc-radius-button);
+}
+
+.tool-header-slot .terminal-tabs {
+  padding: 0;
+  border: 0;
+  flex: 1;
+}
+.tool-header-slot .terminal-tablist {
+  min-width: 0;
+  flex: 1;
+}
+.tool-header-slot .terminal-tab {
+  min-width: 24px;
+}
+@container tool (max-width: 430px) {
+  .terminal-share-state .terminal-share-label {
+    display: none;
+  }
+  :root[data-app] .tool-header-slot .terminal-tabs {
+    gap: 0;
+  }
+  .tool-header-slot .terminal-tab-icon {
+    display: none;
+  }
+}

@@ -482,11 +482,6 @@ textarea.input {
   border-left: 1px solid var(--piarc-border-subtle);
 }
 
-.panel-area-dock {
-  position: relative;
-  border-top: 1px solid var(--piarc-border-subtle);
-}
-
 .panel-area > .resizer {
   position: absolute;
   z-index: 1;
@@ -496,31 +491,6 @@ textarea.input {
 .panel-area-rail > .resizer {
   inset: 0 auto 0 -2px;
   width: 4px;
-}
-
-.panel-area-dock > .resizer {
-  inset: -2px 0 auto;
-  height: 4px;
-}
-
-.panel-tabs {
-  display: flex;
-  gap: var(--piarc-space-1);
-  padding: var(--piarc-space-1) var(--piarc-space-2);
-  border-bottom: 1px solid var(--piarc-border-subtle);
-}
-
-.panel-tab {
-  padding: 2px var(--piarc-space-2);
-  border: 0;
-  border-radius: var(--piarc-radius-sm);
-  background: transparent;
-  color: var(--piarc-text-secondary);
-}
-
-.panel-tab.is-active {
-  background: var(--piarc-surface-active);
-  color: var(--piarc-text-primary);
 }
 
 .panel-body {

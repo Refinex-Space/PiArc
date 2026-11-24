@@ -3,6 +3,7 @@
 // workspace's tasks and reads a task's output from Core in parts, and the stop button ends the
 // command (A12); a background subagent is a task in the same panel and stops from it (A11).
 // Screenshots go to tmp/evidence/T32/ with PIARC_EVIDENCE_TASK=T32.
+import type { BrowserWindow } from 'electron';
 import { expect, test } from './sessions.js';
 import { idle, openSession, screenshots } from './t19.js';
 
@@ -12,6 +13,11 @@ test('the background task card and panel show a command and stop it', async ({
   workspaces,
 }, info) => {
   test.setTimeout(120_000);
+  // Inspect the rail card alongside the workspace task tile, as in a wide desktop layout.
+  const owner = await app.browserWindow(page);
+  await owner.evaluate((window: BrowserWindow) => {
+    window.setContentSize(1440, 820);
+  });
   await openSession(app, page, workspaces, 'background 后台', 't32-bg', 'Start the watcher');
   await idle(page);
   // The conversation's command card says it runs on in the background.
@@ -20,7 +26,7 @@ test('the background task card and panel show a command and stop it', async ({
   const card = page.getByTestId('bg-tasks-card');
   await expect(card).toBeVisible();
   // A workspace task can advertise its state without taking space away from the composer.
-  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
+  await expect(page.getByTestId('tile-background-tasks')).toHaveCount(0);
   const task = card.getByTestId('bg-task');
   await expect(task).toHaveCount(1);
   await expect(task).toContainText('Command');
@@ -48,25 +54,33 @@ test('the background task card and panel show a command and stop it', async ({
   await expect(row).toContainText('Stopped');
   await expect(task.getByTestId('bg-task-stop')).toHaveCount(0);
   await screenshots(page, info, 'card-stopped');
-  await page.getByTestId('panel-close-dock').click();
-  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
+  await page.getByTestId('tile-close-background-tasks').click();
+  await expect(page.getByTestId('tile-background-tasks')).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Show all background tasks' })).toBeFocused();
+  await page.getByTestId('tool-more').click();
   await page.getByTestId('tool-background-tasks').click();
   await expect(row).toContainText('Stopped');
+  await page.getByTestId('tool-more').click();
   await page.getByTestId('tool-background-tasks').click();
-  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
-  // Closing the task list after switching from a terminal closes the entire dock. Reopening
-  // the terminal attaches to the same running shell.
+  await expect(page.getByTestId('tile-background-tasks')).toHaveCount(0);
+  // The task list and terminal occupy independent tiles. Closing the list leaves the
+  // same terminal live; closing just its view and reopening attaches to that shell.
   await page.getByTestId('tool-terminal').click();
   const terminal = page.getByTestId('terminal-tab');
   await expect(terminal).toHaveCount(1);
   const taskId = await terminal.getAttribute('data-task');
   if (!taskId) throw new Error('Missing terminal task id');
+  await page.getByTestId('tool-more').click();
   await page.getByTestId('tool-background-tasks').click();
   await expect(panel).toBeVisible();
-  await page.getByTestId('panel-close-dock').click();
-  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
-  await expect(page.getByTestId('tool-background-tasks')).toBeFocused();
+  await expect(page.getByTestId('tile-terminal')).toBeVisible();
+  await expect(terminal).toHaveAttribute('data-task', taskId);
+  await page.getByTestId('tile-close-background-tasks').click();
+  await expect(page.getByTestId('tile-background-tasks')).toHaveCount(0);
+  await expect(page.getByTestId('tool-more')).toBeFocused();
+  await expect(terminal).toHaveAttribute('data-task', taskId);
+  await page.getByTestId('tile-close-terminal').click();
+  await expect(page.getByTestId('tile-terminal')).toHaveCount(0);
   await page.getByTestId('tool-terminal').click();
   await expect(terminal).toHaveAttribute('data-task', taskId);
 });

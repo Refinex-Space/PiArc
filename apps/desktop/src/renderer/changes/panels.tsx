@@ -15,10 +15,10 @@ registerPanel({
 
 registerPanel({
   id: 'changes',
-  area: 'dock',
+  area: 'tool',
   title: 'panel.changes',
   order: 30,
-  when: (context) => context.sessionId !== undefined && context.changes === true,
+  when: (context) => context.sessionId !== undefined,
   render: (context) =>
     context.sessionId === undefined ? null : <ChangesPanel sessionId={context.sessionId} />,
 });

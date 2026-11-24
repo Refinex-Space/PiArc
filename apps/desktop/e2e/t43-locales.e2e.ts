@@ -64,7 +64,11 @@ test('the main pages in Chinese and English, with nothing cut off', async ({
     await prefer(page, { key: 'language', value: language });
     await expect(page.locator('html')).toHaveAttribute('lang', language);
     await capture(page, language, 'conversation', problems);
-    await page.getByTestId('panel-tab-changes-card').click();
+    const details = page.getByTestId('tool-rail');
+    if ((await details.getAttribute('aria-pressed')) === 'false') await details.click();
+    const changesSection = page.getByTestId('panel-tab-changes-card');
+    if ((await changesSection.getAttribute('aria-expanded')) !== 'true')
+      await changesSection.click();
     await page.getByTestId('changes-open').click();
     await capture(page, language, 'changes', problems);
     await page.getByTestId('new-session').click();

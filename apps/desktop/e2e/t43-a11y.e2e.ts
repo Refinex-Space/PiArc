@@ -29,6 +29,8 @@ async function newSession(page: Page, text: string, scenario: string): Promise<v
 
 /** Opens a rail tab (card) by its panel id. */
 async function railTab(page: Page, panel: string): Promise<void> {
+  const details = page.getByTestId('tool-rail');
+  if ((await details.getAttribute('aria-pressed')) === 'false') await details.click();
   const section = page.getByTestId(`panel-tab-${panel}`);
   if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click();
   await expect(section).toHaveAttribute('aria-expanded', 'true');
@@ -71,7 +73,22 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await page.keyboard.press(`${MOD}+Semicolon`);
   await expect(page.getByTestId('side-chat')).toBeVisible();
   await checkState(page, 'panel:side-chat');
-  await page.getByRole('button', { name: 'Close side chat' }).click();
+  await page.getByTestId('tile-close-side-chat').click();
+  await page.getByTestId('tool-files').click();
+  await expect(page.getByTestId('tile-files')).toBeVisible();
+  await checkState(page, 'panel:files');
+  const opening = app.waitForEvent('window');
+  await page.getByTestId('tile-popout-files').click();
+  const fileWindow = await opening;
+  await expect(fileWindow.getByTestId('files-placeholder')).toBeVisible();
+  await checkState(fileWindow, 'window:tool', { themeOwner: page });
+  await fileWindow.getByTestId('tile-popout-files').click();
+  await expect(page.getByTestId('files-placeholder')).toBeVisible();
+  await page.getByTestId('tool-preview').click();
+  await expect(page.getByTestId('tile-preview')).toBeVisible();
+  await checkState(page, 'panel:preview');
+  await page.getByTestId('tile-close-preview').click();
+  await page.getByTestId('tile-close-files').click();
   await checkState(page, 'row:userMessage');
   await checkState(page, 'row:agentMessage');
   await checkState(page, 'row:reasoning');
@@ -245,12 +262,15 @@ test('a subagent card, background tasks and the terminal panel', async ({
   await row.getByRole('button', { name: 'Output' }).click();
   await expect(row.getByTestId('bg-task-output')).toContainText('tick 3');
   await checkState(page, 'panel:background-tasks');
+  await railTab(page, 'background-tasks-card');
   await tasks.getByTestId('bg-task-stop').click();
 
   await page.keyboard.press('Control+Backquote');
   await expect(page.getByTestId('terminal-panel')).toBeVisible();
+  await expect(page.getByTestId('tile-background-tasks')).toBeVisible();
   await expect(page.getByRole('textbox', { name: /Terminal|终端/u })).toBeFocused();
   await checkState(page, 'panel:terminal');
+  await page.getByTestId('terminal-actions').click();
   await page.getByTestId('terminal-view-text').click();
   await expect(page.getByTestId('terminal-text-dialog')).toBeVisible();
   await checkState(page, 'dialog:terminal-text');

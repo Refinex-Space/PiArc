@@ -11,19 +11,7 @@
   position: relative;
 }
 .panel-area.workbench-rail,
-.panel-area.workbench-dock {
-  background: var(--piarc-surface-app);
-}
-.panel-area.workbench-rail {
-  flex: 0 1 auto;
-  max-width: max(35%, calc(100% - 340px));
-  min-width: 0;
-}
-.workbench-dock {
-  flex-shrink: 0;
-  max-height: 64%;
-}
-.workbench-rail .rail-sections {
+.panel-area.workbench-rail .rail-sections {
   padding: 0 var(--piarc-space-4);
   scrollbar-gutter: auto;
 }
@@ -33,44 +21,6 @@
 }
 .rail-section:last-child {
   border: 0;
-}
-.rail-section > h2 {
-  margin: 0;
-  font: inherit;
-}
-.rail-section > h2 > button,
-.rail-environment > summary {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--piarc-space-2);
-  padding: var(--piarc-space-2) 0;
-  background: transparent;
-  border: 0;
-  border-radius: var(--piarc-radius-sm);
-  color: var(--piarc-text-primary);
-  font-family: inherit;
-  font-size: var(--piarc-font-size-body);
-  font-weight: var(--piarc-font-weight-medium);
-  text-align: start;
-  cursor: pointer;
-}
-.rail-environment summary::-webkit-details-marker {
-  display: none;
-}
-.rail-section > h2 svg,
-.rail-environment > summary svg,
-.bg-task-history-toggle svg {
-  width: var(--piarc-space-3);
-  height: var(--piarc-space-3);
-  color: var(--piarc-text-secondary);
-  transition: transform var(--piarc-motion-fast) var(--piarc-motion-easing);
-}
-.rail-section button[aria-expanded='false'] > svg,
-.rail-environment:not([open]) > summary svg,
-.bg-task-history-toggle[aria-expanded='false'] svg {
-  transform: rotate(-90deg);
 }
 .rail-environment-row {
   display: flex;
@@ -96,33 +46,6 @@
 .rail-environment-row small {
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-font-size-small);
-}
-.dock-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--piarc-space-2);
-  padding: var(--piarc-space-1) var(--piarc-space-3);
-  border-bottom: 1px solid var(--piarc-border-subtle);
-}
-.dock-heading .panel-tabs {
-  align-items: center;
-  min-width: 0;
-  overflow-x: auto;
-  padding: 0;
-  border: 0;
-}
-.dock-heading .panel-tab {
-  flex: none;
-  padding: var(--piarc-space-1) var(--piarc-space-2);
-  font: inherit;
-}
-.dock-heading > .icon-button {
-  flex: none;
-}
-.workbench-rail > .panel-body,
-.workbench-dock > .panel-body {
-  overscroll-behavior: contain;
 }
 :root[data-app]
   .rail-section
@@ -178,7 +101,7 @@
   font-variant-numeric: tabular-nums;
 }
 :root[data-app] .workbench-rail .bg-task,
-:root[data-app] .workbench-dock .bg-task {
+:root[data-app] .tool-tile .bg-task {
   grid-template-columns: minmax(0, 1fr);
   background: var(--piarc-surface-app);
   border-radius: var(--piarc-radius-lg);
@@ -217,22 +140,39 @@
   font: inherit;
   font-size: var(--piarc-font-size-small);
 }
-@media (max-width: 860px) {
+
+.workspace-primary-frame {
+  container: session-frame / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--piarc-workbench-canvas);
+}
+.tool-header-slot {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+.tool-header-slot .terminal-tabs {
+  width: 100%;
+  border: 0;
+}
+.rail-backdrop {
+  display: none;
+}
+@container session-frame (max-width: 659px) {
   .main-row > .workbench-rail {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0 0 0 auto;
     max-width: min(100%, 420px);
     box-shadow: var(--piarc-shadow-overlay);
     z-index: 3;
   }
-}
-
-.rail-backdrop {
-  display: none;
-}
-@media (max-width: 860px) {
   .rail-backdrop {
     display: block;
     position: absolute;
@@ -241,8 +181,4 @@
     background: transparent;
     border: 0;
   }
-}
-
-.workbench-dock[hidden] {
-  display: none;
 }

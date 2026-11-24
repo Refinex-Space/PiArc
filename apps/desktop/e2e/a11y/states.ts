@@ -28,6 +28,7 @@ export const A11Y_STATES = [
   // Windows.
   { id: 'window:welcome', area: 'window', note: 'main window without a workspace' },
   { id: 'window:new-session', area: 'window', note: 'new session form of an open workspace' },
+  { id: 'window:tool', area: 'window', note: 'a detached tool with return and pin controls' },
   { id: 'window:conversation', area: 'window', note: 'a session after a turn, sidebar and rail' },
   {
     id: 'window:message-search',
@@ -136,7 +137,7 @@ export const A11Y_STATES = [
   },
   { id: 'approval:question', area: 'approval', note: 'question form' },
   { id: 'approval:plan', area: 'approval', note: 'plan card' },
-  // Rail cards and dock panels, one per registered panel.
+  // Session rail sections and independent tool tiles, one per registered panel.
   { id: 'panel:context', area: 'panel', panel: 'context', note: 'context card' },
   { id: 'panel:usage', area: 'panel', panel: 'usage', note: 'usage card' },
   { id: 'panel:tasks', area: 'panel', panel: 'tasks', note: 'task list card' },
@@ -162,6 +163,8 @@ export const A11Y_STATES = [
   },
   { id: 'panel:terminal', area: 'panel', panel: 'terminal', note: 'terminal panel' },
   { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
+  { id: 'panel:files', area: 'panel', panel: 'files', note: 'workspace files tile' },
+  { id: 'panel:preview', area: 'panel', panel: 'preview', note: 'session preview tile' },
   // Dialogs, one or more per file that renders `<Dialog>`.
   {
     id: 'dialog:workspace-search',

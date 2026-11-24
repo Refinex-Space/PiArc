@@ -39,8 +39,14 @@ test('Ctrl+` opens a terminal in the session directory; tabs open, rename, switc
   test.setTimeout(120_000);
   const { ws, terminal } = await openPanel(app, page, workspaces);
   await expect(page.getByTestId('terminal-input')).toBeFocused();
-  await run(page, 'pwd');
-  await waitForPanel(page, (text) => text.split('\n').includes(ws), 'the session directory');
+  // A long cwd wraps in the side pane. Compare the complete path in the shell itself.
+  const expected = "'" + ws.replaceAll("'", "'\\''") + "'";
+  await run(page, `test "$PWD" = ${expected} && printf 'cwd-%s\\n' matched`);
+  await waitForPanel(
+    page,
+    (text) => text.split('\n').includes('cwd-matched'),
+    'the session directory',
+  );
   // A job the shell started: closing the tab must end it too.
   await run(page, 'sleep 600 & echo PID=$!');
   const screen = await waitForPanel(page, (text) => /^PID=\d+$/m.test(text), 'the job id');
@@ -53,6 +59,18 @@ test('Ctrl+` opens a terminal in the session directory; tabs open, rename, switc
   await waitForPanel(page, (text) => text !== '', 'the second shell');
   await run(page, 'echo second-$((1+1))');
   await waitForPanel(page, (text) => text.split('\n').includes('second-2'), 'the second tab');
+
+  const tab = page.getByTestId('terminal-tab');
+  await tab.nth(1).focus();
+  await page.keyboard.press('Home');
+  await expect(tab.first()).toBeFocused();
+  await expect(tab.first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('End');
+  await expect(tab.nth(1)).toBeFocused();
+  await tab.nth(1).press('Shift+F10');
+  await expect(page.getByTestId('menu-terminal-rename-tab')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(tab.nth(1)).toBeFocused();
 
   // Renamed tabs keep their name; the program's title is used otherwise.
   await page.getByTestId('terminal-tab').nth(1).dblclick();
@@ -123,6 +141,7 @@ test('dragging, double and triple clicks select; Mod+C copies; the selection goe
   });
 
   // The selection becomes a chip in the message and its text goes to the model.
+  await page.getByTestId('terminal-actions').click();
   await page.getByTestId('terminal-attach').click();
   await expect(page.getByTestId('terminal-status')).toContainText(
     /added to the message|附加到消息/,
@@ -303,6 +322,7 @@ test('the terminal is focusable, labeled, and its screen can be read as text', a
   const input = page.getByRole('textbox', { name: /Terminal|终端/ });
   await expect(input).toBeFocused();
   await expect(page.getByRole('group', { name: /Terminal|终端/ })).toBeVisible();
+  await page.getByTestId('terminal-actions').click();
   await page.getByTestId('terminal-view-text').click();
   const text = page.getByTestId('terminal-screen-text');
   await expect(text).toBeFocused();

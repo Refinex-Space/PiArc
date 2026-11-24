@@ -10,7 +10,7 @@ import path from 'node:path';
 import { expect, test } from './sessions.js';
 import {
   frameRequests,
-  growDock,
+  widenTerminal,
   openPanel,
   panelScreen,
   PASTE,
@@ -70,8 +70,8 @@ test('vim, top and less render as Core says, before and after a resize', async (
     'main.rs': SOURCE,
     'long.txt': LONG,
   });
-  // Room for top's process table and a page of less.
-  await growDock(page, 260);
+  // Room for top's process columns and wide lines in less.
+  await widenTerminal(page, 260);
   await page.getByTestId('terminal-canvas').click();
   const evidence = async (name: string) => {
     const text = await settledPanel(app, page, terminal);

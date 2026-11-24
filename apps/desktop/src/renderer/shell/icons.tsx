@@ -166,3 +166,41 @@ export const FileIcon = () => (
     <path d="M3.4 2h6L13 5.8v8.1H3.4zM9 2.3v4h3.5" />
   </Icon>
 );
+
+export const GripIcon = () => (
+  <Icon>
+    <path
+      d="M5.5 3.5h.01m4.99 0h.01M5.5 8h.01m4.99 0h.01M5.5 12.5h.01m4.99 0h.01"
+      strokeWidth="2.4"
+    />
+  </Icon>
+);
+
+export const PreviewIcon = () => (
+  <Icon>
+    <path d="M3.5 2.6a.6.6 0 0 1 .9-.5l9 5.4a.6.6 0 0 1 0 1l-9 5.4a.6.6 0 0 1-.9-.5Z" />
+  </Icon>
+);
+export const GlobeIcon = () => (
+  <Icon>
+    <circle cx="8" cy="8" r="6.2" />
+    <ellipse cx="8" cy="8" rx="2.6" ry="6.2" />
+    <path d="M2 8h12" />
+  </Icon>
+);
+export const ExpandIcon = () => (
+  <Icon>
+    <path d="M9.5 2.5h4v4m0-4-4.3 4.3M6.5 13.5h-4v-4m0 4 4.3-4.3" />
+  </Icon>
+);
+export const RestoreIcon = () => (
+  <Icon>
+    <path d="M9 3.1v4h4m-4 0 4.4-4.4M7 12.9v-4H3m4 0-4.4 4.4" />
+  </Icon>
+);
+export const PopoutIcon = () => (
+  <Icon>
+    <rect x="5" y="2" width="9" height="8.5" rx="1.6" />
+    <path d="M5 5H3.6C2.7 5 2 5.7 2 6.6v5.7c0 .9.7 1.7 1.6 1.7h6c.9 0 1.6-.8 1.6-1.7v-1.8" />
+  </Icon>
+);

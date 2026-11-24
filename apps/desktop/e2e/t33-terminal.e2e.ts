@@ -36,6 +36,8 @@ test('a command run in a terminal is a terminal task the panel reads and stops',
   await expect(log).toContainText('built 中文\nall done');
   await screenshots(page, info, 'terminal-screen');
 
+  const details = page.getByTestId('tool-rail');
+  if ((await details.getAttribute('aria-pressed')) === 'false') await details.click();
   await task.getByTestId('bg-task-stop').click();
   await expect(task).toContainText(/Stopped|已停止/);
   await expect(task.getByTestId('bg-task-stop')).toHaveCount(0);

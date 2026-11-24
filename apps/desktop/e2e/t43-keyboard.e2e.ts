@@ -1,10 +1,11 @@
 // T43-A06 and A07 with the real Core, Agent Host and mock provider.
 // A06: only the keyboard: a new session and its first message, the four kinds of approval card,
 // the Changes panel and a comment, a setting in the settings window, into and out of the
-// terminal; Tab walks the regions in order (sidebar, main area, side panels, bottom panels)
+// terminal; Tab walks the regions in order (sidebar, main area, side panels, tool tiles)
 // with a visible focus ring; a dialog gives focus back to what opened it.
 // A07: reduced motion (system and the app's switch), more contrast and forced colors.
 // Screenshots go to tmp/evidence/T43/ with PIARC_EVIDENCE_TASK=T43.
+import type { BrowserWindow } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -48,8 +49,8 @@ function focusInfo(page: Page) {
       ? 'sidebar'
       : el.closest('[data-testid="panel-area-rail"]')
         ? 'rail'
-        : el.closest('[data-testid="panel-area-dock"]')
-          ? 'dock'
+        : el.closest('[data-testid="tile-changes"]')
+          ? 'tools'
           : el.closest('main')
             ? 'main'
             : 'other';
@@ -93,6 +94,10 @@ test('everything with the keyboard: session, approvals, Changes, settings and th
   test.setTimeout(240_000);
   await prefer(page, { key: 'language', value: 'en' });
   await writeFile(path.join(workspaces, 'outside 外部.txt'), 'outside\n');
+  const owner = await app.browserWindow(page);
+  await owner.evaluate((window: BrowserWindow) => {
+    window.setContentSize(1440, 820);
+  });
   const ws = await makeWorkspace(workspaces, 'keyboard 键盘', {});
   await openFolder(page, app, ws);
   await focusMain(app);
@@ -123,6 +128,11 @@ test('everything with the keyboard: session, approvals, Changes, settings and th
   await page.getByTestId('composer-input').focus();
   await page.keyboard.press(`${MOD}+Shift+KeyD`);
   await expect(page.getByTestId('changes-panel')).toBeVisible();
+  // Give the conversation and its session rail enough room for the full keyboard tour.
+  const divider = page.getByTestId('tile-divider-main');
+  await tabTo(page, divider);
+  await page.keyboard.press('End');
+  await expect(page.getByTestId('panel-area-rail')).toBeVisible();
   await page.evaluate(() => {
     (document.activeElement as HTMLElement | null)?.blur();
   });
@@ -132,10 +142,10 @@ test('everything with the keyboard: session, approvals, Changes, settings and th
     const info = await focusInfo(page);
     if (info !== null) walk.push(info);
   }
-  const order = ['sidebar', 'main', 'rail', 'dock'];
+  const order = ['sidebar', 'main', 'rail', 'tools'];
   const regions = walk.map((w) => w.region).filter((r) => r !== 'other');
   const entered = regions.filter((r, i) => r !== regions[i - 1]);
-  // Every region is reached, each from the one before it (Tab wraps from the bottom panels
+  // Every region is reached, each from the one before it (Tab wraps from the tool tiles
   // back to the sidebar).
   expect(new Set(entered)).toEqual(new Set(order));
   for (let i = 1; i < entered.length; i++) {

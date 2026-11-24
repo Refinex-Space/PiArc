@@ -17,7 +17,7 @@ registerPanel({
 
 registerPanel({
   id: 'background-tasks',
-  area: 'dock',
+  area: 'tool',
   title: 'panel.backgroundTasks',
   order: 45,
   when: (context) => context.sessionId !== undefined,

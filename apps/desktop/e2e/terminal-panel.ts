@@ -201,15 +201,15 @@ export function linkCalls(app: ElectronApplication): Promise<string[]> {
   return app.evaluate(() => (globalThis as Recorder).__terminalLinkCalls ?? []);
 }
 
-/** Makes the dock `by` pixels taller by dragging its edge. */
-export async function growDock(page: Page, by: number): Promise<void> {
-  const edge = page.locator('[data-testid="panel-area-dock"] > .resizer');
+/** Gives the full-height terminal more columns by dragging its left divider. */
+export async function widenTerminal(page: Page, by: number): Promise<void> {
+  const edge = page.getByTestId('tile-divider-main');
   const box = await edge.boundingBox();
-  if (box === null) throw new Error('no dock edge');
+  if (box === null) throw new Error('Missing main/tool divider');
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(x, y - by, { steps: 8 });
+  await page.mouse.move(x - by, y, { steps: 8 });
   await page.mouse.up();
 }

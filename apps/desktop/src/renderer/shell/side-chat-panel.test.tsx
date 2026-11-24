@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppEvent, EventListener } from '../../shared/ipc.js';
 import { DEFAULT_PREFERENCES } from '../../shared/preferences.js';
 import { AppProvider } from '../app/app-context.js';
-import { registerPanel } from './registry.js';
 import { Shell } from './Shell.js';
 
 const parent = 'session-one';
@@ -19,7 +18,6 @@ const abort = vi.fn();
 const prompt = vi.fn();
 let root: Root;
 let container: HTMLDivElement;
-let unregister: () => void;
 
 async function settle(action: () => void | Promise<void>): Promise<void> {
   await act(async () => {
@@ -38,7 +36,9 @@ function panel(): HTMLElement {
 }
 
 function button(label: string): HTMLButtonElement {
-  const found = [...panel().querySelectorAll('button')].find((item) => item.textContent === label);
+  const found = [...panel().querySelectorAll('button')].find(
+    (item) => (item.getAttribute('aria-label') ?? item.textContent) === label,
+  );
   if (found === undefined) throw new Error('Missing side chat action ' + label);
   return found;
 }
@@ -49,7 +49,7 @@ function key(code: string): void {
   );
 }
 
-async function send(question: string): Promise<void> {
+async function writeQuestion(question: string): Promise<void> {
   const input = element('[data-testid="side-chat-question"]');
   await settle(() => {
     // React observes a native user edit separately from the value it last rendered.
@@ -59,6 +59,10 @@ async function send(question: string): Promise<void> {
     );
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
+}
+
+async function send(question: string): Promise<void> {
+  await writeQuestion(question);
   await settle(() => {
     button('Send').click();
   });
@@ -102,13 +106,6 @@ describe('side chat in a running session window', () => {
     });
     container = document.createElement('div');
     document.body.append(container);
-    unregister = registerPanel({
-      id: 'other-side-chat-test',
-      area: 'dock',
-      title: 'panel.changes',
-      order: 99,
-      render: () => null,
-    });
     root = createRoot(container);
     await settle(() => {
       root.render(
@@ -157,13 +154,45 @@ describe('side chat in a running session window', () => {
     act(() => {
       root.unmount();
     });
-    unregister();
     container.remove();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  it('stops only the side request and preserves its answer and clipboard action across dock tabs', async () => {
+  it('sends a plain Enter once, while Shift+Enter and IME confirmation stay in the side editor', async () => {
+    await settle(() => {
+      key('Semicolon');
+    });
+    const input = element('[data-testid="side-chat-question"]');
+    ask.mockResolvedValueOnce(complete('Local answer'));
+    await writeQuestion('A quick question');
+    const enter = (options: KeyboardEventInit) => {
+      input.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...options }),
+      );
+    };
+    await settle(() => {
+      enter({ shiftKey: true });
+      enter({ isComposing: true });
+      const confirming = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true,
+      });
+      Object.defineProperty(confirming, 'keyCode', { value: 229 });
+      input.dispatchEvent(confirming);
+    });
+    expect(ask).not.toHaveBeenCalled();
+    await settle(() => {
+      enter({});
+    });
+    expect(ask).toHaveBeenCalledOnce();
+    expect(element('[data-testid="side-chat-answer"]').textContent).toBe('Local answer');
+    expect(input.getAttribute('placeholder')).toBe('Ask a follow-up…');
+    expect(prompt).not.toHaveBeenCalled();
+  });
+
+  it('stops only the side request and preserves its answer and clipboard action while a sibling tile is maximized', async () => {
     await settle(() => {
       key('Semicolon');
     });
@@ -178,17 +207,21 @@ describe('side chat in a running session window', () => {
     });
     expect(control.mock.calls).toEqual([[parent, id, false]]);
     expect(abort).not.toHaveBeenCalled();
-    const other = element('[data-testid="panel-tab-other-side-chat-test"]');
     await settle(() => {
-      other.click();
+      element('[data-testid="tool-files"]').click();
     });
-    expect(panel().closest('[hidden]')).not.toBeNull();
+    expect(element('[data-testid="tile-files"]')).toBeTruthy();
+    expect(panel().closest('[hidden]')).toBeNull();
+    await settle(() => {
+      element('[data-testid="tile-maximize-files"]').click();
+    });
+    expect(panel().closest('[hidden], [inert]')).not.toBeNull();
     const answer = 'Partial answer <as text>';
     await settle(() => {
       reply.resolve(complete(answer, true));
     });
     await settle(() => {
-      element('[data-testid="panel-tab-side-chat"]').click();
+      element('[data-testid="tile-maximize-files"]').click();
     });
     expect(element('[data-testid="side-chat-answer"]').textContent).toBe(answer);
     expect(panel().textContent).toContain('Answer stopped');
@@ -230,7 +263,7 @@ describe('side chat in a running session window', () => {
     await send('Old question');
     const first = ask.mock.calls[0]?.[1];
     await settle(() => {
-      button('Close side chat').click();
+      element('[data-testid="tile-close-side-chat"]').click();
     });
     expect(control.mock.calls).toEqual([[parent, first, true]]);
     expect(container.querySelector('[data-testid="side-chat"]')).toBeNull();

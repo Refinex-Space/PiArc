@@ -9,9 +9,9 @@ test('opens one window with the sidebar and the main area', async ({ app, page }
   await expect(page).toHaveTitle('PiArc');
   await expect(page.getByTestId('shell-sidebar')).toBeVisible();
   await expect(page.getByTestId('shell-main')).toBeVisible();
-  // The right rail and the dock are registered containers: nothing registered, nothing shown.
+  // A new conversation starts without session details or open tool tiles.
   await expect(page.getByTestId('panel-area-rail')).toHaveCount(0);
-  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="tile-body-"]')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('window.png') });
 });
 

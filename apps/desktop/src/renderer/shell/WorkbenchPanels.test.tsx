@@ -2,25 +2,32 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { registerPanel, showPanel, type PanelContext } from './registry.js';
+import { panelsFor, registerPanel, showPanel, usePanels, type PanelContext } from './registry.js';
 import { usePanelPresentation, WorkbenchPanels } from './WorkbenchPanels.js';
 
-function DockSelection() {
-  const { dockId, closeDock } = usePanelPresentation();
+function ToolSelection({ context }: { context: PanelContext }) {
+  const { openIds, closePanel } = usePanelPresentation();
+  const available = panelsFor(usePanels(), 'tool', context);
+  const visible = openIds.filter((id) => available.some((spec) => spec.id === id));
   return (
-    <button type="button" onClick={closeDock}>
-      {dockId}
+    <button
+      type="button"
+      onClick={() => {
+        closePanel('plan');
+      }}
+    >
+      {visible.join(',')}
     </button>
   );
 }
 
-it('keeps the selected plan across the gap between approval removal and publication, until closed or navigated away', () => {
+it('keeps the selected plan across the gap between approval removal and publication, and restores only the owning session', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const remove = registerPanel({
     id: 'plan',
     title: 'panel.plan',
     order: 1,
-    area: 'dock',
+    area: 'tool',
     when: (ctx) => ctx.plan === true,
     render: () => null,
   });
@@ -30,7 +37,7 @@ it('keeps the selected plan across the gap between approval removal and publicat
     act(() => {
       root.render(
         <WorkbenchPanels context={context}>
-          <DockSelection />
+          <ToolSelection context={context} />
         </WorkbenchPanels>,
       );
     });
@@ -57,8 +64,9 @@ it('keeps the selected plan across the gap between approval removal and publicat
       showPanel('plan');
     });
     update({ sessionId: 'second', plan: true });
-    update(approved);
     expect(host.textContent).toBe('');
+    update(approved);
+    expect(host.textContent).toBe('plan');
   } finally {
     act(() => {
       root.unmount();

@@ -38,7 +38,7 @@ function PendingPlan({ request }: { readonly request: ApprovalRequest }) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
   const pickSelection = () => {
-    const selection = window.getSelection();
+    const selection = text.current?.ownerDocument.getSelection() ?? null;
     const container = text.current;
     if (selection === null || selection.rangeCount === 0 || container === null) return;
     const found = selectionRange(container, selection.getRangeAt(0));
@@ -52,7 +52,7 @@ function PendingPlan({ request }: { readonly request: ApprovalRequest }) {
     if (planComments.add(request.requestId, plan, range.start, range.end, draft)) {
       setRange(undefined);
       setDraft('');
-      window.getSelection()?.removeAllRanges();
+      text.current?.ownerDocument.getSelection()?.removeAllRanges();
     } else {
       setError(t('plan.panel.overlap'));
     }

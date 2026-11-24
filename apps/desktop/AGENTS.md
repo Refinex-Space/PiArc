@@ -39,7 +39,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 原型页 `#/event-probe`、`#/transcript-lab`、`#/terminal-lab` 经 `globalThis.__piarc*` 给 L4 与基准用（类型在 `src/shared/`），只在开发构建里（`renderer/test-pages.tsx`，T45 起发布构建不带；终端原型页只能接测试钩子创建的终端）。
 - 正式会话与原型共用 transcript 和 composer。行类型、历史窗口与滚动参数见 [transcript/AGENTS.md](src/renderer/transcript/AGENTS.md)，提及、附件与键盘约定见 [composer/AGENTS.md](src/renderer/composer/AGENTS.md)。
 - 窗口（T18，ADR-0029）：主窗口的根是 `src/renderer/shell/Shell.tsx`（侧栏、主区、注册式右栏与面板区、对话框、提醒），设置是同一工作台内 `#/settings` 的原生模态面板（ADR-0074，`src/renderer/settings/SettingsModal.tsx`、`SettingsApp.tsx`）；两者共用 `src/renderer/app/app-context.tsx`（平台、偏好、翻译）与 `app.css`（只读令牌；元素级规则写在 `:root[data-app]` 之下，`main.tsx` 只给工作台设 `data-app`，原型页不受影响）。主进程的窗口、菜单、偏好、通知在 `src/main/app-shell.ts`、`menu.ts`、`preferences.ts`、`platform/attention.ts`、`platform/window-chrome.ts`；会话、工作区与信任命令在 `src/main/core/session-ipc.ts`。
-- 注册点：右栏与面板区 `registerPanel`（`src/renderer/shell/registry.ts`，area 为 `rail` 或 `dock`，没有注册内容的区域不渲染）；设置页 `registerSettingsPage`（`src/renderer/settings/registry.ts`）；快捷键在 `src/shared/keybindings.ts` 的 `COMMANDS` 追加一行（id、`Mod` 记法默认键、标签消息 id），渲染进程的 `use-commands.ts` 与主进程菜单自动跟随；界面字符串在 `src/shared/i18n/en.ts` 与 `zh-CN.ts` 各加一条（类型检查保证两边键相同），用 `useT()`（渲染进程）或 `AppShell.t()`（主进程）。
+- 注册点：会话详情栏与右侧工具分块 `registerPanel`（`src/renderer/shell/registry.ts`，area 为 `rail` 或 `tool`，没有注册内容的区域不渲染）；设置页 `registerSettingsPage`（`src/renderer/settings/registry.ts`）；快捷键在 `src/shared/keybindings.ts` 的 `COMMANDS` 追加一行（id、`Mod` 记法默认键、标签消息 id），渲染进程的 `use-commands.ts` 与主进程菜单自动跟随；界面字符串在 `src/shared/i18n/en.ts` 与 `zh-CN.ts` 各加一条（类型检查保证两边键相同），用 `useT()`（渲染进程）或 `AppShell.t()`（主进程）。
 - 打包在 `packaging/`（`Resources/agent-host/` 布局、分层签名、DMG maker、Velopack 绑定，架构第 5.6、13.2 节）；图标取 `design/brand/`，bundle id 与 AppUserModelID 取应用标识（`app-identity.mjs` 与 Rust 的定义由测试保持一致）。
 
 ## 不变量
@@ -126,3 +126,5 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - T49：会话内的 `Mod+;` 或 `/btw` 打开停靠面板。主进程仅通过 `askSideChat`、`controlSideChat` 转发，并在页面离开时释放内存对话。T49 L4 用 `PIARC_EVIDENCE_TASK=T49 npx playwright test -c apps/desktop/playwright.config.ts t49- --project dev`。平台动作的原生构建见 [macOS 快捷指令](../../docs/engineering/app-intents.md)，跳转列表见 [platform](src/main/platform/AGENTS.md)。
 
 - 架构第 3.4、6.11、7.6、8.1–8.8、10.2、10.3、11 章；ADR-0013、ADR-0014、ADR-0017、ADR-0018 第 1、6 条、ADR-0022、ADR-0023、ADR-0029、ADR-0051；`docs/spikes/S10-electron-security.md`、`S02-napi-event-channel.md`、`S01-transcript-composer.md`、`S07-terminal.md`；`docs/engineering/testing.md` 第 9 节。
+
+- 右侧工具按 ADR-0075 注册。`WorkbenchPanels` 管理每个会话打开的工具，`ToolTiles` 管理位置、比例、拖动与放大，`ToolHeaderSlot` 将终端和侧聊标签接到同一标题行。工具弹出后仍由原工作台持有 React 实例与 Core 权限；子窗口只承载 `tool-window.html` 的空壳。跨文档焦点、菜单、终端画布及可见性应使用工具实际所在的 document。侧聊的每个标签持有独立内存对话，同一工作台最多 8 个；关闭所属标签时释放。

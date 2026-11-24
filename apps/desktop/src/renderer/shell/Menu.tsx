@@ -1,3 +1,4 @@
+import { documentWindow, useSurfaceDocument } from '../app/surface-document.js';
 // A small popup menu (sidebar row and group actions): opens from its button or with a right
 // click, arrow keys move, Enter or a click runs an item, Escape or a click outside closes it.
 import {
@@ -81,6 +82,8 @@ export function MenuPopup({
   readonly label: string;
   readonly testId?: string;
 }) {
+  const ownerDoc = useSurfaceDocument();
+  const win = documentWindow(ownerDoc);
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [query, setQuery] = useState('');
@@ -99,9 +102,9 @@ export function MenuPopup({
   useLayoutEffect(() => {
     const width = ref.current?.offsetWidth ?? 0;
     setLeft(
-      at.flipLeft !== undefined && at.x + width > window.innerWidth ? at.flipLeft - width : at.x,
+      at.flipLeft !== undefined && at.x + width > win.innerWidth ? at.flipLeft - width : at.x,
     );
-  }, [at, choices]);
+  }, [at, choices, win]);
   const closeChild = useCallback(() => {
     setChild(undefined);
     (filter.current ?? ref.current)?.focus();
@@ -109,7 +112,7 @@ export function MenuPopup({
   const activeChild = child && items.find((item) => item.id === child.id);
   const openChild = (item: MenuItem, index: number, keyboard: boolean) => {
     if (!item.submenu || item.disabled) return;
-    const anchor = document.getElementById(`${id}-${String(index)}`);
+    const anchor = ownerDoc.getElementById(`${id}-${String(index)}`);
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
     setChild({ id: item.id, at: { x: rect.right, y: rect.top, flipLeft: rect.left }, keyboard });
@@ -117,47 +120,50 @@ export function MenuPopup({
   // Closing gives the focus back to what had it, when nothing else took it (an item that opens
   // a rename field keeps that field focused): otherwise it falls to the page body (R5).
   useEffect(() => {
-    const previous = document.activeElement;
+    const previous = ownerDoc.activeElement;
     return () => {
-      const now = document.activeElement;
-      if ((now === null || now === document.body) && previous instanceof HTMLElement) {
+      const now = ownerDoc.activeElement;
+      if (
+        (now === null || now === ownerDoc.body) &&
+        (previous instanceof HTMLElement || previous instanceof win.HTMLElement)
+      ) {
         if (previous.isConnected) previous.focus();
       }
     };
-  }, []);
+  }, [ownerDoc, win]);
   useEffect(() => {
     if (!branch || branch.keyboard) (filter.current ?? ref.current)?.focus();
     const away = (event: MouseEvent) => {
       if (
-        !(event.target instanceof Element) ||
+        !(event.target instanceof Element || event.target instanceof win.Element) ||
         event.target.closest<HTMLElement>('[data-menu-tree]')?.dataset.menuTree !== group
       ) {
         dismiss();
       }
     };
-    window.addEventListener('mousedown', away, true);
-    window.addEventListener('blur', dismiss);
+    win.addEventListener('mousedown', away, true);
+    win.addEventListener('blur', dismiss);
     return () => {
-      window.removeEventListener('mousedown', away, true);
-      window.removeEventListener('blur', dismiss);
+      win.removeEventListener('mousedown', away, true);
+      win.removeEventListener('blur', dismiss);
     };
-  }, [branch?.keyboard, dismiss, group]);
+  }, [branch?.keyboard, dismiss, group, win]);
   useEffect(() => {
     const repositioned = (event: Event) => {
       if (
-        event.target instanceof Element &&
+        (event.target instanceof Element || event.target instanceof win.Element) &&
         event.target.closest<HTMLElement>('[data-menu-tree]')?.dataset.menuTree === group
       )
         return;
       dismiss();
     };
-    window.addEventListener('resize', repositioned);
-    document.addEventListener('scroll', repositioned, true);
+    win.addEventListener('resize', repositioned);
+    ownerDoc.addEventListener('scroll', repositioned, true);
     return () => {
-      window.removeEventListener('resize', repositioned);
-      document.removeEventListener('scroll', repositioned, true);
+      win.removeEventListener('resize', repositioned);
+      ownerDoc.removeEventListener('scroll', repositioned, true);
     };
-  }, [dismiss, group]);
+  }, [dismiss, group, win, ownerDoc]);
   const run = (item: MenuItem | undefined, keyboard = true) => {
     if (item !== undefined && item.disabled !== true) {
       if (item.submenu) openChild(item, items.indexOf(item), keyboard);
@@ -187,7 +193,7 @@ export function MenuPopup({
         const step = event.key === 'ArrowDown' ? 1 : -1;
         const next = (active + step + items.length) % items.length;
         setActive(next);
-        revealListOption(document.getElementById(`${id}-${String(next)}`));
+        revealListOption(ownerDoc.getElementById(`${id}-${String(next)}`));
         break;
       }
       case 'ArrowRight': {
@@ -204,7 +210,7 @@ export function MenuPopup({
       case 'End': {
         const next = event.key === 'Home' ? 0 : Math.max(0, items.length - 1);
         setActive(next);
-        revealListOption(document.getElementById(`${id}-${String(next)}`));
+        revealListOption(ownerDoc.getElementById(`${id}-${String(next)}`));
         break;
       }
       case 'Enter':

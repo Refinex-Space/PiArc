@@ -1,4 +1,4 @@
-// The main window (architecture section 8.2): sidebar | main area (+ right rail) over the dock.
+// The main window (architecture section 8.2): sidebar | conversation (including session rail) | session tools.
 // Owns the window's presentation state (`ui.tsx`) and connects the store to Core's events.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -26,16 +26,16 @@ import {
 import { NoticeBar } from './NoticeBar.js';
 import { WorktreeCleanupNotices, folderDrop, useLaunchTargets } from './worktree-ui.js';
 import { PageBoundary } from './PageBoundary.js';
-import { DockArea, RailArea, SessionTools, WorkbenchPanels } from './PanelAreas.js';
+import { RailArea } from './PanelAreas.js';
+import { SessionTools, SessionTileWorkspace, WorkbenchPanels } from './WorkbenchPanels.js';
 import type { PanelContext } from './registry.js';
 import './harness-panels.js';
 import './task-panels.js';
 import './SideChat.js';
 import '../changes/panels.js';
 import '../terminal/panels.js';
-import { toggleTerminalPanel, useTerminalPanelOpen } from '../terminal/panel-state.js';
-import { toggleChangesPanel, useChangesPanelOpen } from '../changes/panel-state.js';
-import { showPanel } from './registry.js';
+import { toggleChangesPanel } from '../changes/panel-state.js';
+import { showPanel, togglePanel } from './registry.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
 import { CommandPalette } from './CommandPalette.js';
 import { requestCommand } from './command-requests.js';
@@ -49,21 +49,7 @@ import { UiContext, type Toast, type TrustMode, type Ui, type View } from './ui.
 import { useAttention } from './use-attention.js';
 import { useCommands } from './use-commands.js';
 
-/** Whether focus is in the bottom panels (a panel that closes takes it away). */
-function dockHasFocus(): boolean {
-  return document.activeElement?.closest('[data-testid="panel-area-dock"]') != null;
-}
-
-/** After the panel that had focus closed: the conversation's message box, not the page. */
-function focusMessageBox(): void {
-  requestAnimationFrame(() => {
-    document.querySelector<HTMLElement>('.conversation .composer-editor')?.focus();
-  });
-}
-
-/** The rail's width and the dock's height bounds (px). */
 const RAIL_WIDTH = { min: 240, max: 560 } as const;
-const DOCK_HEIGHT = { min: 120, max: 800 } as const;
 
 interface TrustRequest {
   readonly workspace: string;
@@ -76,8 +62,6 @@ function usePanelContext(store: AppStore, sessionId: string | undefined): PanelC
   const harness = useHarnessOf(store, sessionId);
   const session = useSessionOf(store, sessionId);
   const pendingPlan = session?.approvals.some((r) => r.kind === 'plan');
-  const changes = useChangesPanelOpen();
-  const terminal = useTerminalPanelOpen();
   const tasks = useTasksOf(store);
   const backgroundTasks =
     sessionId !== undefined && tasks.some((t) => t.ownerSessionId === sessionId);
@@ -86,11 +70,9 @@ function usePanelContext(store: AppStore, sessionId: string | undefined): PanelC
       sessionId,
       tasks: (harness?.todos.length ?? 0) > 0,
       plan: harness?.plan !== undefined || pendingPlan === true,
-      changes,
       backgroundTasks,
-      terminal,
     }),
-    [sessionId, harness, pendingPlan, changes, backgroundTasks, terminal],
+    [sessionId, harness, pendingPlan, backgroundTasks],
   );
 }
 
@@ -159,11 +141,7 @@ export function Shell() {
       query.removeEventListener('change', update);
     };
   }, []);
-  const [sideSession, setSideSession] = useState<string>();
   const selected = view.kind === 'session' ? view.id : undefined;
-  useEffect(() => {
-    if (sideSession !== selected) setSideSession(undefined);
-  }, [sideSession, selected]);
   const [viewNonce, setViewNonce] = useState(0);
   const [layout, setLayout] = useState<Layout>(() => loadLayout(localStore()));
   const collapsed = narrow ? !sidebarPeek : layout.sidebarCollapsed;
@@ -433,7 +411,6 @@ export function Shell() {
       }
       case 'session.sideChat':
         if (selected && !shortcutsOpen) {
-          setSideSession(selected);
           showPanel('side-chat');
         }
         break;
@@ -476,18 +453,10 @@ export function Shell() {
         }
         break;
       case 'changes.toggle':
-        if (view.kind === 'session') {
-          const inside = dockHasFocus();
-          if (toggleChangesPanel()) showPanel('changes');
-          else if (inside) focusMessageBox();
-        }
+        if (selected) toggleChangesPanel();
         break;
       case 'terminal.toggle':
-        if (view.kind === 'session') {
-          const inside = dockHasFocus();
-          if (toggleTerminalPanel()) showPanel('terminal');
-          else if (inside) focusMessageBox();
-        }
+        if (selected) togglePanel('terminal');
         break;
       case 'app.settings':
         void window.piarc.openSettings();
@@ -531,19 +500,7 @@ export function Shell() {
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
   };
-  const baseContext = usePanelContext(store, selected);
-  const context =
-    sideSession && sideSession === selected
-      ? {
-          ...baseContext,
-          sideChat: {
-            close: () => {
-              setSideSession(undefined);
-              focusMessageBox();
-            },
-          },
-        }
-      : baseContext;
+  const context = usePanelContext(store, selected);
   return (
     <StoreContext.Provider value={store}>
       <UiContext.Provider value={ui}>
@@ -617,59 +574,49 @@ export function Shell() {
               onClick={toggleSidebar}
             />
           )}
-          <WorkbenchPanels context={context}>
-            <div className="workspace-area" inert={narrow && sidebarPeek}>
-              <WorkbenchHeader sessionId={selected} collapsed={collapsed} history={history}>
-                <SessionTools context={context} />
-              </WorkbenchHeader>
-              <div className="main-row">
-                <main className="main" data-testid="shell-main">
-                  <NoticeBar />
-                  <WorktreeCleanupNotices />
-                  <PageBoundary
-                    key={view.kind === 'home' ? `home:${String(viewNonce)}` : view.id}
-                    message={t('shell.pageFailed')}
-                  >
-                    {view.kind === 'home' ? (
-                      <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
-                    ) : (
-                      <Conversation
-                        covered={settingsOpen}
-                        id={view.id}
-                        modeButton={modeButton}
-                        modelButton={modelButton}
-                        effortButton={effortButton}
-                      />
-                    )}
-                  </PageBoundary>
-                </main>
-                <RailArea
-                  context={context}
-                  size={layout.railWidth}
-                  min={RAIL_WIDTH.min}
-                  max={RAIL_WIDTH.max}
-                  onResize={(size) => {
-                    setLayout((current) => ({
-                      ...current,
-                      railWidth: Math.min(RAIL_WIDTH.max, Math.max(RAIL_WIDTH.min, size)),
-                    }));
-                  }}
-                />
-              </div>
-              <DockArea
-                context={context}
-                size={layout.dockHeight}
-                min={DOCK_HEIGHT.min}
-                max={DOCK_HEIGHT.max}
-                onResize={(size) => {
-                  setLayout((current) => ({
-                    ...current,
-                    dockHeight: Math.min(DOCK_HEIGHT.max, Math.max(DOCK_HEIGHT.min, size)),
-                  }));
-                }}
-              />
-            </div>
-          </WorkbenchPanels>
+          <div className="workspace-area" inert={narrow && sidebarPeek}>
+            <WorkbenchPanels context={context}>
+              <SessionTileWorkspace context={context}>
+                <WorkbenchHeader sessionId={selected} collapsed={collapsed} history={history}>
+                  <SessionTools context={context} />
+                </WorkbenchHeader>
+                <div className="main-row">
+                  <main className="main" data-testid="shell-main">
+                    <NoticeBar />
+                    <WorktreeCleanupNotices />
+                    <PageBoundary
+                      key={view.kind === 'home' ? `home:${String(viewNonce)}` : view.id}
+                      message={t('shell.pageFailed')}
+                    >
+                      {view.kind === 'home' ? (
+                        <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
+                      ) : (
+                        <Conversation
+                          covered={settingsOpen}
+                          id={view.id}
+                          modeButton={modeButton}
+                          modelButton={modelButton}
+                          effortButton={effortButton}
+                        />
+                      )}
+                    </PageBoundary>
+                  </main>
+                  <RailArea
+                    context={context}
+                    size={layout.railWidth}
+                    min={RAIL_WIDTH.min}
+                    max={RAIL_WIDTH.max}
+                    onResize={(size) => {
+                      setLayout((current) => ({
+                        ...current,
+                        railWidth: Math.min(RAIL_WIDTH.max, Math.max(RAIL_WIDTH.min, size)),
+                      }));
+                    }}
+                  />
+                </div>
+              </SessionTileWorkspace>
+            </WorkbenchPanels>
+          </div>
         </div>
         <Toasts />
         {paletteOpen && (

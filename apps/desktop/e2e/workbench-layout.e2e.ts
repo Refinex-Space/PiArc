@@ -18,7 +18,7 @@ test('the composer stays on its reading axis through navigation and panel toggle
   await expect(page.locator('.composer-box')).toHaveCSS('width', '768px');
   await expect(page.locator('.composer-box')).toHaveCSS('height', '46px');
   await expect(page.locator('.environment-card')).toHaveCSS('width', '320px');
-  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="tile-body-"]')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('new-session.png') });
   await startSession(page, 'Check the workspace', 't18-chat');
   await idle(page);

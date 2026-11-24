@@ -13,7 +13,7 @@ import {
   cellPoint,
   COPY,
   frameRequests,
-  growDock,
+  widenTerminal,
   isAlive,
   LINK_MODIFIER,
   linkCalls,
@@ -143,6 +143,7 @@ test('selection copies with Ctrl+C or Ctrl+Shift+C; without one Ctrl+C interrupt
     await expect.poll(() => readClipboard(app)).toBe('second line here');
   });
 
+  await page.getByTestId('terminal-actions').click();
   await page.getByTestId('terminal-attach').click();
   await expect(page.locator('.snippet-chip')).toContainText('1 line');
   await typeInComposer(page, ' What is this?');
@@ -276,7 +277,7 @@ test('vim, a PowerShell process table and less render as Core says, before and a
       (_, i) => `line ${String(i + 1)} of the long file`,
     ).join('\n'),
   });
-  await growDock(page, 260);
+  await widenTerminal(page, 260);
   await page.getByTestId('terminal-canvas').click();
   const evidence = async (name: string) => {
     const text = await settledPanel(app, page, terminal);

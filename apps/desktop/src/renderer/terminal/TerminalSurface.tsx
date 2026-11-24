@@ -1,3 +1,4 @@
+import { documentWindow, useSurfaceDocument } from '../app/surface-document.js';
 // One terminal on screen (T34): a `TerminalController` fitted to its box, attached to Core's
 // terminal `terminalId`. Only the panel's visible tab mounts a surface, so a hidden tab or a
 // closed panel pulls no frames; mounting again (another tab, a reload) starts with one full
@@ -64,6 +65,7 @@ export function TerminalSurface({
   /** A new value moves the focus into the terminal. */
   readonly focusNonce: number;
 }) {
+  const ownerDoc = useSurfaceDocument();
   const { keyPlatform, preferences } = useApp();
   const host = useRef<HTMLDivElement>(null);
   const controller = useRef<TerminalController | null>(null);
@@ -101,7 +103,9 @@ export function TerminalSurface({
       if (event.type === 'output') {
         view.wake();
       } else if (event.type === 'clipboard') {
-        void navigator.clipboard.writeText(event.text).catch(() => undefined);
+        void documentWindow(ownerDoc)
+          .navigator.clipboard.writeText(event.text)
+          .catch(() => undefined);
       }
     });
     return () => {
@@ -112,7 +116,7 @@ export function TerminalSurface({
       view.dispose();
     };
     // The view follows the label and handlers through refs; a new terminal is a new view.
-  }, [terminalId, keyPlatform]);
+  }, [terminalId, keyPlatform, ownerDoc]);
 
   // The theme's colors follow the appearance settings (the app's and the system's).
   useEffect(() => {
@@ -123,11 +127,11 @@ export function TerminalSurface({
       motion === 'on' ||
         (motion === 'system' && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
     );
-  }, [preferences.appearance, appearance]);
+  }, [preferences.appearance, appearance, ownerDoc]);
 
   useEffect(() => {
     if (focusNonce > 0) controller.current?.focus();
-  }, [focusNonce]);
+  }, [focusNonce, ownerDoc]);
 
   useEffect(() => {
     controller.current?.setLabel(label);

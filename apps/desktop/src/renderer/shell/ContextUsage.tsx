@@ -106,6 +106,21 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
   const turn = useTurnInfo(sessionId);
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const percent = usage === undefined ? undefined : percentOf(usage);
+  const categories = usage
+    ? CATEGORY_ORDER.filter((category) => usage.categories[category] > 0).sort(
+        (left, right) => usage.categories[right] - usage.categories[left],
+      )
+    : [];
+  const free = usage ? Math.max(0, usage.contextWindow - usage.tokens) : 0;
+  const shareOf = (tokens: number, capacity: number) => {
+    const share = tokens / capacity;
+    return format.number(
+      share,
+      share > 0 && share < 0.001
+        ? { style: 'percent', maximumSignificantDigits: 2 }
+        : { style: 'percent', maximumFractionDigits: 1 },
+    );
+  };
   return (
     <div className="context-panel" data-testid="context-panel" data-level={levelOf(percent)}>
       {usage === undefined || percent === undefined ? (
@@ -114,13 +129,17 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
         <>
           <div className="context-summary">
             <strong data-testid="context-percent">{t('context.percent', { percent })}</strong>
-            <span className="context-window" aria-hidden="true">
+            <span
+              className="context-window"
+              aria-hidden="true"
+              title={t('context.tokens', { tokens: usage.tokens, window: usage.contextWindow })}
+            >
               {format.number(usage.tokens, { notation: 'compact' })} /{' '}
               {format.number(usage.contextWindow, { notation: 'compact' })}
             </span>
           </div>
           <div className="context-meter" aria-hidden="true">
-            {CATEGORY_ORDER.map((category) => (
+            {categories.map((category) => (
               <span
                 key={category}
                 className={`context-swatch swatch-${category}`}
@@ -131,31 +150,36 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
               />
             ))}
           </div>
-          <p className="context-tokens muted">
-            {t('context.tokens', { tokens: usage.tokens, window: usage.contextWindow })} ·{' '}
-            {t(usage.source === 'provider' ? 'context.source.provider' : 'context.source.estimate')}
-          </p>
+          <span className="visually-hidden">
+            {t('context.tokens', { tokens: usage.tokens, window: usage.contextWindow })}
+          </span>
           <ul className="context-categories" data-testid="context-categories">
-            {CATEGORY_ORDER.filter(
-              (category) => usage.categories[category] > 0 || category !== 'unclassified',
-            ).map((category) => {
+            {categories.map((category) => {
               const tokens = usage.categories[category];
               return (
                 <li key={category} className="context-category" data-category={category}>
                   <span className={`context-swatch swatch-${category}`} aria-hidden="true" />
                   <span className="context-category-name">{t(`context.category.${category}`)}</span>
                   <span className="context-category-tokens">{format.number(tokens)}</span>
-                  <span className="context-share">
-                    {format.number(tokens / usage.contextWindow, {
-                      style: 'percent',
-                      maximumFractionDigits: 1,
-                    })}
-                  </span>
+                  <span className="context-share">{shareOf(tokens, usage.contextWindow)}</span>
                 </li>
               );
             })}
+            <li className="context-category" data-category="free">
+              <span className="context-swatch swatch-free" aria-hidden="true" />
+              <span className="context-category-name">{t('context.free')}</span>
+              <span className="context-category-tokens">{format.number(free)}</span>
+              <span className="context-share">{shareOf(free, usage.contextWindow)}</span>
+            </li>
           </ul>
-          <AutoCompactLine usage={usage} />
+          <div className="context-meta">
+            <span>
+              {t(
+                usage.source === 'provider' ? 'context.source.provider' : 'context.source.estimate',
+              )}
+            </span>
+            <AutoCompactLine usage={usage} />
+          </div>
           {usage.serverFallback === true && <p role="status">{t('context.serverFallback')}</p>}
         </>
       )}

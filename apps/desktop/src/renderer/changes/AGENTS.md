@@ -7,7 +7,7 @@
 | 部分 | 位置 | 说明 |
 |---|---|---|
 | 回退对话框 | `RewindDialog.tsx`、`rewind.ts` | 入口是用户消息行的"回退到这里"与 `/rewind`（Core 的内置命令，`CommandAction::Rewind`，先列出当前分支的消息）。四个选项、要恢复或删除的文件、冲突逐个选"保留 / 覆盖"、Bash 说明；执行后列逐文件结果并提供撤销。纯逻辑（选项、请求、结果解析）在 `rewind.ts` 并有单测 |
-| Changes 面板与右栏卡片 | `ChangesPanel.tsx`、`DiffBody.tsx`、`panels.tsx`、`panel-state.ts` | 卡片经 `registerPanel` 注册在右栏（每个会话），面板在停靠区，开关状态只在 `panel-state.ts`；快捷键 `changes.toggle`（Mod+Shift+D，`shared/keybindings.ts`） |
+| Changes 面板与右栏卡片 | `ChangesPanel.tsx`、`DiffBody.tsx`、`panels.tsx`、`panel-state.ts` | 卡片经 `registerPanel` 注册在右栏（每个会话），面板作为右侧工具注册，开关和位置由工作台管理，`panel-state.ts` 转发改动卡和快捷键的打开请求；快捷键 `changes.toggle`（Mod+Shift+D，`shared/keybindings.ts`） |
 | 分支切换 | `BranchSwitcher.tsx`、`use-branch-actions.ts` | 有兄弟分支的用户消息显示"‹ 2 / 3 ›"；回退后尚未发送时输入框上方列出可切回的分支（`BranchTail`）；"从这里分支"新建会话，消息经 `drafts.ts` 放进新会话的输入框 |
 | diff 行内评论（T42，ADR-0060） | `comments.ts`、`DiffComments.tsx`、`DiffBody.tsx` 的 `Gutter` | 行号是按钮（Shift+点击扩成范围），评论绑定旧侧或新侧的行号范围并带摘录；按会话存 `localStorage`（`piarc.diffComments.<会话 id>`），diff 更新后 `reanchor` 先原位、再同侧按摘录找回，找不到标 `stale` 并保留文本；Mod+Enter（`isSendKey`）或"发送评论"把未失效的评论经 `formatComments` 拼成一条消息，空闲时 `prompt`，运行中 `followUp` 排队。消息格式只在 `formatComments` |
 | 语言 | `language.ts` | 扩展名到高亮语言名，名字必须是 highlight worker 认识的（`transcript/highlight/languages.ts`） |

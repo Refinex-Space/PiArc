@@ -4,14 +4,20 @@
 // in parts (`readTaskOutput`) so the window never holds a whole log. Stopping goes through
 // `stopTask`, the same Core entry as KillShell.
 import type { BackgroundTask, TaskStatus } from '@piarc/protocol';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useT } from '../app/app-context.js';
 import { useSession, useSessions, useTasks } from '../store/hooks.js';
 import { durationParts, taskDuration, tasksOfSession } from '../store/tasks.js';
 import { showTerminal } from '../terminal/panel-state.js';
-import { ChevronDownIcon } from './icons.js';
+import { ChevronDownIcon, SideChatIcon, TasksIcon, TerminalIcon } from './icons.js';
+import { revealBidi } from '../transcript/reveal.js';
+import { SCROLL_FOLLOW } from '../transcript/constants.js';
+import { PanelEmpty } from './PanelEmpty.js';
+import { IconButton } from '../app/IconButton.js';
+import { StopIcon } from './icons.js';
+import { Button } from '../app/Button.js';
 import { showPanel } from './registry.js';
 
 /** Bytes one read asks for (Core's chunk size). */
@@ -72,15 +78,15 @@ function StopButton({ task }: { readonly task: BackgroundTask }) {
   };
   return (
     <>
-      <button
-        type="button"
-        className="button bg-task-stop"
+      <IconButton
+        label={t(stopping ? 'bgTasks.stopping' : 'bgTasks.stop')}
+        className="bg-task-stop"
         disabled={stopping}
         onClick={stop}
         data-testid="bg-task-stop"
       >
-        {t(stopping ? 'bgTasks.stopping' : 'bgTasks.stop')}
-      </button>
+        <StopIcon />
+      </IconButton>
       {error === undefined ? null : (
         <p className="bg-task-error" role="alert">
           {t('bgTasks.stopFailed', { reason: error })}
@@ -97,9 +103,9 @@ function OpenTerminalButton({ task }: { readonly task: BackgroundTask }) {
     return null;
   }
   return (
-    <button
-      type="button"
-      className="button"
+    <Button
+      size="small"
+      variant="ghost"
       data-testid="bg-task-open-terminal"
       onClick={() => {
         showTerminal(task.ownerSessionId, task.taskId);
@@ -107,7 +113,7 @@ function OpenTerminalButton({ task }: { readonly task: BackgroundTask }) {
       }}
     >
       {t('bgTasks.openTerminal')}
-    </button>
+    </Button>
   );
 }
 
@@ -119,9 +125,18 @@ function TaskSummary({ task, now }: { readonly task: BackgroundTask; readonly no
       : t('bgTasks.exitCode', { code: String(task.exitCode) });
   return (
     <div className="bg-task-summary">
+      <span className="bg-task-icon" aria-hidden="true">
+        {task.kind === 'subagent' ? (
+          <SideChatIcon />
+        ) : task.kind === 'monitor' ? (
+          <TasksIcon />
+        ) : (
+          <TerminalIcon />
+        )}
+      </span>
       <span className="bg-task-kind">{t(KIND_MESSAGE[task.kind])}</span>
-      <span className="bg-task-title" title={task.command ?? task.title}>
-        {task.title}
+      <span className="bg-task-title" title={revealBidi(task.command ?? task.title)}>
+        {revealBidi(task.title)}
       </span>
       <span className="bg-task-status" data-status={task.status}>
         {t(STATUS_MESSAGE[task.status])}
@@ -209,6 +224,11 @@ function TaskOutput({ task }: { readonly task: BackgroundTask }) {
   const [error, setError] = useState<string>();
   const reading = useRef(false);
   const bytes = task.outputBytes;
+  const log = useRef<HTMLPreElement>(null);
+  const following = useRef(true);
+  useLayoutEffect(() => {
+    if (log.current && following.current) log.current.scrollTop = log.current.scrollHeight;
+  }, [loaded]);
   useEffect(() => {
     if (task.outputPath == null || reading.current) return;
     const read = (offset: number, apply: (chunk: Chunk) => void) => {
@@ -246,6 +266,7 @@ function TaskOutput({ task }: { readonly task: BackgroundTask }) {
   }
   const earlier = () => {
     if (loaded === undefined || loaded.start === 0) return;
+    following.current = false;
     const start = Math.max(0, loaded.start - CHUNK);
     window.piarc
       .readTaskOutput(task.taskId, start, loaded.start - start)
@@ -273,14 +294,31 @@ function TaskOutput({ task }: { readonly task: BackgroundTask }) {
           {t('bgTasks.readFailed', { reason: error })}
         </p>
       )}
-      {loaded === undefined || loaded.text.length === 0 ? (
+      {loaded === undefined ? (
+        error === undefined ? (
+          <p className="muted small" role="status">
+            {t('agents.loading')}
+          </p>
+        ) : null
+      ) : loaded.text.length === 0 ? (
         <p className="muted small">{t('bgTasks.noOutput')}</p>
       ) : (
-        <pre className="bg-task-log">{loaded.text}</pre>
+        <pre
+          className="bg-task-log"
+          ref={log}
+          onScroll={(event) => {
+            const element = event.currentTarget;
+            following.current =
+              element.scrollHeight - element.clientHeight - element.scrollTop <=
+              SCROLL_FOLLOW.resumePx;
+          }}
+        >
+          {loaded.text}
+        </pre>
       )}
-      <p className="muted small">
+      <p className="bg-task-output-meta muted small">
         {t('bgTasks.outputSize', { bytes: String(bytes) })}
-        {` · ${task.outputPath ?? ''}`}
+        <span title={revealBidi(task.outputPath)}>{revealBidi(task.outputPath)}</span>
       </p>
     </div>
   );
@@ -313,7 +351,7 @@ export function TasksPanel({ sessionId }: { readonly sessionId: string | undefin
   if (groups.length === 0) {
     return (
       <div className="bg-tasks-panel" data-testid="bg-tasks-panel">
-        <p className="muted">{t('bgTasks.workspaceEmpty')}</p>
+        <PanelEmpty icon={<TasksIcon />} title={t('bgTasks.workspaceEmpty')} />
       </div>
     );
   }
@@ -352,16 +390,18 @@ function SessionTaskList({ tasks, now }: { tasks: readonly BackgroundTask[]; now
         >
           <TaskSummary task={task} now={now} />
           <div className="bg-task-actions">
-            <button
-              type="button"
-              className="button"
+            <Button
+              size="small"
+              variant="ghost"
+              className="bg-task-disclosure"
               aria-expanded={open === task.taskId}
               onClick={() => {
                 setOpen(open === task.taskId ? undefined : task.taskId);
               }}
             >
+              <ChevronDownIcon />
               {t(open === task.taskId ? 'bgTasks.hideOutput' : 'bgTasks.showOutput')}
-            </button>
+            </Button>
             <StopButton task={task} />
             <OpenTerminalButton task={task} />
           </div>

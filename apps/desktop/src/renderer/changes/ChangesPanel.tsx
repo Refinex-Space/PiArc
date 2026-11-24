@@ -12,7 +12,6 @@ import { useApp, useT } from '../app/app-context.js';
 import { useChanges, useStore } from '../store/hooks.js';
 import { changesOf } from '../store/changes.js';
 import { reason } from '../shell/errors.js';
-import { showPanel } from '../shell/registry.js';
 import { useUi } from '../shell/ui.js';
 import { isSendKey } from './comments.js';
 import { DiffBody } from './DiffBody.js';
@@ -21,6 +20,8 @@ import { languageOf } from './language.js';
 import { openChangesPanel } from './panel-state.js';
 import { revealBidi } from '../transcript/reveal.js';
 import { Button } from '../app/Button.js';
+import { PanelEmpty } from '../shell/PanelEmpty.js';
+import { ChangesIcon, ChevronDownIcon, FileIcon } from '../shell/icons.js';
 
 function Counts({ added, removed }: { readonly added: number; readonly removed: number }) {
   return (
@@ -110,11 +111,16 @@ function FileRow({
           data-testid="changes-toggle"
           onClick={toggle}
         >
-          {open ? '▾' : '▸'}
+          <ChevronDownIcon />
+          <FileIcon />
+          <span
+            className="changes-file-path"
+            title={revealBidi(file.path)}
+            data-testid="changes-file-path"
+          >
+            {revealBidi(file.label)}
+          </span>
         </button>
-        <span className="changes-file-path" title={file.path} data-testid="changes-file-path">
-          {revealBidi(file.label)}
-        </span>
         <span className="change-tag">{t(`changes.kind.${file.kind}`)}</span>
         <Counts added={file.added} removed={file.removed} />
         <Button
@@ -210,14 +216,15 @@ export function ChangesPanel({ sessionId }: { readonly sessionId: string }) {
               <span className="muted">{t('changes.files', { count: view.files.length })}</span>
             </>
           )}
-          <button
-            type="button"
-            className="row-action"
+          <Button
+            size="small"
+            variant="ghost"
+            className="changes-refresh"
             data-testid="changes-refresh"
             onClick={refresh}
           >
             {t('changes.refresh')}
-          </button>
+          </Button>
         </div>
         {state?.failure === undefined ? null : (
           <p className="changes-error" role="alert">
@@ -227,9 +234,12 @@ export function ChangesPanel({ sessionId }: { readonly sessionId: string }) {
         {view === undefined ? (
           <p className="muted">{t('changes.loading')}</p>
         ) : view.files.length === 0 ? (
-          <p className="muted" data-testid="changes-empty">
-            {t('changes.none')}
-          </p>
+          <PanelEmpty
+            icon={<ChangesIcon />}
+            title={t('changes.none')}
+            testId="changes-empty"
+            description={<span data-testid="changes-bash-note">{t('changes.bashNote')}</span>}
+          />
         ) : (
           <>
             {view.degraded === true ? (
@@ -241,9 +251,11 @@ export function ChangesPanel({ sessionId }: { readonly sessionId: string }) {
           </>
         )}
         <CommentsBar />
-        <p className="muted changes-note" data-testid="changes-bash-note">
-          {t('changes.bashNote')}
-        </p>
+        {view && view.files.length > 0 && (
+          <p className="muted changes-note" data-testid="changes-bash-note">
+            {t('changes.bashNote')}
+          </p>
+        )}
       </div>
     </DiffCommentsProvider>
   );
@@ -271,8 +283,7 @@ export function ChangesCard({ sessionId }: { readonly sessionId: string }) {
         className="button"
         data-testid="changes-open"
         onClick={() => {
-          openChangesPanel(true);
-          showPanel('changes');
+          openChangesPanel();
         }}
       >
         {t('changes.open')}

@@ -112,7 +112,9 @@ test('the Changes panel shows, highlights and discards the session’s changes',
   await made.getByTestId('changes-discard-file').click();
   await expect(made).toHaveCount(0);
   expect(existsSync(path.join(ws, 'src', 'made.ts'))).toBe(false);
-  await expect(page.getByTestId('changes-card').getByTestId('changes-counts')).toHaveText('+1 −1');
+  // A wide diff can temporarily fold the rail. Its summary still follows the discard.
+  if (!(await card.isVisible())) await page.getByTestId('tool-rail').click();
+  await expect(card.getByTestId('changes-counts')).toHaveText('+1 −1');
 });
 
 test('past the limits the Changes panel folds files and shows them as plain text', async ({

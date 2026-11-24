@@ -42,7 +42,7 @@ registerPanel({
 
 registerPanel({
   id: 'plan',
-  area: 'dock',
+  area: 'tool',
   title: 'panel.plan',
   order: 40,
   when: (context) => context.sessionId !== undefined && context.plan === true,

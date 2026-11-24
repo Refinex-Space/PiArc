@@ -37,7 +37,7 @@ export interface AxeSummary {
 export async function checkState(
   page: Page,
   state: A11yStateId,
-  options: { readonly include?: string } = {},
+  options: { readonly include?: string; readonly themeOwner?: Page } = {},
 ): Promise<void> {
   expect(
     A11Y_STATES.some((s) => s.id === state),
@@ -46,7 +46,7 @@ export async function checkState(
   await mkdir(AXE_DIR, { recursive: true });
   const found: AxeSummary[] = [];
   for (const theme of ['light', 'dark'] as const) {
-    await prefer(page, { key: 'appearance.theme', value: theme });
+    await prefer(options.themeOwner ?? page, { key: 'appearance.theme', value: theme });
     await expect(page.locator('html')).toHaveAttribute('data-color-mode', theme);
     // Let transitions settle so colors are measured at rest.
     await page.evaluate(
@@ -83,7 +83,7 @@ export async function checkState(
       })),
     });
   }
-  await prefer(page, { key: 'appearance.theme', value: 'system' });
+  await prefer(options.themeOwner ?? page, { key: 'appearance.theme', value: 'system' });
   await writeFile(path.join(AXE_DIR, `${state.replace(/[^a-z0-9-]+/giu, '_')}.checked`), '');
   // Soft: a journey goes on to its other states and reports all of them.
   expect

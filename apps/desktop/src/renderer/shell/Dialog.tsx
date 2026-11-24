@@ -3,6 +3,7 @@
 // (`focusKey`) moves focus to the new content: the control that had it is gone.
 import { useEffect, useRef, type ReactNode } from 'react';
 
+import { documentWindow, useSurfaceDocument } from '../app/surface-document.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 
 const FOCUSABLE =
@@ -28,14 +29,19 @@ export function Dialog({
   readonly focusKey?: string;
   readonly dismissOnBackdrop?: boolean;
 }) {
+  const ownerDoc = useSurfaceDocument();
   const ref = useRef<HTMLDivElement>(null);
   const backdropPress = useRef(false);
   useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const active = ownerDoc.activeElement;
+    const previous =
+      active instanceof HTMLElement || active instanceof documentWindow(ownerDoc).HTMLElement
+        ? active
+        : null;
     return () => {
       previous?.focus();
     };
-  }, []);
+  }, [ownerDoc]);
   useEffect(() => {
     const dialog = ref.current;
     const first =
@@ -62,10 +68,10 @@ export function Dialog({
     if (first === undefined || last === undefined) {
       return;
     }
-    if (event.shiftKey && document.activeElement === first) {
+    if (event.shiftKey && ownerDoc.activeElement === first) {
       event.preventDefault();
       last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
+    } else if (!event.shiftKey && ownerDoc.activeElement === last) {
       event.preventDefault();
       first.focus();
     }

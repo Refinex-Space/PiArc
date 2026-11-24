@@ -1,11 +1,7 @@
-// Presentation state of the terminal panel (architecture section 8.3 rule 2): whether it is in
-// the dock, which tab each session shows, and the names the person gave tabs. Ctrl+` opens and
-// closes it. The open flag survives a reload of the window (sessionStorage), so the panel comes
-// back and re-attaches to the session's terminals; names are kept per window in localStorage.
-// Storage can be unavailable; the panel then simply starts closed and unnamed.
+// Core task ids identify terminal tabs across reconnects. This window remembers names and
+// the active tab for each session; WorkbenchPanels owns the visibility of the tool.
 import { useSyncExternalStore } from 'react';
 
-const OPEN_KEY = 'piarc.terminal.open';
 const NAMES_KEY = 'piarc.terminal.names';
 
 function read(storage: () => Storage, key: string): string | null {
@@ -24,9 +20,9 @@ function write(storage: () => Storage, key: string, value: string): void {
   }
 }
 
-let open = read(() => sessionStorage, OPEN_KEY) === 'true';
 /** A new terminal is wanted when the panel shows a session without one (Ctrl+`). */
-let wantTerminal = false;
+let wantedSession: string | undefined;
+let focusSession: string | undefined;
 /** Bumped to ask the panel to move the focus into its terminal. */
 let focusNonce = 0;
 const active = new Map<string, string>();
@@ -59,44 +55,23 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-export function setTerminalPanelOpen(next: boolean): void {
-  if (open === next) return;
-  open = next;
-  write(() => sessionStorage, OPEN_KEY, String(next));
-  changed();
-}
-
-/** Ctrl+`: opens the panel (with a terminal and the focus in it) or closes it. */
-export function toggleTerminalPanel(): boolean {
-  setTerminalPanelOpen(!open);
-  if (open) {
-    wantTerminal = true;
-    focusNonce += 1;
-    changed();
-  }
-  return open;
-}
-
-/** Asks the panel to open (if needed) and focus. */
-export function focusTerminalPanel(): void {
-  setTerminalPanelOpen(true);
+/** Explicit user input may start a shell. Restoring a layout only reconnects to existing tasks. */
+export function requestTerminalFocus(sessionId: string, createIfEmpty = false): void {
+  wantedSession = createIfEmpty ? sessionId : undefined;
+  focusSession = sessionId;
   focusNonce += 1;
   changed();
 }
 
 /** Takes the "open a terminal if there is none" request. */
-export function takeTerminalWish(): boolean {
-  const wanted = wantTerminal;
-  wantTerminal = false;
-  return wanted;
+export function takeTerminalWish(sessionId: string): boolean {
+  if (wantedSession !== sessionId) return false;
+  wantedSession = undefined;
+  return true;
 }
 
-export function useTerminalPanelOpen(): boolean {
-  return useSyncExternalStore(subscribe, () => open);
-}
-
-export function useTerminalFocusRequest(): number {
-  return useSyncExternalStore(subscribe, () => focusNonce);
+export function useTerminalFocusRequest(sessionId: string): number {
+  return useSyncExternalStore(subscribe, () => (focusSession === sessionId ? focusNonce : 0));
 }
 
 /** The tab (task id) session `sessionId` shows. */
@@ -113,7 +88,7 @@ export function setActiveTerminal(sessionId: string, taskId: string): void {
 /** Shows `taskId` in its session's panel (the background task card's button). */
 export function showTerminal(sessionId: string, taskId: string): void {
   active.set(sessionId, taskId);
-  focusTerminalPanel();
+  requestTerminalFocus(sessionId);
 }
 
 export function useTerminalNames(): Readonly<Record<string, string>> {

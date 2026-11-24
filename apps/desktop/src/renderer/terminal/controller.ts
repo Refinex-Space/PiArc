@@ -1,3 +1,4 @@
+import { documentWindow } from '../app/surface-document.js';
 // One terminal view (ADR-0017, T10, T34): a canvas drawn by the forked CanvasRenderer from
 // frames pulled from Core, and a hidden textarea that follows the cursor and receives keys and
 // input-method text. Keyboard, input method, paste and copy are in `input.ts`; pointer,
@@ -135,21 +136,24 @@ export class TerminalController {
   #size: { cols: number; rows: number } | null = null;
   readonly #cleanups: (() => void)[] = [];
 
+  readonly #win: Window & typeof globalThis;
+
   constructor(host: HTMLElement, api: TerminalViewApi, options: TerminalViewOptions) {
+    this.#win = documentWindow(host.ownerDocument);
     this.#api = api;
     this.#options = options;
     this.#host = host;
     host.style.position = 'relative';
-    this.#canvas = document.createElement('canvas');
+    this.#canvas = host.ownerDocument.createElement('canvas');
     this.#canvas.setAttribute('data-testid', 'terminal-canvas');
     this.#canvas.setAttribute('aria-hidden', 'true');
-    this.#textarea = document.createElement('textarea');
+    this.#textarea = host.ownerDocument.createElement('textarea');
     this.#textarea.setAttribute('aria-label', options.label);
     this.#textarea.setAttribute('data-testid', 'terminal-input');
     this.#textarea.autocapitalize = 'off';
     this.#textarea.spellcheck = false;
     host.append(this.#canvas, this.#textarea);
-    const family = getComputedStyle(host).getPropertyValue('--piarc-font-mono').trim();
+    const family = this.#win.getComputedStyle(host).getPropertyValue('--piarc-font-mono').trim();
     // Invisible, on the cursor cell: the input method places its candidates there.
     Object.assign(this.#textarea.style, {
       position: 'absolute',
@@ -171,10 +175,10 @@ export class TerminalController {
     this.#renderer = new CanvasRenderer(this.#canvas, {
       fontSize: TERMINAL_FONT_SIZE,
       fontFamily: family === '' ? FALLBACK_FAMILY : family,
-      devicePixelRatio: window.devicePixelRatio,
+      devicePixelRatio: this.#win.devicePixelRatio,
     });
     this.#sizeTextarea();
-    const observer = new IntersectionObserver((entries) => {
+    const observer = new this.#win.IntersectionObserver((entries) => {
       const last = entries[entries.length - 1];
       this.#onScreen = last?.isIntersecting ?? false;
       this.#schedule();
@@ -183,7 +187,7 @@ export class TerminalController {
     this.#cleanups.push(() => {
       observer.disconnect();
     });
-    this.#listen(document, 'visibilitychange', () => {
+    this.#listen(host.ownerDocument, 'visibilitychange', () => {
       this.#schedule();
     });
     this.#cleanups.push(
@@ -193,7 +197,7 @@ export class TerminalController {
     );
     this.#watchRatio();
     if (options.fit) {
-      const resize = new ResizeObserver(() => {
+      const resize = new this.#win.ResizeObserver(() => {
         this.#fit();
       });
       resize.observe(host);
@@ -363,7 +367,7 @@ export class TerminalController {
     if (id === null) return '';
     const text = await this.#api.terminalSelectionText(id);
     if (text !== '') {
-      await navigator.clipboard.writeText(text);
+      await this.#win.navigator.clipboard.writeText(text);
       this.#options.copied?.();
     }
     return text;
@@ -434,9 +438,9 @@ export class TerminalController {
   }
 
   dispose(): void {
-    cancelAnimationFrame(this.#raf);
+    this.#win.cancelAnimationFrame(this.#raf);
     this.#raf = 0;
-    window.clearInterval(this.#blink);
+    this.#win.clearInterval(this.#blink);
     for (const cleanup of this.#cleanups.splice(0)) {
       cleanup();
     }
@@ -446,7 +450,13 @@ export class TerminalController {
   }
 
   #visible(): boolean {
-    return this.#onScreen && document.visibilityState === 'visible' && isWindowVisible();
+    return (
+      this.#onScreen &&
+      this.#win.document.visibilityState === 'visible' &&
+      (this.#win === window
+        ? isWindowVisible()
+        : !this.#win.document.documentElement.hasAttribute('data-tool-hidden'))
+    );
   }
 
   /** Asks for an animation frame when one is due: attached, visible, not parked. */
@@ -454,7 +464,7 @@ export class TerminalController {
     if (this.#raf !== 0 || this.#id === null || !this.#visible() || this.#parked) {
       return;
     }
-    this.#raf = requestAnimationFrame(this.#tick);
+    this.#raf = this.#win.requestAnimationFrame(this.#tick);
   }
 
   readonly #tick = (): void => {
@@ -610,14 +620,14 @@ export class TerminalController {
   #updateBlink(): void {
     const wanted = this.#focused && this.#screen.cursor.blinking && !this.#reducedMotion;
     if (wanted && this.#blink === 0) {
-      this.#blink = window.setInterval(() => {
+      this.#blink = this.#win.setInterval(() => {
         if (!this.#visible()) return;
         this.#blinkOff = !this.#blinkOff;
         this.#remote.setBlinkHidden(this.#blinkOff);
         this.#draw();
       }, BLINK_MS);
     } else if (!wanted && this.#blink !== 0) {
-      window.clearInterval(this.#blink);
+      this.#win.clearInterval(this.#blink);
       this.#blink = 0;
       this.#blinkOff = false;
       this.#remote.setBlinkHidden(false);
@@ -627,10 +637,10 @@ export class TerminalController {
 
   /** Re-measures when the window moves to a screen with another pixel ratio, or zooms. */
   #watchRatio(): void {
-    const query = window.matchMedia(`(resolution: ${String(window.devicePixelRatio)}dppx)`);
+    const query = this.#win.matchMedia(`(resolution: ${String(this.#win.devicePixelRatio)}dppx)`);
     const changed = () => {
       query.removeEventListener('change', changed);
-      this.#renderer.setDevicePixelRatio(window.devicePixelRatio);
+      this.#renderer.setDevicePixelRatio(this.#win.devicePixelRatio);
       this.#remote.markAll();
       if (this.#options.fit) {
         this.#size = null;

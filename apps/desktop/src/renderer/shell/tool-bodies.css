@@ -1,0 +1,310 @@
+/* Tool contents have their own reading and scrolling areas inside the workbench pane. */
+:root[data-app] .tool-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--piarc-space-2);
+  min-height: 6rem;
+  padding: var(--piarc-space-4);
+  text-align: center;
+  color: var(--piarc-text-secondary);
+}
+.tool-empty > svg {
+  width: var(--piarc-space-5);
+  height: var(--piarc-space-5);
+}
+.tool-empty p,
+.tool-empty small {
+  max-width: 32em;
+  margin: 0;
+}
+.tool-empty p {
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-button);
+}
+
+/* The notice and transcript scroll, while the one-line composer stays within reach. */
+:root[data-app] .side-chat {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+.side-chat .side-chat-history {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-4);
+  padding: var(--piarc-space-1);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.side-chat .side-chat-exchange {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--piarc-space-3);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.side-chat .side-chat-prompt {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-surface-hover);
+}
+.side-chat .side-chat-reply {
+  min-width: 0;
+  line-height: 1.55;
+}
+.side-chat-reply .row-action,
+.side-chat-busy {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+.side-chat .side-chat-form {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--piarc-space-1);
+}
+.side-chat-composer {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-workbench-composer-radius);
+  background: var(--piarc-workbench-editor);
+  box-shadow: var(--piarc-workbench-composer-shadow);
+}
+.side-chat .side-chat-composer textarea {
+  flex: 1;
+  field-sizing: content;
+  min-width: 0;
+  max-height: 6lh;
+  box-sizing: border-box;
+  padding: var(--piarc-space-1);
+  resize: none;
+  border: 0;
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+  font: inherit;
+  line-height: var(--piarc-space-5);
+}
+:root[data-app] .side-chat-composer:has(textarea:focus-visible) {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: -2px;
+}
+:root[data-app] .side-chat .side-chat-composer textarea:focus {
+  outline: none;
+}
+.side-chat-composer .icon-button {
+  align-self: flex-end;
+}
+
+:root[data-app] .changes-panel {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 100%;
+  padding: var(--piarc-space-3);
+}
+.changes-panel .changes-refresh {
+  margin-inline-start: auto;
+}
+.changes-panel .changes-file {
+  min-width: 0;
+  container-type: inline-size;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-workbench-editor);
+}
+:root[data-app] .changes-panel .changes-file-head {
+  min-width: 0;
+  padding: var(--piarc-space-1);
+  gap: var(--piarc-space-1);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-surface-hover);
+}
+.changes-file-head .changes-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  padding-inline: var(--piarc-space-1);
+  text-align: start;
+}
+.changes-toggle > svg,
+.bg-task-icon svg {
+  flex: none;
+  color: var(--piarc-text-secondary);
+}
+.changes-toggle > svg:first-child {
+  width: var(--piarc-space-3);
+  transition: transform var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.changes-toggle[aria-expanded='false'] > svg:first-child,
+.bg-task-disclosure[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+:root[data-app] .changes-toggle .changes-file-path {
+  font-family: var(--piarc-font-ui);
+}
+.changes-panel .change-tag {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+.changes-panel .changes-head,
+.changes-panel .diff-counts {
+  font-variant-numeric: tabular-nums;
+}
+.changes-panel .changes-diff,
+.changes-panel .changes-plain {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.changes-panel .changes-note,
+.changes-panel .changes-error {
+  overflow-wrap: anywhere;
+}
+
+:root[data-app] .bg-tasks-panel {
+  align-content: start;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 100%;
+}
+:root[data-app] .bg-tasks-panel:has(> .tool-empty) {
+  display: flex;
+}
+:root[data-app] :is(.bg-tasks-card, .bg-tasks-panel) .bg-task-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'icon title status' '. meta time';
+  align-items: center;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  min-width: 0;
+}
+.bg-task-summary > .bg-task-icon {
+  grid-area: icon;
+  display: flex;
+}
+:root[data-app] .bg-task-summary > .bg-task-title {
+  grid-area: title;
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-body);
+}
+:root[data-app] .bg-task-summary > .bg-task-kind {
+  grid-area: meta;
+}
+:root[data-app] .bg-task-summary > .bg-task-status {
+  grid-area: status;
+}
+:root[data-app] .bg-task-summary > .bg-task-duration {
+  grid-area: time;
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-app] .bg-tasks-panel .bg-task {
+  min-width: 0;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-subtle);
+}
+.bg-task .bg-task-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.bg-task-actions .bg-task-disclosure svg {
+  width: var(--piarc-space-3);
+}
+.bg-task-actions .bg-task-stop {
+  margin-inline-start: auto;
+}
+:root[data-app] .bg-task-output {
+  min-width: 0;
+  border-top: 1px solid var(--piarc-border-subtle);
+  padding-top: var(--piarc-space-2);
+}
+:root[data-app] .bg-task-output .bg-task-log {
+  min-width: 0;
+  max-height: 18em;
+  padding: var(--piarc-space-2);
+  background: var(--piarc-surface-hover);
+  line-height: 1.5;
+  font-size: var(--piarc-font-size-small);
+}
+.bg-task-output .bg-task-output-meta {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  min-width: 0;
+}
+.bg-task-output-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (max-width: 22rem) {
+  :root[data-app] .changes-panel .changes-file-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'file counts' 'kind discard';
+  }
+  .changes-file-head .changes-toggle {
+    grid-area: file;
+  }
+  .changes-file-head .change-tag {
+    grid-area: kind;
+    padding-inline-start: var(--piarc-space-2);
+  }
+  .changes-file-head .diff-counts {
+    grid-area: counts;
+    justify-self: end;
+  }
+  .changes-file-head .changes-discard-file {
+    grid-area: discard;
+  }
+}
+
+:root[data-app] .side-chat[hidden] {
+  display: none;
+}
+.side-chat-tabs {
+  display: flex;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  overflow-x: auto;
+}
+:root[data-app] .side-chat-tabs [role='tab'] {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  border-radius: var(--piarc-radius-md);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  font: inherit;
+}
+:root[data-app] .side-chat-tabs [aria-selected='true'] {
+  background: var(--piarc-action-hover);
+  color: var(--piarc-text-primary);
+}
+
+.tool-tile-body > .tool-empty {
+  min-height: 100%;
+}

@@ -46,6 +46,7 @@ function mods(event: MouseEvent): number {
 
 /** Wires `canvas`; returns the function that unwires it. */
 export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () => void {
+  const target = canvas.ownerDocument.defaultView ?? window;
   let held: number | undefined;
   let last: { x: number; y: number; mods: number } | undefined;
   let autoscroll = 0;
@@ -71,14 +72,14 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
   };
 
   const stopAutoscroll = () => {
-    window.clearInterval(autoscroll);
+    target.clearInterval(autoscroll);
     autoscroll = 0;
   };
   /** Keeps a drag outside the canvas scrolling, one row per tick, by repeating its motion. */
   const updateAutoscroll = (point: { y: number }) => {
     const outside = point.y < 0 || point.y > canvas.height;
     if (outside && autoscroll === 0) {
-      autoscroll = window.setInterval(() => {
+      autoscroll = target.setInterval(() => {
         if (held !== undefined && last !== undefined) {
           host.mouse({ action: 'motion', button: held, mods: last.mods, x: last.x, y: last.y });
         }
@@ -130,8 +131,8 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
     const button = BUTTONS[event.button];
     if (button === undefined || held !== undefined) return;
     event.preventDefault();
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    target.addEventListener('mousemove', onMove);
+    target.addEventListener('mouseup', onUp);
     held = button;
     const point = at(event);
     last = { ...point, mods: mods(event) };
@@ -157,8 +158,8 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
   };
   const onUp = (event: MouseEvent) => {
     stopAutoscroll();
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
+    target.removeEventListener('mousemove', onMove);
+    target.removeEventListener('mouseup', onUp);
     if (held === undefined || !host.attached()) return;
     const button = held;
     held = undefined;
@@ -196,15 +197,15 @@ export function attachPointer(host: PointerHost, canvas: HTMLCanvasElement): () 
   canvas.addEventListener('mousemove', onHover);
   canvas.addEventListener('mouseleave', clearLink);
   canvas.addEventListener('wheel', onWheel, { passive: false });
-  window.addEventListener('keyup', onKeyModifier);
+  target.addEventListener('keyup', onKeyModifier);
   return () => {
     stopAutoscroll();
     canvas.removeEventListener('mousedown', onDown);
     canvas.removeEventListener('mousemove', onHover);
     canvas.removeEventListener('mouseleave', clearLink);
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
+    target.removeEventListener('mousemove', onMove);
+    target.removeEventListener('mouseup', onUp);
     canvas.removeEventListener('wheel', onWheel);
-    window.removeEventListener('keyup', onKeyModifier);
+    target.removeEventListener('keyup', onKeyModifier);
   };
 }
