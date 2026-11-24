@@ -1,4 +1,6 @@
 // Use native selection gestures, not synthetic selectionchange or synthetic menu clicks.
+import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import type { BrowserWindow } from 'electron';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './sessions.js';
@@ -78,7 +80,7 @@ test('editor menu restores context, applies grouped commands and accepts paste o
   await win.evaluate((w: BrowserWindow) => {
     w.setContentSize(1520, 900);
   });
-  const { id } = await openSession(
+  const { id, ws } = await openSession(
     app,
     page,
     workspaces,
@@ -123,6 +125,10 @@ test('editor menu restores context, applies grouped commands and accepts paste o
     await expect(menu).toBeVisible();
     await menu.getByTestId('menu-md-paste').click();
     await expect(field).toContainText('Inserted through native paste');
+    await expect
+      .poll(() => readFile(path.join(ws, 'note.md'), 'utf8'))
+      .toContain('Inserted through native paste');
+    await expect(page.getByTestId('file-viewer')).not.toHaveAttribute('data-dirty', 'true');
     await expect(
       page.evaluate((id) => window.piarc.projectFileAction(id, 'note.md', 'pasteMarkdown'), id),
     ).rejects.toThrow();
