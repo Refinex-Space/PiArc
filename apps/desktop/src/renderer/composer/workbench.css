@@ -95,7 +95,12 @@
 }
 .composer .composer-box {
   box-sizing: border-box;
-  align-items: flex-end;
+  /* Center the row in the spare height. When the editor grows, actions follow its last line. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  align-items: end;
   min-height: var(--piarc-workbench-composer-height);
   gap: var(--piarc-space-1);
   padding: var(--piarc-space-2);
@@ -109,9 +114,9 @@
   opacity: 1;
 }
 .composer-box .workbench-icon {
-  flex: none;
   width: calc(var(--piarc-space-4) + var(--piarc-space-3));
-  height: calc(var(--piarc-space-4) + var(--piarc-space-3));
+  /* Match one editor line plus its vertical padding in either density. */
+  height: calc(var(--piarc-space-5) + var(--piarc-space-1));
 }
 .composer .composer-editor,
 .composer-mount[data-empty='true']::before {

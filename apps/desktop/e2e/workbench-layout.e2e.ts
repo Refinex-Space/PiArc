@@ -42,3 +42,36 @@ test('the composer stays on its reading axis through navigation and panel toggle
   await expect(page.getByTestId('home')).toBeVisible();
   await expect(page.getByTestId('expand-sidebar')).toBeVisible();
 });
+
+test('the empty composer centers its icons and prompt in both densities', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  await openFolder(page, app, await makeWorkspace(workspaces, 'Composer'));
+  const box = page.locator('.composer-box');
+  for (const density of ['comfortable', 'compact'] as const) {
+    await prefer(page, { key: 'appearance.density', value: density });
+    await expect(page.locator('html')).toHaveAttribute('data-density', density);
+    await expect(box).toHaveCSS('height', '46px');
+    const offsets = await box.evaluate((element) => {
+      const center = (rect: DOMRect) => rect.top + rect.height / 2;
+      const middle = center(element.getBoundingClientRect());
+      const mount = element.querySelector<HTMLElement>('.composer-mount');
+      if (!mount) throw new Error('Missing composer editor');
+      const hint = getComputedStyle(mount, '::before');
+      const hintCenter =
+        mount.getBoundingClientRect().top + parseFloat(hint.top) + parseFloat(hint.lineHeight) / 2;
+      return [
+        ...Array.from(
+          element.querySelectorAll('.workbench-icon > svg'),
+          (icon) => center(icon.getBoundingClientRect()) - middle,
+        ),
+        hintCenter - middle,
+      ];
+    });
+    expect(offsets).toHaveLength(3);
+    for (const offset of offsets)
+      expect(Math.abs(offset), `${density}: ${offsets.join(', ')}`).toBeLessThanOrEqual(0.5);
+  }
+});
