@@ -144,6 +144,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await expect(
     page.getByTestId('markdown-reader').getByRole('heading', { name: 'Project Guide' }),
   ).toBeVisible();
+  await expect(author).toHaveAttribute('tabindex', '0');
   await checkState(page, 'state:md-split');
   await page.getByRole('treeitem', { name: 'notes.txt', exact: true }).click();
   await expect(page.locator('[data-source-line="1"]')).toBeVisible();

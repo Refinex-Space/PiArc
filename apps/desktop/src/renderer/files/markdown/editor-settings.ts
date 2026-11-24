@@ -63,6 +63,7 @@ export function editSettings(
     EditorView.contentAttributes.of({
       'aria-label': t(live ? 'md.edit.liveAria' : 'md.edit.sourceAria'),
       'aria-readonly': String(!editable),
+      tabindex: '0',
       'data-testid': 'markdown-editor-input',
       spellcheck: 'false',
       autocapitalize: 'off',
