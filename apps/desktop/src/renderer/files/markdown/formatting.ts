@@ -10,16 +10,32 @@ import {
 } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
+import { insertTemplate, type Template } from './insert-block.js';
 import { newTable } from './table-model.js';
-export type InlineFormat = 'bold' | 'italic' | 'strikethrough' | 'code' | 'math' | 'highlight';
+export type InlineFormat =
+  | 'bold'
+  | 'italic'
+  | 'strikethrough'
+  | 'code'
+  | 'math'
+  | 'highlight'
+  | 'underline'
+  | 'superscript'
+  | 'subscript';
 
-const FORMATS: Record<InlineFormat, { node: string | null; mark: string; marks: string | null }> = {
+const FORMATS: Record<
+  InlineFormat,
+  { node: string | null; mark: string; close?: string; marks: string | null }
+> = {
   bold: { node: 'StrongEmphasis', mark: '**', marks: 'EmphasisMark' },
   italic: { node: 'Emphasis', mark: '*', marks: 'EmphasisMark' },
   strikethrough: { node: 'Strikethrough', mark: '~~', marks: 'StrikethroughMark' },
   code: { node: 'InlineCode', mark: '`', marks: 'CodeMark' },
   math: { node: 'InlineMath', mark: '$', marks: 'InlineMathMark' },
-  highlight: { node: null, mark: '==', marks: null },
+  highlight: { node: 'Highlight', mark: '==', marks: 'FileStyleMark' },
+  underline: { node: 'Underline', mark: '<u>', close: '</u>', marks: 'FileStyleMark' },
+  superscript: { node: 'Superscript', mark: '^', marks: 'FileStyleMark' },
+  subscript: { node: 'Subscript', mark: '~', marks: 'FileStyleMark' },
 };
 
 /** The innermost `name` node around `[from, to]`. */
@@ -62,43 +78,45 @@ function toggleInline(state: EditorState, format: InlineFormat) {
         return {
           changes,
           range: EditorSelection.range(
-            Math.max(open.from, range.anchor - shift),
+            Math.max(open.from, Math.min(close.from - shift, range.anchor - shift)),
             Math.max(open.from, Math.min(close.from - shift, range.head - shift)),
           ),
         };
       }
     }
-    const m = f.mark;
+    const m = f.mark,
+      end = f.close ?? m;
     // Already wrapped just outside the selection: unwrap.
     if (
       !range.empty &&
       range.from >= m.length &&
-      range.to + m.length <= state.doc.length &&
+      range.to + end.length <= state.doc.length &&
       state.sliceDoc(range.from - m.length, range.from) === m &&
-      state.sliceDoc(range.to, range.to + m.length) === m
+      state.sliceDoc(range.to, range.to + end.length) === end &&
+      !(format === 'subscript' && state.sliceDoc(Math.max(0, range.from - 2), range.from) === '~~')
     )
       return {
         changes: [
           { from: range.from - m.length, to: range.from },
-          { from: range.to, to: range.to + m.length },
+          { from: range.to, to: range.to + end.length },
         ],
-        range: EditorSelection.range(range.from - m.length, range.to - m.length),
+        range: EditorSelection.range(range.anchor - m.length, range.head - m.length),
       };
     const target = range.empty ? wordAt(state, range.from) : range;
     if (!target) {
       return {
-        changes: { from: range.from, insert: m + m },
+        changes: { from: range.from, insert: m + end },
         range: EditorSelection.cursor(range.from + m.length),
       };
     }
     return {
       changes: [
         { from: target.from, insert: m },
-        { from: target.to, insert: m },
+        { from: target.to, insert: end },
       ],
       range: range.empty
         ? EditorSelection.cursor(range.from + m.length)
-        : EditorSelection.range(target.from + m.length, target.to + m.length),
+        : EditorSelection.range(range.anchor + m.length, range.head + m.length),
     };
   });
   return state.update(tr, { userEvent: 'input.format', scrollIntoView: true });
@@ -223,16 +241,60 @@ const inline = {
   italic: (state: EditorState) => toggleInline(state, 'italic'),
   strike: (state: EditorState) => toggleInline(state, 'strikethrough'),
   inlineCode: (state: EditorState) => toggleInline(state, 'code'),
+  inlineMath: (state: EditorState) => toggleInline(state, 'math'),
+  underline: (state: EditorState) => toggleInline(state, 'underline'),
+  highlight: (state: EditorState) => toggleInline(state, 'highlight'),
+  superscript: (state: EditorState) => toggleInline(state, 'superscript'),
+  subscript: (state: EditorState) => toggleInline(state, 'subscript'),
   link: insertLink,
 };
+export function formatActive(state: EditorState, command: FormatCommand): boolean {
+  const { from, to } = state.selection.main;
+  if (command === 'link') return !!around(state, from, to, 'Link');
+  const style =
+    command === 'inlineCode'
+      ? 'code'
+      : command === 'inlineMath'
+        ? 'math'
+        : command === 'strike'
+          ? 'strikethrough'
+          : command;
+  if (Object.hasOwn(FORMATS, style)) {
+    const f = FORMATS[style as InlineFormat],
+      close = f.close ?? f.mark;
+    if (f.node && around(state, from, to, f.node)) return true;
+    if (from < f.mark.length || to + close.length > state.doc.length) return false;
+    if (style === 'subscript' && state.sliceDoc(Math.max(0, from - 2), from) === '~~') return false;
+    return (
+      state.sliceDoc(from - f.mark.length, from) === f.mark &&
+      state.sliceDoc(to, to + close.length) === close
+    );
+  }
+  const first = state.doc.lineAt(from).number,
+    last = state.doc.lineAt(Math.max(from, to - 1)).number;
+  for (let n = first; n <= last; n++) {
+    const line = state.doc.line(n);
+    if (first !== last && !line.text.trim()) continue;
+    const shape = lineShape(line.text);
+    if (command === 'quote' ? !shape.quote : kindOf(shape) !== command) return false;
+  }
+  return true;
+}
 export type FormatCommand =
-  keyof typeof inline | BlockKind | 'table' | 'fence' | 'formula' | 'diagram' | 'rule';
+  keyof typeof inline | BlockKind | Template | 'table' | 'fence' | 'formula' | 'diagram' | 'rule';
 
 function formatChange(
   state: EditorState,
   command: FormatCommand,
   columnName: (n: number) => string,
 ): Transaction | null {
+  if (
+    command === 'footnote' ||
+    command === 'frontMatter' ||
+    command.startsWith('callout-') ||
+    command.startsWith('diagram-')
+  )
+    return insertTemplate(state, command as Template);
   if (command in inline) return inline[command as keyof typeof inline](state);
   if (
     command === 'paragraph' ||
@@ -276,9 +338,18 @@ export function applyFormat(
   prefix?: { from: number; to: number },
 ) {
   if (view.composing || view.state.readOnly) return false;
-  const before = prefix
-    ? view.state.update({ changes: { ...prefix, insert: '' }, selection: { anchor: prefix.from } })
-    : null;
+  let before: Transaction | undefined;
+  if (prefix) {
+    const changes = view.state.changes({ ...prefix, insert: '' });
+    const line = view.state.doc.lineAt(prefix.from);
+    const block =
+      ['table', 'fence', 'formula', 'diagram', 'rule'].includes(command) ||
+      command.startsWith('callout-') ||
+      command.startsWith('diagram-');
+    // Taking a slash command midway through a paragraph preserves the entire paragraph.
+    const anchor = block ? changes.mapPos(line.to) : prefix.from;
+    before = view.state.update({ changes, selection: { anchor } });
+  }
   const edit = formatChange(before?.state ?? view.state, command, columnName);
   if (!edit) return false;
   if (before) {

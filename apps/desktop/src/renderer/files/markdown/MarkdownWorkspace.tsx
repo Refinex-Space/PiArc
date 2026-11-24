@@ -9,6 +9,10 @@ import {
   type Ref,
 } from 'react';
 import { useT } from '../../app/app-context.js';
+import { useSession } from '../../store/hooks.js';
+import { markdownTarget } from '../../transcript/markdown/text.js';
+import { fileLocation, parentPath, projectFileRoot } from '../file-path.js';
+import { openProjectFile } from '../navigation.js';
 import { IconButton } from '../../app/IconButton.js';
 import { MenuPopup, useMenu } from '../../shell/Menu.js';
 import { RailIcon } from '../../shell/icons.js';
@@ -20,8 +24,10 @@ import type { FileLocation } from '../viewer-source.js';
 import type { ViewerSettings, FileSelection, FindMatch } from '../viewer-model.js';
 import type { MarkdownEditorHandle } from './MarkdownEditor.js';
 import type { FileMode } from './MarkdownModes.js';
-import { markdownRichBlock } from './RichBlock.js';
+import { markdownEditingBlock } from './RichBlock.js';
+import { MarkdownMediaContext } from './MediaContextHost.js';
 import { MarkdownImage } from './MarkdownImage.js';
+import type { ParseReply } from './document.worker.js';
 import type { Heading } from './document-model.js';
 
 const Editor = lazy(async () => ({
@@ -63,6 +69,63 @@ export function MarkdownWorkspace({
     images = useMarkdownImages(sessionId, path),
     editor = useRef<MarkdownEditorHandle | null>(null),
     reader = useRef<MarkdownReaderHandle | null>(null);
+  const project = projectFileRoot(useSession(sessionId));
+  const anchorLookup = useRef<Worker | null>(null);
+  useLayoutEffect(
+    () => () => {
+      anchorLookup.current?.terminate();
+      anchorLookup.current = null;
+    },
+    [sessionId, path, text, mode],
+  );
+  const followLink = (href: string) => {
+    if (href.startsWith('#') && !/^#L\d/u.test(href)) {
+      let slug: string;
+      try {
+        slug = decodeURIComponent(href.slice(1));
+      } catch {
+        return;
+      }
+      // The explicit navigation uses the same anchor and duplicate-heading mapping as reading.
+      anchorLookup.current?.terminate();
+      const worker = new Worker(new URL('./document.worker.ts', import.meta.url), {
+        type: 'module',
+        name: 'markdown-anchor',
+      });
+      anchorLookup.current = worker;
+      const finish = () => {
+        worker.terminate();
+        if (anchorLookup.current === worker) anchorLookup.current = null;
+      };
+      worker.onmessage = (event: MessageEvent<ParseReply>) => {
+        if (anchorLookup.current === worker) {
+          const match = event.data.document?.headings.find((h) => h.slug === slug);
+          if (match) editor.current?.scrollToLine(match.line);
+        }
+        finish();
+      };
+      worker.onerror = (error) => {
+        console.error('[files] resolving Markdown anchor failed', error.message);
+        finish();
+      };
+      worker.postMessage({ sequence: 1, text });
+      return;
+    }
+    const target = markdownTarget(href);
+    if (target.href) {
+      void window.piarc.openExternal(target.href).catch((error: unknown) => {
+        console.error('[files] opening Markdown link failed', error);
+      });
+    } else if (project && target.projectTarget) {
+      const relative = target.projectTarget;
+      const to = fileLocation(
+        relative.startsWith('#') ? path + relative : relative,
+        project,
+        relative.startsWith('#') ? '' : parentPath(path),
+      );
+      if (to) openProjectFile(sessionId, to);
+    }
+  };
   const root = useRef<HTMLDivElement>(null),
     topLine = useRef(1);
   const placed = useToolVisible();
@@ -110,7 +173,7 @@ export function MarkdownWorkspace({
   );
   const renderImage = useCallback(
     (source: string, alt: string) => (
-      <MarkdownImage sessionId={sessionId} path={path} source={source} alt={alt} />
+      <MarkdownImage sessionId={sessionId} path={path} source={source} alt={alt} editing />
     ),
     [sessionId, path],
   );
@@ -173,7 +236,8 @@ export function MarkdownWorkspace({
               chooseImage={images.choose}
               onImageSettings={images.openSettings}
               renderImage={renderImage}
-              renderBlock={markdownRichBlock}
+              followLink={followLink}
+              renderBlock={markdownEditingBlock}
               onScrollLine={scrollReader}
             />
           </Suspense>
@@ -230,6 +294,13 @@ export function MarkdownWorkspace({
           onClose={menu.close}
         />
       )}
+      <MarkdownMediaContext
+        root={root}
+        sessionId={sessionId}
+        path={path}
+        text={text}
+        visible={painted}
+      />
       {images.dialogs}
     </div>
   );

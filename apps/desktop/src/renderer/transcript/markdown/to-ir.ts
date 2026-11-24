@@ -42,7 +42,7 @@ export interface ConvertOptions {
   readonly isIncomplete?: (token: Tokens.Code) => boolean;
 }
 
-function spans(tokens: readonly Token[] | undefined, options: ConvertOptions): Span[] {
+export function spans(tokens: readonly Token[] | undefined, options: ConvertOptions): Span[] {
   const result: Span[] = [];
   const push = (span: Span): void => {
     // Merge neighbouring text so React renders fewer nodes.

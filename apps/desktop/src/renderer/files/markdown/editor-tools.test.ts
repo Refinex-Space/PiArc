@@ -140,3 +140,109 @@ it('updates only the language token from the fence picker, preserving metadata, 
     view.destroy();
   }
 });
+
+it('groups insertion commands, shows syntax hints and chooses a nested diagram with arrows', () => {
+  const v = editor();
+  try {
+    type(v, '/');
+    const list = v.dom.querySelector('[role=listbox]');
+    expect(list?.querySelectorAll('[role=group]')).toHaveLength(3);
+    expect(list?.querySelector('[data-command=h2] [data-hint]')?.getAttribute('data-hint')).toBe(
+      '##',
+    );
+    const folder = list?.querySelector<HTMLElement>('[data-folder=diagram]');
+    expect(folder).toBeTruthy();
+    folder?.click();
+    expect(v.dom.querySelector('[role=listbox][aria-label="Mermaid diagram"]')).toBeTruthy();
+    key(v, 'ArrowLeft');
+    expect(v.dom.querySelectorAll('[role=listbox]')).toHaveLength(1);
+    key(v, 'ArrowRight');
+    key(v, 'ArrowDown');
+    key(v, 'Enter');
+    expect(v.state.doc.toString()).toContain('sequenceDiagram');
+    undo(v);
+    expect(v.state.doc.toString()).toBe('/');
+  } finally {
+    v.destroy();
+  }
+});
+
+it('opens at a word boundary with the Chinese trigger, resolves initials and inserts a warning in one edit', () => {
+  const v = editor('Notes ');
+  try {
+    type(v, '、');
+    type(v, 'jg');
+    expect(v.dom.querySelector('[role=option]')?.getAttribute('data-command')).toBe(
+      'callout-warning',
+    );
+    key(v, 'Tab');
+    expect(v.state.doc.toString()).toMatch(/^Notes\s*\n\n> \[!WARNING\]\n> /);
+    undo(v);
+    expect(v.state.doc.toString()).toBe('Notes 、jg');
+  } finally {
+    v.destroy();
+  }
+});
+
+it('finds footnotes, metadata, syntax markers and deeper headings from either locale', () => {
+  for (const [query, command] of [
+    ['jz', 'footnote'],
+    ['ysj', 'frontMatter'],
+    ['######', 'h6'],
+    ['lct', 'diagram-flowchart'],
+  ] as const) {
+    const v = editor('Existing[^1]\n\n[^1]: source\n\n');
+    try {
+      type(v, '/');
+      type(v, query);
+      expect(v.dom.querySelector('[role=option]')?.getAttribute('data-command')).toBe(command);
+      key(v, 'Enter');
+      if (command === 'footnote') expect(v.state.doc.toString()).toContain('[^2]\n\n[^2]: ');
+      if (command === 'frontMatter') expect(v.state.doc.toString()).toMatch(/^---\ntitle: \n---/);
+    } finally {
+      v.destroy();
+    }
+  }
+});
+
+it('inserts a chosen block after the surrounding paragraph when slash is used before existing text', () => {
+  const v = editor('A paragraph ends here.');
+  try {
+    v.dispatch({ selection: { anchor: 2 } });
+    type(v, '/');
+    type(v, 'warning');
+    key(v, 'Enter');
+    expect(v.state.doc.toString()).toBe('A paragraph ends here.\n\n> [!WARNING]\n> \n');
+  } finally {
+    v.destroy();
+  }
+});
+
+it('shows the callout label in live editing while keeping its literal marker in the shared document', async () => {
+  const { liveMode, liveExtensions } = await import('./live-preview.js');
+  const t = new Translator('en');
+  const text = 'Start\n\n> [!TIP]\n> A practical suggestion.\n';
+  const view = new EditorView({
+    parent: document.createElement('div'),
+    state: EditorState.create({
+      doc: text,
+      extensions: [
+        markdownSupport(),
+        liveMode.of(true),
+        ...liveExtensions,
+        widgetHost.of({
+          t: (id, values) => t.t(id, values),
+          mount: () => undefined,
+          unmount: () => undefined,
+        }),
+      ],
+    }),
+  });
+  try {
+    expect(view.dom.querySelector('.md-callout-title')?.textContent).toBe('Tip');
+    expect(view.dom.querySelectorAll('.md-callout-tip')).toHaveLength(2);
+    expect(view.state.doc.toString()).toBe(text);
+  } finally {
+    view.destroy();
+  }
+});

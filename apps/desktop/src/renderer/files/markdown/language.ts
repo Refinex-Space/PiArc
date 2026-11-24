@@ -6,6 +6,8 @@ import { languages } from '@codemirror/language-data';
 import { tags as t } from '@lezer/highlight';
 import type { BlockContext, Line, MarkdownConfig } from '@lezer/markdown';
 
+import { styleSyntax } from './inline-styles.js';
+
 const DOLLAR = 36;
 const BACKSLASH = 92;
 const isSpace = (c: number) => c === 32 || c === 9 || c === 10 || c === 13;
@@ -141,6 +143,6 @@ export function markdownSupport(): LanguageSupport {
   return markdown({
     base: markdownLanguage,
     codeLanguages: fenceLanguage,
-    extensions: [mathSyntax, frontMatter],
+    extensions: [mathSyntax, frontMatter, styleSyntax],
   });
 }

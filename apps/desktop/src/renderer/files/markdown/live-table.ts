@@ -1,10 +1,11 @@
 import { syntaxTree } from '@codemirror/language';
-import type { EditorState } from '@codemirror/state';
+import { Prec, type EditorState } from '@codemirror/state';
 import type { SyntaxNode } from '@lezer/common';
 // Table mutations reuse Markdown Studio's lossless cell model. Every keystroke becomes
 // a CodeMirror transaction, so autosave, undo, and external-file conflict detection share it.
-import { redo, undo } from '@codemirror/commands';
-import { WidgetType, type EditorView } from '@codemirror/view';
+import { isolateHistory } from '@codemirror/commands';
+import { TableControls } from './table-controls.js';
+import { WidgetType, keymap, type EditorView } from '@codemirror/view';
 import { paintCell } from './table-cell.js';
 import { hostOf } from './widget-host.js';
 import {
@@ -56,6 +57,7 @@ interface TableDOM {
   source: string;
   focused: Cell;
   fields: HTMLInputElement[][];
+  controls?: TableControls;
 }
 const mounted = new WeakMap<HTMLElement, TableDOM>();
 const currentCell = new WeakMap<
@@ -144,7 +146,13 @@ export function applySourceTableAction(view: EditorView, action: TableAction) {
     Math.min(model.columns - 1, (line?.starts.filter((start) => start <= pos).length ?? 1) - 1),
   );
   const edits = cellChanges(model, { row, col }, action);
-  if (edits) view.dispatch({ changes: edits, userEvent: 'input.table', scrollIntoView: true });
+  if (edits)
+    view.dispatch({
+      changes: edits,
+      annotations: isolateHistory.of('full'),
+      userEvent: 'input.table',
+      scrollIntoView: true,
+    });
   view.focus();
 }
 function currentTable(view: EditorView, holder: HTMLElement) {
@@ -155,6 +163,38 @@ function currentTable(view: EditorView, holder: HTMLElement) {
     return null;
   return parseTable(mountedTable.source, pos);
 }
+// Keyboard approach to a rendered block follows Markdown Studio's livePreview/index.ts:
+// move into the grid only once the arrow would leave the current wrapped visual line.
+function enterTable(view: EditorView, down: boolean) {
+  const selection = view.state.selection.main;
+  if (!selection.empty || view.composing) return false;
+  const line = view.state.doc.lineAt(selection.head);
+  const neighbor = line.number + (down ? 1 : -1);
+  if (neighbor < 1 || neighbor > view.state.doc.lines) return false;
+  for (const holder of view.contentDOM.querySelectorAll<HTMLElement>('.md-live-table')) {
+    const info = mounted.get(holder);
+    if (!info) continue;
+    const start = view.posAtDOM(holder),
+      edge = down ? start : start + info.source.length;
+    if (view.state.doc.lineAt(edge).number !== neighbor) continue;
+    const next = view.moveVertically(selection, down);
+    if (down ? next.head <= line.to : next.head >= line.from) return false;
+    const field = down ? info.fields[0]?.[0] : info.fields.at(-1)?.at(-1);
+    if (!field) return false;
+    field.focus({ preventScroll: true });
+    field.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const end = field.value.length;
+    field.setSelectionRange(end, end);
+    return true;
+  }
+  return false;
+}
+export const tableArrowKeys = Prec.high(
+  keymap.of([
+    { key: 'ArrowDown', run: (view) => enterTable(view, true) },
+    { key: 'ArrowUp', run: (view) => enterTable(view, false) },
+  ]),
+);
 function tableDom(source: string, view: EditorView) {
   const doc = view.dom.ownerDocument,
     t = hostOf(view.state).t;
@@ -164,84 +204,14 @@ function tableDom(source: string, view: EditorView) {
   const model = parseTable(source, 0);
   if (!model) return holder;
   const table = doc.createElement('table'),
-    toolbar = doc.createElement('div'),
-    menu = doc.createElement('select');
+    scroller = doc.createElement('div');
+  scroller.className = 'md-table-scroller';
+  table.setAttribute('role', 'grid');
+  table.setAttribute('aria-label', t('files.viewer.table'));
+  table.setAttribute('aria-multiselectable', 'true');
+  table.setAttribute('aria-readonly', String(view.state.readOnly));
   const state: TableDOM = { source, focused: { row: 0, col: 0 }, fields: [] };
   mounted.set(holder, state);
-  const label = t('md.edit.tableActions');
-  menu.setAttribute('aria-label', label);
-  const title = doc.createElement('option');
-  title.textContent = label;
-  title.value = '';
-  menu.append(title);
-  for (const action of tableActions) {
-    const option = doc.createElement('option');
-    option.value = action;
-    option.textContent = t(`md.edit.${action}`);
-    menu.append(option);
-  }
-  function available(cell: Cell) {
-    for (const opt of menu.options) {
-      const a = opt.value;
-      opt.disabled =
-        a !== '' &&
-        a !== 'source' &&
-        (view.state.readOnly ||
-          ((a === 'deleteRow' || a === 'moveUp' || a === 'moveDown') && cell.row === 0) ||
-          (a === 'deleteColumn' && model?.columns === 1) ||
-          (a === 'moveUp' && cell.row <= 1) ||
-          (a === 'moveDown' && cell.row === (model?.rows.length ?? 0)) ||
-          (a === 'moveLeft' && cell.col === 0) ||
-          (a === 'moveRight' && cell.col === (model?.columns ?? 1) - 1));
-    }
-  }
-  available(state.focused);
-  menu.onchange = () => {
-    const m = currentTable(view, holder);
-    const cmd = tableActions.find((id) => id === menu.value);
-    menu.value = '';
-    if (!m || !cmd) return;
-    if (cmd === 'source') {
-      view.dispatch({
-        selection: { anchor: m.from + Math.min(1, m.to - m.from) },
-        scrollIntoView: true,
-      });
-      view.focus();
-      return;
-    }
-    const changes = cellChanges(m, state.focused, cmd);
-    if (changes && !view.state.readOnly) {
-      const cell = { ...state.focused };
-      view.dispatch({ changes, userEvent: 'input.table' });
-      const next = Array.from(view.contentDOM.querySelectorAll<HTMLElement>('.md-live-table')).find(
-        (el) => view.posAtDOM(el) === m.from,
-      );
-      const rows = next ? mounted.get(next)?.fields : undefined;
-      if (rows?.length) {
-        const row =
-          rows[
-            Math.min(
-              rows.length - 1,
-              Math.max(
-                0,
-                cell.row + (cmd === 'moveUp' ? -1 : cmd === 'moveDown' || cmd === 'addRow' ? 1 : 0),
-              ),
-            )
-          ];
-        row?.[
-          Math.min(
-            row.length - 1,
-            Math.max(
-              0,
-              cell.col +
-                (cmd === 'moveLeft' ? -1 : cmd === 'moveRight' || cmd === 'addColumn' ? 1 : 0),
-            ),
-          )
-        ]?.focus();
-      }
-    }
-  };
-  toolbar.append(menu);
   const head = doc.createElement('thead'),
     body = doc.createElement('tbody');
   for (const [row, line] of [model.header, ...model.rows].entries()) {
@@ -254,6 +224,8 @@ function tableDom(source: string, view: EditorView) {
       input.value = cellText(line.segs[col]);
       input.readOnly = view.state.readOnly;
       input.tabIndex = row === 0 && col === 0 ? 0 : -1;
+      td.setAttribute('role', row === 0 ? 'columnheader' : 'gridcell');
+      input.setAttribute('aria-keyshortcuts', 'Alt+Shift+T Shift+F10');
       input.setAttribute('aria-label', t('md.edit.tableCell', { row: row + 1, col: col + 1 }));
       td.style.textAlign = model.aligns[col] ?? 'start';
       input.style.textAlign = 'inherit';
@@ -263,7 +235,6 @@ function tableDom(source: string, view: EditorView) {
         if (old) old.tabIndex = -1;
         state.focused = { row, col };
         input.tabIndex = 0;
-        available({ row, col });
       };
       const commit = () => {
         if (view.state.readOnly) return;
@@ -277,37 +248,6 @@ function tableDom(source: string, view: EditorView) {
         if (!event.isComposing) commit();
       };
       input.addEventListener('compositionend', commit);
-      input.onkeydown = (e) => {
-        if (e.isComposing) return;
-        const mod = e.ctrlKey || e.metaKey;
-        if (mod && ['z', 'y'].includes(e.key.toLowerCase())) {
-          e.preventDefault();
-          e.stopPropagation();
-          (e.shiftKey || e.key.toLowerCase() === 'y' ? redo : undo)(view);
-          return;
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          view.focus();
-          return;
-        }
-        if (!['Tab', 'Enter', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-        const at = row * model.columns + col;
-        const step =
-          e.key === 'Tab'
-            ? e.shiftKey
-              ? -1
-              : 1
-            : model.columns * (e.key === 'ArrowUp' || e.shiftKey ? -1 : 1);
-        const n = at + step;
-        const next = state.fields[Math.floor(n / model.columns)]?.[n % model.columns];
-        if (next) {
-          e.preventDefault();
-          e.stopPropagation();
-          next.focus();
-          next.select();
-        }
-      };
       const display = doc.createElement('span');
       display.className = 'md-cell-display';
       display.setAttribute('aria-hidden', 'true');
@@ -320,20 +260,52 @@ function tableDom(source: string, view: EditorView) {
     (row === 0 ? head : body).append(tr);
   }
   table.append(head, body);
-  holder.append(table, toolbar);
+  scroller.append(table);
+  holder.append(scroller);
+  state.controls = new TableControls({
+    holder,
+    table,
+    scroller,
+    view,
+    model: () => currentTable(view, holder),
+    focusCell: (pos, cell, where) => {
+      const next = Array.from(view.contentDOM.querySelectorAll<HTMLElement>('.md-live-table')).find(
+        (el) => view.posAtDOM(el) === pos,
+      );
+      const rows = next ? mounted.get(next)?.fields : undefined;
+      const line = rows?.[Math.max(0, Math.min(cell.row, rows.length - 1))],
+        input = line?.[Math.max(0, Math.min(cell.col, line.length - 1))];
+      if (!input) return;
+      input.focus({ preventScroll: true });
+      input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const end = input.value.length;
+      input.setSelectionRange(
+        where === 'all' || where === 'start' ? 0 : end,
+        where === 'start' ? 0 : end,
+      );
+    },
+  });
   return holder;
 }
 export class TableWidget extends WidgetType {
-  constructor(readonly source: string) {
+  constructor(
+    readonly source: string,
+    readonly readOnly = false,
+  ) {
     super();
   }
   override eq(other: TableWidget) {
-    return other.source === this.source;
+    return other.source === this.source && other.readOnly === this.readOnly;
   }
   toDOM(view: EditorView) {
     return tableDom(this.source, view);
   }
-  override updateDOM(holder: HTMLElement, view: EditorView) {
+  override destroy(holder: HTMLElement) {
+    mounted.get(holder)?.controls?.destroy();
+    mounted.delete(holder);
+  }
+  override updateDOM(holder: HTMLElement, view: EditorView, previous: this) {
+    if (previous.readOnly !== this.readOnly) return false;
     const state = mounted.get(holder),
       model = parseTable(this.source, 0);
     if (
@@ -344,6 +316,7 @@ export class TableWidget extends WidgetType {
     )
       return false;
     state.source = this.source;
+    state.controls?.invalidate();
     for (const [r, l] of [model.header, ...model.rows].entries()) {
       for (const [c, input] of (state.fields[r] ?? []).entries()) {
         const value = cellText(l.segs[c]);

@@ -323,3 +323,106 @@ test('the document slash menu, selection toolbar and code language picker edit t
     .poll(() => readFile(path.join(ws, 'commands.md'), 'utf8'))
     .toMatch(/\|[^\n]*\|\n\|[ :-]+\|/u);
 });
+
+test('the grouped block menu accepts pinyin, navigates diagram types and renders the inserted document', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
+  const { ws } = await openSession(
+    app,
+    page,
+    workspaces,
+    'Block menu',
+    't18-chat',
+    'Open authoring',
+    { 'article.md': '# Notes\n\n' },
+  );
+  await idle(page);
+  await page.getByTestId('tool-files').click();
+  await page.getByTestId('tile-maximize-files').click();
+  await page.getByRole('treeitem', { name: 'article.md' }).click();
+  await page.getByTestId('md-mode-edit').check();
+  const editor = page.getByTestId('markdown-editor-input');
+  await editor.click();
+  await editor.press(mod + '+End');
+  await editor.press('End');
+  await editor.press('Enter');
+  await editor.press('/');
+  const list = page.getByRole('listbox', { name: 'Insert Markdown' });
+  await expect(list.getByRole('group')).toHaveCount(3);
+  const folder = list.getByRole('option', { name: 'Mermaid diagram', exact: true });
+  await folder.hover();
+  const child = page.getByRole('listbox', { name: 'Mermaid diagram', exact: true });
+  await expect(child.getByRole('option')).toHaveCount(8);
+  await page.screenshot({ path: info.outputPath('slash-diagrams.png') });
+  await editor.press('ArrowLeft');
+  await expect(child).toHaveCount(0);
+  await editor.press('ArrowRight');
+  await editor.press('ArrowDown');
+  await editor.press('Tab');
+  await expect
+    .poll(() => readFile(path.join(ws, 'article.md'), 'utf8'))
+    .toContain('sequenceDiagram');
+  await editor.press(mod + '+End');
+  await editor.press('End');
+  await editor.press('Enter');
+  await page.keyboard.insertText('、');
+  // insertText follows Electron's committed-text path, including non-ASCII triggers.
+  await page.keyboard.type('jg');
+  await expect(page.getByRole('option', { name: 'Warning', exact: true })).toBeVisible();
+  await editor.press('Enter');
+  await expect.poll(() => readFile(path.join(ws, 'article.md'), 'utf8')).toContain('[!WARNING]');
+  await page.getByTestId('md-mode-preview').check();
+  await expect(
+    page.getByTestId('markdown-reader').locator('figure.markdown-diagram img'),
+  ).toBeVisible();
+});
+
+test('every authored Mermaid template renders offline as an image in the reading pane', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  const kinds = ['flowchart', 'sequence', 'class', 'state', 'er', 'gantt', 'pie', 'mindmap'];
+  await openSession(app, page, workspaces, 'Diagram templates', 't18-chat', 'Open diagrams', {
+    'diagrams.md': '# Diagrams\n\n',
+  });
+  await idle(page);
+  await page.getByTestId('tool-files').click();
+  await page.getByTestId('tile-maximize-files').click();
+  await page.getByRole('treeitem', { name: 'diagrams.md' }).click();
+  await page.getByTestId('md-mode-source').check();
+  const field = page.getByTestId('markdown-editor-input');
+  await field.click();
+  for (const kind of kinds) {
+    await field.press(mod + '+End');
+    await field.press('End');
+    await field.press('Enter');
+    await page.keyboard.type('/' + kind);
+    const option = page
+      .getByRole('listbox', { name: 'Insert Markdown' })
+      .getByRole('option')
+      .first();
+    await expect(option).toHaveAttribute('data-command', 'diagram-' + kind);
+    await field.press('Enter');
+  }
+  await page.getByTestId('md-mode-preview').check();
+  const figures = page.getByTestId('markdown-reader').locator('figure.markdown-diagram');
+  await expect(figures).toHaveCount(kinds.length);
+  for (const [i, kind] of kinds.entries()) {
+    const figure = figures.nth(i);
+    await figure.scrollIntoViewIfNeeded();
+    await expect
+      .poll(
+        () =>
+          figure
+            .locator('img')
+            .evaluateAll((images) =>
+              images.some((image) => (image as HTMLImageElement).naturalWidth > 0),
+            ),
+        { message: kind, timeout: 15000 },
+      )
+      .toBe(true);
+  }
+});

@@ -38,6 +38,7 @@ export function FileActionsMenu({
   actions,
   onRevealInTree,
   extraItems,
+  documentItems,
   onClose,
 }: {
   readonly at: FileMenuPoint;
@@ -46,6 +47,7 @@ export function FileActionsMenu({
   readonly actions: FileActions;
   readonly onRevealInTree?: (path: string) => void;
   readonly extraItems?: readonly MenuItem[];
+  readonly documentItems?: readonly MenuItem[] | undefined;
   readonly onClose: () => void;
 }) {
   const { t, platform } = useApp();
@@ -174,10 +176,22 @@ export function FileActionsMenu({
   }
   return createPortal(
     <MenuPopup
-      items={[...items, ...(extraItems ?? [])]}
+      items={
+        documentItems
+          ? [
+              ...documentItems,
+              {
+                id: 'md-file',
+                label: t('md.selection.file'),
+                submenu: [...items, ...(extraItems ?? [])],
+              },
+            ]
+          : [...items, ...(extraItems ?? [])]
+      }
+
       at={at}
       onClose={onClose}
-      label={t('files.tree.actions')}
+      label={t(documentItems ? 'md.selection.menu' : 'files.tree.actions')}
       testId="file-actions-menu"
     />,
     win.document.body,

@@ -7,7 +7,10 @@ export type Span =
   | { readonly kind: 'math'; readonly text: string }
   | { readonly kind: 'note'; readonly label: string; readonly number: number }
   | { readonly kind: 'text'; readonly text: string }
-  | { readonly kind: 'strong' | 'emphasis' | 'delete'; readonly children: readonly Span[] }
+  | {
+      readonly kind: 'strong' | 'emphasis' | 'delete' | 'mark' | 'sub' | 'sup' | 'u';
+      readonly children: readonly Span[];
+    }
   | { readonly kind: 'code'; readonly text: string }
   | {
       readonly kind: 'link';

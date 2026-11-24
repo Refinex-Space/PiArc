@@ -13,7 +13,7 @@ import {
 } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
 import { RichWidget, type WidgetContent, hostOf } from './widget-host.js';
-import { TableWidget } from './live-table.js';
+import { TableWidget, tableArrowKeys } from './live-table.js';
 import { parseTable } from './table-model.js';
 
 export const liveMode = Facet.define<boolean, boolean>({ combine: (values) => values[0] ?? false });
@@ -78,6 +78,24 @@ class Marker extends WidgetType {
     return el;
   }
 }
+type CalloutKind = 'note' | 'tip' | 'important' | 'warning' | 'caution';
+class CalloutTitle extends WidgetType {
+  constructor(
+    readonly kind: CalloutKind,
+    readonly title: string,
+  ) {
+    super();
+  }
+  override eq(other: CalloutTitle) {
+    return this.kind === other.kind && this.title === other.title;
+  }
+  toDOM(view: EditorView) {
+    const label = view.dom.ownerDocument.createElement('strong');
+    label.className = 'md-callout-title';
+    label.textContent = this.title || hostOf(view.state).t(`files.md.callout.${this.kind}`);
+    return label;
+  }
+}
 const hide = Decoration.replace({});
 function inlineDecorations(view: EditorView): DecorationSet {
   const { state } = view;
@@ -123,7 +141,18 @@ function inlineDecorations(view: EditorView): DecorationSet {
             }
           return;
         }
-        if (['StrongEmphasis', 'Emphasis', 'Strikethrough', 'InlineCode'].includes(name)) {
+        if (
+          [
+            'StrongEmphasis',
+            'Emphasis',
+            'Strikethrough',
+            'InlineCode',
+            'Highlight',
+            'Subscript',
+            'Superscript',
+            'Underline',
+          ].includes(name)
+        ) {
           mark(from, to, 'md-' + name);
           if (!active)
             for (let c = n.firstChild; c; c = c.nextSibling)
@@ -158,16 +187,33 @@ function inlineDecorations(view: EditorView): DecorationSet {
           name === 'CodeBlock' ||
           name === 'FrontMatter'
         ) {
+          const firstLine = state.doc.lineAt(from);
+          const callout =
+            name === 'Blockquote' && n.parent?.name === 'Document'
+              ? /^( {0,3}>[ \t]*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:[ \t]+(.*))?$/iu.exec(
+                  firstLine.text,
+                )
+              : null;
+          const kind = callout?.[2]?.toLowerCase() as CalloutKind | undefined;
+          if (kind && callout && !touches(state, firstLine.from, firstLine.to)) {
+            replace(
+              firstLine.from + (callout[1]?.length ?? 0),
+              firstLine.to,
+              new CalloutTitle(kind, callout[3]?.trim() ?? ''),
+            );
+          }
           const start = state.doc.lineAt(Math.max(from, r.from)).number,
             end = state.doc.lineAt(Math.min(to, r.to)).number;
           for (let i = start; i <= end; i++)
             line(
               state.doc.line(i).from,
-              name === 'Blockquote'
-                ? 'md-quote'
-                : name === 'FrontMatter'
-                  ? 'md-frontmatter'
-                  : 'md-code-block',
+              kind
+                ? 'md-callout md-callout-' + kind
+                : name === 'Blockquote'
+                  ? 'md-quote'
+                  : name === 'FrontMatter'
+                    ? 'md-frontmatter'
+                    : 'md-code-block',
             );
         } else if (name === 'QuoteMark' && !lineSelected()) {
           replace(
@@ -198,7 +244,7 @@ function inlineDecorations(view: EditorView): DecorationSet {
               );
             return false;
           }
-          mark(first.to, second.from, 'md-live-link', { title: href });
+          mark(first.to, second.from, 'md-live-link', { title: href, 'data-href': href });
           if (!active) {
             replace(from, first.to);
             replace(second.from, to);
@@ -223,25 +269,21 @@ function blockWidgets(state: EditorState): DecorationSet {
     enter(ref) {
       const n = ref.node;
       if (ref.name === 'Table') {
-        if (
-          n.parent?.name === 'Document' &&
-          ref.to - ref.from < 65536 &&
-          !touches(state, ref.from, ref.to, true)
-        ) {
+        if (ref.to - ref.from < 65536 && !touches(state, ref.from, ref.to, true)) {
           const source = state.sliceDoc(ref.from, ref.to),
             model = parseTable(source, 0);
           if (model && model.columns <= 32 && model.rows.length < 128)
             out.push(
-              Decoration.replace({ widget: new TableWidget(source), block: true }).range(
-                ref.from,
-                ref.to,
-              ),
+              Decoration.replace({
+                widget: new TableWidget(source, state.readOnly),
+                block: true,
+              }).range(ref.from, ref.to),
             );
         }
         return false;
       }
       if (ref.name === 'FencedCode' || ref.name === 'BlockMath') {
-        if (touches(state, ref.from, ref.to) || ref.to - ref.from > 65536) return false;
+        if (ref.to - ref.from > 65536) return false;
         const child = (name: string, node: SyntaxNode = n) => {
           const c = node.getChild(name);
           return c ? state.sliceDoc(c.from, c.to) : '';
@@ -260,13 +302,15 @@ function blockWidgets(state: EditorState): DecorationSet {
               inline: false,
             };
         }
-        if (content)
+        if (content) {
+          const widget = new RichWidget(content);
+          const editing = touches(state, ref.from, ref.to);
           out.push(
-            Decoration.replace({ widget: new RichWidget(content), block: true }).range(
-              ref.from,
-              ref.to,
-            ),
+            editing
+              ? Decoration.widget({ widget, block: true, side: 1 }).range(ref.to)
+              : Decoration.replace({ widget, block: true }).range(ref.from, ref.to),
           );
+        }
         return false;
       }
       return !['Paragraph', 'FrontMatter', 'HTMLBlock'].includes(ref.name);
@@ -328,6 +372,7 @@ const liveViewport = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 export const liveExtensions = [
+  tableArrowKeys,
   focused,
   viewport,
   blocks,

@@ -214,3 +214,8 @@
   min-width: 24px;
   min-height: 24px;
 }
+
+.markdown-reading mark {
+  color: var(--piarc-workbench-ink);
+  background: var(--piarc-state-warning-subtle);
+}

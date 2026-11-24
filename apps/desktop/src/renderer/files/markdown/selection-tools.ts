@@ -3,18 +3,30 @@
 import { syntaxTree } from '@codemirror/language';
 import { Prec, StateEffect, StateField, EditorState } from '@codemirror/state';
 import { EditorView, ViewPlugin, keymap, showTooltip } from '@codemirror/view';
-import type { SyntaxNode } from '@lezer/common';
-import { applyFormat } from './formatting.js';
+import { selectionIcon, type SelectionAction } from './selection-icons.js';
+import { applyFormat, formatActive } from './formatting.js';
 import { hostOf } from './widget-host.js';
-const shapes = {
-  bold: 'M6 4h7a4 4 0 0 1 0 8H6zM6 12h8a4 4 0 0 1 0 8H6z',
-  italic: 'M10 4h9M5 20h9M15 4 9 20',
-  strike: 'M16 6c-1-2-7-2-8 0s0 4 4 5M5 12h14M8 17c2 3 8 3 9 0s-1-4-4-5',
-  inlineCode: 'm8 7-5 5 5 5m8-10 5 5-5 5',
-  link: 'M10 14a4 4 0 0 0 5 0l3-3a4 4 0 0 0-5-5l-2 2m3 2a4 4 0 0 0-5 0l-3 3a4 4 0 0 0 5 5l2-2',
-  quote: 'M4 5h16M8 10h12M8 15h10M4 9v10',
+const groups: readonly (readonly SelectionAction[])[] = [
+  ['h1', 'h2', 'h3'],
+  ['bold', 'italic', 'strike', 'inlineCode', 'inlineMath', 'link'],
+  ['bullet', 'ordered', 'task', 'quote'],
+];
+export const selectionBindings = {
+  bold: 'Mod-b',
+  italic: 'Mod-i',
+  underline: 'Mod-u',
+  strike: 'Mod-Shift-x',
+  link: 'Mod-Alt-k',
 } as const;
-const commands = ['bold', 'italic', 'strike', 'inlineCode', 'link', 'quote'] as const;
+export function commandShortcut(view: EditorView, command: string) {
+  if (!Object.hasOwn(selectionBindings, command)) return '';
+  const mac = /Mac|iPhone|iPad/u.test(view.dom.ownerDocument.defaultView?.navigator.platform ?? '');
+  return selectionBindings[command as keyof typeof selectionBindings]
+    .replace('Mod-', mac ? '⌘' : 'Ctrl+')
+    .replace('Shift-', mac ? '⇧' : 'Shift+')
+    .replace('Alt-', mac ? '⌥' : 'Alt+')
+    .replace(/[a-z]$/u, (c) => c.toUpperCase());
+}
 const skip = new Set(['FencedCode', 'CodeBlock', 'FrontMatter', 'BlockMath', 'Table', 'HTMLBlock']);
 const selectDrag = StateEffect.define<boolean>(),
   dismiss = StateEffect.define();
@@ -34,13 +46,19 @@ export function mayFormatSelection(state: EditorState) {
   const r = state.selection.main;
   if (state.readOnly || r.empty || state.selection.ranges.length !== 1 || r.to - r.from > 4096)
     return false;
-  for (const [pos, bias] of [
-    [r.from, 1],
-    [r.to, -1],
-  ] as const)
-    for (let n: SyntaxNode | null = syntaxTree(state).resolveInner(pos, bias); n; n = n.parent)
-      if (skip.has(n.name)) return false;
-  return true;
+  let allowed = true;
+  syntaxTree(state).iterate({
+    from: r.from,
+    to: r.to,
+    enter(node) {
+      if (skip.has(node.name) && node.from < r.to && node.to > r.from) {
+        allowed = false;
+        return false;
+      }
+      return allowed;
+    },
+  });
+  return allowed;
 }
 function toolbar(view: EditorView) {
   const doc = view.dom.ownerDocument,
@@ -49,32 +67,39 @@ function toolbar(view: EditorView) {
   dom.className = 'md-selection-tools';
   dom.setAttribute('role', 'toolbar');
   dom.setAttribute('aria-label', t('md.edit.selectionTools'));
-  for (const command of commands) {
-    const button = doc.createElement('button');
-    button.type = 'button';
-    button.tabIndex = -1;
-    button.dataset.command = command;
-    button.setAttribute(
-      'aria-label',
-      t('md.edit.selectionAction', { action: t(`md.edit.${command}`) }),
-    );
-    button.title = t(`md.edit.${command}`);
-    const ns = 'http://www.w3.org/2000/svg',
-      icon = doc.createElementNS(ns, 'svg'),
-      glyph = doc.createElementNS(ns, 'path');
-    icon.setAttribute('viewBox', '0 0 24 24');
-    icon.setAttribute('aria-hidden', 'true');
-    glyph.setAttribute('d', shapes[command]);
-    icon.append(glyph);
-    button.append(icon);
-    button.onmousedown = (e) => {
-      e.preventDefault();
-    };
-    button.onclick = () => {
-      applyFormat(view, command, (n) => t('md.edit.column', { n }));
-    };
-    dom.append(button);
+  const buttons = new Map<SelectionAction, HTMLButtonElement>();
+  for (const [index, actions] of groups.entries()) {
+    if (index > 0) {
+      const separator = doc.createElement('span');
+      separator.setAttribute('role', 'separator');
+      separator.setAttribute('aria-orientation', 'vertical');
+      dom.append(separator);
+    }
+    for (const command of actions) {
+      const button = doc.createElement('button'),
+        label = t(`md.edit.${command}`),
+        shortcut = commandShortcut(view, command);
+      button.type = 'button';
+      button.tabIndex = -1;
+      button.dataset.command = command;
+      button.title = shortcut ? label + ' (' + shortcut + ')' : label;
+      button.setAttribute('aria-label', t('md.edit.selectionAction', { action: label }));
+      button.append(selectionIcon(doc, command));
+      buttons.set(command, button);
+      button.onmousedown = (e) => {
+        e.preventDefault();
+      };
+      button.onclick = () => {
+        applyFormat(view, command, (n) => t('md.edit.column', { n }));
+      };
+      dom.append(button);
+    }
   }
+  const update = () => {
+    for (const [action, button] of buttons)
+      button.setAttribute('aria-pressed', String(formatActive(view.state, action)));
+  };
+  update();
   dom.onkeydown = (e) => {
     const buttons = Array.from(dom.querySelectorAll('button')),
       index = buttons.indexOf(e.target as HTMLButtonElement);
@@ -102,7 +127,37 @@ function toolbar(view: EditorView) {
       buttons[(next + buttons.length) % buttons.length]?.focus();
     }
   };
-  return { dom, offset: { x: 0, y: 5 } };
+  // CodeMirror clamps and flips within the owning editor, including split panes and detached windows.
+  const offset = { x: 0, y: 6 };
+  return {
+    dom,
+    offset,
+    update,
+    getCoords: () => {
+      const r = view.state.selection.main,
+        first = view.coordsAtPos(r.from),
+        last = view.coordsAtPos(r.to),
+        viewport = view.scrollDOM.getBoundingClientRect();
+      const a = first ?? last,
+        b = last ?? first;
+      if (!a || !b)
+        return {
+          left: viewport.left,
+          right: viewport.left,
+          top: viewport.top - 1,
+          bottom: viewport.top - 1,
+        };
+      const width = dom.getBoundingClientRect().width;
+      offset.x = -width / 2;
+      const x = Math.max(viewport.left, Math.min(viewport.right, (a.left + b.right) / 2));
+      return {
+        left: x,
+        right: x,
+        top: Math.max(a.top, viewport.top),
+        bottom: Math.min(b.bottom, viewport.bottom),
+      };
+    },
+  };
 }
 const dragging = ViewPlugin.fromClass(
   class {
@@ -136,7 +191,60 @@ const dragging = ViewPlugin.fromClass(
     }
   },
 );
+const toolbarStyle = EditorView.baseTheme({
+  '.cm-tooltip.md-selection-tools': {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '2px',
+    padding: '3px',
+    boxSizing: 'border-box',
+    border: '1px solid var(--piarc-border-subtle)',
+    borderRadius: 'var(--piarc-radius-button)',
+    background: 'var(--piarc-surface-raised)',
+    color: 'var(--piarc-text-secondary)',
+    boxShadow: 'var(--piarc-shadow-overlay)',
+    fontFamily: 'var(--piarc-font-ui)',
+    maxWidth: '100%',
+  },
+  '.md-selection-tools button': {
+    display: 'inline-grid',
+    placeItems: 'center',
+    width: '26px',
+    height: '26px',
+    padding: '0',
+    border: '0',
+    borderRadius: 'var(--piarc-radius-sm)',
+    color: 'inherit',
+    background: 'transparent',
+    cursor: 'pointer',
+  },
+  '.md-selection-tools button:hover,.md-selection-tools button:focus-visible': {
+    color: 'var(--piarc-text-primary)',
+    background: 'var(--piarc-surface-hover)',
+  },
+  '.md-selection-tools button[aria-pressed=true]': {
+    color: 'var(--piarc-text-primary)',
+    background: 'var(--piarc-surface-active)',
+  },
+  '.md-selection-tools [role=separator]': {
+    width: '1px',
+    height: '16px',
+    margin: '0 3px',
+    background: 'var(--piarc-border-subtle)',
+  },
+  '.md-selection-tools svg': {
+    width: '16px',
+    height: '16px',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '1.8',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  },
+});
 export const selectionTools = [
+  toolbarStyle,
   toolbarState,
   dragging,
   showTooltip.compute([toolbarState, 'selection', 'doc', EditorState.readOnly], (state) => {
@@ -148,6 +256,13 @@ export const selectionTools = [
   }),
   Prec.high(
     keymap.of([
+      ...Object.entries(selectionBindings).map(([command, key]) => ({
+        key,
+        run: (v: EditorView) =>
+          applyFormat(v, command as keyof typeof selectionBindings, (n) =>
+            hostOf(v.state).t('md.edit.column', { n }),
+          ),
+      })),
       {
         key: 'Alt-F10',
         run: (v) => {

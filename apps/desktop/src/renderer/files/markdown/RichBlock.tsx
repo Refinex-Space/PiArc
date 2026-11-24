@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useT } from '../../app/app-context.js';
 import { useSurfaceDocument } from '../../app/surface-document.js';
 import { useDarkScheme } from '../../transcript/use-color-scheme.js';
-import { drawDiagram } from './diagram-client.js';
+import { MediaTrigger } from './MediaTrigger.js';
+import { drawDiagram, type DiagramImage } from './diagram-client.js';
 export function MarkdownMath({ source, inline }: { source: string; inline: boolean }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -35,7 +36,13 @@ export function MarkdownMath({ source, inline }: { source: string; inline: boole
   }, [source, inline]);
   return <span ref={ref} className={inline ? 'markdown-inline-math' : 'markdown-display-math'} />;
 }
-export function MarkdownDiagram({ source }: { source: string }) {
+export function MarkdownDiagram({
+  source,
+  editing = false,
+}: {
+  source: string;
+  editing?: boolean;
+}) {
   const doc = useSurfaceDocument(),
     dark = useDarkScheme(),
     t = useT();
@@ -44,7 +51,7 @@ export function MarkdownDiagram({ source }: { source: string }) {
   const [result, setResult] = useState<{
     source: string;
     dark: boolean;
-    image?: string;
+    image?: DiagramImage;
     error?: string;
   }>();
   useEffect(() => {
@@ -66,20 +73,25 @@ export function MarkdownDiagram({ source }: { source: string }) {
   useEffect(() => {
     if (!visible) return;
     const controller = new AbortController();
-    void drawDiagram(doc, source, dark, controller.signal).then(
-      (image) => {
-        if (!controller.signal.aborted) setResult({ source, dark, image });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setResult({
-            source,
-            dark,
-            error: error instanceof Error ? error.message : String(error),
-          });
-      },
-    );
+    // Typing in a live fence may replace the entire CM widget. Debounce even a first
+    // draw so unmounted source revisions never enter the shared drawing queue.
+    const timer = setTimeout(() => {
+      void drawDiagram(doc, source, dark, controller.signal).then(
+        (image) => {
+          if (!controller.signal.aborted) setResult({ source, dark, image });
+        },
+        (error: unknown) => {
+          if (!controller.signal.aborted)
+            setResult({
+              source,
+              dark,
+              error: error instanceof Error ? error.message : String(error),
+            });
+        },
+      );
+    }, 150);
     return () => {
+      clearTimeout(timer);
       controller.abort();
     };
   }, [source, dark, visible, doc]);
@@ -87,7 +99,13 @@ export function MarkdownDiagram({ source }: { source: string }) {
   return (
     <figure className="markdown-diagram" ref={ref} aria-label={t('files.md.diagram')}>
       {shown?.image ? (
-        <img src={shown.image} alt={t('files.md.diagram')} />
+        <MediaTrigger
+          src={shown.image.url}
+          natural={shown.image.size}
+          label={t('files.md.diagram')}
+          editing={editing}
+          kind="diagram"
+        />
       ) : (
         <>
           <pre>{source}</pre>
@@ -104,5 +122,13 @@ export function markdownRichBlock(kind: 'math' | 'mermaid', source: string, inli
     <MarkdownMath source={source} inline={inline} />
   ) : (
     <MarkdownDiagram source={source} />
+  );
+}
+
+export function markdownEditingBlock(kind: 'math' | 'mermaid', source: string, inline: boolean) {
+  return kind === 'mermaid' ? (
+    <MarkdownDiagram source={source} editing />
+  ) : (
+    <MarkdownMath source={source} inline={inline} />
   );
 }

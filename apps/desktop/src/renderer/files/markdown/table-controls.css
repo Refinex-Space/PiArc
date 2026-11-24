@@ -1,0 +1,248 @@
+/* The control rails sit outside the cell hit targets. A wide table scrolls
+   independently inside these rails; menus remain local to its document. */
+.cm-editor .md-live-table[data-table-widget] {
+  box-sizing: border-box;
+  position: relative;
+  overflow: visible;
+  margin: var(--piarc-space-1) 0;
+  padding: 24px;
+}
+.cm-editor .md-live-table[data-table-widget] > .md-table-scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  visibility: visible;
+  scrollbar-width: thin;
+}
+.cm-editor .md-table-scroller table {
+  max-width: none;
+}
+.cm-editor .md-table-grip {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-workbench-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+.cm-editor .md-table-grip[hidden],
+.md-table-popover[hidden] {
+  display: none;
+}
+.cm-editor .md-table-grip::before {
+  content: '';
+  box-sizing: border-box;
+  border-radius: var(--piarc-radius-sm);
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+}
+.cm-editor .md-table-grip:is(:hover, :focus-visible)::before {
+  background: var(--piarc-surface-active);
+}
+.cm-editor .md-table-grip::after {
+  content: '';
+  position: absolute;
+}
+.cm-editor .md-table-grip[data-table-control='row']::after,
+.cm-editor .md-table-grip[data-table-control='column']::after,
+.cm-editor .md-table-grip[data-table-control='corner']::after {
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1.4px);
+  background-size: 4px 4px;
+}
+.cm-editor .md-table-grip[data-table-control='row']::after {
+  width: 8px;
+  height: 12px;
+}
+.cm-editor .md-table-grip[data-table-control='column']::after {
+  width: 12px;
+  height: 8px;
+}
+.cm-editor .md-table-grip[data-table-control='corner']::after {
+  width: 8px;
+  height: 8px;
+}
+.cm-editor
+  .md-table-grip:is(
+    [data-table-control='append-row'],
+    [data-table-control='append-column']
+  )::after {
+  content: '+';
+  font: var(--piarc-font-size-body) var(--piarc-font-ui);
+}
+.cm-editor .md-table-grip[data-table-control='append-row']::before {
+  width: 100%;
+  height: 12px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip[data-table-control='append-column']::before {
+  height: 100%;
+  width: 12px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip:is(:focus-visible, :hover) {
+  color: var(--piarc-text-accent);
+}
+.cm-editor .md-live-table [data-table-selected],
+.cm-editor .md-live-table[data-table-hover-axis='row'] [data-hover-row] :is(th, td),
+.cm-editor .md-live-table[data-table-hover-axis='column'] [data-hover-column],
+.cm-editor .md-live-table[data-table-hover-axis='corner'] :is(th, td) {
+  background: var(--piarc-surface-selected);
+}
+.cm-editor .md-live-table [data-table-drop='row'] :is(th, td) {
+  box-shadow: inset 0 2px var(--piarc-accent-solid);
+}
+.cm-editor .md-live-table [data-table-drop='column'] {
+  box-shadow: inset 2px 0 var(--piarc-accent-solid);
+}
+.md-table-popover {
+  position: fixed;
+  inset: auto;
+  z-index: 50;
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 8px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+  min-width: min(188px, calc(100vw - 8px));
+  margin: 0;
+  padding: var(--piarc-space-1);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-body);
+  line-height: 1.4;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-workbench-menu-radius);
+  box-shadow: var(--piarc-shadow-overlay);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-workbench-ink);
+}
+.md-table-popover .md-table-menu-tabs {
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-hover);
+  margin-bottom: var(--piarc-space-1);
+}
+.md-table-menu-tabs button,
+.md-table-menu-item,
+.md-table-size button {
+  font: inherit;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.md-table-menu-tabs button {
+  font-size: var(--piarc-font-size-small);
+  min-height: 24px;
+  border-radius: var(--piarc-radius-sm);
+  padding: 0 var(--piarc-space-1);
+  flex: 1;
+  white-space: nowrap;
+}
+.md-table-menu-tabs button[aria-pressed='true'] {
+  background: var(--piarc-surface-raised);
+  box-shadow: var(--piarc-shadow-button);
+}
+.md-table-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--piarc-size-button-height);
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  text-align: start;
+}
+.md-table-menu-item:disabled {
+  color: var(--piarc-text-disabled);
+  cursor: default;
+}
+.md-table-menu-item:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--piarc-surface-hover);
+}
+.md-table-menu-item:focus-visible,
+.md-table-menu-tabs button:focus-visible {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: -2px;
+}
+.md-table-menu-item[data-danger='true'] {
+  color: var(--piarc-text-danger);
+}
+.md-table-menu-item[aria-haspopup='menu']::after {
+  content: '›';
+  margin-inline-start: auto;
+}
+.md-table-menu-item[aria-checked='true']::after {
+  content: '✓';
+  margin-inline-start: auto;
+}
+.md-table-popover hr {
+  height: 1px;
+  border: 0;
+  margin: var(--piarc-space-1) var(--piarc-space-2);
+  background: var(--piarc-border-subtle);
+}
+.md-table-size-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  margin: var(--piarc-space-1);
+}
+.md-table-size-grid button {
+  height: 14px;
+  background: var(--piarc-surface-app);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: 2px;
+}
+.md-table-size-grid button[data-fill='true'] {
+  background: var(--piarc-surface-selected);
+  border-color: var(--piarc-c-focus-ring);
+}
+.md-table-size {
+  display: flex;
+  gap: var(--piarc-space-1);
+  align-items: end;
+  padding: var(--piarc-space-1);
+}
+.md-table-size label {
+  display: grid;
+  gap: 2px;
+  font-size: var(--piarc-font-size-small);
+}
+.md-table-size input {
+  width: 5ch;
+  height: 24px;
+  color: inherit;
+  background: var(--piarc-surface-input);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+}
+.md-table-size button {
+  min-height: 24px;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-active);
+}
+
+.cm-editor .md-table-grip[data-table-control='row']::before {
+  width: 10px;
+  height: calc(100% - 2px);
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip[data-table-control='column']::before {
+  width: calc(100% - 2px);
+  height: 10px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip[data-table-control='corner']::before {
+  height: 14px;
+  width: 14px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor
+  .md-table-grip[data-table-control]:is(:hover, :focus-visible, [aria-expanded='true'])::before {
+  background: var(--piarc-surface-active);
+}

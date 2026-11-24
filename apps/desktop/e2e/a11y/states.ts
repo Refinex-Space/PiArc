@@ -179,11 +179,31 @@ export const A11Y_STATES = [
   {
     id: 'dialog:md-image',
     area: 'dialog',
-    source: 'files/markdown/MarkdownImage.tsx',
-    note: 'local Markdown image viewer',
+    source: 'files/markdown/MediaViewer.tsx',
+    note: 'pan, zoom and rotate local Markdown images and rendered Mermaid diagrams',
   },
   { id: 'panel:files', area: 'panel', panel: 'files', note: 'workspace files tile' },
   { id: 'state:files-source', area: 'state', note: 'file tabs, source lines and the file tree' },
+  {
+    id: 'state:md-selection',
+    area: 'state',
+    note: 'formatting toolbar anchored to a real text selection',
+  },
+  {
+    id: 'state:md-body-menu',
+    area: 'state',
+    note: 'contextual Markdown editing and clipboard actions',
+  },
+  {
+    id: 'state:md-table-controls',
+    area: 'state',
+    note: 'row and column actions on an editable document table',
+  },
+  {
+    id: 'state:md-slash',
+    area: 'state',
+    note: 'grouped document commands and the diagram submenu',
+  },
   { id: 'state:files-editor', area: 'state', note: 'editable project file' },
   {
     id: 'dialog:files-discard',

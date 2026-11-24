@@ -49,3 +49,26 @@ it('keeps compound front matter intact and indexes the following heading at its 
   expect(doc.headings[0]?.line).toBe(5);
   expect(parseDocument('+++\ntitle = "Release"\n+++\n').fields).toEqual([['title', '"Release"']]);
 });
+
+it('renders authored inline formats as semantic nodes, including nested emphasis, with arbitrary HTML inert', () => {
+  const doc = parseDocument(
+    '==**marked**== H~2~O x^2^ <u>under</u> ~~gone~~ `==literal==` <u class=x>plain</u>',
+  );
+  const block = doc.blocks[0]?.block;
+  expect(block?.kind).toBe('paragraph');
+  if (block?.kind !== 'paragraph') throw new Error('Expected paragraph');
+  expect(block.spans).toEqual(
+    expect.arrayContaining([
+      {
+        kind: 'mark',
+        children: [{ kind: 'strong', children: [{ kind: 'text', text: 'marked' }] }],
+      },
+      { kind: 'sub', children: [{ kind: 'text', text: '2' }] },
+      { kind: 'sup', children: [{ kind: 'text', text: '2' }] },
+      { kind: 'u', children: [{ kind: 'text', text: 'under' }] },
+      { kind: 'delete', children: [{ kind: 'text', text: 'gone' }] },
+      { kind: 'code', text: '==literal==' },
+      { kind: 'html', text: '<u class=x>' },
+    ]),
+  );
+});

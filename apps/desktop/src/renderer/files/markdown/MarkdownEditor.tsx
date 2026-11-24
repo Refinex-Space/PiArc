@@ -77,6 +77,7 @@ export interface MarkdownEditorProps {
   chooseImage?: (placement: ImagePlacement) => Promise<string | null>;
   onImageSettings?: () => void;
   renderImage?: (src: string, alt: string) => ReactNode;
+  followLink?: (href: string) => void;
   renderBlock?: (kind: 'math' | 'mermaid', source: string, inline: boolean) => ReactNode;
   ref?: Ref<MarkdownEditorHandle>;
 }
@@ -312,6 +313,20 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
           return false;
         },
         mousedown: (event, v) => {
+          if (
+            callbacks.current.mode === 'live' &&
+            (event.metaKey || event.ctrlKey) &&
+            event.button === 0
+          ) {
+            const link = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+              '.md-live-link',
+            );
+            if (link?.dataset.href && callbacks.current.followLink) {
+              event.preventDefault();
+              callbacks.current.followLink(link.dataset.href);
+              return true;
+            }
+          }
           if (event.target === v.contentDOM) forgetTableSelection(v);
           return false;
         },
@@ -342,7 +357,18 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       highlightSpecialChars(),
       history(),
       search({ top: true }),
-      tooltips({ tooltipSpace: (view) => view.dom.getBoundingClientRect() }),
+      tooltips({
+        tooltipSpace: (view) => {
+          const b = view.dom.getBoundingClientRect();
+          const inset = Math.min(8, b.width / 4, b.height / 4);
+          return {
+            left: b.left + inset,
+            right: b.right - inset,
+            top: b.top + inset,
+            bottom: b.bottom - inset,
+          };
+        },
+      }),
       ...liveExtensions,
       slashMenu,
       selectionTools,

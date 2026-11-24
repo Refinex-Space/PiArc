@@ -1,9 +1,14 @@
 // One isolated drawing surface per window. Never insert the SVG into the workbench DOM.
 import { projectRecord } from '../../../shared/project-files.js';
+import { diagramSize, type MediaSize } from './media-camera.js';
+export interface DiagramImage {
+  url: string;
+  size: MediaSize | undefined;
+}
 interface Drawing {
   source: string;
   dark: boolean;
-  resolve: (image: string) => void;
+  resolve: (image: DiagramImage) => void;
   reject: (reason: Error) => void;
   signal: AbortSignal;
 }
@@ -14,13 +19,13 @@ class DiagramQueue {
   private queue: Drawing[] = [];
   private active: Drawing | undefined;
   private timer: number | undefined;
-  private cache = new Map<string, string>();
+  private cache = new Map<string, DiagramImage>();
   private cacheSize = 0;
   constructor(private readonly doc: Document) {}
   private key(source: string, dark: boolean) {
     return (dark ? 'd' : 'l') + source;
   }
-  draw(source: string, dark: boolean, signal: AbortSignal): Promise<string> {
+  draw(source: string, dark: boolean, signal: AbortSignal): Promise<DiagramImage> {
     if (source.length > 32768) return Promise.reject(new Error('Diagram exceeds 32 KiB'));
     const key = this.key(source, dark),
       cached = this.cache.get(key);
@@ -45,17 +50,20 @@ class DiagramQueue {
     this.clearTimer();
     const svg = event.data.svg;
     if (typeof svg === 'string' && svg.length <= 2 * 1024 * 1024 && /^<svg[\s>]/u.test(svg)) {
-      const image = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      const image: DiagramImage = {
+        url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+        size: diagramSize(svg),
+      };
       const key = this.key(task.source, task.dark);
-      if (!this.cache.has(key) && image.length <= 2 * 1024 * 1024) {
-        while (this.cache.size >= 32 || this.cacheSize + image.length > 4 * 1024 * 1024) {
+      if (!this.cache.has(key) && image.url.length <= 2 * 1024 * 1024) {
+        while (this.cache.size >= 32 || this.cacheSize + image.url.length > 4 * 1024 * 1024) {
           const oldest = this.cache.entries().next().value;
           if (!oldest) break;
-          this.cacheSize -= oldest[1].length;
+          this.cacheSize -= oldest[1].url.length;
           this.cache.delete(oldest[0]);
         }
         this.cache.set(key, image);
-        this.cacheSize += image.length;
+        this.cacheSize += image.url.length;
       }
       task.resolve(image);
     } else

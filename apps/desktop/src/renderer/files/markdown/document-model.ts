@@ -1,7 +1,8 @@
 // File-only grammar adapted from Markdown Studio e6ebd0c, web/core/features/viewers/markdown/render.ts
 // (Apache-2.0, third-party/licenses/markdown-studio.LICENSE). Emit typed nodes instead of HTML.
 import { Marked, type Token, type TokenizerAndRendererExtension } from 'marked';
-import { toBlocks, type ConvertOptions } from '../../transcript/markdown/to-ir.js';
+import { inlineStyles, inlineStyleTokens } from './inline-styles.js';
+import { spans, toBlocks, type ConvertOptions } from '../../transcript/markdown/to-ir.js';
 import { taskMarker } from './task-marker.js';
 import type { Block, ListItem, Span } from '../../transcript/markdown/ir.js';
 
@@ -11,6 +12,7 @@ export interface DocumentBlock {
   end: number;
   anchor?: string;
   callout?: Callout;
+  calloutTitle?: string;
 }
 export interface Heading {
   title: string;
@@ -91,6 +93,7 @@ export function parseDocument(raw: string): MarkdownDocument {
   const definitions = new Map<string, Token[]>(),
     numbers = new Map<string, number>();
   const extensions: TokenizerAndRendererExtension[] = [
+    ...inlineStyleTokens,
     {
       name: 'fileFormula',
       level: 'block',
@@ -150,6 +153,10 @@ export function parseDocument(raw: string): MarkdownDocument {
   const tokens = lexer.lexer(source);
   const options: ConvertOptions = {
     documentSpan(token) {
+      if (token.type.startsWith('fileStyle-')) {
+        const kind = inlineStyles.find((k) => token.type === 'fileStyle-' + k);
+        if (kind && 'tokens' in token) return { kind, children: spans(token.tokens, options) };
+      }
       if (token.type === 'fileInlineMath' && typeof token.text === 'string')
         return { kind: 'math', text: token.text };
       if (token.type === 'fileNote' && typeof token.label === 'string') {
@@ -185,9 +192,13 @@ export function parseDocument(raw: string): MarkdownDocument {
       const first = block.blocks[0],
         span = first?.kind === 'paragraph' ? first.spans[0] : undefined;
       if (first?.kind === 'paragraph' && span?.kind === 'text') {
-        const m = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(?:\n|$)/iu.exec(span.text);
+        const m =
+          /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:[ \t]+([^\n]*))?[ \t]*(?:\n|$)/iu.exec(
+            span.text,
+          );
         if (m) {
           entry.callout = m[1]?.toLowerCase() as Callout;
+          if (m[2]?.trim()) entry.calloutTitle = m[2].trim();
           const rest = span.text.slice(m[0].length);
           const lead = first.spans.slice(1);
           if (rest) lead.unshift({ kind: 'text', text: rest });

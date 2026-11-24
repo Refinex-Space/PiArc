@@ -1,28 +1,27 @@
-import { createPortal } from 'react-dom';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useT } from '../../app/app-context.js';
-import { Button } from '../../app/Button.js';
+import { MediaTrigger } from './MediaTrigger.js';
 import { useSurfaceDocument } from '../../app/surface-document.js';
-import { Dialog } from '../../shell/Dialog.js';
 import { loadMarkdownImage } from '../markdown-images/use-markdown-images.js';
 export function MarkdownImage({
   sessionId,
   path,
   source,
   alt,
+  editing = false,
 }: {
   sessionId: string;
   path: string;
   source: string;
   alt: string;
+  editing?: boolean;
 }) {
   const t = useT(),
     doc = useSurfaceDocument(),
-    ref = useRef<HTMLSpanElement>(null),
-    title = useId();
+    ref = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false),
     [sourceUrl, setUrl] = useState<{ source: string; url: string } | null>(null);
-  const [zoom, setZoom] = useState<null | number>(null),
+  const [held, setHeld] = useState(false),
     [failed, setFailed] = useState(false);
   const remote = /^https?:\/\//iu.test(source);
   useEffect(() => {
@@ -39,7 +38,7 @@ export function MarkdownImage({
       observer.disconnect();
     };
   }, [doc]);
-  const needed = visible || zoom !== null;
+  const needed = visible || held;
   useEffect(() => {
     if (!needed || remote) return;
     let used = true,
@@ -84,62 +83,21 @@ export function MarkdownImage({
   return (
     <span ref={ref} className="markdown-image">
       {src && !failed ? (
-        <button
-          type="button"
-          className="markdown-image-open"
-          title={t('files.md.zoomImage', { name: label })}
-          onClick={() => {
-            setZoom(1);
+        <MediaTrigger
+          kind="image"
+          editing={editing}
+          src={src}
+          label={label}
+          onOpenChange={setHeld}
+          onError={() => {
+            setFailed(true);
           }}
-        >
-          <img
-            alt={label}
-            src={src}
-            onError={() => {
-              setFailed(true);
-            }}
-          />
-        </button>
+        />
       ) : (
         <span className="muted">
           {failed ? t('files.md.imageMissing', { name: label }) : label}
         </span>
       )}
-      {zoom !== null &&
-        src &&
-        createPortal(
-          <Dialog
-            testId="markdown-image-dialog"
-            labelledBy={title}
-            wide
-            onCancel={() => {
-              setZoom(null);
-            }}
-            dismissOnBackdrop
-          >
-            <div className="markdown-image-tools">
-              <h2 id={title}>{label}</h2>
-              <Button
-                onClick={() => {
-                  setZoom(zoom === 1 ? 2 : 1);
-                }}
-              >
-                {t(zoom === 1 ? 'files.md.zoomIn' : 'files.md.fit')}
-              </Button>
-              <Button
-                onClick={() => {
-                  setZoom(null);
-                }}
-              >
-                {t('files.md.close')}
-              </Button>
-            </div>
-            <div className="markdown-image-zoom" data-fit={zoom === 1}>
-              <img alt={label} src={src} />
-            </div>
-          </Dialog>,
-          doc.body,
-        )}
     </span>
   );
 }

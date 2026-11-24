@@ -148,3 +148,27 @@ describe('the Markdown editing document', () => {
     }
   });
 });
+
+it('parses semantic inline markers in editable Markdown without changing strikethrough, fenced examples or tags with attributes', async () => {
+  const { syntaxTree } = await import('@codemirror/language');
+  const state = EditorState.create({
+    doc: '==**marked**== H~2~O x^2^ <u>under</u> ~~gone~~ `^literal^` <u class=x>plain</u>',
+    extensions: [markdownSupport()],
+  });
+  const tree: string[] = [];
+  syntaxTree(state).iterate({
+    enter(node) {
+      tree.push(node.name);
+    },
+  });
+  for (const node of [
+    'Highlight',
+    'Superscript',
+    'Subscript',
+    'Underline',
+    'Strikethrough',
+    'InlineCode',
+  ])
+    expect(tree).toContain(node);
+  expect(tree.filter((node) => node === 'Underline')).toHaveLength(1);
+});

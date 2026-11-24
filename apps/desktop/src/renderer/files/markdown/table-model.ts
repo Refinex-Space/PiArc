@@ -60,7 +60,9 @@ function pipes(text: string): number[] {
 }
 
 export function parseLine(text: string, from: number): TableLine {
-  const indent = text.slice(0, text.length - text.trimStart().length);
+  // Continuation lines from Lezer retain their quote/list prefix even though the
+  // node's first line starts at the first cell. It is layout, not a cell.
+  const indent = /^[ \t]*(?:>[ \t]*)*/u.exec(text)?.[0] ?? '';
   const body = text.slice(indent.length);
   const trimmed = body.trimEnd();
   const rest = body.slice(trimmed.length);
@@ -180,7 +182,7 @@ export function setCell(t: TableModel, row: number, col: number, text: string): 
 export function insertRow(t: TableModel, at: number): Change {
   const like = t.rows[0] ?? t.header;
   const text = serializeLine({
-    indent: t.header.indent,
+    indent: t.delimiter.indent,
     leading: like.leading,
     trailing: like.trailing,
     rest: '',

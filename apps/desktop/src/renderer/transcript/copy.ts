@@ -18,6 +18,10 @@ function spanText(spans: readonly Span[]): string {
           return '\n';
         case 'strong':
         case 'emphasis':
+        case 'mark':
+        case 'sub':
+        case 'sup':
+        case 'u':
         case 'delete':
           return spanText(span.children);
         case 'link': {

@@ -55,7 +55,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   const ws = await makeWorkspace(workspaces, 'a11y 无障碍', {
     'notes.txt': 'The release is on Friday.\n',
     'guide.md':
-      '# Project Guide\n\n![Local sample](./image.png)\n\nEquation $x^2$ with a note[^1].\n\n[^1]: Check local files.\n',
+      '# Project Guide\n\n| Day | Status |\n| --- | --- |\n| Today | Ready |\n\n![Local sample](./image.png)\n\nEquation $x^2$ with a note[^1].\n\n[^1]: Check local files.\n',
     '.piarc/settings.json': JSON.stringify({
       hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'true' }] }] },
     }),
@@ -109,6 +109,37 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await page.getByTestId('md-mode-edit').check();
   await expect(page.getByTestId('markdown-editor-input')).toBeVisible();
   await checkState(page, 'state:md-live');
+  const cell = page.getByRole('textbox', { name: 'Row 2, column 1', exact: true });
+  await cell.hover();
+  await page.locator('[data-table-control=row]').click();
+  await expect(page.getByRole('menu', { name: 'Row actions', exact: true })).toBeVisible();
+  await checkState(page, 'state:md-table-controls');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('md-mode-source').check();
+  const author = page.getByTestId('markdown-editor-input');
+  await author.click();
+  await author.press(MOD + '+Home');
+  await author.press('Home');
+  await author.press('Shift+End');
+  await expect(page.getByRole('toolbar', { name: 'Format selection' })).toBeVisible();
+  await checkState(page, 'state:md-selection');
+  await author.press('Shift+F10');
+  const authorMenu = page.getByRole('menu', { name: 'Markdown actions', exact: true });
+  await expect(authorMenu).toBeVisible();
+  await checkState(page, 'state:md-body-menu');
+  await page.keyboard.press('Escape');
+  await author.focus();
+  await author.press(MOD + '+End');
+  await author.press('End');
+  await author.press('Enter');
+  await author.press('/');
+  const slash = page.getByRole('listbox', { name: 'Insert Markdown' });
+  await slash.getByRole('option', { name: 'Mermaid diagram', exact: true }).hover();
+  await expect(page.getByRole('listbox', { name: 'Mermaid diagram', exact: true })).toBeVisible();
+  await checkState(page, 'state:md-slash');
+  await author.press('Escape');
+  await author.press('Escape');
+  await author.press('Backspace');
   await page.getByTestId('md-mode-split').check();
   await expect(
     page.getByTestId('markdown-reader').getByRole('heading', { name: 'Project Guide' }),

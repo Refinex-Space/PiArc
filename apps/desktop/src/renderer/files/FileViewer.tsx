@@ -20,6 +20,7 @@ import { FileActionsMenu, type FileActions } from './FileActionsMenu.js';
 import { useFileDocument } from './viewer-document.js';
 import { FileSelectionBar } from './viewer-selection.js';
 import { MarkdownModes, type FileMode } from './markdown/MarkdownModes.js';
+import { ReaderSelectionTools } from './markdown/ReaderSelectionTools.js';
 import { MarkdownWorkspace, type MarkdownWorkspaceHandle } from './markdown/MarkdownWorkspace.js';
 import { FileEditor } from './viewer-editor.js';
 import { GoToLine, ViewerFind, useFileFind } from './viewer-find.js';
@@ -123,6 +124,31 @@ export function FileViewer({
     }
   }, [markdown, mode]);
   const menu = useMenu();
+  const [documentItems, setDocumentItems] = useState<MenuItem[]>();
+  const menuTicket = useRef(0);
+  useEffect(() => {
+    if (!visible) {
+      menuTicket.current++;
+      menu.close();
+    }
+  }, [visible, menu.close]);
+
+  useEffect(() => {
+    if (!markdown || !editable || !visible || mode === 'preview') return;
+    const observe = () => {
+      if (win.document.hasFocus())
+        void window.piarc
+          .projectFileAction(sessionId, path, 'observeMarkdownPaste')
+          .catch((e: unknown) => {
+            console.warn('[files] Markdown paste observer unavailable', reason(e));
+          });
+    };
+    observe();
+    win.addEventListener('focus', observe);
+    return () => {
+      win.removeEventListener('focus', observe);
+    };
+  }, [markdown, editable, visible, mode, win, sessionId, path]);
   function copy(text: string) {
     void win.navigator.clipboard.writeText(text).catch((e: unknown) => {
       addToast({ sessionId, text: t('files.viewer.copyError', { reason: reason(e) }) });
@@ -208,6 +234,46 @@ export function FileViewer({
     },
     [path, onAttach],
   );
+  const commentOn = (value: FileSelection) => {
+    setSelection(value);
+    setComment('');
+  };
+  const showBodyMenu = (eventPath: EventTarget[], x: number, y: number, keyboard = false) => {
+    const ticket = ++menuTicket.current,
+      scope = main.current;
+    if (!markdown || !scope) {
+      setDocumentItems(undefined);
+      menu.openAt(x, y);
+      return;
+    }
+    const report = (e: unknown) => {
+      addToast({ sessionId, text: t('files.viewer.failed', { reason: reason(e) }) });
+    };
+    void import('./markdown/body-context.js')
+      .then((module) => {
+        if (
+          ticket !== menuTicket.current ||
+          main.current !== scope ||
+          !scope.isConnected ||
+          !scope.getClientRects().length
+        )
+          return;
+        const items = module.markdownBodyActions(eventPath, { x, y }, keyboard, lines, {
+          t,
+          copy: (s) => win.navigator.clipboard.writeText(s),
+          paste: () => window.piarc.projectFileAction(sessionId, path, 'pasteMarkdown'),
+          attach: attachSelection,
+          comment: commentOn,
+          report,
+          openLink: (address) => {
+            module.openMarkdownAddress(address, sessionId, root ?? '', path, report);
+          },
+        });
+        setDocumentItems(items);
+        menu.openAt(x, y);
+      })
+      .catch(report);
+  };
   const extra: MenuItem[] = [];
   if (file?.kind === 'image')
     extra.push({
@@ -305,6 +371,7 @@ export function FileViewer({
       aria-label={path}
       role="group"
       data-testid="file-viewer"
+      data-md-session={markdown ? sessionId : undefined}
       data-dirty={doc.dirty || undefined}
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing) return;
@@ -489,14 +556,14 @@ export function FileViewer({
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          menu.openAt(event.clientX, event.clientY);
+          showBodyMenu(event.nativeEvent.composedPath(), event.clientX, event.clientY);
         }}
         onKeyDown={(event) => {
           if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
             event.preventDefault();
             event.stopPropagation();
             const box = event.currentTarget.getBoundingClientRect();
-            menu.openAt(box.left + 8, box.top + 8);
+            showBodyMenu(event.nativeEvent.composedPath(), box.left + 8, box.top + 8, true);
           }
         }}
       >
@@ -595,6 +662,7 @@ export function FileViewer({
               entries={[{ path }]}
               actions={fileActions}
               extraItems={extra}
+              documentItems={documentItems}
               {...(onRevealInTree ? { onRevealInTree } : {})}
               onClose={menu.close}
             />
@@ -602,6 +670,7 @@ export function FileViewer({
             <MenuPopup
               at={menu.open}
               items={[
+                ...(documentItems ?? []),
                 {
                   id: 'attach',
                   label: t('files.viewer.attachFile'),
@@ -616,6 +685,16 @@ export function FileViewer({
             />
           ))}
       </div>
+      {markdown && visible && (mode === 'preview' || mode === 'split') && (
+        <ReaderSelectionTools
+          scope={main}
+          lines={lines}
+          copy={copy}
+          attach={attachSelection}
+          comment={commentOn}
+          edit={editable ? edit : undefined}
+        />
+      )}
       {selection && (
         <FileSelectionBar
           selection={selection}

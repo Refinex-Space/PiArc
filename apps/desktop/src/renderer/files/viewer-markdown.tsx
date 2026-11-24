@@ -53,7 +53,7 @@ const Chapter = memo(function Chapter({ entry }: { entry: DocumentBlock }) {
     >
       {entry.callout && entry.block.kind === 'blockquote' ? (
         <aside className={'markdown-callout is-' + entry.callout}>
-          <strong>{t(`files.md.callout.${entry.callout}`)}</strong>
+          <strong>{entry.calloutTitle ?? t(`files.md.callout.${entry.callout}`)}</strong>
           <MarkdownView blocks={entry.block.blocks} />
         </aside>
       ) : (

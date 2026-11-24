@@ -30,6 +30,7 @@ export type MenuItem = {
   /** A second line under the label. */
   readonly hint?: string;
   readonly tooltip?: string;
+  readonly shortcut?: string;
 } & (
   | { readonly submenu: readonly MenuItem[]; readonly run?: never }
   | { readonly submenu?: never; readonly run: () => void }
@@ -323,6 +324,11 @@ export function MenuPopup({
         <span className="menu-item-text">{item.label}</span>
         {item.selected === true && <CheckIcon />}
         {item.submenu && <ChevronRightIcon />}
+        {item.shortcut && (
+          <span className="menu-shortcut" aria-hidden="true">
+            {item.shortcut}
+          </span>
+        )}
         {numbered && (
           <span className="menu-shortcut" aria-hidden="true">
             {i + 1}

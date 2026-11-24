@@ -39,7 +39,7 @@ export default defineConfig({
             path.join(licences, 'markdown-studio.LICENSE'),
           ],
           [
-            'Marklyra (Refinex) — adapted local image validation',
+            'Marklyra (Refinex) — adapted editor interactions and local image validation',
             path.join(licences, 'marklyra.LICENSE'),
           ],
           ['Mermaid', path.join(path.dirname(engineFile), '../LICENSE')],

@@ -124,6 +124,17 @@ function SpanView({ span }: { span: Span }): ReactNode {
           <Spans spans={span.children} />
         </em>
       );
+    case 'mark':
+    case 'sup':
+    case 'sub':
+    case 'u': {
+      const Tag = span.kind;
+      return (
+        <Tag>
+          <Spans spans={span.children} />
+        </Tag>
+      );
+    }
     case 'delete':
       return (
         <del>

@@ -1,6 +1,7 @@
 // Core resolves every project-relative name before any OS integration. Editors are fixed
 // native applications. No project executable, shell command or renderer-supplied program runs.
 import path from 'node:path';
+import { markdownPaste } from './markdown-paste.js';
 import { takePickedInsertion } from './markdown-image-save.js';
 import { installedEditors, openInFileEditor } from '../platform/file-editors.js';
 import { randomUUID } from 'node:crypto';
@@ -60,7 +61,16 @@ export function registerProjectFileHandlers(
       throw new TypeError('Invalid project file action');
     if (action === 'editors')
       return JSON.stringify((await installedEditors()).map(({ id, name }) => ({ id, name })));
-    input.requireInput(sender, id, 'files');
+    if (action !== 'observeMarkdownPaste') input.requireInput(sender, id, 'files');
+    if (action === 'observeMarkdownPaste' || action === 'pasteMarkdown')
+      return markdownPaste(
+        action,
+        id,
+        file,
+        sender,
+        () => BrowserWindow.getFocusedWindow()?.webContents,
+        fileOwner,
+      );
     if (action === 'editorMenu') {
       const focus = BrowserWindow.getFocusedWindow();
       if (!focus || (focus.webContents !== sender && fileOwner(focus.webContents) !== sender))
