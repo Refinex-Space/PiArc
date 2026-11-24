@@ -169,21 +169,26 @@ export function TasksCard({ sessionId }: { readonly sessionId: string }) {
                   {(task.tail ?? []).slice(-CARD_LINES).join('\n')}
                 </pre>
               ) : null}
-              <StopButton task={task} />
-              <OpenTerminalButton task={task} />
+              {task.status === 'running' && (
+                <div className="bg-card-actions">
+                  <OpenTerminalButton task={task} />
+                  <StopButton task={task} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
-      <button
-        type="button"
-        className="button"
+      <Button
+        size="small"
+        variant="ghost"
+        className="bg-card-all"
         onClick={() => {
           showPanel('background-tasks');
         }}
       >
         {t('bgTasks.openPanel')}
-      </button>
+      </Button>
     </div>
   );
 }

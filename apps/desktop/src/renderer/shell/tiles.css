@@ -207,3 +207,17 @@ body[data-tool-window] > #tool-root {
 .tool-tile-header:has(> [data-tile-grip]:enabled) > .tool-tile-actions {
   margin-inline-start: 0;
 }
+
+/* On a short title row the project sidebar still provides the history controls. */
+@container session-frame (max-width: 460px) {
+  .workbench-header .history-buttons > button:not(:first-child) {
+    display: none;
+  }
+  .workbench-header,
+  .session-tools {
+    gap: 0;
+  }
+  .workbench-header .view-control > button {
+    min-width: var(--piarc-space-5);
+  }
+}

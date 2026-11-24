@@ -10,8 +10,13 @@
 .main-row:has(.workbench-rail) {
   position: relative;
 }
-.panel-area.workbench-rail,
-.panel-area.workbench-rail .rail-sections {
+.panel-area.workbench-rail {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: max(35%, calc(100% - 340px));
+  background: var(--piarc-workbench-canvas);
+}
+.workbench-rail .rail-sections {
   padding: 0 var(--piarc-space-4);
   scrollbar-gutter: auto;
 }

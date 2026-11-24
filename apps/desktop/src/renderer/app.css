@@ -2893,7 +2893,8 @@ textarea.input {
 }
 
 /* The desk and its navigation share a title bar and a single reading column. */
-.shell {
+.shell,
+body[data-tool-window] {
   --piarc-surface-app: var(--piarc-workbench-canvas);
   --piarc-text-primary: var(--piarc-workbench-ink);
   --piarc-text-secondary: var(--piarc-workbench-muted);

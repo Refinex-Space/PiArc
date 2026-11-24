@@ -46,9 +46,9 @@ export function TerminalTabs({
         {tabs.map((tab, index) => {
           const selected = tab.taskId === active?.taskId;
           const label = nameOf(tab, index);
-          const context = (x: number, y: number) => {
+          const context = (x: number, y: number, anchor?: HTMLElement) => {
             setTarget(tab.taskId);
-            menu.openAt(x, y);
+            menu.openAt(x, y, anchor);
           };
           return (
             <div
@@ -140,7 +140,7 @@ export function TerminalTabs({
                         case 'ContextMenu': {
                           if (event.key === 'F10' && !event.shiftKey) return;
                           const rect = event.currentTarget.getBoundingClientRect();
-                          context(rect.left, rect.bottom);
+                          context(rect.left, rect.bottom, event.currentTarget);
                           break;
                         }
                         default:

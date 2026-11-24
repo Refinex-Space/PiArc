@@ -1,5 +1,6 @@
 // In-process layout only. Pop-out, pinning and redocking are exercised by the native-window
 // journey; these assertions use actual CSS-pixel geometry and live terminal/side-chat state.
+import { waitForPanel } from './terminal-panel.js';
 import type { BrowserWindow } from 'electron';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './sessions.js';
@@ -78,6 +79,7 @@ test('live tools split to the right, resize, move, maximize and restore without 
   await expect
     .poll(async () => Math.abs((await box(term)).height - (await box(changes)).height))
     .toBeLessThanOrEqual(1);
+  await waitForPanel(page, (text) => text.trim().length > 0, 'the running shell prompt');
   await page.screenshot({ path: info.outputPath('terminal-and-changes.png') });
 
   const grip = page.getByTestId('tile-move-changes');
@@ -177,6 +179,9 @@ test('side chat keeps its unsent draft across sibling tools and maximization', a
   const preview = page.getByTestId('tile-preview');
   const files = page.getByTestId('tile-files');
   await expect(preview).toBeVisible();
+  const empty = await box(preview.getByTestId('preview-placeholder'));
+  const body = await box(preview.getByTestId('tile-body-preview'));
+  expect(Math.abs(body.y + body.height / 2 - (empty.y + empty.height / 2))).toBeLessThanOrEqual(1);
   await expect(files).toBeVisible();
   await expect(input).toBeVisible();
   await page.getByTestId('tile-maximize-files').click();

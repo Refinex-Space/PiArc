@@ -1,5 +1,7 @@
 /* One strip for session terminals. Fixed controls stay reachable while the tabs scroll. */
 :root[data-app] .workbench-terminal {
+  --piarc-c-terminal-background: var(--piarc-workbench-canvas);
+  --piarc-c-terminal-foreground: var(--piarc-workbench-ink);
   position: relative;
   min-inline-size: 0;
   background: var(--piarc-c-terminal-background);

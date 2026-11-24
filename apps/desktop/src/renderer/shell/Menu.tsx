@@ -37,6 +37,7 @@ interface MenuPoint {
   readonly y: number;
   readonly above?: boolean;
   readonly flipLeft?: number;
+  readonly anchor?: HTMLElement;
 }
 
 export function useMenu() {
@@ -46,8 +47,8 @@ export function useMenu() {
   }, []);
   return {
     open,
-    openAt: (x: number, y: number) => {
-      setOpen({ x, y });
+    openAt: (x: number, y: number, anchor?: HTMLElement) => {
+      setOpen(anchor ? { x, y, anchor } : { x, y });
     },
     openAbove: (button: HTMLElement) => {
       const rect = button.getBoundingClientRect();
@@ -99,6 +100,7 @@ export function MenuPopup({
   const dismiss = branch?.dismiss ?? onClose;
   const [child, setChild] = useState<{ id: string; at: MenuPoint; keyboard: boolean }>();
   const [left, setLeft] = useState(at.x);
+  const [top, setTop] = useState(at.y);
   useLayoutEffect(() => {
     const width = ref.current?.offsetWidth ?? 0;
     setLeft(
@@ -155,6 +157,15 @@ export function MenuPopup({
         event.target.closest<HTMLElement>('[data-menu-tree]')?.dataset.menuTree === group
       )
         return;
+      // A roving tab can scroll into place just after its keyboard menu opens.
+      // Keep that menu anchored and ignore scrolls from unrelated panels.
+      if (at.anchor?.isConnected && event.type === 'scroll') {
+        if (event.target instanceof win.Element && !event.target.contains(at.anchor)) return;
+        const rect = at.anchor.getBoundingClientRect();
+        setLeft(rect.left);
+        setTop(rect.bottom);
+        return;
+      }
       dismiss();
     };
     win.addEventListener('resize', repositioned);
@@ -163,7 +174,7 @@ export function MenuPopup({
       win.removeEventListener('resize', repositioned);
       ownerDoc.removeEventListener('scroll', repositioned, true);
     };
-  }, [dismiss, group, win, ownerDoc]);
+  }, [at, dismiss, group, win, ownerDoc]);
   const run = (item: MenuItem | undefined, keyboard = true) => {
     if (item !== undefined && item.disabled !== true) {
       if (item.submenu) openChild(item, items.indexOf(item), keyboard);
@@ -232,7 +243,7 @@ export function MenuPopup({
   };
   // Percentages in translate resolve against the rendered menu, including gaps and wrapped hints.
   const style = {
-    transform: `translate(clamp(0px, ${String(left)}px, calc(100vw - 100%)), clamp(0px, calc(${String(at.y)}px - ${at.above === true ? '100%' : '0%'}), calc(100vh - 100%)))`,
+    transform: `translate(clamp(0px, ${String(left)}px, calc(100vw - 100%)), clamp(0px, calc(${String(top)}px - ${at.above === true ? '100%' : '0%'}), calc(100vh - 100%)))`,
   };
   const activeId = items[active] ? `${id}-${String(active)}` : undefined;
   const rows = items.map((item, i) => (

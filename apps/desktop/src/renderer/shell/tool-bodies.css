@@ -305,6 +305,16 @@
   color: var(--piarc-text-primary);
 }
 
-.tool-tile-body > .tool-empty {
+:root[data-app] .tool-tile-body > .tool-empty {
   min-height: 100%;
+}
+
+.bg-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--piarc-space-1);
+}
+.bg-tasks-card .bg-card-all {
+  justify-self: start;
 }

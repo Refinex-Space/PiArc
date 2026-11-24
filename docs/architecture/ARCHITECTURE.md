@@ -286,6 +286,7 @@ PiArc/
 | [0072](../adr/0072-macos-local-asset-responses.md) | macOS 在应用协议上直接返回资源字节 | 保留请求边界和响应头，减少主进程内存占用 |
 | [0073](../adr/0073-settings-segmented-control-reference.md) | 桌面前端可复刻 Claude Desktop 的视觉与交互 | 分项校准 UI，内核与 Harness 独立演进 |
 | [0074](../adr/0074-workbench-settings.md) | 设置使用工作台内模态面板 | 对齐设置布局、焦点与导航行为 |
+| [0075](../adr/0075-session-tool-tiles.md) | 会话工具右侧分块与受控独立窗口 | 详情随主会话，工具可独立调整位置、大小和回停靠 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |

@@ -133,7 +133,17 @@ test('THR-04 a whole mock session makes no outbound connection from Electron', a
   // The control: one loopback request through Chromium's network stack must show in the log
   // (the app's own pages are served in-process and leave nothing there).
   const control = `${mock.baseUrl}/_piarc/requests`;
-  await app.evaluate(({ net }, url) => net.fetch(url).then((r) => r.status), control);
+  // NetLog covers Chromium sessions process-wide. Keep the loopback control in memory so
+  // that only this synthetic request avoids opening a persistent cookie encryption key.
+  const status = await app.evaluate(
+    ({ session }, url) =>
+      session
+        .fromPartition('piarc-netlog-control')
+        .fetch(url, { credentials: 'omit' })
+        .then((r) => r.status),
+    control,
+  );
+  expect(status).toBe(200);
 
   const mainProcess = await app.evaluate(
     () => (globalThis as { __piarcConnections?: string[] }).__piarcConnections ?? [],
