@@ -312,7 +312,7 @@ test('the document slash menu, selection toolbar and code language picker edit t
   await expect
     .poll(() => readFile(path.join(ws, 'commands.md'), 'utf8'))
     .toContain('**Plain text**');
-  const picker = page.getByLabel('Code block language', { exact: true });
+  const picker = page.getByRole('combobox', { name: 'Code block language', exact: true });
   await expect(picker).toHaveCount(0);
   await page.getByTestId('md-mode-edit').check();
   await picker.fill('typescr');
