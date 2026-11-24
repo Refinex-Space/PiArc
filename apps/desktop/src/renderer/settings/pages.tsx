@@ -443,7 +443,12 @@ function ShortcutsPage() {
                       type="button"
                       className="shortcut-recorder"
                       aria-pressed={isRecording}
-                      aria-label={t('settings.shortcuts.change', { command: t(command.label) })}
+                      aria-label={[
+                        isRecording
+                          ? t('settings.shortcuts.recording')
+                          : displayKey(binding, keyPlatform) || t('settings.shortcuts.unbound'),
+                        t('settings.shortcuts.change', { command: t(command.label) }),
+                      ].join(' · ')}
                       aria-describedby={message ? valueId + ' ' + errorId : valueId}
                       data-testid={`shortcut-key-${command.id}`}
                       title={t('settings.shortcuts.change', { command: t(command.label) })}
