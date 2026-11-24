@@ -445,7 +445,13 @@ export function FilesPanel({ id }: { id: string }) {
             />
           )}
           {tabs.paths.map((path) => (
-            <div role="tabpanel" aria-label={path} key={path} hidden={path !== active}>
+            <div
+              role="tabpanel"
+              id={'file-content-' + encodeURIComponent(path)}
+              aria-labelledby={'file-tab-' + encodeURIComponent(path)}
+              key={path}
+              hidden={path !== active}
+            >
               <FileViewer
                 sessionId={id}
                 path={path}
