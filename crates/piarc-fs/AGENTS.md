@@ -64,3 +64,5 @@ Core 层的集成测试在 `crates/piarc-core/tests/tool_io.rs`（越界、会�
 - `Scope::label` 接受规范路径与 `display()` 写法（检查点记录的是后者）：Windows 上规范根带 `\\?\` 前缀，只按规范根剥离时标签会变成绝对路径（W2）。
 - 单元测试的临时目录名必须各不相同：同名的 `TempTree` 在并行测试里会互相删除。
 - Windows 上 `Scope::locate` 拒绝保留设备名（`CON`、`NUL`、`COM1` 等，带扩展名同样）和以点或空格结尾的名字（`EINVAL`）：句柄相对的打开不走 Win32 的名字规则，会建出资源管理器打不开、之后按路径也读不到的文件（W1）。Windows 路径的生产路径回归在 `piarc-core` 的 `tool_io/policy/tests.rs` 的 `windows_paths`：超过 260 字符的路径、保留名，以及需要 `PIARC_TEST_UNC_SHARE` 的 UNC 工作区。
+
+Markdown 本地图片在 `project::images` 中校验和发布。新文件按真实格式命名，仅在绑定目录下独占创建；同名且内容相同可复用，同名不同内容依次加后缀。用户原生选择的图片目录记录规范路径和目录对象身份，仅供本地图片使用；不要把该目录加到智能体的文件 scope。图片目录被替换后必须重新选择。

@@ -78,6 +78,10 @@ impl Scope {
         })
     }
 
+    pub(crate) fn root_identity(&self) -> (u64, u64) {
+        self.root_binding.identity()
+    }
+
     /// Restricts a desktop file view to the retained project directory. Added directories,
     /// temporary tool results and individual agent approvals do not travel into this view.
     #[must_use]

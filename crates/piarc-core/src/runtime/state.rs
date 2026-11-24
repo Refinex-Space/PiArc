@@ -77,6 +77,21 @@ impl CoreRuntime {
         })
     }
 
+    /// Reads or updates local Markdown image storage. Only the native host supplies folder grants.
+    ///
+    /// # Errors
+    /// Invalid preferences or directory identity, inaccessible storage, managed setting, or shutdown.
+    pub fn markdown_image_settings(
+        &self,
+        request: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        let managed = self.storage()?.dirs().managed().clone();
+        self.client_settings_job(on_done, move |dir| {
+            crate::markdown_images::update(dir, &managed, &request)
+        })
+    }
+
     fn client_settings_job(
         &self,
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,

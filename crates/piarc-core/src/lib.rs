@@ -85,6 +85,7 @@ pub mod host_probe;
 pub mod identity;
 pub mod keychain_probe;
 pub mod managed;
+mod markdown_images;
 pub mod mcp;
 pub mod plugins;
 pub mod providers;

@@ -1,6 +1,7 @@
 //! The session's Files tool: each operation works relative to a retained project directory.
 //! Paths returned to the renderer use forward slashes on both supported platforms.
 mod download;
+pub mod images;
 mod search;
 #[cfg(test)]
 mod tests;

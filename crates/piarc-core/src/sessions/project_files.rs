@@ -38,6 +38,16 @@ enum Request {
     Export {
         path: String,
     },
+    ImageImport {
+        path: String,
+        name: String,
+        bytes: String,
+        source: Option<PathBuf>,
+    },
+    ImagePreview {
+        path: String,
+        reference: String,
+    },
     Save {
         path: String,
         text: String,
@@ -73,6 +83,7 @@ impl Request {
         scope: &Scope,
         locks: &piarc_fs::PathLocks,
         stop: &CancellationToken,
+        images: Option<&project::images::Preferences>,
     ) -> piarc_fs::Result<Value> {
         match self {
             Request::List {
@@ -120,13 +131,33 @@ impl Request {
                 },
                 &|| stop.is_cancelled(),
             ),
+            Request::ImageImport {
+                path,
+                name,
+                bytes,
+                source,
+            } => project::images::import_base64(
+                scope,
+                images.expect("image preferences"),
+                &path,
+                &name,
+                &bytes,
+                source.as_deref(),
+                piarc_config::claude::is_claude_path,
+            ),
+            Request::ImagePreview { path, reference } => project::images::preview(
+                scope,
+                images.expect("image preferences"),
+                &path,
+                &reference,
+            ),
             Request::Cancel { .. } => unreachable!("cancellation is handled without I/O"),
         }
     }
 }
 impl Hub {
     pub(crate) async fn project_files(&self, id: String, request_json: String) -> Result<Value> {
-        if request_json.len() > 8 * 1024 * 1024 {
+        if request_json.len() > 12 * 1024 * 1024 {
             return Err(invalid("request is too large"));
         }
         let request: Request = serde_json::from_str(&request_json)
@@ -192,28 +223,42 @@ impl Hub {
             None
         };
         let locks = self.ctx.tool_io.file_locks();
+        let data = self.ctx.storage.dirs().data().to_owned();
 
         tokio::task::spawn_blocking(move || {
             let scope = match registered {
                 Some(scope) => scope.project_root(),
                 None => {
                     let root = fallback.expect("indexed project root");
-                    let scope = Scope::new(&root, &root)?;
+                    let scope = Scope::new(&root, &root)
+                        .map_err(|e| Error::feature(&e.to_error_object()))?;
                     if piarc_fs::display(scope.root()) != piarc_fs::display(&root) {
-                        return Err(piarc_fs::Error::ApprovalMismatch {
-                            path: piarc_fs::display(&root),
-                        });
+                        return Err(Error::feature(
+                            &piarc_fs::Error::ApprovalMismatch {
+                                path: piarc_fs::display(&root),
+                            }
+                            .to_error_object(),
+                        ));
                     }
                     scope
                 }
             };
-            request.run(&scope, &locks, &stop)
+            let prefs = if matches!(
+                request,
+                Request::ImagePreview { .. } | Request::ImageImport { .. }
+            ) {
+                Some(crate::markdown_images::read(&data)?)
+            } else {
+                None
+            };
+            request
+                .run(&scope, &locks, &stop, prefs.as_ref())
+                .map_err(|e| Error::feature(&e.to_error_object()))
         })
         .await
         .map_err(|e| Error::Internal {
             reason: format!("project file operation failed: {e}"),
         })?
-        .map_err(|e| Error::feature(&e.to_error_object()))
     }
     /// An imported history's claimed cwd is not authority to browse arbitrary files. Older
     /// records without a PiArc ownership field can use a previously opened enclosing workspace.

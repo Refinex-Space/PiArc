@@ -638,6 +638,44 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
         name: "language",
         shape: Shape::OneOf(&["system", "en", "zh-CN"]),
     },
+    // Local image settings and the native folder capability are read only from the user layer.
+    Field {
+        name: "markdownImages",
+        shape: Shape::Object(&[
+            Field {
+                name: "mode",
+                shape: Shape::OneOf(&[
+                    "reference",
+                    "document",
+                    "assets",
+                    "named",
+                    "relative",
+                    "selected",
+                ]),
+            },
+            Field {
+                name: "folder",
+                shape: Shape::String,
+            },
+            Field {
+                name: "link",
+                shape: Shape::OneOf(&["relativeDot", "relative", "absolute"]),
+            },
+            Field {
+                name: "directory",
+                shape: Shape::Object(&[
+                    Field {
+                        name: "path",
+                        shape: Shape::String,
+                    },
+                    Field {
+                        name: "identity",
+                        shape: Shape::String,
+                    },
+                ]),
+            },
+        ]),
+    },
     Field {
         name: "appearance",
         shape: Shape::Object(&[

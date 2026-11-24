@@ -684,6 +684,18 @@ impl CoreRuntime {
         })
     }
 
+    /// Local Markdown image storage choices and native directory grants.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn markdown_image_settings<'env>(
+        &self,
+        env: &'env Env,
+        request_json: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.markdownImageSettings", |core, done| {
+            core.markdown_image_settings(request_json, done)
+        })
+    }
+
     /// Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most
     /// `limit` matches. A newer search with the same `searchId` cancels this one, which then
     /// rejects with kind `cancelled`. Resolves with `{ root, results: [{ path, name,
