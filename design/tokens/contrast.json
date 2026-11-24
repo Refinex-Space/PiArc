@@ -1,6 +1,15 @@
 {
   "$description": "Foreground/background pairs the contrast check measures in every color mode (WCAG 2.2): `text` needs 4.5:1 (7:1 in high-contrast modes), `large` text and `ui` components (borders, focus rings, status badges) 3:1. Colors with alpha cannot be checked: pairs use opaque tokens only.",
   "pairs": [
+    { "fg": "workbench.ink", "bg": "workbench.canvas", "kind": "text" },
+    { "fg": "workbench.ink", "bg": "workbench.navigation", "kind": "text" },
+    { "fg": "workbench.ink", "bg": "workbench.editor", "kind": "text" },
+    { "fg": "workbench.muted", "bg": "workbench.canvas", "kind": "text" },
+    { "fg": "workbench.muted", "bg": "workbench.navigation", "kind": "text" },
+    { "fg": "workbench.muted", "bg": "workbench.editor", "kind": "text" },
+    { "fg": "border.focus", "bg": "workbench.canvas", "kind": "ui" },
+    { "fg": "border.focus", "bg": "workbench.navigation", "kind": "ui" },
+    { "fg": "border.focus", "bg": "workbench.editor", "kind": "ui" },
     { "fg": "text.primary", "bg": "surface.app", "kind": "text" },
     { "fg": "text.primary", "bg": "surface.sidebar", "kind": "text" },
     { "fg": "text.primary", "bg": "surface.raised", "kind": "text" },
