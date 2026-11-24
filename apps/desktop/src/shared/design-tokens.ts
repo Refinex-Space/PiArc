@@ -18,6 +18,11 @@ export type ColorToken =
   | 'surface.hover'
   | 'surface.active'
   | 'surface.selected'
+  | 'workbench.canvas'
+  | 'workbench.navigation'
+  | 'workbench.editor'
+  | 'workbench.ink'
+  | 'workbench.muted'
   | 'text.primary'
   | 'text.secondary'
   | 'text.disabled'
@@ -92,6 +97,13 @@ export type ScaleToken =
   | 'size.sidebarMin'
   | 'size.sidebarMax'
   | 'size.badge'
+  | 'workbench.readingWidth'
+  | 'workbench.environmentWidth'
+  | 'workbench.composerHeight'
+  | 'workbench.composerRadius'
+  | 'workbench.composerShadow'
+  | 'workbench.menuRadius'
+  | 'workbench.iconSize'
   | 'settings.width'
   | 'settings.height'
   | 'settings.rail'
@@ -174,6 +186,11 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'surface.hover': '#f0f1f3',
     'surface.active': '#e8e9ec',
     'surface.selected': '#dde3fd',
+    'workbench.canvas': '#ffffff',
+    'workbench.navigation': '#fafafa',
+    'workbench.editor': '#ffffff',
+    'workbench.ink': '#191919',
+    'workbench.muted': '#626262',
     'text.primary': '#1d2027',
     'text.secondary': '#5d626c',
     'text.disabled': '#858a94',
@@ -230,6 +247,11 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'surface.hover': '#1e2024',
     'surface.active': '#25272c',
     'surface.selected': '#202c56',
+    'workbench.canvas': '#191919',
+    'workbench.navigation': '#202020',
+    'workbench.editor': '#303030',
+    'workbench.ink': '#f1f1f1',
+    'workbench.muted': '#b3b3b3',
     'text.primary': '#eceef2',
     'text.secondary': '#a9adb7',
     'text.disabled': '#6b707c',
@@ -286,6 +308,11 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'surface.hover': '#f0f1f3',
     'surface.active': '#e8e9ec',
     'surface.selected': '#dde3fd',
+    'workbench.canvas': '#ffffff',
+    'workbench.navigation': '#ffffff',
+    'workbench.editor': '#ffffff',
+    'workbench.ink': '#000000',
+    'workbench.muted': '#000000',
     'text.primary': '#1d2027',
     'text.secondary': '#1d2027',
     'text.disabled': '#858a94',
@@ -342,6 +369,11 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'surface.hover': '#1e2024',
     'surface.active': '#25272c',
     'surface.selected': '#202c56',
+    'workbench.canvas': '#000000',
+    'workbench.navigation': '#000000',
+    'workbench.editor': '#000000',
+    'workbench.ink': '#ffffff',
+    'workbench.muted': '#ffffff',
     'text.primary': '#eceef2',
     'text.secondary': '#eceef2',
     'text.disabled': '#6b707c',
@@ -401,6 +433,11 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'surface.hover': '--piarc-surface-hover',
   'surface.active': '--piarc-surface-active',
   'surface.selected': '--piarc-surface-selected',
+  'workbench.canvas': '--piarc-workbench-canvas',
+  'workbench.navigation': '--piarc-workbench-navigation',
+  'workbench.editor': '--piarc-workbench-editor',
+  'workbench.ink': '--piarc-workbench-ink',
+  'workbench.muted': '--piarc-workbench-muted',
   'text.primary': '--piarc-text-primary',
   'text.secondary': '--piarc-text-secondary',
   'text.disabled': '--piarc-text-disabled',
@@ -472,6 +509,13 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'size.sidebarMin': '--piarc-size-sidebar-min',
   'size.sidebarMax': '--piarc-size-sidebar-max',
   'size.badge': '--piarc-size-badge',
+  'workbench.readingWidth': '--piarc-workbench-reading-width',
+  'workbench.environmentWidth': '--piarc-workbench-environment-width',
+  'workbench.composerHeight': '--piarc-workbench-composer-height',
+  'workbench.composerRadius': '--piarc-workbench-composer-radius',
+  'workbench.composerShadow': '--piarc-workbench-composer-shadow',
+  'workbench.menuRadius': '--piarc-workbench-menu-radius',
+  'workbench.iconSize': '--piarc-workbench-icon-size',
   'settings.width': '--piarc-settings-width',
   'settings.height': '--piarc-settings-height',
   'settings.rail': '--piarc-settings-rail',

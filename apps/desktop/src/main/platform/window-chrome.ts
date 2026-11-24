@@ -7,7 +7,7 @@ import { nativeTheme, type BrowserWindow, type BrowserWindowConstructorOptions }
 import { COLORS } from '../../shared/design-tokens.js';
 
 /** Height of the title bar area the page reserves (matches `--piarc-size-titlebar-height`). */
-export const TITLEBAR_HEIGHT = 40;
+export const TITLEBAR_HEIGHT = 44;
 
 /** Appearance options of the main window. */
 export function mainWindowChrome(platform: string): BrowserWindowConstructorOptions {
@@ -16,7 +16,7 @@ export function mainWindowChrome(platform: string): BrowserWindowConstructorOpti
     case 'darwin':
       return {
         titleBarStyle: 'hidden',
-        trafficLightPosition: { x: 16, y: 13 },
+        trafficLightPosition: { x: 16, y: 15 },
         vibrancy: 'sidebar',
         visualEffectState: 'followWindow',
         // Transparent so the vibrancy material shows where the page is transparent.

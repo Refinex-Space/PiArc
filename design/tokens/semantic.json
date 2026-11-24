@@ -15,6 +15,36 @@
     "active": "neutral.4",
     "selected": "accent.4"
   },
+  "workbench": {
+    "canvas": {
+      "light": "base.white",
+      "dark": "base.canvasDark",
+      "darkHighContrast": "base.black"
+    },
+    "navigation": {
+      "light": "base.sidebarLight",
+      "dark": "base.sidebarDark",
+      "lightHighContrast": "base.white",
+      "darkHighContrast": "base.black"
+    },
+    "editor": {
+      "light": "base.white",
+      "dark": "base.controlDark",
+      "darkHighContrast": "base.black"
+    },
+    "ink": {
+      "light": "base.chromeInk",
+      "dark": "base.chromeLightInk",
+      "lightHighContrast": "base.black",
+      "darkHighContrast": "base.white"
+    },
+    "muted": {
+      "light": "base.chromeMuted",
+      "dark": "base.chromeLightMuted",
+      "lightHighContrast": "base.black",
+      "darkHighContrast": "base.white"
+    }
+  },
   "text": {
     "primary": "neutral.12",
     "secondary": { "light": "neutral.11", "dark": "neutral.11", "highContrast": "neutral.12" },
@@ -102,6 +132,11 @@
     "scrim": { "light": "base.scrimLight", "dark": "base.scrimDark" }
   },
   "forcedColors": {
+    "workbench.canvas": "Canvas",
+    "workbench.navigation": "Canvas",
+    "workbench.editor": "Field",
+    "workbench.ink": "CanvasText",
+    "workbench.muted": "CanvasText",
     "surface.app": "Canvas",
     "surface.sidebar": "Canvas",
     "surface.panel": "Canvas",

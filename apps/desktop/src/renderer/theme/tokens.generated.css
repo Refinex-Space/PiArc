@@ -26,10 +26,17 @@
   --piarc-motion-easing: cubic-bezier(0.2, 0, 0, 1);
   --piarc-shadow-button: 0 1px 2px rgb(0 0 0 / 0.05);
   --piarc-shadow-overlay: 0 8px 28px rgb(0 0 0 / 0.18), 0 1px 3px rgb(0 0 0 / 0.12);
-  --piarc-size-titlebar-height: 40px;
+  --piarc-size-titlebar-height: 44px;
   --piarc-size-sidebar-min: 200px;
   --piarc-size-sidebar-max: 420px;
   --piarc-size-badge: 8px;
+  --piarc-workbench-reading-width: 768px;
+  --piarc-workbench-environment-width: 320px;
+  --piarc-workbench-composer-height: 46px;
+  --piarc-workbench-composer-radius: 15px;
+  --piarc-workbench-composer-shadow: 0 3px 16px rgb(0 0 0 / 0.055);
+  --piarc-workbench-menu-radius: 10px;
+  --piarc-workbench-icon-size: 18px;
   --piarc-settings-width: 1000px;
   --piarc-settings-height: 780px;
   --piarc-settings-rail: 208px;
@@ -106,6 +113,11 @@
   --piarc-surface-hover: #f0f1f3;
   --piarc-surface-active: #e8e9ec;
   --piarc-surface-selected: #dde3fd;
+  --piarc-workbench-canvas: #ffffff;
+  --piarc-workbench-navigation: #fafafa;
+  --piarc-workbench-editor: #ffffff;
+  --piarc-workbench-ink: #191919;
+  --piarc-workbench-muted: #626262;
   --piarc-text-primary: #1d2027;
   --piarc-text-secondary: #5d626c;
   --piarc-text-disabled: #858a94;
@@ -165,6 +177,11 @@
     --piarc-surface-hover: #1e2024;
     --piarc-surface-active: #25272c;
     --piarc-surface-selected: #202c56;
+    --piarc-workbench-canvas: #191919;
+    --piarc-workbench-navigation: #202020;
+    --piarc-workbench-editor: #303030;
+    --piarc-workbench-ink: #f1f1f1;
+    --piarc-workbench-muted: #b3b3b3;
     --piarc-text-primary: #eceef2;
     --piarc-text-secondary: #a9adb7;
     --piarc-text-disabled: #6b707c;
@@ -224,6 +241,11 @@
   --piarc-surface-hover: #f0f1f3;
   --piarc-surface-active: #e8e9ec;
   --piarc-surface-selected: #dde3fd;
+  --piarc-workbench-canvas: #ffffff;
+  --piarc-workbench-navigation: #fafafa;
+  --piarc-workbench-editor: #ffffff;
+  --piarc-workbench-ink: #191919;
+  --piarc-workbench-muted: #626262;
   --piarc-text-primary: #1d2027;
   --piarc-text-secondary: #5d626c;
   --piarc-text-disabled: #858a94;
@@ -282,6 +304,11 @@
   --piarc-surface-hover: #1e2024;
   --piarc-surface-active: #25272c;
   --piarc-surface-selected: #202c56;
+  --piarc-workbench-canvas: #191919;
+  --piarc-workbench-navigation: #202020;
+  --piarc-workbench-editor: #303030;
+  --piarc-workbench-ink: #f1f1f1;
+  --piarc-workbench-muted: #b3b3b3;
   --piarc-text-primary: #eceef2;
   --piarc-text-secondary: #a9adb7;
   --piarc-text-disabled: #6b707c;
@@ -340,6 +367,11 @@
   --piarc-surface-hover: #f0f1f3;
   --piarc-surface-active: #e8e9ec;
   --piarc-surface-selected: #dde3fd;
+  --piarc-workbench-canvas: #ffffff;
+  --piarc-workbench-navigation: #ffffff;
+  --piarc-workbench-editor: #ffffff;
+  --piarc-workbench-ink: #000000;
+  --piarc-workbench-muted: #000000;
   --piarc-text-primary: #1d2027;
   --piarc-text-secondary: #1d2027;
   --piarc-text-disabled: #858a94;
@@ -398,6 +430,11 @@
   --piarc-surface-hover: #1e2024;
   --piarc-surface-active: #25272c;
   --piarc-surface-selected: #202c56;
+  --piarc-workbench-canvas: #000000;
+  --piarc-workbench-navigation: #000000;
+  --piarc-workbench-editor: #000000;
+  --piarc-workbench-ink: #ffffff;
+  --piarc-workbench-muted: #ffffff;
   --piarc-text-primary: #eceef2;
   --piarc-text-secondary: #eceef2;
   --piarc-text-disabled: #6b707c;
@@ -473,6 +510,11 @@
 @media (forced-colors: active) {
   :root,
   :root[data-color-mode] {
+    --piarc-workbench-canvas: Canvas;
+    --piarc-workbench-navigation: Canvas;
+    --piarc-workbench-editor: Field;
+    --piarc-workbench-ink: CanvasText;
+    --piarc-workbench-muted: CanvasText;
     --piarc-surface-app: Canvas;
     --piarc-surface-sidebar: Canvas;
     --piarc-surface-panel: Canvas;
