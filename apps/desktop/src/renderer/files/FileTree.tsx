@@ -65,7 +65,7 @@ function TreeBrowser({
   onWatchDirectories,
   revision = 0,
 }: FileTreeProps) {
-  const { t, preferences } = useApp();
+  const { t } = useApp();
   const doc = useSurfaceDocument();
   const win = documentWindow(doc);
   const [query, setQuery] = useState('');
@@ -117,12 +117,24 @@ function TreeBrowser({
   }, [selection.paths, activePath, directories.expanded]);
   const pendingReveal = useRef<string | null>(null);
 
-  const size = useMemo(() => {
-    const raw = win
-      .getComputedStyle(doc.documentElement)
-      .getPropertyValue('--piarc-size-button-height');
-    return Number.parseFloat(raw) || 28;
-  }, [doc, win, preferences.appearance.density]);
+  // Appearance is applied to the owning document after React receives the preference.
+  // Observe that applied density so virtual offsets and pointer hitboxes change together.
+  const [size, setSize] = useState(28);
+  useLayoutEffect(() => {
+    const root = doc.documentElement;
+    const measure = () => {
+      const height = Number.parseFloat(
+        win.getComputedStyle(root).getPropertyValue('--piarc-size-button-height'),
+      );
+      if (Number.isFinite(height) && height > 0) setSize(height);
+    };
+    const observer = new win.MutationObserver(measure);
+    observer.observe(root, { attributes: true, attributeFilter: ['data-density'] });
+    measure();
+    return () => {
+      observer.disconnect();
+    };
+  }, [doc, win]);
   const virtual = useVirtualizer({
     count: rows.length,
     getScrollElement: () => list.current,

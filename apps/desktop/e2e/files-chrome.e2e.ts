@@ -43,7 +43,12 @@ test('the docked file title aligns with the workbench, row highlights are separa
       )
       .toBeLessThanOrEqual(0.5);
     await expect.soft(heading).toHaveCSS('border-bottom-width', '0px', { timeout: 300 });
+    const height = await page
+      .locator('html')
+      .evaluate((el) => getComputedStyle(el).getPropertyValue('--piarc-size-button-height').trim());
+    await expect(row('beta.txt')).toHaveCSS('height', height);
     await row('beta.txt').hover();
+    await expect(row('beta.txt')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     const paint = await page.getByRole('tree').evaluate((tree) => {
       const rows = [...tree.querySelectorAll('[role=treeitem]')].slice(0, 2);
       const edges = rows.map((row) => {
