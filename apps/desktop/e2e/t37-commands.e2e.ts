@@ -3,10 +3,11 @@
 // `/`), the built-in commands, the output style switched mid-session (an appended reminder, the
 // system prompt unchanged) and the Mod+K palette (actions, sessions, the session's commands, a
 // changed shortcut). Screenshots go to tmp/evidence/T37/ with PIARC_EVIDENCE_TASK=T37.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { ElectronApplication, Page, TestInfo } from '@playwright/test';
+import type { Page, TestInfo } from '@playwright/test';
 
 import { expect, focusMain, test } from './sessions.js';
 import { idle, lastUserBlocks, openSession, requests, send, typeInComposer } from './t19.js';
@@ -28,14 +29,6 @@ function lastUserText(body: Record<string, unknown>): string {
   return lastUserBlocks(body)
     .map((block) => (typeof block.text === 'string' ? block.text : ''))
     .join('\n');
-}
-
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
 }
 
 test('the / palette groups by source, searches fuzzily, hints arguments and ignores an IME /', async ({
@@ -201,12 +194,12 @@ test('Mod+K runs actions, switches sessions and commands; its shortcut can chang
   await page.keyboard.press('Escape');
 
   // Rebinding in the settings window applies at once.
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-shortcuts').click();
   await settings.getByTestId('shortcut-key-app.commandPalette').click();
   await settings.keyboard.press(`${MOD}+Shift+KeyK`);
   await expect(settings.getByTestId('shortcut-problem')).toHaveCount(0);
-  await settings.close();
+  await closeSettings(settings);
   await focusMain(app);
   await page.keyboard.press(`${MOD}+KeyK`);
   await expect(palette).toHaveCount(0);
@@ -226,7 +219,7 @@ test('the Skills & plugins page lists skills with source, overrides and warnings
       '---\ndescription: Fix an issue\nallowed-tools: Bash(git *)\ncontext: fork\nunknown-setting: custom\n---\nBranch: !`git branch`\n',
   });
   await idle(page);
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-skills').click();
   const list = settings.getByTestId('skill-list');
   await expect(list.locator('[data-name="greet"]')).toBeVisible();

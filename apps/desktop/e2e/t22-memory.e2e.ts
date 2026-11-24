@@ -1,4 +1,5 @@
 // T22: the user-level memory file preference survives closing the settings window.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -7,14 +8,11 @@ import { test as sessionTest } from './sessions.js';
 import { idle, openSession, requests } from './t19.js';
 
 test('both memory files can be enabled and disabled from General settings', async ({
-  app,
   page,
   userDataDir,
 }, testInfo) => {
   async function openGeneral() {
-    const opened = app.waitForEvent('window');
-    await page.getByTestId('open-settings').click();
-    const settings = await opened;
+    const settings = await openSettings(page);
     await settings.getByTestId('settings-page-general').waitFor();
     return settings;
   }
@@ -30,7 +28,7 @@ test('both memory files can be enabled and disabled from General settings', asyn
       page.evaluate(async () => (await window.piarc.getAppState()).preferences.memory.readBoth),
     )
     .toBe(true);
-  await settings.close();
+  await closeSettings(settings);
 
   const reopened = await openGeneral();
   await reopened.getByTestId('setting-language').selectOption('zh-CN');

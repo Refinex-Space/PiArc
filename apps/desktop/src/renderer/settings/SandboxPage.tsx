@@ -268,7 +268,7 @@ export function SandboxPage() {
   }
   const off = !view.supported;
   return (
-    <div className="settings-section" data-testid="sandbox-page">
+    <div className="settings-section settings-detail-page" data-testid="sandbox-page">
       <p className="muted">{t('sandbox.intro')}</p>
       {view.workspaces.length > 0 && (
         <div className="setting">

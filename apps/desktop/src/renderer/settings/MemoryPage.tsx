@@ -325,7 +325,7 @@ export function MemoryPage() {
   // The organization may manage the switch even before the page knows (Core refuses then).
   const locked = view?.locked === true || managed.locked.includes('/autoMemoryEnabled');
   return (
-    <div className="settings-section" data-testid="memory-page">
+    <div className="settings-section settings-detail-page" data-testid="memory-page">
       <p className="muted">{t('memory.hint')}</p>
       {chosen === null ? (
         <p className="muted">{t('agents.noWorkspace')}</p>

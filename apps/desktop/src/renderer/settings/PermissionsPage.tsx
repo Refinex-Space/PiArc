@@ -516,83 +516,83 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
   return (
     <section className="permission-audit" data-testid="permission-audit">
       <h2 className="permission-heading">{t('permissions.audit')}</h2>
-      <div className="permission-filters">
-        <label htmlFor={ids.kind} className="permission-filter-label">
-          {t('permissions.audit.kind')}
+      <div className="settings-audit-filters">
+        <label htmlFor={ids.kind} className="settings-filter-field">
+          <span>{t('permissions.audit.kind')}</span>
+          <select
+            id={ids.kind}
+            className="input"
+            value={kind}
+            data-testid="audit-kind"
+            onChange={(e) => {
+              const value = e.currentTarget.value;
+              setKind(value === 'sandbox' || value === 'autoReview' ? value : 'permission');
+            }}
+          >
+            <option value="permission">{t('permissions.audit.kind.permission')}</option>
+            <option value="sandbox">{t('permissions.audit.kind.sandbox')}</option>
+            <option value="autoReview">{t('permissions.audit.kind.autoReview')}</option>
+          </select>
         </label>
-        <select
-          id={ids.kind}
-          className="input"
-          value={kind}
-          data-testid="audit-kind"
-          onChange={(e) => {
-            const value = e.currentTarget.value;
-            setKind(value === 'sandbox' || value === 'autoReview' ? value : 'permission');
-          }}
-        >
-          <option value="permission">{t('permissions.audit.kind.permission')}</option>
-          <option value="sandbox">{t('permissions.audit.kind.sandbox')}</option>
-          <option value="autoReview">{t('permissions.audit.kind.autoReview')}</option>
-        </select>
-        <label htmlFor={ids.session} className="permission-filter-label">
-          {t('permissions.audit.session')}
+        <label htmlFor={ids.session} className="settings-filter-field">
+          <span>{t('permissions.audit.session')}</span>
+          <input
+            id={ids.session}
+            className="input"
+            value={session}
+            data-testid="audit-session"
+            onChange={(e) => {
+              setSession(e.target.value);
+            }}
+          />
         </label>
-        <input
-          id={ids.session}
-          className="input"
-          value={session}
-          data-testid="audit-session"
-          onChange={(e) => {
-            setSession(e.target.value);
-          }}
-        />
-        <label htmlFor={ids.tool} className="permission-filter-label">
-          {t('permissions.audit.tool')}
+        <label htmlFor={ids.tool} className="settings-filter-field">
+          <span>{t('permissions.audit.tool')}</span>
+          <input
+            id={ids.tool}
+            className="input"
+            value={tool}
+            data-testid="audit-tool"
+            onChange={(e) => {
+              setTool(e.target.value);
+            }}
+          />
         </label>
-        <input
-          id={ids.tool}
-          className="input"
-          value={tool}
-          data-testid="audit-tool"
-          onChange={(e) => {
-            setTool(e.target.value);
-          }}
-        />
-        <label htmlFor={ids.conclusion} className="permission-filter-label">
-          {t('permissions.audit.conclusion')}
+        <label htmlFor={ids.conclusion} className="settings-filter-field">
+          <span>{t('permissions.audit.conclusion')}</span>
+          <select
+            id={ids.conclusion}
+            className="input"
+            value={conclusion}
+            data-testid="audit-conclusion"
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setConclusion(v === 'allow' || v === 'deny' ? v : '');
+            }}
+          >
+            <option value="">{t('permissions.audit.all')}</option>
+            <option value="allow">{t('permissions.audit.allow')}</option>
+            <option value="deny">{t('permissions.audit.deny')}</option>
+          </select>
         </label>
-        <select
-          id={ids.conclusion}
-          className="input"
-          value={conclusion}
-          data-testid="audit-conclusion"
-          onChange={(e) => {
-            const v = e.currentTarget.value;
-            setConclusion(v === 'allow' || v === 'deny' ? v : '');
-          }}
-        >
-          <option value="">{t('permissions.audit.all')}</option>
-          <option value="allow">{t('permissions.audit.allow')}</option>
-          <option value="deny">{t('permissions.audit.deny')}</option>
-        </select>
-        <label htmlFor={ids.since} className="permission-filter-label">
-          {t('permissions.audit.since')}
+        <label htmlFor={ids.since} className="settings-filter-field">
+          <span>{t('permissions.audit.since')}</span>
+          <select
+            id={ids.since}
+            className="input"
+            value={since}
+            data-testid="audit-since"
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setSince(v === 'hour' || v === 'day' || v === 'week' ? v : 'all');
+            }}
+          >
+            <option value="all">{t('permissions.audit.all')}</option>
+            <option value="hour">{t('permissions.audit.hour')}</option>
+            <option value="day">{t('permissions.audit.day')}</option>
+            <option value="week">{t('permissions.audit.week')}</option>
+          </select>
         </label>
-        <select
-          id={ids.since}
-          className="input"
-          value={since}
-          data-testid="audit-since"
-          onChange={(e) => {
-            const v = e.currentTarget.value;
-            setSince(v === 'hour' || v === 'day' || v === 'week' ? v : 'all');
-          }}
-        >
-          <option value="all">{t('permissions.audit.all')}</option>
-          <option value="hour">{t('permissions.audit.hour')}</option>
-          <option value="day">{t('permissions.audit.day')}</option>
-          <option value="week">{t('permissions.audit.week')}</option>
-        </select>
         <Button size="small" onClick={load}>
           {t('permissions.audit.refresh')}
         </Button>
@@ -732,7 +732,7 @@ export function PermissionsPage() {
   }, []);
   const workspace = view?.workspace ?? null;
   return (
-    <div className="settings-section" data-testid="permissions-page">
+    <div className="settings-section settings-detail-page" data-testid="permissions-page">
       <div className="setting">
         <span className="setting-label">
           {t('approval.modeMenu')}

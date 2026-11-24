@@ -1,12 +1,17 @@
 // Native radio inputs own selection and keyboard navigation. The one decorative thumb follows
 // the actual label bounds, including after translations, density changes and font loading.
-import { useId, useLayoutEffect, useRef, type AriaAttributes } from 'react';
+import { useId, useLayoutEffect, useRef, type AriaAttributes, type ReactNode } from 'react';
 
-interface Props<T extends string> extends Pick<AriaAttributes, 'aria-label' | 'aria-labelledby'> {
+interface Props<T extends string> extends Pick<
+  AriaAttributes,
+  'aria-label' | 'aria-labelledby' | 'aria-describedby'
+> {
   readonly options: readonly T[];
   readonly value: T;
   readonly onChange: (value: T) => void;
   readonly labelOf: (value: T) => string;
+  readonly iconOf?: (value: T) => ReactNode;
+  readonly disabled?: boolean;
   readonly hintOf?: (value: T) => string;
   readonly name?: string;
   readonly testIdPrefix?: string;
@@ -20,6 +25,8 @@ export function SegmentedControl<T extends string>({
   onChange,
   labelOf,
   hintOf,
+  iconOf,
+  disabled,
   name,
   testIdPrefix,
   testId,
@@ -74,18 +81,24 @@ export function SegmentedControl<T extends string>({
     >
       <span ref={thumb} className="segment-thumb" aria-hidden="true" />
       {options.map((option) => (
-        <label key={option} className="segment" title={hintOf?.(option)}>
+        <label
+          key={option}
+          className={iconOf ? 'segment segment-icon' : 'segment'}
+          title={hintOf?.(option) ?? (iconOf ? labelOf(option) : undefined)}
+        >
           <input
             type="radio"
             name={name ?? groupId}
             value={option}
+            disabled={disabled}
+            aria-label={iconOf ? labelOf(option) : undefined}
             checked={value === option}
             data-testid={testIdPrefix && testIdPrefix + '-' + option}
             onChange={() => {
               onChange(option);
             }}
           />
-          {labelOf(option)}
+          {iconOf ? iconOf(option) : labelOf(option)}
         </label>
       ))}
     </div>

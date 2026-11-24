@@ -5,12 +5,13 @@
 // event). Allow once from the notification runs the command; a card already answered on the
 // card turns the notification's answer into the in-app "already answered" reminder; a command
 // too long to read in a notification only offers Open. Evidence in tmp/evidence/T42/.
+import { openSettings } from './settings-panel.js';
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
 
-import { expectTestHooks } from './core.js';
+import { expectTestHooks, openProbe } from './core.js';
 import { expect, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { prefer } from './t19.js';
 
@@ -28,15 +29,12 @@ test('approval notifications answer through the ledger', async ({ app, page, wor
   const allowOnce = (p = page) =>
     p.locator('[data-approval-card=command] button').filter({ hasText: /^Allow once$/u });
   await allowOnce().click();
-  const opening = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opening;
-  await settings.getByTestId('settings-window').waitFor();
+  const { page: foreground } = await openProbe(app);
   await expect
     .poll(() =>
       app.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
-          .filter((w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'))
+          .filter((w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/event-probe'))
           .some((w) => w.isFocused()),
       ),
     )
@@ -104,6 +102,8 @@ test('approval notifications answer through the ledger', async ({ app, page, wor
     )}\n`,
   );
 
+  await foreground.close();
+  const settings = await openSettings(page);
   // The settings page explains what the buttons do (or the fallback without notifications).
   await settings.getByTestId('settings-nav-general').click();
   await expect(settings.getByTestId('setting-notifications-note')).toContainText(
@@ -129,12 +129,7 @@ test('an unavailable system notification leaves the approval in the window and e
   await openFolder(page, app, ws);
   await startSession(page, 'Check the environment', 't42-notify');
   await page.getByRole('button', { name: 'Allow once', exact: true }).first().click();
-  const opening = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opening;
-  await settings.getByTestId('settings-nav-general').click();
-  const note = settings.getByTestId('setting-notifications-note');
-  await expect(note).toContainText("This system does not show PiArc's notifications");
+  const { page: foreground } = await openProbe(app);
   await expect
     .poll(() =>
       app.evaluate(() => {
@@ -150,5 +145,10 @@ test('an unavailable system notification leaves the approval in the window and e
   await expect(
     page.locator('[data-approval-card="command"]').filter({ hasText: 'printenv HOME' }),
   ).toBeVisible();
+  await foreground.close();
+  const settings = await openSettings(page);
+  await settings.getByTestId('settings-nav-general').click();
+  const note = settings.getByTestId('setting-notifications-note');
+  await expect(note).toContainText("This system does not show PiArc's notifications");
   await settings.screenshot({ path: path.join(EVIDENCE, 'notification-unavailable.png') });
 });

@@ -55,7 +55,7 @@ export function useApprovalKeys(
         composing ||
         !el ||
         ev.defaultPrevented ||
-        document.querySelector('[role="dialog"], [role="menu"]')
+        document.querySelector('dialog[open], [role="dialog"], [role="menu"]')
       )
         return;
       const key = approvalKey(ev, keyPlatform);

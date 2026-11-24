@@ -45,7 +45,7 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
   try {
     await writeProvider(auth, mock.baseUrl, 'authorizationCode');
     await browserDouble(app);
-    const settings = await settingsWindow(app, page);
+    const settings = await settingsWindow(page);
     const row = settings.getByTestId(`login-provider-${PROVIDER}`);
     await expect(row).toBeVisible();
     await expect(settings.getByTestId('login-provider-anthropic')).toHaveCount(0);

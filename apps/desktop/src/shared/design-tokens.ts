@@ -92,6 +92,15 @@ export type ScaleToken =
   | 'size.sidebarMin'
   | 'size.sidebarMax'
   | 'size.badge'
+  | 'settings.width'
+  | 'settings.height'
+  | 'settings.rail'
+  | 'settings.header'
+  | 'settings.gutter'
+  | 'settings.radius'
+  | 'settings.headerText'
+  | 'settings.pageTitle'
+  | 'settings.navText'
   | 'size.buttonHeight'
   | 'radius.button'
   | 'fontSize.button'
@@ -463,6 +472,15 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'size.sidebarMin': '--piarc-size-sidebar-min',
   'size.sidebarMax': '--piarc-size-sidebar-max',
   'size.badge': '--piarc-size-badge',
+  'settings.width': '--piarc-settings-width',
+  'settings.height': '--piarc-settings-height',
+  'settings.rail': '--piarc-settings-rail',
+  'settings.header': '--piarc-settings-header',
+  'settings.gutter': '--piarc-settings-gutter',
+  'settings.radius': '--piarc-settings-radius',
+  'settings.headerText': '--piarc-settings-header-text',
+  'settings.pageTitle': '--piarc-settings-page-title',
+  'settings.navText': '--piarc-settings-nav-text',
   'size.buttonHeight': '--piarc-size-button-height',
   'radius.button': '--piarc-radius-button',
   'fontSize.button': '--piarc-font-size-button',

@@ -1,20 +1,13 @@
 // T18-A10, A12: the settings window; changing Mod+N takes effect at once (old key dead, new
 // key works, the menu shows it), a conflicting key is refused; switching the language updates
 // the window and the application menu at once.
-import type { ElectronApplication, Page } from '@playwright/test';
+import { openSettings, closeSettings } from './settings-panel.js';
+import type { ElectronApplication } from '@playwright/test';
 
 import { expect, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { prefer } from './t19.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
-
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
-}
 
 function menuItem(app: ElectronApplication, id: string) {
   return app.evaluate(({ Menu }, itemId) => {
@@ -40,7 +33,7 @@ test('a changed shortcut works at once, the old one stops, the menu follows; con
   await startSession(page, 'A session to leave', 't18-chat#keys');
   expect(await menuItem(app, 'session.new')).toMatchObject({ accelerator: 'CommandOrControl+N' });
 
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-shortcuts').click();
   // Mod+W is taken by "Close Session".
   await settings.getByTestId('shortcut-key-session.new').click();
@@ -61,7 +54,7 @@ test('a changed shortcut works at once, the old one stops, the menu follows; con
   await settings.screenshot({ path: testInfo.outputPath('shortcut-changed.png') });
 
   // The main window: the old key does nothing, the new one opens the new-session view.
-  await page.bringToFront();
+  await closeSettings(settings);
   await expect(page.getByTestId('conversation')).toBeVisible();
   await page.keyboard.press(`${MOD}+KeyN`);
   await expect(page.getByTestId('conversation')).toBeVisible();
@@ -70,12 +63,15 @@ test('a changed shortcut works at once, the old one stops, the menu follows; con
   await expect(page.getByTestId('home')).toBeVisible();
 
   // Reset restores the default everywhere.
+  await openSettings(page);
+  await settings.getByTestId('settings-nav-shortcuts').click();
   await settings.getByTestId('shortcut-reset-session.new').click();
   await expect
     .poll(() => menuItem(app, 'session.new'))
     .toMatchObject({
       accelerator: 'CommandOrControl+N',
     });
+  await closeSettings(settings);
   // Mod+/ lists the shortcuts.
   await page.keyboard.press(`${MOD}+Slash`);
   await expect(page.getByTestId('shortcuts-dialog')).toBeVisible();
@@ -86,7 +82,7 @@ test('switching the language updates the window and the menu at once', async ({
   app,
   page,
 }, testInfo) => {
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('setting-language').selectOption('en');
   await expect(page.getByTestId('session-filter')).toHaveAttribute(
     'placeholder',
@@ -107,10 +103,9 @@ test('switching the language updates the window and the menu at once', async ({
 });
 
 test('adjacent hovered and selected navigation rows keep a non-interactive gap', async ({
-  app,
   page,
 }, info) => {
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   const selected = settings.getByTestId('settings-nav-sandbox');
   const hovered = settings.getByTestId('settings-nav-permissions');
   await selected.click();
@@ -154,13 +149,14 @@ test('adjacent hovered and selected navigation rows keep a non-interactive gap',
 });
 
 test('appearance segments keep the reference geometry and one moving selected surface', async ({
-  app,
   page,
 }, info) => {
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-appearance').click();
   const track = settings.getByTestId('setting-theme').getByRole('radiogroup');
   const labels = track.locator('label');
+  await expect(labels.locator('svg[aria-hidden="true"]')).toHaveCount(3);
+  await expect(settings.getByTestId('setting-reduceMotion').getByRole('combobox')).toBeVisible();
   const thumb = track.locator('.segment-thumb');
   const rects = () =>
     labels.evaluateAll((nodes) =>
@@ -178,6 +174,7 @@ test('appearance segments keep the reference geometry and one moving selected su
     await expect(track).toHaveCSS('border-top-width', '0px');
     await expect(track).toHaveCSS('height', String(height) + 'px');
     await expect(track).toHaveCSS('border-radius', String(radius) + 'px');
+    await expect(track).toHaveCSS('width', String(3 * (height - 2) + 2) + 'px');
     await expect(thumb).toHaveCount(1);
     const before = await rects();
     for (const theme of ['light', 'dark'] as const) {
@@ -214,4 +211,13 @@ test('appearance segments keep the reference geometry and one moving selected su
       '2px',
     );
   }
+  const motion = settings.getByTestId('setting-reduceMotion').getByRole('combobox');
+  await motion.focus();
+  // Space opens the native picker on macOS; the active option then receives the keys.
+  await settings.keyboard.press('Space');
+  await expect.poll(() => motion.evaluate((el) => el.matches(':open'))).toBe(true);
+  await settings.keyboard.press('ArrowDown');
+  await settings.keyboard.press('Enter');
+  await expect(motion).toHaveValue('on');
+  await expect(settings.locator('html')).toHaveAttribute('data-reduce-motion', 'true');
 });

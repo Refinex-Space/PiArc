@@ -6,6 +6,7 @@
 // environment bar says so, a reviewer that cannot be used shows there too; the audit lists the
 // reviewer's decisions and the usage page counts the reviews as "Review". Screenshots in both
 // themes go to tmp/evidence/T46/.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
@@ -41,14 +42,6 @@ async function scriptDialogs(app: ElectronApplication, responses: number[]): Pro
 
 function dialogs(app: ElectronApplication): Promise<string[]> {
   return app.evaluate(() => (globalThis as { t46Dialogs?: string[] }).t46Dialogs ?? []);
-}
-
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
 }
 
 /** The reviewer: a second mock model with strict tool arguments, scripted by header. */
@@ -116,7 +109,7 @@ test('auto review: enabling, decisions on calls, cards, pause, status, audit and
   await page.keyboard.press('Escape');
 
   // Settings: only the reviewer-capable model is offered; the switch waits for it and asks.
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-permissions').click();
   const section = settings.getByTestId('auto-review-section');
   const toggle = section.getByTestId('setting-enable-auto');
@@ -147,7 +140,7 @@ test('auto review: enabling, decisions on calls, cards, pause, status, audit and
   });
 
   // Choosing Auto review is recorded in the transcript.
-  await page.bringToFront();
+  await closeSettings(settings);
   await page.getByTestId('permission-mode').click();
   await expect(page.getByTestId('menu-auto')).not.toHaveAttribute('aria-disabled', 'true');
   await page.getByTestId('menu-auto').click();
@@ -208,7 +201,8 @@ test('auto review: enabling, decisions on calls, cards, pause, status, audit and
   await idle(page);
 
   // The audit lists the reviewer's decisions under their own category.
-  await settings.bringToFront();
+  await openSettings(page);
+  await settings.getByTestId('settings-nav-permissions').click();
   await settings.getByTestId('audit-kind').selectOption('autoReview');
   const rows = settings.getByTestId('audit-row');
   await expect(rows).toHaveCount(8);

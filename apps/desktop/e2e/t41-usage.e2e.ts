@@ -5,6 +5,7 @@
 // 5,000 cache-read and 300 cache-write tokens: at 3 / 15 / 0.3 / 3.75 USD per million tokens a
 // reply costs 3,000 + 3,000 + 1,500 + 1,125 = 8,625 micro-dollars. Screenshots (light, dark,
 // Chinese) go to tmp/evidence/T41/.
+import { closeSettings, openSettings } from './settings-panel.js';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -37,9 +38,7 @@ test('the rail card and the Usage page show tokens and estimated cost', async ({
   await expect(card.getByTestId('usage-tokens')).toContainText('10,000');
 
   // The Usage page lists the model without a price and the session.
-  const opening = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opening;
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-usage').click();
   const usage = settings.getByTestId('usage-page');
   await expect(usage).toBeVisible();
@@ -76,6 +75,7 @@ test('the rail card and the Usage page show tokens and estimated cost', async ({
   await prefer(page, { key: 'appearance.theme', value: 'light' });
 
   // The next turn's card uses the user's price.
+  await closeSettings(settings);
   await send(page, 'Third question');
   await idle(page);
   await expect(card.getByTestId('usage-card-cost')).toHaveText('$0.02588 (estimate)');
@@ -85,6 +85,8 @@ test('the rail card and the Usage page show tokens and estimated cost', async ({
   await page.screenshot({ path: path.join(EVIDENCE, 'usage-card-dark.png') });
   await prefer(page, { key: 'appearance.theme', value: 'light' });
 
+  await openSettings(page);
+  await settings.getByTestId('settings-nav-usage').click();
   // Resetting goes back to no price: unknown again, not zero.
   await row.getByTestId('usage-price-edit').click();
   await usage.getByTestId('usage-price-reset').click();

@@ -31,7 +31,7 @@ export function notificationApproval(card: ApprovalRequest): NotificationApprova
   };
 }
 
-export function useAttention(): void {
+export function useAttention(covered: boolean): void {
   const t = useT();
   const ui = useUi();
   const sessions = useSessions();
@@ -56,7 +56,8 @@ export function useAttention(): void {
       if (is === was || is === undefined || !needsAttention(session)) {
         continue;
       }
-      const shown = ui.view.kind === 'session' && ui.view.id === session.id && isWindowFocused();
+      const shown =
+        !covered && ui.view.kind === 'session' && ui.view.id === session.id && isWindowFocused();
       if (shown) {
         continue;
       }
@@ -87,7 +88,7 @@ export function useAttention(): void {
           console.error('[attention] cannot notify', error);
         });
     }
-  }, [sessions, ui, t]);
+  }, [sessions, ui, t, covered]);
   useEffect(
     () =>
       window.piarc.onAppEvent((event) => {

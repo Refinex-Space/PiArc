@@ -3,6 +3,7 @@
 import { BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 
 import { secureWebPreferences } from './web-preferences.js';
+import { MAIN_WINDOW_DEFAULT } from './platform/window-state.js';
 
 /** The smallest main window. */
 export const MAIN_WINDOW_MIN = { width: 960, height: 600 } as const;
@@ -16,10 +17,11 @@ export function createMainWindow(
   chrome: BrowserWindowConstructorOptions = {},
 ): BrowserWindow {
   const window = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: MAIN_WINDOW_MIN.width,
-    minHeight: MAIN_WINDOW_MIN.height,
+    ...MAIN_WINDOW_DEFAULT,
+    // Placement already fitted the display. A smaller physical work area takes precedence
+    // over the usual minimum, otherwise Electron would expand the window past the screen.
+    minWidth: Math.min(MAIN_WINDOW_MIN.width, chrome.width ?? MAIN_WINDOW_DEFAULT.width),
+    minHeight: Math.min(MAIN_WINDOW_MIN.height, chrome.height ?? MAIN_WINDOW_DEFAULT.height),
     // i18n-exempt: the product name, the same in every language.
     title: 'PiArc',
     show: false,
@@ -56,27 +58,4 @@ export function reloadAfterCrash(window: BrowserWindow): void {
     console.error(`[window] renderer gone (${details.reason}); reloading`);
     window.webContents.reload();
   });
-}
-
-/** Creates the settings window (architecture section 8.2: settings are a separate window). */
-export function createSettingsWindow(
-  preloadPath: string,
-  title: string,
-  chrome: BrowserWindowConstructorOptions = {},
-): BrowserWindow {
-  const window = new BrowserWindow({
-    width: 760,
-    height: 560,
-    minWidth: 600,
-    minHeight: 420,
-    title,
-    show: false,
-    fullscreenable: false,
-    ...chrome,
-    webPreferences: secureWebPreferences(preloadPath),
-  });
-  window.once('ready-to-show', () => {
-    window.show();
-  });
-  return window;
 }

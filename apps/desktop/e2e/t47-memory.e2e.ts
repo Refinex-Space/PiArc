@@ -7,11 +7,10 @@
 //   a fake system root, `PIARC_TEST_MANAGED_ROOT`) show a banner, lock marks and read-only
 //   controls; the diagnostics list the Claude Code file's ignored keys.
 // Screenshots go to tmp/evidence/T47/.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-
-import type { ElectronApplication, Page } from '@playwright/test';
 
 import {
   expect,
@@ -26,14 +25,6 @@ import {
 import { prefer, send } from './t19.js';
 
 const EVIDENCE = path.join(import.meta.dirname, '..', '..', '..', 'tmp', 'evidence', 'T47');
-
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
-}
 
 async function exists(file: string): Promise<boolean> {
   try {
@@ -87,9 +78,8 @@ test('the agent saves a note; the transcript and the memory page show, edit and 
 
   // "Open in settings" opens the memory page on this workspace with the note expanded.
   await summary.click();
-  const opened = app.waitForEvent('window');
   await page.getByTestId('memory-open-settings').click();
-  const settings = await opened;
+  const settings = page;
   await settings.getByTestId('memory-page').waitFor();
   await expect(settings.getByTestId('memory-workspace')).toHaveValue(ws);
   const note = settings.getByTestId('memory-note-build');
@@ -144,6 +134,7 @@ test('the agent saves a note; the transcript and the memory page show, edit and 
   expect(userSettings.autoMemoryEnabled).toBe(false);
 
   // A new session has no Memory tool (A05).
+  await closeSettings(settings);
   await focusMain(app);
   await page.getByTestId('new-session').click();
   await startSession(page, 'Anything to remember?', 't47-off', 'none');
@@ -154,9 +145,11 @@ test('the agent saves a note; the transcript and the memory page show, edit and 
   const [off] = await mockRequests(mock, 't47-off');
   expect(off?.tools).not.toContain('Memory');
 
-  // `/memory` brings the open settings window back to the memory page on this workspace.
+  // After leaving General, the command opens Memory for this session in the same workbench.
+  await openSettings(page);
   await settings.getByTestId('settings-nav-general').click();
   await expect(settings.getByTestId('memory-page')).toHaveCount(0);
+  await closeSettings(settings);
   await send(page, '/memory');
   await expect(settings.getByTestId('memory-page')).toBeVisible({ timeout: 15_000 });
   await expect(settings.getByTestId('memory-workspace')).toHaveValue(ws);
@@ -220,7 +213,7 @@ managedTest.describe('managed settings', () => {
       await openFolder(page, app, ws);
       await startSession(page, 'Hello', 't18-chat', 'trust');
       await focusMain(app);
-      const settings = await openSettings(app, page);
+      const settings = await openSettings(page);
       await expect(settings.getByTestId('managed-banner')).toContainText(
         'Some settings are managed by your organization.',
       );

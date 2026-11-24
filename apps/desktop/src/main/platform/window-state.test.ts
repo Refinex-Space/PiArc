@@ -54,7 +54,7 @@ describe('window state', () => {
     });
   });
 
-  it('shrinks a window larger than the display and keeps the default without a save', () => {
+  it('shrinks a window larger than the display', () => {
     const saved = { x: 0, y: 0, width: 4000, height: 3000, maximized: true };
     expect(placeWindow(saved, [second], min)).toEqual({
       x: 1920,
@@ -63,6 +63,31 @@ describe('window state', () => {
       height: 800,
       maximized: true,
     });
-    expect(placeWindow(undefined, [screen], min)).toBeUndefined();
+  });
+
+  it('centers a fresh 1200 by 800 workbench and cascades another from the centered position', () => {
+    expect(placeWindow(undefined, [screen], min)).toEqual({
+      x: 360,
+      y: 140,
+      width: 1200,
+      height: 800,
+      maximized: false,
+    });
+    expect(placeWindow(undefined, [screen], min, CASCADE)).toEqual({
+      x: 384,
+      y: 164,
+      width: 1200,
+      height: 800,
+      maximized: false,
+    });
+  });
+
+  it('fits a fresh window into a small nonzero work area even below the usual minimum', () => {
+    const small = { x: -800, y: 26, width: 800, height: 540 };
+    expect(placeWindow(undefined, [small, screen], min, CASCADE)).toEqual({
+      ...small,
+      maximized: false,
+    });
+    expect(placeWindow(undefined, [], min)).toBeUndefined();
   });
 });

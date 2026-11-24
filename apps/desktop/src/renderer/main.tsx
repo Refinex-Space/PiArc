@@ -5,8 +5,6 @@ import { EVENT_PROBE_HASH } from '../shared/event-probe.js';
 import { TERMINAL_LAB_HASH } from '../shared/terminal-lab.js';
 import { TRANSCRIPT_LAB_HASH } from '../shared/transcript-lab.js';
 import { AppProvider } from './app/app-context.js';
-import { registerBuiltInSettingsPages } from './settings/pages.js';
-import { SettingsApp } from './settings/SettingsApp.js';
 import { Shell } from './shell/Shell.js';
 
 const container = document.getElementById('root');
@@ -16,7 +14,7 @@ if (container === null) {
 const root = createRoot(container);
 const hash = window.location.hash;
 
-/** `#/settings` is the settings window; everything else is the main window. */
+/** Render the workbench, including bookmarked settings routes. */
 function renderApp(target: Root): void {
   // The app's own stylesheet rules apply from the first paint (app.css), not to the test pages.
   document.documentElement.dataset.app = 'piarc';
@@ -41,14 +39,12 @@ function renderApp(target: Root): void {
   );
   window.addEventListener('focusin', markFocus, true);
 
-  const settings = hash.startsWith('#/settings');
-  if (settings) {
-    registerBuiltInSettingsPages();
-  }
   void window.piarc.getAppState().then((state) => {
     target.render(
       <StrictMode>
-        <AppProvider initial={state}>{settings ? <SettingsApp /> : <Shell />}</AppProvider>
+        <AppProvider initial={state}>
+          <Shell />
+        </AppProvider>
       </StrictMode>,
     );
   });

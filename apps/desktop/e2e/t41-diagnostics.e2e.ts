@@ -4,6 +4,7 @@
 // says when it loads), subagent definitions, skills, commands, output styles, and the
 // enterprise place ("Not configured"); a rule added while the app runs shows up without
 // reopening the window. Screenshots (light, dark, Chinese) go to tmp/evidence/T41/.
+import { openSettings } from './settings-panel.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -35,9 +36,7 @@ test('every configuration source is listed with its state and follows an edit', 
   await openFolder(page, app, ws);
   await startSession(page, 'Hello', 't18-chat', 'deny');
   await focusMain(app);
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-diagnostics').click();
   const diagnostics = settings.getByTestId('config-diagnostics');
   await diagnostics.waitFor();

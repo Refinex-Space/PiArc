@@ -2,10 +2,11 @@
 // control: buttons, tabs, navigation items, table headers and badges whose content is wider than
 // their box are reported (text meant to end in an ellipsis is not in this set). Screenshots go to
 // tmp/evidence/T43/locales/ with PIARC_EVIDENCE_TASK=T43.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import { expect, focusMain, makeWorkspace, openFolder, test } from './sessions.js';
 import { idle, prefer } from './t19.js';
@@ -40,14 +41,6 @@ async function capture(page: Page, language: string, name: string, problems: str
   for (const p of await overflowing(page)) problems.push(`${language} ${name}: ${p}`);
 }
 
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
-}
-
 test('the main pages in Chinese and English, with nothing cut off', async ({
   app,
   page,
@@ -66,7 +59,6 @@ test('the main pages in Chinese and English, with nothing cut off', async ({
   await expect(page.getByTestId('conversation')).toBeVisible({ timeout: 30_000 });
   await focusMain(app);
   await idle(page);
-  const settings = await openSettings(app, page);
 
   for (const language of ['zh-CN', 'en'] as const) {
     await prefer(page, { key: 'language', value: language });
@@ -78,6 +70,7 @@ test('the main pages in Chinese and English, with nothing cut off', async ({
     await page.getByTestId('new-session').click();
     await capture(page, language, 'new-session', problems);
     await page.getByTestId('session-title').first().click();
+    const settings = await openSettings(page);
     for (const id of [
       'general',
       'appearance',
@@ -86,6 +79,7 @@ test('the main pages in Chinese and English, with nothing cut off', async ({
       'sandbox',
       'agents',
       'skills',
+      'memory',
       'mcp',
       'usage',
       'diagnostics',
@@ -95,6 +89,7 @@ test('the main pages in Chinese and English, with nothing cut off', async ({
       await expect(settings.getByTestId(`settings-page-${id}`)).toBeVisible();
       await capture(settings, language, `settings-${id}`, problems);
     }
+    await closeSettings(page);
   }
   expect(problems).toEqual([]);
 });

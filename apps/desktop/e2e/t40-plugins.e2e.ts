@@ -6,6 +6,7 @@
 // answer the native dialog (Playwright cannot click it); release builds have no test hooks
 // (scripts/ci/check-app-layout.mjs checks the release Core). Screenshots and the confirmations'
 // text go to tmp/evidence/T40/.
+import { openSettings } from './settings-panel.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
@@ -71,11 +72,8 @@ async function starts(workspace: string): Promise<string[]> {
   return text.split('\n').filter((line) => line !== '');
 }
 
-async function openSkills(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+async function openSkills(page: Page): Promise<Page> {
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-skills').click();
   await settings.getByTestId('plugins-section').waitFor();
   return settings;
@@ -126,7 +124,7 @@ test('packages install off, turn on only after the native confirmation, and list
   await idle(page);
 
   await focusMain(app);
-  const settings = await openSkills(app, page);
+  const settings = await openSkills(page);
   await install(settings, plugin);
   const demo = row(settings, 'demo');
   await expect(demo.getByTestId('package-type')).toHaveText('Claude Code plugin');

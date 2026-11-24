@@ -162,55 +162,64 @@ export function ProvidersPage() {
   );
   if (!form)
     return (
-      <div className="settings-section">
-        {header}
-        {settings.providers.length === 0 ? (
-          <p className="muted">{t('providers.empty')}</p>
-        ) : (
-          <ul className="provider-list">
-            {settings.providers.map((p) => (
-              <li key={p.id}>
-                <div>
-                  <strong>{p.id}</strong>
-                  <div className="muted small">{p.baseUrl ?? t(`providers.${p.kind}`)}</div>
-                </div>
-                <Button
-                  size="small"
-                  data-testid={`provider-edit-${p.id}`}
-                  disabled={busy}
-                  onClick={() => {
-                    edit(p);
-                  }}
-                >
-                  {t('providers.edit')}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="small"
-                  data-testid={`provider-delete-${p.id}`}
-                  disabled={busy}
-                  onClick={() => {
-                    void mutate(() => window.piarc.deleteProvider(p.id), false);
-                  }}
-                >
-                  {t('providers.remove')}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div>
-          <Button
-            variant="primary"
-            data-testid="provider-add"
-            disabled={busy}
-            onClick={() => {
-              edit();
-            }}
-          >
-            {t('providers.add')}
-          </Button>
-        </div>
+      <div className="settings-section settings-detail-page">
+        <section className="settings-connection-section">
+          <h2 className="settings-heading">{t('providers.connections')}</h2>
+          <div className="settings-connection-box">
+            <div className="settings-connect-row">
+              <div>
+                <strong>{t('providers.connectTitle')}</strong>
+                <p className="muted">{t('providers.connectHint')}</p>
+              </div>
+              <Button
+                size="small"
+                data-testid="provider-add"
+                disabled={busy}
+                onClick={() => {
+                  edit();
+                }}
+              >
+                {t('providers.add')}
+              </Button>
+            </div>
+            {settings.providers.length === 0 ? (
+              <p className="muted settings-connection-empty">{t('providers.empty')}</p>
+            ) : (
+              <ul className="provider-list">
+                {settings.providers.map((p) => (
+                  <li key={p.id}>
+                    <div>
+                      <strong>{p.id}</strong>
+                      <div className="muted small">{p.baseUrl ?? t(`providers.${p.kind}`)}</div>
+                    </div>
+                    <Button
+                      size="small"
+                      data-testid={`provider-edit-${p.id}`}
+                      disabled={busy}
+                      onClick={() => {
+                        edit(p);
+                      }}
+                    >
+                      {t('providers.edit')}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="small"
+                      data-testid={`provider-delete-${p.id}`}
+                      disabled={busy}
+                      onClick={() => {
+                        void mutate(() => window.piarc.deleteProvider(p.id), false);
+                      }}
+                    >
+                      {t('providers.remove')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {header}
+        </section>
         {failed}
         <SignInSection providers={settings.loginProviders} busy={busy} onChanged={reload} />
         <ModelSettingsSection
@@ -237,7 +246,7 @@ export function ProvidersPage() {
     form.id === 'amazon-bedrock' ? ['bearer', 'profile'] : ['apiKey', 'adc', 'serviceAccount'];
   return (
     <form
-      className="settings-section"
+      className="settings-section settings-detail-page"
       autoComplete="off"
       noValidate
       onSubmit={(event) => {
@@ -261,6 +270,7 @@ export function ProvidersPage() {
         );
       }}
     >
+      <h2 className="settings-heading">{t(original ? 'providers.editTitle' : 'providers.add')}</h2>
       <fieldset className="settings-section provider-form" disabled={busy}>
         {field(
           'kind',

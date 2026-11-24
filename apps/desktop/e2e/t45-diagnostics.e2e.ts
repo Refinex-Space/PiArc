@@ -4,6 +4,7 @@
 // dialogs); the written archive holds exactly the listed files, without the credential in the
 // user's settings, without session content and with the home folder as `~`. Screenshots go to
 // tmp/evidence/T45/.
+import { openSettings } from './settings-panel.js';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,11 +16,8 @@ import { prefer } from './t19.js';
 const EVIDENCE = path.join(import.meta.dirname, '..', '..', '..', 'tmp', 'evidence', 'T45');
 const SECRET = 'l4-settings-env-secret-7a6b';
 
-async function openDiagnostics(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+async function openDiagnostics(page: Page): Promise<Page> {
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-diagnostics').click();
   await settings.getByTestId('config-diagnostics').waitFor();
   return settings;
@@ -75,7 +73,7 @@ test('the diagnostic bundle shows what it holds and is written only where the us
     path.join(userDataDir, 'pi', 'sessions', 'w', 's.jsonl'),
     '{"text":"l4-session-content-marker"}\n',
   );
-  const settings = await openDiagnostics(app, page);
+  const settings = await openDiagnostics(page);
   const section = settings.getByTestId('diagnostic-bundle');
   await section.scrollIntoViewIfNeeded();
 

@@ -106,6 +106,13 @@ function launchTargetsOf(value: unknown): LaunchTarget[] | undefined {
       typeof target.text === 'string'
     ) {
       targets.push({ kind: 'draft', path: target.path, text: target.text });
+    } else if (
+      target.kind === 'settings' &&
+      (target.page === undefined || typeof target.page === 'string')
+    ) {
+      targets.push(
+        target.page === undefined ? { kind: 'settings' } : { kind: 'settings', page: target.page },
+      );
     } else if (target.kind === 'newSession' || target.kind === 'chooseFolder') {
       targets.push({ kind: target.kind });
     } else if (target.kind === 'session' && typeof target.sessionId === 'string') {

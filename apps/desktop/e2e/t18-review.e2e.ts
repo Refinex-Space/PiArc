@@ -2,6 +2,7 @@
 // dark, each in both densities (plus the high-contrast modes), the trust dialog and the settings
 // window — and, on macOS, a capture of the real window with its native chrome (hidden title
 // bar with the traffic lights, sidebar vibrancy), which page screenshots do not include.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 
@@ -38,7 +39,7 @@ async function captureMain(app: ElectronApplication, page: Page, file: string): 
   }
   const source = await app.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows().find(
-      (w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'),
+      (w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/event-probe'),
     );
     window?.focus();
     return window?.getMediaSourceId() ?? '';
@@ -65,7 +66,7 @@ async function captureWindowsScreen(
   await focusMain(app);
   const rect = await app.evaluate(({ BrowserWindow, screen }) => {
     const window = BrowserWindow.getAllWindows().find(
-      (w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/settings'),
+      (w) => !w.isDestroyed() && !w.webContents.getURL().includes('#/event-probe'),
     );
     if (window === undefined) throw new Error('no main window');
     // Windows may keep other windows above one a test brings forward: lift it for the capture.
@@ -180,12 +181,10 @@ test('review screenshots: modes, densities, dialogs and the native window', asyn
     await captureMain(app, page, testInfo.outputPath(`trust-${theme}.png`));
     await page.keyboard.press('Escape');
 
-    const opened = app.waitForEvent('window');
-    await page.getByTestId('open-settings').click();
-    const settings = await opened;
+    const settings = await openSettings(page);
     await settings.getByTestId('settings-nav-appearance').click();
     await settings.screenshot({ path: testInfo.outputPath(`settings-${theme}.png`) });
-    await settings.close();
+    await closeSettings(settings);
   }
 
   // The native window in the system theme: traffic lights and vibrancy are drawn by macOS.

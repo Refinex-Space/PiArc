@@ -1,6 +1,6 @@
 // T35 parts of the main window: what links, dropped folders and second starts ask to open, and
 // the question the worktree cleanup leaves for archived sessions with uncommitted changes.
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { LaunchTarget } from '../../shared/ipc.js';
 import { useT } from '../app/app-context.js';
@@ -10,14 +10,19 @@ import { Button } from '../app/Button.js';
 
 /** Runs `open` for the targets waiting for this window, then for each one that arrives. */
 export function useLaunchTargets(open: (target: LaunchTarget) => void): void {
+  const openRef = useRef(open);
+  openRef.current = open;
+  const initial = useRef<Promise<readonly LaunchTarget[]> | undefined>(undefined);
   useEffect(() => {
     let active = true;
     const unsubscribe = window.piarc.onAppEvent((event) => {
-      if (event.type === 'launch') open(event.target);
+      if (event.type === 'launch') openRef.current(event.target);
     });
-    window.piarc.takeLaunchTargets().then(
+    // The main process drains this queue. StrictMode replays effects before the response.
+    initial.current ??= window.piarc.takeLaunchTargets();
+    initial.current.then(
       (targets) => {
-        if (active) for (const target of targets) open(target);
+        if (active) for (const target of targets) openRef.current(target);
       },
       (error: unknown) => {
         console.error('[shell] cannot read the launch targets', error);
@@ -27,7 +32,7 @@ export function useLaunchTargets(open: (target: LaunchTarget) => void): void {
       active = false;
       unsubscribe();
     };
-  }, [open]);
+  }, []);
 }
 
 /**

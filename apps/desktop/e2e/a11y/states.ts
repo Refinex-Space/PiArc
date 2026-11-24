@@ -30,7 +30,18 @@ export const A11Y_STATES = [
   { id: 'window:new-session', area: 'window', note: 'new session form of an open workspace' },
   { id: 'window:conversation', area: 'window', note: 'a session after a turn, sidebar and rail' },
   { id: 'window:message-search', area: 'window', note: 'sidebar message search with results' },
-  // Settings window, one state per registered page.
+  // Workbench settings: the native modal, its search popup and each registered page.
+  {
+    id: 'dialog:settings',
+    area: 'dialog',
+    source: 'settings/SettingsModal.tsx',
+    note: 'modal settings in the originating workbench',
+  },
+  {
+    id: 'state:settings-search',
+    area: 'state',
+    note: 'settings search results with a keyboard-selected option',
+  },
   { id: 'settings:general', area: 'settings', page: 'general', note: 'General' },
   { id: 'settings:appearance', area: 'settings', page: 'appearance', note: 'Appearance' },
   { id: 'settings:providers', area: 'settings', page: 'providers', note: 'Models and providers' },

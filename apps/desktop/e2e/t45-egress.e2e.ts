@@ -4,6 +4,7 @@
 // connections hold nothing but loopback (a control request to the mock provider proves the log
 // captures requests; the app's own `app://` pages never reach the network stack). The Agent Host's side is
 // crates/piarc-testkit/tests/egress.rs; the report is docs/security/egress.md.
+import { openSettings } from './settings-panel.js';
 import { readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -124,10 +125,7 @@ test('THR-04 a whole mock session makes no outbound connection from Electron', a
   await startSession(page, 'Hello', 't18-chat');
   await focusMain(app);
   await idle(page);
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+  const settings = await openSettings(page);
   for (const nav of ['providers', 'mcp', 'skills', 'diagnostics']) {
     await settings.getByTestId(`settings-nav-${nav}`).click();
   }

@@ -8,7 +8,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { ElectronApplication, Locator, Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 import { expect, focusMain, makeWorkspace, openFolder, test } from './sessions.js';
 import { COLORS } from '../src/shared/design-tokens.js';
@@ -78,10 +78,9 @@ async function card(page: Page, kind: string): Promise<Locator> {
   return found;
 }
 
-async function openSettingsByKeyboard(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
+async function openSettingsByKeyboard(page: Page): Promise<Page> {
   await page.keyboard.press(`${MOD}+Comma`);
-  const settings = await opened;
+  const settings = page;
   await settings.getByTestId('settings-window').waitFor();
   return settings;
 }
@@ -175,15 +174,13 @@ test('everything with the keyboard: session, approvals, Changes, settings and th
   await expect(page.getByTestId('composer-input')).toBeFocused();
 
   // A setting in the settings window.
-  const settings = await openSettingsByKeyboard(app, page);
+  const settings = await openSettingsByKeyboard(page);
   await tabTo(settings, settings.getByTestId('settings-nav-appearance'));
   await settings.keyboard.press('Enter');
   await expect(settings.getByTestId('settings-page-appearance')).toBeVisible();
-  const dark = settings.getByRole('radio', { name: 'Dark' });
-  await tabTo(
-    settings,
-    settings.getByRole('radiogroup').first().getByRole('radio', { checked: true }),
-  );
+  const themes = settings.getByTestId('setting-theme').getByRole('radiogroup');
+  const dark = themes.getByRole('radio', { name: 'Dark' });
+  await tabTo(settings, themes.getByRole('radio', { checked: true }));
   await settings.keyboard.press('ArrowRight');
   await settings.keyboard.press('ArrowRight');
   await expect(dark).toBeChecked();
@@ -327,7 +324,7 @@ test('pointer editing and keyboard navigation give exactly one visible focus ind
   await expect(surface).toHaveCSS('outline-style', 'none');
   await page.keyboard.press('Control+Backquote');
 
-  const settings = await openSettingsByKeyboard(app, page);
+  const settings = await openSettingsByKeyboard(page);
   await settings.getByTestId('settings-nav-appearance').click();
   const light = settings.locator('label').filter({ has: settings.getByTestId('theme-light') });
   await light.click();

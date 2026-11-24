@@ -5,7 +5,8 @@
 // and the files that are not valid definitions with their line (A01). The subagent's requests
 // pick their mock script with the marker in the task prompt. Screenshots go to
 // tmp/evidence/T31/ with PIARC_EVIDENCE_TASK=T31.
-import type { ElectronApplication, Page } from '@playwright/test';
+import { openSettings } from './settings-panel.js';
+import type { Page } from '@playwright/test';
 
 import { expect, focusMain, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { idle, openSession, prefer, requests, screenshots } from './t19.js';
@@ -14,11 +15,8 @@ const REVIEWER =
   '---\nname: reviewer\ndescription: Reviews the build.\ntools: Read, Bash\ncolor: blue\n' +
   'memory: project\n---\nYou review builds and report what you found.\n';
 
-async function openAgentsPage(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+async function openAgentsPage(page: Page): Promise<Page> {
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-agents').click();
   await settings.getByTestId('agents-page').waitFor();
   return settings;
@@ -111,7 +109,7 @@ test('the Subagents page lists types, overrides, warnings and invalid files', as
   await startSession(page, 'Hello', 't18-chat');
   await focusMain(app);
   await idle(page);
-  const settings = await openAgentsPage(app, page);
+  const settings = await openAgentsPage(page);
   const reviewer = settings.locator('[data-testid="agent-row"][data-name="reviewer"]');
   await expect(reviewer.getByTestId('agent-source')).toHaveText('Project (.piarc)');
   await expect(reviewer).toContainText('Replaces');

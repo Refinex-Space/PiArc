@@ -168,6 +168,7 @@ export type LaunchTarget =
   | { readonly kind: 'draft'; readonly path: string; readonly text: string }
   | { readonly kind: 'newSession' }
   | { readonly kind: 'chooseFolder' }
+  | { readonly kind: 'settings'; readonly page?: string }
   | { readonly kind: 'session'; readonly sessionId: string };
 
 /** The list a permission rule is in. */
@@ -638,7 +639,7 @@ export interface PiarcApi {
   setPreference(change: PreferenceChange): Promise<Preferences>;
   /** Receives app events; returns the function that stops them. */
   onAppEvent(listener: (event: AppEvent) => void): () => void;
-  /** Opens the settings window (or focuses it) on `page`. */
+  /** Opens the settings dialog in the calling workbench, optionally on `page`. */
   openSettings(page?: string): Promise<void>;
 
   /** Shows the system folder picker; resolves with the chosen directory, or `null`. */

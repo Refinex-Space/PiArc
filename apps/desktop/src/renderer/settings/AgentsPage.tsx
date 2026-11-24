@@ -162,7 +162,7 @@ export function AgentsPage() {
   }, [chosen, t]);
   useEffect(load, [load]);
   return (
-    <div className="agents-page" data-testid="agents-page">
+    <div className="agents-page settings-detail-page" data-testid="agents-page">
       <p className="muted">{t('agents.hint')}</p>
       {chosen === null ? (
         <p className="muted">{t('agents.noWorkspace')}</p>

@@ -4,6 +4,7 @@
 // the next command follows the change; a sandbox denial is in the audit under "Sandbox denials"
 // (A07); a network-domain card allows once, adds to the allowlist or declines (A14). On Windows
 // the switch is disabled and says why (A12). Screenshots go to tmp/evidence/T39/.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -42,14 +43,6 @@ const test = base.extend<{ hello: number; sandboxSettings: Record<string, unknow
     await use(userDataDir);
   },
 });
-
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
-}
 
 /** Native message boxes answer with button 0 and record their message and detail. */
 async function confirmDialogs(app: ElectronApplication): Promise<void> {
@@ -127,7 +120,7 @@ test('the sandbox page edits the user values, the next command follows, denials 
   );
   await expect(page.getByTestId('env-sandbox')).toBeVisible();
 
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-sandbox').click();
   const sandbox = settings.getByTestId('sandbox-page');
   await expect(sandbox.getByTestId('sandbox-enabled')).toBeChecked();
@@ -182,7 +175,7 @@ test('the sandbox page edits the user values, the next command follows, denials 
     .getByTestId('permission-audit')
     .screenshot({ path: path.join(EVIDENCE, 'sandbox-audit.png') });
 
-  await page.bringToFront();
+  await closeSettings(settings);
   await page.getByTestId('composer-input').click();
   await page.keyboard.type('Write inside');
   await page.keyboard.press('Enter');
@@ -262,7 +255,7 @@ test.describe('on Windows', () => {
     await card.getByRole('button', { name: 'Decline' }).click();
     await idle(page);
     await expect(readFile(path.join(ws, 'w.txt'), 'utf8')).rejects.toThrow();
-    const settings = await openSettings(app, page);
+    const settings = await openSettings(page);
     await settings.getByTestId('settings-nav-sandbox').click();
     const sandbox = settings.getByTestId('sandbox-page');
     await expect(sandbox.getByTestId('sandbox-enabled')).toBeDisabled();

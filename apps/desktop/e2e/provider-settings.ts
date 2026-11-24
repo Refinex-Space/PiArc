@@ -1,13 +1,12 @@
+import { openSettings } from './settings-panel.js';
 import { randomUUID } from 'node:crypto';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { expect } from './sessions.js';
 import { prefer } from './t19.js';
 
-export async function settingsWindow(app: ElectronApplication, main: Page) {
+export async function settingsWindow(main: Page) {
   await prefer(main, { key: 'language', value: 'en' });
-  const opening = app.waitForEvent('window');
-  await main.getByTestId('open-settings').click();
-  const settings = await opening;
+  const settings = await openSettings(main);
   await settings.getByTestId('settings-nav-providers').click();
   await settings.getByTestId('catalog-refresh').uncheck();
   return settings;

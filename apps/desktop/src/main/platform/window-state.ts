@@ -21,6 +21,9 @@ export interface Area {
   readonly height: number;
 }
 
+/** First workbench size in device-independent pixels, before fitting the display. */
+export const MAIN_WINDOW_DEFAULT = { width: 1200, height: 800 } as const;
+
 /** The file name in the user data directory. */
 export const WINDOW_STATE_FILE = 'window-state.json';
 
@@ -67,8 +70,8 @@ function overlap(a: Area, b: Area): { width: number; height: number } {
 /**
  * Where a window goes: `saved` moved by `offset` (cascading windows), its size at least
  * `min` and at most the display's; a window that would not show `VISIBLE` pixels on any
- * display is centered on the first one. `undefined` without saved bounds (the default
- * placement).
+ * display is centered on the first one. A fresh workbench starts centered on that display,
+ * with a further window cascaded only as far as it still fits.
  */
 export function placeWindow(
   saved: WindowBounds | undefined,
@@ -77,25 +80,30 @@ export function placeWindow(
   offset = 0,
 ): WindowBounds | undefined {
   const primary = areas[0];
-  if (saved === undefined || primary === undefined) return undefined;
-  const moved = { ...saved, x: saved.x + offset, y: saved.y + offset };
+  if (primary === undefined) return undefined;
+  const moved = saved && { ...saved, x: saved.x + offset, y: saved.y + offset };
   const target =
-    areas.find((area) => {
-      const o = overlap(area, moved);
-      return o.width >= VISIBLE && o.height >= VISIBLE;
-    }) ?? primary;
-  const width = Math.min(Math.max(moved.width, min.width), target.width);
-  const height = Math.min(Math.max(moved.height, min.height), target.height);
-  const visible = overlap(target, { ...moved, width, height });
-  if (visible.width >= VISIBLE && visible.height >= VISIBLE) {
-    return { ...moved, width, height };
+    (moved &&
+      areas.find((area) => {
+        const o = overlap(area, moved);
+        return o.width >= VISIBLE && o.height >= VISIBLE;
+      })) ??
+    primary;
+  const size = moved ?? MAIN_WINDOW_DEFAULT;
+  const width = Math.min(Math.max(size.width, min.width), target.width);
+  const height = Math.min(Math.max(size.height, min.height), target.height);
+  if (moved) {
+    const visible = overlap(target, { ...moved, width, height });
+    if (visible.width >= VISIBLE && visible.height >= VISIBLE) return { ...moved, width, height };
   }
+  const centered = (room: number) =>
+    Math.min(room, Math.max(0, Math.round(room / 2) + (saved ? 0 : offset)));
   return {
-    x: target.x + Math.round((target.width - width) / 2),
-    y: target.y + Math.round((target.height - height) / 2),
+    x: target.x + centered(target.width - width),
+    y: target.y + centered(target.height - height),
     width,
     height,
-    maximized: moved.maximized,
+    maximized: saved?.maximized ?? false,
   };
 }
 

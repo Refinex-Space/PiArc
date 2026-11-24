@@ -265,7 +265,7 @@ export function McpPage() {
       });
   };
   return (
-    <div className="agents-page" data-testid="mcp-page">
+    <div className="agents-page settings-detail-page" data-testid="mcp-page">
       <p className="muted">{t('mcp.hint')}</p>
       {chosen === null ? (
         <p className="muted">{t('mcp.noWorkspace')}</p>

@@ -65,7 +65,7 @@ export function TokenList({ tokens }: { readonly tokens: UsageTokens }) {
   return (
     <dl className="usage-tokens" data-testid="usage-tokens">
       {rows.map(([label, value]) => (
-        <div key={label} className="usage-token">
+        <div key={label} className="usage-token" data-rate={label}>
           <dt>{t(label)}</dt>
           <dd>{format.number(value)}</dd>
         </div>

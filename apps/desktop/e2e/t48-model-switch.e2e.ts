@@ -1,5 +1,6 @@
 // T48: the model picker releases focus after a confirmed switch so its PreModelSwitch hook
 // can ask a question in the session's approval ledger while the original call waits.
+import { closeSettings } from './settings-panel.js';
 import { addEndpoint, settingsWindow } from './provider-settings.js';
 import { expect, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { idle } from './t19.js';
@@ -13,10 +14,10 @@ test('a model switch hook can ask after the cost preview and either keep or swit
   workspaces,
 }, info) => {
   test.setTimeout(120_000);
-  const settings = await settingsWindow(app, page);
+  const settings = await settingsWindow(page);
   await addEndpoint(settings, 'relay-a', mock.baseUrl, 'anthropic-messages', 'first');
   await addEndpoint(settings, 'relay-b', mock.baseUrl + '/v1', 'openai-completions', 'second');
-  await settings.close();
+  await closeSettings(settings);
   const workspace = await makeWorkspace(workspaces, 'model switch hook', {
     'note.txt': 'A note from the mock workspace.',
     '.piarc/settings.json': JSON.stringify({

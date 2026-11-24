@@ -254,6 +254,72 @@ function SessionTable({ report }: { readonly report: UsageReport }) {
   );
 }
 
+/** The report provides cumulative counts. Per-model shares use the same token total as the cards. */
+function UsageOverview({ report }: { readonly report: UsageReport }) {
+  const { t, format } = useApp();
+  const total = totalTokens(report.tokens);
+  return (
+    <section className="usage-overview" data-testid="usage-summary">
+      <h2 className="settings-heading">{t('usage.overview')}</h2>
+      <dl className="usage-metrics">
+        <div>
+          <dt>{t('usage.tokensColumn')}</dt>
+          <dd>{format.number(total)}</dd>
+        </div>
+        <div>
+          <dt>{t('usage.requestsColumn')}</dt>
+          <dd>{format.number(report.tokens.requests)}</dd>
+        </div>
+        <div>
+          <dt>{t('usage.costColumn')}</dt>
+          <dd>
+            <Cost cost={report.cost} partial={report.partial} testId="usage-total-cost" />
+          </dd>
+        </div>
+      </dl>
+      {(total > 0 || report.tokens.reasoning > 0) && (
+        <div className="usage-distribution">
+          <section>
+            <h3>{t('usage.breakdown')}</h3>
+            <div className="usage-stack" aria-hidden="true">
+              {RATES.filter((rate) => report.tokens[rate] > 0).map((rate) => (
+                <span
+                  key={rate}
+                  data-rate={RATE_LABELS[rate]}
+                  style={{ flexGrow: report.tokens[rate] }}
+                />
+              ))}
+            </div>
+            <TokenList tokens={report.tokens} />
+          </section>
+          {total > 0 && report.models.length > 0 && (
+            <section>
+              <h3>{t('usage.models')}</h3>
+              <ul className="usage-model-shares">
+                {report.models.map((model) => {
+                  const key = `${model.provider}/${model.model}`;
+                  const tokens = totalTokens(model.tokens);
+                  return (
+                    <li key={key}>
+                      <span className="usage-share-model" title={key}>
+                        {model.model}
+                      </span>
+                      <span className="usage-share-meter" aria-hidden="true">
+                        <span style={{ width: `${String((tokens / total) * 100)}%` }} />
+                      </span>
+                      <span>{format.number(tokens)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function UsagePage() {
   const { t } = useApp();
   const selectId = useId();
@@ -284,8 +350,7 @@ export function UsagePage() {
   }, [chosen, t]);
   useEffect(load, [load]);
   return (
-    <div className="agents-page" data-testid="usage-page">
-      <p className="muted">{t('usage.hint')}</p>
+    <div className="settings-detail-page usage-page" data-testid="usage-page">
       <div className="permission-filters">
         <label htmlFor={selectId} className="permission-filter-label">
           {t('permissions.workspace')}
@@ -317,14 +382,9 @@ export function UsagePage() {
       )}
       {report === undefined ? null : (
         <>
-          <section className="usage-summary" data-testid="usage-summary">
-            <Cost cost={report.cost} partial={report.partial} testId="usage-total-cost" />
-            <span className="muted small">
-              {t('usage.requests', { count: report.tokens.requests })}
-            </span>
-            <TokenList tokens={report.tokens} />
-          </section>
-          <h2 className="settings-heading">{t('usage.models')}</h2>
+          <UsageOverview report={report} />
+          <h2 className="settings-heading">{t('usage.modelDetails')}</h2>
+          <p className="muted">{t('usage.hint')}</p>
           {report.models.length === 0 ? (
             <p className="muted">{t('usage.empty')}</p>
           ) : (

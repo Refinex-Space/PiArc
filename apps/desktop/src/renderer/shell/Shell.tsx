@@ -6,6 +6,7 @@ import type { AppCommand, LaunchTarget } from '../../shared/ipc.js';
 import { parseComposerInfo, type ComposerInfo } from '../composer/attachments.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
+import { SettingsModal } from '../settings/SettingsModal.js';
 import { AppStore } from '../store/app-store.js';
 import { StoreConnection } from '../store/connection.js';
 import { StoreContext, useHarnessOf, useSessionOf, useTasksOf } from '../store/hooks.js';
@@ -85,8 +86,12 @@ function usePanelContext(store: AppStore, sessionId: string | undefined): PanelC
   );
 }
 
-function Attention() {
-  useAttention();
+function isSettingsRoute(): boolean {
+  return /^#\/settings(?:\/|$)/u.test(window.location.hash);
+}
+
+function Attention({ covered }: { readonly covered: boolean }) {
+  useAttention(covered);
   return null;
 }
 
@@ -139,6 +144,32 @@ export function Shell() {
   const [layout, setLayout] = useState<Layout>(() => loadLayout(localStore()));
   const [trust, setTrust] = useState<TrustRequest | undefined>(undefined);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [settingsEntry, setSettingsEntry] = useState<number | null>(() =>
+    isSettingsRoute() ? 0 : null,
+  );
+  const settingsOpen = settingsEntry !== null;
+  const openSettings = useCallback((page?: string) => {
+    if (page === undefined && isSettingsRoute()) {
+      setSettingsEntry((current) => current ?? 0);
+      return;
+    }
+    window.history.replaceState(null, '', page ? '#/settings/' + page : '#/settings');
+    setSettingsEntry((current) => (current ?? -1) + 1);
+  }, []);
+  const closeSettings = useCallback(() => {
+    if (isSettingsRoute())
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setSettingsEntry(null);
+  }, []);
+  useEffect(() => {
+    const sync = () => {
+      setSettingsEntry((current) => (isSettingsRoute() ? (current ?? 0) : null));
+    };
+    window.addEventListener('hashchange', sync);
+    return () => {
+      window.removeEventListener('hashchange', sync);
+    };
+  }, []);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toasts, setToasts] = useState<readonly Toast[]>([]);
   const viewRef = useRef(view);
@@ -156,10 +187,11 @@ export function Shell() {
     () =>
       window.piarc.onAppEvent((event) => {
         if (event.type === 'openSession') {
+          closeSettings();
           setView({ kind: 'session', id: event.sessionId });
         }
       }),
-    [],
+    [closeSettings],
   );
   // A session that disappears (deleted, archived elsewhere) leaves the main area. A session
   // just created may not be in the list yet: only one that was listed can disappear.
@@ -229,6 +261,11 @@ export function Shell() {
   // is not trusted yet, the trust dialog shows as for any folder; a session is shown.
   const launch = useCallback(
     (target: LaunchTarget) => {
+      if (target.kind === 'settings') {
+        openSettings(target.page);
+        return;
+      }
+      closeSettings();
       if (target.kind === 'session') {
         show({ kind: 'session', id: target.sessionId });
         return;
@@ -250,7 +287,7 @@ export function Shell() {
           console.error('[shell] cannot open the launch target', error);
         });
     },
-    [show, ensureTrust, openFolder, openPath],
+    [show, ensureTrust, openFolder, openPath, openSettings, closeSettings],
   );
   useLaunchTargets(launch);
   const drop = useMemo(
@@ -309,6 +346,14 @@ export function Shell() {
   const effortButton = useRef<HTMLButtonElement>(null);
   const modeButton = useRef<HTMLButtonElement>(null);
   const run = (command: AppCommand) => {
+    if (settingsOpen) {
+      if (
+        command === 'session.close' &&
+        !document.querySelector('.settings-dialog [role="dialog"]')
+      )
+        closeSettings();
+      return;
+    }
     switch (command) {
       case 'session.new':
         show({
@@ -425,7 +470,7 @@ export function Shell() {
   return (
     <StoreContext.Provider value={store}>
       <UiContext.Provider value={ui}>
-        <Attention />
+        <Attention covered={settingsOpen} />
         <div
           className={`shell${layout.sidebarCollapsed ? ' is-collapsed' : ''}`}
           data-testid="app-shell"
@@ -498,6 +543,7 @@ export function Shell() {
                     <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
                   ) : (
                     <Conversation
+                      covered={settingsOpen}
                       id={view.id}
                       modeButton={modeButton}
                       modelButton={modelButton}
@@ -576,6 +622,7 @@ export function Shell() {
             }}
           />
         )}
+        {settingsEntry !== null && <SettingsModal entry={settingsEntry} onClose={closeSettings} />}
       </UiContext.Provider>
     </StoreContext.Provider>
   );

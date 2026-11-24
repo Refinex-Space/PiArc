@@ -3,22 +3,15 @@
 // after it is enabled in settings and still asks natively; the Permissions page adds, edits
 // and removes rules (allow rules behind the native confirmation) and filters the audit.
 // Screenshots go to tmp/evidence/T23/.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { ElectronApplication } from '@playwright/test';
 
 import { expect, test } from './sessions.js';
 import { idle, openSession } from './t19.js';
 
 const EVIDENCE = path.join(import.meta.dirname, '..', '..', '..', 'tmp', 'evidence', 'T23');
-
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
-}
 
 /** Answers every native message box with `responses` in turn and records each detail. */
 async function scriptDialogs(app: ElectronApplication, responses: number[]): Promise<void> {
@@ -90,13 +83,13 @@ test('always allow saves one edited rule per subcommand; bypass needs settings a
   await expect(menu.getByRole('menuitem', { name: /Plan/u })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: /Bypass permissions/u })).toHaveCount(0);
   await page.keyboard.press('Escape');
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-permissions').click();
   // A controlled checkbox: it turns on when the saved preference comes back.
   await settings.getByTestId('setting-enable-bypass').click();
   await expect(settings.getByTestId('setting-enable-bypass')).toBeChecked();
   await settings.screenshot({ path: path.join(EVIDENCE, 'bypass-setting.png') });
-  await settings.close();
+  await closeSettings(settings);
   await scriptDialogs(app, [1, 0]);
   await modeButton.click();
   await menu.getByRole('menuitem', { name: /Bypass permissions/u }).click();
@@ -134,7 +127,7 @@ test('the Permissions page edits rules by source behind a native confirmation an
     await card.getByRole('button', { name: 'Decline' }).click();
   }
   await idle(page);
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-permissions').click();
   const local = settings.getByTestId('permission-source-projectLocal');
   await expect(local).toContainText('.piarc/settings.local.json');

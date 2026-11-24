@@ -5,6 +5,7 @@
 // hook's notice, and OSC 8 links in the terminal panel. Everything shows as text: the page's
 // sentinel stays, no element carries an event attribute, no frame, object or foreignObject
 // appears, links keep safe schemes, the window does not navigate and the CSP reports nothing.
+import { openSettings } from './settings-panel.js';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -253,10 +254,7 @@ test('THR-11 settings pages and a hook notice show names, values and messages as
   await expect(page.getByTestId('notices')).toContainText(PLAIN[0] ?? '', { timeout: 30_000 });
   await expectInertDocument(page, mainUrl, 'hook notice');
 
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+  const settings = await openSettings(page);
   await watchMarkup(settings);
   const settingsUrl = (): string => settings.url();
   const settingsWindow = settings.getByTestId('settings-window');

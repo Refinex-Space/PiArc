@@ -1,4 +1,5 @@
 // The same fixture and approvals are used on macOS and Windows (W1).
+import { closeSettings } from './settings-panel.js';
 import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -28,7 +29,7 @@ for (const [id, api, format] of [
     workspaces,
   }, info) => {
     test.setTimeout(120_000);
-    const settings = await settingsWindow(app, page);
+    const settings = await settingsWindow(page);
     await addEndpoint(
       settings,
       id,
@@ -37,7 +38,7 @@ for (const [id, api, format] of [
       'fixture',
     );
     await settings.screenshot({ path: info.outputPath('settings.png') });
-    await settings.close();
+    await closeSettings(settings);
     const ws = await makeWorkspace(workspaces, '加法 regression', files);
     const init = spawnSync('git', ['init', '--quiet'], { cwd: ws, encoding: 'utf8' });
     expect(init.status, init.stderr).toBe(0);

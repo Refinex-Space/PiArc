@@ -30,6 +30,15 @@
   --piarc-size-sidebar-min: 200px;
   --piarc-size-sidebar-max: 420px;
   --piarc-size-badge: 8px;
+  --piarc-settings-width: 1000px;
+  --piarc-settings-height: 780px;
+  --piarc-settings-rail: 208px;
+  --piarc-settings-header: 56px;
+  --piarc-settings-gutter: 32px;
+  --piarc-settings-radius: 12px;
+  --piarc-settings-header-text: 16px;
+  --piarc-settings-page-title: 18px;
+  --piarc-settings-nav-text: 14.5px;
   --piarc-size-button-height: 28px;
   --piarc-radius-button: 8px;
   --piarc-font-size-button: 14px;

@@ -289,7 +289,7 @@ function InstallForm({
   const [scope, setScope] = useState<PackageScope>('user');
   return (
     <form
-      className="permission-filters"
+      className="settings-install-form"
       data-testid="package-install"
       onSubmit={(e) => {
         e.preventDefault();
@@ -304,35 +304,39 @@ function InstallForm({
         );
       }}
     >
-      <label htmlFor={kindId} className="permission-filter-label">
-        {t('plugins.kind')}
-      </label>
-      <select
-        id={kindId}
-        className="input"
-        data-testid="package-kind"
-        value={kind}
-        onChange={(e) => {
-          const value = e.currentTarget.value;
-          if (value === 'directory' || value === 'git' || value === 'npm') setKind(value);
-        }}
-      >
-        <option value="directory">{t('plugins.kind.directory')}</option>
-        <option value="git">{t('plugins.kind.git')}</option>
-        <option value="npm">{t('plugins.kind.npm')}</option>
-      </select>
-      <label htmlFor={locationId} className="permission-filter-label">
-        {t('plugins.location')}
-      </label>
-      <input
-        id={locationId}
-        className="input"
-        data-testid="package-location"
-        value={location}
-        onChange={(e) => {
-          setLocation(e.currentTarget.value);
-        }}
-      />
+      <div className="setting">
+        <label htmlFor={kindId} className="setting-label">
+          {t('plugins.kind')}
+        </label>
+        <select
+          id={kindId}
+          className="input"
+          data-testid="package-kind"
+          value={kind}
+          onChange={(e) => {
+            const value = e.currentTarget.value;
+            if (value === 'directory' || value === 'git' || value === 'npm') setKind(value);
+          }}
+        >
+          <option value="directory">{t('plugins.kind.directory')}</option>
+          <option value="git">{t('plugins.kind.git')}</option>
+          <option value="npm">{t('plugins.kind.npm')}</option>
+        </select>
+      </div>
+      <div className="setting">
+        <label htmlFor={locationId} className="setting-label">
+          {t('plugins.location')}
+        </label>
+        <input
+          id={locationId}
+          className="input"
+          data-testid="package-location"
+          value={location}
+          onChange={(e) => {
+            setLocation(e.currentTarget.value);
+          }}
+        />
+      </div>
       {kind === 'directory' ? (
         <Button
           size="small"
@@ -346,21 +350,25 @@ function InstallForm({
           {t('plugins.chooseFolder')}
         </Button>
       ) : null}
-      <label htmlFor={scopeId} className="permission-filter-label">
-        {t('plugins.scope')}
-      </label>
-      <select
-        id={scopeId}
-        className="input"
-        data-testid="package-scope"
-        value={scope}
-        onChange={(e) => {
-          setScope(e.currentTarget.value === 'project' ? 'project' : 'user');
-        }}
-      >
-        <option value="user">{t('plugins.scope.user')}</option>
-        {workspace === null ? null : <option value="project">{t('plugins.scope.project')}</option>}
-      </select>
+      <div className="setting">
+        <label htmlFor={scopeId} className="setting-label">
+          {t('plugins.scope')}
+        </label>
+        <select
+          id={scopeId}
+          className="input"
+          data-testid="package-scope"
+          value={scope}
+          onChange={(e) => {
+            setScope(e.currentTarget.value === 'project' ? 'project' : 'user');
+          }}
+        >
+          <option value="user">{t('plugins.scope.user')}</option>
+          {workspace === null ? null : (
+            <option value="project">{t('plugins.scope.project')}</option>
+          )}
+        </select>
+      </div>
       <Button
         type="submit"
         variant="primary"

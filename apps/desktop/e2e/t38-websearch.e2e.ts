@@ -137,7 +137,7 @@ test('without a backend WebSearch is not offered and the settings page says why'
   expect(tools.map((t) => t.name)).not.toContain('WebSearch');
   expect(tools.map((t) => t.name)).toContain('WebFetch');
 
-  const settings = await settingsWindow(app, page);
+  const settings = await settingsWindow(page);
   const section = settings.getByTestId('web-search-section');
   await section.scrollIntoViewIfNeeded();
   await expect(section.getByTestId('web-search-status')).toContainText('WebSearch is unavailable');

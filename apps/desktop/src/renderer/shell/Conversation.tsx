@@ -231,12 +231,14 @@ function useHistory(
 }
 
 export function Conversation({
+  covered,
   id,
   modeButton,
   modelButton,
   effortButton,
 }: {
   readonly id: string;
+  readonly covered: boolean;
   readonly modelButton: React.Ref<HTMLButtonElement>;
   readonly effortButton: React.Ref<HTMLButtonElement>;
   readonly modeButton: React.Ref<HTMLButtonElement>;
@@ -331,12 +333,12 @@ export function Conversation({
   const unread = session?.unread === true;
   const focused = useWindowFocused();
   useEffect(() => {
-    if (unread && focused) {
+    if (unread && focused && !covered) {
       window.piarc.markSessionRead(id).catch((failure: unknown) => {
         console.error('[conversation] cannot mark the session read', failure);
       });
     }
-  }, [id, unread, focused]);
+  }, [id, unread, focused, covered]);
 
   const sessionWorkspace = session?.workspace;
   const view = useMemo<TranscriptView>(

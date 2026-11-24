@@ -39,6 +39,17 @@
     "sidebarMax": "420px",
     "badge": "8px"
   },
+  "settings": {
+    "width": "1000px",
+    "height": "780px",
+    "rail": "208px",
+    "header": "56px",
+    "gutter": "32px",
+    "radius": "12px",
+    "headerText": "16px",
+    "pageTitle": "18px",
+    "navText": "14.5px"
+  },
   "density": {
     "comfortable": {
       "size.buttonHeight": "28px",

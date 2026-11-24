@@ -4,9 +4,10 @@
 // the app runs. Claude Code's files are left byte for byte as they were. Core reads the user's
 // files from the test home (`<user data>/test-home`, `createForTests`), never the real one.
 // Screenshots go to tmp/evidence/T24/.
+import { openSettings } from './settings-panel.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import { expect, focusMain, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { prefer } from './t19.js';
@@ -29,11 +30,8 @@ const USER = JSON.stringify({
   theme: 'dark',
 });
 
-async function openDiagnostics(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+async function openDiagnostics(page: Page): Promise<Page> {
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-diagnostics').click();
   await settings.getByTestId('config-diagnostics').waitFor();
   return settings;
@@ -66,7 +64,7 @@ test('configuration diagnostics explain every file and follow a Claude Code edit
   // Not trusted: the project's allow rule and mode wait for trust.
   await startSession(page, 'Hello', 't18-chat', 'deny');
   await focusMain(app);
-  const settings = await openDiagnostics(app, page);
+  const settings = await openDiagnostics(page);
   await expect(settings.getByTestId('diagnostics-trust')).toContainText('not trusted');
 
   const project = settings.getByTestId('diagnostics-file-claudeProject');

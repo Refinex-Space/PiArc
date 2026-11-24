@@ -239,7 +239,7 @@ export async function focusMain(app: ElectronApplication): Promise<void> {
         (w) =>
           !w.isDestroyed() &&
           !w.webContents.isDestroyed() &&
-          !w.webContents.getURL().includes('#/settings'),
+          !w.webContents.getURL().includes('#/event-probe'),
       )
       ?.focus();
   });
@@ -251,7 +251,7 @@ export async function focusMain(app: ElectronApplication): Promise<void> {
             !w.isDestroyed() &&
             !w.webContents.isDestroyed() &&
             w.isFocused() &&
-            !w.webContents.getURL().includes('#/settings'),
+            !w.webContents.getURL().includes('#/event-probe'),
         ),
       ),
     )

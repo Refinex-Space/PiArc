@@ -13,6 +13,8 @@
 ## 窗口（T35，ADR-0052）
 
 - `AppShell` 管任意多个主窗口：最近获得焦点的是"当前"主窗口（菜单命令、系统通知、Dock 角标只认它）；全部窗口共用一个 Core、订阅同一批快照，审批的先到答复由 Core 的账本裁定。
+- 设置在发起操作的工作台中显示为模态面板。`settingsOpen` IPC 将调用窗口绑定到 `LaunchTarget` 的 `settings` 分支；应用菜单选取最近聚焦的工作台，无窗口时先创建工作台。打开请求沿用 `takeLaunchTargets` 的就绪队列，同页重复定位（例如记忆笔记）也会送达。
+- 首次主窗口以 1200 × 800 DIP 为基准，居中放入主显示器的工作区。正常最小尺寸为 960 × 600 DIP；当显示器工作区更小时，原生最小尺寸按轴缩小至可用范围。
 - 窗口状态：主窗口移动、缩放（防抖 500 ms）与关闭时写 `<userData>/window-state.json`（`platform/window-state.ts`，同目录临时文件 + rename）；新窗口按 24 px 错开，`placeWindow` 把落在已不存在显示器上的窗口移回主显示器居中。
 - 关闭最后一个窗口不退出（两个平台一样）。退出只经菜单与托盘的 `app.quit` 命令（`platform/quit.ts`）：Core 的 `runningWork()` 报告有运行中的会话或后台任务时先弹原生确认；系统注销、测试驱动的 `app.quit()` 不询问。不要把确认挂到 `before-quit` 上。
 

@@ -1,0 +1,435 @@
+/* Page-specific information architecture shared by the settings surfaces. The controls,
+   popups and navigation keep their own interaction rules. */
+.settings .settings-detail-page {
+  --settings-card: var(--piarc-surface-panel);
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-3);
+  min-width: 0;
+}
+
+.settings-detail-page :is(h2.settings-heading, .permission-heading) {
+  margin: var(--piarc-space-5) 0 0;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-title);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: 1.4;
+}
+
+.settings-detail-page
+  :is(.settings-subsection, .settings-connection-section, .auto-review, .permission-audit),
+.settings-detail-page > section:has(> .settings-heading) {
+  display: grid;
+  align-content: start;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+
+.settings-detail-page > :first-child,
+.settings-detail-page > :first-child > :first-child {
+  margin-block-start: 0;
+}
+
+.settings-detail-page p {
+  margin-block: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-detail-page :is(.permission-filters, .permission-editor) {
+  row-gap: var(--piarc-space-2);
+  min-width: 0;
+}
+
+.settings-detail-page :is(.permission-filters, .permission-editor) > :is(.input, .button),
+.settings-detail-page .provider-list select {
+  max-width: 100%;
+}
+
+.settings-detail-page .permission-filters:has(> label:only-of-type):has(> select:only-of-type) {
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+
+.settings-detail-page .permission-filters:has(> label:only-of-type) > label:only-of-type {
+  margin-inline-end: auto;
+  color: var(--piarc-text-primary);
+  font-size: inherit;
+}
+
+/* A card groups related records. A fine rule separates records inside the card. */
+.settings-detail-page
+  :is(.settings-connection-box, .provider-list, .agent-list, .provider-form, .permission-source) {
+  min-width: 0;
+  margin: 0;
+  padding: 0 var(--piarc-space-4);
+  border: 1px solid var(--settings-divider);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--settings-card);
+}
+
+.settings-detail-page :is(.provider-list, .agent-list):empty {
+  display: none;
+}
+
+.settings-detail-page .settings-connection-box .provider-list {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.settings-detail-page
+  :is(.settings-connect-row, .provider-list > li, .agent-list > li, .settings-connection-empty) {
+  padding-block: var(--piarc-space-3);
+  border: 0;
+}
+
+.settings-detail-page :is(.provider-list, .agent-list) > li + li,
+.settings-detail-page .settings-connection-box > :not(:first-child) {
+  border-block-start: 1px solid var(--settings-divider);
+}
+
+.settings-connect-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-3);
+}
+
+.settings-detail-page :is(.settings-connect-row, .provider-list, .agent-row-head) strong {
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.settings-detail-page .provider-list > li {
+  flex-wrap: wrap;
+}
+
+.settings-detail-page .provider-list > li > div:first-child {
+  flex: 1 1 12em;
+}
+
+.settings-detail-page .provider-list select {
+  flex: 0 1 16em;
+}
+
+.settings-detail-page .agent-row-head {
+  flex-wrap: wrap;
+}
+
+.settings-detail-page .checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+
+.settings-detail-page .checkbox > input[type='checkbox'] {
+  order: 1;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+.settings-detail-page .settings-connection-section > .checkbox,
+.settings-detail-page .setting:has(> .checkbox) {
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+
+.settings-detail-page .setting:has(> .setting-label):has(> .input) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10em, 46%);
+  align-items: center;
+  column-gap: var(--piarc-space-3);
+  row-gap: var(--piarc-space-1);
+  min-width: 0;
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+
+.settings-detail-page .setting > .setting-label {
+  font-weight: var(--piarc-font-weight-regular);
+}
+
+.settings-detail-page .setting:has(> .setting-label) > .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-detail-page .setting:has(> .setting-label):has(> .input) > :is(.muted, .error-text, div) {
+  grid-column: 1 / -1;
+}
+
+.settings-detail-page .provider-form > .setting:last-of-type {
+  border: 0;
+}
+
+.settings-detail-page .provider-form > .dialog-actions {
+  margin: 0;
+  padding-block: var(--piarc-space-3);
+}
+
+.settings-detail-page .permission-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--piarc-space-1) var(--piarc-space-3);
+  padding-block: var(--piarc-space-3);
+}
+
+.settings-detail-page .permission-source > :not(.permission-add) {
+  grid-column: 1 / -1;
+}
+
+.settings-detail-page .permission-source:has(> .permission-add) > .permission-source-title {
+  grid-column: 1;
+}
+
+.settings-detail-page .permission-source > .permission-add {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.settings-detail-page .permission-rule + .permission-rule {
+  border-block-start: 1px solid var(--settings-divider);
+}
+
+.settings-detail-page .permission-rule {
+  border: 0;
+}
+
+.settings-detail-page .permission-audit {
+  overflow-x: auto;
+}
+
+.settings-detail-page :is(.permission-audit-table, .diagnostics-table) :is(th, td) {
+  padding-block: var(--piarc-space-2);
+  border-color: var(--settings-divider);
+}
+
+.settings-detail-page .diagnostics-file {
+  min-width: 0;
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+
+.settings-detail-page .diagnostics-code {
+  overflow-wrap: anywhere;
+}
+
+/* Scope the dashboard to the report: the compact usage rail has different geometry. */
+.settings-detail-page.usage-page {
+  gap: var(--piarc-space-3);
+}
+
+.settings-detail-page .usage-overview {
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+
+.settings-detail-page .usage-overview > h2 {
+  margin-block: 0 var(--piarc-space-2);
+}
+
+.usage-metrics,
+.usage-distribution {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--piarc-space-2);
+  margin: 0;
+}
+
+.usage-metrics > div,
+.usage-distribution > section {
+  min-width: 0;
+  padding: var(--piarc-space-3) var(--piarc-space-4);
+  border-radius: var(--piarc-radius-md);
+}
+
+.usage-metrics > div {
+  background: var(--piarc-surface-active);
+}
+
+.usage-metrics dt {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+.usage-metrics dd {
+  margin: var(--piarc-space-1) 0 0;
+  font-size: var(--piarc-font-size-heading);
+  font-weight: var(--piarc-font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.usage-metrics .usage-cost {
+  font: inherit;
+  color: inherit;
+}
+
+.usage-distribution {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.usage-distribution > section {
+  border: 1px solid var(--settings-divider);
+}
+
+.usage-distribution h3 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.usage-stack,
+.usage-share-meter {
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+  height: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-active);
+}
+
+.usage-stack {
+  column-gap: 1px;
+  margin-block: var(--piarc-space-3);
+}
+
+.usage-stack span,
+.usage-distribution .usage-token dt::before {
+  background: var(--chart-color, var(--piarc-text-secondary));
+}
+
+.usage-overview [data-rate='usage.tokens.input'],
+.usage-share-meter > span {
+  --chart-color: var(--piarc-accent-solid);
+}
+
+.usage-overview [data-rate='usage.tokens.cacheRead'] {
+  --chart-color: var(--piarc-state-success);
+}
+
+.usage-overview [data-rate='usage.tokens.output'] {
+  --chart-color: var(--piarc-state-warning);
+}
+
+.usage-distribution .usage-tokens,
+.usage-model-shares {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--piarc-font-size-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-distribution .usage-tokens {
+  grid-template-columns: 1fr;
+}
+
+.usage-distribution .usage-token,
+.usage-model-shares li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--piarc-space-2);
+}
+
+.usage-distribution .usage-token dt {
+  color: var(--piarc-text-primary);
+}
+
+.usage-distribution .usage-token dt::before {
+  content: '';
+  display: inline-block;
+  width: var(--piarc-space-2);
+  height: var(--piarc-space-2);
+  margin-inline-end: var(--piarc-space-2);
+  border-radius: 2px;
+}
+
+.usage-distribution .usage-token[data-rate='usage.tokens.reasoning'] dt::before {
+  visibility: hidden;
+}
+
+.usage-model-shares {
+  margin-block-start: var(--piarc-space-3);
+}
+
+.usage-model-shares li {
+  align-items: center;
+}
+
+.usage-share-model {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 0 1 42%;
+}
+
+.usage-share-meter {
+  flex: 1;
+}
+
+.usage-share-meter > span {
+  background: var(--chart-color);
+}
+
+@container (max-width: 32rem) {
+  .usage-distribution {
+    grid-template-columns: 1fr;
+  }
+  .settings-detail-page .setting:has(> .setting-label):has(> .input) {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (max-width: 24rem) {
+  .usage-metrics {
+    grid-template-columns: 1fr;
+  }
+  .settings-connect-row {
+    flex-wrap: wrap;
+  }
+}
+
+.settings-audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10em), 1fr));
+  align-items: end;
+  gap: var(--piarc-space-2) var(--piarc-space-3);
+}
+
+.settings-filter-field {
+  display: grid;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+.settings-filter-field .input {
+  width: 100%;
+  min-width: 0;
+  color: var(--piarc-text-primary);
+}
+
+.settings-audit-filters > .button {
+  justify-self: start;
+}
+
+.settings-install-form {
+  display: grid;
+  padding: 0 var(--piarc-space-4) var(--piarc-space-3);
+  border: 1px solid var(--settings-divider);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--settings-card);
+}
+
+.settings-install-form > .button {
+  margin-block-start: var(--piarc-space-2);
+  justify-self: end;
+}

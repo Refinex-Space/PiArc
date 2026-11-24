@@ -44,7 +44,7 @@ describe('accessibility state list', () => {
     const files = await sources();
     const pages = files.flatMap((f) => registered(f.text, 'registerSettingsPage'));
     const panels = files.flatMap((f) => registered(f.text, 'registerPanel'));
-    const dialogs = files.filter((f) => /<Dialog\b/u.test(f.text)).map((f) => f.file);
+    const dialogs = files.filter((f) => /<(?:Dialog|dialog)\b/u.test(f.text)).map((f) => f.file);
     expect(pages.length).toBeGreaterThan(5);
     expect(panels.length).toBeGreaterThan(5);
     expect(dialogs.length).toBeGreaterThan(5);

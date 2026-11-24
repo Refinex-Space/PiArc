@@ -2,7 +2,7 @@
 // notification (and always the in-app reminder and the Dock bounce), and the Dock badge counts
 // the sessions that need the user. On macOS the program cannot see whether a banner appeared
 // (S6, I43), so the test checks what PiArc asked for; the banner itself is checked by hand.
-import { expectTestHooks } from './core.js';
+import { expectTestHooks, openProbe } from './core.js';
 import {
   expect,
   focusMain,
@@ -29,10 +29,7 @@ test('a session finishing in the background notifies and counts on the Dock badg
     .locator('[data-approval-card=command] button')
     .filter({ hasText: /^(Allow once|仅本次允许)$/u })
     .click();
-  const settings = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const front = await settings;
-  await front.getByTestId('settings-window').waitFor();
+  const { page: front } = await openProbe(app);
   // The main window is no longer in front.
   await expect
     .poll(() =>
@@ -42,7 +39,7 @@ test('a session finishing in the background notifies and counts on the Dock badg
             (w) =>
               !w.isDestroyed() &&
               !w.webContents.isDestroyed() &&
-              !w.webContents.getURL().includes('#/settings'),
+              !w.webContents.getURL().includes('#/event-probe'),
           )
           .some((w) => w.isFocused()),
       ),

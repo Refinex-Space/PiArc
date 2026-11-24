@@ -1,7 +1,7 @@
 // The settings pages: General (language, notifications, memory), Appearance (theme, contrast,
 // density, motion) and Keyboard Shortcuts (every registered command; changes take effect at
 // once in every window and in the menu; conflicts are refused with a message).
-import { useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import {
@@ -24,6 +24,7 @@ import {
 } from '../../shared/preferences.js';
 import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
+import { reason } from '../shell/errors.js';
 import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { SandboxPage } from './SandboxPage.js';
@@ -55,71 +56,150 @@ function useSave(): { save: (change: PreferenceChange) => void; error: string | 
   };
 }
 
+function themeIcon(theme: (typeof THEMES)[number]) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {theme === 'system' ? (
+        <>
+          <rect x="2.75" y="4" width="18.5" height="13.25" rx="2" />
+          <path d="M12 17.25v3M8.5 20.25h7" />
+        </>
+      ) : theme === 'light' ? (
+        <>
+          <circle cx="12" cy="12" r="4.25" />
+          <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+        </>
+      ) : (
+        <path d="M20.8 14.7a9.25 9.25 0 0 1-11.5-11.5A9.25 9.25 0 1 0 20.8 14.7Z" />
+      )}
+    </svg>
+  );
+}
+
 function Choice<T extends string>({
   label,
+  hint,
   name,
   pointer,
   options,
   value,
   labelOf,
+  iconOf,
+  menu,
   onChange,
 }: {
   readonly label: MessageId;
+  readonly hint?: MessageId;
   readonly name: string;
-  /** The setting it writes (T47: read-only when managed settings lock it). */
   readonly pointer: string;
   readonly options: readonly T[];
   readonly value: T;
   readonly labelOf: (option: T) => MessageId;
+  readonly iconOf?: (option: T) => ReactNode;
+  readonly menu?: boolean;
   readonly onChange: (value: T) => void;
 }) {
   const { t } = useApp();
   const id = useId();
+  const hintId = hint ? id + '-hint' : undefined;
   const managed = useIsManaged(pointer);
   return (
-    <fieldset className="setting" data-testid={`setting-${name}`} disabled={managed}>
-      <legend id={id} className="setting-label">
-        {t(label)}
-        {managed && <ManagedBadge testId={`managed-${name}`} />}
-      </legend>
-      <SegmentedControl
-        options={options}
-        value={value}
-        onChange={onChange}
-        name={name}
-        testIdPrefix={name}
-        aria-labelledby={id}
-        labelOf={(option) => t(labelOf(option))}
-      />
-    </fieldset>
+    <div className="preference-row" data-testid={`setting-${name}`}>
+      <div className="preference-copy">
+        <span id={id}>
+          {t(label)}
+          {managed && <ManagedBadge testId={`managed-${name}`} />}
+        </span>
+        {hint && <p id={hintId}>{t(hint)}</p>}
+      </div>
+      {menu ? (
+        <select
+          className="input preference-select-ghost"
+          value={value}
+          disabled={managed}
+          aria-labelledby={id}
+          aria-describedby={hintId}
+          onChange={(event) => {
+            const next = options.find((option) => option === event.currentTarget.value);
+            if (next !== undefined) onChange(next);
+          }}
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {t(labelOf(option))}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <SegmentedControl
+          options={options}
+          value={value}
+          onChange={onChange}
+          disabled={managed}
+          name={name}
+          testIdPrefix={name}
+          aria-labelledby={id}
+          labelOf={(option) => t(labelOf(option))}
+          {...(hintId && { 'aria-describedby': hintId })}
+          {...(iconOf && { iconOf })}
+        />
+      )}
+    </div>
   );
 }
 
 function GeneralPage() {
   const { t, preferences, notificationsSupported } = useApp();
+  const [notificationInfo, setNotificationInfo] = useState<boolean | string>(
+    notificationsSupported,
+  );
+  // The workbench can stay open while OS notification availability changes. Read only the
+  // capability when visiting this page; live preferences still come from AppProvider.
+  useEffect(() => {
+    let active = true;
+    window.piarc.getAppState().then(
+      (snapshot) => {
+        if (active) setNotificationInfo(snapshot.notificationsSupported);
+      },
+      (failure: unknown) => {
+        if (active) setNotificationInfo(reason(failure));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
   const { save, error } = useSave();
   const languageId = useId();
+  const notificationDescription = useId();
+  const notificationLabel = useId();
   const managedLanguage = useIsManaged('/language');
   const managedNotifications = useIsManaged('/notifications/enabled');
   const managedReadBoth = useIsManaged('/memory/readBoth');
   return (
-    <div className="settings-section">
-      <div className="setting">
-        <label htmlFor={languageId} className="setting-label">
+    <div className="preference-rows">
+      <div className="preference-row">
+        <label htmlFor={languageId} className="preference-copy">
           {t('settings.language')}
           {managedLanguage && <ManagedBadge testId="managed-language" />}
         </label>
         <select
           id={languageId}
-          className="input"
+          className="input preference-language"
           value={preferences.language}
           disabled={managedLanguage}
           data-testid="setting-language"
           onChange={(event) => {
             const value = LANGUAGES.find((l) => l === event.currentTarget.value);
-            if (value !== undefined) {
-              save({ key: 'language', value });
-            }
+            if (value !== undefined) save({ key: 'language', value });
           }}
         >
           {LANGUAGES.map((language) => (
@@ -129,49 +209,61 @@ function GeneralPage() {
           ))}
         </select>
       </div>
-      <div className="setting">
-        <span className="setting-label">
-          {t('settings.notifications')}
-          {managedNotifications && <ManagedBadge testId="managed-notifications" />}
+      <label className="preference-row">
+        <span className="preference-copy">
+          <span>
+            {t('settings.notifications')}
+            {managedNotifications && <ManagedBadge testId="managed-notifications" />}
+          </span>
+          <span className="preference-description" id={notificationLabel}>
+            {t('settings.notifications.enabled')}
+          </span>
+          <span
+            className="preference-description"
+            id={notificationDescription}
+            data-testid="setting-notifications-note"
+          >
+            {typeof notificationInfo === 'string'
+              ? notificationInfo
+              : t(
+                  notificationInfo
+                    ? 'settings.notifications.actions'
+                    : 'settings.notifications.unsupported',
+                )}
+          </span>
         </span>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={preferences.notifications.enabled}
-            disabled={managedNotifications}
-            data-testid="setting-notifications"
-            onChange={(event) => {
-              save({ key: 'notifications.enabled', value: event.currentTarget.checked });
-            }}
-          />
-          {t('settings.notifications.enabled')}
-        </label>
-        <p className="muted small" data-testid="setting-notifications-note">
-          {t(
-            notificationsSupported
-              ? 'settings.notifications.actions'
-              : 'settings.notifications.unsupported',
-          )}
-        </p>
-      </div>
-      <div className="setting">
-        <span className="setting-label">
-          {t('settings.memory')}
-          {managedReadBoth && <ManagedBadge testId="managed-read-both" />}
+        <input
+          type="checkbox"
+          className="preference-switch"
+          checked={preferences.notifications.enabled}
+          disabled={managedNotifications}
+          aria-labelledby={notificationLabel}
+          aria-describedby={notificationDescription}
+          data-testid="setting-notifications"
+          onChange={(event) => {
+            save({ key: 'notifications.enabled', value: event.currentTarget.checked });
+          }}
+        />
+      </label>
+      <label className="preference-row">
+        <span className="preference-copy">
+          <span>
+            {t('settings.memory')}
+            {managedReadBoth && <ManagedBadge testId="managed-read-both" />}
+          </span>
+          <span className="preference-description">{t('settings.memory.readBoth')}</span>
         </span>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={preferences.memory.readBoth}
-            disabled={managedReadBoth}
-            data-testid="setting-memory-read-both"
-            onChange={(event) => {
-              save({ key: 'memory.readBoth', value: event.currentTarget.checked });
-            }}
-          />
-          {t('settings.memory.readBoth')}
-        </label>
-      </div>
+        <input
+          type="checkbox"
+          className="preference-switch"
+          checked={preferences.memory.readBoth}
+          disabled={managedReadBoth}
+          data-testid="setting-memory-read-both"
+          onChange={(event) => {
+            save({ key: 'memory.readBoth', value: event.currentTarget.checked });
+          }}
+        />
+      </label>
       {error !== undefined && (
         <p className="error-text" role="alert">
           {error}
@@ -186,24 +278,39 @@ function AppearancePage() {
   const { save, error } = useSave();
   const { appearance } = preferences;
   return (
-    <div className="settings-section">
+    <div className="preference-rows">
       <Choice
         label="settings.theme"
         name="theme"
         pointer="/appearance/theme"
         options={THEMES}
         value={appearance.theme}
+        iconOf={themeIcon}
         labelOf={(o) => `settings.theme.${o}`}
         onChange={(value) => {
           save({ key: 'appearance.theme', value });
         }}
       />
       <Choice
+        label="settings.reduceMotion"
+        name="reduceMotion"
+        pointer="/appearance/reduceMotion"
+        options={MOTIONS}
+        value={appearance.reduceMotion}
+        menu
+        labelOf={(o) => `settings.reduceMotion.${o}`}
+        onChange={(value) => {
+          save({ key: 'appearance.reduceMotion', value });
+        }}
+      />
+      <Choice
         label="settings.contrast"
         name="contrast"
         pointer="/appearance/contrast"
+        hint="settings.contrast.hint"
         options={CONTRASTS}
         value={appearance.contrast}
+        menu
         labelOf={(o) => `settings.contrast.${o}`}
         onChange={(value) => {
           save({ key: 'appearance.contrast', value });
@@ -213,22 +320,12 @@ function AppearancePage() {
         label="settings.density"
         name="density"
         pointer="/appearance/density"
+        hint="settings.density.hint"
         options={DENSITY_PREFERENCES}
         value={appearance.density}
         labelOf={(o) => `settings.density.${o}`}
         onChange={(value) => {
           save({ key: 'appearance.density', value });
-        }}
-      />
-      <Choice
-        label="settings.reduceMotion"
-        name="reduceMotion"
-        pointer="/appearance/reduceMotion"
-        options={MOTIONS}
-        value={appearance.reduceMotion}
-        labelOf={(o) => `settings.reduceMotion.${o}`}
-        onChange={(value) => {
-          save({ key: 'appearance.reduceMotion', value });
         }}
       />
       {error !== undefined && (
@@ -431,7 +528,7 @@ export function registerBuiltInSettingsPages(): void {
   registerSettingsPage({
     id: 'usage',
     title: 'settings.usage',
-    order: 60,
+    order: 5,
     component: UsagePage,
   });
   registerSettingsPage({

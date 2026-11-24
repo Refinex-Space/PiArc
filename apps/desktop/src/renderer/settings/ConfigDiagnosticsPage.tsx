@@ -567,7 +567,7 @@ export function ConfigDiagnosticsPage() {
     );
   }
   return (
-    <div className="diagnostics-page" data-testid="config-diagnostics">
+    <div className="diagnostics-page settings-detail-page" data-testid="config-diagnostics">
       <p className="muted">{t('diagnostics.intro')}</p>
       {view.workspace === null ? (
         <p className="muted">{t('permissions.noWorkspace')}</p>

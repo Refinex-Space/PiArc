@@ -1,5 +1,6 @@
 // Drives the same provider configuration and session paths a user takes, with a strict mock
 // at both endpoints and synthetic API keys. No pre-seeded Pi provider.
+import { closeSettings } from './settings-panel.js';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -24,11 +25,11 @@ test('two configured endpoints complete tool turns; a text-only model refuses an
   userDataDir,
 }, testInfo) => {
   test.setTimeout(120_000);
-  const settings = await settingsWindow(app, page);
+  const settings = await settingsWindow(page);
   await addEndpoint(settings, 'relay-a', mock.baseUrl, 'anthropic-messages', 'first\nextra');
   await addEndpoint(settings, 'relay-b', `${mock.baseUrl}/v1`, 'openai-completions', 'second');
   await settings.screenshot({ path: testInfo.outputPath('configured-providers.png') });
-  await settings.close();
+  await closeSettings(settings);
   const ws = await makeWorkspace(workspaces, 'model settings', {
     'note.txt': 'A note from the mock workspace.',
   });
@@ -102,7 +103,7 @@ test('provider settings validate, edit, and remove built-in, cloud, and keyless 
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
-  const settings = await settingsWindow(app, page);
+  const settings = await settingsWindow(page);
   await stubMessageBox(app, 0);
   for (const [kind, id] of [
     ['builtin', 'anthropic'],

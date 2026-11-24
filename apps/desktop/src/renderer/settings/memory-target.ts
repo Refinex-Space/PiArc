@@ -1,9 +1,5 @@
-// Where the memory page should open (T47, design addendum sections 4.1 and 4.4): `/memory` and a
-// memory row's "Open in settings" in the main window name the session's workspace (and the note)
-// before opening the settings window, which takes it once. Both windows share the app's origin,
-// so the hand-over is the origin's localStorage; losing it only opens the page on the most
-// recently used workspace.
-
+// A memory row or /memory names the destination in this workbench. Its pending target
+// survives a reload and cannot be consumed by another open workbench.
 const KEY = 'piarc.memoryTarget';
 
 export interface MemoryTarget {
@@ -14,7 +10,7 @@ export interface MemoryTarget {
 /** Names the workspace (and note) the next memory page shows. */
 export function rememberMemoryTarget(target: MemoryTarget): void {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(target));
+    window.sessionStorage.setItem(KEY, JSON.stringify(target));
   } catch {
     // Storage unavailable: the page opens on the most recent workspace instead.
   }
@@ -37,8 +33,8 @@ function parse(raw: string | null): MemoryTarget | undefined {
 /** The target named for this page, once: reading it clears it. */
 export function takeMemoryTarget(): MemoryTarget | undefined {
   try {
-    const target = parse(window.localStorage.getItem(KEY));
-    window.localStorage.removeItem(KEY);
+    const target = parse(window.sessionStorage.getItem(KEY));
+    window.sessionStorage.removeItem(KEY);
     return target;
   } catch {
     return undefined;

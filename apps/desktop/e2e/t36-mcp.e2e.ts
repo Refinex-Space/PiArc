@@ -5,9 +5,10 @@
 // definition and the replaced one is listed; SSE and WebSocket servers are marked unsupported on
 // the MCP page and in Configuration diagnostics (A05). The session's first request carries the
 // servers' tools as `mcp__<server>__<tool>` (A01). Screenshots go to tmp/evidence/T36/.
+import { openSettings } from './settings-panel.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import {
   expect,
@@ -89,11 +90,8 @@ const MCP_JSON = JSON.stringify({
   },
 });
 
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+async function openMcp(page: Page): Promise<Page> {
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-mcp').click();
   await settings.getByTestId('mcp-page').waitFor();
   return settings;
@@ -142,7 +140,7 @@ test('the MCP page shows the pool and turns servers off, on and reconnects them'
   expect(echoPid !== undefined && alive(echoPid)).toBe(true);
 
   await focusMain(app);
-  const settings = await openSettings(app, page);
+  const settings = await openMcp(page);
   const echoRow = server(settings, 'echo');
   await expect(echoRow).toHaveAttribute('data-state', 'connected');
   await expect(echoRow.getByTestId('mcp-source')).toHaveText(path.join(ws, '.mcp.json'));

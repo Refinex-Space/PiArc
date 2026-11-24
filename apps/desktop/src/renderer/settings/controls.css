@@ -1,0 +1,249 @@
+/* Settings rows align the action at the trailing edge. Text takes the remaining width and
+   reflows independently of the control, including when a managed-policy badge is present. */
+.preference-rows {
+  container: preference-controls / inline-size;
+  min-width: 0;
+}
+
+.preference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-c-button-height);
+  min-width: 0;
+  padding-block: var(--piarc-space-3);
+  font-size: var(--piarc-c-button-font-size);
+  line-height: var(--piarc-c-button-line-height);
+}
+
+.preference-row + .preference-row {
+  border-top: 1px solid var(--piarc-segment-track);
+}
+
+.preference-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.preference-copy > p,
+.preference-description {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+}
+
+.preference-row > .segmented {
+  flex: none;
+  align-self: center;
+}
+
+@container preference-controls (max-width: 28rem) {
+  .preference-row:not(:has(.preference-switch)) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--piarc-space-2);
+  }
+  .preference-row > .segmented {
+    align-self: flex-start;
+  }
+  .settings-page select.preference-language {
+    width: min(220px, 100%);
+  }
+}
+
+.segment-icon {
+  width: calc(var(--piarc-segment-height) - 2px);
+  padding-inline: 0;
+}
+
+.segment-icon svg {
+  width: calc(var(--piarc-segment-height) - 8px);
+  height: calc(var(--piarc-segment-height) - 8px);
+  pointer-events: none;
+}
+
+.settings-page :is(.preference-switch, .checkbox input[type='checkbox']) {
+  --switch-height: calc(var(--piarc-segment-height) - 8px);
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: calc(var(--switch-height) * 1.8);
+  height: var(--switch-height);
+  margin: 0;
+  border: 0;
+  border-radius: var(--piarc-radius-pill);
+  background-color: var(--piarc-border-strong);
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.settings-page :is(.preference-switch, .checkbox input[type='checkbox'])::before {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  width: calc(var(--switch-height) - 4px);
+  height: calc(var(--switch-height) - 4px);
+  border-radius: inherit;
+  background-color: var(--piarc-text-on-accent);
+  box-shadow: var(--piarc-shadow-button);
+  content: '';
+  transition: transform var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.settings-page :is(.preference-switch, .checkbox input[type='checkbox']):checked {
+  background-color: var(--piarc-accent-solid);
+}
+
+.settings-page :is(.preference-switch, .checkbox input[type='checkbox']):checked::before {
+  transform: translateX(calc(var(--switch-height) * 0.8));
+}
+
+.settings-page :is(.preference-switch, .checkbox input[type='checkbox']):disabled {
+  opacity: 0.45;
+}
+
+/* Native select owns focus, keyboard navigation, typeahead, form values and popup dismissal.
+   Chromium renders the picker in the top layer; its options stay reachable above scrollers. */
+.settings-page select.input {
+  max-width: 100%;
+  min-width: 0;
+  height: var(--piarc-c-button-height);
+  padding-block: 0;
+  padding-inline: var(--piarc-space-2);
+  border: 1px solid color-mix(in srgb, var(--piarc-text-primary) 12%, transparent);
+  border-radius: var(--piarc-c-button-radius);
+  background-color: var(--piarc-surface-raised);
+}
+
+.settings-page select.preference-language {
+  width: min(220px, 60%);
+}
+
+.settings-page select.preference-select-ghost {
+  field-sizing: content;
+  width: auto;
+  border-color: transparent;
+  background-color: transparent;
+}
+
+.settings-page select.input:hover:enabled {
+  border-color: var(--piarc-border-strong);
+}
+
+.settings-page select.preference-select-ghost:is(:hover, :open):enabled {
+  border-color: transparent;
+  background-color: var(--piarc-surface-hover);
+}
+
+/* Browsers without customizable pickers keep their platform popup and disclosure indicator. */
+@supports (appearance: base-select) {
+  .settings-page select:where(:not([multiple]):not([size])),
+  .settings-page select:where(:not([multiple]):not([size]))::picker(select) {
+    appearance: base-select;
+  }
+
+  .settings-page select:where(:not([multiple]):not([size])) {
+    align-items: center;
+    gap: var(--piarc-space-2);
+  }
+
+  .settings-page select:where(:not([multiple]):not([size]))::picker-icon {
+    align-self: center;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin-inline: auto 2px;
+    border: solid var(--piarc-text-secondary);
+    border-width: 0 1.5px 1.5px 0;
+    content: '';
+    transform: translateY(-1px) rotate(45deg);
+  }
+
+  .settings-page select:where(:not([multiple]):not([size]))::picker(select) {
+    position-area: block-end span-inline-start;
+    position-try-fallbacks:
+      flip-block,
+      flip-inline,
+      flip-block flip-inline;
+    justify-self: end;
+    width: max-content;
+    min-width: anchor-size(inline);
+    max-width: min(32rem, calc(100vw - var(--piarc-space-4)));
+    max-height: min(320px, 60dvh);
+    margin-block: var(--piarc-space-1);
+    padding: var(--piarc-space-1);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: calc(var(--piarc-c-button-radius) + var(--piarc-space-1));
+    background: var(--piarc-surface-raised);
+    color: var(--piarc-text-primary);
+    box-shadow:
+      0 0 0 1px var(--piarc-segment-edge),
+      var(--piarc-shadow-overlay);
+    font: inherit;
+  }
+
+  .settings-page select.preference-select-ghost::picker(select) {
+    min-width: min(220px, calc(100vw - var(--piarc-space-4)));
+  }
+
+  .settings-page select:where(:not([multiple]):not([size])) option {
+    display: flex;
+    align-items: center;
+    gap: var(--piarc-space-2);
+    min-height: var(--piarc-c-button-height);
+    padding: var(--piarc-space-1) var(--piarc-space-3);
+    border-radius: var(--piarc-c-button-radius);
+    overflow-wrap: anywhere;
+  }
+
+  .settings-page
+    select:where(:not([multiple]):not([size]))
+    option:is(:hover, :focus-visible):enabled {
+    background: var(--piarc-surface-hover);
+  }
+
+  .settings-page select:where(:not([multiple]):not([size])) option:focus-visible {
+    outline: 2px solid var(--piarc-c-focus-ring);
+    outline-offset: -2px;
+  }
+
+  :root[data-app][data-pointer-focus] .settings-page option:focus-visible {
+    outline: none;
+    background: var(--piarc-surface-hover);
+  }
+
+  .settings-page option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+    color: var(--piarc-text-accent);
+  }
+}
+
+@media (forced-colors: active) {
+  .settings-page :is(.preference-switch, .checkbox input[type='checkbox']) {
+    appearance: auto;
+    accent-color: auto;
+    width: var(--piarc-c-button-height);
+    opacity: 1;
+  }
+
+  .settings-page :is(.preference-switch, .checkbox input[type='checkbox'])::before {
+    content: none;
+  }
+
+  .settings-page select.input {
+    border-color: ButtonText;
+  }
+  .settings-page select::picker(select) {
+    border: 1px solid ButtonText;
+  }
+
+  .settings-page select:where(:not([multiple]):not([size])) option:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}

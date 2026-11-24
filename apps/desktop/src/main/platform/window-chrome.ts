@@ -57,10 +57,3 @@ export function followTheme(window: BrowserWindow, platform: string): void {
     nativeTheme.off('updated', update);
   });
 }
-
-/** Appearance options of the settings window: a standard title bar and an opaque background. */
-export function settingsWindowChrome(): BrowserWindowConstructorOptions {
-  return {
-    backgroundColor: COLORS[nativeTheme.shouldUseDarkColors ? 'dark' : 'light']['surface.app'],
-  };
-}

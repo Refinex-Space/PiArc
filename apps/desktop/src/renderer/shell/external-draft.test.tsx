@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // Mount the actual window with an external launch target already waiting after cold start.
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import type { AppEvent, LaunchTarget } from '../../shared/ipc.js';
@@ -16,7 +16,7 @@ it('presents external text for editing only after a trust decision and never sen
   const createSession = vi.fn();
   const prompt = vi.fn();
   const api = {
-    takeLaunchTargets: vi.fn().mockResolvedValue([target]),
+    takeLaunchTargets: vi.fn().mockResolvedValueOnce([target]).mockResolvedValue([]),
     onAppEvent: (f: (event: AppEvent) => void) => {
       listeners.add(f);
       return () => {
@@ -45,17 +45,19 @@ it('presents external text for editing only after a trust decision and never sen
   try {
     await act(async () => {
       root.render(
-        <AppProvider
-          initial={{
-            platform: 'win32',
-            focused: true,
-            notificationsSupported: false,
-            locale: 'en',
-            preferences: DEFAULT_PREFERENCES,
-          }}
-        >
-          <Shell />
-        </AppProvider>,
+        <StrictMode>
+          <AppProvider
+            initial={{
+              platform: 'win32',
+              focused: true,
+              notificationsSupported: false,
+              locale: 'en',
+              preferences: DEFAULT_PREFERENCES,
+            }}
+          >
+            <Shell />
+          </AppProvider>
+        </StrictMode>,
       );
       await Promise.resolve();
     });

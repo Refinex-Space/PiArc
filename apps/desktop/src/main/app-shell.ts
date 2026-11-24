@@ -1,4 +1,4 @@
-// The app around the windows (T18): the main and settings windows, the preferences and the
+// The app around the windows (T18): the workbench windows, the preferences and the
 // language, the application menu, theme following, notifications and the attention count.
 // Platform integration only: what a session is and when it needs the user is decided in the
 // renderer from Core's snapshots (ADR-0013).
@@ -27,13 +27,10 @@ import { effectiveBindings } from '../shared/keybindings.js';
 import type { RegisterHandler } from './ipc/register.js';
 import { buildMenuTemplate, type MainCommand } from './menu.js';
 import { Attention } from './platform/attention.js';
-import { followTheme, mainWindowChrome, settingsWindowChrome } from './platform/window-chrome.js';
+import { followTheme, mainWindowChrome } from './platform/window-chrome.js';
 import type { PreferenceStore } from './preferences.js';
 import { CASCADE, placeWindow, type WindowStateFile } from './platform/window-state.js';
-import { MAIN_WINDOW_MIN, createMainWindow, createSettingsWindow } from './window.js';
-
-/** Hash route of the settings window's page (src/renderer/main.tsx). */
-export const SETTINGS_HASH = '#/settings';
+import { MAIN_WINDOW_MIN, createMainWindow } from './window.js';
 
 /** Settings pages a caller may ask for; anything else opens the first page. */
 const SETTINGS_PAGE = /^[a-z][a-zA-Z0-9.-]{0,63}$/;
@@ -62,7 +59,6 @@ export class AppShell {
   private readonly pending = new Map<number, LaunchTarget[]>();
   /** Pages that took their queue: they hear launch targets as app events. */
   private readonly listening = new Set<number>();
-  private settings: BrowserWindow | null = null;
   private readonly languageListeners = new Set<() => void>();
   private translator: Translator;
   readonly attention: Attention;
@@ -153,6 +149,9 @@ export class AppShell {
     followTheme(window, process.platform);
     this.reportFocus(window);
     this.keepState(window);
+    window.webContents.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) this.listening.delete(id);
+    });
     void window.loadURL(this.options.entryUrl);
     this.main = window;
     this.mains.add(window);
@@ -190,7 +189,11 @@ export class AppShell {
       this.openMain([target]);
       return;
     }
-    const window = this.focusMain();
+    this.deliver(this.focusMain(), target);
+  }
+
+  /** Keep commands received before the workbench mounts, including menu opens after cold start. */
+  private deliver(window: BrowserWindow, target: LaunchTarget): void {
     const id = window.webContents.id;
     if (this.listening.has(id)) {
       this.send(window, { type: 'launch', target });
@@ -218,38 +221,10 @@ export class AppShell {
     window.on('close', save);
   }
 
-  /** Opens the settings window on `page` (or focuses it). */
-  openSettings(page?: string): BrowserWindow {
-    const hash =
-      page !== undefined && SETTINGS_PAGE.test(page) ? `${SETTINGS_HASH}/${page}` : SETTINGS_HASH;
-    if (this.settings !== null && !this.settings.isDestroyed()) {
-      if (page !== undefined) {
-        void this.settings.loadURL(`${this.options.entryUrl}${hash}`);
-      }
-      this.settings.show();
-      this.settings.focus();
-      return this.settings;
-    }
-    const window = createSettingsWindow(
-      this.options.preloadPath,
-      this.translator.t('settings.title'),
-      settingsWindowChrome(),
-    );
-    this.reportFocus(window);
-    void window.loadURL(`${this.options.entryUrl}${hash}`);
-    this.settings = window;
-    window.on('closed', () => {
-      if (this.settings === window) {
-        this.settings = null;
-      }
-    });
-    return window;
-  }
-
   /** Runs a command from the menu (or a shortcut the menu handled). */
   run(command: AppCommand | MainCommand): void {
     if (command === 'app.settings') {
-      this.openSettings();
+      this.deliver(this.focusMain(), { kind: 'settings' });
       return;
     }
     if (command === 'app.quit') {
@@ -293,11 +268,13 @@ export class AppShell {
       }
       return this.options.preferences.set(change);
     });
-    registerHandler(IPC_CHANNELS.settingsOpen, (_event, [page]) => {
+    registerHandler(IPC_CHANNELS.settingsOpen, (event, [page]) => {
       if (page !== undefined && (typeof page !== 'string' || !SETTINGS_PAGE.test(page))) {
         throw new TypeError('page must be a settings page id');
       }
-      this.openSettings(page);
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      if (!owner || !this.mains.has(owner)) throw new Error('No workbench for settings');
+      this.deliver(owner, page === undefined ? { kind: 'settings' } : { kind: 'settings', page });
     });
     registerHandler(IPC_CHANNELS.attentionNotify, (event, [notice]) => {
       if (!isAttentionNotice(notice)) throw new TypeError('invalid attention notice');
@@ -365,7 +342,6 @@ export class AppShell {
         }),
       ),
     );
-    this.settings?.setTitle(this.translator.t('settings.title'));
     for (const listener of this.languageListeners) listener();
     const event: AppEvent = {
       type: 'preferences',

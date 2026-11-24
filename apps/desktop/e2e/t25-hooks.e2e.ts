@@ -2,9 +2,10 @@
 // the configuration diagnostics list the parts of the hooks configuration PiArc does not run.
 // The hooks are the trusted project's (`.claude/settings.json`), run by Core with the session's
 // command shell. Screenshots go to tmp/evidence/T25/.
+import { openSettings } from './settings-panel.js';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import { expect, focusMain, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { prefer } from './t19.js';
@@ -31,11 +32,8 @@ const HOOKS = JSON.stringify({
   },
 });
 
-async function openDiagnostics(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
+async function openDiagnostics(page: Page): Promise<Page> {
+  const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-diagnostics').click();
   await settings.getByTestId('config-diagnostics').waitFor();
   return settings;
@@ -72,7 +70,7 @@ test('hook messages and errors show in the notice bar and unsupported hooks in d
   await expect(notices.getByRole('alert')).toHaveCount(1);
 
   await prefer(page, { key: 'language', value: 'en' });
-  const settings = await openDiagnostics(app, page);
+  const settings = await openDiagnostics(page);
   const hooks = settings.getByTestId('diagnostics-hooks');
   await expect(hooks.getByTestId('diagnostics-hook')).toHaveText([
     /\.claude\/settings\.json \(Claude Code\).*\/hooks\/PreToolUse\/0\/hooks\/0\/async.*async hooks are not supported; this hook does not run/,

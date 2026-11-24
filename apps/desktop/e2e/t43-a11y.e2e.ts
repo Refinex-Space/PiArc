@@ -2,10 +2,11 @@
 // dark, with the real Core, Agent Host and mock provider. Journeys reach the states the way a
 // user does; `checkState` writes each axe result to tmp/evidence/T43/axe/ and fails on any
 // violation. The last test checks every listed state was reached in this run.
+import { openSettings, closeSettings } from './settings-panel.js';
 import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import { exerciseElicitation } from './elicitation.js';
 import { AXE_DIR, checkState } from './a11y.js';
@@ -17,14 +18,6 @@ import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from
 import { idle, killAgentHost, openSession, prefer, send } from './t19.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
-
-async function openSettings(app: ElectronApplication, page: Page): Promise<Page> {
-  const opened = app.waitForEvent('window');
-  await page.getByTestId('open-settings').click();
-  const settings = await opened;
-  await settings.getByTestId('settings-window').waitFor();
-  return settings;
-}
 
 /** Starts another session in the open workspace with `scenario`. */
 async function newSession(page: Page, text: string, scenario: string): Promise<void> {
@@ -115,7 +108,13 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
       hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo plugin-stop' }] }] },
     }),
   });
-  const settings = await openSettings(app, page);
+  const settings = await openSettings(page);
+  await checkState(settings, 'dialog:settings');
+  const search = settings.getByRole('combobox', { name: 'Search settings' });
+  await search.fill('theme');
+  await expect(settings.getByRole('listbox', { name: 'Search settings' })).toBeVisible();
+  await checkState(settings, 'state:settings-search');
+  await search.press('Escape');
   await settings.getByTestId('settings-nav-skills').click();
   await settings.getByTestId('package-kind').selectOption('directory');
   await settings.getByTestId('package-location').fill(plugin);
@@ -141,6 +140,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     await expect(settings.getByTestId(`settings-page-${id}`)).toBeVisible();
     await checkState(settings, `settings:${id}`);
   }
+  await closeSettings(settings);
   await send(page, 'Thanks.');
 });
 
@@ -434,7 +434,7 @@ test.describe('sign in', () => {
       await writeProvider(auth, mock.baseUrl, 'deviceCode');
       await browserDouble(app);
       await prefer(page, { key: 'language', value: 'en' });
-      const settings = await openSettings(app, page);
+      const settings = await openSettings(page);
       await settings.getByTestId('settings-nav-providers').click();
       await settings.getByTestId(`login-${PROVIDER}`).click();
       await expect(settings.getByTestId('login-user-code')).toBeVisible({ timeout: 30_000 });
