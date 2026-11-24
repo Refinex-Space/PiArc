@@ -309,11 +309,6 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-**计划外维护 · 桌面交互焦点**
-
-- [x] 复现鼠标聚焦搜索框与分段单选的外圈；统一输入框、复合控件、菜单和终端的焦点归属，补充亮暗主题下的鼠标与键盘回归。
-- [ ] 在提交上运行全量验证并记录结果。
-
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。
@@ -1278,3 +1273,9 @@ Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m
 ### 2026-11-24 R5 已完成（macOS）
 
 Apple M1 Max / 32 GB、macOS arm64、接电。提交 0cbecdc 执行 node scripts/perf/run.mjs --lane nightly --absolute --machine m1-max-32g，25/25 个指标同时通过绝对预算及已有相对基线，无错误。打包运行时代码与 0cbecdc 一致。主进程 RSS 增量 23.10/24 MB，单活动会话 Agent Host 142.97/150 MB，流式帧 p99 8.41/12 ms。结果在 tmp/evidence/partial-closure/nightly-full-results/report.json。Windows 数据及 W4 归属见 R5-findings.md 第 1.2 节与 W4 清单。 第 16 章及评审索引已同步。
+
+### 2026-11-24 桌面交互焦点（计划外维护，提交 88cc245）
+
+- 编辑框、附件、分段单选、菜单与终端分别标记当前焦点目标。鼠标点入文本框显示 1 px 灰阶边线，键盘导航显示 2 px 轮廓。使用规则见 `docs/engineering/accessibility.md`。
+- macOS 上 `npm run verify` 17/17；`t43-keyboard`、`t43-a11y` 的 Electron dev 回归 13/13，61 个状态在明暗主题下共 122 份 axe 报告，零违规。14 种背景在四种主题下的焦点色对比度最低为 3.27:1。
+- ego-browser 实操与 Chromium、Firefox、WebKit 的本地控件检查通过。截图、axe 与全量验证报告在 `tmp/evidence/focus-state/`。Windows 原生显示效果尚未复核。
