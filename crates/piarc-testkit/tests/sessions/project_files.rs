@@ -14,6 +14,8 @@ fn setup_repository(env: &Env) {
     let git = |args: &[&str]| {
         let result = std::process::Command::new("git")
             .current_dir(&env.ws)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", env.root.join("empty-git-config"))
             .args([
                 "-c",
                 "user.name=Fixture",
@@ -39,11 +41,11 @@ fn setup_repository(env: &Env) {
     git(&["commit", "-qm", "fixture"]);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn files_follow_the_session_before_and_after_an_app_restart() {
-    let env = Env::new("project-file-panel").await;
-    setup_repository(&env);
-    let (core, events) = env.start(env.config(&[]));
+async fn prepare_worktree(
+    core: &CoreRuntime,
+    events: &super::support::Events,
+    env: &Env,
+) -> (String, std::path::PathBuf) {
     let (done, rx) = reply();
     core.open_workspace(env.ws.clone(), done).unwrap();
     answer(rx).await.unwrap();
@@ -63,11 +65,36 @@ async fn files_follow_the_session_before_and_after_an_app_restart() {
     let id = opened["sessionId"].as_str().unwrap().to_owned();
     let checkout = env.ws.join(".piarc").join("worktrees").join("files");
     std::fs::write(checkout.join("sample.md"), "original").unwrap();
-    let turn = super::prompt(&core, &id, &prompt_text("Hello.", "chat")).await;
+    let turn = super::prompt(core, &id, &prompt_text("Hello.", "chat")).await;
     assert_eq!(
         events.turn_completed(&id, &turn).await["status"],
         "completed"
     );
+    (id, checkout)
+}
+
+async fn check_read_only_config(core: &CoreRuntime, id: &str, checkout: &std::path::Path) {
+    std::fs::write(checkout.join(".claude.json"), "{}").unwrap();
+    let config = request(core, id, json!({"op":"read","path":".claude.json"}))
+        .await
+        .unwrap();
+    assert_eq!(config["editable"], false);
+    let forbidden_update = json!({
+        "op":"save",
+        "path":".claude.json",
+        "revision":config["revision"],
+        "text":"updated"
+    });
+    assert!(request(core, id, forbidden_update).await.is_err());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn files_follow_the_session_before_and_after_an_app_restart() {
+    let env = Env::new("project-file-panel").await;
+    setup_repository(&env);
+    let (core, events) = env.start(env.config(&[]));
+    let (id, checkout) = prepare_worktree(&core, &events, &env).await;
+    check_read_only_config(&core, &id, &checkout).await;
     let shown = request(&core, &id, json!({"op":"read","path":"sample.md"}))
         .await
         .unwrap();

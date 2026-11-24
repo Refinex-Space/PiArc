@@ -127,12 +127,14 @@ pub(crate) fn write_editor(
     spec: &WriteSpec<'_>,
     expected: Option<[u8; 32]>,
     size_limit: u64,
+    read_only: fn(&Path) -> bool,
 ) -> Result<Written> {
     write_inner(
         scope,
         Writer::Editor {
             expected,
             size_limit,
+            read_only,
         },
         locks,
         spec,
@@ -146,6 +148,7 @@ enum Writer<'a> {
     Editor {
         expected: Option<[u8; 32]>,
         size_limit: u64,
+        read_only: fn(&Path) -> bool,
     },
 }
 
@@ -178,7 +181,18 @@ impl Writer<'_> {
                     check(lock(states).freshness(key, current), path)?;
                 }
             }
-            Writer::Editor { expected, .. } => {
+            Writer::Editor {
+                expected,
+                read_only,
+                ..
+            } => {
+                if read_only(path) || read_only(&scope.root().join(requested)) {
+                    return Err(Error::coded(
+                        path,
+                        "EACCES",
+                        "this configuration is read-only in the project editor",
+                    ));
+                }
                 if *expected != original {
                     return Err(Error::Changed {
                         path: display(path),
@@ -214,6 +228,7 @@ impl Writer<'_> {
             Writer::Editor {
                 expected: Some(hash),
                 size_limit,
+                ..
             } => crate::atomic::replace_checked(bound, metadata, write, || {
                 let mut current = bound
                     .open_file()

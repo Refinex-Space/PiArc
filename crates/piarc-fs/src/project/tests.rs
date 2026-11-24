@@ -3,6 +3,20 @@ use crate::testing::TempTree;
 use base64::prelude::*;
 use piarc_protocol::fs::MAX_BLOB_BYTES;
 
+// Core's extra read-only paths (Claude configuration) are covered by the session integration test.
+fn read(scope: &Scope, path: &str, force: bool) -> Result<Value> {
+    super::read(scope, path, force, |_| false)
+}
+fn save(
+    scope: &Scope,
+    locks: &PathLocks,
+    path: &str,
+    text: &str,
+    revision: Option<&str>,
+) -> Result<Value> {
+    super::save(scope, locks, path, text, revision, |_| false)
+}
+
 #[test]
 fn lists_and_previews_without_accepting_an_escape_or_writing_protected_files() {
     let tree = TempTree::new("project-files-boundary");

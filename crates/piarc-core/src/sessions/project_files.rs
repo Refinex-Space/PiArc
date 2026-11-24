@@ -79,7 +79,9 @@ impl Request {
                 path,
                 include_child,
             } => project::list(scope, &path, include_child.as_deref()),
-            Request::Read { path, force } => project::read(scope, &path, force),
+            Request::Read { path, force } => {
+                project::read(scope, &path, force, piarc_config::claude::is_claude_path)
+            }
             Request::Resolve { path } => project::resolve(scope, &path),
             Request::Chunk {
                 path,
@@ -92,7 +94,14 @@ impl Request {
                 path,
                 text,
                 revision,
-            } => project::save(scope, locks, &path, &text, revision.as_deref()),
+            } => project::save(
+                scope,
+                locks,
+                &path,
+                &text,
+                revision.as_deref(),
+                piarc_config::claude::is_claude_path,
+            ),
             Request::Search {
                 query,
                 mode,

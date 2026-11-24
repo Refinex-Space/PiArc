@@ -142,13 +142,15 @@ pub(crate) fn safe_text(bytes: &[u8]) -> Option<String> {
 ///
 /// # Errors
 /// The file is inaccessible or outside the project.
-pub fn read(scope: &Scope, path: &str, force: bool) -> Result<Value> {
+pub fn read(scope: &Scope, path: &str, force: bool, read_only: fn(&Path) -> bool) -> Result<Value> {
     let requested = relative(path, false)?;
     let bound = scope.bind(requested, Access::Read)?;
+    let writable_path = !read_only(&scope.root().join(requested)) && !read_only(bound.path());
     let mut file = match bound.open_file() {
         Ok(f) => f,
         Err(Error::NotFound { .. }) => {
-            let editable = scope.check(path, Access::Write).is_ok()
+            let editable = writable_path
+                && scope.check(path, Access::Write).is_ok()
                 && can_create_at(scope, path, &bound).unwrap_or(false);
             return Ok(json!({"path":path,"kind":"missing","size":0,"editable":editable}));
         }
@@ -179,6 +181,7 @@ pub fn read(scope: &Scope, path: &str, force: bool) -> Result<Value> {
     let text = safe_text(&bytes);
     let editable = text.is_some()
         && media(path).is_none()
+        && writable_path
         && !metadata.permissions().readonly()
         && scope.check(requested, Access::Write).is_ok();
     match text.or_else(|| force.then(|| String::from_utf8_lossy(&bytes).into_owned())) {
@@ -236,6 +239,7 @@ pub fn save(
     path: &str,
     text: &str,
     revision: Option<&str>,
+    read_only: fn(&Path) -> bool,
 ) -> Result<Value> {
     relative(path, false)?;
     if text.len() as u64 > TEXT_LIMIT || text.contains('\0') || media(path).is_some() {
@@ -256,6 +260,7 @@ pub fn save(
         },
         expected,
         TEXT_LIMIT,
+        read_only,
     )?;
     Ok(json!({"revision":to_hex(&written.after_sha256),"size":written.bytes_written}))
 }
