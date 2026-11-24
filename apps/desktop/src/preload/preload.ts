@@ -425,6 +425,14 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.attachmentStore, id, name, mimeType, data)
       .then((value: unknown) => expectString(value)),
+  markdownImage: (id, document, request) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.markdownImage, id, document, request)
+      .then((s: unknown) => expectString(s)),
+  markdownImageSettings: (req) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.markdownImageSettings, req)
+      .then((s: unknown) => expectString(s)),
   watchProjectFiles: async (id, paths) => {
     await ipcRenderer.invoke(IPC_CHANNELS.projectFileWatch, id, paths);
   },

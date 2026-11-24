@@ -7,6 +7,9 @@ function spanText(spans: readonly Span[]): string {
   return spans
     .map((span) => {
       switch (span.kind) {
+        case 'note':
+          return '[' + String(span.number) + ']';
+        case 'math':
         case 'text':
         case 'code':
         case 'html':

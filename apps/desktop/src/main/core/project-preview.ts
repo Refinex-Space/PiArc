@@ -2,6 +2,8 @@
 // scheme is never a trusted IPC origin and is never accepted for top-level navigation.
 import { Readable } from 'node:stream';
 import { projectChunk, readProjectRange } from './project-file-stream.js';
+import { DIAGRAM_PAGE } from './markdown-diagram.js';
+import { markdownImageResponse } from './markdown-images.js';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { protocol, type WebContents, type CustomScheme } from 'electron';
@@ -67,6 +69,7 @@ export class ProjectPreviews {
       CoreRuntime,
       'projectFiles' | 'projectTrust' | 'sessionDeletionTarget'
     >,
+    private readonly diagram?: (req: Request) => Promise<Response>,
   ) {}
   private entry(url: string) {
     try {
@@ -80,6 +83,7 @@ export class ProjectPreviews {
     }
   }
   allowsFrame(owner: WebContents, url: string, parent?: string, initiator?: string) {
+    if (url === DIAGRAM_PAGE) return true;
     // Chromium's built-in PDF viewer creates a child for its own PDF stream. Electron
     // reports both initiator and parent as the built-in viewer, not the workbench.
     const viewer = 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/';
@@ -179,6 +183,9 @@ export class ProjectPreviews {
     protocol.handle(scheme, (req) => this.serve(req));
   }
   async serve(req: Request): Promise<Response> {
+    if (new URL(req.url).host === 'markdown-diagram' && this.diagram) return this.diagram(req);
+    const picture = markdownImageResponse(req);
+    if (picture) return picture;
     const entry = this.entry(req.url);
     if (!entry || !['HEAD', 'GET'].includes(req.method)) return new Response(null, { status: 404 });
     const { file, grant } = entry;

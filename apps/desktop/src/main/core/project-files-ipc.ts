@@ -1,6 +1,7 @@
 // Core resolves every project-relative name before any OS integration. Editors are fixed
 // native applications. No project executable, shell command or renderer-supplied program runs.
 import path from 'node:path';
+import { takePickedInsertion } from './markdown-image-save.js';
 import { installedEditors, openInFileEditor } from '../platform/file-editors.js';
 import { randomUUID } from 'node:crypto';
 import { pipeline } from 'node:stream/promises';
@@ -29,13 +30,24 @@ import type { TerminalOwners } from './terminal-ipc.js';
 export function registerProjectFileHandlers(
   register: RegisterHandler,
   core: Pick<CoreRuntime, 'projectFiles'>,
-  input: Pick<TerminalOwners, 'requireInput'>,
+  input: Pick<TerminalOwners, 'requireInput' | 'page'>,
   fileOwner: (child: Electron.WebContents) => Electron.WebContents | undefined,
 ) {
   register(IPC_CHANNELS.projectFiles, ({ sender, senderFrame }, [id, request]) => {
     if (senderFrame !== sender.mainFrame || !isSessionId(id) || !isProjectRequest(request))
       throw new TypeError('Invalid project file request');
-    if (request.op === 'save') input.requireInput(sender, id, 'files');
+    if (
+      request.op === 'save' &&
+      !takePickedInsertion(
+        sender,
+        input.page(sender),
+        id,
+        request.path,
+        request.revision,
+        request.text,
+      )
+    )
+      input.requireInput(sender, id, 'files');
     return core.projectFiles(id, JSON.stringify(request));
   });
   register(IPC_CHANNELS.projectFileAction, async ({ sender, senderFrame }, [id, file, action]) => {

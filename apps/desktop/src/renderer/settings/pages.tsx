@@ -33,6 +33,7 @@ import { ManagedBadge, useIsManaged } from './managed.js';
 import { registerSettingsPage } from './registry.js';
 import { AgentsPage } from './AgentsPage.js';
 import { McpPage } from './McpPage.js';
+import { MarkdownPage } from './MarkdownPage.js';
 import { MemoryPage } from './MemoryPage.js';
 import { SkillsPage } from './SkillsPage.js';
 import { UsagePage } from '../usage/UsagePage.js';
@@ -509,6 +510,12 @@ function ShortcutsPage() {
 
 /** Registers T18's pages; later tasks register theirs the same way. */
 export function registerBuiltInSettingsPages(): void {
+  registerSettingsPage({
+    id: 'markdown',
+    title: 'files.images.markdown',
+    order: 12,
+    component: MarkdownPage,
+  });
   registerSettingsPage({
     id: 'general',
     title: 'settings.general',

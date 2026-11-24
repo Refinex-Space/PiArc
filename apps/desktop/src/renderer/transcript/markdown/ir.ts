@@ -4,11 +4,14 @@
 // displayed literally, and links carry an `href` only when it passed `safeHref`.
 
 export type Span =
+  | { readonly kind: 'math'; readonly text: string }
+  | { readonly kind: 'note'; readonly label: string; readonly number: number }
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'strong' | 'emphasis' | 'delete'; readonly children: readonly Span[] }
   | { readonly kind: 'code'; readonly text: string }
   | {
       readonly kind: 'link';
+      readonly documentAnchor?: string;
       /** An `https:`, `http:` or `mailto:` URL, or `null` when the target was not allowed. */
       readonly href: string | null;
       /** A possible local path; the renderer checks it against this session. */
@@ -19,6 +22,7 @@ export type Span =
   | {
       /** Images are never loaded: they render as a link to their source. */
       readonly kind: 'image';
+      readonly documentSource?: string;
       readonly href: string | null;
       /** A possible local path; the renderer checks it against this session. */
       readonly projectTarget?: string;
@@ -32,6 +36,7 @@ export type Span =
 export type Align = 'left' | 'center' | 'right' | null;
 
 export interface ListItem {
+  sourceLine?: number;
   /** `true` / `false` for task list items, `null` for ordinary items. */
   readonly checked: boolean | null;
   readonly blocks: readonly Block[];

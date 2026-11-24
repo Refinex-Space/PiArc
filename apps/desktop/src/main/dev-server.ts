@@ -50,6 +50,14 @@ export function devServerCsp(server: DevServer): string {
 export function applyDevServerCsp(session: Session, server: DevServer): void {
   const csp = devServerCsp(server);
   session.webRequest.onHeadersReceived({ urls: [`${server.origin}/*`] }, (details, callback) => {
-    callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [csp] } });
+    // Files previews use the custom document protocol in Electron's dev mode as well.
+    // A direct visit to the development server's static copy also gets an opaque origin.
+    const diagram = new URL(details.url).pathname.toLowerCase().startsWith('/markdown-diagram/');
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [diagram ? "sandbox; default-src 'none'" : csp],
+      },
+    });
   });
 }

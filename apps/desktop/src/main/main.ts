@@ -1,6 +1,8 @@
 // Main-process entry: app lifecycle and the security baseline of architecture section 10.3.
 // Business logic does not belong here (ADR-0013); this file only wires modules together.
 import path from 'node:path';
+import { createRequire } from 'node:module';
+import { diagramAssets } from './core/markdown-diagram.js';
 
 import { app, BrowserWindow, dialog, protocol, session } from 'electron';
 
@@ -15,6 +17,7 @@ import {
 } from './core/core-host.js';
 import { DOCUMENT_SCHEME, ProjectPreviews } from './core/project-preview.js';
 import { registerProjectWatch } from './core/project-file-watch.js';
+import { registerMarkdownImageHandlers } from './core/markdown-images.js';
 import { registerProjectFileHandlers } from './core/project-files-ipc.js';
 import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
@@ -289,9 +292,20 @@ function start(dirs: DataDirs): void {
       },
     );
     const terminalOwners = new TerminalOwners(core.runtime);
-    previews = new ProjectPreviews(core.runtime);
+    const diagramFolder = devServer
+      ? path.join(app.getAppPath(), 'src', 'renderer', 'public', 'markdown-diagram')
+      : bundlePath('renderer', MAIN_WINDOW_VITE_NAME, 'markdown-diagram');
+    const diagramEngine = devServer
+      ? createRequire(path.join(app.getAppPath(), 'package.json')).resolve(
+          'mermaid/dist/mermaid.min.js',
+        )
+      : path.join(diagramFolder, 'engine.js');
+    previews = new ProjectPreviews(core.runtime, diagramAssets(diagramFolder, diagramEngine));
     previews.register(registerHandler, terminalOwners);
     registerProjectWatch(registerHandler, core.runtime);
+    registerMarkdownImageHandlers(registerHandler, core.runtime, terminalOwners, () =>
+      appShell.t(),
+    );
     registerProjectFileHandlers(registerHandler, core.runtime, terminalOwners, (child) =>
       toolWindows?.fileOwner(child),
     );

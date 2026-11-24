@@ -44,6 +44,8 @@ const PIARC_API_SNAPSHOT = [
   'logoutProvider',
   'managedSettings',
   'markSessionRead',
+  'markdownImage',
+  'markdownImageSettings',
   'mcpLogin',
   'mcpReconnect',
   'mcpSetEnabled',

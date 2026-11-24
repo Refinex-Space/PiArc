@@ -3,6 +3,12 @@ import type { ReactNode } from 'react';
 import { GearIcon } from '../shell/icons.js';
 
 const symbols: Record<string, ReactNode> = {
+  markdown: (
+    <>
+      <rect x="2" y="4" width="16" height="12" rx="2" />
+      <path d="M5 13V7l2.5 3L10 7v6m4-6v6m-2-2 2 2 2-2" />
+    </>
+  ),
   appearance: (
     <>
       <path d="M17.8 8.8c0 2.4-1.9 3.5-4 3.2-1.3-.2-2 .6-1.7 1.8.4 1.9-.5 3.6-2.6 3.6a7.4 7.4 0 1 1 8.3-8.6Z" />

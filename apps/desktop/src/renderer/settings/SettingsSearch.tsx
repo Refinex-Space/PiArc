@@ -12,6 +12,11 @@ const fields: Record<string, readonly (readonly [MessageId, string])[]> = {
     ['settings.notifications', 'setting-notifications'],
     ['settings.memory', 'setting-memory-read-both'],
   ],
+  markdown: [
+    ['files.images.storage', 'markdown-image-storage'],
+    ['files.images.location', 'markdown-image-location'],
+    ['files.images.links', 'markdown-image-link'],
+  ],
   appearance: [
     ['settings.theme', 'setting-theme'],
     ['settings.contrast', 'setting-contrast'],

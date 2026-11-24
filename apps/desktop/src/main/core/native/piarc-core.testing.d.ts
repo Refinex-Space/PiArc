@@ -232,6 +232,8 @@ export declare class CoreRuntime {
   storeAttachment(id: string, name: string, mimeType: string, data: Uint8Array): Promise<string>;
   /** Performs one bounded Files panel operation in the named session's project. */
   projectFiles(sessionId: string, requestJson: string): Promise<string>;
+  /** Local Markdown image storage choices and native directory grants. */
+  markdownImageSettings(requestJson: string): Promise<string>;
   /**
    * Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most
    * `limit` matches. A newer search with the same `searchId` cancels this one, which then

@@ -7,6 +7,10 @@ import { contentTypeFor, resolveAssetPath } from './asset-path.js';
 const root = path.resolve('bundle root', '渲染');
 
 describe('resolveAssetPath', () => {
+  it('serves the isolated diagram runtime only on its dedicated document origin', () => {
+    expect(resolveAssetPath(root, 'app://piarc/markdown-diagram/index.html')).toBeNull();
+    expect(resolveAssetPath(root, 'app://piarc/MARKDOWN-DIAGRAM%2Fengine.js')).toBeNull();
+  });
   it('maps the root and nested paths into the bundle', () => {
     expect(resolveAssetPath(root, 'app://piarc/')).toBe(path.join(root, 'index.html'));
     expect(resolveAssetPath(root, 'app://piarc/index.html')).toBe(path.join(root, 'index.html'));

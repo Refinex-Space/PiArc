@@ -1,136 +1,294 @@
-import { memo, startTransition, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { useT } from '../app/app-context.js';
+import { useSession, useStore } from '../store/hooks.js';
 import { useUi } from '../shell/ui.js';
-import { projectFileRoot } from './navigation.js';
-import { parentPath } from './file-path.js';
-import { useStore, useSession } from '../store/hooks.js';
 import { TranscriptContext } from '../transcript/services.js';
-import { MarkdownView } from '../transcript/markdown/MarkdownView.js';
-import type { Block } from '../transcript/markdown/ir.js';
+import { MarkdownView, DocumentElements } from '../transcript/markdown/MarkdownView.js';
+import type { ListItem } from '../transcript/markdown/ir.js';
+import { parentPath, projectFileRoot } from './file-path.js';
+import { MarkdownImage } from './markdown/MarkdownImage.js';
+import { markdownRichBlock } from './markdown/RichBlock.js';
+import { useParsedDocument } from './markdown/use-parsed-document.js';
+import { taskMarker } from './markdown/task-marker.js';
+import type { DocumentBlock, Heading } from './markdown/document-model.js';
 
-// Avoid sending adversarially long lines or giant markdown tables to the same worker that renders chat replies.
-function markdownDocument(text: string) {
-  if (text.length > 512 * 1024) return { body: text, plain: true };
-  let column = 0,
-    pipes = 0;
-  for (const char of text) {
-    column = char === '\n' ? 0 : column + 1;
-    if (char === '|') pipes++;
-    if (column > 32768 || pipes > 8000) return { body: text, plain: true };
-  }
-  const front = /^---[ \t]*\r?\n([\s\S]{1,8192}?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/u.exec(text);
-  const fields: (readonly [string, string])[] = [];
-  if (front?.[1]) {
-    for (const line of front[1].split(/\r?\n/u)) {
-      if (!line.trim() || line.startsWith('#')) continue;
-      const row = /^([\w.-]+):[ \t]*(.*)$/u.exec(line);
-      if (!row?.[1]) return { body: text, plain: false };
-      fields.push([row[1], row[2] ?? '']);
-    }
-  }
-  return {
-    body: fields.length && front ? text.slice(front[0].length) : text,
-    fields,
-    plain: false,
-  };
+export interface MarkdownReaderHandle {
+  scrollToLine: (line: number) => void;
 }
-
-const MarkdownPages = memo(function MarkdownPages({ blocks }: { blocks: readonly Block[] }) {
-  const batches = useMemo(() => {
-    const result: Block[][] = [];
-    for (let i = 0; i < blocks.length; i += 48) result.push(blocks.slice(i, i + 48));
-    return result;
-  }, [blocks]);
-  const [count, setCount] = useState(1);
-  useEffect(() => {
-    if (count >= batches.length) return;
-    const id = window.requestIdleCallback(
-      () => {
-        startTransition(() => {
-          setCount((n) => n + 1);
-        });
-      },
-      { timeout: 100 },
-    );
-    return () => {
-      window.cancelIdleCallback(id);
-    };
-  }, [batches, count]);
-  return batches.slice(0, count).map((block, i) => (
-    <div key={i} className="file-markdown-chunk">
-      <MarkdownView blocks={block} />
-    </div>
-  ));
+interface Props {
+  sessionId: string;
+  path: string;
+  text: string;
+  revision?: string;
+  onChange?: (s: string) => void;
+  onScrollLine?: (line: number) => void;
+  readerRef?: RefObject<MarkdownReaderHandle | null>;
+  onHeadings?: (headings: readonly Heading[]) => void;
+}
+function anchorKey(s: string) {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+const Chapter = memo(function Chapter({ entry }: { entry: DocumentBlock }) {
+  const t = useT();
+  return (
+    <section
+      className="markdown-section"
+      data-doc-line={entry.line}
+      data-end-line={entry.end}
+      data-anchor={entry.anchor}
+    >
+      {entry.callout && entry.block.kind === 'blockquote' ? (
+        <aside className={'markdown-callout is-' + entry.callout}>
+          <strong>{t(`files.md.callout.${entry.callout}`)}</strong>
+          <MarkdownView blocks={entry.block.blocks} />
+        </aside>
+      ) : (
+        <MarkdownView blocks={[entry.block]} />
+      )}
+    </section>
+  );
 });
-
 export function FileMarkdown({
   sessionId,
   path,
   text,
-  revision,
-}: {
-  sessionId: string;
-  path: string;
-  text: string;
-  revision: string;
-}) {
+  onChange,
+  onScrollLine,
+  onHeadings,
+  readerRef,
+}: Props) {
   const { transcriptServices: services } = useUi(),
     store = useStore(),
     t = useT();
-  const fileRoot = projectFileRoot(useSession(sessionId));
-  const [id] = useState(() => crypto.randomUUID());
-  const doc = useMemo(() => markdownDocument(text), [text]);
-  const key = 'file-markdown/' + id + '/' + revision;
-  const { markdown } = services;
-  const parsed = useSyncExternalStore(
-    (listener) => markdown.subscribe(key, listener),
-    () => markdown.get(key),
+  const root = projectFileRoot(useSession(sessionId)),
+    element = useRef<HTMLDivElement>(null);
+  const parsed = useParsedDocument(text),
+    model = parsed?.document;
+  const [limit, setLimit] = useState(64),
+    [pendingAnchor, setAnchor] = useState<string>(),
+    group = useId();
+  const suppressed = useRef(false),
+    frame = useRef<number | undefined>(undefined),
+    pendingLine = useRef<number | undefined>(undefined);
+  const safeReveal = useCallback((selector: string) => {
+    const host = element.current,
+      entry = host?.querySelector<HTMLElement>(selector);
+    if (!entry || !host) return false;
+    suppressed.current = true;
+    host.scrollTop += entry.getBoundingClientRect().top - host.getBoundingClientRect().top - 12;
+    host.ownerDocument.defaultView?.requestAnimationFrame(() => {
+      suppressed.current = false;
+    });
+    return true;
+  }, []);
+  const go = useCallback(
+    (name: string) => {
+      const id = anchorKey(name);
+      if (!safeReveal('[data-anchor="' + CSS.escape(id) + '"]')) {
+        setLimit(model?.blocks.length ?? 64);
+        setAnchor(id);
+      }
+    },
+    [model, safeReveal],
   );
-  useEffect(() => {
-    if (!doc.plain) markdown.parseFinished(key, doc.body);
+  const sync = useCallback(
+    (line: number) => {
+      if (!model?.blocks.length) {
+        pendingLine.current = line;
+        return;
+      }
+      let low = 0,
+        high = model.blocks.length;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if ((model.blocks[mid]?.line ?? 0) <= line) low = mid + 1;
+        else high = mid;
+      }
+      const i = Math.max(0, low - 1),
+        block = model.blocks[i];
+      if (block && !safeReveal('[data-doc-line="' + String(block.line) + '"]')) {
+        pendingLine.current = line;
+        setLimit((n) => Math.max(n, i + 32));
+      }
+    },
+    [model, safeReveal],
+  );
+  useLayoutEffect(() => {
+    if (!readerRef) return;
+    readerRef.current = { scrollToLine: sync };
     return () => {
-      markdown.drop([key]);
+      readerRef.current = null;
     };
-  }, [markdown, key, doc]);
+  }, [sync, readerRef]);
+  useLayoutEffect(() => {
+    if (pendingAnchor) {
+      safeReveal('[data-anchor="' + CSS.escape(pendingAnchor) + '"]');
+      setAnchor(undefined);
+    }
+    if (pendingLine.current !== undefined && model) {
+      const line = pendingLine.current;
+      pendingLine.current = undefined;
+      sync(line);
+    }
+  }, [limit, model, pendingAnchor, safeReveal, sync]);
+  useEffect(() => {
+    if (model) onHeadings?.(model.headings);
+  }, [model, onHeadings]);
+  useEffect(() => {
+    if (!model || limit >= model.blocks.length) return;
+    const id = window.requestIdleCallback(
+      () => {
+        setLimit((n) => n + 64);
+      },
+      { timeout: 160 },
+    );
+    return () => {
+      window.cancelIdleCallback(id);
+    };
+  }, [model, limit]);
+  useEffect(
+    () => () => {
+      if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
   const view = useMemo(
     () => ({
       services,
-      fileLinks: { sessionId, root: fileRoot, directory: parentPath(path), document: path },
+      fileLinks: { sessionId, root, directory: parentPath(path), document: path },
       transcript: store.transcript(sessionId),
       actions: { retry: () => undefined, resend: () => undefined },
     }),
-    [services, store, sessionId, fileRoot, path],
+    [services, root, path, sessionId, store],
   );
-  if (!text.trim())
-    return (
-      <div className="tool-empty" role="status">
-        {t('files.viewer.empty')}
-      </div>
-    );
+  const sourceLines = useMemo(() => text.split(/\r\n|\r|\n/u), [text]);
+  const elements = useMemo(
+    () => ({
+      image: (src: string, alt: string) => (
+        <MarkdownImage sessionId={sessionId} path={path} source={src} alt={alt} />
+      ),
+      rich: markdownRichBlock,
+      anchor: go,
+      anchorId: (label: string) => group + encodeURIComponent(label),
+      checked: (item: ListItem) => {
+        const line = item.sourceLine === undefined ? undefined : sourceLines[item.sourceLine - 1];
+        const marker = line === undefined ? null : taskMarker.exec(line);
+        return marker ? marker[2] !== ' ' : item.checked === true;
+      },
+      ...(onChange && parsed?.source === text
+        ? {
+            task: (item: ListItem) => {
+              if (!item.sourceLine) return;
+              const lines = text.split(/(\r\n|\n|\r)/u),
+                index = (item.sourceLine - 1) * 2;
+              const line = lines[index],
+                match = line === undefined ? undefined : taskMarker.exec(line);
+              if (!line || !match?.[1]) return;
+              const at = match[1].length;
+              lines[index] =
+                line.slice(0, at) + (match[2] === ' ' ? 'x' : ' ') + line.slice(at + 1);
+              onChange(lines.join(''));
+            },
+          }
+        : {}),
+    }),
+    [path, sessionId, go, onChange, text, parsed?.source, sourceLines, group],
+  );
+  const scrolled = () => {
+    if (!onScrollLine || suppressed.current || frame.current !== undefined) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = undefined;
+      const host = element.current;
+      if (!host || suppressed.current) return;
+      const entries = host.querySelectorAll<HTMLElement>('[data-doc-line]'),
+        top = host.getBoundingClientRect().top;
+      let lo = 0,
+        hi = entries.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (entries.item(mid).getBoundingClientRect().bottom <= top) lo = mid + 1;
+        else hi = mid;
+      }
+      const line = entries[Math.min(lo, entries.length - 1)]?.dataset.docLine;
+      if (line) onScrollLine(Number(line));
+    });
+  };
   return (
     <TranscriptContext.Provider value={view}>
-      <div className="file-document file-prose" aria-busy={!doc.plain && !parsed}>
-        {doc.fields && doc.fields.length > 0 && (
-          <dl className="file-frontmatter">
-            {doc.fields.map(([label, value], i) => (
-              <div key={i}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
-        {doc.plain ? (
-          <>
-            <small>{t('files.viewer.plain')}</small>
-            <pre>{doc.body}</pre>
-          </>
-        ) : parsed ? (
-          <MarkdownPages key={key} blocks={parsed.blocks} />
-        ) : (
-          <span role="status">{t('files.viewer.loading')}</span>
-        )}
-      </div>
+      <DocumentElements.Provider value={elements}>
+        <div
+          ref={element}
+          className="file-document file-prose markdown-reader"
+          data-testid="markdown-reader"
+          aria-busy={!parsed}
+          onScroll={scrolled}
+        >
+          <article>
+            {model?.fields.length ? (
+              <dl className="file-frontmatter">
+                {model.fields.map(([label, value], i) => (
+                  <div key={i}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+            {model?.plain || parsed?.error ? (
+              <>
+                <small>{parsed?.error ?? t('files.viewer.plain')}</small>
+                <pre>{text}</pre>
+              </>
+            ) : !text.trim() ? (
+              <p className="muted">{t('files.viewer.empty')}</p>
+            ) : model ? (
+              model.blocks.slice(0, limit).map((entry, i) => <Chapter key={i} entry={entry} />)
+            ) : (
+              <span role="status">{t('files.viewer.loading')}</span>
+            )}
+            {model && model.notes.length > 0 && (
+              <footer className="markdown-notes" aria-labelledby={group}>
+                <h2 id={group}>{t('files.md.footnotes')}</h2>
+                <ol>
+                  {model.notes.map((note) => (
+                    <li
+                      key={note.label}
+                      id={group + encodeURIComponent('fn-' + note.label)}
+                      data-anchor={'fn-' + note.label}
+                    >
+                      <MarkdownView blocks={note.blocks} />
+                      <button
+                        type="button"
+                        className="markdown-anchor"
+                        aria-label={t('files.md.backToNote', { number: note.number })}
+                        onClick={() => {
+                          go('fnref-' + note.label);
+                        }}
+                      >
+                        ↩
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </footer>
+            )}
+          </article>
+        </div>
+      </DocumentElements.Provider>
     </TranscriptContext.Provider>
   );
 }

@@ -22,9 +22,46 @@ import {
   npmLicenseProblems,
   parseExceptions,
 } from '../lib/audit.mjs';
-import { isMain, readJsonFile, repoRoot, run } from '../lib/repo.mjs';
+import { isMain, isRecord, readJsonFile, repoRoot, run } from '../lib/repo.mjs';
 import { localToolPath } from '../dev/install-tools.mjs';
 
+/**
+ * An npm tarball can omit its SPDX field while shipping a licence. Accept a reviewed
+ * declaration only for the pinned archive and the complete, byte-identical licence file.
+ * @param {unknown} sources
+ * @param {string} root
+ */
+export function reviewedNpmLicenses(sources, root) {
+  const entries =
+    isRecord(sources) && Array.isArray(sources.components)
+      ? sources.components.filter(isRecord)
+      : [];
+  /** @param {string} location @param {Record<string,unknown>} pkg */
+  return (location, pkg) => {
+    const name = location.split('node_modules/').at(-1);
+    for (const entry of entries) {
+      const npm = entry.npm;
+      if (
+        !isRecord(npm) ||
+        npm.package !== name ||
+        entry.version !== pkg.version ||
+        typeof pkg.integrity !== 'string' ||
+        npm.integrity !== pkg.integrity ||
+        typeof npm.licenseFile !== 'string' ||
+        typeof entry.licenseFile !== 'string' ||
+        typeof entry.license !== 'string'
+      )
+        continue;
+      const installed = path.join(root, location, npm.licenseFile);
+      if (
+        existsSync(installed) &&
+        readFileSync(installed).equals(readFileSync(path.join(root, entry.licenseFile)))
+      )
+        return entry.license;
+    }
+    return '';
+  };
+}
 export const EXCEPTIONS = path.join(repoRoot, 'tests', 'security', 'audit-exceptions.yaml');
 
 /**
@@ -143,6 +180,7 @@ async function main() {
   const licenses = npmLicenseProblems(
     readJsonFile(path.join(repoRoot, 'package-lock.json')),
     NPM_LICENSES,
+    reviewedNpmLicenses(readJsonFile(path.join(repoRoot, 'third-party/sources.json')), repoRoot),
   );
   console.log(`  ${String(licenses.checked)} packages checked`);
   failures.push(...licenses.problems.map((p) => `license outside the allowlist: ${p}`));

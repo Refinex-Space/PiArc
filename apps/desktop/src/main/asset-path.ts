@@ -35,6 +35,8 @@ export function resolveAssetPath(rootDir: string, requestUrl: string): string | 
   if (fromRoot === '' || fromRoot.startsWith('..') || path.isAbsolute(fromRoot)) {
     return null;
   }
+  // The Mermaid document and its scripts are served by the sandboxed document handler.
+  if (fromRoot.split(path.sep)[0]?.toLowerCase() === 'markdown-diagram') return null;
   return resolved;
 }
 

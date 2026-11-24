@@ -2,13 +2,20 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 
 const Header = createContext<{
+  visible: boolean;
   target: HTMLDivElement | null;
   attach: (el: HTMLDivElement | null) => void;
 } | null>(null);
 
-export function ToolHeaderProvider({ children }: { children: ReactNode }) {
+export function ToolHeaderProvider({
+  children,
+  visible = true,
+}: {
+  children: ReactNode;
+  visible?: boolean;
+}) {
   const [target, attach] = useState<HTMLDivElement | null>(null);
-  const value = useMemo(() => ({ target, attach }), [target]);
+  const value = useMemo(() => ({ target, attach, visible }), [target, visible]);
   return <Header.Provider value={value}>{children}</Header.Provider>;
 }
 
@@ -21,4 +28,9 @@ export function ToolHeaderContent({ children }: { children: ReactNode }) {
   const header = useContext(Header);
   if (!header) return children;
   return header.target ? createPortal(children, header.target) : null;
+}
+
+/** Actual tile placement, independent of a document reader’s own scroll position. */
+export function useToolVisible() {
+  return useContext(Header)?.visible ?? true;
 }

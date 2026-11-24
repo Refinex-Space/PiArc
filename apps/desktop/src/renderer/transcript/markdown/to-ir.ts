@@ -38,10 +38,11 @@ export function isMarkedToken(token: Token): token is MarkedToken {
 
 /** Converts tokens to blocks; `isIncomplete` names the code token whose fence is still open. */
 export interface ConvertOptions {
+  readonly documentSpan?: (token: Token) => Span | undefined;
   readonly isIncomplete?: (token: Tokens.Code) => boolean;
 }
 
-function spans(tokens: readonly Token[] | undefined): Span[] {
+function spans(tokens: readonly Token[] | undefined, options: ConvertOptions): Span[] {
   const result: Span[] = [];
   const push = (span: Span): void => {
     // Merge neighbouring text so React renders fewer nodes.
@@ -55,10 +56,10 @@ function spans(tokens: readonly Token[] | undefined): Span[] {
   for (const token of tokens ?? []) {
     // A text token can wrap further inline tokens (marked does this in tight list items).
     if (token.type === 'text' && token.tokens !== undefined && token.tokens.length > 0) {
-      spans(token.tokens).forEach(push);
+      spans(token.tokens, options).forEach(push);
       continue;
     }
-    const span = toSpan(token);
+    const span = options.documentSpan?.(token) ?? toSpan(token, options);
     if (span !== null) {
       push(span);
     }
@@ -66,7 +67,7 @@ function spans(tokens: readonly Token[] | undefined): Span[] {
   return result;
 }
 
-function toSpan(token: Token): Span | null {
+function toSpan(token: Token, options: ConvertOptions): Span | null {
   if (!isMarkedToken(token)) {
     return { kind: 'text', text: token.raw };
   }
@@ -76,11 +77,11 @@ function toSpan(token: Token): Span | null {
     case 'escape':
       return { kind: 'text', text: token.text };
     case 'strong':
-      return { kind: 'strong', children: spans(token.tokens) };
+      return { kind: 'strong', children: spans(token.tokens, options) };
     case 'em':
-      return { kind: 'emphasis', children: spans(token.tokens) };
+      return { kind: 'emphasis', children: spans(token.tokens, options) };
     case 'del':
-      return { kind: 'delete', children: spans(token.tokens) };
+      return { kind: 'delete', children: spans(token.tokens, options) };
     case 'codespan':
       return { kind: 'code', text: token.text };
     case 'br':
@@ -88,16 +89,20 @@ function toSpan(token: Token): Span | null {
     case 'link':
       return {
         kind: 'link',
+        ...(options.documentSpan && token.href.startsWith('#')
+          ? { documentAnchor: token.href.slice(1) }
+          : {}),
         ...markdownTarget(token.href),
         title:
           token.title === undefined || token.title === null
             ? null
             : decodeCharacterReferences(token.title),
-        children: spans(token.tokens),
+        children: spans(token.tokens, options),
       };
     case 'image':
       return {
         kind: 'image',
+        ...(options.documentSpan ? { documentSource: decodeCharacterReferences(token.href) } : {}),
         ...markdownTarget(token.href),
         alt: decodeCharacterReferences(token.text),
         title: token.title === null ? null : decodeCharacterReferences(token.title),
@@ -143,7 +148,7 @@ function toBlock(token: Token, options: ConvertOptions): Block | null {
     case 'checkbox':
       return null;
     case 'paragraph':
-      return { kind: 'paragraph', spans: spans(token.tokens) };
+      return { kind: 'paragraph', spans: spans(token.tokens, options) };
     case 'text':
       // Block-level text: the content of a tight list item.
       return {
@@ -151,10 +156,10 @@ function toBlock(token: Token, options: ConvertOptions): Block | null {
         spans:
           token.tokens === undefined
             ? [{ kind: 'text', text: decodeCharacterReferences(token.text) }]
-            : spans(token.tokens),
+            : spans(token.tokens, options),
       };
     case 'heading':
-      return { kind: 'heading', level: token.depth, spans: spans(token.tokens) };
+      return { kind: 'heading', level: token.depth, spans: spans(token.tokens, options) };
     case 'code': {
       const info = token.lang?.trim().split(/\s+/u)[0] ?? '';
       return {
@@ -181,8 +186,8 @@ function toBlock(token: Token, options: ConvertOptions): Block | null {
       return {
         kind: 'table',
         align: token.align.map(align),
-        header: token.header.map((cell) => spans(cell.tokens)),
-        rows: token.rows.map((row) => row.map((cell) => spans(cell.tokens))),
+        header: token.header.map((cell) => spans(cell.tokens, options)),
+        rows: token.rows.map((row) => row.map((cell) => spans(cell.tokens, options))),
       };
     case 'hr':
       return { kind: 'rule' };

@@ -4,6 +4,8 @@
   // `window.piarc` (src/preload).
   "compilerOptions": {
     "composite": true,
+    "allowJs": true,
+    "checkJs": true,
     "emitDeclarationOnly": true,
     "rootDir": ".",
     "outDir": "../../dist/renderer",
@@ -12,6 +14,11 @@
     "types": [],
     "jsx": "react-jsx"
   },
-  "include": ["**/*.ts", "**/*.tsx", "terminal/frame/frame-samples.json"],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "public/markdown-diagram/frame.js",
+    "terminal/frame/frame-samples.json"
+  ],
   "references": [{ "path": "../shared" }, { "path": "../../../../packages/protocol" }]
 }

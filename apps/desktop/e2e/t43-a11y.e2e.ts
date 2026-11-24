@@ -54,10 +54,19 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
 
   const ws = await makeWorkspace(workspaces, 'a11y 无障碍', {
     'notes.txt': 'The release is on Friday.\n',
+    'guide.md':
+      '# Project Guide\n\n![Local sample](./image.png)\n\nEquation $x^2$ with a note[^1].\n\n[^1]: Check local files.\n',
     '.piarc/settings.json': JSON.stringify({
       hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'true' }] }] },
     }),
   });
+  await writeFile(
+    path.join(ws, 'image.png'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGMwrPCHIwbiOACRYw+BvTjSqgAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  );
   await openFolder(page, app, ws);
   await checkState(page, 'window:new-session');
 
@@ -85,6 +94,26 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await fileWindow.getByTestId('tile-popout-files').click();
   await expect(page.getByTestId('project-files')).toBeVisible();
   await page.getByTestId('tile-maximize-files').click();
+  await page.getByRole('treeitem', { name: 'guide.md', exact: true }).click();
+  await expect(
+    page.getByTestId('markdown-reader').getByRole('heading', { name: 'Project Guide' }),
+  ).toBeVisible();
+  await checkState(page, 'state:md-read');
+  await page.getByTestId('markdown-reader').getByRole('img', { name: 'Local sample' }).click();
+  await expect(page.getByTestId('markdown-image-dialog')).toBeVisible();
+  await checkState(page, 'dialog:md-image');
+  await page
+    .getByTestId('markdown-image-dialog')
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  await page.getByTestId('md-mode-edit').check();
+  await expect(page.getByTestId('markdown-editor-input')).toBeVisible();
+  await checkState(page, 'state:md-live');
+  await page.getByTestId('md-mode-split').check();
+  await expect(
+    page.getByTestId('markdown-reader').getByRole('heading', { name: 'Project Guide' }),
+  ).toBeVisible();
+  await checkState(page, 'state:md-split');
   await page.getByRole('treeitem', { name: 'notes.txt', exact: true }).click();
   await expect(page.locator('[data-source-line="1"]')).toBeVisible();
   await checkState(page, 'state:files-source');
@@ -160,6 +189,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   for (const id of [
     'general',
     'appearance',
+    'markdown',
     'providers',
     'permissions',
     'sandbox',

@@ -505,7 +505,7 @@ export function ToolTiles({
                 detached={detached}
                 onDock={dock}
               >
-                <ToolHeaderProvider>
+                <ToolHeaderProvider visible={detached || rect !== undefined}>
                   <section
                     className="tool-tile"
                     data-testid={`tile-${id}`}

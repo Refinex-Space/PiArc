@@ -19,6 +19,8 @@ import { useUi } from '../shell/ui.js';
 import { FileActionsMenu, type FileActions } from './FileActionsMenu.js';
 import { useFileDocument } from './viewer-document.js';
 import { FileSelectionBar } from './viewer-selection.js';
+import { MarkdownModes, type FileMode } from './markdown/MarkdownModes.js';
+import { MarkdownWorkspace, type MarkdownWorkspaceHandle } from './markdown/MarkdownWorkspace.js';
 import { FileEditor } from './viewer-editor.js';
 import { GoToLine, ViewerFind, useFileFind } from './viewer-find.js';
 import {
@@ -90,9 +92,7 @@ export function FileViewer({
   );
   const { file, draft } = doc;
   const main = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<'preview' | 'source' | 'edit'>(
-    doc.dirty ? 'edit' : location ? 'source' : 'preview',
-  );
+  const [mode, setMode] = useState<FileMode>(doc.dirty ? 'edit' : location ? 'source' : 'preview');
   const [target, setTarget] = useState<FileLocation | undefined>(location);
   const [tools, setTools] = useState<'find' | 'goToLine'>();
   const [query, setQuery] = useState(''),
@@ -113,6 +113,15 @@ export function FileViewer({
   const canPreviewText = file?.kind === 'text' && previewKind(path) !== null;
   const media = file && ['image', 'audio', 'video', 'pdf'].includes(file.kind);
   const editable = file?.kind === 'text' && file.editable;
+  const markdown = file?.kind === 'text' && previewKind(path) === 'markdown';
+  const markdownEditor = useRef<MarkdownWorkspaceHandle | null>(null);
+  const pendingMarkdownFind = useRef(false);
+  useLayoutEffect(() => {
+    if (markdown && mode !== 'preview' && pendingMarkdownFind.current) {
+      pendingMarkdownFind.current = false;
+      markdownEditor.current?.findReplace();
+    }
+  }, [markdown, mode]);
   const menu = useMenu();
   function copy(text: string) {
     void win.navigator.clipboard.writeText(text).catch((e: unknown) => {
@@ -125,7 +134,7 @@ export function FileViewer({
   };
   useEffect(() => {
     if (location) {
-      setMode((previous) => (previous === 'edit' ? 'edit' : 'source'));
+      setMode((previous) => (previous === 'edit' || previous === 'split' ? previous : 'source'));
       setTarget(location);
       setSelection(undefined);
     }
@@ -138,7 +147,15 @@ export function FileViewer({
   };
   function openTool(tool: 'find' | 'goToLine') {
     if (file?.kind !== 'text') return;
-    if (mode !== 'edit') setMode('source');
+    if (markdown && tool === 'find') {
+      setTools(undefined);
+      if (mode === 'preview') {
+        pendingMarkdownFind.current = true;
+        setMode('source');
+      } else markdownEditor.current?.findReplace();
+      return;
+    }
+    if (mode !== 'edit' && mode !== 'split') setMode('source');
     setTools(tool);
     if (
       tool === 'find' &&
@@ -153,7 +170,8 @@ export function FileViewer({
   }
   function closeTool() {
     setTools(undefined);
-    main.current?.querySelector<HTMLElement>('.file-editor,.file-source-scroll')?.focus();
+    if (markdown) markdownEditor.current?.focus();
+    else main.current?.querySelector<HTMLElement>('.file-editor,.file-source-scroll')?.focus();
   }
   const reload = () => {
     if (doc.dirty) {
@@ -206,14 +224,15 @@ export function FileViewer({
         );
       },
     });
-  if (mode === 'edit' && editable)
+  if ((mode === 'edit' || (markdown && mode !== 'preview')) && editable)
     extra.push({
       id: 'editorMenu',
       label: t('files.viewer.editActions'),
       run: () => {
         const field = main.current?.querySelector<HTMLTextAreaElement>('.file-editor');
-        if (!field) return;
-        field.focus({ preventScroll: true });
+        if (markdown) markdownEditor.current?.focus();
+        else if (field) field.focus({ preventScroll: true });
+        else return;
         void window.piarc
           .projectFileAction(sessionId, path, 'editorMenu')
           .catch((error: unknown) => {
@@ -316,7 +335,17 @@ export function FileViewer({
         </div>
         {file?.kind === 'text' && (
           <>
-            {canPreviewText && !doc.dirty && (
+            {markdown && (
+              <MarkdownModes
+                mode={mode}
+                editable={editable}
+                change={(next) => {
+                  setTools(undefined);
+                  setMode(next);
+                }}
+              />
+            )}
+            {!markdown && canPreviewText && !doc.dirty && (
               <IconButton
                 label={t(mode === 'preview' ? 'files.viewer.source' : 'files.viewer.preview')}
                 onClick={() => {
@@ -336,7 +365,7 @@ export function FileViewer({
             >
               <SearchIcon />
             </IconButton>
-            {editable && mode !== 'edit' && (
+            {!markdown && editable && mode !== 'edit' && (
               <Button
                 size="small"
                 variant="ghost"
@@ -347,7 +376,7 @@ export function FileViewer({
                 {t('files.viewer.edit')}
               </Button>
             )}
-            {mode === 'edit' && (
+            {!markdown && mode === 'edit' && (
               <Button
                 size="small"
                 variant="ghost"
@@ -478,7 +507,22 @@ export function FileViewer({
             </div>
           )
         ) : file.kind === 'text' ? (
-          mode === 'edit' ? (
+          markdown ? (
+            <MarkdownWorkspace
+              ref={markdownEditor}
+              sessionId={sessionId}
+              path={path}
+              text={draft}
+              editable={editable}
+              mode={mode}
+              visible={visible}
+              settings={settings}
+              location={target}
+              match={match}
+              onChange={doc.setDraft}
+              onSelect={setSelection}
+            />
+          ) : mode === 'edit' ? (
             <FileEditor
               path={path}
               lines={lines}

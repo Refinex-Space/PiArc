@@ -147,6 +147,58 @@
       "usedBy": "design/brand/mark.svg, source of menu bar and tray icons (T35, T50)",
       "addedBy": "T12 (registered in R1)",
       "notes": "The licence covers the SVG file only, not the Pi name or logo as trademarks; see design/brand/README.md (requirement D3)."
+    },
+    {
+      "id": "marklyra-image-validation",
+      "name": "Marklyra local image asset validation",
+      "version": "0.3.2",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/marklyra.LICENSE",
+      "copyright": "Marklyra contributors (refinex)",
+      "source": {
+        "repository": "https://github.com/Refinex-Space/marklyra",
+        "path": "crates/image-assets/src/validation.rs",
+        "commit": "e7c2175246443ca1fbdc1195ca3960b8a7beb6a5"
+      },
+      "usedBy": "crates/piarc-fs/src/project/images/validation.rs",
+      "addedBy": "Markdown file editing",
+      "notes": "Adapted to PiArc file errors, BMP support, and cumulative animation decoding bounds."
+    },
+    {
+      "id": "markdown-studio-document-editor",
+      "name": "Markdown Studio document editing and preview syntax",
+      "version": "0.2.0",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/markdown-studio.LICENSE",
+      "copyright": "Markdown Studio contributors (Refinex)",
+      "source": {
+        "repository": "https://github.com/Refinex-Space/markdown-studio",
+        "path": "web/core/editor/core/cm/markdownLang.ts; web/core/features/viewers/markdown/livePreview/{commands,tableModel,inline,blocks,slash,toolbar,codeBlocks}.ts; web/core/features/viewers/markdown/render.ts",
+        "commit": "e6ebd0c015b0c53d4091a8fcd3e76c6c95d91c21"
+      },
+      "usedBy": "apps/desktop/src/renderer/files/markdown/",
+      "addedBy": "Markdown file editing",
+      "notes": "Adapted text formatting, GFM table mutations, syntax extensions, viewport decorations, and rendering of math and footnotes. PiArc supplies its own document lifecycle, React widgets, file-referenced images and structured preview output."
+    },
+    {
+      "id": "khroma-license",
+      "name": "khroma (Mermaid colour utilities)",
+      "version": "2.1.0",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/khroma-2.1.0.LICENSE",
+      "copyright": "Copyright (c) 2019-present Fabio Spampinato, Andrew Maney",
+      "source": {
+        "repository": "https://github.com/fabiospampinato/khroma",
+        "path": "license"
+      },
+      "npm": {
+        "package": "khroma",
+        "integrity": "sha512-Ls993zuzfayK269Svk9hzpeGUKob/sIgZzyHYdjQoAdQetRKpOLj+k/QQQ/6Qi0Yz65mlROrfd+Ev+1+7dz9Kw==",
+        "licenseFile": "license"
+      },
+      "usedBy": "Mermaid document diagram engine",
+      "addedBy": "Markdown file editing",
+      "notes": "The npm tarball ships the complete MIT licence but omits the SPDX field. Match both the reviewed tarball integrity and the installed licence text before using this declaration."
     }
   ]
 }

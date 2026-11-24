@@ -11,6 +11,7 @@ import type {
   RewindRequest,
 } from '@piarc/protocol';
 
+import type { ImageInput, ImageSettingsRequest } from './markdown-images.js';
 import type { ProjectRequest } from './project-files.js';
 import type { CommandId } from './keybindings.js';
 import type { Locale } from './i18n/index.js';
@@ -73,6 +74,8 @@ export const IPC_CHANNELS = {
   queueEdit: 'piarc:session.queueEdit',
   queueDelete: 'piarc:session.queueDelete',
   attachmentStore: 'piarc:session.attachmentStore',
+  markdownImage: 'piarc:files.markdownImage',
+  markdownImageSettings: 'piarc:files.markdownImageSettings',
   projectFileWatch: 'piarc:files.watch',
   projectFilePreview: 'piarc:files.preview',
   projectFiles: 'piarc:files.project',
@@ -798,6 +801,8 @@ export interface PiarcApi {
    * search with the same `searchId` cancels this one. Resolves with `{ root, results: [{ path,
    * name, positions }], truncated }` as JSON.
    */
+  markdownImage(sessionId: string, document: string, request: ImageInput): Promise<string>;
+  markdownImageSettings(request: ImageSettingsRequest): Promise<string>;
   watchProjectFiles(sessionId: string, paths: readonly string[]): Promise<void>;
   projectFilePreview(
     sessionId: string,

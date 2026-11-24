@@ -225,9 +225,10 @@ function splitTop(text, operator) {
  * outside the allowlist.
  * @param {unknown} lock package-lock.json (lockfileVersion 3)
  * @param {readonly string[]} allowed
+ * @param {(path:string,entry:Record<string,unknown>)=>string} [reviewedLicense] Exact checked-in evidence for a release with missing metadata.
  * @returns {{ checked: number, problems: string[] }}
  */
-export function npmLicenseProblems(lock, allowed) {
+export function npmLicenseProblems(lock, allowed, reviewedLicense) {
   if (!isRecord(lock) || !isRecord(lock.packages)) {
     throw new Error('package-lock.json: no `packages` (needs lockfileVersion 3)');
   }
@@ -239,7 +240,8 @@ export function npmLicenseProblems(lock, allowed) {
       continue;
     }
     checked += 1;
-    const license = str(entry.license);
+    const declared = str(entry.license);
+    const license = declared === '' ? (reviewedLicense?.(key, entry) ?? '') : declared;
     if (license === '') problems.push(`${key}: no license`);
     else if (!licenseAllowed(license, allowed)) problems.push(`${key}: ${license}`);
   }

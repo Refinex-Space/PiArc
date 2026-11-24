@@ -2,7 +2,7 @@
 // 10.3): no innerHTML, raw HTML shown as text, links opened through the main process's
 // confirmation (`window.piarc.openExternal`), images never loaded and shown as links. Blocks are
 // memoized by identity, so while a message streams only its changed tail re-renders.
-import { memo, useContext, type MouseEvent, type ReactNode } from 'react';
+import { createContext, memo, useContext, type MouseEvent, type ReactNode } from 'react';
 
 import { fileLocation, openProjectFile } from '../../files/navigation.js';
 import { TranscriptContext } from '../services.js';
@@ -11,6 +11,15 @@ import { useT } from '../../app/app-context.js';
 import { CodeBlock } from '../highlight/CodeBlock.js';
 import type { Align, Block, Span } from './ir.js';
 
+// File documents opt into rich media and document-local navigation; chat keeps its own policy.
+export const DocumentElements = createContext<{
+  image: (source: string, alt: string) => ReactNode;
+  rich: (kind: 'math' | 'mermaid', source: string, inline: boolean) => ReactNode;
+  anchor: (name: string) => void;
+  anchorId: (name: string) => string;
+  checked?: (item: Extract<Block, { kind: 'list' }>['items'][number]) => boolean;
+  task?: (item: Extract<Block, { kind: 'list' }>['items'][number]) => void;
+} | null>(null);
 function openLink(event: MouseEvent<HTMLAnchorElement>, href: string): void {
   event.preventDefault();
   window.piarc.openExternal(href).catch((error: unknown) => {
@@ -82,7 +91,25 @@ function Spans({ spans }: { spans: readonly Span[] }): ReactNode {
 
 function SpanView({ span }: { span: Span }): ReactNode {
   const t = useT();
+  const document = useContext(DocumentElements);
   switch (span.kind) {
+    case 'math':
+      return document?.rich('math', span.text, true) ?? span.text;
+    case 'note':
+      return (
+        <sup data-anchor={'fnref-' + span.label}>
+          <a
+            className="markdown-anchor"
+            href={'#' + (document?.anchorId('fn-' + span.label) ?? '')}
+            onClick={(event) => {
+              event.preventDefault();
+              document?.anchor('fn-' + span.label);
+            }}
+          >
+            {span.number}
+          </a>
+        </sup>
+      );
     case 'text':
       return span.text;
     case 'strong':
@@ -108,12 +135,25 @@ function SpanView({ span }: { span: Span }): ReactNode {
     case 'break':
       return <br />;
     case 'link':
+      if (document && span.documentAnchor)
+        return (
+          <button
+            type="button"
+            className="markdown-anchor"
+            onClick={() => {
+              document.anchor(span.documentAnchor ?? '');
+            }}
+          >
+            <Spans spans={span.children} />
+          </button>
+        );
       return (
         <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
           <Spans spans={span.children} />
         </Link>
       );
     case 'image':
+      if (document && span.documentSource) return document.image(span.documentSource, span.alt);
       return (
         <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
           <span className="md-image-label">
@@ -146,7 +186,8 @@ function Blocks({
 }
 
 const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNode {
-  const t = useT();
+  const t = useT(),
+    document = useContext(DocumentElements);
   switch (block.kind) {
     case 'paragraph':
       return (
@@ -173,6 +214,9 @@ const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNod
       }
     }
     case 'code':
+      if (document && block.lang === 'mermaid') return document.rich('mermaid', block.text, false);
+      if (document && (block.lang === 'math' || block.lang === 'latex'))
+        return document.rich('math', block.text, false);
       return <CodeBlock lang={block.lang} code={block.text} complete={block.complete} />;
     case 'list': {
       const items = block.items.map((item, index) => (
@@ -180,9 +224,14 @@ const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNod
           {item.checked === null ? null : (
             <input
               type="checkbox"
-              checked={item.checked}
-              disabled
-              aria-label={t(item.checked ? 'markdown.taskDone' : 'markdown.task')}
+              checked={document?.checked?.(item) ?? item.checked}
+              disabled={!document?.task || item.sourceLine === undefined}
+              onChange={() => {
+                document?.task?.(item);
+              }}
+              aria-label={t(
+                (document?.checked?.(item) ?? item.checked) ? 'markdown.taskDone' : 'markdown.task',
+              )}
             />
           )}
           <Blocks blocks={item.blocks} tight={!block.loose} />
