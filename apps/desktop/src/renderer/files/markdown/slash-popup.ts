@@ -187,10 +187,11 @@ export function slashPopup(
       if (!child || host !== rows[s.active]) {
         child?.remove();
         child = doc.createElement('div');
-        child.setAttribute('role', 'listbox');
-        child.id = s.id + '-child';
         child.className = 'md-slash-list md-slash-child';
-        child.setAttribute('aria-label', t(selected.label));
+        const list = doc.createElement('div');
+        list.setAttribute('role', 'listbox');
+        list.id = s.id + '-child';
+        list.setAttribute('aria-label', t(selected.label));
         const back = doc.createElement('button');
         back.className = 'md-slash-back';
         back.type = 'button';
@@ -200,7 +201,8 @@ export function slashPopup(
           move(view, s.active, null);
         };
         buttons = selected.children.map((item, i) => row(item, i, true, s));
-        child.append(back, ...buttons);
+        list.append(...buttons);
+        child.append(back, list);
         dom.append(child);
         host = rows[s.active];
         position();

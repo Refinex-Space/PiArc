@@ -154,6 +154,9 @@ it('groups insertion commands, shows syntax hints and chooses a nested diagram w
     expect(folder).toBeTruthy();
     folder?.click();
     expect(v.dom.querySelector('[role=listbox][aria-label="Mermaid diagram"]')).toBeTruthy();
+    const submenu = v.dom.querySelector('[role=listbox][aria-label="Mermaid diagram"]');
+    expect(submenu?.querySelector('button')).toBeNull();
+    expect(submenu?.querySelectorAll('[role=option]')).toHaveLength(8);
     key(v, 'ArrowLeft');
     expect(v.dom.querySelectorAll('[role=listbox]')).toHaveLength(1);
     key(v, 'ArrowRight');
