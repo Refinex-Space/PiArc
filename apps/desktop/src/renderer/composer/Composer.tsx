@@ -16,12 +16,14 @@ import type { EditorDraft } from './session-draft.js';
 import { IconButton } from '../app/IconButton.js';
 import {
   CommandIcon,
-  FileIcon,
+  FileCodeCornerIcon,
   GearIcon,
+  LayoutFreeformIcon,
   PaperclipIcon,
   PlusIcon,
   SendIcon,
   StopIcon,
+  UnplugIcon,
 } from '../shell/icons.js';
 import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
 import { revealListOption } from '../app/list-navigation.js';
@@ -612,7 +614,7 @@ export function Composer({
     {
       id: 'mention',
       label: t('composer.mentions.label'),
-      icon: <FileIcon />,
+      icon: <FileCodeCornerIcon />,
       run: () => {
         const editor = viewRef.current;
         if (!editor) return;
@@ -641,7 +643,7 @@ export function Composer({
           {
             id: 'skills',
             label: t('skills.title'),
-            icon: <CommandIcon />,
+            icon: <LayoutFreeformIcon />,
             submenu: [
               ...commands
                 .filter((c) => c.kind === 'skill')
@@ -668,7 +670,7 @@ export function Composer({
           {
             id: 'manage-connectors',
             label: t('settings.mcp'),
-            icon: <GearIcon />,
+            icon: <UnplugIcon />,
             run: () => {
               void window.piarc.openSettings('mcp');
             },
@@ -738,7 +740,7 @@ export function Composer({
                   }
                 }}
               >
-                <FileIcon />
+                <FileCodeCornerIcon />
                 <span className="mention-label">{candidate.label}</span>
                 <span className="mention-path">{candidate.path}</span>
               </li>
@@ -869,7 +871,7 @@ export function Composer({
             add.openAbove(event.currentTarget);
           }}
         >
-          <PlusIcon />
+          <PlusIcon strokeWidth={1} />
         </IconButton>
         <input
           ref={fileInput}

@@ -109,6 +109,10 @@
   background: var(--piarc-workbench-editor);
   box-shadow: var(--piarc-workbench-composer-shadow);
 }
+:root[data-app] .composer-box:has(.composer-editor:focus) {
+  outline: none;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.075);
+}
 /* Keep a composed draft readable while the user decides workspace trust. */
 .composer .composer-box.is-disabled {
   opacity: 1;
@@ -201,6 +205,10 @@
 .menu-item-line svg {
   flex-shrink: 0;
 }
+.composer .menu .icon,
+.composer .mention-popup .icon {
+  stroke-width: 1;
+}
 .menu-shortcut,
 .menu-heading {
   font-size: var(--piarc-font-size-small);
@@ -211,15 +219,18 @@
 }
 .menu-filter {
   display: block;
-  width: 100%;
+  width: calc(100% + 2 * var(--piarc-space-1));
   box-sizing: border-box;
+  margin: calc(var(--piarc-space-1) * -1) calc(var(--piarc-space-1) * -1) var(--piarc-space-1);
   padding: var(--piarc-space-2);
-  margin-bottom: var(--piarc-space-1);
   border: 0;
   border-bottom: 1px solid var(--piarc-border-subtle);
+  border-radius: 0;
   background: transparent;
   color: inherit;
   font: inherit;
+  outline: none;
+  appearance: none;
 }
 .interactive-list.menu {
   --menu-edge: var(--piarc-space-2);

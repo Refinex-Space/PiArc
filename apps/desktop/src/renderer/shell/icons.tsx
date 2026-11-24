@@ -1,7 +1,15 @@
 // PiArc's own line icons (16 px grid, `currentColor`), drawn as React SVG elements.
 import type { ReactNode } from 'react';
 
-function Icon({ children, label }: { readonly children: ReactNode; readonly label?: string }) {
+function Icon({
+  children,
+  label,
+  strokeWidth = 1.5,
+}: {
+  readonly children: ReactNode;
+  readonly label?: string;
+  readonly strokeWidth?: number;
+}) {
   return (
     <svg
       className="icon"
@@ -10,7 +18,7 @@ function Icon({ children, label }: { readonly children: ReactNode; readonly labe
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden={label === undefined ? true : undefined}
@@ -22,17 +30,29 @@ function Icon({ children, label }: { readonly children: ReactNode; readonly labe
   );
 }
 
-export const PlusIcon = () => (
-  <Icon>
-    <path d="M8 3v10M3 8h10" />
-  </Icon>
-);
+export function PlusIcon({ strokeWidth = 1.5 }: { readonly strokeWidth?: number } = {}) {
+  return (
+    <Icon strokeWidth={strokeWidth}>
+      <path d="M8 3v10M3 8h10" />
+    </Icon>
+  );
+}
 
 export const SidebarIcon = () => (
-  <Icon>
-    <rect x="2" y="3" width="12" height="10" rx="2" />
-    <path d="M6 3v10" />
-  </Icon>
+  <svg
+    className="icon"
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
+    fill="currentColor"
+    aria-hidden="true"
+  >
+    <path
+      fillRule="evenodd"
+      d="M4.65 3.23H11.35A3.02 3.02 0 0 1 14.37 6.25V10.55A3.02 3.02 0 0 1 11.35 13.57H4.65A3.02 3.02 0 0 1 1.63 10.55V6.25A3.02 3.02 0 0 1 4.65 3.23ZM4.66 4.18H11.34A2.08 2.08 0 0 1 13.42 6.26V10.54A2.08 2.08 0 0 1 11.34 12.62H4.66A2.08 2.08 0 0 1 2.58 10.54V6.26A2.08 2.08 0 0 1 4.66 4.18Z"
+    />
+    <rect x="4.43" y="6.03" width="0.95" height="4.74" rx="0.47" />
+  </svg>
 );
 
 export const GearIcon = () => (
@@ -63,6 +83,13 @@ export const ArrowUpIcon = () => (
   </Icon>
 );
 
+/** Lucide `corner-down-left`, the return mark on a selected search row. */
+export const ReturnIcon = () => (
+  <Icon>
+    <path d="M13.33 2.67v4.67a2.67 2.67 0 0 1-2.67 2.67H2.67" />
+    <path d="m6 6.67-3.33 3.33 3.33 3.33" />
+  </Icon>
+);
 export const SearchIcon = () => (
   <Icon>
     <circle cx="6.8" cy="6.8" r="4.9" />
@@ -84,6 +111,23 @@ export const ChevronDownIcon = () => (
     <path d="m4 6 4 4 4-4" />
   </Icon>
 );
+/** Solid disclosure mark beside a project name. Points right; the row rotates it when open. */
+export function DisclosureIcon() {
+  return (
+    <svg
+      className="icon project-caret"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+    >
+      <path
+        fill="currentColor"
+        d="M7.76 4.47 10.65 7.05a1.28 1.28 0 0 1 0 1.9l-2.89 2.58A1.28 1.28 0 0 1 5.62 10.57V5.43A1.28 1.28 0 0 1 7.76 4.47Z"
+      />
+    </svg>
+  );
+}
 export const CheckIcon = () => (
   <Icon>
     <path d="m2.8 8.7 3.4 3.4L13.2 4" />
@@ -94,13 +138,15 @@ export const CloseIcon = () => (
     <path d="m4 4 8 8m0-8-8 8" />
   </Icon>
 );
-export const MoreIcon = () => (
-  <Icon>
-    {[3, 8, 13].map((x) => (
-      <circle key={x} cx={x} cy="8" r="1.1" fill="currentColor" stroke="none" />
-    ))}
-  </Icon>
-);
+export function MoreIcon({ dot = 1.1 }: { readonly dot?: number } = {}) {
+  return (
+    <Icon>
+      {[3, 8, 13].map((x) => (
+        <circle key={x} cx={x} cy="8" r={dot} fill="currentColor" stroke="none" />
+      ))}
+    </Icon>
+  );
+}
 export const ComputerIcon = () => (
   <Icon>
     <rect x="3.1" y="2.9" width="9.8" height="7.7" rx="1.2" />
@@ -111,6 +157,14 @@ export const RailIcon = () => (
   <Icon>
     <rect x="1.8" y="2.2" width="12.4" height="11.6" rx="2" />
     <path d="M9.5 2.6v10.8m1.9-7.5h1m-1 2.4h1" />
+  </Icon>
+);
+/** Lucide `layout-list`, scaled onto the 16px grid. */
+export const LayoutListIcon = () => (
+  <Icon>
+    <rect x="2" y="2" width="4.67" height="4.67" rx="0.67" />
+    <rect x="2" y="9.33" width="4.67" height="4.67" rx="0.67" />
+    <path d="M9.33 2.67h4.67M9.33 6h4.67M9.33 10h4.67M9.33 13.33h4.67" />
   </Icon>
 );
 export const TerminalIcon = () => (
@@ -166,6 +220,31 @@ export const FileIcon = () => (
     <path d="M3.4 2h6L13 5.8v8.1H3.4zM9 2.3v4h3.5" />
   </Icon>
 );
+/** Lucide `file-code-corner`, scaled onto the 16px grid. */
+export const FileCodeCornerIcon = () => (
+  <Icon>
+    <path d="M2.67 8.1V2.67a1.33 1.33 0 0 1 1.33-1.33h5.33a1.6 1.6 0 0 1 1.14.47l2.39 2.39A1.6 1.6 0 0 1 13.33 5.33v8a1.33 1.33 0 0 1-1.33 1.33h-2.23" />
+    <path d="M9.33 1.33v3.33a.67.67 0 0 0 .67.67h3.33" />
+    <path d="m3.33 10.67-2 2 2 2M6 14.67l2-2-2-2" />
+  </Icon>
+);
+/** Lucide `layout-freeform`, scaled onto the 16px grid. */
+export const LayoutFreeformIcon = () => (
+  <Icon>
+    <rect x="2" y="2" width="4.67" height="4.67" rx="0.67" />
+    <rect x="9.33" y="2.67" width="4.67" height="4.67" rx="0.67" />
+    <rect x="2.67" y="9.33" width="4.67" height="4.67" rx="0.67" />
+  </Icon>
+);
+/** Lucide `unplug`, scaled onto the 16px grid. */
+export const UnplugIcon = () => (
+  <Icon>
+    <path d="m12.67 3.33 2-2M1.33 14.67l2-2" />
+    <path d="M4.2 13.53a1.6 1.6 0 0 0 2.27 0L8 12l-4-4-1.53 1.53a1.6 1.6 0 0 0 0 2.27Z" />
+    <path d="M5 9 6.67 7.33M7 11l1.67-1.67" />
+    <path d="m8 4 4 4 1.53-1.53a1.6 1.6 0 0 0 0-2.27l-1.73-1.73a1.6 1.6 0 0 0-2.27 0Z" />
+  </Icon>
+);
 
 export const GripIcon = () => (
   <Icon>
@@ -179,6 +258,13 @@ export const GripIcon = () => (
 export const PreviewIcon = () => (
   <Icon>
     <path d="M3.5 2.6a.6.6 0 0 1 .9-.5l9 5.4a.6.6 0 0 1 0 1l-9 5.4a.6.6 0 0 1-.9-.5Z" />
+  </Icon>
+);
+/** Lucide `pencil`, scaled onto the 16px grid. */
+export const PencilIcon = () => (
+  <Icon>
+    <path d="M14.12 4.54a.67.67 0 0 0-2.66-2.66L2.56 10.78a1.33 1.33 0 0 0-.33.55l-.88 2.9a.33.33 0 0 0 .42.42l2.9-.88a1.33 1.33 0 0 0 .55-.33z" />
+    <path d="m10 3.33 2.67 2.67" />
   </Icon>
 );
 export const GlobeIcon = () => (
@@ -196,6 +282,18 @@ export const ExpandIcon = () => (
 export const RestoreIcon = () => (
   <Icon>
     <path d="M9 3.1v4h4m-4 0 4.4-4.4M7 12.9v-4H3m4 0-4.4 4.4" />
+  </Icon>
+);
+/** Lucide `maximize`, scaled onto the 16px grid. */
+export const MaximizeIcon = () => (
+  <Icon>
+    <path d="M5.33 2H3.33a1.33 1.33 0 0 0-1.33 1.33v2M14 5.33V3.33A1.33 1.33 0 0 0 12.67 2h-2M2 10.67v2A1.33 1.33 0 0 0 3.33 14h2M10.67 14h2a1.33 1.33 0 0 0 1.33-1.33v-2" />
+  </Icon>
+);
+/** Lucide `minimize`, scaled onto the 16px grid. */
+export const MinimizeIcon = () => (
+  <Icon>
+    <path d="M5.33 2v2A1.33 1.33 0 0 1 4 5.33H2M14 5.33h-2A1.33 1.33 0 0 1 10.67 4V2M2 10.67h2A1.33 1.33 0 0 1 5.33 12v2M10.67 14v-2a1.33 1.33 0 0 1 1.33-1.33h2" />
   </Icon>
 );
 export const PopoutIcon = () => (

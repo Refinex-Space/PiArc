@@ -67,6 +67,16 @@ export interface FindResult {
 }
 export const NONE_FOUND: FindResult = { matches: [], truncated: false, invalid: false };
 
+function findPattern(query: string, options: FindOptions) {
+  let pattern = options.regexp ? query : query.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  if (options.wholeWord) pattern = '(?<![\\p{L}\\p{N}_])(?:' + pattern + ')(?![\\p{L}\\p{N}_])';
+  return pattern;
+}
+
+function findFlags(options: FindOptions) {
+  return options.matchCase ? 'gu' : 'giu';
+}
+
 // Called off the UI thread. A find operation is stopped when a new query arrives or its time budget expires.
 export function findMatches(
   lines: readonly string[],
@@ -74,11 +84,9 @@ export function findMatches(
   options: FindOptions,
 ): FindResult {
   if (!query) return NONE_FOUND;
-  let pattern = options.regexp ? query : query.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  if (options.wholeWord) pattern = '(?<![\\p{L}\\p{N}_])(?:' + pattern + ')(?![\\p{L}\\p{N}_])';
   let regex: RegExp;
   try {
-    regex = new RegExp(pattern, options.matchCase ? 'gu' : 'giu');
+    regex = new RegExp(findPattern(query, options), findFlags(options));
   } catch {
     return { ...NONE_FOUND, invalid: true };
   }
@@ -91,6 +99,113 @@ export function findMatches(
     }
   }
   return { matches, truncated: false, invalid: false };
+}
+
+const LINE_BREAK = /\r\n|\n|\r/u;
+
+interface LineSlice {
+  text: string;
+  offset: number;
+}
+
+/** Line slices in the same order as `sourceLines`, with offsets into the original text. */
+function lineSlices(text: string): LineSlice[] {
+  const slices: LineSlice[] = [];
+  let offset = 0;
+  while (offset <= text.length) {
+    const rest = text.slice(offset);
+    const newline = LINE_BREAK.exec(rest);
+    if (!newline) {
+      slices.push({ text: rest, offset });
+      break;
+    }
+    slices.push({ text: rest.slice(0, newline.index), offset });
+    const next = offset + newline.index + newline[0].length;
+    if (next === text.length) {
+      slices.push({ text: '', offset: next });
+      break;
+    }
+    offset = next;
+  }
+  return slices;
+}
+
+function expandReplacement(replacement: string, match: RegExpExecArray) {
+  return replacement.replace(/\$(\$|&|\d{1,2})/g, (_whole, token: string) => {
+    if (token === '$') return '$';
+    if (token === '&') return match[0];
+    return match[Number(token)] ?? '';
+  });
+}
+
+/**
+ * Replace the current match, or every match. Newlines in `text` are preserved.
+ * Returns undefined when the pattern is invalid.
+ */
+export function replaceMatches(
+  text: string,
+  query: string,
+  replacement: string,
+  options: FindOptions,
+  target: 'all' | FindMatch,
+): string | undefined {
+  if (!query) return text;
+  const slices = lineSlices(text);
+  const found = findMatches(
+    slices.map((slice) => slice.text),
+    query,
+    options,
+  );
+  if (found.invalid) return undefined;
+  const hits =
+    target === 'all'
+      ? found.matches
+      : found.matches.filter(
+          (hit) => hit.line === target.line && hit.start === target.start && hit.end === target.end,
+        );
+  if (!hits.length) return text;
+  let regex: RegExp;
+  try {
+    regex = new RegExp(findPattern(query, options), findFlags(options));
+  } catch {
+    return undefined;
+  }
+  const edits: { from: number; to: number; insert: string }[] = [];
+  for (const hit of hits) {
+    const slice = slices[hit.line - 1];
+    if (!slice) continue;
+    regex.lastIndex = hit.start;
+    const match = regex.exec(slice.text);
+    if (match?.index !== hit.start) continue;
+    edits.push({
+      from: slice.offset + hit.start,
+      to: slice.offset + hit.end,
+      insert: options.regexp ? expandReplacement(replacement, match) : replacement,
+    });
+  }
+  edits.sort((a, b) => b.from - a.from);
+  let next = text;
+  for (const edit of edits) next = next.slice(0, edit.from) + edit.insert + next.slice(edit.to);
+  return next;
+}
+
+/** One selection covering the first match through the last, in document order. */
+export function selectionFromMatches(
+  text: string,
+  matches: readonly FindMatch[],
+): FileSelection | undefined {
+  const first = matches[0];
+  const last = matches.at(-1);
+  if (!first || !last) return undefined;
+  const slices = lineSlices(text);
+  const start = slices[first.line - 1];
+  const end = slices[last.line - 1];
+  if (!start || !end) return undefined;
+  return {
+    startLine: first.line,
+    endLine: last.line,
+    text: text.slice(start.offset + first.start, end.offset + last.end),
+  };
 }
 
 export function previewKind(path: string) {

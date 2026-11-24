@@ -62,10 +62,9 @@ body,
 /* Paint one edge, including on controls whose actual focus target is invisible. Keeping it
    inside the bounds also protects the indicator in clipped menus, panels and virtual lists. */
 :root[data-app] :focus-visible:not(:where([data-focus-proxy])),
-:root[data-app] :is(.settings-search, .project-filter):has(input:focus-visible),
+:root[data-app] .settings-search:has(input:focus-visible),
 .segment:has(> input:focus-visible),
 .composer-attach:has(> input:focus-visible),
-.composer-box:has(.composer-editor:focus-visible),
 :root[data-app] .terminal-surface:has(textarea:focus-visible),
 :root[data-app] .menu:focus-visible > .menu-item.is-active {
   outline: 2px solid var(--piarc-c-focus-ring);
@@ -95,8 +94,7 @@ body,
    This also covers implicit text inputs, multiline editors, and native selects. */
 :root[data-app][data-pointer-focus]
   :is(input:read-write, input[readonly], textarea, select):focus:not(:where([data-focus-proxy])),
-:root[data-app][data-pointer-focus] :is(.settings-search, .project-filter):has(input:focus),
-:root[data-app][data-pointer-focus] .composer-box:has(.composer-editor:focus) {
+:root[data-app][data-pointer-focus] .settings-search:has(input:focus) {
   outline: 1px solid var(--piarc-c-focus-ring);
   outline-offset: -1px;
   transition: outline-color var(--piarc-motion-fast) var(--piarc-motion-easing);
@@ -105,6 +103,39 @@ body,
 /* The focused terminal draws its own cursor on the canvas. */
 :root[data-app][data-pointer-focus] .terminal-surface:focus-within {
   outline: none;
+}
+
+/* A menu filter is a quiet strip, not a boxed field. */
+:root[data-app] input.menu-filter:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] input.menu-filter:focus {
+  outline: none;
+}
+
+/* The find field keeps its own hairline; the browser focus ring reads as a thick yellow frame. */
+:root[data-app] .cm-panel.md-find input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .cm-panel.md-find input:focus {
+  outline: none;
+}
+
+/* The file-tree filter already has its hairline. Focus must not add a second frame. */
+:root[data-app] .project-filter:has(> input:is(:focus, :focus-visible)),
+:root[data-app] .project-filter > input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .project-filter:has(> input:focus),
+:root[data-app][data-pointer-focus] .project-filter > input:focus {
+  outline: none;
+}
+
+/* File find keeps its hairline; the browser focus ring reads as a thick frame. */
+:root[data-app] .file-find input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .file-find input:focus {
+  outline: none;
+}
+
+/* The terminal find chip has no boxed field; focus stays on the caret. */
+:root[data-app] .terminal-find-input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .terminal-find-input:focus {
+  outline: none;
+  border-color: transparent;
 }
 
 :root[data-app] button,

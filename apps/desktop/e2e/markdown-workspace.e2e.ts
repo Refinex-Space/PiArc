@@ -371,6 +371,11 @@ test('source and split editors expose cell edits in the body menu and find and r
     await editor.press(mod + '+f');
     const find = page.getByRole('textbox', { name: 'Find', exact: true });
     await expect(find).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Replace', exact: true })).toBeHidden();
+    await page
+      .locator('.cm-search')
+      .getByRole('button', { name: 'Show replace', exact: true })
+      .click();
     await expect(page.getByRole('textbox', { name: 'Replace', exact: true })).toBeVisible();
     await page.locator('.cm-search').getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.locator('.md-edit-toolbar')).toHaveCount(0);

@@ -106,6 +106,7 @@ export function MarkdownPage() {
           <label className="preference-row">
             <span>{t('files.images.location')}</span>
             <select
+              className="input preference-language"
               aria-label={t('files.images.location')}
               data-testid="markdown-image-location"
               value={prefs.mode}
@@ -192,6 +193,7 @@ export function MarkdownPage() {
           <label className="preference-row">
             <span>{t('files.images.links')}</span>
             <select
+              className="input preference-language"
               disabled={busy}
               aria-label={t('files.images.links')}
               data-testid="markdown-image-link"

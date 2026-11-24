@@ -13,7 +13,14 @@ import { Button } from '../app/Button.js';
 import { IconButton } from '../app/IconButton.js';
 import { documentWindow, useSurfaceDocument } from '../app/surface-document.js';
 import { reason } from '../shell/errors.js';
-import { CommandIcon, FileIcon, PaperclipIcon, PreviewIcon, SearchIcon } from '../shell/icons.js';
+import {
+  CommandIcon,
+  FileIcon,
+  PaperclipIcon,
+  PencilIcon,
+  PreviewIcon,
+  SearchIcon,
+} from '../shell/icons.js';
 import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
 import { useUi } from '../shell/ui.js';
 import { FileActionsMenu, type FileActions } from './FileActionsMenu.js';
@@ -27,6 +34,8 @@ import { GoToLine, ViewerFind, useFileFind } from './viewer-find.js';
 import {
   DEFAULT_VIEWER_SETTINGS,
   previewKind,
+  replaceMatches,
+  selectionFromMatches,
   sourceLines,
   type FileSelection,
   type FindOptions,
@@ -424,25 +433,6 @@ export function FileViewer({
                 {mode === 'preview' ? <CommandIcon /> : <PreviewIcon />}
               </IconButton>
             )}
-            <IconButton
-              label={t('files.viewer.find')}
-              onClick={() => {
-                openTool('find');
-              }}
-            >
-              {markdown ? <MarkdownActionIcon name="find" /> : <SearchIcon />}
-            </IconButton>
-            {!markdown && editable && mode !== 'edit' && (
-              <Button
-                size="small"
-                variant="ghost"
-                onClick={() => {
-                  edit(target?.line ?? 1);
-                }}
-              >
-                {t('files.viewer.edit')}
-              </Button>
-            )}
             {!markdown && mode === 'edit' && (
               <Button
                 size="small"
@@ -463,14 +453,38 @@ export function FileViewer({
           </>
         )}
         {file && file.kind !== 'missing' && (
-          <IconButton
-            label={t('files.viewer.attachFile')}
-            onClick={() => {
-              onAttach(path);
-            }}
-          >
-            {markdown ? <MarkdownActionIcon name="attach" /> : <PaperclipIcon />}
-          </IconButton>
+          <div className="file-viewer-actions">
+            {file.kind === 'text' && (
+              <IconButton
+                label={t('files.viewer.find')}
+                onClick={() => {
+                  openTool('find');
+                }}
+              >
+                {markdown ? <MarkdownActionIcon name="find" /> : <SearchIcon />}
+              </IconButton>
+            )}
+            {file.kind === 'text' && !markdown && editable && mode !== 'edit' && (
+              <IconButton
+                label={t('files.viewer.edit')}
+                onClick={() => {
+                  edit(target?.line ?? 1);
+                }}
+              >
+                <PencilIcon />
+              </IconButton>
+            )}
+            {file.kind !== 'missing' && (
+              <IconButton
+                label={t('files.viewer.attachFile')}
+                onClick={() => {
+                  onAttach(path);
+                }}
+              >
+                {markdown ? <MarkdownActionIcon name="attach" /> : <PaperclipIcon />}
+              </IconButton>
+            )}
+          </div>
         )}
       </div>
       {doc.failure && (
@@ -539,6 +553,19 @@ export function FileViewer({
             setIndex(count ? (current + n + count) % count : 0);
           }}
           close={closeTool}
+          editable={editable}
+          onReplace={(replacement, all) => {
+            if (!editable || (all ? !count : !match)) return;
+            const wasLast = !all && current === count - 1;
+            const next = replaceMatches(draft, query, replacement, options, all ? 'all' : match);
+            if (next === undefined || next === draft) return;
+            doc.setDraft(next);
+            if (wasLast) setIndex(0);
+          }}
+          onSelectAll={() => {
+            const picked = selectionFromMatches(draft, find?.result.matches ?? []);
+            if (picked) setSelection(picked);
+          }}
         />
       )}
       {tools === 'goToLine' && (

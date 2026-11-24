@@ -84,6 +84,8 @@ export function editSettings(
     EditorState.phrases.of({
       Find: t('md.edit.find'),
       Replace: t('md.edit.replace'),
+      'show replace': t('md.edit.showReplace'),
+      'hide replace': t('md.edit.hideReplace'),
       next: t('md.edit.next'),
       previous: t('md.edit.previous'),
       all: t('md.edit.all'),

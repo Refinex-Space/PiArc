@@ -1,6 +1,7 @@
 import type { ImagePlacement } from '../../../shared/markdown-images.js';
 import { history, isolateHistory } from '@codemirror/commands';
 import { openSearchPanel, search } from '@codemirror/search';
+import { createMarkdownSearchPanel } from './search-panel.js';
 import {
   Compartment,
   EditorSelection,
@@ -329,7 +330,7 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       dropCursor(),
       highlightSpecialChars(),
       history(),
-      search({ top: true }),
+      search({ top: true, createPanel: createMarkdownSearchPanel }),
       tooltips({
         tooltipSpace: (view) => {
           const b = view.dom.getBoundingClientRect();

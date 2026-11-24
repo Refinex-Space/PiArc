@@ -45,7 +45,7 @@
   text-overflow: ellipsis;
 }
 
-:root[data-app] .project-filter > input:focus-visible {
+:root[data-app] .project-filter > input:is(:focus, :focus-visible) {
   outline: none;
 }
 

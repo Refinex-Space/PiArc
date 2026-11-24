@@ -17,7 +17,7 @@ import {
   FolderIcon,
   MoreIcon,
   PreviewIcon,
-  RailIcon,
+  LayoutListIcon,
   SideChatIcon,
   TasksIcon,
   TerminalIcon,
@@ -259,7 +259,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
           setRailOpen(!railOpen);
         }}
       >
-        <RailIcon />
+        <LayoutListIcon />
       </IconButton>
       {controls.map(([id, label, icon]) => (
         <IconButton
@@ -284,7 +284,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
           menu.openAt(b.left, b.bottom + 4);
         }}
       >
-        <MoreIcon />
+        <MoreIcon dot={0.7} />
       </IconButton>
       {menu.open && (
         <MenuPopup at={menu.open} items={items} label={t('panels.tools')} onClose={menu.close} />

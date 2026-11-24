@@ -22,7 +22,30 @@
 .file-viewer-toolbar {
   min-height: var(--piarc-size-row-height);
   box-sizing: border-box;
-  background: var(--piarc-surface-sidebar);
+  background: transparent;
+}
+.file-viewer-toolbar .icon {
+  stroke-width: 1;
+}
+/* The trailing find actions share this grid with the toolbar icons above them. */
+:root[data-app] .file-viewer-actions,
+:root[data-app] .file-find-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--piarc-space-5);
+  align-items: center;
+  flex: none;
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .file-viewer-actions .icon-button,
+:root[data-app] .file-find-actions .icon-button {
+  width: var(--piarc-space-5);
+  min-width: var(--piarc-space-5);
+  max-width: var(--piarc-space-5);
+  height: var(--piarc-space-5);
+  min-height: var(--piarc-space-5);
+  margin: 0;
+  padding: 0;
 }
 .file-viewer-crumb {
   flex: 1;
@@ -44,6 +67,53 @@
 .file-find {
   flex-wrap: wrap;
 }
+.file-find-bar {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 6px;
+  background: transparent;
+}
+.file-find-row {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+}
+.file-find-bar input {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+}
+.file-find-bar input:focus {
+  outline: none;
+  border-color: var(--piarc-border-subtle);
+}
+.file-find-count {
+  flex: none;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-variant-numeric: tabular-nums;
+}
+.file-find-replace {
+  display: none;
+  padding-inline-start: calc(var(--piarc-space-5) + var(--piarc-space-1));
+}
+.file-find-replace.is-open {
+  display: flex;
+}
+.file-find-toggle[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+.file-find-bar .icon-button[aria-pressed='true'] {
+  background: var(--piarc-surface-selected);
+  color: var(--piarc-text-primary);
+}
 .file-find input,
 .file-selection-bar input {
   min-width: 4ch;
@@ -54,13 +124,6 @@
   color: var(--piarc-text-primary);
   background: var(--piarc-surface-app);
   font: inherit;
-}
-.file-find-options {
-  display: flex;
-  align-items: center;
-}
-.file-find-options .icon-button[aria-pressed='true'] {
-  background: var(--piarc-surface-selected);
 }
 .file-selection-bar {
   border-block: 1px solid var(--piarc-border-subtle) 0;

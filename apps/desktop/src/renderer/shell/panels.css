@@ -4,6 +4,13 @@
   gap: var(--piarc-space-1);
   -webkit-app-region: no-drag;
 }
+.session-tools .icon,
+.titlebar-actions .icon,
+.history-buttons .icon,
+.view-control .icon,
+.sidebar-footer .icon-button .icon {
+  stroke-width: 1;
+}
 .session-tools button[aria-pressed='true'] {
   background: var(--piarc-surface-active);
 }
@@ -160,6 +167,7 @@
   display: flex;
   align-items: center;
   flex: 1;
+  gap: var(--piarc-space-1);
   min-width: 0;
   -webkit-app-region: no-drag;
 }

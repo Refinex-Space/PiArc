@@ -11,8 +11,6 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  CommandIcon,
-  FolderIcon,
   SidebarIcon,
 } from './icons.js';
 import { sessionTitle } from './SessionRow.js';
@@ -122,30 +120,7 @@ export function WorkbenchHeader({
       ) : (
         <h1 className="workbench-heading home-heading">{t('sidebar.newSession')}</h1>
       )}
-      <div className="header-tools">
-        {sessionId ? (
-          children
-        ) : (
-          <>
-            <IconButton
-              label={t('command.app.commandPalette')}
-              onClick={() => {
-                ui.runCommand('app.commandPalette');
-              }}
-            >
-              <CommandIcon />
-            </IconButton>
-            <IconButton
-              label={t('sidebar.openFolder')}
-              onClick={() => {
-                ui.runCommand('workspace.openFolder');
-              }}
-            >
-              <FolderIcon />
-            </IconButton>
-          </>
-        )}
-      </div>
+      {sessionId ? <div className="header-tools">{children}</div> : null}
     </header>
   );
 }

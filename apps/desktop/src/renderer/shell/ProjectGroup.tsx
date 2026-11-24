@@ -3,7 +3,7 @@ import { IconButton } from '../app/IconButton.js';
 import { useT } from '../app/app-context.js';
 import type { SessionEntry } from '../store/snapshots.js';
 import { isImeComposing } from '../composer/ime-guard.js';
-import { ChevronDownIcon, ChevronRightIcon, MoreIcon, PlusIcon } from './icons.js';
+import { DisclosureIcon, MoreIcon, PlusIcon } from './icons.js';
 import { MenuPopup, useMenu, type MenuItem } from './Menu.js';
 import { SessionRow } from './SessionRow.js';
 import { useUi } from './ui.js';
@@ -137,7 +137,7 @@ export function ProjectGroup({
           }}
         >
           <span className="truncate">{group.name}</span>
-          {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+          <DisclosureIcon />
         </button>
         <IconButton
           label={t('workspace.actions', { name: group.name })}
@@ -150,14 +150,14 @@ export function ProjectGroup({
             menu.openAt(rect.left, rect.bottom);
           }}
         >
-          <MoreIcon />
+          <MoreIcon dot={0.75} />
         </IconButton>
         <IconButton
           label={t('workspace.newSession', { name: group.name })}
           onClick={start}
           data-testid="project-new"
         >
-          <PlusIcon />
+          <PlusIcon strokeWidth={1.15} />
         </IconButton>
       </header>
       <div id={listId} hidden={!expanded}>

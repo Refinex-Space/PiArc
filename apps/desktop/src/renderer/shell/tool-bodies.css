@@ -103,11 +103,12 @@
   font: inherit;
   line-height: var(--piarc-space-5);
 }
-:root[data-app] .side-chat-composer:has(textarea:focus-visible) {
-  outline: 2px solid var(--piarc-c-focus-ring);
-  outline-offset: -2px;
+:root[data-app] .side-chat-composer:has(textarea:focus) {
+  outline: none;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.075);
 }
-:root[data-app] .side-chat .side-chat-composer textarea:focus {
+:root[data-app] .side-chat .side-chat-composer textarea:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .side-chat .side-chat-composer textarea:focus {
   outline: none;
 }
 .side-chat-composer .icon-button {

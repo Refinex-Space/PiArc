@@ -76,6 +76,9 @@ body[data-tool-window] > #tool-root {
   width: calc(var(--piarc-space-4) + var(--piarc-space-3));
   height: calc(var(--piarc-space-4) + var(--piarc-space-3));
 }
+.tool-tile-header .icon {
+  stroke-width: 1;
+}
 .tool-tile-title {
   min-width: 0;
   overflow: hidden;
@@ -89,6 +92,7 @@ body[data-tool-window] > #tool-root {
   display: flex;
   align-items: center;
   flex: none;
+  gap: var(--piarc-space-1);
   margin-inline-start: auto;
 }
 .tool-tile-body {

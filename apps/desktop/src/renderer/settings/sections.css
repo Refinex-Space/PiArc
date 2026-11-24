@@ -441,6 +441,11 @@
 .markdown-image-settings input {
   max-width: 100%;
 }
+.markdown-image-settings select.preference-language {
+  width: auto;
+  max-width: min(24rem, 100%);
+  field-sizing: content;
+}
 .markdown-image-settings .image-location-example {
   overflow-wrap: anywhere;
   font-family: var(--piarc-font-mono);

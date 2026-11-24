@@ -14,8 +14,8 @@ import { IconButton } from '../app/IconButton.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import {
   CloseIcon,
-  ExpandIcon,
-  RestoreIcon,
+  MaximizeIcon,
+  MinimizeIcon,
   PopoutIcon,
   GripIcon,
   ChevronDownIcon,
@@ -576,7 +576,7 @@ export function ToolTiles({
                               }));
                             }}
                           >
-                            {expanded ? <RestoreIcon /> : <ExpandIcon />}
+                            {expanded ? <MinimizeIcon /> : <MaximizeIcon />}
                           </IconButton>
                         )}
                         <IconButton

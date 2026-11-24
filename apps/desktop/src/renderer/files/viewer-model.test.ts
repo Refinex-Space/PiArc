@@ -4,6 +4,8 @@ import {
   indentSelection,
   findMatches,
   parseLocation,
+  replaceMatches,
+  selectionFromMatches,
   sourceLines,
   textSelection,
 } from './viewer-model.js';
@@ -62,5 +64,39 @@ describe('project file viewer', () => {
     expect(findMatches(['猫 猫咪'], '猫', options).matches).toHaveLength(1);
     expect(findMatches(['hello'], '(', { ...options, regexp: true }).invalid).toBe(true);
     expect(findMatches(['hello'], '^', { ...options, regexp: true }).matches).toEqual([]);
+  });
+
+  it('replaces one match or every match and keeps the original newlines', () => {
+    const options = { matchCase: false, wholeWord: true, regexp: false };
+    expect(replaceMatches('a cat\r\ncatapult CAT', 'cat', 'dog', options, 'all')).toBe(
+      'a dog\r\ncatapult dog',
+    );
+    expect(replaceMatches('a cat cat', 'cat', 'dog', options, { line: 1, start: 2, end: 5 })).toBe(
+      'a dog cat',
+    );
+    expect(
+      replaceMatches(
+        'id-9',
+        '(\\d+)',
+        'n$1',
+        { matchCase: false, wholeWord: false, regexp: true },
+        'all',
+      ),
+    ).toBe('id-n9');
+    expect(
+      replaceMatches(
+        'hello',
+        '(',
+        'x',
+        { matchCase: false, wholeWord: false, regexp: true },
+        'all',
+      ),
+    ).toBeUndefined();
+    expect(
+      selectionFromMatches('a cat\nand dog', [
+        { line: 1, start: 2, end: 5 },
+        { line: 2, start: 4, end: 7 },
+      ]),
+    ).toEqual({ startLine: 1, endLine: 2, text: 'cat\nand dog' });
   });
 });
