@@ -232,6 +232,7 @@
 
 @media (forced-colors: active) {
   :root[data-app] .composer-box .composer-send {
+    transition: none;
     forced-color-adjust: none;
     color: ButtonText;
     background: ButtonFace;
