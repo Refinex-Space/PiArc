@@ -113,6 +113,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 
 - crate 依赖方向：`piarc-napi → piarc-core → 功能 crate → {piarc-protocol, piarc-ports}`，功能 crate 之间不互相依赖；例外逐条登记在 `crates/deps-rules.json`。
 - 依赖精确锁定：npm 不用 `^`/`~`；Cargo 依赖只在 `[workspace.dependencies]` 声明；许可证白名单见 `deny.toml`。
+- 桌面前端按 ADR-0073 逐项复刻或高度参考 Claude Desktop 的视觉与交互，当前基准为 OpenClaudeDesktop `next-4.16336.0`；Core、Agent Host 和 Pi Harness 遵循 PiArc 自有架构。
 - clean-room（ADR-0006）：不复制 `reference/claude-code` 与 `reference/OpenClaudeDesktop` 的代码、提示词和界面组件，不用 Anthropic 品牌资产；不提供 Claude.ai 订阅登录。
 - 不写入凭据、个人信息与本机绝对路径；不打印凭据。凭据只存在 Core 的保险箱（`piarc-secrets`）并只经 AHP 交给 Agent Host，不进环境变量、不进 `pi/auth.json`（ADR-0021）。
 - 不靠删除、跳过、放宽测试或吞掉异常让检查通过。

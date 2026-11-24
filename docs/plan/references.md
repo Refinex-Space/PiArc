@@ -27,7 +27,7 @@
 | Pi | `reference/pi` | MIT | SDK 与扩展 API 的真实签名和行为；会话 JSONL；压缩；工具与 Operations；pi-ai 的服务商与线格式；pi-mcp | **以 PiArc 锁定的版本为准**，见下节 |
 | claude-code（社区复原） | `reference/claude-code` | 无许可证，原为 Anthropic 专有软件 | Harness 机制：主循环、工具并发、压缩、权限判定顺序、hooks、子 agent。已提炼的要点见 `docs/research/harness-reference-notes.md`，优先读它 | **只学机制，禁止复制任何代码和提示词**。社区版有魔改，行为以官方文档（`docs/research/claude-official-capabilities.md`）为准 |
 | claw-code | `reference/claw-code` | MIT | Rust 侧的 crate 划分、窄 trait 隔离 I/O、权限阶梯、parity 测试方法；以及它的反面教训 | 实验项目，质量参差，教训见 `harness-reference-notes.md` 第 2 节 |
-| OpenClaudeDesktop | `reference/OpenClaudeDesktop` | 声明 MIT，但含官方应用切出的组件 | 信息架构、交互流程、Electron 宿主层结构、UI 与内核之间的协议语义（Codex app-server v2 风格） | 只看交互与宿主层思路；生成组件一律不碰。已提炼的要点见 `docs/research/ui-reference-notes.md` |
+| OpenClaudeDesktop | `reference/OpenClaudeDesktop` | 声明 MIT，但含官方应用切出的组件 | 信息架构、交互流程、Electron 宿主层结构、UI 与内核之间的协议语义（Codex app-server v2 风格） | 前端可研读对应源码并测量渲染结果，逐项复刻视觉和交互，由 PiArc 独立实现（ADR-0073）。已提炼的要点见 `docs/research/ui-reference-notes.md` |
 | open-claude-ui | `reference/open-claude-ui` | MIT | 交互物理：滚动跟随、输入法守卫、拖拽死区、悬停意图、动效参数 | 只复用交互逻辑（MIT，注明出处），不用视觉组件与令牌 |
 
 ## 读 Pi 的锁定版本

@@ -88,4 +88,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0070](0070-in-memory-side-conversations.md) | 独立的内存侧边对话、工具拒绝和无转录来源的用量 | 已接受（补充） |
 | [0071](0071-local-esm-chunks.md) | Agent Host 按本地 ESM 分块构建与校验 | 已接受，修订架构第 5.6 节 |
 | [0072](0072-macos-local-asset-responses.md) | macOS 通过原生缓冲区交付本地应用资源 | 已接受，升级 Electron 时重新评估 |
-| [0073](0073-settings-segmented-control-reference.md) | 设置页分段控件以指定版本的渲染效果为视觉基准，由 PiArc 独立实现 | 提议 |
+| [0073](0073-settings-segmented-control-reference.md) | 桌面前端长期对标 Claude Desktop 的视觉与交互，首项为设置分段控件；PiArc 自有内核与 Harness | 已接受 |

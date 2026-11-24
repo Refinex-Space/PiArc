@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.64（2026-11-24） |
+| 版本 | 2.65（2026-11-24） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -284,6 +284,7 @@ PiArc/
 | [0068](../adr/0068-worktree-hook-ownership.md) | 在 Core 登记 hook 创建的目录及其文件系统身份 | 清理与恢复能核实所有者，无法判断改动时保留目录 |
 | [0071](../adr/0071-local-esm-chunks.md) | Agent Host 的本地 ESM 分块 | 冷模块按需加载，完整模块清单随包校验 |
 | [0072](../adr/0072-macos-local-asset-responses.md) | macOS 在应用协议上直接返回资源字节 | 保留请求边界和响应头，减少主进程内存占用 |
+| [0073](../adr/0073-settings-segmented-control-reference.md) | 桌面前端可复刻 Claude Desktop 的视觉与交互 | 分项校准 UI，内核与 Harness 独立演进 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -1367,6 +1368,8 @@ T34 落地（ADR-0051）：Ctrl+\` 切换终端面板（`terminal.toggle`）。�
 
 ### 8.6 设计语言
 
+桌面前端以 Claude Desktop 的视觉、UI 细节和交互为长期参考，可按组件与流程逐项复刻。按 ADR-0073 固定版本、实测并映射到 PiArc 的组件和令牌。Core、Agent Host、Pi Harness 与后端能力继续采用本文的自有架构。
+
 - PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色 / 陶土色系；不用"暖奶油底 + 衬线大标题"组合；插画、提示音自行设计。应用图标与标记用 `design/brand/` 中的黑白 Pi 字形（来源与许可证见该目录 README）；公开发布前要确认 Pi logo 的使用许可（需求 D3）。
 - **字体**：使用系统字体，不打包专有字体。界面字体 macOS 为 SF Pro、Windows 为 Segoe UI Variable，中文回退 PingFang SC / Microsoft YaHei UI；等宽字体 macOS 为 SF Mono、Windows 为 Cascadia Mono。
 - **令牌分层**：原始色板 → 明暗阶梯 → 语义层（surface / text / border / accent / state / agent-status / diff / code）→ 组件层；四种模式（明、暗，各自含高对比度）× 两档密度。跟随 `prefers-color-scheme`、`prefers-contrast` 与 Windows 的 `forced-colors`。
@@ -1865,7 +1868,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 审批账本 | Core 中管理进行中审批请求的结构，带 revision 与 connectionEpoch |
 | 检查点（Checkpoint） | 每个用户回合开始时建立的文件快照集合 |
 | 项目信任 | 用户对工作区可执行配置（hooks、MCP、插件等）的授权 |
-| clean-room | 只研读外部实现的行为，不复制其代码与文本的开发方式 |
+| clean-room | 独立编写实现与文案；桌面前端可研读并复刻可观察的视觉和交互（ADR-0073） |
 
 ---
 
@@ -1894,6 +1897,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
+| 2.65 | 2026-11-24 | 第 8.6 节明确桌面前端视觉与交互的长期基准（ADR-0073）。 |
 | 2.64 | 2026-11-24 | R5 收尾复核，第 16 章记录 macOS M4 达标与 Windows 的实机复测归属。 |
 | 2.63 | 2026-11-24 | M4 性能收尾：第 10.3 节明确 macOS 本地资源协议和打包模块的符号处理（ADR-0072）。 |
 | 2.62 | 2026-11-24 | M4 性能收尾：第 5.6 节采用随应用分发、按清单校验的 Agent Host 本地 ESM 分块（ADR-0071）。 |

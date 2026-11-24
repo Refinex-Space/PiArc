@@ -309,7 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-计划外维护 · 设置页分段控件：阻塞（等待用户确认 [ADR-0073](../adr/0073-settings-segmented-control-reference.md) 的视觉对齐范围）。
+计划外维护 · 分段控件：已确认 [ADR-0073](../adr/0073-settings-segmented-control-reference.md) 为桌面前端长期方针。当前检查点为实现共享控件并验证外观、输入与可访问性。
 
 ## 登记事项
 

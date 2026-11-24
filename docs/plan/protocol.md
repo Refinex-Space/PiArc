@@ -73,7 +73,7 @@
 ### 合规（ADR-0006）
 
 - 不提供、不调用 Claude.ai 订阅登录；pi-ai 中的 Anthropic 订阅 OAuth 必须保持屏蔽。
-- clean-room：`reference/claude-code` 与 `reference/OpenClaudeDesktop` 只用于理解行为。
+- clean-room：`reference/claude-code` 用于理解行为；桌面前端按 ADR-0073 对照 `reference/OpenClaudeDesktop` 的视觉和交互，由 PiArc 独立实现。
   - 不复制其中任何代码、提示词原文、界面组件（尤其是 OpenClaudeDesktop 中从官方应用切出的生成组件）；
   - 不使用 Anthropic 的品牌资产。
 - MIT/Apache 许可的代码可以按许可证复用：保留版权声明，并在代码注释与提交说明中注明来源（仓库、路径、版本）。
