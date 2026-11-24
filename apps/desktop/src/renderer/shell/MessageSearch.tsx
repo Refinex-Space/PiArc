@@ -157,9 +157,13 @@ export function MessageSearch({ filter }: { readonly filter: string }) {
         <p className="muted small">{t('search.none', { query: state.query })}</p>
       )}
       {state.kind === 'done' && (
-        <ul className="search-results">
+        <ul className="interactive-list search-results">
           {state.results.map((result) => (
-            <li key={result.sessionId} className="search-result" data-session={result.sessionId}>
+            <li
+              key={result.sessionId}
+              className="interactive-list search-result"
+              data-session={result.sessionId}
+            >
               <button
                 type="button"
                 className="search-session truncate"
@@ -170,7 +174,7 @@ export function MessageSearch({ filter }: { readonly filter: string }) {
               >
                 {sessionTitle(result.title, t('session.untitled'))}
               </button>
-              <ul className="search-hits">
+              <ul className="interactive-list search-hits">
                 {result.hits.map((hit, index) => (
                   <li key={`${hit.entryId ?? ''}:${String(index)}`}>
                     <button

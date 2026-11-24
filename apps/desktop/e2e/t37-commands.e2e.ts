@@ -176,6 +176,12 @@ test('Mod+K runs actions, switches sessions and commands; its shortcut can chang
   await page.keyboard.press(`${MOD}+KeyK`);
   const palette = page.getByTestId('command-palette');
   await expect(palette).toBeVisible();
+  const list = page.getByTestId('command-palette-list');
+  await expect(list.locator('[data-entry="command:frontend:component"]')).toBeAttached();
+  await page.keyboard.press('ArrowUp');
+  await expect(list.getByRole('option').last()).toHaveAttribute('aria-selected', 'true');
+  await expect(list.getByRole('option').last()).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId('command-palette-input')).toBeFocused();
   await page.keyboard.type('first sess');
   await shoot(page, info, 'mod-k-session');
   await page.keyboard.press('Enter');

@@ -952,11 +952,11 @@
   bottom: 100%;
   left: var(--piarc-space-5);
   z-index: 2;
-  min-width: 320px;
+  min-width: min(320px, calc(100% - 2 * var(--piarc-space-5)));
   max-width: calc(100% - 2 * var(--piarc-space-5));
   max-height: 320px;
   margin: 0 0 var(--piarc-space-1);
-  padding: var(--piarc-space-1) 0;
+  padding: var(--piarc-space-1);
   overflow-y: auto;
   list-style: none;
   border: 1px solid var(--piarc-border-default);
@@ -970,12 +970,9 @@
 .mention-empty {
   display: flex;
   gap: var(--piarc-space-2);
-  padding: 4px var(--piarc-space-3);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
   cursor: default;
-}
-
-.mention-option.is-active {
-  background: var(--piarc-surface-selected);
 }
 
 .mention-path {
@@ -987,7 +984,7 @@
 
 /* the `/` palette's groups, argument hints and skill marks (T37) */
 .command-group {
-  padding: var(--piarc-space-1) var(--piarc-space-3) 2px;
+  padding: var(--piarc-space-1) var(--piarc-space-2) 2px;
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-font-size-caption);
   font-weight: 600;

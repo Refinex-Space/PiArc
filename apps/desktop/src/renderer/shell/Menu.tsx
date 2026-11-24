@@ -2,6 +2,7 @@
 // click, arrow keys move, Enter or a click runs an item, Escape or a click outside closes it.
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { revealListOption } from '../app/list-navigation.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 
 export interface MenuItem {
@@ -89,11 +90,14 @@ export function MenuPopup({
     }
     switch (event.key) {
       case 'ArrowDown':
-        setActive((i) => (i + 1) % items.length);
+      case 'ArrowUp': {
+        if (items.length === 0) break;
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        const next = (active + step + items.length) % items.length;
+        setActive(next);
+        revealListOption(ref.current?.children.item(next) ?? null);
         break;
-      case 'ArrowUp':
-        setActive((i) => (i - 1 + items.length) % items.length);
-        break;
+      }
       case 'Enter':
       case ' ':
         run(items[active]);
@@ -108,15 +112,14 @@ export function MenuPopup({
     event.preventDefault();
     event.stopPropagation();
   };
-  // Keep the menu inside the window.
+  // Percentages in translate resolve against the rendered menu, including gaps and wrapped hints.
   const style = {
-    left: Math.min(at.x, window.innerWidth - 200),
-    top: Math.min(at.y, window.innerHeight - 32 * items.length - 16),
+    transform: `translate(clamp(0px, ${String(at.x)}px, calc(100vw - 100%)), clamp(0px, ${String(at.y)}px, calc(100vh - 100%)))`,
   };
   return (
     <div
       ref={ref}
-      className="menu"
+      className="interactive-list menu"
       role="menu"
       aria-label={label}
       tabIndex={-1}
@@ -135,7 +138,7 @@ export function MenuPopup({
           aria-describedby={item.hint === undefined ? undefined : `${id}-${String(i)}-hint`}
           className={`menu-item${i === active ? ' is-active' : ''}${item.danger === true ? ' is-danger' : ''}${item.disabled === true ? ' is-disabled' : ''}`}
           data-testid={`menu-${item.id}`}
-          onMouseEnter={() => {
+          onMouseMove={() => {
             setActive(i);
           }}
           onClick={() => {

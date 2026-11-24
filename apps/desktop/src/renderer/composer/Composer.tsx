@@ -10,6 +10,7 @@ import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { Fragment as ReactFragment, useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { revealListOption } from '../app/list-navigation.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { formatSize } from '../transcript/rows/common.js';
@@ -525,7 +526,7 @@ export function Composer({
       {above}
       {mention.active ? (
         <ul
-          className="composer-popup mention-popup"
+          className="interactive-list composer-popup mention-popup"
           role="listbox"
           data-testid="mention-popup"
           aria-label={t('composer.mentions.label')}
@@ -539,6 +540,7 @@ export function Composer({
               <li
                 key={candidate.id}
                 role="option"
+                ref={index === highlighted ? revealListOption : undefined}
                 aria-selected={index === highlighted}
                 className={index === highlighted ? 'mention-option is-active' : 'mention-option'}
                 onMouseDown={(event) => {
@@ -560,7 +562,7 @@ export function Composer({
       ) : null}
       {palette.active ? (
         <ul
-          className="composer-popup command-popup"
+          className="interactive-list composer-popup command-popup"
           role="listbox"
           data-testid="command-popup"
           aria-label={t('composer.commands.label')}
@@ -585,6 +587,7 @@ export function Composer({
                   )}
                   <li
                     role="option"
+                    ref={index === paletteIndex ? revealListOption : undefined}
                     aria-selected={index === paletteIndex}
                     data-command={choice.name}
                     data-kind={choice.kind}

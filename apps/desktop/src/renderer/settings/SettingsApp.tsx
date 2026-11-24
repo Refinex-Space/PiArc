@@ -36,7 +36,7 @@ export function SettingsApp() {
     <ManagedProvider page={page?.id}>
       <div className="settings" data-testid="settings-window">
         <nav className="settings-nav" aria-label={t('settings.pages')}>
-          <ul>
+          <ul className="interactive-list">
             {pages.map((p) => (
               <li key={p.id}>
                 <button

@@ -3,6 +3,7 @@
 // same fuzzy matcher as the `/` palette. Keys go through the input method guard.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
+import { revealListOption } from '../app/list-navigation.js';
 import { fuzzyFilter } from '../../shared/fuzzy.js';
 import type { AppCommand } from '../../shared/ipc.js';
 import { COMMANDS, displayKey, effectiveBindings } from '../../shared/keybindings.js';
@@ -182,7 +183,7 @@ export function CommandPalette({
       />
       <ul
         id={`${titleId}-list`}
-        className="palette-list"
+        className="interactive-list palette-list"
         role="listbox"
         data-testid="command-palette-list"
       >
@@ -197,6 +198,7 @@ export function CommandPalette({
             <div
               id={`${titleId}-${String(at)}`}
               role="option"
+              ref={at === active ? revealListOption : undefined}
               aria-selected={at === active}
               className={at === active ? 'palette-option is-active' : 'palette-option'}
               data-entry={entry.key}

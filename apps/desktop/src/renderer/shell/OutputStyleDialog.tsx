@@ -43,7 +43,7 @@ export function OutputStyleDialog({
         {t('outputStyle.title')}
       </h2>
       <p className="muted">{t('outputStyle.note')}</p>
-      <ul className="style-list" aria-labelledby={titleId}>
+      <ul className="interactive-list style-list" aria-labelledby={titleId}>
         {styles.map((style) => (
           <li key={style.name}>
             <button

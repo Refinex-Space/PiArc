@@ -135,6 +135,30 @@ body,
   color: var(--piarc-text-warning);
 }
 
+/* A single column for interactive rows. Only the items paint backgrounds and receive clicks;
+   the density scale leaves 4px (comfortable) or 3px (compact) of clear surface between them. */
+.interactive-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  align-content: start;
+  row-gap: var(--piarc-space-1);
+}
+
+.palette-option:hover,
+.mention-option:hover,
+.style-choice:hover,
+.model-option:enabled:hover {
+  background: var(--piarc-surface-hover);
+}
+
+.palette-option.is-active,
+.mention-option.is-active,
+.style-choice.is-current,
+.model-option[aria-current='true'] {
+  background: var(--piarc-surface-selected);
+}
+
 /* ---- controls ---- */
 
 .button {
@@ -872,7 +896,13 @@ textarea.input {
 .menu {
   position: fixed;
   z-index: 30;
-  min-width: 180px;
+  inset: 0 auto auto 0;
+  width: max-content;
+  min-width: min(180px, 100%);
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  overflow-wrap: anywhere;
   padding: var(--piarc-space-1);
   border: 1px solid var(--piarc-c-dialog-border);
   border-radius: var(--piarc-radius-md);
@@ -960,6 +990,7 @@ textarea.input {
 }
 
 .settings-nav {
+  overflow-y: auto;
   padding: var(--piarc-space-4) var(--piarc-space-2);
   border-right: 1px solid var(--piarc-border-subtle);
   background: var(--piarc-surface-sidebar);
@@ -972,6 +1003,7 @@ textarea.input {
 }
 
 .settings-nav-item {
+  display: block;
   width: 100%;
   /* A long name (larger text, another language) wraps and the row grows with it. */
   min-height: var(--piarc-c-sidebar-row-height);
@@ -1213,9 +1245,9 @@ textarea.input {
   gap: var(--piarc-space-1);
   padding: var(--piarc-space-2);
   overflow-wrap: anywhere;
-}
-.model-option:hover {
-  background: var(--piarc-accent-subtle);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background-color: transparent;
 }
 .model-preview {
   display: grid;
@@ -2125,8 +2157,9 @@ textarea.input {
   padding: 0;
   list-style: none;
 }
-:root[data-app] .search-result {
-  padding-block: var(--piarc-space-1);
+/* A session heading and its hits form a group within the search results. */
+:root[data-app] .search-results {
+  row-gap: var(--piarc-space-2);
 }
 :root[data-app] .search-session,
 :root[data-app] .search-hit {
@@ -2144,7 +2177,7 @@ textarea.input {
 }
 :root[data-app] .search-session:hover,
 :root[data-app] .search-hit:hover {
-  background: var(--piarc-surface-active);
+  background: var(--piarc-surface-hover);
 }
 :root[data-app] .search-hit {
   color: var(--piarc-text-secondary);
@@ -2196,10 +2229,6 @@ textarea.input {
   cursor: default;
 }
 
-.palette-option.is-active {
-  background: var(--piarc-surface-selected);
-}
-
 .palette-detail {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2217,12 +2246,6 @@ textarea.input {
   background: none;
   color: var(--piarc-text-primary);
   text-align: left;
-}
-
-.style-choice:hover,
-.style-choice.is-current {
-  border-color: var(--piarc-border-default);
-  background: var(--piarc-surface-selected);
 }
 
 .style-name {

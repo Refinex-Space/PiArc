@@ -220,23 +220,27 @@ export function ModelMenus({
                   setSearch(e.currentTarget.value);
                 }}
               />
-              <ul className="model-list">
-                {models.map((m) => (
-                  <li key={keyOf(m)}>
-                    <button
-                      type="button"
-                      className="model-option"
-                      disabled={busy || running || (current && keyOf(m) === keyOf(current))}
-                      data-testid={`model-option-${keyOf(m)}`}
-                      onClick={() => {
-                        void edit(m);
-                      }}
-                    >
-                      <strong>{m.name}</strong>
-                      <span className="small muted">{keyOf(m)}</span>
-                    </button>
-                  </li>
-                ))}
+              <ul className="interactive-list model-list">
+                {models.map((m) => {
+                  const selected = current !== undefined && keyOf(m) === keyOf(current);
+                  return (
+                    <li key={keyOf(m)}>
+                      <button
+                        type="button"
+                        className="model-option"
+                        disabled={busy || running || selected}
+                        aria-current={selected ? 'true' : undefined}
+                        data-testid={`model-option-${keyOf(m)}`}
+                        onClick={() => {
+                          void edit(m);
+                        }}
+                      >
+                        <strong>{m.name}</strong>
+                        <span className="small muted">{keyOf(m)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
               {!models.length && <p className="muted">{t('models.empty')}</p>}
               <div className="dialog-actions">

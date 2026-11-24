@@ -4,6 +4,7 @@
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import { expect, makeWorkspace, openFolder, startSession, test } from './sessions.js';
+import { prefer } from './t19.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -103,4 +104,51 @@ test('switching the language updates the window and the menu at once', async ({
   expect((await menuItem(app, 'session.new')).label).toBe('新建会话');
   await page.screenshot({ path: testInfo.outputPath('language-zh.png') });
   await settings.screenshot({ path: testInfo.outputPath('settings-zh.png') });
+});
+
+test('adjacent hovered and selected navigation rows keep a non-interactive gap', async ({
+  app,
+  page,
+}, info) => {
+  const settings = await openSettings(app, page);
+  const selected = settings.getByTestId('settings-nav-sandbox');
+  const hovered = settings.getByTestId('settings-nav-permissions');
+  await selected.click();
+  const background = (el: Element) => getComputedStyle(el).backgroundColor;
+  for (const [density, gap, height] of [
+    ['comfortable', 4, 32],
+    ['compact', 3, 26],
+  ] as const) {
+    await prefer(settings, { key: 'appearance.density', value: density });
+    await expect(settings.locator('html')).toHaveAttribute('data-density', density);
+    await selected.hover();
+    const resting = await hovered.evaluate(background);
+    await hovered.hover();
+    await expect(selected).toHaveAttribute('aria-current', 'page');
+    const upper = await hovered.boundingBox();
+    const lower = await selected.boundingBox();
+    if (!upper || !lower) throw new Error('Both navigation rows must be visible');
+    expect(lower.y - upper.y - upper.height).toBeCloseTo(gap);
+    expect(lower.height).toBeGreaterThanOrEqual(height);
+    expect(lower.x).toBe(upper.x);
+    expect(lower.width).toBe(upper.width);
+    expect(await hovered.evaluate(background)).not.toBe(resting);
+    expect(await hovered.evaluate(background)).not.toBe(await selected.evaluate(background));
+    await settings.locator('.settings-nav').screenshot({ path: info.outputPath(density + '.png') });
+    const x = upper.x + upper.width / 2;
+    const y = lower.y - gap / 2;
+    expect(
+      await settings.evaluate(
+        (point) => document.elementFromPoint(point.x, point.y)?.closest('button') === null,
+        { x, y },
+      ),
+    ).toBe(true);
+    await settings.mouse.click(x, y);
+    await expect(selected).toHaveAttribute('aria-current', 'page');
+    await hovered.click();
+    await settings.keyboard.press('Tab');
+    await expect(selected).toBeFocused();
+    await settings.keyboard.press('Enter');
+    await expect(selected).toHaveAttribute('aria-current', 'page');
+  }
 });

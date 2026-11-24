@@ -177,7 +177,7 @@ export function Sidebar({ resizer }: { readonly resizer?: ReactNode }) {
             {group.sessions.length === 0 ? (
               <p className="workspace-empty muted small">{t('sidebar.workspaceEmpty')}</p>
             ) : (
-              <ul className="session-list">
+              <ul className="interactive-list session-list">
                 {group.sessions.map((session) => (
                   <SessionRow key={session.id} id={session.id} />
                 ))}
