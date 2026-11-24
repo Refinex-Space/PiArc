@@ -9,6 +9,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import type { SandboxChange } from '../../shared/ipc.js';
+import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
@@ -211,7 +212,10 @@ function EntryList({
   );
 }
 
+const SANDBOX_MODES = ['ask', 'auto'] as const;
+
 export function SandboxPage() {
+  const modeLabel = useId();
   const { t } = useApp();
   const [view, setView] = useState<SandboxView>();
   const [error, setError] = useState('');
@@ -317,30 +321,21 @@ export function SandboxPage() {
         data-testid="sandbox-mode"
         disabled={off || busy || managedMode}
       >
-        <legend className="setting-label">
+        <legend id={modeLabel} className="setting-label">
           {t('sandbox.mode')}
           {managedMode && <ManagedBadge testId="managed-sandbox-mode" />}
         </legend>
-        <div className="segmented" role="radiogroup">
-          {(['ask', 'auto'] as const).map((mode) => {
-            const selected = (mode === 'auto') === view.autoAllow;
-            return (
-              <label key={mode} className={`segment${selected ? ' is-selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="sandbox-mode"
-                  value={mode}
-                  checked={selected}
-                  data-testid={`sandbox-mode-${mode}`}
-                  onChange={() => {
-                    save({ autoAllow: mode === 'auto' });
-                  }}
-                />
-                {t(mode === 'auto' ? 'sandbox.mode.auto' : 'sandbox.mode.ask')}
-              </label>
-            );
-          })}
-        </div>
+        <SegmentedControl
+          options={SANDBOX_MODES}
+          value={view.autoAllow ? 'auto' : 'ask'}
+          name="sandbox-mode"
+          testIdPrefix="sandbox-mode"
+          aria-labelledby={modeLabel}
+          labelOf={(mode) => t(mode === 'auto' ? 'sandbox.mode.auto' : 'sandbox.mode.ask')}
+          onChange={(mode) => {
+            save({ autoAllow: mode === 'auto' });
+          }}
+        />
         <p className="muted">{t('sandbox.modeHint')}</p>
       </fieldset>
       {error !== '' && (

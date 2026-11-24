@@ -1058,39 +1058,91 @@ textarea.input {
 }
 
 .segmented {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-self: flex-start;
-  padding: 2px;
-  border: 1px solid var(--piarc-border-default);
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-surface-panel);
+  width: fit-content;
+  max-width: 100%;
+  min-height: var(--piarc-segment-height);
+  padding: 1px;
+  border-radius: var(--piarc-segment-radius);
+  background: var(--piarc-segment-track);
+  font-size: var(--piarc-segment-font-size);
+  font-weight: var(--piarc-font-weight-control);
+  line-height: var(--piarc-segment-line-height);
+  user-select: none;
+}
+
+.segment-thumb {
+  position: absolute;
+  inset: 1px auto 1px 0;
+  pointer-events: none;
+  border-radius: calc(var(--piarc-segment-radius) - 1px);
+  background: var(--piarc-segment-thumb);
+  box-shadow: 0 0 0 1px var(--piarc-segment-edge);
+}
+
+.segment-thumb[data-moving] {
+  transition:
+    transform var(--piarc-motion-fast) var(--piarc-motion-easing),
+    width var(--piarc-motion-fast) var(--piarc-motion-easing);
 }
 
 .segment {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 2px var(--piarc-space-3);
-  border-radius: var(--piarc-radius-sm);
+  justify-content: center;
+  min-width: 0;
+  padding: 0 var(--piarc-segment-padding);
+  border-radius: calc(var(--piarc-segment-radius) - 2px);
+  color: color-mix(in srgb, var(--piarc-text-primary) 85%, var(--piarc-text-secondary));
+  text-align: center;
+  overflow-wrap: anywhere;
+  transition:
+    color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
 }
 
-.segment input {
+.segment > input {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
-  pointer-events: none;
 }
 
-.segment.is-selected {
-  background: var(--piarc-surface-raised);
-  box-shadow: 0 0 0 1px var(--piarc-border-strong);
+.segment:has(input:checked),
+.segment:has(input:enabled):hover {
+  color: var(--piarc-text-primary);
 }
 
-.segment:has(> input:focus-visible) {
+.segment:has(input:enabled):active {
+  background-color: var(--piarc-segment-edge);
+}
+
+.segmented:has(input:checked:focus-visible) .segment-thumb {
   box-shadow: none;
 }
 
+.segmented:has(input:disabled) {
+  opacity: 0.5;
+}
+
 @media (forced-colors: active) {
-  .segment.is-selected {
+  .segment-thumb {
+    border: 1px solid ButtonText;
+  }
+  .segment:has(input:checked) {
     text-decoration: underline;
+  }
+  .segmented:has(input:disabled) {
+    opacity: 1;
+  }
+  .segment:has(input:disabled) {
+    color: GrayText;
   }
 }
 

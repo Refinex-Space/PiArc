@@ -13,6 +13,7 @@
   },
   "fontWeight": {
     "regular": "400",
+    "control": "435",
     "medium": "500",
     "semibold": "600"
   },
@@ -38,6 +39,11 @@
   },
   "density": {
     "comfortable": {
+      "segment.height": "28px",
+      "segment.radius": "8px",
+      "segment.fontSize": "14px",
+      "segment.padding": "12px",
+      "segment.lineHeight": "20px",
       "space.1": "4px",
       "space.2": "8px",
       "space.3": "12px",
@@ -47,6 +53,11 @@
       "size.controlHeight": "30px"
     },
     "compact": {
+      "segment.height": "24px",
+      "segment.radius": "6px",
+      "segment.fontSize": "13px",
+      "segment.padding": "8px",
+      "segment.lineHeight": "19px",
       "space.1": "3px",
       "space.2": "6px",
       "space.3": "8px",

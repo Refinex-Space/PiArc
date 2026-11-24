@@ -14,10 +14,10 @@ PiArc 在设计阶段研读了以下开源仓库。为了随时查阅和核对�
 
 ## 使用边界
 
-这些仓库只用于学习设计思路和核对行为。PiArc 的代码、提示词和视觉资产都由我们自己编写，遵循 clean-room 原则：
+OpenClaudeDesktop 同时作为桌面前端的视觉与交互基准（[ADR-0073](../adr/0073-settings-segmented-control-reference.md)）。PiArc 的代码、提示词和视觉资产都由我们自己编写，遵循 clean-room 原则：
 
-1. **不复制源码和提示词。** `claude-code` 复原的是 Anthropic 的专有产品，`OpenClaudeDesktop` 的 `app/src/generated/` 是从官方应用中切出的组件。即使仓库标注了开源许可证，这些内容的著作权也不属于仓库作者。我们只提炼行为、状态机和信息结构，再用自己的实现表达。
-2. **不使用 Anthropic 的品牌资产。** 包括 logo、专有字体、提示音、标志性品牌色（例如 Clay `#d97757`）和整体视觉识别。PiArc 对标的是 Claude Desktop 的交互能力，视觉上保持自己的品牌。
+1. **不复制源码和提示词。** `claude-code` 复原的是 Anthropic 的专有产品，`OpenClaudeDesktop` 的 `app/src/generated/` 是从官方应用中切出的组件。即使仓库标注了开源许可证，这些内容的著作权也不属于仓库作者。我们提炼行为、状态机、信息结构和可观察的 UI 规格，由 PiArc 独立实现。
+2. **不使用 Anthropic 的品牌资产。** 包括 logo、专有字体、提示音、标志性品牌色（例如 Clay `#d97757`）和整体视觉识别。PiArc 保留自己的品牌标识，组件外观与交互可逐项复刻或高度参考 Claude Desktop。
 3. **MIT 仓库（`pi`、`claw-code`、`open-claude-ui` 中作者原创的部分）可以按许可证复用**，复用时保留版权声明，并在 PR 中注明来源。
    - PiArc 改用 Electron + React 后（ADR-0013），和 `OpenClaudeDesktop`、`open-claude-ui` 用的是同一种技术，复制代码变得很顺手，边界因此要更明确：`OpenClaudeDesktop` 的 `app/src/generated/` 及其他由生成器从官方应用切出的文件一律不得复制，改写后也不行；它的宿主层只有确认为作者原创的文件才能逐个按 MIT 复用。`open-claude-ui` 的交互逻辑（滚动跟随、输入法守卫、悬停意图等）可以按 MIT 复用；它的视觉组件和设计令牌还原的是 Claude 的外观，不使用。
 4. **Claude 的能力以官方文档为准。** 社区复原工程中有大量魔改特性，不能当作官方行为引用。

@@ -13,6 +13,7 @@
   --piarc-font-size-title: 15px;
   --piarc-font-size-heading: 20px;
   --piarc-font-weight-regular: 400;
+  --piarc-font-weight-control: 435;
   --piarc-font-weight-medium: 500;
   --piarc-font-weight-semibold: 600;
   --piarc-radius-sm: 4px;
@@ -27,6 +28,11 @@
   --piarc-size-sidebar-min: 200px;
   --piarc-size-sidebar-max: 420px;
   --piarc-size-badge: 8px;
+  --piarc-segment-height: 28px;
+  --piarc-segment-radius: 8px;
+  --piarc-segment-font-size: 14px;
+  --piarc-segment-padding: 12px;
+  --piarc-segment-line-height: 20px;
   --piarc-space-1: 4px;
   --piarc-space-2: 8px;
   --piarc-space-3: 12px;
@@ -89,6 +95,9 @@
   --piarc-border-default: #cdd0d6;
   --piarc-border-strong: #858a94;
   --piarc-border-focus: #5d626c;
+  --piarc-segment-track: #0b0b0b0d;
+  --piarc-segment-thumb: #ffffff;
+  --piarc-segment-edge: #0b0b0b0d;
   --piarc-accent-solid: #3b5bdb;
   --piarc-accent-solid-hover: #3450c8;
   --piarc-accent-subtle: #e9edfe;
@@ -136,6 +145,9 @@
     --piarc-border-default: #3e424a;
     --piarc-border-strong: #6b707c;
     --piarc-border-focus: #787d89;
+    --piarc-segment-track: #ffffff0d;
+    --piarc-segment-thumb: #ffffff1a;
+    --piarc-segment-edge: #ffffff33;
     --piarc-accent-solid: #4568e6;
     --piarc-accent-solid-hover: #4659ac;
     --piarc-accent-subtle: #1b2442;
@@ -183,6 +195,9 @@
   --piarc-border-default: #cdd0d6;
   --piarc-border-strong: #858a94;
   --piarc-border-focus: #5d626c;
+  --piarc-segment-track: #0b0b0b0d;
+  --piarc-segment-thumb: #ffffff;
+  --piarc-segment-edge: #0b0b0b0d;
   --piarc-accent-solid: #3b5bdb;
   --piarc-accent-solid-hover: #3450c8;
   --piarc-accent-subtle: #e9edfe;
@@ -229,6 +244,9 @@
   --piarc-border-default: #3e424a;
   --piarc-border-strong: #6b707c;
   --piarc-border-focus: #787d89;
+  --piarc-segment-track: #ffffff0d;
+  --piarc-segment-thumb: #ffffff1a;
+  --piarc-segment-edge: #ffffff33;
   --piarc-accent-solid: #4568e6;
   --piarc-accent-solid-hover: #4659ac;
   --piarc-accent-subtle: #1b2442;
@@ -275,6 +293,9 @@
   --piarc-border-default: #858a94;
   --piarc-border-strong: #5d626c;
   --piarc-border-focus: #1d2027;
+  --piarc-segment-track: #0b0b0b0d;
+  --piarc-segment-thumb: #ffffff;
+  --piarc-segment-edge: #5d626c;
   --piarc-accent-solid: #3049b8;
   --piarc-accent-solid-hover: #1a2559;
   --piarc-accent-subtle: #e9edfe;
@@ -321,6 +342,9 @@
   --piarc-border-default: #6b707c;
   --piarc-border-strong: #a9adb7;
   --piarc-border-focus: #eceef2;
+  --piarc-segment-track: #ffffff0d;
+  --piarc-segment-thumb: #ffffff1a;
+  --piarc-segment-edge: #a9adb7;
   --piarc-accent-solid: #d6deff;
   --piarc-accent-solid-hover: #9db0ff;
   --piarc-accent-subtle: #1b2442;
@@ -346,6 +370,11 @@
 }
 
 :root[data-density='compact'] {
+  --piarc-segment-height: 24px;
+  --piarc-segment-radius: 6px;
+  --piarc-segment-font-size: 13px;
+  --piarc-segment-padding: 8px;
+  --piarc-segment-line-height: 19px;
   --piarc-space-1: 3px;
   --piarc-space-2: 6px;
   --piarc-space-3: 8px;
@@ -378,6 +407,9 @@
     --piarc-border-default: CanvasText;
     --piarc-border-strong: CanvasText;
     --piarc-border-focus: Highlight;
+    --piarc-segment-track: Canvas;
+    --piarc-segment-thumb: ButtonFace;
+    --piarc-segment-edge: ButtonText;
     --piarc-accent-solid: ButtonFace;
     --piarc-accent-solid-hover: Highlight;
     --piarc-accent-subtle: Canvas;

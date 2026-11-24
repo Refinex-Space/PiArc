@@ -30,6 +30,9 @@ export type ColorToken =
   | 'border.default'
   | 'border.strong'
   | 'border.focus'
+  | 'segment.track'
+  | 'segment.thumb'
+  | 'segment.edge'
   | 'accent.solid'
   | 'accent.solidHover'
   | 'accent.subtle'
@@ -63,6 +66,7 @@ export type ScaleToken =
   | 'fontSize.title'
   | 'fontSize.heading'
   | 'fontWeight.regular'
+  | 'fontWeight.control'
   | 'fontWeight.medium'
   | 'fontWeight.semibold'
   | 'radius.sm'
@@ -77,6 +81,11 @@ export type ScaleToken =
   | 'size.sidebarMin'
   | 'size.sidebarMax'
   | 'size.badge'
+  | 'segment.height'
+  | 'segment.radius'
+  | 'segment.fontSize'
+  | 'segment.padding'
+  | 'segment.lineHeight'
   | 'space.1'
   | 'space.2'
   | 'space.3'
@@ -145,6 +154,9 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#cdd0d6',
     'border.strong': '#858a94',
     'border.focus': '#5d626c',
+    'segment.track': '#0b0b0b0d',
+    'segment.thumb': '#ffffff',
+    'segment.edge': '#0b0b0b0d',
     'accent.solid': '#3b5bdb',
     'accent.solidHover': '#3450c8',
     'accent.subtle': '#e9edfe',
@@ -189,6 +201,9 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#3e424a',
     'border.strong': '#6b707c',
     'border.focus': '#787d89',
+    'segment.track': '#ffffff0d',
+    'segment.thumb': '#ffffff1a',
+    'segment.edge': '#ffffff33',
     'accent.solid': '#4568e6',
     'accent.solidHover': '#4659ac',
     'accent.subtle': '#1b2442',
@@ -233,6 +248,9 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#858a94',
     'border.strong': '#5d626c',
     'border.focus': '#1d2027',
+    'segment.track': '#0b0b0b0d',
+    'segment.thumb': '#ffffff',
+    'segment.edge': '#5d626c',
     'accent.solid': '#3049b8',
     'accent.solidHover': '#1a2559',
     'accent.subtle': '#e9edfe',
@@ -277,6 +295,9 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#6b707c',
     'border.strong': '#a9adb7',
     'border.focus': '#eceef2',
+    'segment.track': '#ffffff0d',
+    'segment.thumb': '#ffffff1a',
+    'segment.edge': '#a9adb7',
     'accent.solid': '#d6deff',
     'accent.solidHover': '#9db0ff',
     'accent.subtle': '#1b2442',
@@ -324,6 +345,9 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'border.default': '--piarc-border-default',
   'border.strong': '--piarc-border-strong',
   'border.focus': '--piarc-border-focus',
+  'segment.track': '--piarc-segment-track',
+  'segment.thumb': '--piarc-segment-thumb',
+  'segment.edge': '--piarc-segment-edge',
   'accent.solid': '--piarc-accent-solid',
   'accent.solidHover': '--piarc-accent-solid-hover',
   'accent.subtle': '--piarc-accent-subtle',
@@ -354,6 +378,7 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'fontSize.title': '--piarc-font-size-title',
   'fontSize.heading': '--piarc-font-size-heading',
   'fontWeight.regular': '--piarc-font-weight-regular',
+  'fontWeight.control': '--piarc-font-weight-control',
   'fontWeight.medium': '--piarc-font-weight-medium',
   'fontWeight.semibold': '--piarc-font-weight-semibold',
   'radius.sm': '--piarc-radius-sm',
@@ -368,6 +393,11 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'size.sidebarMin': '--piarc-size-sidebar-min',
   'size.sidebarMax': '--piarc-size-sidebar-max',
   'size.badge': '--piarc-size-badge',
+  'segment.height': '--piarc-segment-height',
+  'segment.radius': '--piarc-segment-radius',
+  'segment.fontSize': '--piarc-segment-font-size',
+  'segment.padding': '--piarc-segment-padding',
+  'segment.lineHeight': '--piarc-segment-line-height',
   'space.1': '--piarc-space-1',
   'space.2': '--piarc-space-2',
   'space.3': '--piarc-space-3',

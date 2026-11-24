@@ -31,6 +31,11 @@
     "strong": { "light": "neutral.9", "dark": "neutral.9", "highContrast": "neutral.11" },
     "focus": { "light": "neutral.11", "dark": "neutral.10", "highContrast": "neutral.12" }
   },
+  "segment": {
+    "track": { "light": "base.ink5", "dark": "base.white5" },
+    "thumb": { "light": "base.white", "dark": "base.white10" },
+    "edge": { "light": "base.ink5", "dark": "base.white20", "highContrast": "neutral.11" }
+  },
   "accent": {
     "solid": {
       "light": "accent.9",
@@ -101,6 +106,9 @@
     "border.default": "CanvasText",
     "border.strong": "CanvasText",
     "border.focus": "Highlight",
+    "segment.track": "Canvas",
+    "segment.thumb": "ButtonFace",
+    "segment.edge": "ButtonText",
     "accent.solid": "ButtonFace",
     "accent.solidHover": "Highlight",
     "accent.subtle": "Canvas",

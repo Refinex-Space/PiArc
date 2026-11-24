@@ -152,3 +152,66 @@ test('adjacent hovered and selected navigation rows keep a non-interactive gap',
     await expect(selected).toHaveAttribute('aria-current', 'page');
   }
 });
+
+test('appearance segments keep the reference geometry and one moving selected surface', async ({
+  app,
+  page,
+}, info) => {
+  const settings = await openSettings(app, page);
+  await settings.getByTestId('settings-nav-appearance').click();
+  const track = settings.getByTestId('setting-theme').getByRole('radiogroup');
+  const labels = track.locator('label');
+  const thumb = track.locator('.segment-thumb');
+  const rects = () =>
+    labels.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const { x, y, width, height } = node.getBoundingClientRect();
+        return { x, y, width, height };
+      }),
+    );
+  for (const [density, height, radius] of [
+    ['comfortable', 28, 8],
+    ['compact', 24, 6],
+  ] as const) {
+    await prefer(settings, { key: 'appearance.density', value: density });
+    await expect(settings.locator('html')).toHaveAttribute('data-density', density);
+    await expect(track).toHaveCSS('border-top-width', '0px');
+    await expect(track).toHaveCSS('height', String(height) + 'px');
+    await expect(track).toHaveCSS('border-radius', String(radius) + 'px');
+    await expect(thumb).toHaveCount(1);
+    const before = await rects();
+    for (const theme of ['light', 'dark'] as const) {
+      const label = labels.filter({ has: settings.getByTestId('theme-' + theme) });
+      await label.click();
+      await expect(label.getByRole('radio')).toBeChecked();
+      await expect(settings.locator('html')).toHaveAttribute('data-color-mode', theme);
+      await expect
+        .poll(() =>
+          thumb.evaluate((node) => {
+            const selected = node.parentElement?.querySelector('input:checked')?.parentElement;
+            if (!selected) return false;
+            const a = node.getBoundingClientRect(),
+              b = selected.getBoundingClientRect();
+            return (
+              Math.abs(a.x - b.x) < 0.5 &&
+              Math.abs(a.width - b.width) < 0.5 &&
+              a.height === b.height
+            );
+          }),
+        )
+        .toBe(true);
+      expect(await rects()).toEqual(before);
+      await settings.getByTestId('settings-page-appearance').screenshot({
+        path: info.outputPath(density + '-' + theme + '.png'),
+      });
+    }
+    await settings.keyboard.press('ArrowLeft');
+    await expect(settings.getByTestId('theme-light')).toBeChecked();
+    await expect(thumb).toHaveAttribute('data-moving', '');
+    await expect(thumb).toHaveCSS('box-shadow', 'none');
+    await expect(settings.getByTestId('theme-light').locator('..')).toHaveCSS(
+      'outline-width',
+      '2px',
+    );
+  }
+});

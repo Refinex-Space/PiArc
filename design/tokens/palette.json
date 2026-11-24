@@ -153,6 +153,10 @@
   "base": {
     "white": "#ffffff",
     "black": "#000000",
+    "ink5": "#0b0b0b0d",
+    "white5": "#ffffff0d",
+    "white10": "#ffffff1a",
+    "white20": "#ffffff33",
     "scrimLight": "#1d202733",
     "scrimDark": "#00000080"
   }

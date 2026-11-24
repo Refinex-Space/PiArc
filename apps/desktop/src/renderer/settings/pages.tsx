@@ -22,6 +22,7 @@ import {
   THEMES,
   type PreferenceChange,
 } from '../../shared/preferences.js';
+import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
 import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
@@ -80,23 +81,15 @@ function Choice<T extends string>({
         {t(label)}
         {managed && <ManagedBadge testId={`managed-${name}`} />}
       </legend>
-      <div className="segmented" role="radiogroup" aria-labelledby={id}>
-        {options.map((option) => (
-          <label key={option} className={`segment${option === value ? ' is-selected' : ''}`}>
-            <input
-              type="radio"
-              name={name}
-              value={option}
-              checked={option === value}
-              data-testid={`${name}-${option}`}
-              onChange={() => {
-                onChange(option);
-              }}
-            />
-            {t(labelOf(option))}
-          </label>
-        ))}
-      </div>
+      <SegmentedControl
+        options={options}
+        value={value}
+        onChange={onChange}
+        name={name}
+        testIdPrefix={name}
+        aria-labelledby={id}
+        labelOf={(option) => t(labelOf(option))}
+      />
     </fieldset>
   );
 }
