@@ -29,7 +29,7 @@
     "subtle": "neutral.6",
     "default": { "light": "neutral.7", "dark": "neutral.7", "highContrast": "neutral.9" },
     "strong": { "light": "neutral.9", "dark": "neutral.9", "highContrast": "neutral.11" },
-    "focus": { "light": "accent.9", "dark": "accent.11", "highContrast": "accent.12" }
+    "focus": { "light": "neutral.11", "dark": "neutral.10", "highContrast": "neutral.12" }
   },
   "accent": {
     "solid": {

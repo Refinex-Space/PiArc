@@ -48,9 +48,48 @@ body,
   transition-duration: 0s !important;
 }
 
-:root[data-app] :focus-visible {
+/* Paint one edge, including on controls whose actual focus target is invisible. Keeping it
+   inside the bounds also protects the indicator in clipped menus, panels and virtual lists. */
+:root[data-app] :focus-visible,
+.segment:has(> input:focus-visible),
+.composer-attach:has(> input:focus-visible),
+.composer-box:has(.composer-editor:focus-visible),
+:root[data-app] .terminal-surface:has(textarea:focus-visible),
+:root[data-app] .menu:focus-visible > .menu-item.is-active {
   outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: -2px;
+}
+
+/* The menu and editor each delegate their indicator to the visible target above. */
+:root[data-app] .menu:focus-visible:has(> .menu-item.is-active),
+:root[data-app] .composer-editor:focus-visible {
+  outline: none;
+}
+
+/* Leave room around inline text, filled buttons, narrow separators, and native check marks. */
+:root[data-app]
+  :is(
+    a[href],
+    .button-primary,
+    .resizer,
+    input[type='radio'],
+    input[type='checkbox']
+  ):focus-visible {
   outline-offset: 1px;
+}
+
+/* A pointer-focused text field still shows its insertion point and a single fine edge.
+   This also covers implicit text inputs, multiline editors, and native selects. */
+:root[data-app][data-pointer-focus] :is(input:read-write, input[readonly], textarea, select):focus,
+:root[data-app][data-pointer-focus] .composer-box:has(.composer-editor:focus) {
+  outline: 1px solid var(--piarc-c-focus-ring);
+  outline-offset: -1px;
+  transition: outline-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+/* The focused terminal draws its own cursor on the canvas. */
+:root[data-app][data-pointer-focus] .terminal-surface:focus-within {
+  outline: none;
 }
 
 :root[data-app] button,
@@ -537,7 +576,7 @@ textarea.input {
   min-width: 0;
   height: calc(var(--piarc-c-sidebar-row-height) - 6px);
   padding: 0 var(--piarc-space-1);
-  border: 1px solid var(--piarc-c-focus-ring);
+  border: 1px solid var(--piarc-c-input-border);
   border-radius: var(--piarc-radius-sm);
   background: var(--piarc-surface-input);
   user-select: text;
@@ -1013,8 +1052,14 @@ textarea.input {
   box-shadow: 0 0 0 1px var(--piarc-border-strong);
 }
 
-.segment:focus-within {
-  outline: 2px solid var(--piarc-c-focus-ring);
+.segment:has(> input:focus-visible) {
+  box-shadow: none;
+}
+
+@media (forced-colors: active) {
+  .segment.is-selected {
+    text-decoration: underline;
+  }
 }
 
 .key-button {
@@ -2025,10 +2070,6 @@ textarea.input {
   flex: 1;
   min-width: 0;
   min-height: 0;
-}
-:root[data-app] .terminal-surface:focus-within {
-  outline: 2px solid var(--piarc-c-focus-ring);
-  outline-offset: -2px;
 }
 :root[data-app] .terminal-empty {
   display: grid;

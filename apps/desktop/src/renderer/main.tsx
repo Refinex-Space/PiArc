@@ -20,6 +20,27 @@ const hash = window.location.hash;
 function renderApp(target: Root): void {
   // The app's own stylesheet rules apply from the first paint (app.css), not to the test pages.
   document.documentElement.dataset.app = 'piarc';
+  // Text editors match :focus-visible even on click. Remember how this focus arrived so
+  // typing in a clicked editor keeps its quiet edge until focus actually moves.
+  let pointer = false;
+  const markFocus = () => document.documentElement.toggleAttribute('data-pointer-focus', pointer);
+  window.addEventListener(
+    'pointerdown',
+    () => {
+      pointer = true;
+      markFocus();
+    },
+    true,
+  );
+  window.addEventListener(
+    'keydown',
+    () => {
+      pointer = false;
+    },
+    true,
+  );
+  window.addEventListener('focusin', markFocus, true);
+
   const settings = hash.startsWith('#/settings');
   if (settings) {
     registerBuiltInSettingsPages();

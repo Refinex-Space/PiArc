@@ -270,3 +270,71 @@ test('reduced motion, more contrast and forced colors', async ({ app, page, work
   await page.emulateMedia({ forcedColors: 'none' });
   await prefer(page, { key: 'appearance.theme', value: 'system' });
 });
+
+test('pointer editing and keyboard navigation give exactly one visible focus indicator', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  await openSession(app, page, workspaces, 'focus', 't43-rows', 'Read the notes.', {
+    'notes.txt': 'Focus test.',
+  });
+  await idle(page);
+  const editor = page.getByTestId('composer-input');
+  const box = page.locator('.composer-box');
+  const attach = page.locator('.composer-attach');
+  const filter = page.getByTestId('session-filter');
+
+  for (const theme of ['light', 'dark'] as const) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await expect(page.locator('html')).toHaveAttribute('data-color-mode', theme);
+    await filter.click();
+    await expect(filter).toHaveCSS('outline-width', '1px');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(filter).toBeFocused();
+    await expect(filter).toHaveCSS('outline-width', '2px');
+
+    await editor.click();
+    await page.keyboard.type('x');
+    await expect(editor).toHaveCSS('outline-style', 'none');
+    await expect(box).toHaveCSS('outline-width', '1px');
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('composer-file-input')).toBeFocused();
+    await expect(attach).toHaveCSS('outline-width', '2px');
+    await expect(box).toHaveCSS('outline-style', 'none');
+    await page.keyboard.press('Shift+Tab');
+    await expect(editor).toBeFocused();
+    await expect(box).toHaveCSS('outline-width', '2px');
+    await expect(box).toHaveCSS('outline-offset', '-2px');
+  }
+
+  await page.getByTestId('permission-mode').focus();
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('menu');
+  await page.keyboard.press('ArrowDown');
+  await expect(menu).toBeFocused();
+  await expect(menu).toHaveCSS('outline-style', 'none');
+  await expect(menu.locator('.is-active')).toHaveCSS('outline-width', '2px');
+  await page.keyboard.press('Escape');
+
+  await page.keyboard.press('Control+Backquote');
+  const surface = page.getByTestId('terminal-surface');
+  await expect(page.getByTestId('terminal-input')).toBeFocused();
+  await expect(surface).toHaveCSS('outline-width', '2px');
+  await page.getByTestId('terminal-canvas').click();
+  await expect(page.getByTestId('terminal-input')).toBeFocused();
+  await expect(surface).toHaveCSS('outline-style', 'none');
+  await page.keyboard.press('Control+Backquote');
+
+  const settings = await openSettingsByKeyboard(app, page);
+  await settings.getByTestId('settings-nav-appearance').click();
+  const light = settings.locator('label').filter({ has: settings.getByTestId('theme-light') });
+  await light.click();
+  await expect(light).toHaveCSS('outline-style', 'none');
+  await settings.keyboard.press('ArrowRight');
+  const dark = settings.locator('label').filter({ has: settings.getByTestId('theme-dark') });
+  await expect(settings.getByTestId('theme-dark')).toBeFocused();
+  await expect(dark).toHaveCSS('outline-width', '2px');
+  await expect(dark).toHaveCSS('box-shadow', 'none');
+});
