@@ -48,3 +48,5 @@
 - fuse 配置的单一来源是 `fuses.mjs`；`PIARC_BUILD_FLAVOR`（由 `package:desktop --flavor` 设置）选择配置，默认 `release`。开发构建只多开 `EnableNodeCliInspectArguments`，L4 的打包形态靠它被 Playwright 驱动。
 - `electron-forge start` 用 node_modules 中的 Electron，不写 fuse；界面来自 Vite 开发服务器，开发服务器 origin 加入可信 origin，CSP 放宽三项（见 `dev-server.ts`）。
 - `app-protocol.ts` 的两个传输共用资源范围、方法、MIME 和安全头。macOS 的原生缓冲区回调是 ADR-0072 的限定例外；升级 Electron 时同时复测资源契约与主进程内存。
+
+项目文件菜单和预览采用 [ADR-0076](../../../../docs/adr/0076-project-files.md)。工作树由 Core 绑定。专用文档来源只供当前窗口的文件呈现；它没有工作台 IPC 权限。系统编辑器只从已知安装目录选择，文件名作为独立进程参数。

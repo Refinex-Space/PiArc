@@ -9,7 +9,7 @@ const project = {
   'README.md': '# Project atlas\n\n| Name | Role |\n|---|---|\n| Alpha | Release |\n',
   'src/example.ts': 'export const label = "project atlas";\nexport const total = 23;\n',
   'index.html':
-    '<!doctype html><html><head><link rel="stylesheet" href="layout.css"></head><body><h1>Local document</h1><p id="state">Static view</p><script src="local.js"></script></body></html>',
+    '<!doctype html><html><head><link rel="stylesheet" href="layout.css"></head><body><h1>Local document</h1><p id="state">Static view</p><a href="README.md">Project guide</a><script src="local.js"></script></body></html>',
   'layout.css': 'h1 { color: rgb(18, 71, 95); }',
   'local.js': 'document.getElementById("state").textContent = "Interactive view";',
 };
@@ -111,6 +111,8 @@ test('static and offline interactive HTML previews load local styles and release
   await expect(iframe.locator('#state')).toHaveText('Interactive view');
   expect(await iframe.locator('body').evaluate(() => typeof window.piarc)).toBe('undefined');
   await page.screenshot({ path: info.outputPath('local-html-preview.png') });
+  await iframe.getByRole('link', { name: 'Project guide' }).click();
+  await expect(page.getByRole('heading', { name: 'Project atlas' })).toBeVisible();
   await page.getByTestId('tile-close-files').click();
   await expect(page.locator('iframe')).toHaveCount(0);
 });
@@ -219,7 +221,95 @@ test('project PDF and audio render in the Files tile with a real document and a 
   await expect.poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration)).toBe(1);
   await page.getByRole('treeitem', { name: 'sample.pdf' }).click();
   await expect(page.locator('audio')).toHaveCount(0);
-  const pdf = page.frameLocator('iframe[title="sample.pdf"]');
-  await expect(pdf.locator('embed')).toBeAttached();
+  // Chromium commits the PDF stream to its original URL underneath the built-in
+  // reader. Checking that nested frame distinguishes a rendered PDF from an empty viewer.
+  await expect
+    .poll(() =>
+      app.evaluate(({ webContents }) =>
+        webContents
+          .getAllWebContents()
+          .some((wc) =>
+            wc.mainFrame.framesInSubtree.some(
+              (frame) =>
+                frame.parent?.url ===
+                  'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/index.html' &&
+                frame.url.startsWith('piarc-document://') &&
+                frame.url.endsWith('/sample.pdf'),
+            ),
+          ),
+      ),
+    )
+    .toBe(true);
   await page.screenshot({ path: info.outputPath('pdf-viewer.png') });
+});
+
+test('a large checkout remains navigable by filename and line with bounded DOM rows', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
+  const source = Array.from(
+    { length: 8000 },
+    (_, i) => 'export const field' + String(i) + ' = ' + String(i) + ';',
+  ).join('\n');
+  const { ws } = await openSession(
+    app,
+    page,
+    workspaces,
+    'Large project',
+    't18-chat',
+    'Browse the large checkout',
+    { 'large.ts': source },
+  );
+  for (let batch = 0; batch < 12; batch++) {
+    await Promise.all(
+      Array.from({ length: 50 }, (_, i) =>
+        writeFile(
+          path.join(ws, 'note-' + String(batch * 50 + i).padStart(4, '0') + '.txt'),
+          'Project note\n',
+        ),
+      ),
+    );
+  }
+  await idle(page);
+  const win = await app.browserWindow(page);
+  await win.evaluate((w: BrowserWindow) => {
+    w.setContentSize(1550, 900);
+  });
+  const start = performance.now();
+  await page.getByTestId('tool-files').click();
+  await expect(page.getByRole('treeitem', { name: 'large.ts', exact: true })).toBeVisible();
+  const listing = performance.now() - start;
+  expect(await page.getByRole('treeitem').count()).toBeLessThan(60);
+  const input = page.getByRole('textbox', { name: 'Filter files' });
+  const search = performance.now();
+  await input.fill('note-0599');
+  await page.getByRole('treeitem', { name: 'note-0599.txt', exact: true }).click();
+  await expect(page.locator('[data-source-line="1"]')).toContainText('Project note');
+  const opening = performance.now() - search;
+  await input.fill('');
+  await page.getByRole('treeitem', { name: 'large.ts', exact: true }).click();
+  const first = page.locator('[data-source-line="1"]');
+  await expect(first).toContainText('field0');
+  const scroller = page.locator('.file-source-scroll');
+  await scroller.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await expect(page.locator('[data-source-line="8000"]')).toContainText('field7999');
+  const mounted = await page.locator('[data-source-line]').count();
+  expect(mounted).toBeLessThan(100);
+  await writeFile(
+    info.outputPath('files-performance.json'),
+    JSON.stringify(
+      {
+        rootFiles: 601,
+        sourceLines: 8000,
+        listingMs: Math.round(listing),
+        filterAndOpenMs: Math.round(opening),
+        mountedSourceRows: mounted,
+      },
+      null,
+      2,
+    ),
+  );
 });

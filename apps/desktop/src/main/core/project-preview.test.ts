@@ -33,7 +33,7 @@ it('binds passive document ranges to one file, session and workbench page and re
     (c, h) => {
       handlers.set(c, h);
     },
-    { requireInput: vi.fn() },
+    { requireInput: vi.fn(), hasRecentInput: () => false },
   );
   const call = (...args: unknown[]) =>
     Promise.resolve(handlers.get(IPC_CHANNELS.projectFilePreview)?.(event, args));
@@ -48,4 +48,12 @@ it('binds passive document ranges to one file, session and workbench page and re
   expect(await result.text()).toBe('2345');
   await call('test-session', 'clip.mp4', 'release', url);
   expect((await preview.serve(new Request(url))).status).toBe(404);
+  const viewer = 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/';
+  const stream = viewer + '10000000-0000-4000-8000-000000000000';
+  const source = viewer + 'index.html';
+  expect(preview.allowsFrame(sender, stream, source, source)).toBe(false);
+  await call('test-session', 'manual.pdf', 'media');
+  expect(preview.allowsFrame(sender, stream, source, source)).toBe(true);
+  expect(preview.allowsFrame(sender, stream, 'app://piarc/index.html', source)).toBe(false);
+  expect(preview.allowsFrame(sender, viewer + 'wrong-page', source, source)).toBe(false);
 });

@@ -259,6 +259,8 @@ export interface AppState {
 
 /** Messages on `APP_EVENT_CHANNEL`. */
 export type AppEvent =
+  | { readonly type: 'projectFileLink'; readonly sessionId: string; readonly path: string }
+  | { readonly type: 'projectWebLink'; readonly sessionId: string; readonly url: string }
   | { readonly type: 'projectFilesChanged'; readonly sessionId: string }
   | { readonly type: 'preferences'; readonly preferences: Preferences; readonly locale: Locale }
   | { readonly type: 'providersChanged' }

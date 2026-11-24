@@ -101,7 +101,12 @@ export class ToolWindows {
     });
   }
 
-  allowFileFrame?: (contents: WebContents, url: string) => boolean;
+  allowFileFrame?: (
+    contents: WebContents,
+    url: string,
+    parent?: string,
+    initiator?: string,
+  ) => boolean;
   fileOwner(contents: WebContents): WebContents | undefined {
     for (const { child, ticket } of this.#open.values())
       if (ticket.panel === 'files' && child.webContents === contents) return ticket.owner;
@@ -147,7 +152,7 @@ export class ToolWindows {
         if (
           !event.isMainFrame &&
           ticket.panel === 'files' &&
-          this.allowFileFrame?.(contents, event.url)
+          this.allowFileFrame?.(contents, event.url, event.frame?.parent?.url, event.initiator?.url)
         )
           return;
         if (!initial || !event.isMainFrame || event.url !== ticket.url) event.preventDefault();

@@ -168,8 +168,14 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
 function start(dirs: DataDirs): void {
   let toolWindows: ToolWindows | undefined;
   let previews: ProjectPreviews | undefined;
-  const previewFrame = (contents: Electron.WebContents, url: string) =>
-    previews?.allowsFrame(toolWindows?.fileOwner(contents) ?? contents, url) ?? false;
+  const previewFrame = (
+    contents: Electron.WebContents,
+    url: string,
+    parent?: string,
+    initiator?: string,
+  ) =>
+    previews?.allowsFrame(toolWindows?.fileOwner(contents) ?? contents, url, parent, initiator) ??
+    false;
   app.on('session-created', (created) => {
     applyPermissionPolicy(created, trustedOrigins);
   });
@@ -178,7 +184,9 @@ function start(dirs: DataDirs): void {
       contents,
       trustedOrigins,
       (details) => toolWindows?.open(contents, details),
-      (url) => previewFrame(contents, url),
+      (url, parent, initiator) => previewFrame(contents, url, parent, initiator),
+      (from, to) =>
+        previews?.followLink(contents, toolWindows?.fileOwner(contents) ?? contents, from, to),
     );
   });
   app.on('second-instance', (_event, argv, workingDirectory) => {

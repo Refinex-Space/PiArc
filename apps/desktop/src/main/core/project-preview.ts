@@ -5,7 +5,7 @@ import { projectChunk, readProjectRange } from './project-file-stream.js';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { protocol, type WebContents, type CustomScheme } from 'electron';
-import { IPC_CHANNELS, isSessionId } from '../../shared/ipc.js';
+import { APP_EVENT_CHANNEL, IPC_CHANNELS, isSessionId, type AppEvent } from '../../shared/ipc.js';
 import { isProjectPath, projectRecord } from '../../shared/project-files.js';
 import type { RegisterHandler } from '../ipc/register.js';
 import type { CoreRuntime } from './native/piarc-core.js';
@@ -79,11 +79,53 @@ export class ProjectPreviews {
       return undefined;
     }
   }
-  allowsFrame(owner: WebContents, url: string) {
+  allowsFrame(owner: WebContents, url: string, parent?: string, initiator?: string) {
+    // Chromium's built-in PDF viewer creates a child for its own PDF stream. Electron
+    // reports both initiator and parent as the built-in viewer, not the workbench.
+    const viewer = 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/';
+    if (
+      parent === viewer + 'index.html' &&
+      initiator === parent &&
+      url.startsWith(viewer) &&
+      /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/u.test(url.slice(viewer.length))
+    ) {
+      return [...this.grants.values()].some(
+        (g) => g.owner === owner && g.mode === 'media' && mime(g.file) === 'application/pdf',
+      );
+    }
     const entry = this.entry(url);
     return !!entry && entry.file === entry.grant.file && entry.grant.owner === owner;
   }
-  register(register: RegisterHandler, input: Pick<TerminalOwners, 'requireInput'>) {
+  followLink(
+    sender: WebContents,
+    owner: WebContents,
+    initiator: string | undefined,
+    target: string,
+  ) {
+    const source = initiator ? this.entry(initiator) : undefined;
+    if (
+      !source ||
+      source.grant.mode === 'media' ||
+      source.file !== source.grant.file ||
+      source.grant.owner !== owner ||
+      !this.input?.hasRecentInput(sender.id)
+    )
+      return;
+    const local = this.entry(target);
+    let event: AppEvent;
+    if (local?.grant === source.grant)
+      event = { type: 'projectFileLink', sessionId: source.grant.id, path: local.file };
+    else if (/^https?:\/\//iu.test(target))
+      event = { type: 'projectWebLink', sessionId: source.grant.id, url: target };
+    else return;
+    if (!owner.isDestroyed()) owner.send(APP_EVENT_CHANNEL, event);
+  }
+  private input?: Pick<TerminalOwners, 'hasRecentInput'>;
+  register(
+    register: RegisterHandler,
+    input: Pick<TerminalOwners, 'requireInput' | 'hasRecentInput'>,
+  ) {
+    this.input = input;
     register(
       IPC_CHANNELS.projectFilePreview,
       async ({ sender, senderFrame }, [id, file, mode, token]) => {

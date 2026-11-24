@@ -35,7 +35,8 @@ export function guardWebContents(
   contents: WebContents,
   trustedOrigins: readonly string[],
   toolWindow?: (details: HandlerDetails) => WindowOpenHandlerResponse | undefined,
-  previewFrame?: (url: string) => boolean,
+  previewFrame?: (url: string, parent?: string, initiator?: string) => boolean,
+  followPreviewLink?: (from: string | undefined, to: string) => void,
 ): void {
   contents.on('will-navigate', (event) => {
     if (!isTrustedUrl(event.url, trustedOrigins)) {
@@ -50,9 +51,10 @@ export function guardWebContents(
     if (
       !event.isMainFrame &&
       !isTrustedUrl(event.url, trustedOrigins) &&
-      !previewFrame?.(event.url)
+      !previewFrame?.(event.url, event.frame?.parent?.url, event.initiator?.url)
     ) {
       event.preventDefault();
+      followPreviewLink?.(event.initiator?.url, event.url);
       console.warn(`[security] blocked frame navigation to ${originForLog(event.url)}`);
     }
   });

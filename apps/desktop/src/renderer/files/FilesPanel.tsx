@@ -6,10 +6,10 @@ import { useSurfaceDocument } from '../app/surface-document.js';
 import { attachSnippet } from '../composer/snippets.js';
 import { useSession } from '../store/hooks.js';
 import { showTerminal } from '../terminal/panel-state.js';
-import { FolderIcon, MoreIcon, SearchIcon, RailIcon } from '../shell/icons.js';
+import { FolderIcon, SearchIcon, RailIcon } from '../shell/icons.js';
 import { ToolHeaderContent } from '../shell/ToolHeaderSlot.js';
 import { Dialog } from '../shell/Dialog.js';
-import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
+import type { MenuItem } from '../shell/Menu.js';
 import { PanelEmpty } from '../shell/PanelEmpty.js';
 import { showPanel } from '../shell/registry.js';
 import { usePanelPresentation } from '../shell/WorkbenchPanels.js';
@@ -19,13 +19,12 @@ import { FileTree, type TreeOpenOptions } from './FileTree.js';
 import { FileActionsMenu, type FileActions, type FileMenuPoint } from './FileActionsMenu.js';
 import {
   FileViewer,
-  DEFAULT_VIEWER_SETTINGS,
   discardViewerDraft,
   type FileSelection,
   type ViewerRequest,
-  type ViewerSettings,
 } from './FileViewer.js';
 import { FileBreadcrumb } from './FileBreadcrumb.js';
+import { FileSettings, useFileSettings } from './FileSettings.js';
 import { FileTabStrip } from './FileTabs.js';
 import { closeFiles, restoreTabs, selectFile } from './file-tabs.js';
 import {
@@ -37,28 +36,6 @@ import {
 import { onFilesControl } from './file-controls.js';
 import { useFileWatch } from './use-file-watch.js';
 
-function readSettings(): ViewerSettings {
-  let saved: unknown;
-  try {
-    saved = JSON.parse(localStorage.getItem('piarc.files.preferences') ?? 'null');
-  } catch {
-    return DEFAULT_VIEWER_SETTINGS;
-  }
-  const settings = { ...DEFAULT_VIEWER_SETTINGS };
-  if (!projectRecord(saved)) return settings;
-  for (const key of [
-    'autoSave',
-    'tabIndents',
-    'wordWrap',
-    'indentGuides',
-    'showWhitespace',
-    'scrollPastEnd',
-  ] as const)
-    if (typeof saved[key] === 'boolean') settings[key] = saved[key];
-  if (typeof saved.tabSize === 'number' && [2, 4, 8].includes(saved.tabSize))
-    settings.tabSize = saved.tabSize;
-  return settings;
-}
 export function FilesPanel({ id }: { id: string }) {
   const t = useT(),
     ui = useUi(),
@@ -68,7 +45,7 @@ export function FilesPanel({ id }: { id: string }) {
   const root = projectFileRoot(session);
   const [tabs, setTabs] = useState(() => restoreTabs(id)),
     [dirty, setDirty] = useState<ReadonlySet<string>>(new Set());
-  const [settings, setSettings] = useState(readSettings);
+  const [settings, setSettings] = useFileSettings();
   const [previewTabs, setPreviewTabs] = useState(
     () => localStorage.getItem('piarc.files.preview-tabs') !== 'false',
   );
@@ -100,7 +77,6 @@ export function FilesPanel({ id }: { id: string }) {
   const [editors, setEditors] = useState<{ id: string; name: string }[]>([]);
   const [dirs, setDirs] = useState<readonly string[]>(['']);
   const revision = useFileWatch(id, dirs, tabs.active, doc);
-  const menu = useMenu();
   const small = innerWidth > 0 && innerWidth < 440;
   const showTree = small ? smallTree || !tabs.active : treeShown;
   const showingOnlyTree = small && showTree;
@@ -196,6 +172,15 @@ export function FilesPanel({ id }: { id: string }) {
       if (id === key) take();
     });
   }, [id, select]);
+  useEffect(
+    () =>
+      window.piarc.onAppEvent((event) => {
+        if (event.type === 'projectFileLink' && event.sessionId === id) select(event.path);
+        else if (event.type === 'projectWebLink' && event.sessionId === id)
+          void window.piarc.openExternal(event.url).catch(report);
+      }),
+    [id, select, report],
+  );
   const close = useCallback(
     (names: readonly string[], after?: () => void) => {
       const affected = names.filter((p) => dirty.has(p));
@@ -299,63 +284,6 @@ export function FilesPanel({ id }: { id: string }) {
   const issue = (action: ViewerRequest['action']) => {
     if (active) setCommand({ action, file: active, nonce: performance.now() });
   };
-  const settingsItems: MenuItem[] = [
-    ...(['find', 'goToLine', 'copy', 'reload'] as const).map((key) => ({
-      id: key,
-      label: t(`files.${key}`),
-      disabled: !active,
-      run: () => {
-        issue(key);
-      },
-    })),
-    {
-      id: 'download',
-      label: t('files.download'),
-      disabled: !active,
-      run: () => {
-        if (active) void window.piarc.projectFileAction(id, active, 'download').catch(report);
-      },
-    },
-    { id: 'tree', label: t('files.showTree'), selected: showTree, run: toggleTree },
-    {
-      id: 'preview',
-      label: t('files.previewTabs'),
-      selected: previewTabs,
-      run: () => {
-        setPreviewTabs(!previewTabs);
-        if (previewTabs) setTabs((old) => ({ ...old, preview: null }));
-      },
-    },
-    ...(
-      [
-        'autoSave',
-        'tabIndents',
-        'wordWrap',
-        'indentGuides',
-        'showWhitespace',
-        'scrollPastEnd',
-      ] as const
-    ).map((key) => ({
-      id: key,
-      label: t(`files.${key}`),
-      selected: settings[key],
-      run: () => {
-        setSettings((s) => ({ ...s, [key]: !s[key] }));
-      },
-    })),
-    {
-      id: 'tabSize',
-      label: t('files.tabSize'),
-      submenu: [2, 4, 8].map((n) => ({
-        id: String(n),
-        label: String(n),
-        selected: settings.tabSize === n,
-        run: () => {
-          setSettings((s) => ({ ...s, tabSize: n }));
-        },
-      })),
-    },
-  ];
   const setTreeWidth = (n: number) => {
     setWidth(Math.round(Math.min(Math.max(120, n), Math.max(120, innerWidth - 180))));
   };
@@ -427,16 +355,22 @@ export function FilesPanel({ id }: { id: string }) {
           <IconButton label={t('files.quick')} onClick={focusSearch}>
             <SearchIcon />
           </IconButton>
-          <IconButton
-            label={t('files.settings')}
-            aria-haspopup="menu"
-            onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect();
-              menu.openAt(r.left, r.bottom, e.currentTarget);
+          <FileSettings
+            settings={settings}
+            change={setSettings}
+            showTree={showTree}
+            toggleTree={toggleTree}
+            previewTabs={previewTabs}
+            togglePreview={() => {
+              setPreviewTabs(!previewTabs);
+              if (previewTabs) setTabs((old) => ({ ...old, preview: null }));
             }}
-          >
-            <MoreIcon />
-          </IconButton>
+            active={!!active}
+            issue={issue}
+            download={() => {
+              if (active) void window.piarc.projectFileAction(id, active, 'download').catch(report);
+            }}
+          />
         </div>
       </ToolHeaderContent>
       <div
@@ -543,14 +477,6 @@ export function FilesPanel({ id }: { id: string }) {
           ))}
         </div>
       </div>
-      {menu.open && (
-        <MenuPopup
-          label={t('files.settings')}
-          at={menu.open}
-          items={settingsItems}
-          onClose={menu.close}
-        />
-      )}
       {fileMenu && (
         <FileActionsMenu
           at={fileMenu.at}
