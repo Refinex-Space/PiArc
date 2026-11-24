@@ -421,19 +421,19 @@ export function Shell() {
         break;
       }
       case 'session.sideChat':
-        if (selected && !trust && !shortcutsOpen) {
+        if (selected && !shortcutsOpen) {
           setSideSession(selected);
           showPanel('side-chat');
         }
         break;
       case 'session.model':
-        if (!trust && !shortcutsOpen) modelButton.current?.click();
+        if (!shortcutsOpen) modelButton.current?.click();
         break;
       case 'session.effort':
-        if (!trust && !shortcutsOpen) effortButton.current?.click();
+        if (!shortcutsOpen) effortButton.current?.click();
         break;
       case 'session.permissionMode':
-        if (!trust && !shortcutsOpen) modeButton.current?.click();
+        if (!shortcutsOpen) modeButton.current?.click();
         break;
       case 'session.next': {
         const order = groupSessions(
@@ -458,7 +458,7 @@ export function Shell() {
         setShortcutsOpen(true);
         break;
       case 'app.commandPalette':
-        if (!trust && !shortcutsOpen) setPaletteOpen(true);
+        if (!shortcutsOpen) setPaletteOpen(true);
         break;
       case 'changes.toggle':
         if (view.kind === 'session') {
