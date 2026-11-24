@@ -12,6 +12,9 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
+import { decorateCodeCard, focusedCard, focusCard } from './code-card.js';
+import { fenceAt, languageSlot, shapeOf } from './code-card-model.js';
+import { codeCardKeys } from './code-card-keys.js';
 import { RichWidget, type WidgetContent, hostOf } from './widget-host.js';
 import { TableWidget, tableArrowKeys } from './live-table.js';
 import { parseTable } from './table-model.js';
@@ -181,12 +184,15 @@ function inlineDecorations(view: EditorView): DecorationSet {
           } else if (!lineSelected()) replace(from, to, new Marker('bullet'));
         } else if (name === 'TaskMarker') {
           if (!active) replace(from, to, new Marker('task', /x/iu.test(state.sliceDoc(from, to))));
-        } else if (
-          name === 'Blockquote' ||
-          name === 'FencedCode' ||
-          name === 'CodeBlock' ||
-          name === 'FrontMatter'
-        ) {
+        } else if (name === 'FencedCode' || name === 'BlockMath') {
+          const shape = shapeOf(state, n);
+          const fromLine = state.doc.lineAt(
+            Math.max(shape ? shape.open.to + 1 : from, r.from),
+          ).number;
+          const toLine = state.doc.lineAt(Math.min(shape ? shape.close.from - 1 : to, r.to)).number;
+          for (let i = fromLine; i <= toLine; i++) line(state.doc.line(i).from, 'md-code-block');
+          return false;
+        } else if (name === 'Blockquote' || name === 'CodeBlock' || name === 'FrontMatter') {
           const firstLine = state.doc.lineAt(from);
           const callout =
             name === 'Blockquote' && n.parent?.name === 'Document'
@@ -259,10 +265,12 @@ function inlineDecorations(view: EditorView): DecorationSet {
     out.push(Decoration.line({ class: [...classes].join(' ') }).range(from));
   return Decoration.set(out, true);
 }
-function blockWidgets(state: EditorState): DecorationSet {
-  if (!state.facet(liveMode)) return Decoration.none;
+const noBlocks = { decorations: Decoration.none, fences: Decoration.none };
+function blockWidgets(state: EditorState) {
+  if (!state.facet(liveMode)) return noBlocks;
   const range = state.field(viewport);
-  const out: Range<Decoration>[] = [];
+  const out: Range<Decoration>[] = [],
+    fences: Range<Decoration>[] = [];
   syntaxTree(state).iterate({
     from: range.from,
     to: range.to,
@@ -283,18 +291,25 @@ function blockWidgets(state: EditorState): DecorationSet {
         return false;
       }
       if (ref.name === 'FencedCode' || ref.name === 'BlockMath') {
-        if (ref.to - ref.from > 65536) return false;
+        const shape = shapeOf(state, n);
+        const at = state.field(focusedCard);
+        const editing =
+          !state.readOnly &&
+          (touches(state, ref.from, ref.to) || (at !== null && at >= ref.from && at <= ref.to));
         const child = (name: string, node: SyntaxNode = n) => {
           const c = node.getChild(name);
           return c ? state.sliceDoc(c.from, c.to) : '';
         };
-        const lang = child('CodeInfo').trim().toLowerCase();
+        const lang = languageSlot(state, n)?.lang.toLowerCase() ?? '';
         let content: WidgetContent | undefined;
-        if (ref.name === 'BlockMath') {
+        if (ref.name === 'BlockMath' && ref.to - ref.from <= 65536) {
           const src = state.sliceDoc(ref.from, ref.to);
           if (src.endsWith('$$') && src.length > 4)
             content = { kind: 'math', source: src.slice(2, -2).trim(), inline: false };
-        } else if (lang === 'mermaid' || ['latex', 'tex', 'math', 'katex'].includes(lang)) {
+        } else if (
+          ref.to - ref.from <= 65536 &&
+          (lang === 'mermaid' || ['latex', 'tex', 'math', 'katex'].includes(lang))
+        ) {
           if (n.getChildren('CodeMark').length >= 2)
             content = {
               kind: lang === 'mermaid' ? 'mermaid' : 'math',
@@ -302,9 +317,10 @@ function blockWidgets(state: EditorState): DecorationSet {
               inline: false,
             };
         }
+        if (shape && (!content || editing))
+          decorateCodeCard(shape, state.readOnly, state.doc.length, out, fences);
         if (content) {
           const widget = new RichWidget(content);
-          const editing = touches(state, ref.from, ref.to);
           out.push(
             editing
               ? Decoration.widget({ widget, block: true, side: 1 }).range(ref.to)
@@ -316,19 +332,22 @@ function blockWidgets(state: EditorState): DecorationSet {
       return !['Paragraph', 'FrontMatter', 'HTMLBlock'].includes(ref.name);
     },
   });
-  return Decoration.set(out, true);
+  return { decorations: Decoration.set(out, true), fences: Decoration.set(fences, true) };
 }
-const blocks = StateField.define<DecorationSet>({
+const blocks = StateField.define<ReturnType<typeof blockWidgets>>({
   create: (state) => blockWidgets(state),
   update: (deco, tr) =>
     tr.docChanged ||
     tr.selection ||
     tr.reconfigured ||
-    tr.effects.some((e) => e.is(visible) || e.is(focus)) ||
+    tr.effects.some((e) => e.is(visible) || e.is(focus) || e.is(focusCard)) ||
     syntaxTree(tr.startState) !== syntaxTree(tr.state)
       ? blockWidgets(tr.state)
       : deco,
-  provide: (field) => EditorView.decorations.from(field),
+  provide: (field) => [
+    EditorView.decorations.from(field, (value) => value.decorations),
+    EditorView.atomicRanges.of((view) => view.state.field(field).fences),
+  ],
 });
 const liveViewport = ViewPlugin.fromClass(
   class {
@@ -372,6 +391,27 @@ const liveViewport = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 export const liveExtensions = [
+  focusedCard,
+  codeCardKeys((state) => state.facet(liveMode)),
+  EditorView.domEventHandlers({
+    mousedown(event, view) {
+      if (event.button || view.state.readOnly || !view.state.facet(liveMode)) return false;
+      const target = event.target as HTMLElement | null;
+      if (!target || target.closest('button,input,a,[role=dialog]')) return false;
+      const widget = target.closest<HTMLElement>('div.md-rich-widget');
+      if (!widget) return false;
+      const node = fenceAt(view.state, view.posAtDOM(widget));
+      if (!node) return false;
+      const first = view.state.doc.lineAt(node.from);
+      event.preventDefault();
+      view.focus();
+      view.dispatch({
+        selection: { anchor: Math.min(node.to, first.to < node.to ? first.to + 1 : node.from + 2) },
+        effects: focus.of(true),
+      });
+      return true;
+    },
+  }),
   tableArrowKeys,
   focused,
   viewport,

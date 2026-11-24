@@ -49,9 +49,10 @@ it('mounts a Markdown source editor, edits rich table cells and keeps both the d
   };
   try {
     await render('live');
+    expect(host.querySelector('.md-edit-toolbar')).toBeNull();
     const shadow = host.querySelector('.md-editor-mount')?.shadowRoot;
-    const field = shadow?.querySelector<HTMLInputElement>(
-      'tbody input[aria-label="Row 2, column 2"]',
+    const field = shadow?.querySelector<HTMLTextAreaElement>(
+      'tbody textarea[aria-label="Row 2, column 2"]',
     );
     expect(field?.value).toBe('hello');
     await act(async () => {
@@ -62,6 +63,7 @@ it('mounts a Markdown source editor, edits rich table cells and keeps both the d
     });
     expect(draft).toContain('| 1 | Ada |');
     await render('source');
+    expect(host.querySelector('.md-edit-toolbar')).toBeNull();
     expect(shadow?.querySelector('table')).toBeNull();
     const content = shadow?.querySelector<HTMLElement>('.cm-content');
     expect(content?.getAttribute('aria-label')).toBe('Markdown source editor');
@@ -74,7 +76,8 @@ it('mounts a Markdown source editor, edits rich table cells and keeps both the d
     expect(changes.at(-1)).toContain('| 1 | hello |');
     await render('live');
     expect(
-      shadow?.querySelector<HTMLInputElement>('tbody input[aria-label="Row 2, column 2"]')?.value,
+      shadow?.querySelector<HTMLTextAreaElement>('tbody textarea[aria-label="Row 2, column 2"]')
+        ?.value,
     ).toBe('hello');
   } finally {
     await act(async () => {

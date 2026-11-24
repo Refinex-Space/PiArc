@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useUi } from '../../shell/ui.js';
 import { useT } from '../../app/app-context.js';
 import {
@@ -94,13 +94,5 @@ export function useMarkdownImages(sessionId: string, path: string) {
     },
     [sessionId, path, t, format],
   );
-  const openSettings = useCallback(() => {
-    void window.piarc.openSettings('markdown').catch((e: unknown) => {
-      console.error('[files] opening Markdown settings failed', e);
-    });
-  }, []);
-  return useMemo(
-    () => ({ choose, importFiles, openSettings, dialogs: null }),
-    [choose, importFiles, openSettings],
-  );
+  return { choose, importFiles };
 }

@@ -4,6 +4,7 @@
 import { isolateHistory, undo, redo } from '@codemirror/commands';
 import type { EditorView } from '@codemirror/view';
 import { isImeComposing } from '../../composer/ime-guard.js';
+import { fitFileTable } from './table-fit.js';
 import { hostOf } from './widget-host.js';
 import {
   area,
@@ -63,7 +64,6 @@ export class TableControls {
   private viewActive = true;
   private opening = false;
   private composing = false;
-  private resize: ResizeObserver | null = null;
   private dragOrigin: {
     x: number;
     y: number;
@@ -77,8 +77,7 @@ export class TableControls {
   private status: HTMLElement;
   constructor(private readonly p: Parts) {
     const { holder, table, scroller, view } = p,
-      doc = holder.ownerDocument,
-      win = doc.defaultView;
+      doc = holder.ownerDocument;
     this.status = doc.createElement('span');
     this.status.className = 'visually-hidden';
     this.status.setAttribute('role', 'status');
@@ -153,13 +152,10 @@ export class TableControls {
       this.close(false);
       this.position();
     });
-    if (win?.ResizeObserver) {
-      this.resize = new win.ResizeObserver(() => {
-        this.position();
-      });
-      this.resize.observe(table);
-      this.resize.observe(scroller);
-    }
+    const stopFitting = fitFileTable(scroller, table, () => {
+      this.position();
+    });
+    if (stopFitting) this.cleanup.push(stopFitting);
   }
   private listen(target: EventTarget, type: string, handler: EventListener, capture = false) {
     target.addEventListener(type, handler, capture);
@@ -296,8 +292,13 @@ export class TableControls {
           height: data(Math.max(1, height)),
         });
     };
-    place('corner', x - 24, y - 24, 24, 24);
-    place('row', x - 24, r.top - h.top, 24, r.height);
+    // The prose can reach the edge of a narrow pane. Keep the grips in
+    // the available margin without widening the editor or covering the text.
+    const viewport = view.scrollDOM.getBoundingClientRect();
+    const leftGrip = Math.max(1, Math.min(24, h.left + x - viewport.left));
+    const rightGrip = Math.max(1, Math.min(24, viewport.right - h.left - end));
+    place('corner', x - leftGrip, y - 24, leftGrip, 24);
+    place('row', x - leftGrip, r.top - h.top, leftGrip, r.height);
     place(
       'column',
       left,
@@ -311,7 +312,7 @@ export class TableControls {
       'append-column',
       end,
       y,
-      24,
+      rightGrip,
       t.height,
       this.hit.col === tr.cells.length - 1 && (t.right <= scroll.right + 1 || t.width === 0),
     );
@@ -345,7 +346,7 @@ export class TableControls {
     this.close(false);
     const root = holder.getRootNode() as ShadowRoot | Document,
       previous = root.activeElement as HTMLElement | null;
-    const oldInput = previous?.tagName === 'INPUT' ? (previous as HTMLInputElement) : null;
+    const oldInput = previous?.tagName === 'TEXTAREA' ? (previous as HTMLTextAreaElement) : null;
     const selection = oldInput
       ? ([oldInput.selectionStart, oldInput.selectionEnd, oldInput.selectionDirection] as const)
       : null;
@@ -353,7 +354,7 @@ export class TableControls {
       if (previous && previous.isConnected && holder.contains(previous)) {
         previous.focus({ preventScroll: true });
         if (oldInput && selection)
-          oldInput.setSelectionRange(selection[0], selection[1], selection[2] ?? 'none');
+          oldInput.setSelectionRange(selection[0], selection[1], selection[2]);
       } else this.focusCell(m.from, cell);
     };
     this.hit = cell;
@@ -652,7 +653,7 @@ export class TableControls {
     if (!m) return;
     const current = targetCell(e.target, table) ?? this.picked?.focus ?? this.hit;
     if (!current) return;
-    const field = table.rows[current.row]?.cells[current.col]?.querySelector('input');
+    const field = table.rows[current.row]?.cells[current.col]?.querySelector('textarea');
     const stop = () => {
       e.preventDefault();
       e.stopPropagation();
@@ -710,8 +711,8 @@ export class TableControls {
     if (!view.state.readOnly && mod && !e.altKey && ['b', 'i'].includes(e.key.toLowerCase())) {
       stop();
       const mark = e.key.toLowerCase() === 'b' ? '**' : '*',
-        a = field.selectionStart ?? 0,
-        b = field.selectionEnd ?? a;
+        a = field.selectionStart,
+        b = field.selectionEnd;
       field.setRangeText(mark + field.value.slice(a, b) + mark, a, b, 'select');
       field.setSelectionRange(a + mark.length, b + mark.length);
       field.dispatchEvent(new Event('input', { bubbles: true }));
@@ -786,7 +787,6 @@ export class TableControls {
     this.viewActive = false;
     this.close(false);
     this.stopPointer?.();
-    this.resize?.disconnect();
     for (const off of this.cleanup) off();
   }
 }

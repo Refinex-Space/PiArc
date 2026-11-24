@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { BrowserWindow } from 'electron';
 import { expect, test, stubFolderDialog } from './sessions.js';
 import { openSession, idle } from './t19.js';
-import { closeSettings } from './settings-panel.js';
+import { closeSettings, openSettings } from './settings-panel.js';
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 const article = [
   '# Field notes',
@@ -151,7 +151,8 @@ test('Markdown image settings control the real paste destination and the inline 
   await page.getByTestId('tile-maximize-files').click();
   await page.getByRole('treeitem', { name: 'guide.md', exact: true }).click();
   await page.getByTestId('md-mode-edit').check();
-  await page.getByRole('button', { name: 'Image settings' }).click();
+  await openSettings(page);
+  await page.getByTestId('settings-nav-markdown').click();
   await expect(page.getByTestId('settings-nav-markdown')).toBeVisible();
   await page.getByTestId('markdown-image-location').selectOption('relative');
   await page.getByLabel('Relative folder', { exact: true }).fill('pictures');
@@ -227,7 +228,8 @@ test('an explicitly selected local image folder receives the file and revoking i
   await page.getByTestId('tile-maximize-files').click();
   await page.getByRole('treeitem', { name: 'note.md', exact: true }).click();
   await page.getByTestId('md-mode-edit').check();
-  await page.getByRole('button', { name: 'Image settings' }).click();
+  await openSettings(page);
+  await page.getByTestId('settings-nav-markdown').click();
   await stubFolderDialog(app, directory);
   await page.getByTestId('markdown-image-location').selectOption('selected');
   await expect(page.getByTestId('settings-window')).toContainText(directory);
@@ -250,7 +252,10 @@ test('an explicitly selected local image folder receives the file and revoking i
   await editor.press(mod + '+End');
   await editor.press('End');
   await editor.press('Enter');
-  await page.getByRole('button', { name: 'Insert images' }).click();
+  await editor.press('Shift+F10');
+  const menu = page.getByRole('menu', { name: 'Markdown actions', exact: true });
+  await menu.getByRole('menuitem', { name: 'Insert', exact: true }).hover();
+  await page.getByRole('menuitem', { name: 'Insert images', exact: true }).click();
   await app.evaluate(
     () => (globalThis as { __piarcImageDialogClosed?: Promise<boolean> }).__piarcImageDialogClosed,
   );
@@ -270,7 +275,8 @@ test('an explicitly selected local image folder receives the file and revoking i
     )
     .toBe(4);
   await page.getByTestId('md-mode-edit').check();
-  await page.getByRole('button', { name: 'Image settings' }).click();
+  await openSettings(page);
+  await page.getByTestId('settings-nav-markdown').click();
   await page.getByRole('button', { name: 'Forget folder' }).click();
   await closeSettings(page);
   await page.getByTestId('md-mode-preview').check();
@@ -307,8 +313,10 @@ test('the document slash menu, selection toolbar and code language picker edit t
     .poll(() => readFile(path.join(ws, 'commands.md'), 'utf8'))
     .toContain('**Plain text**');
   const picker = page.getByLabel('Code block language', { exact: true });
-  await picker.focus();
-  await picker.selectOption('typescript');
+  await expect(picker).toHaveCount(0);
+  await page.getByTestId('md-mode-edit').check();
+  await picker.fill('typescr');
+  await picker.press('Enter');
   await expect
     .poll(() => readFile(path.join(ws, 'commands.md'), 'utf8'))
     .toContain('```typescript\nlet value = 20;');
@@ -322,6 +330,51 @@ test('the document slash menu, selection toolbar and code language picker edit t
   await expect
     .poll(() => readFile(path.join(ws, 'commands.md'), 'utf8'))
     .toMatch(/\|[^\n]*\|\n\|[ :-]+\|/u);
+});
+
+test('source and split editors expose cell edits in the body menu and find and replace from the keyboard', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  const source = '| Name | Date |\n| --- | --- |\n| Tea | Monday |\n| Coffee | Friday |';
+  const { ws } = await openSession(
+    app,
+    page,
+    workspaces,
+    'Source table',
+    't18-chat',
+    'Open the table',
+    { 'calendar.md': source },
+  );
+  await idle(page);
+  await page.getByTestId('tool-files').click();
+  await page.getByTestId('tile-maximize-files').click();
+  await page.getByRole('treeitem', { name: 'calendar.md' }).click();
+  for (const mode of ['source', 'split'] as const) {
+    await page.getByTestId('md-mode-' + mode).check();
+    const editor = page.getByTestId('markdown-editor-input');
+    await editor.click();
+    await editor.press(mod + '+End');
+    await editor.press('End');
+    await editor.press('ArrowLeft');
+    await editor.press('ArrowLeft');
+    await editor.press('Shift+F10');
+    await page.getByRole('menuitem', { name: 'Table actions', exact: true }).hover();
+    const actions = page.getByRole('menu', { name: 'Table actions', exact: true });
+    await expect(actions.getByRole('menuitem', { name: 'Move row down' })).toBeDisabled();
+    await actions.getByRole('menuitem', { name: 'Insert row below' }).click();
+    const disk = () => readFile(path.join(ws, 'calendar.md'), 'utf8');
+    await expect.poll(disk).toMatch(/\| Coffee \| Friday \|\n\| *\| *\|$/u);
+    await editor.press(mod + '+z');
+    await expect.poll(disk).toBe(source);
+    await editor.press(mod + '+f');
+    const find = page.getByRole('textbox', { name: 'Find', exact: true });
+    await expect(find).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Replace', exact: true })).toBeVisible();
+    await page.locator('.cm-search').getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.locator('.md-edit-toolbar')).toHaveCount(0);
+  }
 });
 
 test('the grouped block menu accepts pinyin, navigates diagram types and renders the inserted document', async ({

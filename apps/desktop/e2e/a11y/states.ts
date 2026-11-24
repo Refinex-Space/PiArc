@@ -174,6 +174,16 @@ export const A11Y_STATES = [
     area: 'state',
     note: 'Markdown reading with local images, math and footnotes',
   },
+  {
+    id: 'state:md-outline',
+    area: 'state',
+    note: 'hoverable heading rail and keyboard-operable document outline',
+  },
+  {
+    id: 'state:md-code-language',
+    area: 'state',
+    note: 'searchable code card footer with language suggestions',
+  },
   { id: 'state:md-live', area: 'state', note: 'live Markdown editor and its formatting controls' },
   { id: 'state:md-split', area: 'state', note: 'Markdown source alongside its rendered draft' },
   {

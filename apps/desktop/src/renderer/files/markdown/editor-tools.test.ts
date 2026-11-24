@@ -8,9 +8,9 @@ import { widgetHost } from './widget-host.js';
 import { markdownSupport } from './language.js';
 import { slashMenu, slashState } from './slash-menu.js';
 import { selectionTools } from './selection-tools.js';
-import { fenceLanguages } from './fence-language.js';
+import { liveMode, liveExtensions } from './live-preview.js';
 
-function editor(text = '', readonly = false) {
+function editor(text = '', readonly = false, live = false) {
   const t = new Translator('en');
   const parent = document.createElement('div');
   const state = EditorState.create({
@@ -22,7 +22,8 @@ function editor(text = '', readonly = false) {
       widgetHost.of({ t: (k, v) => t.t(k, v), mount: () => undefined, unmount: () => undefined }),
       slashMenu,
       selectionTools,
-      fenceLanguages,
+      liveMode.of(live),
+      ...liveExtensions,
       EditorState.readOnly.of(readonly),
     ],
   });
@@ -125,14 +126,15 @@ it('applies floating selection formatting to the selected range, preserving fenc
 });
 it('updates only the language token from the fence picker, preserving metadata, delimiter, body and undo', () => {
   const body = '~~~ts title="demo"\nlet n = 3;\n~~~~';
-  const view = editor(body);
+  const view = editor(body, false, true);
   try {
-    const field = view.dom.querySelector<HTMLSelectElement>('select.md-fence-lang');
+    const field = view.dom.querySelector<HTMLInputElement>('.md-code-footer input[role=combobox]');
     expect(field?.value).toBe('ts');
     if (!field) throw new Error('Missing code language selector');
     field.dispatchEvent(new FocusEvent('focus'));
     field.value = 'python';
-    field.dispatchEvent(new Event('change'));
+    field.dispatchEvent(new Event('input'));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(view.state.doc.toString()).toBe('~~~python title="demo"\nlet n = 3;\n~~~~');
     expect(undo(view)).toBe(true);
     expect(view.state.doc.toString()).toBe(body);

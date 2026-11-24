@@ -18,9 +18,9 @@ import type { ListItem } from '../transcript/markdown/ir.js';
 import { parentPath, projectFileRoot } from './file-path.js';
 import { MarkdownImage } from './markdown/MarkdownImage.js';
 import { markdownRichBlock } from './markdown/RichBlock.js';
-import { useParsedDocument } from './markdown/use-parsed-document.js';
+import { useParsedDocument, type ParsedDocument } from './markdown/use-parsed-document.js';
 import { taskMarker } from './markdown/task-marker.js';
-import type { DocumentBlock, Heading } from './markdown/document-model.js';
+import type { DocumentBlock } from './markdown/document-model.js';
 
 export interface MarkdownReaderHandle {
   scrollToLine: (line: number) => void;
@@ -33,7 +33,6 @@ interface Props {
   onChange?: (s: string) => void;
   onScrollLine?: (line: number) => void;
   readerRef?: RefObject<MarkdownReaderHandle | null>;
-  onHeadings?: (headings: readonly Heading[]) => void;
 }
 function anchorKey(s: string) {
   try {
@@ -62,22 +61,26 @@ const Chapter = memo(function Chapter({ entry }: { entry: DocumentBlock }) {
     </section>
   );
 });
-export function FileMarkdown({
+export function FileMarkdown(props: Props) {
+  const parsed = useParsedDocument(props.text);
+  return <MarkdownReader {...props} parsed={parsed} />;
+}
+
+export function MarkdownReader({
+  parsed,
   sessionId,
   path,
   text,
   onChange,
   onScrollLine,
-  onHeadings,
   readerRef,
-}: Props) {
+}: Props & { parsed: ParsedDocument | undefined }) {
   const { transcriptServices: services } = useUi(),
     store = useStore(),
     t = useT();
   const root = projectFileRoot(useSession(sessionId)),
     element = useRef<HTMLDivElement>(null);
-  const parsed = useParsedDocument(text),
-    model = parsed?.document;
+  const model = parsed?.document;
   const [limit, setLimit] = useState(64),
     [pendingAnchor, setAnchor] = useState<string>(),
     group = useId();
@@ -145,9 +148,6 @@ export function FileMarkdown({
       sync(line);
     }
   }, [limit, model, pendingAnchor, safeReveal, sync]);
-  useEffect(() => {
-    if (model) onHeadings?.(model.headings);
-  }, [model, onHeadings]);
   useEffect(() => {
     if (!model || limit >= model.blocks.length) return;
     const id = window.requestIdleCallback(
@@ -234,7 +234,7 @@ export function FileMarkdown({
           ref={element}
           className="file-document file-prose markdown-reader"
           data-testid="markdown-reader"
-          aria-busy={!parsed}
+          aria-busy={!model && !parsed?.error}
           onScroll={scrolled}
         >
           <article>

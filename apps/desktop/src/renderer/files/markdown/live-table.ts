@@ -1,68 +1,26 @@
-import { syntaxTree } from '@codemirror/language';
-import { Prec, type EditorState } from '@codemirror/state';
-import type { SyntaxNode } from '@lezer/common';
+import { Prec } from '@codemirror/state';
 // Table mutations reuse Markdown Studio's lossless cell model. Every keystroke becomes
 // a CodeMirror transaction, so autosave, undo, and external-file conflict detection share it.
-import { isolateHistory } from '@codemirror/commands';
 import { TableControls } from './table-controls.js';
 import { WidgetType, keymap, type EditorView } from '@codemirror/view';
+import { repeatTableHeadings } from './table-fit.js';
 import { paintCell } from './table-cell.js';
 import { hostOf } from './widget-host.js';
-import {
-  parseTable,
-  cellText,
-  setCell,
-  insertRow,
-  insertColumn,
-  deleteRow,
-  deleteColumn,
-  alignColumn,
-  moveColumn,
-  moveRow,
-  type Change,
-  type TableModel,
-} from './table-model.js';
+import { parseTable, cellText, setCell } from './table-model.js';
 interface Cell {
   row: number;
   col: number;
 }
-export type TableAction =
-  | 'addRow'
-  | 'addColumn'
-  | 'deleteRow'
-  | 'deleteColumn'
-  | 'alignLeft'
-  | 'alignCenter'
-  | 'alignRight'
-  | 'moveLeft'
-  | 'moveRight'
-  | 'moveUp'
-  | 'moveDown'
-  | 'source';
-export const tableActions: readonly TableAction[] = [
-  'addRow',
-  'addColumn',
-  'deleteRow',
-  'deleteColumn',
-  'alignLeft',
-  'alignCenter',
-  'alignRight',
-  'moveLeft',
-  'moveRight',
-  'moveUp',
-  'moveDown',
-  'source',
-];
 interface TableDOM {
   source: string;
   focused: Cell;
-  fields: HTMLInputElement[][];
+  fields: HTMLTextAreaElement[][];
   controls?: TableControls;
 }
 const mounted = new WeakMap<HTMLElement, TableDOM>();
 const currentCell = new WeakMap<
   EditorView,
-  { holder: HTMLElement; input: HTMLInputElement; row: number; col: number }
+  { holder: HTMLElement; input: HTMLTextAreaElement; row: number; col: number }
 >();
 export function cellSelection(view: EditorView) {
   const cell = currentCell.get(view);
@@ -82,8 +40,8 @@ export function cellSelection(view: EditorView) {
     }
     return start + source;
   };
-  const a = sourceOffset(cell.input.selectionStart ?? 0),
-    z = sourceOffset(cell.input.selectionEnd ?? 0);
+  const a = sourceOffset(cell.input.selectionStart),
+    z = sourceOffset(cell.input.selectionEnd);
   return {
     anchor: cell.input.selectionDirection === 'backward' ? z : a,
     head: cell.input.selectionDirection === 'backward' ? a : z,
@@ -91,69 +49,6 @@ export function cellSelection(view: EditorView) {
 }
 export function forgetTableSelection(view: EditorView) {
   currentCell.delete(view);
-}
-function cellChanges(
-  table: TableModel,
-  cell: Cell,
-  action: Exclude<TableAction, 'source'>,
-): Change | Change[] | null {
-  switch (action) {
-    case 'addRow':
-      return insertRow(table, cell.row);
-    case 'addColumn':
-      return insertColumn(table, cell.col + 1);
-    case 'deleteRow':
-      return deleteRow(table, cell.row);
-    case 'deleteColumn':
-      return deleteColumn(table, cell.col);
-    case 'alignLeft':
-      return alignColumn(table, cell.col, 'left');
-    case 'alignCenter':
-      return alignColumn(table, cell.col, 'center');
-    case 'alignRight':
-      return alignColumn(table, cell.col, 'right');
-    case 'moveLeft':
-      return moveColumn(table, cell.col, -1);
-    case 'moveRight':
-      return moveColumn(table, cell.col, 1);
-    case 'moveUp':
-      return moveRow(table, cell.row, -1);
-    case 'moveDown':
-      return moveRow(table, cell.row, 1);
-  }
-}
-export function tableAtCursor(state: EditorState): SyntaxNode | null {
-  const pos = state.selection.main.head;
-  for (const bias of [1, -1] as const) {
-    for (let n: SyntaxNode | null = syntaxTree(state).resolveInner(pos, bias); n; n = n.parent) {
-      if (n.name === 'Table') return n;
-    }
-  }
-  return null;
-}
-export function applySourceTableAction(view: EditorView, action: TableAction) {
-  const state = view.state,
-    node = tableAtCursor(state);
-  if (!node || action === 'source' || state.readOnly || view.composing) return;
-  const model = parseTable(state.sliceDoc(node.from, node.to), node.from);
-  if (!model) return;
-  const pos = state.selection.main.head;
-  const delta = state.doc.lineAt(pos).number - state.doc.lineAt(node.from).number;
-  const row = Math.max(0, Math.min(model.rows.length, delta - 1));
-  const line = delta === 1 ? model.delimiter : row === 0 ? model.header : model.rows[row - 1];
-  const col = Math.max(
-    0,
-    Math.min(model.columns - 1, (line?.starts.filter((start) => start <= pos).length ?? 1) - 1),
-  );
-  const edits = cellChanges(model, { row, col }, action);
-  if (edits)
-    view.dispatch({
-      changes: edits,
-      annotations: isolateHistory.of('full'),
-      userEvent: 'input.table',
-      scrollIntoView: true,
-    });
-  view.focus();
 }
 function currentTable(view: EditorView, holder: HTMLElement) {
   const mountedTable = mounted.get(holder);
@@ -216,11 +111,13 @@ function tableDom(source: string, view: EditorView) {
     body = doc.createElement('tbody');
   for (const [row, line] of [model.header, ...model.rows].entries()) {
     const tr = doc.createElement('tr'),
-      fields: HTMLInputElement[] = [];
+      fields: HTMLTextAreaElement[] = [];
     state.fields[row] = fields;
     for (let col = 0; col < model.columns; col++) {
       const td = doc.createElement(row === 0 ? 'th' : 'td'),
-        input = doc.createElement('input');
+        input = doc.createElement('textarea');
+      input.rows = 1;
+      input.wrap = 'soft';
       input.value = cellText(line.segs[col]);
       input.readOnly = view.state.readOnly;
       input.tabIndex = row === 0 && col === 0 ? 0 : -1;
@@ -253,7 +150,10 @@ function tableDom(source: string, view: EditorView) {
       display.setAttribute('aria-hidden', 'true');
       paintCell(display, input.value);
       display.dataset.raw = input.value;
-      td.append(display, input);
+      const contents = doc.createElement('div');
+      contents.className = 'md-table-cell';
+      contents.append(display, input);
+      td.append(contents);
       tr.append(td);
       fields.push(input);
     }
@@ -317,18 +217,25 @@ export class TableWidget extends WidgetType {
       return false;
     state.source = this.source;
     state.controls?.invalidate();
+    let headingChanged = false;
     for (const [r, l] of [model.header, ...model.rows].entries()) {
       for (const [c, input] of (state.fields[r] ?? []).entries()) {
         const value = cellText(l.segs[c]);
         if (input.value !== value) input.value = value;
         const display = input.previousElementSibling;
         if (display && display.getAttribute('data-raw') !== value) {
+          if (r === 0) headingChanged = true;
           paintCell(display as HTMLElement, value);
           display.setAttribute('data-raw', value);
         }
-        if (input.parentElement) input.parentElement.style.textAlign = model.aligns[c] ?? 'start';
+        const cell = input.closest<HTMLTableCellElement>('td,th');
+        if (cell) cell.style.textAlign = model.aligns[c] ?? 'start';
         input.readOnly = view.state.readOnly;
       }
+    }
+    if (headingChanged) {
+      const table = holder.querySelector('table');
+      if (table) repeatTableHeadings(table);
     }
     return true;
   }

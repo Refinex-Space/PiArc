@@ -145,7 +145,7 @@ it('keeps input method composition and a concurrent edit from executing a stale 
     const cell = hover(v, 1, 0);
     button(v, 'row').click();
     const action = v.dom.querySelector<HTMLButtonElement>('[data-table-action="deleteRow"]');
-    const input = cell.querySelector('input');
+    const input = cell.querySelector('textarea');
     input?.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
     expect(v.dom.querySelector('[role=menu]')).toBeNull();
     action?.click();
@@ -180,13 +180,33 @@ it('pastes a multi-cell selection, retains one undo step and protects the header
     const clip = new DataTransfer();
     clip.setData('text/plain', 'A\tB\n1\t2');
     header
-      .querySelector('input')
+      .querySelector('textarea')
       ?.dispatchEvent(
         new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: clip }),
       );
     expect(v.state.doc.toString()).toBe('| A | B |\n| --- | --- |\n| 1 | 2 |');
     expect(undo(v)).toBe(true);
     expect(v.state.doc.toString()).toBe('| A |\n| --- |\n| 1 |');
+  } finally {
+    v.destroy();
+  }
+});
+
+it('soft-wraps the cell source without committing composition or introducing Markdown row breaks', () => {
+  const v = editor();
+  try {
+    const cell = hover(v, 1, 0);
+    const field = cell.querySelector('textarea');
+    if (!field) throw new Error('Expected a wrapping cell editor');
+    expect(field.wrap).toBe('soft');
+    field.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    field.value = '长路径'.repeat(30) + '|end';
+    field.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    expect(v.state.doc.toString()).toBe(raw);
+    field.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    expect(v.state.doc.toString()).toBe(raw.replace('A\\|B', '长路径'.repeat(30) + '\\|end'));
+    expect(undo(v)).toBe(true);
+    expect(v.state.doc.toString()).toBe(raw);
   } finally {
     v.destroy();
   }

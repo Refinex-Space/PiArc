@@ -8,9 +8,16 @@
   position: relative;
 }
 .markdown-workspace {
+  --md-document-inset: clamp(var(--piarc-space-3), 3%, var(--piarc-space-5));
   width: 100%;
   height: 100%;
   container-type: size;
+}
+.markdown-workspace:has(> .md-outline-layer) {
+  --md-rail-space: calc(24px + var(--piarc-space-4) + var(--piarc-space-1));
+}
+.markdown-workspace[data-layout='split'][data-stacked='false'] > .markdown-writing {
+  --md-rail-space: 0px;
 }
 .markdown-writing,
 .markdown-reading {
@@ -44,21 +51,47 @@
 .markdown-split-divider:is(:hover, :focus-visible) {
   background: var(--piarc-workbench-muted);
 }
-.markdown-modes.segmented {
+.file-viewer-toolbar[data-markdown] {
+  background: transparent;
+}
+.file-viewer-toolbar .markdown-modes.segmented {
   flex: none;
+  align-self: center;
+  align-items: center;
+  padding: 0;
+  gap: var(--piarc-space-1);
+  min-height: 0;
+  background: transparent;
 }
-.markdown-outline {
-  position: absolute;
-  inset-block-start: var(--piarc-space-2);
-  inset-inline-end: var(--piarc-space-2);
-  background: var(--piarc-workbench-canvas);
+.file-viewer-toolbar .markdown-modes .segment {
+  box-sizing: border-box;
+  width: var(--piarc-size-button-height);
+  height: var(--piarc-size-button-height);
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
   border-radius: var(--piarc-radius-sm);
-  opacity: 0;
+  color: var(--piarc-workbench-muted);
 }
-.markdown-reading:hover .markdown-outline,
-.markdown-reading:focus-within .markdown-outline {
-  opacity: 1;
+.file-viewer-toolbar .markdown-modes .segment-thumb {
+  inset-block: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-action-pressed);
+  box-shadow: none;
 }
+.file-viewer-toolbar .markdown-modes .segment:has(input:checked) {
+  color: var(--piarc-workbench-ink);
+}
+.file-viewer-toolbar .markdown-modes .segment:hover {
+  background: var(--piarc-surface-hover);
+}
+.file-viewer-toolbar[data-markdown] .icon-button svg,
+.file-viewer-toolbar .markdown-modes svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
 .markdown-reader.file-document {
   padding: 0;
   overflow: auto;
@@ -69,10 +102,14 @@
   color: var(--piarc-workbench-ink);
 }
 .markdown-reader > article {
-  max-inline-size: 78ch;
-  margin-inline: auto;
-  padding: var(--piarc-space-5) clamp(var(--piarc-space-4), 4%, calc(var(--piarc-space-4) * 2))
+  box-sizing: border-box;
+  inline-size: 100%;
+  padding: var(--piarc-space-5) var(--md-document-inset, var(--piarc-space-4))
     calc(var(--piarc-space-4) * 2);
+  padding-inline-end: max(
+    var(--md-document-inset, var(--piarc-space-4)),
+    var(--md-rail-space, 0px)
+  );
 }
 .markdown-reader .md {
   font-size: var(--piarc-font-size-title);

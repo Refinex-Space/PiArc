@@ -4,6 +4,7 @@
 // memoized by identity, so while a message streams only its changed tail re-renders.
 import { createContext, memo, useContext, type MouseEvent, type ReactNode } from 'react';
 
+import { fitFileTable } from '../../files/markdown/table-fit.js';
 import { fileLocation, openProjectFile } from '../../files/navigation.js';
 import { TranscriptContext } from '../services.js';
 import { revealBidi } from '../reveal.js';
@@ -265,7 +266,17 @@ const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNod
       );
     case 'table':
       return (
-        <div className="md-table-wrap">
+        <div
+          className="md-table-wrap"
+          ref={
+            document
+              ? (frame) => {
+                  const table = frame?.querySelector('table');
+                  return frame && table ? fitFileTable(frame, table) : undefined;
+                }
+              : undefined
+          }
+        >
           <table>
             <thead>
               <tr>

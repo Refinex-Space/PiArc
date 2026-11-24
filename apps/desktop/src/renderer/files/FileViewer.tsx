@@ -19,7 +19,7 @@ import { useUi } from '../shell/ui.js';
 import { FileActionsMenu, type FileActions } from './FileActionsMenu.js';
 import { useFileDocument } from './viewer-document.js';
 import { FileSelectionBar } from './viewer-selection.js';
-import { MarkdownModes, type FileMode } from './markdown/MarkdownModes.js';
+import { MarkdownActionIcon, MarkdownModes, type FileMode } from './markdown/MarkdownModes.js';
 import { ReaderSelectionTools } from './markdown/ReaderSelectionTools.js';
 import { MarkdownWorkspace, type MarkdownWorkspaceHandle } from './markdown/MarkdownWorkspace.js';
 import { FileEditor } from './viewer-editor.js';
@@ -396,7 +396,7 @@ export function FileViewer({
         }
       }}
     >
-      <div className="file-viewer-toolbar">
+      <div className="file-viewer-toolbar" data-markdown={markdown || undefined}>
         <div className="file-viewer-crumb" title={path}>
           {breadcrumb ?? path.split('/').at(-1)}
         </div>
@@ -430,7 +430,7 @@ export function FileViewer({
                 openTool('find');
               }}
             >
-              <SearchIcon />
+              {markdown ? <MarkdownActionIcon name="find" /> : <SearchIcon />}
             </IconButton>
             {!markdown && editable && mode !== 'edit' && (
               <Button
@@ -469,7 +469,7 @@ export function FileViewer({
               onAttach(path);
             }}
           >
-            <PaperclipIcon />
+            {markdown ? <MarkdownActionIcon name="attach" /> : <PaperclipIcon />}
           </IconButton>
         )}
       </div>

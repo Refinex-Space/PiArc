@@ -13,13 +13,10 @@ import { useSession } from '../../store/hooks.js';
 import { markdownTarget } from '../../transcript/markdown/text.js';
 import { fileLocation, parentPath, projectFileRoot } from '../file-path.js';
 import { openProjectFile } from '../navigation.js';
-import { IconButton } from '../../app/IconButton.js';
-import { MenuPopup, useMenu } from '../../shell/Menu.js';
-import { RailIcon } from '../../shell/icons.js';
 import { useToolVisible } from '../../shell/ToolHeaderSlot.js';
 import { useMarkdownImages } from '../markdown-images/use-markdown-images.js';
 import { SplitDivider } from './SplitDivider.js';
-import { FileMarkdown, type MarkdownReaderHandle } from '../viewer-markdown.js';
+import { MarkdownReader, type MarkdownReaderHandle } from '../viewer-markdown.js';
 import type { FileLocation } from '../viewer-source.js';
 import type { ViewerSettings, FileSelection, FindMatch } from '../viewer-model.js';
 import type { MarkdownEditorHandle } from './MarkdownEditor.js';
@@ -27,9 +24,11 @@ import type { FileMode } from './MarkdownModes.js';
 import { markdownEditingBlock } from './RichBlock.js';
 import { MarkdownMediaContext } from './MediaContextHost.js';
 import { MarkdownImage } from './MarkdownImage.js';
-import type { ParseReply } from './document.worker.js';
+import { useParsedDocument } from './use-parsed-document.js';
+import { MarkdownOutline, headingAtLine } from './MarkdownOutline.js';
 import type { Heading } from './document-model.js';
 
+const noHeadings: readonly Heading[] = [];
 const Editor = lazy(async () => ({
   default: (await import('./MarkdownEditor.js')).MarkdownEditor,
 }));
@@ -70,14 +69,6 @@ export function MarkdownWorkspace({
     editor = useRef<MarkdownEditorHandle | null>(null),
     reader = useRef<MarkdownReaderHandle | null>(null);
   const project = projectFileRoot(useSession(sessionId));
-  const anchorLookup = useRef<Worker | null>(null);
-  useLayoutEffect(
-    () => () => {
-      anchorLookup.current?.terminate();
-      anchorLookup.current = null;
-    },
-    [sessionId, path, text, mode],
-  );
   const followLink = (href: string) => {
     if (href.startsWith('#') && !/^#L\d/u.test(href)) {
       let slug: string;
@@ -86,29 +77,7 @@ export function MarkdownWorkspace({
       } catch {
         return;
       }
-      // The explicit navigation uses the same anchor and duplicate-heading mapping as reading.
-      anchorLookup.current?.terminate();
-      const worker = new Worker(new URL('./document.worker.ts', import.meta.url), {
-        type: 'module',
-        name: 'markdown-anchor',
-      });
-      anchorLookup.current = worker;
-      const finish = () => {
-        worker.terminate();
-        if (anchorLookup.current === worker) anchorLookup.current = null;
-      };
-      worker.onmessage = (event: MessageEvent<ParseReply>) => {
-        if (anchorLookup.current === worker) {
-          const match = event.data.document?.headings.find((h) => h.slug === slug);
-          if (match) editor.current?.scrollToLine(match.line);
-        }
-        finish();
-      };
-      worker.onerror = (error) => {
-        console.error('[files] resolving Markdown anchor failed', error.message);
-        finish();
-      };
-      worker.postMessage({ sequence: 1, text });
+      setAnchor(slug);
       return;
     }
     const target = markdownTarget(href);
@@ -147,9 +116,22 @@ export function MarkdownWorkspace({
   }, []);
   const [initialized, setInitialized] = useState(mode !== 'preview');
   if (mode !== 'preview' && !initialized) setInitialized(true);
-  const [headings, setHeadings] = useState<readonly Heading[]>([]);
-  const menu = useMenu(),
-    pendingFind = useRef(false);
+  const parsed = useParsedDocument(
+    text,
+    painted ? (mode === 'preview' || mode === 'split' ? 'document' : 'outline') : false,
+  );
+  const headings = parsed?.document?.headings ?? parsed?.headings ?? noHeadings;
+  const [anchor, setAnchor] = useState<string>();
+  const [activeHeading, setActiveHeading] = useState(0);
+  const pendingFind = useRef(false);
+  useLayoutEffect(() => {
+    setActiveHeading(headingAtLine(headings, topLine.current));
+    if (anchor && parsed?.source === text) {
+      const heading = headings.find((h) => h.slug === anchor);
+      if (heading) editor.current?.scrollToLine(heading.line);
+      setAnchor(undefined);
+    }
+  }, [headings, anchor, parsed?.source, text]);
   const mounted = useCallback((view: MarkdownEditorHandle | null) => {
     editor.current = view;
     if (view && topLine.current > 1) view.scrollToLine(topLine.current);
@@ -187,16 +169,18 @@ export function MarkdownWorkspace({
   const scrollReader = useCallback(
     (line: number) => {
       topLine.current = line;
+      setActiveHeading(headingAtLine(headings, line));
       if (split) reader.current?.scrollToLine(line);
     },
-    [split],
+    [split, headings],
   );
   const scrollEditor = useCallback(
     (line: number) => {
       topLine.current = line;
+      setActiveHeading(headingAtLine(headings, line));
       if (split) editor.current?.scrollToLine(line);
     },
-    [split],
+    [split, headings],
   );
   return (
     <div
@@ -234,7 +218,6 @@ export function MarkdownWorkspace({
               onSelect={onSelect}
               importImages={images.importFiles}
               chooseImage={images.choose}
-              onImageSettings={images.openSettings}
               renderImage={renderImage}
               followLink={followLink}
               renderBlock={markdownEditingBlock}
@@ -246,12 +229,12 @@ export function MarkdownWorkspace({
       {split && <SplitDivider stacked={stacked} ratio={ratio} change={setRatio} />}
       {(mode === 'preview' || split) && painted && (
         <div className="markdown-reading">
-          <FileMarkdown
+          <MarkdownReader
             sessionId={sessionId}
             path={path}
             text={text}
             readerRef={reader}
-            onHeadings={setHeadings}
+            parsed={parsed}
             onScrollLine={scrollEditor}
             {...(editable
               ? {
@@ -262,36 +245,19 @@ export function MarkdownWorkspace({
                 }
               : {})}
           />
-          {headings.length > 0 && (
-            <div className="markdown-outline">
-              <IconButton
-                label={t('files.md.outline')}
-                aria-haspopup="menu"
-                onClick={(e) => {
-                  const b = e.currentTarget.getBoundingClientRect();
-                  menu.openAt(b.right, b.bottom, e.currentTarget);
-                }}
-              >
-                <RailIcon />
-              </IconButton>
-            </div>
-          )}
         </div>
       )}
-      {menu.open && (
-        <MenuPopup
-          at={menu.open}
-          label={t('files.md.outline')}
-          filterLabel={t('files.md.findHeading')}
-          items={headings.map((h) => ({
-            id: h.slug,
-            label: h.title,
-            run: () => {
-              reader.current?.scrollToLine(h.line);
-              if (split) editor.current?.scrollToLine(h.line);
-            },
-          }))}
-          onClose={menu.close}
+      {painted && headings.length >= 2 && (
+        <MarkdownOutline
+          key={path}
+          headings={headings}
+          active={activeHeading}
+          jump={(heading, index) => {
+            topLine.current = heading.line;
+            setActiveHeading(index);
+            if (mode !== 'preview') editor.current?.scrollToLine(heading.line);
+            if (mode === 'preview' || split) reader.current?.scrollToLine(heading.line);
+          }}
         />
       )}
       <MarkdownMediaContext
@@ -301,7 +267,6 @@ export function MarkdownWorkspace({
         text={text}
         visible={painted}
       />
-      {images.dialogs}
     </div>
   );
 }

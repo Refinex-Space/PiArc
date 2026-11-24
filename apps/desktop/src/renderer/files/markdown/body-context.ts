@@ -28,6 +28,7 @@ import { fileLocation, parentPath } from '../file-path.js';
 import { openProjectFile } from '../navigation.js';
 import { applyFormat, formatActive } from './formatting.js';
 import { commandShortcut } from './selection-tools.js';
+import { sourceTableMenu } from './source-table-menu.js';
 import { runSlashItem } from './slash-menu.js';
 import { slashGroups, type Entry } from './slash-catalog.js';
 import { markdownToHtml, selectionMarkup } from './clipboard-markup.js';
@@ -274,6 +275,8 @@ export function editorBodyActions(
           ),
         },
       );
+    const table = sourceTableMenu(snapshot, at, t, edit);
+    if (table) items.push(table);
     items.push({
       id: 'md-lines',
       label: t('md.selection.line'),

@@ -1,63 +1,58 @@
-import { useEffect, useRef, useState } from 'react';
-import type { MarkdownDocument } from './document-model.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ParseReply } from './document.worker.js';
-// One worker for the visible tab. Coalesce drafts while typing, keep the previous document
-// on screen, and never paint an older parse after a newer one.
-export function useParsedDocument(text: string) {
-  const [result, setResult] = useState<{
-    document?: MarkdownDocument;
-    error?: string;
-    source: string;
-  }>();
-  const sequence = useRef(0),
-    worker = useRef<Worker | null>(null);
-  const latest = useRef(text);
-  latest.current = text;
-  const busy = useRef(false);
-  const send = (source: string) => {
-    if (!worker.current) return;
-    busy.current = true;
-    worker.current.postMessage({ sequence: ++sequence.current, text: source });
-  };
-  const sent = useRef<string | undefined>(undefined);
+type Scope = 'outline' | 'document' | false;
+export type ParsedDocument = Omit<ParseReply, 'sequence'> & { source: string };
+// The currently visible file owns one parser. Source/live modes transfer just headings.
+// Switching to reading reuses the parsed text in the same worker.
+export function useParsedDocument(text: string, scope: Scope = 'document') {
+  const [result, setResult] = useState<ParsedDocument>();
+  const request = useMemo(() => ({ text, scope }), [text, scope]),
+    latest = useRef(request);
+  latest.current = request;
+  const submit = useRef<() => void>(undefined);
+  const enabled = Boolean(scope);
   useEffect(() => {
-    const instance = new Worker(new URL('./document.worker.ts', import.meta.url), {
+    if (!enabled) return;
+    const worker = new Worker(new URL('./document.worker.ts', import.meta.url), {
       type: 'module',
       name: 'piarc-file-markdown',
     });
-    worker.current = instance;
-    sent.current = undefined;
-    busy.current = false;
-    instance.onmessage = (e: MessageEvent<ParseReply>) => {
-      if (e.data.sequence !== sequence.current) return;
-      busy.current = false;
-      const source = sent.current;
-      if (source !== undefined && source === latest.current) setResult({ ...e.data, source });
-      else {
-        sent.current = latest.current;
-        send(sent.current);
-      }
+    let sent: typeof request | undefined,
+      busy = false,
+      sequence = 0;
+    const send = () => {
+      const next = latest.current;
+      if (!next.scope || busy || sent === next) return;
+      sent = next;
+      busy = true;
+      worker.postMessage({
+        sequence: ++sequence,
+        text: next.text,
+        outlineOnly: next.scope === 'outline',
+      });
     };
-    instance.onerror = (e) => {
-      busy.current = false;
-      setResult({ source: latest.current, error: e.message });
+    submit.current = send;
+    worker.onmessage = (event: MessageEvent<ParseReply>) => {
+      if (event.data.sequence !== sequence) return;
+      busy = false;
+      if (sent && sent === latest.current) setResult({ ...event.data, source: sent.text });
+      else send();
+    };
+    worker.onerror = (e) => {
+      busy = false;
+      setResult({ source: latest.current.text, error: e.message });
     };
     return () => {
-      sequence.current++;
-      worker.current = null;
-      instance.terminate();
+      submit.current = undefined;
+      worker.terminate();
     };
-  }, []);
+  }, [enabled]);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!busy.current && sent.current !== text) {
-        sent.current = text;
-        send(text);
-      }
-    }, 60);
+    if (scope === false) return;
+    const timer = setTimeout(() => submit.current?.(), scope === 'outline' ? 120 : 60);
     return () => {
       clearTimeout(timer);
     };
-  }, [text]);
-  return result;
+  }, [request, scope]);
+  return enabled ? result : undefined;
 }

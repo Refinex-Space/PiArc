@@ -1,22 +1,19 @@
-// Adapted selection behavior from Markdown Studio's livePreview/codeBlocks.ts
-// (e6ebd0c, Apache-2.0). The control changes only the language token of the opening fence.
+// Adapted from Markdown Studio livePreview/codeBlocks.ts (e6ebd0c, Apache-2.0).
 import { isolateHistory } from '@codemirror/commands';
-import { syntaxTree } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import type { EditorState, Range } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
-import { Decoration, ViewPlugin, WidgetType, type ViewUpdate } from '@codemirror/view';
-import type { SyntaxNode } from '@lezer/common';
+import { fenceAt, languageSlot, shapeOf, validLanguage } from './code-card-model.js';
 import { hostOf } from './widget-host.js';
 
-const valid = /^[a-z0-9][a-z\d_+#.-]{0,47}$/iu;
-const options = [
+const choices = [
   ...new Set([
     'javascript',
     'typescript',
     'python',
+    'java',
     'rust',
     'go',
+    'bash',
     'shell',
     'json',
     'yaml',
@@ -25,119 +22,167 @@ const options = [
     'sql',
     'mermaid',
     'math',
-    ...languages.flatMap((l) =>
-      [l.name, ...l.alias].map((n) => n.toLowerCase()).filter((n) => valid.test(n)),
+    ...languages.flatMap((language) =>
+      [language.name, ...language.alias]
+        .map((name) => name.toLowerCase())
+        .filter((name) => validLanguage.test(name)),
     ),
   ]),
 ];
-function languageToken(state: EditorState, node: SyntaxNode) {
-  const start = node.getChild('CodeMark')?.to;
-  if (start === undefined) return null;
-  const end = state.doc.lineAt(start).to;
-  const info = state.sliceDoc(start, end);
-  const space = info.length - info.trimStart().length;
-  const lang = /^[a-z0-9][a-z\d_+#.-]*(?=\s|\{|$)/iu.exec(info.slice(space))?.[0] ?? '';
-  return {
-    from: start + space,
-    to: start + space + lang.length,
-    lang,
-    suffix: !lang && info.trim().length > 0,
+let nextListId = 0;
+
+export function languageSuggestions(value: string): string[] {
+  const q = value.trim().toLowerCase();
+  return [
+    ...choices.filter((name) => name.startsWith(q)),
+    ...choices.filter((name) => !name.startsWith(q) && name.includes(q)),
+  ].slice(0, 8);
+}
+
+export function languageField(view: EditorView, original: string, foot: HTMLElement): HTMLElement {
+  const doc = foot.ownerDocument,
+    wrap = doc.createElement('span'),
+    input = doc.createElement('input'),
+    list = doc.createElement('div');
+  const t = hostOf(view.state).t;
+  const label = t('md.edit.fenceLanguage');
+  wrap.className = 'md-code-language';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.enterKeyHint = 'done';
+  input.maxLength = 64;
+  input.value = original;
+  input.placeholder = t('md.edit.plainText');
+  input.setAttribute('aria-label', label);
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-expanded', 'false');
+  list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', label);
+  list.id = 'md-code-languages-' + String(++nextListId);
+  list.className = 'md-code-languages';
+  input.setAttribute('aria-controls', list.id);
+  wrap.append(input, list);
+  let items: string[] = [],
+    active = -1,
+    composing = false,
+    finished = false;
+  const size = () => {
+    input.size = Math.max(3, Math.min(20, (input.value || input.placeholder).length + 1));
   };
-}
-export function setFenceLanguage(view: EditorView, at: number, language: string) {
-  if (view.state.readOnly || view.composing || (language && !valid.test(language))) return false;
-  let n: SyntaxNode | null = syntaxTree(view.state).resolveInner(at, -1);
-  while (n && n.name !== 'FencedCode') n = n.parent;
-  if (!n) return false;
-  const token = languageToken(view.state, n);
-  if (!token || token.lang === language) return false;
-  view.dispatch({
-    changes: {
-      from: token.from,
-      to: token.to,
-      insert: language + (language && token.suffix ? ' ' : ''),
-    },
-    annotations: isolateHistory.of('full'),
-    userEvent: 'input.language',
+  size();
+  const close = () => {
+    list.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+  };
+  close();
+  const choose = (focusEditor: boolean, cancel = false) => {
+    if (finished || composing) return;
+    finished = true;
+    close();
+    if (!view.dom.contains(foot)) return;
+    const node = fenceAt(view.state, view.posAtDOM(foot));
+    const shape = node && shapeOf(view.state, node),
+      slot = node && languageSlot(view.state, node);
+    if (!shape || !slot) return;
+    const value = cancel ? slot.lang : input.value.trim();
+    const change =
+      !view.state.readOnly && value !== slot.lang && (!value || validLanguage.test(value));
+    const insert = value + (value && slot.separate ? ' ' : '');
+    const changes = view.state.changes(change ? { from: slot.from, to: slot.to, insert } : []);
+    input.value = change ? value : slot.lang;
+    size();
+    if (change || focusEditor)
+      view.dispatch({
+        changes,
+        ...(focusEditor
+          ? { selection: { anchor: changes.mapPos(shape.close.from - 1) }, scrollIntoView: true }
+          : {}),
+        ...(change ? { annotations: isolateHistory.of('full'), userEvent: 'input.language' } : {}),
+      });
+    if (focusEditor) view.focus();
+  };
+  const show = () => {
+    list.replaceChildren(
+      ...items.map((name, i) => {
+        const option = doc.createElement('div');
+        option.id = list.id + '-' + String(i);
+        option.textContent = name;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(i === active));
+        option.onmousedown = (event) => {
+          event.preventDefault();
+        };
+        option.onclick = () => {
+          input.value = name;
+          choose(true);
+        };
+        return option;
+      }),
+    );
+    const id = list.children[active]?.id;
+    if (id) input.setAttribute('aria-activedescendant', id);
+    else input.removeAttribute('aria-activedescendant');
+    list.hidden = !items.length;
+    input.setAttribute('aria-expanded', String(!!items.length));
+    if (items.length) {
+      const bounds = view.scrollDOM.getBoundingClientRect(),
+        at = input.getBoundingClientRect();
+      list.dataset.above = String(
+        bounds.bottom - at.bottom < list.offsetHeight + 4 &&
+          at.top - bounds.top > bounds.bottom - at.bottom,
+      );
+    }
+  };
+  const refresh = (typing: boolean) => {
+    size();
+    items = languageSuggestions(input.value);
+    active = typing && items.length ? 0 : -1;
+    show();
+  };
+  input.onfocus = () => {
+    finished = false;
+    input.select();
+    refresh(false);
+  };
+  input.oninput = () => {
+    if (!composing) refresh(true);
+  };
+  input.addEventListener('compositionstart', () => {
+    composing = true;
+    close();
   });
-  return true;
+  input.addEventListener('compositionend', () => {
+    composing = false;
+    refresh(true);
+  });
+  input.onblur = () => {
+    choose(false);
+  };
+  input.onkeydown = (e) => {
+    e.stopPropagation();
+    if (composing || e.isComposing) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!items.length) return;
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      active =
+        active < 0
+          ? step > 0
+            ? 0
+            : items.length - 1
+          : (active + step + items.length) % items.length;
+      show();
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      const selected = items[active];
+      if (selected) input.value = selected;
+      choose(true);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      choose(true, true);
+    }
+  };
+  return wrap;
 }
-class LanguageChoice extends WidgetType {
-  constructor(readonly lang: string) {
-    super();
-  }
-  override eq(other: LanguageChoice) {
-    return this.lang === other.lang;
-  }
-  toDOM(view: EditorView) {
-    const doc = view.dom.ownerDocument,
-      select = doc.createElement('select'),
-      t = hostOf(view.state).t;
-    select.className = 'md-fence-lang';
-    const label = t('md.edit.fenceLanguage');
-    select.setAttribute('aria-label', label);
-    select.title = label;
-    const add = (value: string, name: string) => {
-      const opt = doc.createElement('option');
-      opt.value = value;
-      opt.textContent = name;
-      select.append(opt);
-    };
-    add('', t('md.edit.plainText'));
-    if (this.lang) add(this.lang, this.lang);
-    select.value = this.lang;
-    let populated = false;
-    const populate = () => {
-      if (populated) return;
-      populated = true;
-      for (const lang of options) if (lang !== this.lang) add(lang, lang);
-    };
-    select.addEventListener('focus', populate);
-    select.addEventListener('pointerdown', populate);
-    select.onchange = () => {
-      const pos = view.posAtDOM(select);
-      if (setFenceLanguage(view, pos, select.value)) view.focus();
-    };
-    return select;
-  }
-}
-export const fenceLanguages = ViewPlugin.fromClass(
-  class {
-    decorations;
-    constructor(view: EditorView) {
-      this.decorations = this.collect(view);
-    }
-    collect(view: EditorView) {
-      if (view.state.readOnly) return Decoration.none;
-      const out: Range<Decoration>[] = [];
-      for (const range of view.visibleRanges)
-        syntaxTree(view.state).iterate({
-          from: range.from,
-          to: range.to,
-          enter(ref) {
-            if (ref.name !== 'FencedCode') return;
-            const pos = view.state.doc.lineAt(ref.from).to;
-            if (pos >= range.from && pos <= range.to) {
-              const token = languageToken(view.state, ref.node);
-              if (token)
-                out.push(
-                  Decoration.widget({ side: 1, widget: new LanguageChoice(token.lang) }).range(pos),
-                );
-            }
-            return false;
-          },
-        });
-      return Decoration.set(out, true);
-    }
-    update(u: ViewUpdate) {
-      if (
-        u.docChanged ||
-        u.viewportChanged ||
-        u.startState.readOnly !== u.state.readOnly ||
-        syntaxTree(u.startState) !== syntaxTree(u.state)
-      )
-        this.decorations = this.collect(u.view);
-    }
-  },
-  { decorations: (v) => v.decorations },
-);

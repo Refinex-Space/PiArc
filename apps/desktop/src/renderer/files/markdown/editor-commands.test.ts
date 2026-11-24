@@ -4,14 +4,8 @@ import { Compartment, EditorSelection, EditorState, type TransactionSpec } from 
 import { history, undo, redo } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
 import { applyFormat } from './formatting.js';
-import {
-  parseTable,
-  setCell,
-  insertColumn,
-  deleteColumn,
-  moveRow,
-  alignColumn,
-} from './table-model.js';
+import { parseTable, setCell, alignColumn } from './table-model.js';
+import { editRegion } from './table-operations.js';
 import { liveMode } from './live-preview.js';
 import { markdownSupport } from './language.js';
 import { patchSource, applyUserChange } from './MarkdownEditor.js';
@@ -89,9 +83,12 @@ describe('the Markdown editing document', () => {
     const state = EditorState.create({ doc: text });
     const update = (changes: TransactionSpec) => state.update(changes).newDoc.toString();
     expect(update({ changes: setCell(t, 1, 1, 'x|y') ?? [] })).toContain('| a\\|b | x\\|y |');
-    expect(update({ changes: insertColumn(t, 1) })).toContain('| key |  | value |');
-    expect(update({ changes: deleteColumn(t, 0) ?? [] })).toContain('| value |');
-    expect(update({ changes: moveRow(t, 1, 1) ?? [] })).toContain('| z | 2 |\n| a\\|b | a |');
+    const first = { top: 1, bottom: 1, left: 0, right: 0 };
+    expect(update({ changes: editRegion(t, first, 'addColumn') })).toContain('| key |  | value |');
+    expect(update({ changes: editRegion(t, first, 'deleteColumn') })).toContain('| value |');
+    expect(update({ changes: editRegion(t, first, 'moveDown') })).toContain(
+      '| z | 2 |\n| a\\|b | a |',
+    );
     expect(update({ changes: alignColumn(t, 0, 'center') ?? [] })).toContain('| :---: | ---: |');
   });
   it('maps an async file chooser through typing and leaves a later caret in place', async () => {

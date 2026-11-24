@@ -1,5 +1,5 @@
 import type { ImagePlacement } from '../../../shared/markdown-images.js';
-import { history, undo, redo, undoDepth, redoDepth, isolateHistory } from '@codemirror/commands';
+import { history, isolateHistory } from '@codemirror/commands';
 import { openSearchPanel, search } from '@codemirror/search';
 import {
   Compartment,
@@ -30,27 +30,13 @@ import { useSurfaceDocument } from '../../app/surface-document.js';
 import { reason } from '../../shell/errors.js';
 import type { FileSelection, FindMatch, ViewerSettings } from '../viewer-model.js';
 import type { FileLocation } from '../viewer-source.js';
-import { EditorToolbar } from './EditorToolbar.js';
-import { applyFormat, type FormatCommand } from './formatting.js';
 import { editSettings } from './editor-settings.js';
 import { editorHighlight, editorTheme } from './editor-theme.js';
-import {
-  externalReload,
-  imageInput,
-  imagePort,
-  imageTargets,
-  insertImages,
-} from './image-import.js';
+import { externalReload, imageInput, imagePort, imageTargets } from './image-import.js';
 import { markdownSupport } from './language.js';
-import {
-  applySourceTableAction,
-  tableAtCursor,
-  cellSelection,
-  forgetTableSelection,
-} from './live-table.js';
+import { cellSelection, forgetTableSelection } from './live-table.js';
 import { slashMenu } from './slash-menu.js';
 import { selectionTools } from './selection-tools.js';
-import { fenceLanguages } from './fence-language.js';
 import { liveExtensions } from './live-preview.js';
 import { widgetHost, type WidgetContent } from './widget-host.js';
 
@@ -75,7 +61,6 @@ export interface MarkdownEditorProps {
   onScrollLine?: (line: number) => void;
   importImages?: (files: readonly File[]) => Promise<readonly string[]>;
   chooseImage?: (placement: ImagePlacement) => Promise<string | null>;
-  onImageSettings?: () => void;
   renderImage?: (src: string, alt: string) => ReactNode;
   followLink?: (href: string) => void;
   renderBlock?: (kind: 'math' | 'mermaid', source: string, inline: boolean) => ReactNode;
@@ -174,8 +159,6 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
     | undefined
   >(undefined);
   const raw = useRef(props.text);
-  const [sourceTableActive, setSourceTableActive] = useState(false);
-  const [historyState, setHistoryState] = useState({ undo: false, redo: false });
   const [widgets, setWidgets] = useState<readonly WidgetItem[]>([]);
   const [error, setError] = useState('');
   const suppress = useRef(0);
@@ -295,17 +278,7 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
             if (tr.docChanged) raw.current = patchSource(raw.current, tr);
           callbacks.current.onChange(raw.current);
         }
-        if (u.selectionSet || u.docChanged) {
-          callbacks.current.onSelect(selectedText(u.state));
-          setSourceTableActive(!!tableAtCursor(u.state));
-        }
-        if (u.docChanged) {
-          const a = undoDepth(u.state) > 0,
-            b = redoDepth(u.state) > 0;
-          setHistoryState((prev) =>
-            a === prev.undo && b === prev.redo ? prev : { undo: a, redo: b },
-          );
-        }
+        if (u.selectionSet || u.docChanged) callbacks.current.onSelect(selectedText(u.state));
       }),
       EditorView.domEventHandlers({
         focus: (event, v) => {
@@ -372,7 +345,6 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
       ...liveExtensions,
       slashMenu,
       selectionTools,
-      fenceLanguages,
       imageInput,
       imageTargets,
       transport.of(bindings()),
@@ -393,9 +365,7 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
     const view = new EditorView({ state, parent: viewport, root: shadow });
     if (reuse) view.dispatch({ effects: reuse.scroll });
     runtime.current = { view, settings: presentation };
-    setSourceTableActive(!!tableAtCursor(view.state));
     remembered.current = undefined;
-    setHistoryState({ undo: undoDepth(view.state) > 0, redo: redoDepth(view.state) > 0 });
     return () => {
       remembered.current = {
         state: view.state,
@@ -460,46 +430,8 @@ export function MarkdownEditor(props: MarkdownEditorProps) {
   useLayoutEffect(() => {
     if (visible) runtime.current?.view.requestMeasure();
   }, [visible, mode, doc]);
-  const run = (cmd: FormatCommand) => {
-    if (runtime.current) applyFormat(runtime.current.view, cmd, (n) => t('md.edit.column', { n }));
-  };
   return (
     <div className="markdown-editor-pane" data-testid="markdown-editor" data-mode={mode}>
-      <EditorToolbar
-        run={run}
-        editable={editable}
-        editTable={
-          mode === 'source' && sourceTableActive
-            ? (a) => {
-                if (runtime.current) applySourceTableAction(runtime.current.view, a);
-              }
-            : undefined
-        }
-        image={
-          props.importImages
-            ? (files) => {
-                if (runtime.current) void insertImages(runtime.current.view, files);
-              }
-            : undefined
-        }
-        choose={
-          props.chooseImage
-            ? () => {
-                if (runtime.current) void insertImages(runtime.current.view);
-              }
-            : undefined
-        }
-        configureImages={props.onImageSettings}
-        findReplace={showFind}
-        undo={() => {
-          if (runtime.current) undo(runtime.current.view);
-        }}
-        redo={() => {
-          if (runtime.current) redo(runtime.current.view);
-        }}
-        canUndo={historyState.undo}
-        canRedo={historyState.redo}
-      />
       {error && (
         <div role="alert" className="file-viewer-alert">
           {error}

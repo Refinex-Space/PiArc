@@ -144,10 +144,6 @@ const lineOfRow = (t: TableModel, row: number) => (row === 0 ? t.header : t.rows
 /** Whether the table writes cells as `| a |` (spaced) rather than `|a|`. */
 const spaced = (t: TableModel) => t.header.segs.some((s) => s.startsWith(' '));
 const newCell = (t: TableModel, text = '') => (spaced(t) ? ` ${text} ` : text || ' ');
-const newDelimiter = (t: TableModel, align: Align = null) => {
-  const dashes = `${align === 'left' || align === 'center' ? ':' : ''}---${align === 'right' || align === 'center' ? ':' : ''}`;
-  return t.delimiter.segs.some((s) => s.startsWith(' ')) ? ` ${dashes} ` : dashes;
-};
 
 /** A line with exactly `n` segments (missing ones added empty). */
 function padded(t: TableModel, l: TableLine, n: number): string[] {
@@ -176,70 +172,6 @@ export function setCell(t: TableModel, row: number, col: number, text: string): 
     return { from: start, to: start + seg.length, insert: newCell(t, src) };
   }
   return { from: start + lead, to: start + lead + content.length, insert: src };
-}
-
-/** Inserts an empty body row at body index `at` (0 = first body row). */
-export function insertRow(t: TableModel, at: number): Change {
-  const like = t.rows[0] ?? t.header;
-  const text = serializeLine({
-    indent: t.delimiter.indent,
-    leading: like.leading,
-    trailing: like.trailing,
-    rest: '',
-    segs: Array.from({ length: t.columns }, () => newCell(t)),
-  });
-  const after = at === 0 ? t.delimiter : (t.rows[Math.min(at, t.rows.length) - 1] ?? t.delimiter);
-  return { from: after.to, to: after.to, insert: `\n${text}` };
-}
-
-export function deleteRow(t: TableModel, row: number): Change | null {
-  const line = t.rows[row - 1];
-  if (!line) return null;
-  return { from: line.from - 1, to: line.to, insert: '' };
-}
-
-/** Swaps body rows `row` and `row + dir` (header excluded). */
-export function moveRow(t: TableModel, row: number, dir: -1 | 1): Change | null {
-  const a = t.rows[row - 1];
-  const b = t.rows[row - 1 + dir];
-  if (!a || !b) return null;
-  const [top, bottom] = dir < 0 ? [b, a] : [a, b];
-  const text = (l: TableLine) => serializeLine(l);
-  return { from: top.from, to: bottom.to, insert: `${text(bottom)}\n${text(top)}` };
-}
-
-function eachLine(
-  t: TableModel,
-  f: (l: TableLine, segs: string[], isDelimiter: boolean) => string[],
-): Change[] {
-  return tableLines(t).map((l, i) => {
-    const segs = f(l, padded(t, l, t.columns), i === 1);
-    return { from: l.from, to: l.to, insert: serializeLine({ ...l, segs }) };
-  });
-}
-
-export function insertColumn(t: TableModel, at: number): Change[] {
-  return eachLine(t, (_l, segs, delim) => {
-    segs.splice(at, 0, delim ? newDelimiter(t) : newCell(t));
-    return segs;
-  });
-}
-
-export function deleteColumn(t: TableModel, col: number): Change[] | null {
-  if (t.columns <= 1) return null;
-  return eachLine(t, (_l, segs) => {
-    segs.splice(col, 1);
-    return segs;
-  });
-}
-
-export function moveColumn(t: TableModel, col: number, dir: -1 | 1): Change[] | null {
-  const other = col + dir;
-  if (other < 0 || other >= t.columns) return null;
-  return eachLine(t, (_l, segs) => {
-    [segs[col], segs[other]] = [segs[other] ?? '', segs[col] ?? ''];
-    return segs;
-  });
 }
 
 export function alignColumn(t: TableModel, col: number, align: Align): Change | null {

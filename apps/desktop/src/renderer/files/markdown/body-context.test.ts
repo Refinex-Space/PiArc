@@ -42,3 +42,46 @@ it('uses the original right-click selection for formatting and prevents edits wh
     view.destroy();
   }
 });
+
+it('offers source table operations at the clicked cell, keeps undo, and disables invalid row or column operations', () => {
+  const text = '| Name | Date |\n| --- | --- |\n| Tea | Monday |\n| Coffee | Friday |';
+  const view = new EditorView({
+    parent: document.createElement('div'),
+    state: EditorState.create({ doc: text, extensions: [markdownSupport(), history()] }),
+  });
+  const options = {
+    t: (k: Parameters<typeof t.t>[0], v?: Parameters<typeof t.t>[1]) => t.t(k, v),
+    copy: vi.fn(),
+    paste: vi.fn(),
+    attach: vi.fn(),
+    comment: vi.fn(),
+    openLink: vi.fn(),
+    report: vi.fn(),
+  };
+  const cell = (offset: number) =>
+    editorBodyActions(view, offset, options).find((item) => item.id === 'md-table-actions')
+      ?.submenu;
+  try {
+    const heading = cell(text.indexOf('Name'));
+    expect(heading?.find((action) => action.id === 'md-table-deleteRow')?.disabled).toBe(true);
+    expect(heading?.find((action) => action.id === 'md-table-moveLeft')?.disabled).toBe(true);
+    const target = cell(text.indexOf('Friday'));
+    expect(target?.find((action) => action.id === 'md-table-moveRight')?.disabled).toBe(true);
+    const add = target?.find((action) => action.id === 'md-table-addRow');
+    expect(add?.disabled).not.toBe(true);
+    add?.run?.();
+    expect(view.state.doc.lines).toBe(5);
+    expect(view.state.doc.line(4).text).toContain('Friday');
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe(text);
+    view.setState(
+      EditorState.create({
+        doc: text,
+        extensions: [markdownSupport(), EditorState.readOnly.of(true)],
+      }),
+    );
+    expect(cell(text.indexOf('Friday'))).toBeUndefined();
+  } finally {
+    view.destroy();
+  }
+});

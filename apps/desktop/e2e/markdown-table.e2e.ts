@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { BrowserWindow } from 'electron';
 import { expect, test } from './sessions.js';
 import { openSession, idle } from './t19.js';
 import { readClipboard, withSavedClipboard } from './transcript.js';
@@ -222,4 +223,188 @@ test('a nested Markdown table copies a selected column, applies a heading row an
     await expect.poll(disk).toBe(original);
     await expect(page.getByTestId('file-viewer')).not.toHaveAttribute('data-dirty', 'true');
   });
+});
+
+test('Markdown tables fill the column with a rounded single-pixel frame and wrap long cells in all views', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
+  const longPath = '/architecture/' + 'workspace-directory/'.repeat(5) + 'design.md';
+  const longWord = 'Supercalifragilistic'.repeat(7);
+  const ideographs = '即时编辑与预览'.repeat(14);
+  const row = [longPath, longWord, ideographs, 'Code', 'Pending', 'May', 'Ship', 'Ready'];
+  const original =
+    '| A | B | C | D | E | F | G | H |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| ' +
+    row.join(' | ') +
+    ' |\n';
+  const { ws } = await openSession(
+    app,
+    page,
+    workspaces,
+    'Table layout',
+    't18-chat',
+    'Review the layout',
+    { 'table.md': original },
+  );
+  await idle(page);
+  await page.getByTestId('tool-files').click();
+  await page.getByTestId('tile-maximize-files').click();
+  await page.getByRole('treeitem', { name: 'table.md', exact: true }).click();
+  const win = await app.browserWindow(page);
+  for (const width of [1500, 900]) {
+    await win.evaluate((w: BrowserWindow, width) => {
+      w.setContentSize(width, 840);
+    }, width);
+    for (const mode of ['edit', 'preview', 'split'] as const) {
+      await page.getByTestId('md-mode-' + mode).check();
+      const table =
+        mode === 'edit'
+          ? page.locator('.md-live-table table')
+          : page.getByTestId('markdown-reader').locator('table');
+      await expect(table).toBeVisible();
+      await expect(table).toHaveCSS('border-top-left-radius', '4px');
+      const metrics = await table.evaluate((element: HTMLTableElement) => {
+        const frame = getComputedStyle(element);
+        const parent = element.parentElement;
+        const body = element.rows[1];
+        const first = element.rows[0]?.cells[0];
+        const second = element.rows[0]?.cells[1];
+        const below = body?.cells[0];
+        if (!parent || !body || !first || !second || !below)
+          throw Error('Missing rendered table cells');
+        const a = getComputedStyle(first);
+        const b = getComputedStyle(second);
+        const c = getComputedStyle(below);
+        const bodies = Array.from(body.cells)
+          .slice(0, 3)
+          .map((cell) => {
+            const text = cell.querySelector('.md-cell-display') ?? cell;
+            const range = element.ownerDocument.createRange();
+            range.selectNodeContents(text);
+            return {
+              text: text.textContent,
+              lines: range.getClientRects().length,
+              overflow: cell.scrollWidth - cell.clientWidth,
+            };
+          });
+        return {
+          radius: [
+            frame.borderTopRightRadius,
+            frame.borderBottomRightRadius,
+            frame.borderBottomLeftRadius,
+          ],
+          border: [
+            frame.borderTopWidth,
+            frame.borderRightWidth,
+            frame.borderBottomWidth,
+            frame.borderLeftWidth,
+          ],
+          verticalRule: parseFloat(a.borderRightWidth) + parseFloat(b.borderLeftWidth),
+          horizontalRule: parseFloat(a.borderBottomWidth) + parseFloat(c.borderTopWidth),
+          outerCellBorders: [a.borderTopWidth, a.borderLeftWidth, c.borderBottomWidth],
+          overflow: parent.scrollWidth - parent.clientWidth,
+          widthDifference: Math.abs(parent.clientWidth - element.getBoundingClientRect().width),
+          bodies,
+        };
+      });
+      expect(metrics.radius).toEqual(['4px', '4px', '4px']);
+      expect(metrics.border).toEqual(['1px', '1px', '1px', '1px']);
+      expect(metrics.verticalRule).toBe(1);
+      expect(metrics.horizontalRule).toBe(1);
+      expect(metrics.outerCellBorders).toEqual(['0px', '0px', '0px']);
+      expect(metrics.overflow).toBeLessThanOrEqual(0);
+      expect(metrics.widthDifference).toBeLessThanOrEqual(1);
+      expect(metrics.bodies.map((cell) => cell.text)).toEqual(row.slice(0, 3));
+      for (const cell of metrics.bodies) {
+        expect(cell.lines).toBeGreaterThan(1);
+        expect(cell.overflow).toBeLessThanOrEqual(0);
+      }
+      if (width === 900)
+        await page.screenshot({ path: info.outputPath('table-narrow-' + mode + '.png') });
+    }
+  }
+  await page.getByTestId('md-mode-edit').check();
+  const widget = page.locator('.md-live-table');
+  const field = widget.getByRole('textbox', { name: 'Row 2, column 1', exact: true });
+  await field.hover();
+  await widget.locator('[data-table-control=row]').click({ trial: true });
+  const updated = longPath + longWord;
+  await field.fill(updated);
+  await expect(field).toHaveValue(updated);
+  const size = await field.evaluate((el: HTMLTextAreaElement) => ({
+    lines: el.clientHeight / parseFloat(getComputedStyle(el).lineHeight),
+    hiddenWidth: el.scrollWidth - el.clientWidth,
+    hiddenHeight: el.scrollHeight - el.clientHeight,
+  }));
+  expect(size.lines).toBeGreaterThan(1);
+  expect(size.hiddenWidth).toBeLessThanOrEqual(0);
+  expect(size.hiddenHeight).toBeLessThanOrEqual(1);
+  await field.press('Tab');
+  await expect(widget.getByRole('textbox', { name: 'Row 2, column 2', exact: true })).toBeFocused();
+  await expect
+    .poll(() => readFile(path.join(ws, 'table.md'), 'utf8'))
+    .toBe(original.replace(longPath, updated));
+  await expect(page.getByTestId('file-viewer')).not.toHaveAttribute('data-dirty', 'true');
+});
+
+test('a 32-column Markdown table retains its headers and input controls when one glyph per column no longer fits', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  const headers = Array.from({ length: 32 }, (_, i) => '字段' + String(i + 1));
+  const data = headers.map((_, i) => '单元' + String(i + 1));
+  await openSession(app, page, workspaces, 'Dense table', 't18-chat', 'Inspect the table', {
+    'dense.md': [headers, headers.map(() => '---'), data]
+      .map((row) => '| ' + row.join(' | ') + ' |')
+      .join('\n'),
+  });
+  await idle(page);
+  const win = await app.browserWindow(page);
+  await win.evaluate((window: BrowserWindow) => {
+    window.setContentSize(900, 800);
+  });
+  await page.getByTestId('tool-files').click();
+  await page.getByTestId('tile-maximize-files').click();
+  await page.getByRole('treeitem', { name: 'dense.md', exact: true }).click();
+  for (const mode of ['preview', 'split', 'edit']) {
+    await page.getByTestId('md-mode-' + mode).check();
+    const table =
+      mode === 'edit'
+        ? page.locator('.md-live-table table')
+        : page.getByTestId('markdown-reader').locator('table');
+    await expect(table).toBeVisible();
+    await expect(table.locator('tbody td').nth(29)).toHaveAttribute(
+      'data-table-heading',
+      headers[29] ?? '',
+    );
+    await expect(table.getByRole('columnheader')).toHaveCount(32);
+    const sizes = await table.evaluate((t: HTMLTableElement) => {
+      const frame = t.parentElement,
+        body = t.rows[1];
+      if (!frame || !body) throw Error('Missing dense table body');
+      return {
+        outside: frame.scrollWidth - frame.clientWidth,
+        overflow: Array.from(body.cells).some((c) => c.scrollWidth > c.clientWidth),
+        font: getComputedStyle(body).fontSize,
+        cellFont: getComputedStyle(body.cells.item(29) ?? body).fontSize,
+        tracks: new Set(Array.from(body.cells).map((c) => c.offsetTop)).size,
+      };
+    });
+    expect(sizes.outside).toBe(0);
+    expect(sizes.overflow).toBe(false);
+    expect(sizes.font).toBe(sizes.cellFont);
+    expect(sizes.tracks).toBeGreaterThan(1);
+  }
+  const widget = page.locator('.md-live-table');
+  const field = widget.getByRole('textbox', { name: 'Row 2, column 30', exact: true });
+  await field.click();
+  await field.press('Tab');
+  await expect(
+    widget.getByRole('textbox', { name: 'Row 2, column 31', exact: true }),
+  ).toBeFocused();
+  await widget.locator('[data-table-control=column]').click();
+  await expect(page.getByRole('menu', { name: 'Column actions', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
 });

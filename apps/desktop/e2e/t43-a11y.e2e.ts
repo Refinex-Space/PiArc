@@ -55,7 +55,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   const ws = await makeWorkspace(workspaces, 'a11y 无障碍', {
     'notes.txt': 'The release is on Friday.\n',
     'guide.md':
-      '# Project Guide\n\n| Day | Status |\n| --- | --- |\n| Today | Ready |\n\n![Local sample](./image.png)\n\nEquation $x^2$ with a note[^1].\n\n[^1]: Check local files.\n',
+      '# Project Guide\n\n| Day | Status |\n| --- | --- |\n| Today | Ready |\n\n![Local sample](./image.png)\n\n## Example\n\n~~~js\nconst value = 1;\n~~~\n\nEquation $x^2$ with a note[^1].\n\n[^1]: Check local files.\n',
     '.piarc/settings.json': JSON.stringify({
       hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'true' }] }] },
     }),
@@ -99,6 +99,10 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     page.getByTestId('markdown-reader').getByRole('heading', { name: 'Project Guide' }),
   ).toBeVisible();
   await checkState(page, 'state:md-read');
+  await page.getByTestId('md-outline-trigger').hover();
+  await expect(page.getByTestId('md-outline-popover')).toBeVisible();
+  await checkState(page, 'state:md-outline');
+  await page.keyboard.press('Escape');
   await page.getByTestId('markdown-reader').getByRole('img', { name: 'Local sample' }).click();
   await expect(page.getByTestId('markdown-image-dialog')).toBeVisible();
   await checkState(page, 'dialog:md-image');
@@ -109,6 +113,12 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await page.getByTestId('md-mode-edit').check();
   await expect(page.getByTestId('markdown-editor-input')).toBeVisible();
   await checkState(page, 'state:md-live');
+  const language = page.getByRole('combobox', { name: 'Code block language' });
+  await language.focus();
+  await language.fill('typ');
+  await expect(page.getByRole('option', { name: 'typescript', exact: true })).toBeVisible();
+  await checkState(page, 'state:md-code-language');
+  await language.press('Escape');
   const cell = page.getByRole('textbox', { name: 'Row 2, column 1', exact: true });
   await cell.hover();
   await page.locator('[data-table-control=row]').click();

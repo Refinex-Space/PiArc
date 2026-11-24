@@ -1,20 +1,147 @@
-/* The control rails sit outside the cell hit targets. A wide table scrolls
-   independently inside these rails; menus remain local to its document. */
+/* Only the painted table clips its corners. Control rails remain outside it
+   and both the editor and reader can reflow without a horizontal scrollport. */
 .cm-editor .md-live-table[data-table-widget] {
   box-sizing: border-box;
   position: relative;
-  overflow: visible;
   margin: var(--piarc-space-1) 0;
-  padding: 24px;
+  padding: var(--piarc-space-5) 0;
 }
-.cm-editor .md-live-table[data-table-widget] > .md-table-scroller {
-  overflow-x: auto;
-  overflow-y: hidden;
-  visibility: visible;
-  scrollbar-width: thin;
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap) {
+  container-type: inline-size;
+  min-width: 0;
+  overflow: visible;
 }
-.cm-editor .md-table-scroller table {
-  max-width: none;
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap) > table {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+  overflow: clip;
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap) :is(th, td) {
+  border: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap)
+  :is(th, td)
+  + :is(th, td) {
+  border-inline-start: 1px solid var(--piarc-border-subtle);
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap)
+  :is(tr + tr, thead + tbody > tr:first-child)
+  > :is(th, td) {
+  border-block-start: 1px solid var(--piarc-border-subtle);
+}
+.markdown-reader .md .md-table-wrap :is(td, th) {
+  padding-inline: min(var(--piarc-space-3), 1cqi);
+}
+.cm-editor .md-live-table table {
+  font: inherit;
+}
+.cm-editor .md-live-table :is(td, th) {
+  padding: 0;
+}
+.cm-editor .md-live-table th {
+  background: var(--piarc-surface-hover);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.cm-editor .md-table-cell {
+  display: grid;
+  grid-template-columns: minmax(min-content, 1fr);
+}
+.cm-editor .md-table-cell > :is(textarea, .md-cell-display) {
+  box-sizing: border-box;
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: var(--piarc-size-control-height);
+  padding: var(--piarc-space-1) min(var(--piarc-space-2), 1cqi);
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cm-editor .md-table-cell textarea {
+  field-sizing: content;
+  contain: inline-size;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  resize: none;
+  background: transparent;
+}
+.cm-editor .md-table-cell textarea:focus-visible {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: -2px;
+}
+.cm-editor .md-table-cell:not(:focus-within) textarea {
+  opacity: 0;
+}
+.cm-editor .md-cell-display {
+  pointer-events: none;
+}
+.cm-editor .md-table-cell:focus-within .md-cell-display {
+  visibility: hidden;
+}
+/* Keep short columns usable before giving the remaining space to long prose. */
+:is(.md-table-scroller, .markdown-reader .md-table-wrap) table :is(td, th) {
+  min-width: min(8ch, calc(72cqi / sibling-count()));
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-tight] :is(td, th),
+.md-table-scroller[data-table-tight] .md-table-cell > :is(textarea, .md-cell-display) {
+  min-width: 0;
+  padding-inline: 0;
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-bands]
+  :is(table, thead, tbody) {
+  display: block;
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-bands] tr {
+  display: grid;
+  grid-template-columns: repeat(var(--md-table-band-columns), minmax(0, 1fr));
+}
+:is(.md-table-scroller, .markdown-reader .md .md-table-wrap)[data-table-bands]
+  table
+  tr
+  > :is(td, th) {
+  min-width: 0;
+  border: 0;
+  border-block-start: 1px solid var(--piarc-border-subtle);
+  border-inline-start: 1px solid var(--piarc-border-subtle);
+}
+:is(.md-table-scroller, .markdown-reader .md .md-table-wrap)[data-table-bands]
+  table
+  tr
+  > [data-band-start] {
+  border-inline-start-width: 0;
+}
+:is(.md-table-scroller, .markdown-reader .md .md-table-wrap)[data-table-bands]
+  table
+  tr
+  > [data-band-top] {
+  border-block-start-width: 0;
+}
+.markdown-reader .md .md-table-wrap[data-table-bands] :is(td, th),
+.md-table-scroller[data-table-bands] .md-table-cell > :is(textarea, .md-cell-display) {
+  padding-inline: var(--piarc-space-1);
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-bands] td::before {
+  content: attr(data-table-heading) / '';
+  display: block;
+  color: var(--piarc-workbench-muted);
+  font-size: var(--piarc-font-size-caption);
+  line-height: 1.4;
+  text-align: start;
+}
+.md-table-scroller[data-table-bands] td::before {
+  padding: var(--piarc-space-1) var(--piarc-space-1) 0;
 }
 .cm-editor .md-table-grip {
   position: absolute;

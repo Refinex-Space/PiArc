@@ -173,7 +173,7 @@
       "copyright": "Marklyra contributors (refinex)",
       "source": {
         "repository": "https://github.com/Refinex-Space/marklyra",
-        "path": "packages/editor-runtime/src/runtime/{table-controls,table-controls-actions,table-controls-style,table-formatting,context-menu-items,context-menu-selection,slash-commands,editing-commands}.ts",
+        "path": "packages/editor-runtime/src/runtime/{table-controls,table-controls-actions,table-controls-style,table-formatting,context-menu-items,context-menu-selection,slash-commands,editing-commands}.ts; packages/editor-runtime/src/engine/modules/render/code-fences.js",
         "commit": "e7c2175246443ca1fbdc1195ca3960b8a7beb6a5"
       },
       "usedBy": "apps/desktop/src/renderer/files/markdown/",
@@ -189,7 +189,7 @@
       "copyright": "Markdown Studio contributors (Refinex)",
       "source": {
         "repository": "https://github.com/Refinex-Space/markdown-studio",
-        "path": "web/core/editor/core/cm/markdownLang.ts; web/core/features/viewers/markdown/livePreview/{commands,catalog,table,tableModel,inline,blocks,slash,toolbar,codeBlocks}.ts; web/core/features/viewers/markdown/livePreview/SlashMenu.tsx; web/core/features/viewers/markdown/{render.ts,media/MediaViewerDialog.tsx}; web/core/features/viewers/{imageZoom,panZoom}.ts",
+        "path": "web/core/editor/core/cm/markdownLang.ts; web/core/features/viewers/markdown/livePreview/{commands,catalog,table,tableModel,inline,blocks,slash,toolbar,codeBlocks,theme}.ts; web/core/features/viewers/markdown/livePreview/SlashMenu.tsx; web/core/features/viewers/markdown/{render.ts,media/MediaViewerDialog.tsx}; web/core/features/viewers/{imageZoom,panZoom}.ts",
         "commit": "e6ebd0c015b0c53d4091a8fcd3e76c6c95d91c21"
       },
       "usedBy": "apps/desktop/src/renderer/files/markdown/",
