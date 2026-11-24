@@ -122,7 +122,9 @@ describe('i18n', () => {
             status: 'Done',
             date: '2026-11-22',
             location: '/Library/Application Support/PiArc/managed-settings.json',
-            position: 'Line 3, column 7',
+            panel: 'Terminal',
+            number: 1,
+            position: 2,
           }),
         ).not.toThrow();
       }
