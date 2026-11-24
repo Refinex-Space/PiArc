@@ -17,9 +17,12 @@
     "primaryBackground": "accent.solid",
     "primaryBackgroundHover": "accent.solidHover",
     "primaryText": "text.onAccent",
-    "secondaryBackground": "surface.raised",
-    "secondaryBorder": "border.strong",
-    "height": "size.controlHeight"
+    "secondaryBackground": "action.surface",
+    "secondaryBorder": "action.edge",
+    "height": "button.height",
+    "radius": "button.radius",
+    "fontSize": "button.fontSize",
+    "lineHeight": "button.lineHeight"
   },
   "dialog": {
     "background": "surface.raised",

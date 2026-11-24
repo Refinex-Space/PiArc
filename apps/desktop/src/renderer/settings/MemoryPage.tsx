@@ -8,6 +8,7 @@ import { useApp } from '../app/app-context.js';
 import { parseWorkspaces } from './AgentsPage.js';
 import { ManagedBadge, useManaged } from './managed.js';
 import { takeMemoryTarget } from './memory-target.js';
+import { Button } from '../app/Button.js';
 
 const TYPES = ['user', 'feedback', 'project', 'reference'] as const;
 type MemoryType = (typeof TYPES)[number];
@@ -159,12 +160,12 @@ function NoteEditor({
         }}
       />
       <div className="memory-actions">
-        <button type="submit" className="button" disabled={busy} data-testid="memory-edit-save">
+        <Button type="submit" variant="primary" disabled={busy} data-testid="memory-edit-save">
           {t('memory.save')}
-        </button>
-        <button type="button" className="button button-small" onClick={onCancel}>
+        </Button>
+        <Button variant="ghost" size="small" onClick={onCancel}>
           {t('memory.cancel')}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -230,9 +231,8 @@ function NoteRow({
       )}
       {open && !editing && (
         <div className="memory-actions">
-          <button
-            type="button"
-            className="button button-small"
+          <Button
+            size="small"
             disabled={busy}
             data-testid={`memory-edit-${note.name}`}
             onClick={() => {
@@ -240,10 +240,10 @@ function NoteRow({
             }}
           >
             {t('memory.edit')}
-          </button>
-          <button
-            type="button"
-            className="button button-small"
+          </Button>
+          <Button
+            variant="destructive"
+            size="small"
             disabled={busy}
             data-testid={`memory-delete-${note.name}`}
             onClick={() => {
@@ -256,7 +256,7 @@ function NoteRow({
             }}
           >
             {t(confirming ? 'memory.deleteConfirm' : 'memory.delete')}
-          </button>
+          </Button>
         </div>
       )}
     </li>
@@ -399,16 +399,16 @@ export function MemoryPage() {
             </p>
             <p className="muted small">{t('memory.directory', { path: view.directory })}</p>
             {view.memories.length > 0 && (
-              <button
-                type="button"
-                className="button button-small memory-start"
+              <Button
+                size="small"
+                className="memory-start"
                 data-testid="memory-reveal"
                 onClick={() => {
                   if (chosen !== null) window.piarc.revealMemory(chosen).catch(fail);
                 }}
               >
                 {t('memory.reveal')}
-              </button>
+              </Button>
             )}
           </div>
           {view.claude !== null && view.claude.count > 0 && (
@@ -416,9 +416,9 @@ export function MemoryPage() {
               <p className="muted">
                 {t('memory.import.found', { count: view.claude.count, path: view.claude.path })}
               </p>
-              <button
-                type="button"
-                className="button memory-start"
+              <Button
+                size="small"
+                className="memory-start"
                 disabled={busy}
                 data-testid="memory-import-button"
                 onClick={() => {
@@ -426,7 +426,7 @@ export function MemoryPage() {
                 }}
               >
                 {t('memory.import.button')}
-              </button>
+              </Button>
             </div>
           )}
           <h2 className="settings-heading">{t('memory.notes')}</h2>
@@ -482,9 +482,10 @@ export function MemoryPage() {
                     />
                   ))}
               </ul>
-              <button
-                type="button"
-                className="button button-small memory-start"
+              <Button
+                variant="destructive"
+                size="small"
+                className="memory-start"
                 disabled={busy}
                 data-testid="memory-delete-all"
                 onClick={() => {
@@ -497,7 +498,7 @@ export function MemoryPage() {
                 }}
               >
                 {t(confirmAll ? 'memory.deleteAllConfirm' : 'memory.deleteAll')}
-              </button>
+              </Button>
             </>
           )}
         </>

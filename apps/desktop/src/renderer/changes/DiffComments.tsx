@@ -18,6 +18,7 @@ import {
   type DiffComment,
   type Side,
 } from './comments.js';
+import { Button } from '../app/Button.js';
 
 /** A comment being written or edited. */
 export interface CommentDraft {
@@ -299,16 +300,16 @@ export function CommentRow({ comment }: { readonly comment: DiffComment }) {
             >
               {t('changes.comment.edit')}
             </button>
-            <button
-              type="button"
-              className="button button-small"
+            <Button
+              variant="destructive"
+              size="small"
               data-testid="changes-comment-delete"
               onClick={() => {
                 state.remove(comment.id);
               }}
             >
               {t('changes.comment.delete')}
-            </button>
+            </Button>
           </div>
         </div>
       </td>
@@ -361,15 +362,15 @@ export function CommentsBar() {
                 {c.path}:{c.start}
               </span>{' '}
               <span>{c.body}</span>{' '}
-              <button
-                type="button"
-                className="button button-small"
+              <Button
+                variant="destructive"
+                size="small"
                 onClick={() => {
                   state.remove(c.id);
                 }}
               >
                 {t('changes.comment.delete')}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

@@ -21,6 +21,7 @@ import {
   type Provider,
   type ProviderSettings,
 } from './provider-form.js';
+import { Button } from '../app/Button.js';
 
 const AUTH_LABEL: Record<Auth, MessageId> = {
   bearer: 'providers.bearer',
@@ -173,9 +174,8 @@ export function ProvidersPage() {
                   <strong>{p.id}</strong>
                   <div className="muted small">{p.baseUrl ?? t(`providers.${p.kind}`)}</div>
                 </div>
-                <button
-                  type="button"
-                  className="button"
+                <Button
+                  size="small"
                   data-testid={`provider-edit-${p.id}`}
                   disabled={busy}
                   onClick={() => {
@@ -183,10 +183,10 @@ export function ProvidersPage() {
                   }}
                 >
                   {t('providers.edit')}
-                </button>
-                <button
-                  type="button"
-                  className="button"
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="small"
                   data-testid={`provider-delete-${p.id}`}
                   disabled={busy}
                   onClick={() => {
@@ -194,15 +194,14 @@ export function ProvidersPage() {
                   }}
                 >
                   {t('providers.remove')}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
         )}
         <div>
-          <button
-            type="button"
-            className="button button-primary"
+          <Button
+            variant="primary"
             data-testid="provider-add"
             disabled={busy}
             onClick={() => {
@@ -210,7 +209,7 @@ export function ProvidersPage() {
             }}
           >
             {t('providers.add')}
-          </button>
+          </Button>
         </div>
         {failed}
         <SignInSection providers={settings.loginProviders} busy={busy} onChanged={reload} />
@@ -438,19 +437,19 @@ export function ProvidersPage() {
         )}
         {failed}
         <div className="dialog-actions">
-          <button
-            type="button"
-            className="button"
+          <Button
+            variant="ghost"
+            size="small"
             onClick={() => {
               setForm(undefined);
               setFailure('');
             }}
           >
             {t('dialog.cancel')}
-          </button>
-          <button type="submit" className="button button-primary" data-testid="provider-save">
+          </Button>
+          <Button type="submit" variant="primary" data-testid="provider-save">
             {t('providers.save')}
-          </button>
+          </Button>
         </div>
       </fieldset>
     </form>

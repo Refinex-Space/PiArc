@@ -9,6 +9,7 @@ import { useT } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import { Dialog } from '../shell/Dialog.js';
 import type { LoginProvider } from './provider-form.js';
+import { Button } from '../app/Button.js';
 
 type Step = Exclude<LoginInteraction, { type: 'progress' } | { type: 'info' }>;
 
@@ -94,9 +95,8 @@ function StepView({
         <div className="login-step" data-testid="login-auth-url">
           <p>{t('login.authUrl')}</p>
           {step.instructions == null ? null : <p className="muted small">{step.instructions}</p>}
-          <button
-            type="button"
-            className="button button-primary"
+          <Button
+            variant="primary"
             data-autofocus
             data-testid="login-open-browser"
             onClick={() => {
@@ -104,7 +104,7 @@ function StepView({
             }}
           >
             {t('login.openBrowser')}
-          </button>
+          </Button>
         </div>
       );
     case 'deviceCode':
@@ -120,18 +120,16 @@ function StepView({
             </p>
           )}
           <div className="dialog-actions">
-            <button
-              type="button"
-              className="button"
+            <Button
+              size="small"
               onClick={() => {
                 void navigator.clipboard.writeText(step.userCode);
               }}
             >
               {t('login.copyCode')}
-            </button>
-            <button
-              type="button"
-              className="button button-primary"
+            </Button>
+            <Button
+              variant="primary"
               data-autofocus
               data-testid="login-open-verification"
               onClick={() => {
@@ -139,7 +137,7 @@ function StepView({
               }}
             >
               {t('login.openVerification')}
-            </button>
+            </Button>
           </div>
         </div>
       );
@@ -191,9 +189,9 @@ function StepView({
             />
           )}
           <div className="dialog-actions">
-            <button type="submit" className="button button-primary" disabled={answer === ''}>
+            <Button type="submit" variant="primary" disabled={answer === ''}>
               {t('login.submit')}
-            </button>
+            </Button>
           </div>
         </form>
       );
@@ -293,15 +291,14 @@ export function useSignInDialog(onChanged: () => void): {
               </p>
             )}
             <div className="dialog-actions">
-              <button
-                type="button"
-                className="button"
+              <Button
+                size="small"
                 data-testid="login-cancel"
                 disabled={view.loginId === undefined}
                 onClick={cancel}
               >
                 {t('login.cancel')}
-              </button>
+              </Button>
             </div>
           </>
         ) : (
@@ -319,9 +316,8 @@ export function useSignInDialog(onChanged: () => void): {
                   : t('login.failed', { message: outcome.message ?? '' })}
             </p>
             <div className="dialog-actions">
-              <button
-                type="button"
-                className="button button-primary"
+              <Button
+                variant="primary"
                 data-autofocus
                 data-testid="login-close"
                 onClick={() => {
@@ -329,7 +325,7 @@ export function useSignInDialog(onChanged: () => void): {
                 }}
               >
                 {t('login.close')}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -373,9 +369,8 @@ export function SignInSection({
                 </div>
               </div>
               {p.signedIn ? (
-                <button
-                  type="button"
-                  className="button"
+                <Button
+                  size="small"
                   data-testid={`logout-${p.id}`}
                   disabled={busy || open}
                   onClick={() => {
@@ -391,11 +386,10 @@ export function SignInSection({
                   }}
                 >
                   {t('providers.logout')}
-                </button>
+                </Button>
               ) : (
-                <button
-                  type="button"
-                  className="button"
+                <Button
+                  size="small"
                   data-testid={`login-${p.id}`}
                   disabled={busy || open}
                   onClick={() => {
@@ -404,7 +398,7 @@ export function SignInSection({
                   }}
                 >
                   {t('providers.signIn.button')}
-                </button>
+                </Button>
               )}
             </li>
           ))}

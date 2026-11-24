@@ -15,6 +15,7 @@ import { useApp } from '../app/app-context.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { parseDiagnostics } from './ConfigDiagnosticsPage.js';
 import { parseSettings, type CatalogEntry } from './provider-form.js';
+import { Button } from '../app/Button.js';
 
 const LIST_LABEL: Readonly<Record<AutoModeList, MessageId>> = {
   environment: 'permissions.auto.list.environment',
@@ -184,9 +185,9 @@ function PolicyList({
         {entries.map((value, index) => (
           <li key={`${String(index)}:${value}`}>
             <span className="auto-review-entry">{value}</span>{' '}
-            <button
-              type="button"
-              className="row-action"
+            <Button
+              variant="destructive"
+              size="small"
               disabled={managed}
               aria-label={t('permissions.auto.remove', { value })}
               onClick={() => {
@@ -194,7 +195,7 @@ function PolicyList({
               }}
             >
               {t('permissions.auto.removeShort')}
-            </button>
+            </Button>
           </li>
         ))}
         {claude.map((value) => (
@@ -225,9 +226,9 @@ function PolicyList({
             setDraft(e.currentTarget.value);
           }}
         />
-        <button type="submit" className="button" disabled={managed || entry === ''}>
+        <Button type="submit" size="small" disabled={managed || entry === ''}>
           {t('permissions.auto.add')}
-        </button>
+        </Button>
       </form>
     </div>
   );

@@ -6,6 +6,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { useApp } from '../app/app-context.js';
+import { Button } from '../app/Button.js';
 
 export interface ManagedSource {
   readonly location: string;
@@ -180,16 +181,15 @@ export function ManagedBanner() {
     <p className="managed-banner" role="note" data-testid="managed-banner">
       <ManagedBadge testId="managed-banner-badge" />
       <span>{t(broken ? 'managed.bannerProblem' : 'managed.banner')}</span>
-      <button
-        type="button"
-        className="button button-small"
+      <Button
+        size="small"
         data-testid="managed-banner-link"
         onClick={() => {
           window.location.hash = '#/settings/diagnostics';
         }}
       >
         {t('managed.bannerLink')}
-      </button>
+      </Button>
     </p>
   );
 }

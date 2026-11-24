@@ -128,9 +128,13 @@
   cursor: pointer;
 }
 
-.row-action:hover {
+.row-action:hover:not(:disabled) {
   background: var(--piarc-surface-hover);
   color: var(--piarc-text-primary);
+}
+
+.row-action:enabled:active {
+  background-color: var(--piarc-action-pressed);
 }
 
 .row-status {

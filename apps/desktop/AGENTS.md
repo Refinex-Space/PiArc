@@ -83,6 +83,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 高亮不放宽 CSP：shiki 用 `@shikijs/engine-javascript`，不用需要 `wasm-unsafe-eval` 的 Oniguruma 引擎；语法按需加载，每种一个 chunk，`GRAMMARS` 与 `languages.ts` 的别名表一起改。
 - 输入法守卫：所有键盘处理先过 `isImeComposing`（`isComposing`、`keyCode === 229`、`view.composing`）。composer 在 `handleDOMEvents.keydown` 里先拦，ProseMirror 的按键处理整个跳过且不 `preventDefault`；`handleTextInput` 里的 `@`、`/` 触发也先查 `view.composing`。
 - 滚动跟随只认用户输入（滚轮、触摸、键盘、按住滚动条）引起的滚动；行或虚拟列表提交后在布局阶段对齐底部，尺寸变化再经 ResizeObserver 对齐。阈值只改 `transcript/constants.ts`。
+- 设置的操作按钮使用 `src/renderer/app/Button.tsx`，普通操作为 secondary，提交为 primary，低优先级操作为 ghost，删除或丢弃为 destructive。按钮表面与键盘焦点共用 `app.css` 的按钮规则。为正在运行的动作传 `loading` 并保留原标签以稳定尺寸；其他操作占用资源时传 `disabled`。原生提交按钮显式传 `type="submit"`。
 - 分段切换统一使用 `src/renderer/app/SegmentedControl.tsx`。调用方提供选项、当前值、可访问名称和保存回调；原生单选与 fieldset 负责方向键和禁用。轨道与当前选项尺寸随 `design/tokens/` 的密度令牌变化。其视觉基准是 ADR-0073 指定版本的设置页 Default transcript view。
 - 组件只读语义令牌与组件令牌（`var(--piarc-…)`，或 TS 的 `tokenVar`），不写颜色字面量；改视觉方向只改 `design/tokens/` 再 `npm run gen:tokens`。主题、对比度、密度、减少动效经 `<html>` 的 `data-color-mode`、`data-density`、`data-reduce-motion` 切换（`app/appearance.ts`），组件不读这些属性。
 - store（`src/renderer/store/`）：业务状态只来自 Core 的事件；组件用 `hooks.ts` 的细粒度订阅（列表、单个会话条目、单行），不要订阅整个 store；快照按 `revision` 门控；乐观行以 `clientId` 对账，Core 未确认时显示未送达，重发复用原键。"需要处理"的定义与徽标优先级只在 `store/status.ts`。

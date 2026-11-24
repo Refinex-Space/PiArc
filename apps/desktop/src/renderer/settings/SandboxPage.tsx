@@ -13,6 +13,7 @@ import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
+import { Button } from '../app/Button.js';
 
 type Origin = 'user' | 'claudeUser' | 'project' | 'enterprise';
 
@@ -153,9 +154,9 @@ function EntryList({
             <code>{value}</code>
             <span className="permission-badge">{t('sandbox.origin.user')}</span>
             <span className="permission-actions">
-              <button
-                type="button"
-                className="button"
+              <Button
+                variant="destructive"
+                size="small"
                 disabled={disabled}
                 aria-label={t('sandbox.remove', { value })}
                 data-testid={`${testId}-remove`}
@@ -164,7 +165,7 @@ function EntryList({
                 }}
               >
                 ×
-              </button>
+              </Button>
             </span>
           </li>
         ))}
@@ -204,9 +205,9 @@ function EntryList({
             setDraft(e.target.value);
           }}
         />
-        <button type="submit" className="button" disabled={disabled || draft.trim() === ''}>
+        <Button type="submit" size="small" disabled={disabled || draft.trim() === ''}>
           {t('sandbox.add')}
-        </button>
+        </Button>
       </form>
     </section>
   );
@@ -402,16 +403,15 @@ export function SandboxPage() {
         </section>
       )}
       <div className="setting">
-        <button
-          type="button"
-          className="button"
+        <Button
+          size="small"
           data-testid="sandbox-audit"
           onClick={() => {
             window.location.hash = '#/settings/permissions?audit=sandbox';
           }}
         >
           {t('sandbox.audit')}
-        </button>
+        </Button>
       </div>
     </div>
   );

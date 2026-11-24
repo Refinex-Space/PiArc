@@ -12,6 +12,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { DiagnosticBundleSection } from './DiagnosticBundleSection.js';
+import { Button } from '../app/Button.js';
 
 const STATUSES = [
   'loaded',
@@ -591,14 +592,13 @@ export function ConfigDiagnosticsPage() {
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              className="button"
+            <Button
+              size="small"
               onClick={() => refresh.current?.()}
               data-testid="diagnostics-refresh"
             >
               {t('permissions.audit.refresh')}
-            </button>
+            </Button>
           </div>
           <p className="muted" data-testid="diagnostics-trust">
             {t(view.trusted ? 'diagnostics.trusted' : 'diagnostics.untrusted')}

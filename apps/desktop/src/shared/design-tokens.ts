@@ -30,6 +30,15 @@ export type ColorToken =
   | 'border.default'
   | 'border.strong'
   | 'border.focus'
+  | 'action.surface'
+  | 'action.hover'
+  | 'action.pressed'
+  | 'action.edge'
+  | 'action.primaryPressed'
+  | 'action.danger'
+  | 'action.dangerHover'
+  | 'action.dangerPressed'
+  | 'action.onDanger'
   | 'segment.track'
   | 'segment.thumb'
   | 'segment.edge'
@@ -73,14 +82,25 @@ export type ScaleToken =
   | 'radius.md'
   | 'radius.lg'
   | 'radius.pill'
+  | 'motion.surface'
   | 'motion.fast'
   | 'motion.normal'
   | 'motion.easing'
+  | 'shadow.button'
   | 'shadow.overlay'
   | 'size.titlebarHeight'
   | 'size.sidebarMin'
   | 'size.sidebarMax'
   | 'size.badge'
+  | 'button.height'
+  | 'button.radius'
+  | 'button.fontSize'
+  | 'button.lineHeight'
+  | 'button.smallHeight'
+  | 'button.smallRadius'
+  | 'button.smallPadding'
+  | 'button.smallFontSize'
+  | 'button.smallLineHeight'
   | 'segment.height'
   | 'segment.radius'
   | 'segment.fontSize'
@@ -111,6 +131,9 @@ export type ComponentToken =
   | 'button.secondaryBackground'
   | 'button.secondaryBorder'
   | 'button.height'
+  | 'button.radius'
+  | 'button.fontSize'
+  | 'button.lineHeight'
   | 'dialog.background'
   | 'dialog.border'
   | 'dialog.scrim'
@@ -154,6 +177,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#cdd0d6',
     'border.strong': '#858a94',
     'border.focus': '#5d626c',
+    'action.surface': '#0000000d',
+    'action.hover': '#00000013',
+    'action.pressed': '#0b0b0b1a',
+    'action.edge': '#0b0b0b1a',
+    'action.primaryPressed': '#3049b8',
+    'action.danger': '#c93439',
+    'action.dangerHover': '#c0262d',
+    'action.dangerPressed': '#5c1418',
+    'action.onDanger': '#ffffff',
     'segment.track': '#0b0b0b0d',
     'segment.thumb': '#ffffff',
     'segment.edge': '#0b0b0b0d',
@@ -201,6 +233,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#3e424a',
     'border.strong': '#6b707c',
     'border.focus': '#787d89',
+    'action.surface': '#ffffff26',
+    'action.hover': '#ffffff37',
+    'action.pressed': '#ffffff47',
+    'action.edge': '#00000000',
+    'action.primaryPressed': '#3a4c8f',
+    'action.danger': '#ff8c8c',
+    'action.dangerHover': '#ec5d61',
+    'action.dangerPressed': '#e5484d',
+    'action.onDanger': '#111214',
     'segment.track': '#ffffff0d',
     'segment.thumb': '#ffffff1a',
     'segment.edge': '#ffffff33',
@@ -248,6 +289,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#858a94',
     'border.strong': '#5d626c',
     'border.focus': '#1d2027',
+    'action.surface': '#0000000d',
+    'action.hover': '#00000013',
+    'action.pressed': '#0b0b0b1a',
+    'action.edge': '#5d626c',
+    'action.primaryPressed': '#1a2559',
+    'action.danger': '#5c1418',
+    'action.dangerHover': '#5c1418',
+    'action.dangerPressed': '#5c1418',
+    'action.onDanger': '#ffffff',
     'segment.track': '#0b0b0b0d',
     'segment.thumb': '#ffffff',
     'segment.edge': '#5d626c',
@@ -295,6 +345,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.default': '#6b707c',
     'border.strong': '#a9adb7',
     'border.focus': '#eceef2',
+    'action.surface': '#ffffff26',
+    'action.hover': '#ffffff37',
+    'action.pressed': '#ffffff47',
+    'action.edge': '#a9adb7',
+    'action.primaryPressed': '#9db0ff',
+    'action.danger': '#ffd1d1',
+    'action.dangerHover': '#ffd1d1',
+    'action.dangerPressed': '#ffd1d1',
+    'action.onDanger': '#111214',
     'segment.track': '#ffffff0d',
     'segment.thumb': '#ffffff1a',
     'segment.edge': '#a9adb7',
@@ -345,6 +404,15 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'border.default': '--piarc-border-default',
   'border.strong': '--piarc-border-strong',
   'border.focus': '--piarc-border-focus',
+  'action.surface': '--piarc-action-surface',
+  'action.hover': '--piarc-action-hover',
+  'action.pressed': '--piarc-action-pressed',
+  'action.edge': '--piarc-action-edge',
+  'action.primaryPressed': '--piarc-action-primary-pressed',
+  'action.danger': '--piarc-action-danger',
+  'action.dangerHover': '--piarc-action-danger-hover',
+  'action.dangerPressed': '--piarc-action-danger-pressed',
+  'action.onDanger': '--piarc-action-on-danger',
   'segment.track': '--piarc-segment-track',
   'segment.thumb': '--piarc-segment-thumb',
   'segment.edge': '--piarc-segment-edge',
@@ -385,14 +453,25 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'radius.md': '--piarc-radius-md',
   'radius.lg': '--piarc-radius-lg',
   'radius.pill': '--piarc-radius-pill',
+  'motion.surface': '--piarc-motion-surface',
   'motion.fast': '--piarc-motion-fast',
   'motion.normal': '--piarc-motion-normal',
   'motion.easing': '--piarc-motion-easing',
+  'shadow.button': '--piarc-shadow-button',
   'shadow.overlay': '--piarc-shadow-overlay',
   'size.titlebarHeight': '--piarc-size-titlebar-height',
   'size.sidebarMin': '--piarc-size-sidebar-min',
   'size.sidebarMax': '--piarc-size-sidebar-max',
   'size.badge': '--piarc-size-badge',
+  'button.height': '--piarc-c-button-height',
+  'button.radius': '--piarc-c-button-radius',
+  'button.fontSize': '--piarc-c-button-font-size',
+  'button.lineHeight': '--piarc-c-button-line-height',
+  'button.smallHeight': '--piarc-button-small-height',
+  'button.smallRadius': '--piarc-button-small-radius',
+  'button.smallPadding': '--piarc-button-small-padding',
+  'button.smallFontSize': '--piarc-button-small-font-size',
+  'button.smallLineHeight': '--piarc-button-small-line-height',
   'segment.height': '--piarc-segment-height',
   'segment.radius': '--piarc-segment-radius',
   'segment.fontSize': '--piarc-segment-font-size',
@@ -419,7 +498,6 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'button.primaryText': '--piarc-c-button-primary-text',
   'button.secondaryBackground': '--piarc-c-button-secondary-background',
   'button.secondaryBorder': '--piarc-c-button-secondary-border',
-  'button.height': '--piarc-c-button-height',
   'dialog.background': '--piarc-c-dialog-background',
   'dialog.border': '--piarc-c-dialog-border',
   'dialog.scrim': '--piarc-c-dialog-scrim',

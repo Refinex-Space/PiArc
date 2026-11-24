@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { useT } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import type { ProviderSettings } from './provider-form.js';
+import { Button } from '../app/Button.js';
 
 interface Backend {
   readonly id: string;
@@ -146,18 +147,18 @@ export function WebSearchSection({ settings }: { readonly settings: ProviderSett
             }}
           />
           <div>
-            <button
+            <Button
               type="submit"
-              className="button button-primary"
+              variant="primary"
               data-testid="web-search-key-save"
               disabled={busy || key.trim() === ''}
             >
               {t('webSearch.key.save')}
-            </button>{' '}
+            </Button>{' '}
             {chosen.hasKey ? (
-              <button
-                type="button"
-                className="button"
+              <Button
+                variant="destructive"
+                size="small"
                 data-testid="web-search-key-remove"
                 disabled={busy}
                 onClick={() => {
@@ -165,7 +166,7 @@ export function WebSearchSection({ settings }: { readonly settings: ProviderSett
                 }}
               >
                 {t('webSearch.key.remove')}
-              </button>
+              </Button>
             ) : null}
           </div>
         </form>

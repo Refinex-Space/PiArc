@@ -6,6 +6,7 @@ import type { LaunchTarget } from '../../shared/ipc.js';
 import { useT } from '../app/app-context.js';
 import { useSessions } from '../store/hooks.js';
 import { sessionTitle } from './SessionRow.js';
+import { Button } from '../app/Button.js';
 
 /** Runs `open` for the targets waiting for this window, then for each one that arrives. */
 export function useLaunchTargets(open: (target: LaunchTarget) => void): void {
@@ -76,16 +77,16 @@ export function WorktreeCleanupNotices() {
               <code className="small"> {session.worktreePath}</code>
             )}
           </span>
-          <button
-            type="button"
-            className="button button-small"
+          <Button
+            variant="destructive"
+            size="small"
             data-testid="cleanup-remove"
             onClick={() => {
               window.piarc.removeSessionWorktree(session.id).catch(report);
             }}
           >
             {t('notice.cleanupRemove')}
-          </button>
+          </Button>
           <button
             type="button"
             className="button button-small"

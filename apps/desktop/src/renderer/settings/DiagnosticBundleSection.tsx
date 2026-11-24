@@ -7,6 +7,7 @@ import { useState } from 'react';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
+import { Button } from '../app/Button.js';
 
 /** The redaction kinds Core reports (`piarc_telemetry::redact::Kind::label`), in display order. */
 const REDACTION_KINDS = {
@@ -123,15 +124,15 @@ export function DiagnosticBundleSection({ workspace }: { readonly workspace: str
       </h2>
       <p className="muted">{t('diagnostics.bundle.intro')}</p>
       {state.kind !== 'preview' && (
-        <button
-          type="button"
-          className="button"
-          disabled={state.kind === 'busy'}
+        <Button
+          size="small"
+          loading={state.kind === 'busy'}
+          aria-label={state.kind === 'busy' ? t('diagnostics.bundle.preparing') : undefined}
           onClick={prepare}
           data-testid="diagnostic-bundle-prepare"
         >
-          {t(state.kind === 'busy' ? 'diagnostics.bundle.preparing' : 'diagnostics.bundle.prepare')}
-        </button>
+          {t('diagnostics.bundle.prepare')}
+        </Button>
       )}
       {state.kind === 'preview' && (
         <div className="diagnostic-bundle-preview" data-testid="diagnostic-bundle-preview">
@@ -155,26 +156,25 @@ export function DiagnosticBundleSection({ workspace }: { readonly workspace: str
             {t('diagnostics.bundle.excluded', { list: state.manifest.excluded.join(', ') })}
           </p>
           <div className="diagnostic-bundle-actions">
-            <button
-              type="button"
-              className="button primary"
+            <Button
+              variant="primary"
               onClick={() => {
                 exportBundle(state.manifest);
               }}
               data-testid="diagnostic-bundle-export"
             >
               {t('diagnostics.bundle.export')}
-            </button>
-            <button
-              type="button"
-              className="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="small"
               onClick={() => {
                 setState({ kind: 'idle' });
               }}
               data-testid="diagnostic-bundle-cancel"
             >
               {t('diagnostics.bundle.cancel')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

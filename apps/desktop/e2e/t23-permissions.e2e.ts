@@ -139,6 +139,26 @@ test('the Permissions page edits rules by source behind a native confirmation an
   const local = settings.getByTestId('permission-source-projectLocal');
   await expect(local).toContainText('.piarc/settings.local.json');
   await expect(settings.getByTestId('permission-source-user')).toBeVisible();
+  // The settings action has a soft painted surface inside a stable native hit target.
+  const add = local.getByTestId('permission-add-projectLocal');
+  const paint = () => add.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+  await expect(add).toHaveCSS('border-top-width', '0px');
+  await add.scrollIntoViewIfNeeded();
+  await settings.mouse.move(1, 1);
+  const rest = await paint();
+  expect(rest).not.toBe('rgba(0, 0, 0, 0)');
+  const bounds = await add.boundingBox();
+  await add.hover();
+  await expect.poll(paint).not.toBe(rest);
+  await settings.mouse.down();
+  await expect(add).toBeFocused();
+  await expect
+    .poll(() => add.evaluate((el) => getComputedStyle(el, '::before').boxShadow))
+    .toBe('none');
+  expect(await add.boundingBox()).toEqual(bounds);
+  // Release outside the button so the next click opens the rule editor.
+  await settings.mouse.move(1, 1);
+  await settings.mouse.up();
   // Syntax is checked while typing; broad allow rules get a hint.
   await local.getByTestId('permission-add-projectLocal').click();
   const input = local.getByTestId('permission-rule-input');

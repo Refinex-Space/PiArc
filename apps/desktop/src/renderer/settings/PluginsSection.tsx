@@ -14,6 +14,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { ManagedBadge, pointerToken, useIsManaged } from './managed.js';
+import { Button } from '../app/Button.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -203,9 +204,8 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
       <div className="dialog-actions mcp-actions">
         {managed && <ManagedBadge testId="managed-package" />}
         {pkg.enabled ? (
-          <button
-            type="button"
-            className="button"
+          <Button
+            size="small"
             data-testid="package-off"
             disabled={busy || managed}
             onClick={() => {
@@ -213,11 +213,10 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
             }}
           >
             {t('plugins.turnOff')}
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
-            className="button button-primary"
+          <Button
+            variant="primary"
             data-testid="package-on"
             disabled={busy || managed}
             onClick={() => {
@@ -225,12 +224,11 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
             }}
           >
             {t('plugins.turnOn')}
-          </button>
+          </Button>
         )}
         {pending.length === 0 || !pkg.enabled ? null : (
-          <button
-            type="button"
-            className="button"
+          <Button
+            size="small"
             data-testid="package-review"
             disabled={busy}
             onClick={() => {
@@ -238,11 +236,10 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
             }}
           >
             {t('plugins.review')}
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          className="button"
+        <Button
+          size="small"
           data-testid="package-update"
           disabled={busy}
           onClick={() => {
@@ -250,10 +247,10 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
           }}
         >
           {t('plugins.update')}
-        </button>
-        <button
-          type="button"
-          className="button"
+        </Button>
+        <Button
+          variant="destructive"
+          size="small"
           data-testid="package-uninstall"
           disabled={busy}
           onClick={() => {
@@ -266,7 +263,7 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
           }}
         >
           {sure ? t('plugins.uninstallSure', { id: pkg.id }) : t('plugins.uninstall')}
-        </button>
+        </Button>
       </div>
     </li>
   );
@@ -274,14 +271,16 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
 
 function InstallForm({
   workspace,
-  busy,
+  operation,
   act,
 }: {
   readonly workspace: string | null;
-  readonly busy: boolean;
+  readonly operation: string | undefined;
   readonly act: (label: string, run: () => Promise<string>) => void;
 }) {
   const { t } = useApp();
+  const busy = operation !== undefined;
+  const installing = operation === 'install';
   const kindId = useId();
   const locationId = useId();
   const scopeId = useId();
@@ -335,9 +334,8 @@ function InstallForm({
         }}
       />
       {kind === 'directory' ? (
-        <button
-          type="button"
-          className="button"
+        <Button
+          size="small"
           data-testid="package-choose"
           onClick={() => {
             void window.piarc.chooseFolder().then((path) => {
@@ -346,7 +344,7 @@ function InstallForm({
           }}
         >
           {t('plugins.chooseFolder')}
-        </button>
+        </Button>
       ) : null}
       <label htmlFor={scopeId} className="permission-filter-label">
         {t('plugins.scope')}
@@ -363,14 +361,16 @@ function InstallForm({
         <option value="user">{t('plugins.scope.user')}</option>
         {workspace === null ? null : <option value="project">{t('plugins.scope.project')}</option>}
       </select>
-      <button
+      <Button
         type="submit"
-        className="button button-primary"
+        variant="primary"
         data-testid="package-install-submit"
+        loading={installing}
+        aria-label={installing ? t('plugins.installing') : undefined}
         disabled={busy || location.trim() === ''}
       >
-        {busy ? t('plugins.installing') : t('plugins.install')}
-      </button>
+        {t('plugins.install')}
+      </Button>
     </form>
   );
 }
@@ -381,7 +381,8 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
   const [list, setList] = useState<PackagesList | undefined>(undefined);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<string>();
+  const busy = operation !== undefined;
   const load = useCallback(() => {
     window.piarc
       .listPackages(workspace)
@@ -396,7 +397,7 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
   useEffect(load, [load]);
   const act = useCallback(
     (label: string, run: () => Promise<string>) => {
-      setBusy(true);
+      setOperation(label);
       setStatus('');
       run()
         .then((raw) => {
@@ -432,7 +433,7 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
           setStatus(`${label}: ${e instanceof Error ? e.message : String(e)}`);
         })
         .finally(() => {
-          setBusy(false);
+          setOperation(undefined);
           load();
         });
     },
@@ -443,7 +444,7 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
       <h2 className="settings-heading">{t('plugins.title')}</h2>
       <p className="muted small">{t('plugins.hint')}</p>
       <h3 className="settings-heading">{t('plugins.installTitle')}</h3>
-      <InstallForm workspace={workspace} busy={busy} act={act} />
+      <InstallForm workspace={workspace} operation={operation} act={act} />
       {status === '' ? null : (
         <p className="muted small" data-testid="package-status" role="status">
           {status}

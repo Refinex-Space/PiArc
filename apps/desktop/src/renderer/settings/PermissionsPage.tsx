@@ -15,6 +15,7 @@ import { useApp } from '../app/app-context.js';
 import { AutoReviewSection } from './AutoReviewSection.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { revealBidi } from '../transcript/reveal.js';
+import { Button } from '../app/Button.js';
 
 const BEHAVIORS: readonly RuleBehavior[] = ['deny', 'ask', 'allow'];
 
@@ -268,9 +269,8 @@ function RuleEditor({
           setText(e.target.value);
         }}
       />
-      <button
-        type="button"
-        className="button"
+      <Button
+        variant="primary"
         disabled={!valid}
         data-testid="permission-save"
         onClick={() => {
@@ -278,11 +278,11 @@ function RuleEditor({
         }}
       >
         {t('permissions.save')}
-      </button>
+      </Button>
       {onCancel && (
-        <button type="button" className="button" onClick={onCancel}>
+        <Button variant="ghost" size="small" onClick={onCancel}>
           {t('dialog.cancel')}
-        </button>
+        </Button>
       )}
       {check?.error !== undefined && (
         <p className="error-text" role="alert" data-testid="permission-check">
@@ -402,24 +402,24 @@ function SourceSection({
                     )}
                     {writable && (
                       <span className="permission-actions">
-                        <button
-                          type="button"
-                          className="row-action"
+                        <Button
+                          variant="ghost"
+                          size="small"
                           onClick={() => {
                             setEditing(key);
                           }}
                         >
                           {t('permissions.edit')}
-                        </button>
-                        <button
-                          type="button"
-                          className="row-action"
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="small"
                           onClick={() => {
                             change(r.behavior, r.rule, undefined);
                           }}
                         >
                           {t('permissions.remove')}
-                        </button>
+                        </Button>
                       </span>
                     )}
                   </>
@@ -442,16 +442,16 @@ function SourceSection({
             }}
           />
         ) : (
-          <button
-            type="button"
-            className="button permission-add"
+          <Button
+            size="small"
+            className="permission-add"
             data-testid={`permission-add-${source.id}`}
             onClick={() => {
               setAdding(true);
             }}
           >
             {t('permissions.add')}
-          </button>
+          </Button>
         ))}
     </section>
   );
@@ -593,9 +593,9 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
           <option value="day">{t('permissions.audit.day')}</option>
           <option value="week">{t('permissions.audit.week')}</option>
         </select>
-        <button type="button" className="button" onClick={load}>
+        <Button size="small" onClick={load}>
           {t('permissions.audit.refresh')}
-        </button>
+        </Button>
       </div>
       {error !== '' && (
         <p className="error-text" role="alert">

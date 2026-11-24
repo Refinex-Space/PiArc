@@ -20,6 +20,7 @@ import { CommentsBar, DiffCommentsProvider, useDiffCommentsState } from './DiffC
 import { languageOf } from './language.js';
 import { openChangesPanel } from './panel-state.js';
 import { revealBidi } from '../transcript/reveal.js';
+import { Button } from '../app/Button.js';
 
 function Counts({ added, removed }: { readonly added: number; readonly removed: number }) {
   return (
@@ -116,9 +117,10 @@ function FileRow({
         </span>
         <span className="change-tag">{t(`changes.kind.${file.kind}`)}</span>
         <Counts added={file.added} removed={file.removed} />
-        <button
-          type="button"
-          className="button button-small changes-discard-file"
+        <Button
+          variant="destructive"
+          size="small"
+          className="changes-discard-file"
           data-testid="changes-discard-file"
           disabled={busy}
           onClick={() => {
@@ -126,7 +128,7 @@ function FileRow({
           }}
         >
           {t('changes.discardFile')}
-        </button>
+        </Button>
       </div>
       {failure === undefined ? null : (
         <p className="changes-error" role="alert">

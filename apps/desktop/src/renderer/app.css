@@ -71,6 +71,7 @@ body,
   :is(
     a[href],
     .button-primary,
+    .button-destructive,
     .resizer,
     input[type='radio'],
     input[type='checkbox']
@@ -161,51 +162,145 @@ body,
 
 /* ---- controls ---- */
 
+/* Keep the native hit and focus box stable. The small painted surface can be shorter in
+   compact density; its surrounding space still belongs to the same button. */
 .button {
+  --action-height: var(--piarc-c-button-height);
+  --action-radius: var(--piarc-c-button-radius);
+  --action-pad: var(--piarc-space-3);
+  --action-font: var(--piarc-c-button-font-size);
+  --action-line: var(--piarc-c-button-line-height);
+  --action-fill: var(--piarc-c-button-secondary-background);
+  --action-hover: var(--piarc-action-hover);
+  --action-down: var(--piarc-action-pressed);
+  --action-ink: var(--piarc-text-primary);
+  --action-shadow:
+    inset 0 0 0 1px var(--piarc-c-button-secondary-border), var(--piarc-shadow-button);
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--piarc-space-1);
-  height: var(--piarc-c-button-height);
-  padding: 0 var(--piarc-space-3);
-  border: 1px solid var(--piarc-c-button-secondary-border);
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-c-button-secondary-background);
-  cursor: default;
+  box-sizing: border-box;
+  height: max(24px, var(--action-height));
+  padding: 0 var(--action-pad);
+  border: 0;
+  border-radius: var(--action-radius);
+  background-color: transparent;
+  user-select: none;
   white-space: nowrap;
+  cursor: default;
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-easing);
 }
 
-.button:hover:not(:disabled) {
-  background: var(--piarc-surface-hover);
+.button,
+:root[data-app] .button {
+  color: var(--action-ink);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--action-font);
+  line-height: var(--action-line);
+  font-weight: var(--action-weight, var(--piarc-font-weight-regular));
 }
 
-.button:disabled {
-  color: var(--piarc-text-disabled);
-}
-
-/* Under :root[data-app], or `:root[data-app] button { color: inherit }` wins and the text
-   on the accent background loses its contrast (T34, axe). */
-:root[data-app] .button-primary {
-  border-color: var(--piarc-c-button-primary-background);
-  background: var(--piarc-c-button-primary-background);
-  color: var(--piarc-c-button-primary-text);
-  font-weight: var(--piarc-font-weight-medium);
-}
-
-:root[data-app] .button-primary:hover:not(:disabled) {
-  border-color: var(--piarc-c-button-primary-background-hover);
-  background: var(--piarc-c-button-primary-background-hover);
-}
-
-:root[data-app] .button-primary:disabled {
-  border-color: var(--piarc-border-default);
-  background: var(--piarc-surface-active);
-  color: var(--piarc-text-disabled);
+.button::before {
+  position: absolute;
+  inset: max(0px, calc((24px - var(--action-height)) / 2)) 0;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: var(--action-surface, var(--action-fill));
+  box-shadow: var(--action-shadow);
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    box-shadow var(--piarc-motion-surface) var(--piarc-motion-easing);
 }
 
 .button-small {
-  height: auto;
-  padding: 2px var(--piarc-space-2);
-  font-size: var(--piarc-font-size-small);
+  --action-height: var(--piarc-button-small-height);
+  --action-radius: var(--piarc-button-small-radius);
+  --action-pad: var(--piarc-button-small-padding);
+  --action-font: var(--piarc-button-small-font-size);
+  --action-line: var(--piarc-button-small-line-height);
+}
+
+.button-ghost {
+  --action-fill: transparent;
+  --action-shadow: none;
+}
+
+.button-primary {
+  --action-fill: var(--piarc-c-button-primary-background);
+  --action-hover: var(--piarc-c-button-primary-background-hover);
+  --action-down: var(--piarc-action-primary-pressed);
+  --action-ink: var(--piarc-c-button-primary-text);
+}
+
+.button-destructive {
+  --action-fill: var(--piarc-action-danger);
+  --action-hover: var(--piarc-action-danger-hover);
+  --action-down: var(--piarc-action-danger-pressed);
+  --action-ink: var(--piarc-action-on-danger);
+}
+
+.button-primary,
+.button-destructive {
+  --action-weight: var(--piarc-font-weight-medium);
+  background-color: var(--action-surface, var(--action-fill));
+}
+
+.button-primary::before,
+.button-destructive::before {
+  content: none;
+}
+
+.button:enabled:is(:hover, [aria-expanded='true']) {
+  --action-surface: var(--action-hover);
+}
+
+.button:enabled:active {
+  --action-surface: var(--action-down);
+}
+
+.button:focus-visible::before,
+.button:enabled:active::before {
+  box-shadow: none;
+}
+
+.button:disabled:not([aria-busy='true']) {
+  opacity: 0.4;
+}
+
+.button[aria-busy='true'] .button-label {
+  opacity: 0;
+}
+
+.button[aria-busy='true']::after {
+  content: '';
+  position: absolute;
+  width: 1em;
+  height: 1em;
+  border: 1.5px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: piarc-spin 0.9s linear infinite;
+}
+
+@media (forced-colors: active) {
+  :root[data-app] .button {
+    border: 1px solid ButtonText;
+    background-color: ButtonFace;
+    color: ButtonText;
+  }
+  :root[data-app] .button:disabled:not([aria-busy='true']) {
+    border-color: GrayText;
+    color: GrayText;
+    opacity: 1;
+  }
+  .button::before {
+    content: none;
+  }
 }
 
 .icon-button {
@@ -221,9 +316,18 @@ body,
   color: var(--piarc-text-secondary);
 }
 
-.icon-button:hover {
+.icon-button:hover:not(:disabled) {
   background: var(--piarc-surface-active);
   color: var(--piarc-text-primary);
+}
+
+.icon-button:not(:disabled):active {
+  background-color: var(--piarc-action-pressed);
+}
+
+.icon-button,
+.row-action {
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-easing);
 }
 
 .input {
@@ -1148,16 +1252,13 @@ textarea.input {
 
 .key-button {
   min-width: 120px;
-  padding: 2px var(--piarc-space-2);
-  border: 1px solid var(--piarc-border-default);
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-surface-raised);
+  justify-content: flex-start;
   text-align: left;
 }
 
 .key-button.is-recording {
-  border-color: var(--piarc-c-focus-ring);
-  color: var(--piarc-text-accent);
+  --action-ink: var(--piarc-text-accent);
+  --action-surface: var(--piarc-accent-subtle);
 }
 
 .key-button kbd {

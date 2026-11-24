@@ -35,6 +35,7 @@ import { McpPage } from './McpPage.js';
 import { MemoryPage } from './MemoryPage.js';
 import { SkillsPage } from './SkillsPage.js';
 import { UsagePage } from '../usage/UsagePage.js';
+import { Button } from '../app/Button.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
   const { t } = useApp();
@@ -305,8 +306,8 @@ function ShortcutsPage() {
               <tr key={command.id} data-testid={`shortcut-${command.id}`}>
                 <td id={`shortcut-label-${command.id}`}>{t(command.label)}</td>
                 <td>
-                  <button
-                    type="button"
+                  <Button
+                    size="small"
                     className={`key-button${isRecording ? ' is-recording' : ''}`}
                     // The name is the command and the key as shown ("New session ⌘N");
                     // what the button does is its description.
@@ -336,7 +337,7 @@ function ShortcutsPage() {
                     ) : (
                       t('settings.shortcuts.unbound')
                     )}
-                  </button>
+                  </Button>
                   {problem?.command === command.id && (
                     <p className="error-text small" role="alert" data-testid="shortcut-problem">
                       {problem.text}
@@ -345,16 +346,16 @@ function ShortcutsPage() {
                 </td>
                 <td>
                   {overridden && (
-                    <button
-                      type="button"
-                      className="button button-small"
+                    <Button
+                      variant="ghost"
+                      size="small"
                       data-testid={`shortcut-reset-${command.id}`}
                       onClick={() => {
                         save({ key: 'keybinding', command: command.id, value: null });
                       }}
                     >
                       {t('settings.shortcuts.reset')}
-                    </button>
+                    </Button>
                   )}
                 </td>
               </tr>

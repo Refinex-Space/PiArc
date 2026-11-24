@@ -11,6 +11,7 @@ import {
   type ModelOverride,
   type ProviderSettings,
 } from './provider-form.js';
+import { Button } from '../app/Button.js';
 
 const keyOf = (m: { provider: string; id: string }) => `${m.provider}/${m.id}`;
 
@@ -272,12 +273,12 @@ function ModelForm({
           </select>
         </div>
         <div className="dialog-actions">
-          <button type="button" className="button" onClick={onCancel}>
+          <Button variant="ghost" size="small" onClick={onCancel}>
             {t('dialog.cancel')}
-          </button>
-          <button type="submit" className="button button-primary" data-testid="model-save">
+          </Button>
+          <Button type="submit" variant="primary" data-testid="model-save">
             {t('models.settings.save')}
-          </button>
+          </Button>
         </div>
       </fieldset>
     </form>
@@ -375,9 +376,8 @@ export function ModelSettingsSection({
                     {keyOf(m)} · {format.number(o?.contextWindow ?? m.contextWindow)}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="button"
+                <Button
+                  size="small"
                   data-testid={`model-edit-${keyOf(m)}`}
                   disabled={busy}
                   onClick={() => {
@@ -385,7 +385,7 @@ export function ModelSettingsSection({
                   }}
                 >
                   {t('models.settings.edit')}
-                </button>
+                </Button>
               </li>
             );
           })}

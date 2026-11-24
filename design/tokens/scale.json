@@ -24,11 +24,13 @@
     "pill": "999px"
   },
   "motion": {
+    "surface": "60ms",
     "fast": "120ms",
     "normal": "200ms",
     "easing": "cubic-bezier(0.2, 0, 0, 1)"
   },
   "shadow": {
+    "button": "0 1px 2px rgb(0 0 0 / 0.05)",
     "overlay": "0 8px 28px rgb(0 0 0 / 0.18), 0 1px 3px rgb(0 0 0 / 0.12)"
   },
   "size": {
@@ -39,6 +41,15 @@
   },
   "density": {
     "comfortable": {
+      "button.height": "28px",
+      "button.radius": "8px",
+      "button.fontSize": "14px",
+      "button.lineHeight": "20px",
+      "button.smallHeight": "28px",
+      "button.smallRadius": "7px",
+      "button.smallPadding": "10px",
+      "button.smallFontSize": "14px",
+      "button.smallLineHeight": "20px",
       "segment.height": "28px",
       "segment.radius": "8px",
       "segment.fontSize": "14px",
@@ -53,6 +64,15 @@
       "size.controlHeight": "30px"
     },
     "compact": {
+      "button.height": "24px",
+      "button.radius": "6px",
+      "button.fontSize": "13px",
+      "button.lineHeight": "19px",
+      "button.smallHeight": "20px",
+      "button.smallRadius": "5px",
+      "button.smallPadding": "6px",
+      "button.smallFontSize": "12px",
+      "button.smallLineHeight": "17px",
       "segment.height": "24px",
       "segment.radius": "6px",
       "segment.fontSize": "13px",

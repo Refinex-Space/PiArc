@@ -9,6 +9,7 @@ import { useApp } from '../app/app-context.js';
 import { parseWorkspaces } from '../settings/AgentsPage.js';
 import { Cost, TokenList, purposeLabel } from './UsageViews.js';
 import { parseUsageReport, totalTokens } from './usage.js';
+import { Button } from '../app/Button.js';
 
 const RATES = ['input', 'output', 'cacheRead', 'cacheWrite'] as const;
 type Rate = (typeof RATES)[number];
@@ -95,24 +96,23 @@ function PriceEditor({
         </p>
       )}
       <div className="usage-price-actions">
-        <button type="submit" className="button button-primary" data-testid="usage-price-save">
+        <Button type="submit" variant="primary" data-testid="usage-price-save">
           {t('usage.price.save')}
-        </button>
+        </Button>
         {model.priceSource === 'user' ? (
-          <button
-            type="button"
-            className="button"
+          <Button
+            size="small"
             data-testid="usage-price-reset"
             onClick={() => {
               save(null);
             }}
           >
             {t('usage.price.reset')}
-          </button>
+          </Button>
         ) : null}
-        <button type="button" className="button" onClick={onDone}>
+        <Button variant="ghost" size="small" onClick={onDone}>
           {t('usage.price.cancel')}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -152,16 +152,15 @@ function ModelTable({
                     <span className="muted small" data-testid="usage-price-source">
                       {t(`usage.price.source.${m.priceSource}`)}
                     </span>
-                    <button
-                      type="button"
-                      className="button button-small"
+                    <Button
+                      size="small"
                       data-testid="usage-price-edit"
                       onClick={() => {
                         setEditing(editing === key ? undefined : key);
                       }}
                     >
                       {t('usage.price.edit')}
-                    </button>
+                    </Button>
                   </div>
                 </td>
                 <td className="usage-number">{format.number(m.tokens.requests)}</td>
@@ -307,9 +306,9 @@ export function UsagePage() {
             </option>
           ))}
         </select>
-        <button type="button" className="button" data-testid="usage-refresh" onClick={load}>
+        <Button size="small" data-testid="usage-refresh" onClick={load}>
           {t('usage.refresh')}
-        </button>
+        </Button>
       </div>
       {error === '' ? null : (
         <p className="error-text" role="alert">

@@ -31,6 +31,22 @@
     "strong": { "light": "neutral.9", "dark": "neutral.9", "highContrast": "neutral.11" },
     "focus": { "light": "neutral.11", "dark": "neutral.10", "highContrast": "neutral.12" }
   },
+  "action": {
+    "surface": { "light": "base.black5", "dark": "base.white15" },
+    "hover": { "light": "base.black8", "dark": "base.white22" },
+    "pressed": { "light": "base.ink10", "dark": "base.white28" },
+    "edge": { "light": "base.ink10", "dark": "base.transparent", "highContrast": "neutral.11" },
+    "primaryPressed": {
+      "light": "accent.11",
+      "dark": "accent.7",
+      "lightHighContrast": "accent.12",
+      "darkHighContrast": "accent.11"
+    },
+    "danger": { "light": "danger.10", "dark": "danger.11", "highContrast": "danger.12" },
+    "dangerHover": { "light": "danger.11", "dark": "danger.10", "highContrast": "danger.12" },
+    "dangerPressed": { "light": "danger.12", "dark": "danger.9", "highContrast": "danger.12" },
+    "onDanger": { "light": "base.white", "dark": "neutral.1" }
+  },
   "segment": {
     "track": { "light": "base.ink5", "dark": "base.white5" },
     "thumb": { "light": "base.white", "dark": "base.white10" },
@@ -106,6 +122,15 @@
     "border.default": "CanvasText",
     "border.strong": "CanvasText",
     "border.focus": "Highlight",
+    "action.surface": "ButtonFace",
+    "action.hover": "ButtonFace",
+    "action.pressed": "ButtonFace",
+    "action.edge": "ButtonText",
+    "action.primaryPressed": "ButtonFace",
+    "action.danger": "ButtonFace",
+    "action.dangerHover": "ButtonFace",
+    "action.dangerPressed": "ButtonFace",
+    "action.onDanger": "ButtonText",
     "segment.track": "Canvas",
     "segment.thumb": "ButtonFace",
     "segment.edge": "ButtonText",

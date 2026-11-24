@@ -8,6 +8,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import { useSignInDialog } from './SignInSection.js';
+import { Button } from '../app/Button.js';
 
 const STATES = [
   'connected',
@@ -158,31 +159,18 @@ function ServerRow({
       )}
       <div className="dialog-actions mcp-actions">
         {server.state === 'needsAuth' || (server.oauth === true && server.state === 'failed') ? (
-          <button
-            type="button"
-            className="button button-primary"
-            data-testid="mcp-sign-in"
-            disabled={busy}
-            onClick={onSignIn}
-          >
+          <Button variant="primary" data-testid="mcp-sign-in" disabled={busy} onClick={onSignIn}>
             {t('mcp.signIn')}
-          </button>
+          </Button>
         ) : null}
         {running ? (
-          <button
-            type="button"
-            className="button"
-            data-testid="mcp-reconnect"
-            disabled={busy}
-            onClick={onReconnect}
-          >
+          <Button size="small" data-testid="mcp-reconnect" disabled={busy} onClick={onReconnect}>
             {t('mcp.reconnect')}
-          </button>
+          </Button>
         ) : null}
         {running ? (
-          <button
-            type="button"
-            className="button"
+          <Button
+            size="small"
             data-testid="mcp-disable"
             disabled={busy}
             onClick={() => {
@@ -190,11 +178,10 @@ function ServerRow({
             }}
           >
             {t('mcp.disable')}
-          </button>
+          </Button>
         ) : server.state === 'disabled' ? (
-          <button
-            type="button"
-            className="button"
+          <Button
+            size="small"
             data-testid="mcp-enable"
             disabled={busy}
             onClick={() => {
@@ -202,7 +189,7 @@ function ServerRow({
             }}
           >
             {t('mcp.enable')}
-          </button>
+          </Button>
         ) : null}
       </div>
     </li>
