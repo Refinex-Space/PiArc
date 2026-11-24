@@ -190,6 +190,10 @@ function HomeForm({
         if (seq === commandsRequest.current) setError(reason(cause));
       });
   };
+  const shownEffort = effort ?? catalog?.effort;
+  const effortLabel = shownEffort ? t(`models.effort.${shownEffort}`) : t('models.effort');
+  const modeLabel = mode ? t(`approval.mode.${mode}`) : t('home.modeDefault');
+  const modelLabel = resolved?.name ?? t('workbench.modelAuto');
   const effortItems = (resolved?.efforts ?? []).map((level) => ({
     id: `effort-${level}`,
     label: t(`models.effort.${level}`),
@@ -242,6 +246,7 @@ function HomeForm({
           <div className="environment-card">
             <ChoiceButton
               label={t('home.folder')}
+              valueLabel={label}
               className="environment-current"
               items={folderItems}
               above={false}
@@ -297,12 +302,18 @@ function HomeForm({
           }
         />
         <div className="environment-bar">
-          <ChoiceButton label={t('workbench.environment')} items={setupItems} disabled={busy}>
+          <ChoiceButton
+            label={t('workbench.environment')}
+            valueLabel={localLabel}
+            items={setupItems}
+            disabled={busy}
+          >
             <ComputerIcon />
             {localLabel}
           </ChoiceButton>
           <ChoiceButton
-            label={`${t('home.folder')} · ${label}`}
+            label={t('home.folder')}
+            valueLabel={label}
             items={folderItems}
             heading={t('jumpList.recentWorkspaces')}
             testId="home-workspace"
@@ -318,13 +329,14 @@ function HomeForm({
             items={modelItems}
             heading={t('models.label')}
             buttonRef={modelButton}
+            valueLabel={modelLabel}
             disabled={!workspace || busy}
             onOpen={() => {
               setCatalogRequested(workspace);
             }}
             testId="home-model"
           >
-            {resolved?.name ?? t('workbench.modelAuto')}
+            {modelLabel}
           </ChoiceButton>
           {resolved && resolved.efforts.length > 1 && (
             <ChoiceButton
@@ -332,15 +344,15 @@ function HomeForm({
               disabled={busy}
               heading={t('models.effort')}
               items={effortItems}
+              valueLabel={effortLabel}
             >
-              {(effort ?? catalog?.effort)
-                ? t(`models.effort.${effort ?? catalog?.effort ?? 'off'}`)
-                : t('models.effort')}
+              {effortLabel}
             </ChoiceButton>
           )}
           <ChoiceButton
             label={t('approval.modeMenu')}
             testId="home-mode"
+            valueLabel={modeLabel}
             disabled={!workspace || busy}
             items={[
               {
@@ -355,7 +367,7 @@ function HomeForm({
             ]}
             heading={t('approval.modeMenu')}
           >
-            {mode ? t(`approval.mode.${mode}`) : t('home.modeDefault')}
+            {modeLabel}
           </ChoiceButton>
         </div>
       </div>

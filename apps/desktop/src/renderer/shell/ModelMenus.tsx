@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type Ref } from 'react';
 import { useApp } from '../app/app-context.js';
 import { Dialog } from './Dialog.js';
-import { MenuPopup, useMenu } from './Menu.js';
+import { choiceName, MenuPopup, useMenu } from './Menu.js';
 import {
   keyOf,
   isEffort,
@@ -38,6 +38,8 @@ export function ModelMenus({
   const nextRequest = useRef(0);
   const menu = useMenu();
   const current = catalog?.models.find((m) => catalog.model && keyOf(m) === keyOf(catalog.model));
+  const modelLabel = current?.name ?? catalog?.model?.id ?? t('models.label');
+  const effortLabel = catalog?.effort ? t(`models.effort.${catalog.effort}`) : t('models.effort');
   const close = () => {
     nextRequest.current++;
     setChosen(undefined);
@@ -102,6 +104,7 @@ export function ModelMenus({
         ref={modelButton}
         disabled={running || busy}
         data-testid="session-model"
+        aria-label={choiceName(modelLabel, t('models.label'))}
         aria-haspopup="dialog"
         title={catalog?.model ? keyOf(catalog.model) : t('models.label')}
         aria-expanded={picker.open !== null}
@@ -109,7 +112,7 @@ export function ModelMenus({
           picker.openAbove(event.currentTarget);
         }}
       >
-        {current?.name ?? catalog?.model?.id ?? t('models.label')}
+        {modelLabel}
       </button>
       <button
         type="button"
@@ -117,13 +120,14 @@ export function ModelMenus({
         ref={effortButton}
         disabled={running || busy || !current?.efforts.length}
         data-testid="session-effort"
+        aria-label={choiceName(effortLabel, t('models.effort'))}
         aria-haspopup="menu"
         aria-expanded={Boolean(menu.open)}
         onClick={(e) => {
           menu.openAbove(e.currentTarget);
         }}
       >
-        {catalog?.effort ? t(`models.effort.${catalog.effort}`) : t('models.effort')}
+        {effortLabel}
       </button>
       {menu.open && current && (
         <MenuPopup

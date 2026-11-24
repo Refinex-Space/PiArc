@@ -367,9 +367,15 @@ export function MenuButton({
   );
 }
 
+/** Name a selector with the displayed value first so speech input and readers can use it. */
+export function choiceName(value: string, purpose: string): string {
+  return value === purpose ? value : `${value} · ${purpose}`;
+}
+
 /** A compact choice or action menu attached to a button in the composer or environment card. */
 export function ChoiceButton({
   label,
+  valueLabel,
   children,
   items,
   testId,
@@ -382,6 +388,7 @@ export function ChoiceButton({
   buttonRef,
 }: {
   readonly label: string;
+  readonly valueLabel?: string;
   readonly children: ReactNode;
   readonly items: readonly MenuItem[];
   readonly testId?: string;
@@ -400,7 +407,7 @@ export function ChoiceButton({
         type="button"
         className={`choice-button ${className}`}
         title={label}
-        aria-label={label}
+        aria-label={valueLabel === undefined ? undefined : choiceName(valueLabel, label)}
         aria-haspopup="menu"
         aria-expanded={menu.open !== null}
         disabled={disabled}

@@ -2,7 +2,7 @@ import type { Ref } from 'react';
 import type { PermissionMode } from '../../shared/ipc.js';
 import type { Preferences } from '../../shared/preferences.js';
 import { useApp, type AppContextValue } from '../app/app-context.js';
-import { MenuPopup, useMenu, type MenuItem } from './Menu.js';
+import { choiceName, MenuPopup, useMenu, type MenuItem } from './Menu.js';
 
 /** First-turn choices use the same policy options. Bypass requires the live session's native confirmation. */
 export function permissionChoices(
@@ -46,6 +46,7 @@ export function PermissionModeMenu({
 }) {
   const { t, preferences } = useApp();
   const menu = useMenu();
+  const label = mode === undefined ? t('approval.modeMenu') : t(`approval.mode.${mode}`);
   return (
     <>
       <button
@@ -57,11 +58,12 @@ export function PermissionModeMenu({
         aria-expanded={menu.open !== null}
         disabled={mode === undefined}
         data-testid="permission-mode"
+        aria-label={choiceName(label, t('approval.modeMenu'))}
         onClick={(event) => {
           menu.openAbove(event.currentTarget);
         }}
       >
-        {mode === undefined ? t('approval.modeMenu') : t(`approval.mode.${mode}`)}
+        {label}
       </button>
       {menu.open && (
         <MenuPopup

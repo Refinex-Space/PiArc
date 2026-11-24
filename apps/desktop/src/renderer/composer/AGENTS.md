@@ -1,9 +1,10 @@
 # Composer
 
-ProseMirror 处理编辑、候选面板和键盘意图。正式会话由 `shell/Conversation.tsx` 接线，`shell/session-input.ts` 将草稿发给 Core。输入协议与持久化见 [ADR-0030](../../../../../docs/adr/0030-transcript-and-composer.md)。
+ProseMirror 处理编辑、候选面板和键盘意图。新会话与正式会话共用 `Composer`。首回合由 `shell/Home.tsx` 接线，经信任确认后创建会话、应用选定的模式及推理强度，再调用 `prepareOutgoing` 保存附件并发送。正式会话由 `shell/Conversation.tsx` 接线。输入协议与持久化见 [ADR-0030](../../../../../docs/adr/0030-transcript-and-composer.md)。
 
 ## 不变量
 
+- 工作区与会话各自持有本窗口的未发送草稿。Shell 路由决定新会话所属的工作区。发送成功会清除草稿，Core 快照移除对应实体时释放编辑文档和附件。外部草稿单独编辑。
 - `schema.ts` 的提及节点保存 `{id, label, path}`，胶囊显示 `@label`，`serializeDoc` 生成发给模型的 `@path` 与 UTF-16 区间。路径相对于搜索根并统一用 `/`。输入框每个实例使用独立的搜索 ID，旧结果和已取消的查询都不能覆盖新候选。
 - `composerInfo()` 提供附件种类及大小和搜索结果上限。斜杠命令来自 `listCommands`（T37，`commands-list.ts`）：面板按来源分组（`SOURCE_ORDER`）、经 `src/shared/fuzzy.ts` 排序（名称、别名、描述），显示参数提示；新的内置命令在 Core 的 `piarc_config::skills::BUILT_IN_COMMANDS` 登记，并在 `builtins.ts` 给出动作与中英描述。选中非内置命令时 `fillCommand` 填入 `/名称 ` 等用户输入参数，不直接发送。
 - 拖放、粘贴与选择文件都先经 `checkFiles`。待发送的附件是 `Blob` 和展示信息。发送时逐个将字节经 `window.piarc.storeAttachment` 交给 Core，向会话传 `InputAttachment` 引用。限制由 `piarc_core::composer::attachments` 定义，渲染进程按 Core 的返回值预检。

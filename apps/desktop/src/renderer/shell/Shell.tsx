@@ -399,7 +399,7 @@ export function Shell() {
         closeSettings();
       return;
     }
-    if (document.querySelector('[data-testid="workspace-search"]')) return;
+    if (trust || document.querySelector('[data-testid="workspace-search"]')) return;
     switch (command) {
       case 'session.new':
         show({
@@ -529,6 +529,7 @@ export function Shell() {
         <div
           className={`shell${collapsed ? ' is-collapsed' : ''}`}
           data-testid="app-shell"
+          inert={Boolean(trust) || shortcutsOpen || paletteOpen}
           onKeyDown={(event) => {
             if (
               sidebarPeek &&

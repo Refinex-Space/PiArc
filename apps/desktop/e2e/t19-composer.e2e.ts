@@ -148,6 +148,10 @@ test('the first prompt preserves mentions and attachments through trust and uses
   await expect
     .poll(async () => userTexts((await requests(mock, 't19-input')).at(-1)?.body ?? {}).join(' '))
     .toContain('@src/main.ts');
+  await page.getByTestId('new-session').click();
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', ws);
+  await expect(page.getByTestId('home-input')).toHaveText('');
+  await expect(page.getByTestId('pending-attachment')).toHaveCount(0);
 });
 
 test('@ mentions come from Core, honor ignore files and stay apart from the sent text', async ({

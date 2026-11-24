@@ -104,6 +104,10 @@
   background: var(--piarc-workbench-editor);
   box-shadow: var(--piarc-workbench-composer-shadow);
 }
+/* Keep a composed draft readable while the user decides workspace trust. */
+.composer .composer-box.is-disabled {
+  opacity: 1;
+}
 .composer-box .workbench-icon {
   flex: none;
   width: calc(var(--piarc-space-4) + var(--piarc-space-3));
@@ -224,4 +228,17 @@
 .interactive-list.menu .menu-item.is-active,
 .composer .composer-popup .is-active {
   background: var(--piarc-surface-hover);
+}
+
+@media (forced-colors: active) {
+  :root[data-app] .composer-box .composer-send {
+    forced-color-adjust: none;
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+  :root[data-app] .composer-box .composer-send:disabled {
+    opacity: 1;
+    border: 1px dashed GrayText;
+  }
 }
