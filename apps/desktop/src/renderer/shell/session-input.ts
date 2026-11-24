@@ -48,7 +48,7 @@ function field(text: string, name: string): string | undefined {
   return undefined;
 }
 
-function chipsOf(draft: Draft): AttachmentChip[] {
+export function chipsOf(draft: Draft): AttachmentChip[] {
   return [
     ...draft.stored.flatMap(chipOf),
     ...draft.pending.map((file) => ({
@@ -178,14 +178,23 @@ export class SessionInput {
     stored = [...draft.stored],
   ): Promise<OutgoingInput> {
     await this.ensureOpen();
-    for (const file of draft.pending) {
-      const bytes = new Uint8Array(await file.file.arrayBuffer());
-      stored.push(
-        parseAttachment(
-          await this.api.storeAttachment(this.sessionId, file.name, file.mimeType, bytes),
-        ),
-      );
-    }
-    return { requestId: clientId, text: draft.text, mentions: draft.mentions, attachments: stored };
+    return prepareOutgoing(this.api, this.sessionId, clientId, draft, stored);
   }
+}
+
+/** Stores attachments in their owning session before handing Core the message. */
+export async function prepareOutgoing(
+  api: Pick<PiarcApi, 'storeAttachment'>,
+  sessionId: string,
+  clientId: string,
+  draft: Draft,
+  stored = [...draft.stored],
+): Promise<OutgoingInput> {
+  for (const file of draft.pending) {
+    const bytes = new Uint8Array(await file.file.arrayBuffer());
+    stored.push(
+      parseAttachment(await api.storeAttachment(sessionId, file.name, file.mimeType, bytes)),
+    );
+  }
+  return { requestId: clientId, text: draft.text, mentions: draft.mentions, attachments: stored };
 }

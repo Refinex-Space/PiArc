@@ -3,9 +3,11 @@
 // any step rolls the optimistic message back and gives the text back to the input; a session
 // that was created but did not take its first prompt is closed again (Pi keeps no file for a
 // session without a reply, so it leaves no trace).
-import type { ModelRef } from '@piarc/protocol';
-import type { PiarcApi, WorktreeOptions } from '../../shared/ipc.js';
+import type { ModelRef, EffortLevel } from '@piarc/protocol';
+import type { PiarcApi, PermissionMode, WorktreeOptions } from '../../shared/ipc.js';
 import type { AppStore } from '../store/app-store.js';
+
+import { prepareOutgoing, chipsOf, type Draft } from './session-input.js';
 
 export type StartStep =
   | { readonly kind: 'echo'; readonly clientId: string; readonly text: string }
@@ -47,13 +49,24 @@ function field(text: string, name: string): string | undefined {
  * back.
  */
 export async function startSession(options: {
-  readonly api: Pick<PiarcApi, 'createSession' | 'prompt' | 'closeSession'>;
+  readonly api: Pick<
+    PiarcApi,
+    | 'createSession'
+    | 'prompt'
+    | 'closeSession'
+    | 'storeAttachment'
+    | 'setSessionEffort'
+    | 'setPermissionMode'
+  >;
   readonly store: AppStore;
   readonly workspace: string;
   readonly model?: ModelRef;
   /** Run the session in a worktree of its own (T35). */
   readonly worktree?: WorktreeOptions;
   readonly text: string;
+  readonly draft?: Draft;
+  readonly effort?: EffortLevel;
+  readonly mode?: PermissionMode;
   readonly clientId: string;
   readonly watch: (sessionId: string) => () => void;
   readonly onStep: (step: StartStep) => void;
@@ -66,7 +79,12 @@ export async function startSession(options: {
     throw new Error('Core did not return a session id');
   }
   const transcript = store.transcript(sessionId);
-  transcript.addOptimistic(clientId, { text, mentions: [], attachments: [] });
+  const draft = options.draft ?? { text, mentions: [], pending: [], stored: [] };
+  transcript.addOptimistic(clientId, {
+    text,
+    mentions: draft.mentions,
+    attachments: chipsOf(draft),
+  });
   const unwatch = options.watch(sessionId);
   options.onStep({
     kind: 'created',
@@ -74,10 +92,12 @@ export async function startSession(options: {
     ...(unignoredWorktree(created) ? { unignoredWorktree: true } : {}),
   });
   try {
-    const input = { requestId: clientId, text, mentions: [], attachments: [] };
+    if (options.effort !== undefined) await api.setSessionEffort(sessionId, options.effort);
+    if (options.mode !== undefined) await api.setPermissionMode(sessionId, options.mode);
+    const input = await prepareOutgoing(api, sessionId, clientId, draft);
     const turnId = field(await api.prompt(sessionId, input), 'turnId');
     if (turnId !== undefined) {
-      transcript.confirm(clientId, turnId);
+      transcript.confirm(clientId, turnId, input.attachments);
     }
     return sessionId;
   } catch (error) {

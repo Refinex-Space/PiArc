@@ -62,16 +62,16 @@ it('presents external text for editing only after a trust decision and never sen
       await Promise.resolve();
     });
     expect(api.openWorkspace).toHaveBeenCalledWith(path);
-    const draft = () => container.querySelector<HTMLTextAreaElement>('[data-testid="home-input"]');
-    expect(draft()?.value).toBe('');
+    const draft = () => container.querySelector<HTMLElement>('[data-testid="home-input"]');
+    expect(draft()?.textContent).toBe('');
     const restricted = container.querySelector<HTMLButtonElement>('[data-testid="trust-deny"]');
     expect(restricted?.disabled).toBe(false);
     await act(async () => {
       restricted?.click();
       await Promise.resolve();
     });
-    expect(draft()?.value).toBe(text);
-    expect(draft()?.disabled).toBe(false);
+    expect(draft()?.textContent).toBe(text);
+    expect(draft()?.getAttribute('contenteditable')).toBe('true');
     expect(container.querySelector('b')).toBeNull();
     expect(container.querySelector('[data-testid="session-row"]')).toBeNull();
     // The jump-list tasks reach the same listener as a later second-instance event.
@@ -81,7 +81,7 @@ it('presents external text for editing only after a trust decision and never sen
         for (const listener of listeners) listener({ type: 'launch', target: { kind } });
         await Promise.resolve();
       });
-      expect(draft()?.value).toBe('');
+      expect(draft()?.textContent).toBe('');
     }
     expect(api.chooseFolder).toHaveBeenCalledOnce();
     expect(api.openWorkspace).toHaveBeenLastCalledWith('/another');

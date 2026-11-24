@@ -34,7 +34,8 @@ test('two configured endpoints complete tool turns; a text-only model refuses an
     'note.txt': 'A note from the mock workspace.',
   });
   await openFolder(page, app, ws);
-  await page.getByTestId('home-model').selectOption('relay-a/first');
+  await page.getByTestId('home-model').click();
+  await page.getByTestId('model-option-relay-a/first').click();
   await startSession(page, 'Read note.txt', 't21-models');
   await expect(
     page.getByTestId('agent-message').filter({ hasText: 'First protocol read the note.' }),

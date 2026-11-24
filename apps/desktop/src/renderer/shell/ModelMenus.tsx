@@ -31,8 +31,7 @@ export function ModelMenus({
 }) {
   const { t, locale } = useApp();
   const title = useId();
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const picker = useMenu();
   const [chosen, setChosen] = useState<{ model: ModelChoice; preview: SwitchPreview }>();
   const [level, setLevel] = useState<Effort | ''>('');
   const [busy, setBusy] = useState(false);
@@ -42,7 +41,7 @@ export function ModelMenus({
   const close = () => {
     nextRequest.current++;
     setChosen(undefined);
-    setOpen(false);
+    picker.close();
     setBusy(false);
   };
   const edit = async (model: ModelChoice) => {
@@ -76,7 +75,7 @@ export function ModelMenus({
     try {
       // A PreModelSwitch hook may ask a question in the session's approval ledger. Release
       // this modal's focus trap before waiting for the confirmed operation.
-      setOpen(false);
+      picker.close();
       setChosen(undefined);
       await window.piarc.setSessionModel(id, chosen.model.provider, chosen.model.id, level);
       onChange();
@@ -86,180 +85,152 @@ export function ModelMenus({
       onError(e);
     }
   };
-  const models =
-    catalog?.models.filter((m) =>
-      (m.name + ' ' + keyOf(m)).toLowerCase().includes(search.toLowerCase()),
-    ) ?? [];
+  const effortItems =
+    current?.efforts.map((e) => ({
+      id: `effort-${e}`,
+      selected: e === catalog?.effort,
+      label: t(`models.effort.${e}`),
+      run: () => {
+        if (e !== catalog?.effort) window.piarc.setSessionEffort(id, e).then(onChange, onError);
+      },
+    })) ?? [];
   return (
     <>
       <button
         type="button"
-        className="row-action"
+        className="choice-button"
         ref={modelButton}
         disabled={running || busy}
         data-testid="session-model"
         aria-haspopup="dialog"
-        onClick={() => {
-          setSearch('');
-          setOpen(true);
+        title={catalog?.model ? keyOf(catalog.model) : t('models.label')}
+        aria-expanded={picker.open !== null}
+        onClick={(event) => {
+          picker.openAbove(event.currentTarget);
         }}
       >
-        {catalog?.model ? keyOf(catalog.model) : t('models.label')} ▾
+        {current?.name ?? catalog?.model?.id ?? t('models.label')}
       </button>
       <button
         type="button"
-        className="row-action"
+        className="choice-button"
         ref={effortButton}
         disabled={running || busy || !current?.efforts.length}
         data-testid="session-effort"
         aria-haspopup="menu"
         aria-expanded={Boolean(menu.open)}
         onClick={(e) => {
-          const box = e.currentTarget.getBoundingClientRect();
-          menu.openAt(box.left, box.top);
+          menu.openAbove(e.currentTarget);
         }}
       >
-        {t('models.effort')}
-        {catalog?.effort && ` · ${t(`models.effort.${catalog.effort}`)}`} ▾
+        {catalog?.effort ? t(`models.effort.${catalog.effort}`) : t('models.effort')}
       </button>
       {menu.open && current && (
         <MenuPopup
           label={t('models.effort')}
+          heading={t('models.effort')}
           at={menu.open}
           onClose={menu.close}
-          items={current.efforts.map((e) => ({
-            id: `effort-${e}`,
-            label: t(`models.effort.${e}`),
-            run: () => {
-              if (e !== catalog?.effort)
-                window.piarc.setSessionEffort(id, e).then(onChange, onError);
-            },
-          }))}
+          items={effortItems}
         />
       )}
-      {open && (
+      {picker.open !== null && (
+        <MenuPopup
+          label={t('models.label')}
+          testId="model-menu"
+          filterLabel={t('models.search')}
+          at={picker.open}
+          onClose={picker.close}
+          items={[
+            ...(catalog?.models ?? []).map((m) => ({
+              id: keyOf(m),
+              testId: `model-option-${keyOf(m)}`,
+              label: m.name,
+              hint: keyOf(m),
+              selected: current !== undefined && keyOf(m) === keyOf(current),
+              run: () => {
+                if (current === undefined || keyOf(m) !== keyOf(current)) void edit(m);
+              },
+            })),
+            ...(effortItems.length
+              ? [{ id: 'effort', label: t('models.effort'), submenu: effortItems }]
+              : []),
+            {
+              id: 'manage-models',
+              label: t('models.manage'),
+              run: () => {
+                void window.piarc.openSettings('providers');
+              },
+            },
+          ]}
+        />
+      )}
+      {chosen && (
         <Dialog
           labelledBy={title}
           onCancel={() => {
-            if (!chosen || !busy) close();
+            if (!busy) close();
           }}
-          testId={chosen ? 'model-switch-dialog' : 'model-menu'}
-          focusKey={chosen ? 'preview' : 'menu'}
+          testId="model-switch-dialog"
         >
-          {chosen ? (
-            <>
-              <h2 id={title}>{t('models.switchTo', { model: keyOf(chosen.model) })}</h2>
-              <dl className="model-preview">
-                <dt>{t('models.context')}</dt>
-                <dd data-testid="model-context">
-                  {chosen.preview.contextTokens === null
-                    ? t('models.unknown')
-                    : t('models.tokens', { count: chosen.preview.contextTokens })}
-                </dd>
-                <dt>{t('models.cache')}</dt>
-                <dd>{t(chosen.preview.cacheInvalidated ? 'models.invalidated' : 'models.kept')}</dd>
-                <dt>{t('models.cost')}</dt>
-                <dd data-testid="model-cache-cost">
-                  {chosen.preview.cacheWriteUsd === null
-                    ? t('models.unknown')
-                    : new Intl.NumberFormat(locale, {
-                        style: 'currency',
-                        currency: 'USD',
-                        maximumSignificantDigits: 6,
-                      }).format(chosen.preview.cacheWriteUsd)}
-                </dd>
-                <dt>{t('models.thinking')}</dt>
-                <dd>{t(chosen.preview.dropsThinking ? 'models.dropped' : 'models.retained')}</dd>
-              </dl>
-              <label className="setting">
-                {t('models.effort')}
-                <select
-                  className="input"
-                  value={level}
-                  data-testid="model-switch-effort"
-                  onChange={(e) => {
-                    const v = e.currentTarget.value;
-                    if (isEffort(v)) setLevel(v);
-                  }}
-                >
-                  {!level && <option value="">{t('models.priority')}</option>}
-                  {chosen.model.efforts.map((e) => (
-                    <option key={e} value={e}>
-                      {t(`models.effort.${e}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="dialog-actions">
-                <button type="button" className="button" disabled={busy} onClick={close}>
-                  {t('dialog.cancel')}
-                </button>
-                <button
-                  type="button"
-                  className="button button-primary"
-                  disabled={!level || busy || running}
-                  data-testid="model-switch-confirm"
-                  onClick={() => {
-                    void confirm();
-                  }}
-                >
-                  {t('models.switch')}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 id={title}>{t('models.label')}</h2>
-              <input
-                className="input"
-                data-autofocus
-                aria-label={t('models.search')}
-                placeholder={t('models.search')}
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.currentTarget.value);
-                }}
-              />
-              <ul className="interactive-list model-list">
-                {models.map((m) => {
-                  const selected = current !== undefined && keyOf(m) === keyOf(current);
-                  return (
-                    <li key={keyOf(m)}>
-                      <button
-                        type="button"
-                        className="model-option"
-                        disabled={busy || running || selected}
-                        aria-current={selected ? 'true' : undefined}
-                        data-testid={`model-option-${keyOf(m)}`}
-                        onClick={() => {
-                          void edit(m);
-                        }}
-                      >
-                        <strong>{m.name}</strong>
-                        <span className="small muted">{keyOf(m)}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {!models.length && <p className="muted">{t('models.empty')}</p>}
-              <div className="dialog-actions">
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() => {
-                    void window.piarc.openSettings('providers');
-                    close();
-                  }}
-                >
-                  {t('models.manage')}
-                </button>
-                <button type="button" className="button" onClick={close}>
-                  {t('shortcuts.close')}
-                </button>
-              </div>
-            </>
-          )}
+          <h2 id={title}>{t('models.switchTo', { model: keyOf(chosen.model) })}</h2>
+          <dl className="model-preview">
+            <dt>{t('models.context')}</dt>
+            <dd data-testid="model-context">
+              {chosen.preview.contextTokens === null
+                ? t('models.unknown')
+                : t('models.tokens', { count: chosen.preview.contextTokens })}
+            </dd>
+            <dt>{t('models.cache')}</dt>
+            <dd>{t(chosen.preview.cacheInvalidated ? 'models.invalidated' : 'models.kept')}</dd>
+            <dt>{t('models.cost')}</dt>
+            <dd data-testid="model-cache-cost">
+              {chosen.preview.cacheWriteUsd === null
+                ? t('models.unknown')
+                : new Intl.NumberFormat(locale, {
+                    style: 'currency',
+                    currency: 'USD',
+                    maximumSignificantDigits: 6,
+                  }).format(chosen.preview.cacheWriteUsd)}
+            </dd>
+            <dt>{t('models.thinking')}</dt>
+            <dd>{t(chosen.preview.dropsThinking ? 'models.dropped' : 'models.retained')}</dd>
+          </dl>
+          <label className="setting">
+            {t('models.effort')}
+            <select
+              className="input"
+              value={level}
+              data-testid="model-switch-effort"
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                if (isEffort(v)) setLevel(v);
+              }}
+            >
+              {!level && <option value="">{t('models.priority')}</option>}
+              {chosen.model.efforts.map((e) => (
+                <option key={e} value={e}>
+                  {t(`models.effort.${e}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="dialog-actions">
+            <button type="button" className="button" disabled={busy} onClick={close}>
+              {t('dialog.cancel')}
+            </button>
+            <button
+              type="button"
+              className="button button-primary"
+              disabled={!level || busy || running}
+              data-testid="model-switch-confirm"
+              onClick={() => {
+                void confirm();
+              }}
+            >
+              {t('models.switch')}
+            </button>
+          </div>
         </Dialog>
       )}
     </>

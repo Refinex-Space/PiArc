@@ -396,6 +396,7 @@ export function TranscriptLab() {
           mentions: payload.spans,
           attachments: [],
         });
+        return true;
       },
       stop() {
         actions.push({ kind: 'stop' });

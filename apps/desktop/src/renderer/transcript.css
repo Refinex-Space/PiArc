@@ -200,6 +200,13 @@
   white-space: nowrap;
 }
 
+/* Keep the reading measure aligned with the composer at every rail width. */
+.conversation .transcript-row > .row {
+  max-width: calc(var(--piarc-workbench-reading-width) + 2 * var(--piarc-space-4));
+  padding-inline: var(--piarc-space-4);
+  font-size: var(--piarc-c-button-font-size);
+}
+
 /* the user's message */
 
 .row-user {
@@ -212,7 +219,7 @@
   max-width: min(100%, 640px);
   padding: var(--piarc-space-2) var(--piarc-space-3);
   border-radius: var(--piarc-radius-lg);
-  background: var(--piarc-accent-subtle);
+  background: var(--piarc-action-surface);
 }
 
 .row-user.is-sending .row-user-bubble {

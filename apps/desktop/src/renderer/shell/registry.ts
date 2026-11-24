@@ -22,8 +22,6 @@ export interface PanelContext {
   readonly changes?: boolean;
   /** The selected session has background tasks (T32). */
   readonly backgroundTasks?: boolean;
-  /** The selected session's workspace has background tasks (T32). */
-  readonly workspaceTasks?: boolean;
   /** The terminal panel is open (T34: Ctrl+`). */
   readonly terminal?: boolean;
   readonly sideChat?: { readonly close: () => void };
@@ -37,6 +35,8 @@ export interface PanelSpec {
   readonly title: MessageId;
   /** Lower first. */
   readonly order: number;
+  /** Open this disclosure the first time its rail section appears. */
+  readonly initiallyExpanded?: boolean;
   /** Retain a session panel's ephemeral conversation while another tab is shown. */
   readonly keepMounted?: boolean;
   /** Whether it applies now (for example only with a session selected); always by default. */
@@ -46,7 +46,11 @@ export interface PanelSpec {
 
 let panels: readonly PanelSpec[] = [];
 /** The last panel something asked to bring forward (`showPanel`). */
-let requested: { readonly id: string; readonly nonce: number } | undefined;
+interface PanelRequest {
+  readonly id: string;
+  readonly opener: WeakRef<HTMLElement> | undefined;
+}
+let requested: PanelRequest | undefined;
 const listeners = new Set<() => void>();
 
 function changed(): void {
@@ -67,12 +71,19 @@ export function registerPanel(spec: PanelSpec): () => void {
 
 /** Brings panel `id` forward in its area (for example a card's "open in the plan panel"). */
 export function showPanel(id: string): void {
-  requested = { id, nonce: (requested?.nonce ?? 0) + 1 };
+  const focused = typeof document === 'undefined' ? null : document.activeElement;
+  requested = {
+    id,
+    opener:
+      focused && focused instanceof HTMLElement && focused !== document.body
+        ? new WeakRef(focused)
+        : undefined,
+  };
   changed();
 }
 
 /** The last request of `showPanel`. */
-export function useRequestedPanel(): { readonly id: string; readonly nonce: number } | undefined {
+export function useRequestedPanel(): PanelRequest | undefined {
   return useSyncExternalStore(subscribe, () => requested);
 }
 

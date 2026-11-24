@@ -1,4 +1,4 @@
-// Full-text search over the sessions' messages in the sidebar (T35, FR-WS-04): the filter's
+// Full-text search over the sessions' messages in the search dialog (T35, FR-WS-04): the filter's
 // text is also looked up in Core's index (`searchSessions`, trigram FTS5); results are grouped
 // by session with snippets whose matches are marked. A click shows the session and scrolls to
 // the message. Snippets are text: the marks are built from Core's ranges, never from markup.
@@ -125,12 +125,19 @@ function useSearch(filter: string): State {
   return state;
 }
 
-export function MessageSearch({ filter }: { readonly filter: string }) {
+export function MessageSearch({
+  filter,
+  onSelect,
+}: {
+  readonly filter: string;
+  readonly onSelect: () => void;
+}) {
   const t = useT();
   const ui = useUi();
   const state = useSearch(filter);
   if (state.kind === 'idle') return null;
   const open = (sessionId: string, entryId: string | undefined) => {
+    onSelect();
     if (entryId !== undefined) requestLocate(sessionId, entryId);
     ui.show({ kind: 'session', id: sessionId });
   };

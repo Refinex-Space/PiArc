@@ -19,6 +19,8 @@ test('the background task card and panel show a command and stop it', async ({
   await expect(page.getByTestId('bash-task')).toContainText('Runs in the background as task bg-');
   const card = page.getByTestId('bg-tasks-card');
   await expect(card).toBeVisible();
+  // A workspace task can advertise its state without taking space away from the composer.
+  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
   const task = card.getByTestId('bg-task');
   await expect(task).toHaveCount(1);
   await expect(task).toContainText('Command');
@@ -46,6 +48,27 @@ test('the background task card and panel show a command and stop it', async ({
   await expect(row).toContainText('Stopped');
   await expect(task.getByTestId('bg-task-stop')).toHaveCount(0);
   await screenshots(page, info, 'card-stopped');
+  await page.getByTestId('panel-close-dock').click();
+  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Show all background tasks' })).toBeFocused();
+  await page.getByTestId('tool-background-tasks').click();
+  await expect(row).toContainText('Stopped');
+  await page.getByTestId('tool-background-tasks').click();
+  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
+  // Closing the task list after switching from a terminal closes the entire dock. Reopening
+  // the terminal attaches to the same running shell.
+  await page.getByTestId('tool-terminal').click();
+  const terminal = page.getByTestId('terminal-tab');
+  await expect(terminal).toHaveCount(1);
+  const taskId = await terminal.getAttribute('data-task');
+  if (!taskId) throw new Error('Missing terminal task id');
+  await page.getByTestId('tool-background-tasks').click();
+  await expect(panel).toBeVisible();
+  await page.getByTestId('panel-close-dock').click();
+  await expect(page.getByTestId('panel-area-dock')).toHaveCount(0);
+  await expect(page.getByTestId('tool-background-tasks')).toBeFocused();
+  await page.getByTestId('tool-terminal').click();
+  await expect(terminal).toHaveAttribute('data-task', taskId);
 });
 
 test('a background subagent is a task and stops from the panel', async ({

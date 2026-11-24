@@ -54,3 +54,17 @@ describe('notices', () => {
     ]);
   });
 });
+
+it('drops a removed owner’s draft and preserves drafts of the remaining owners', () => {
+  const store = new AppStore();
+  store.applySessions({ revision: 1, sessions: [{ id: 'session' }] });
+  store.applyWorkspaces({ revision: 1, workspaces: [{ path: '/one' }, { path: '/two' }] });
+  const session = store.editorDraft('session', 'session');
+  const first = store.editorDraft('workspace', '/one');
+  const second = store.editorDraft('workspace', '/two');
+  store.applySessions({ revision: 2, sessions: [] });
+  store.applyWorkspaces({ revision: 2, workspaces: [{ path: '/two' }] });
+  expect(store.editorDraft('session', 'session')).not.toBe(session);
+  expect(store.editorDraft('workspace', '/one')).not.toBe(first);
+  expect(store.editorDraft('workspace', '/two')).toBe(second);
+});

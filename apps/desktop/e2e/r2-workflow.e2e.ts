@@ -49,7 +49,8 @@ for (const [id, api, format] of [
     expect(before.stdout).toContain('ERR_ASSERTION');
     await writeFile(info.outputPath('before.txt'), before.stdout);
     await openFolder(page, app, ws);
-    await page.getByTestId('home-model').selectOption(id + '/fixture');
+    await page.getByTestId('home-model').click();
+    await page.getByTestId('model-option-' + id + '/fixture').click();
     await startSession(page, task, 'r2-workflow');
     await expect(page.getByTestId('permission-mode')).toContainText('Manual');
     const card = page.getByTestId('approval-card');

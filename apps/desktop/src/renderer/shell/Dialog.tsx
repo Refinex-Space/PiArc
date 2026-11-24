@@ -15,6 +15,7 @@ export function Dialog({
   testId,
   wide = false,
   focusKey,
+  dismissOnBackdrop = false,
 }: {
   readonly labelledBy: string;
   readonly onCancel: () => void;
@@ -23,8 +24,10 @@ export function Dialog({
   readonly wide?: boolean;
   /** Changes when the content is replaced in place. */
   readonly focusKey?: string;
+  readonly dismissOnBackdrop?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const backdropPress = useRef(false);
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     return () => {
@@ -66,7 +69,18 @@ export function Dialog({
     }
   };
   return (
-    <div className="scrim" role="presentation">
+    <div
+      className="scrim"
+      role="presentation"
+      onPointerDown={(event) => {
+        backdropPress.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        if (dismissOnBackdrop && backdropPress.current && event.target === event.currentTarget)
+          onCancel();
+        backdropPress.current = false;
+      }}
+    >
       <div
         ref={ref}
         className={wide ? 'dialog dialog-wide' : 'dialog'}

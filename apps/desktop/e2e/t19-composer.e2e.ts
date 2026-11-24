@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import type { CDPSession, Page } from '@playwright/test';
 
-import { expect, test } from './sessions.js';
+import { expect, makeWorkspace, openFolder, test } from './sessions.js';
 import {
   idle,
   lastUserBlocks,
@@ -102,6 +102,53 @@ async function giveFiles(
 async function fixture(name: string): Promise<string> {
   return (await readFile(path.join(FIXTURES, name))).toString('base64');
 }
+
+test('the first prompt preserves mentions and attachments through trust and uses the selected mode', async ({
+  page,
+  app,
+  mock,
+  workspaces,
+}, info) => {
+  const ws = await makeWorkspace(workspaces, 'first input', FILES);
+  await openFolder(page, app, ws);
+  await page.getByTestId('home-mode').click();
+  await page.getByTestId('menu-plan').click();
+  const input = page.getByTestId('home-input');
+  await input.click();
+  await page.keyboard.type('Review [[piarc-scenario:t19-input]] ');
+  await page.getByTestId('composer-add').click();
+  await page.getByTestId('menu-mention').click();
+  await page.keyboard.type('main.ts');
+  await expect(page.getByTestId('mention-popup').getByRole('option').first()).toContainText(
+    'main.ts',
+  );
+  await page.keyboard.press('Enter');
+  await page.getByTestId('composer-file-input').setInputFiles(path.join(FIXTURES, 'pixel.png'));
+  await expect(page.getByTestId('pending-attachment')).toContainText('pixel.png');
+  await page.screenshot({ path: info.outputPath('first-prompt.png') });
+  await page.getByTestId('home-start').click();
+  await expect(page.getByTestId('trust-dialog')).toBeVisible();
+  expect((await requests(mock, 't19-input')).length).toBe(0);
+  await page.getByTestId('trust-accept').click();
+  await expect(page.getByTestId('user-message').getByTestId('mention-chip')).toHaveAttribute(
+    'data-path',
+    'src/main.ts',
+  );
+  await expect(page.getByTestId('user-message').getByTestId('attachment-chip')).toContainText(
+    'pixel.png',
+  );
+  await expect(page.getByTestId('permission-mode')).toHaveText(/Plan|计划/u);
+  await expect
+    .poll(async () =>
+      lastUserBlocks((await requests(mock, 't19-input')).at(-1)?.body ?? {}).map(
+        (block) => block.type,
+      ),
+    )
+    .toContain('image');
+  await expect
+    .poll(async () => userTexts((await requests(mock, 't19-input')).at(-1)?.body ?? {}).join(' '))
+    .toContain('@src/main.ts');
+});
 
 test('@ mentions come from Core, honor ignore files and stay apart from the sent text', async ({
   app,

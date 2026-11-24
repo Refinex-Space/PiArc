@@ -48,3 +48,57 @@ it('gives the focus back to its button when Escape or an item closes it', () => 
     container.remove();
   }
 });
+
+it('moves into a submenu, returns to its parent, and dismisses the tree after a choice', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const selected = vi.fn();
+  const key = (value: string) => {
+    act(() => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: value, bubbles: true }),
+      );
+    });
+  };
+  try {
+    act(() => {
+      root.render(
+        <MenuButton
+          label="Model"
+          items={[
+            {
+              id: 'effort',
+              label: 'Effort',
+              submenu: [{ id: 'high', label: 'High', run: selected }],
+            },
+          ]}
+        >
+          Model
+        </MenuButton>,
+      );
+    });
+    const trigger = host.querySelector('button');
+    trigger?.focus();
+    act(() => {
+      trigger?.click();
+    });
+    key('ArrowRight');
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Effort');
+    key('Escape');
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Model');
+    expect(host.querySelectorAll('[role="menu"]')).toHaveLength(1);
+    key('ArrowRight');
+    key('Enter');
+    expect(selected).toHaveBeenCalledOnce();
+    expect(host.querySelectorAll('[role="menu"]')).toHaveLength(0);
+    expect(document.activeElement).toBe(trigger);
+  } finally {
+    act(() => {
+      root.unmount();
+    });
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

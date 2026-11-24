@@ -27,12 +27,14 @@ async function shoot(page: Page, name: string): Promise<void> {
 }
 
 async function choose(page: Page, detail: 'normal' | 'thinking' | 'detailed'): Promise<void> {
+  await page.getByTestId('session-view-options').click();
   await page
     .getByTestId('detail-switch')
     .locator('label')
     .filter({ has: page.getByTestId(`detail-${detail}`) })
     .click();
   await expect(page.getByTestId(`detail-${detail}`)).toBeChecked();
+  await page.keyboard.press('Escape');
 }
 
 test('normal, thinking and detailed views of one turn', async ({ page, app, workspaces }) => {
@@ -46,7 +48,9 @@ test('normal, thinking and detailed views of one turn', async ({ page, app, work
   ).toBeVisible();
 
   // The default is the thinking view: thinking collapsed, tools summarized, no reminders.
+  await page.getByTestId('session-view-options').click();
   await expect(page.getByTestId('detail-thinking')).toBeChecked();
+  await page.keyboard.press('Escape');
   await expect(page.getByTestId('thinking-block')).toHaveAttribute('data-expanded', 'false');
   await expect(page.getByTestId('tool-group')).toHaveCount(1);
   await expect(page.getByTestId('tool-group-toggle')).toHaveAttribute('aria-expanded', 'false');

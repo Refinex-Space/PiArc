@@ -177,7 +177,7 @@ test('links, Dock drops and a second start open folders and sessions in the runn
     _electron.app.emit('open-url', { preventDefault: () => undefined }, url);
   }, link);
   await expect(page.getByTestId('trust-dialog')).toBeVisible();
-  await expect(page.getByTestId('home-workspace')).toHaveValue(linked);
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', linked);
   await page.screenshot({ path: info.outputPath('link-trust-dialog.png') });
   await page.getByTestId('trust-deny').click();
   // Nothing ran: no session, no model request.
@@ -189,7 +189,7 @@ test('links, Dock drops and a second start open folders and sessions in the runn
   await app.evaluate((_electron, dir) => {
     _electron.app.emit('open-file', { preventDefault: () => undefined }, dir);
   }, dropped);
-  await expect(page.getByTestId('home-workspace')).toHaveValue(dropped);
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', dropped);
   // A folder without a decision asks before its first session, as any folder does.
   await expect(page.getByTestId('trust-dialog')).toContainText('dropped 拖入');
   await page.getByTestId('trust-deny').click();
@@ -203,7 +203,7 @@ test('links, Dock drops and a second start open folders and sessions in the runn
   });
   const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
   expect(code).toBe(0);
-  await expect(page.getByTestId('home-workspace')).toHaveValue(second);
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', second);
   expect(await mainWindows(app)).toBe(1);
   await page.getByTestId('trust-accept').click();
 
@@ -222,7 +222,7 @@ async function openSessionIn(
   dir: string,
   scenario: string,
 ): Promise<{ id: string }> {
-  await expect(page.getByTestId('home-workspace')).toHaveValue(dir);
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', dir);
   await page.getByTestId('home-input').fill(`Opened [[piarc-scenario:${scenario}]]`);
   await page.getByTestId('home-start').click();
   const conversation = page.getByTestId('conversation');

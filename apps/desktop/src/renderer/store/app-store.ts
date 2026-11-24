@@ -10,6 +10,7 @@ import {
   type SessionEntry,
   type WorkspaceEntry,
 } from './snapshots.js';
+import type { EditorDraft } from '../composer/session-draft.js';
 import { sameRequest } from './approvals.js';
 import { TaskList } from './tasks.js';
 import { SessionTranscript } from './transcript.js';
@@ -31,6 +32,18 @@ export interface Notice {
 const MAX_HOOK_NOTICES = 5;
 
 export class AppStore {
+  private readonly drafts = new Map<string, EditorDraft>();
+
+  /** Stable editor storage, dropped with the corresponding entity in Core's next snapshot. */
+  editorDraft(scope: 'workspace' | 'session', id: string): EditorDraft {
+    const key = `${scope}:${id}`;
+    const existing = this.drafts.get(key);
+    if (existing !== undefined) return existing;
+    const draft: EditorDraft = {};
+    this.drafts.set(key, draft);
+    return draft;
+  }
+
   private workspaceRevision = -1;
   private sessionRevision = -1;
   private workspaceList: readonly WorkspaceEntry[] = [];
@@ -92,8 +105,10 @@ export class AppStore {
     const previous = new Map(this.workspaceList.map((w) => [w.path, w]));
     const next = snapshot.entries.map((entry) => {
       const old = previous.get(entry.path);
+      previous.delete(entry.path);
       return old !== undefined && sameEntry(old, entry) ? old : entry;
     });
+    for (const path of previous.keys()) this.drafts.delete(`workspace:${path}`);
     if (!sameList(this.workspaceList, next)) {
       this.workspaceList = next;
       emit(this.workspaceListeners);
@@ -132,6 +147,7 @@ export class AppStore {
       if (!seen.has(id)) {
         this.transcripts.get(id)?.setApprovals([]);
         this.sessionById.delete(id);
+        this.drafts.delete(`session:${id}`);
         changed.push(id);
       }
     }

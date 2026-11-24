@@ -1,0 +1,189 @@
+/* The sidebar has one reading axis for global actions, projects and sessions. */
+.workbench-navigation .titlebar-actions {
+  gap: 0;
+  margin-inline-start: 0;
+}
+.workbench-navigation .titlebar-actions .icon-button,
+.workbench-navigation .sidebar-footer .icon-button {
+  inline-size: var(--piarc-size-button-height);
+  block-size: var(--piarc-size-button-height);
+}
+.workbench-navigation .sidebar-entries,
+.workbench-navigation .sidebar-list {
+  padding-inline: var(--piarc-space-2);
+}
+.workbench-navigation .sidebar-entries {
+  display: grid;
+  gap: calc(var(--piarc-space-1) / 2);
+  padding-block: var(--piarc-space-2) var(--piarc-space-4);
+}
+.workbench-navigation .nav-entry,
+.workbench-navigation .project-toggle,
+.workbench-navigation .sidebar-identity,
+.workspace-search-results .search-destination {
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: transparent;
+  font: inherit;
+  color: var(--piarc-workbench-ink);
+  text-align: start;
+}
+.workbench-navigation .nav-entry {
+  min-height: var(--piarc-c-sidebar-row-height);
+  gap: var(--piarc-space-3);
+  padding-inline: var(--piarc-space-3);
+  font-size: var(--piarc-font-size-button);
+}
+.workbench-navigation .nav-entry:hover,
+.workbench-navigation .project-toggle:hover,
+.workbench-navigation .sidebar-identity:hover,
+.workbench-navigation .nav-entry[aria-expanded='true'] {
+  background: var(--piarc-c-sidebar-row-hover);
+}
+.workbench-navigation .nav-entry[aria-current='page'],
+.workbench-navigation .session-row.is-selected {
+  background: var(--piarc-surface-active);
+}
+.workbench-navigation .workspace-group + .workspace-group {
+  margin-top: var(--piarc-space-1);
+}
+.workbench-navigation .workspace-group[data-drop-target='after'] {
+  box-shadow: inset 0 -2px var(--piarc-border-focus);
+}
+.workbench-navigation .workspace-group[data-drop-target='before'] {
+  box-shadow: inset 0 2px var(--piarc-border-focus);
+}
+.workbench-navigation .workspace-header {
+  min-height: var(--piarc-c-sidebar-row-height);
+  gap: 0;
+  padding: 0 var(--piarc-space-1) 0 0;
+}
+.workbench-navigation .project-toggle {
+  flex: 1;
+  align-self: stretch;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  padding: 0 var(--piarc-space-3);
+  font-size: var(--piarc-font-size-body);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.workbench-navigation .project-toggle .icon,
+.workbench-navigation .sidebar-identity > .icon {
+  width: var(--piarc-space-3);
+  height: var(--piarc-space-3);
+  flex-shrink: 0;
+}
+.workbench-navigation .workspace-header .icon-button,
+.workbench-navigation .session-row .icon-button {
+  visibility: visible;
+  min-width: var(--piarc-space-5);
+  width: var(--piarc-space-5);
+  height: var(--piarc-space-5);
+}
+.workbench-navigation .workspace-header .project-more,
+.workbench-navigation .session-row .icon-button {
+  opacity: 0;
+}
+.workbench-navigation .workspace-header:hover .project-more,
+.workbench-navigation .workspace-header:focus-within .project-more,
+.workbench-navigation .session-row:hover .icon-button,
+.workbench-navigation .session-row:focus-within .icon-button,
+.workbench-navigation .icon-button[aria-expanded='true'] {
+  opacity: 1;
+}
+.workbench-navigation .session-row {
+  position: relative;
+  height: var(--piarc-c-sidebar-row-height);
+  gap: var(--piarc-space-1);
+  padding-inline: var(--piarc-space-3) var(--piarc-space-1);
+  border-radius: var(--piarc-radius-button);
+}
+.workbench-navigation .session-row .badge-idle {
+  display: none;
+}
+.workbench-navigation .session-title {
+  font-size: var(--piarc-font-size-button);
+}
+.workbench-navigation .workspace-empty {
+  padding: var(--piarc-space-1) var(--piarc-space-3);
+}
+.workbench-navigation .sidebar-footer {
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-2);
+  min-height: calc(var(--piarc-space-5) * 2);
+}
+.workbench-navigation .sidebar-identity {
+  min-width: 0;
+  gap: var(--piarc-space-2);
+  min-height: var(--piarc-size-button-height);
+  padding: 0 var(--piarc-space-2);
+  font-size: var(--piarc-font-size-button);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.workbench-navigation .piarc-mark {
+  flex: none;
+  height: var(--piarc-space-5);
+  width: var(--piarc-space-5);
+  background-color: currentColor;
+  mask: url('../../../../../design/brand/mark.svg') center / contain no-repeat;
+}
+.workbench-navigation .sidebar-resizer:hover,
+.workbench-navigation .sidebar-resizer:active {
+  background: var(--piarc-border-focus);
+}
+.dialog:has(.workspace-search-content) {
+  width: min(580px, calc(100vw - 2 * var(--piarc-space-4)));
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--piarc-settings-radius);
+}
+.workspace-search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+.workspace-search-field .icon {
+  flex: none;
+}
+.workspace-search-field .input {
+  flex: 1;
+  min-width: 0;
+  border-color: transparent;
+  background: transparent;
+  font-size: var(--piarc-font-size-title);
+}
+.workspace-search-results {
+  overflow: auto;
+  max-height: min(54vh, 480px);
+  padding: var(--piarc-space-2);
+  overscroll-behavior: contain;
+}
+.workspace-search-results h3,
+.workspace-search-results .workspace-header {
+  margin: 0;
+  padding: var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+  color: var(--piarc-workbench-muted);
+}
+.workspace-search-results .search-destination {
+  gap: var(--piarc-space-2);
+  width: 100%;
+  min-height: var(--piarc-c-sidebar-row-height);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+}
+.workspace-search-results .search-destination:hover,
+.workspace-search-results .search-destination:focus-visible {
+  background: var(--piarc-surface-hover);
+}
+.workspace-search-results .search-destination small {
+  margin-inline-start: auto;
+  color: var(--piarc-workbench-muted);
+}
+.workspace-search-results .search-empty {
+  padding: var(--piarc-space-2);
+}

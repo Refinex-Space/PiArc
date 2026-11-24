@@ -29,7 +29,11 @@ export const A11Y_STATES = [
   { id: 'window:welcome', area: 'window', note: 'main window without a workspace' },
   { id: 'window:new-session', area: 'window', note: 'new session form of an open workspace' },
   { id: 'window:conversation', area: 'window', note: 'a session after a turn, sidebar and rail' },
-  { id: 'window:message-search', area: 'window', note: 'sidebar message search with results' },
+  {
+    id: 'window:message-search',
+    area: 'window',
+    note: 'indexed message results in the search dialog',
+  },
   // Workbench settings: the native modal, its search popup and each registered page.
   {
     id: 'dialog:settings',
@@ -159,6 +163,12 @@ export const A11Y_STATES = [
   { id: 'panel:terminal', area: 'panel', panel: 'terminal', note: 'terminal panel' },
   { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
   // Dialogs, one or more per file that renders `<Dialog>`.
+  {
+    id: 'dialog:workspace-search',
+    area: 'dialog',
+    source: 'shell/WorkspaceSearch.tsx',
+    note: 'search projects and sessions',
+  },
   { id: 'dialog:trust', area: 'dialog', source: 'shell/TrustDialog.tsx', note: 'trust a folder' },
   {
     id: 'dialog:command-palette',

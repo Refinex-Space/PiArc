@@ -29,7 +29,9 @@ async function newSession(page: Page, text: string, scenario: string): Promise<v
 
 /** Opens a rail tab (card) by its panel id. */
 async function railTab(page: Page, panel: string): Promise<void> {
-  await page.getByTestId(`panel-tab-${panel}`).click();
+  const section = page.getByTestId(`panel-tab-${panel}`);
+  if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click();
+  await expect(section).toHaveAttribute('aria-expanded', 'true');
 }
 
 // "Checked in this run" (R5): markers an earlier run left behind would let a state whose check
@@ -94,10 +96,12 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await expect(page.getByTestId('changes-empty')).toBeVisible();
   await checkState(page, 'state:changes-empty');
 
+  await page.getByTestId('open-search').click();
+  await checkState(page, 'dialog:workspace-search');
   await page.getByTestId('session-filter').fill('Friday');
   await expect(page.getByTestId('search-hit').first()).toBeVisible({ timeout: 20_000 });
   await checkState(page, 'window:message-search');
-  await page.getByTestId('session-filter').fill('');
+  await page.keyboard.press('Escape');
 
   // A plugin with a hook (an executable item), installed off, for the Skills & plugins page.
   const plugin = path.join(workspaces, 'packages 包', 'demo');
@@ -187,7 +191,7 @@ test('approval cards of each kind and the rows of tools and the harness', async 
   await checkState(page, 'row:todo');
   await checkState(page, 'row:question');
   await checkState(page, 'row:nextSteps');
-  await page.getByTestId('panel-tab-tasks').click();
+  await railTab(page, 'tasks');
   await checkState(page, 'panel:tasks');
 });
 
@@ -354,11 +358,13 @@ test.describe('failures, compaction, reminders and model dialogs', () => {
       'sub/notes.txt': 'Release on Friday.\n',
     });
     await idle(page);
+    await page.getByTestId('session-view-options').click();
     await page
       .getByTestId('detail-switch')
       .locator('label')
       .filter({ has: page.getByTestId('detail-detailed') })
       .click();
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('reminder-row')).toHaveCount(1);
     await checkState(page, 'row:reminder');
 

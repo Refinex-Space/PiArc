@@ -14,9 +14,9 @@ export interface Layout {
 }
 
 export const DEFAULT_LAYOUT: Layout = {
-  sidebarWidth: 264,
+  sidebarWidth: 288,
   sidebarCollapsed: false,
-  railWidth: 300,
+  railWidth: 320,
   dockHeight: 240,
 };
 
@@ -69,5 +69,37 @@ export function localStore(): Storage | undefined {
     return window.localStorage;
   } catch {
     return undefined;
+  }
+}
+
+/** Presentation preferences for the sidebar's project groups. */
+export interface SidebarGroups {
+  readonly order: readonly string[];
+  readonly collapsed: readonly string[];
+}
+
+const GROUP_KEY = 'piarc.sidebar.groups.v1';
+const DEFAULT_GROUPS: SidebarGroups = { order: [], collapsed: [] };
+
+export function loadSidebarGroups(): SidebarGroups {
+  try {
+    const value: unknown = JSON.parse(localStore()?.getItem(GROUP_KEY) ?? 'null');
+    if (typeof value !== 'object' || value === null) return DEFAULT_GROUPS;
+    const paths = (items: unknown) =>
+      Array.isArray(items) ? items.filter((path): path is string => typeof path === 'string') : [];
+    return {
+      order: paths('order' in value ? value.order : undefined),
+      collapsed: paths('collapsed' in value ? value.collapsed : undefined),
+    };
+  } catch {
+    return DEFAULT_GROUPS;
+  }
+}
+
+export function saveSidebarGroups(groups: SidebarGroups): void {
+  try {
+    localStore()?.setItem(GROUP_KEY, JSON.stringify(groups));
+  } catch {
+    // Keep the groups usable in memory when storage is unavailable.
   }
 }

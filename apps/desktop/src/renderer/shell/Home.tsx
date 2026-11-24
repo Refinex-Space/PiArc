@@ -1,239 +1,362 @@
-// The main area without a session: pick a folder, describe a task, start. The message appears
-// at once (optimistic, with a clientId), then the trust dialog when this is the folder's first
-// session, then the session is created and the message sent; a failure rolls the message back
-// and puts the text back into the input. T35: the session may run in a worktree of its own (a
-// name and a base branch, both optional); a worktree the repository does not ignore yet gets a
-// notice offering the `.gitignore` line.
-import { useEffect, useId, useRef, useState } from 'react';
+// Before the first turn the environment card owns the workspace. The first prompt shares the
+// conversation's editor, with trust and any explicitly selected session options applied first.
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
-import { isWorktreeName, type WorktreeOptions } from '../../shared/ipc.js';
-import { isImeComposing } from '../composer/ime-guard.js';
-import { useT } from '../app/app-context.js';
+import { isWorktreeName, type PermissionMode, type WorktreeOptions } from '../../shared/ipc.js';
+import { useApp, useT } from '../app/app-context.js';
+import { Composer, type ComposerSubmission } from '../composer/Composer.js';
+import type { PaletteCommand } from '../composer/command-plugin.js';
+import { parseCommandsList } from '../composer/commands-list.js';
+import { coreMentions, draftOf } from '../composer/session-draft.js';
 import { useStore, useWorkspaces } from '../store/hooks.js';
-import { keyOf, useModelCatalog } from './model-catalog.js';
+import { CheckIcon, ChevronDownIcon, ComputerIcon, FolderIcon } from './icons.js';
+import { ChoiceButton, type MenuItem } from './Menu.js';
+import { keyOf, useModelCatalog, type Effort } from './model-catalog.js';
+import { permissionChoices } from './PermissionModeMenu.js';
 import { reason } from './errors.js';
 import { startSession } from './start-session.js';
-import { useUi } from './ui.js';
+import { baseName, useUi } from './ui.js';
 
-export function Home({
-  workspace: requested,
-  draft,
-  failure,
-}: {
+interface HomeProps {
   readonly workspace: string | undefined;
   readonly draft: string | undefined;
   readonly failure: string | undefined;
-}) {
-  const t = useT();
+}
+
+export function Home(props: HomeProps) {
+  const workspaces = useWorkspaces();
+  const workspace = props.workspace ?? workspaces[0]?.path;
+  return (
+    <HomeForm key={workspace ?? ''} {...props} workspace={workspace} workspaces={workspaces} />
+  );
+}
+
+function HomeForm({
+  workspace,
+  draft,
+  failure,
+  workspaces,
+}: HomeProps & { readonly workspaces: ReturnType<typeof useWorkspaces> }) {
+  const { t, preferences } = useApp();
   const ui = useUi();
   const store = useStore();
-  const workspaces = useWorkspaces();
-  const [workspace, setWorkspace] = useState<string | undefined>(requested);
+  const label =
+    workspaces.find((entry) => entry.path === workspace)?.displayName ??
+    (workspace ? baseName(workspace) : t('home.chooseFolder'));
   const [catalogRequested, setCatalogRequested] = useState<string>();
   const ready = workspaces.some((w) => w.path === workspace && w.open);
-  // Listing models starts a Host. Avoid reopening an indexed workspace merely because
-  // its name is restored in the home screen after restarting the app.
-  const catalogTarget = ready || workspace === catalogRequested ? workspace : undefined;
-  const { catalog, failure: catalogFailure } = useModelCatalog(catalogTarget, false);
+  const { catalog, failure: catalogFailure } = useModelCatalog(
+    ready || workspace === catalogRequested ? workspace : undefined,
+    false,
+  );
   const [modelKey, setModelKey] = useState('');
   const model = catalog?.models.find((m) => keyOf(m) === modelKey);
-  const [text, setText] = useState(draft ?? '');
-  const [echo, setEcho] = useState<string | undefined>(undefined);
-  const [error, setError] = useState<string | undefined>(failure);
+  const resolved =
+    model ?? catalog?.models.find((m) => catalog.model && keyOf(m) === keyOf(catalog.model));
+  const [effort, setEffort] = useState<Effort>();
+  const [mode, setMode] = useState<PermissionMode>();
+  const [busy, setBusy] = useState(false);
+  const starting = useRef(false);
+  const [echo, setEcho] = useState<string>();
+  const [error, setError] = useState(failure);
   const tree = useWorktreeChoice(workspace);
-  const busy = echo !== undefined;
-  const input = useRef<HTMLTextAreaElement>(null);
-  const folderLabel = useId();
-  useEffect(() => {
-    setWorkspace(requested ?? workspaces[0]?.path);
-  }, [requested, workspaces]);
-  useEffect(() => {
-    input.current?.focus();
-  }, [requested]);
+  const modelButton = useRef<HTMLButtonElement>(null);
+  const [commands, setCommands] = useState<readonly PaletteCommand[]>([]);
+  const commandsRequest = useRef(0);
+  const mentions = useMemo(
+    () => coreMentions(workspace, ui.composer?.maxSearchResults ?? 20),
+    [workspace, ui.composer?.maxSearchResults],
+  );
+  const [configuring, setConfiguring] = useState(false);
 
-  const start = async () => {
-    const message = text.trim();
-    if (workspace === undefined || message.length === 0 || busy) {
-      return;
+  const chooseWorkspace = (path: string) => {
+    if (workspace !== path) ui.show({ kind: 'home', workspace: path });
+  };
+  const pickFolder = () => {
+    void ui.openFolder().catch((cause: unknown) => {
+      setError(reason(cause));
+    });
+  };
+  const folderItems: MenuItem[] = workspaces.map((entry) => ({
+    id: entry.path,
+    label: entry.displayName,
+    selected: entry.path === workspace,
+    icon: <FolderIcon />,
+    run: () => {
+      chooseWorkspace(entry.path);
+    },
+  }));
+  folderItems.push({
+    id: 'open-folder',
+    testId: 'home-open-folder',
+    label: t('home.chooseFolder'),
+    icon: <FolderIcon />,
+    run: pickFolder,
+  });
+  const localLabel =
+    tree.enabled && tree.branches !== false ? t('workbench.worktree') : t('workbench.local');
+  const setupItems: MenuItem[] = [
+    {
+      id: 'local',
+      label: t('workbench.local'),
+      selected: !tree.enabled,
+      icon: <ComputerIcon />,
+      run: () => {
+        tree.setEnabled(false);
+        setConfiguring(false);
+      },
+    },
+    {
+      id: 'worktree',
+      label: t('home.worktree'),
+      selected: tree.enabled,
+      disabled: !workspace,
+      icon: <FolderIcon />,
+      run: () => {
+        tree.setEnabled(true);
+        setConfiguring(true);
+      },
+    },
+  ];
+  const start = async (submission: ComposerSubmission): Promise<boolean> => {
+    if (workspace === undefined || starting.current) return false;
+    if (tree.enabled && tree.branches === false) {
+      setError(t('home.worktreeNoRepo'));
+      return false;
     }
-    setError(undefined);
     if (tree.options === 'invalid') {
       setError(t('home.worktreeInvalidName'));
-      return;
+      return false;
     }
-    if (!(await ui.ensureTrust(workspace, 'decide'))) {
-      return;
-    }
-    const worktree = tree.options;
-    setText('');
+    starting.current = true;
+    setBusy(true);
+    setError(undefined);
     try {
-      await startSession({
+      if (!(await ui.ensureTrust(workspace, 'decide'))) return false;
+      const message = draftOf(submission);
+      const id = await startSession({
         api: window.piarc,
         store,
         workspace,
+        text: message.text,
+        draft: message,
         ...(model ? { model: { provider: model.provider, id: model.id } } : {}),
-        ...(worktree === undefined ? {} : { worktree }),
-        text: message,
+        ...(effort && resolved?.efforts.includes(effort) ? { effort } : {}),
+        ...(mode ? { mode } : {}),
+        ...(tree.options ? { worktree: tree.options } : {}),
         clientId: crypto.randomUUID(),
         watch: (id) => ui.connection.watchSession(id),
         onStep: (step) => {
-          if (step.kind === 'echo') {
-            // Shown before Core is asked: the message is on screen at once, even when creating
-            // fails right away.
+          if (step.kind === 'echo')
             flushSync(() => {
               setEcho(step.text);
             });
-          } else {
-            ui.show({ kind: 'session', id: step.sessionId });
-            if (step.unignoredWorktree === true) {
-              store.addLocalNotice({
-                key: `gitignore:${workspace}`,
-                type: 'gitignore',
-                message: t('notice.gitignore', { workspace }),
-                downloadUrl: undefined,
-                workspace,
-              });
-            }
-          }
+          else if (step.unignoredWorktree === true)
+            store.addLocalNotice({
+              key: `gitignore:${workspace}`,
+              type: 'gitignore',
+              message: t('notice.gitignore', { workspace }),
+              downloadUrl: undefined,
+              workspace,
+            });
         },
       });
+      ui.show({ kind: 'session', id });
+      return true;
     } catch (cause) {
-      // The view may have switched to the new session already: the home view comes back with
-      // the text in its input.
+      setError(t('home.failed', { reason: reason(cause) }));
+      return false;
+    } finally {
+      starting.current = false;
+      setBusy(false);
       setEcho(undefined);
-      ui.show({
-        kind: 'home',
-        workspace,
-        draft: message,
-        error: t('home.failed', { reason: reason(cause) }),
-      });
     }
   };
-
-  const choices =
-    workspaces.some((w) => w.path === workspace) || workspace === undefined
-      ? workspaces
-      : [...workspaces, { path: workspace, displayName: workspace }];
+  const loadCommands = () => {
+    if (workspace === undefined) return;
+    const seq = ++commandsRequest.current;
+    window.piarc
+      .listCommands(workspace, null)
+      .then((json) => {
+        if (seq === commandsRequest.current)
+          setCommands(
+            parseCommandsList(json).commands.filter(
+              (cmd) => cmd.kind !== 'builtIn' || ['model', 'help'].includes(cmd.name),
+            ),
+          );
+      })
+      .catch((cause: unknown) => {
+        if (seq === commandsRequest.current) setError(reason(cause));
+      });
+  };
+  const effortItems = (resolved?.efforts ?? []).map((level) => ({
+    id: `effort-${level}`,
+    label: t(`models.effort.${level}`),
+    selected: level === (effort ?? catalog?.effort),
+    run: () => {
+      setEffort(level);
+    },
+  }));
+  const modelItems: MenuItem[] = [
+    {
+      id: 'auto-model',
+      label: t('models.default'),
+      selected: !model,
+      run: () => {
+        setModelKey('');
+        setEffort(undefined);
+      },
+    },
+    ...(catalog?.models ?? []).map((m) => ({
+      id: keyOf(m),
+      testId: `model-option-${keyOf(m)}`,
+      label: m.name,
+      hint: keyOf(m),
+      selected: keyOf(m) === modelKey,
+      run: () => {
+        setModelKey(keyOf(m));
+        setEffort(undefined);
+      },
+    })),
+    ...(effortItems.length > 1
+      ? [{ id: 'effort', label: t('models.effort'), submenu: effortItems }]
+      : []),
+    {
+      id: 'manage-models',
+      label: t('models.manage'),
+      run: () => {
+        void window.piarc.openSettings('providers');
+      },
+    },
+  ];
   return (
-    <section className="home" data-testid="home">
-      <div className="titlebar main-titlebar" />
-      <div className="home-body">
-        <h1 className="home-title">{t('home.title')}</h1>
-        <div className="field-row">
-          <label id={folderLabel} className="field-label">
-            {t('home.folder')}
-          </label>
-          {choices.length > 0 ? (
-            <select
-              className="input"
-              aria-labelledby={folderLabel}
-              value={workspace ?? ''}
-              data-testid="home-workspace"
-              onChange={(event) => {
-                setWorkspace(event.currentTarget.value);
-              }}
-            >
-              {choices.map((choice) => (
-                <option key={choice.path} value={choice.path}>
-                  {choice.displayName}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="muted">{t('home.noFolder')}</span>
-          )}
-          <button
-            type="button"
-            className="button"
-            data-testid="home-open-folder"
-            onClick={() => {
-              void ui.openFolder().then((opened) => {
-                if (opened !== undefined) {
-                  setWorkspace(opened);
-                }
-              });
-            }}
-          >
-            {t('home.chooseFolder')}
-          </button>
-        </div>
-        {workspace && (
-          <label className="field-row">
-            {t('models.label')}
-            <select
-              className="input"
-              data-testid="home-model"
-              onFocus={() => {
-                setCatalogRequested(workspace);
-              }}
-              disabled={busy}
-              value={model ? keyOf(model) : ''}
-              onChange={(e) => {
-                setModelKey(e.currentTarget.value);
-              }}
-            >
-              <option value="">{t('models.default')}</option>
-              {catalog?.models.map((m) => (
-                <option key={keyOf(m)} value={keyOf(m)}>
-                  {keyOf(m)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {workspace && <WorktreeFields choice={tree} disabled={busy} />}
-        {catalogFailure && (
-          <p className="error-text" role="alert">
-            {t('models.failed', { reason: catalogFailure })}
-          </p>
-        )}
-        {echo !== undefined && (
+    <section className="home workbench-home" data-testid="home">
+      <div className="environment-stage">
+        {echo !== undefined ? (
           <div className="message message-user is-pending" data-testid="optimistic-message">
-            <div className="message-author">{t('conversation.you')}</div>
             <div className="message-text">{echo}</div>
-            <div className="muted small">{t('home.starting')}</div>
+            <span className="small muted">{t('home.starting')}</span>
+          </div>
+        ) : (
+          <div className="environment-card">
+            <ChoiceButton
+              label={t('home.folder')}
+              className="environment-current"
+              items={folderItems}
+              above={false}
+              disabled={busy}
+            >
+              <ComputerIcon />
+              <span className="truncate">{label}</span>
+              {workspace && <CheckIcon />}
+            </ChoiceButton>
+            <ChoiceButton
+              label={t('workbench.environment')}
+              className="environment-change"
+              items={setupItems}
+              above={false}
+              disabled={busy}
+            >
+              {t('workbench.environment')} <ChevronDownIcon />
+            </ChoiceButton>
+            {configuring && tree.enabled && <WorktreeFields choice={tree} disabled={busy} />}
           </div>
         )}
-        <textarea
-          ref={input}
-          className="input prompt-input"
-          rows={4}
-          placeholder={t('home.placeholder')}
-          aria-label={t('home.placeholder')}
-          value={text}
-          disabled={busy || workspace === undefined}
-          data-testid="home-input"
-          onChange={(event) => {
-            setText(event.currentTarget.value);
+      </div>
+      <div className="conversation-composer">
+        <Composer
+          savedDraft={
+            workspace && draft === undefined ? store.editorDraft('workspace', workspace) : undefined
+          }
+          firstTurn
+          running={false}
+          disabled={busy || !workspace || (tree.enabled && tree.branches === undefined)}
+          limits={ui.composer?.limits}
+          supportsImages={resolved?.vision}
+          mentions={mentions}
+          commands={commands}
+          fill={draft ? { text: draft, nonce: 0 } : undefined}
+          handlers={{
+            submit: (_intent, submission) => start(submission),
+            stop: () => undefined,
+            command: loadCommands,
+            mentionOpened: () => undefined,
+            mentionChosen: () => undefined,
+            runCommand: (cmd) => {
+              if (cmd.name === 'help') ui.openShortcuts();
+              else if (cmd.name === 'model') modelButton.current?.click();
+            },
           }}
-          onKeyDown={(event) => {
-            if (isImeComposing(event.nativeEvent)) {
-              return;
-            }
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              void start();
-            }
-          }}
+          above={
+            (error ?? catalogFailure) && (
+              <p className="composer-problems" role="alert" data-testid="home-error">
+                {error ?? t('models.failed', { reason: catalogFailure ?? '' })}
+              </p>
+            )
+          }
         />
-        {error !== undefined && (
-          <p className="error-text" role="alert" data-testid="home-error">
-            {error}
-          </p>
-        )}
-        <div className="home-actions">
-          <button
-            type="button"
-            className="button button-primary"
-            disabled={busy || workspace === undefined || text.trim().length === 0}
-            data-testid="home-start"
-            onClick={() => {
-              void start();
-            }}
+        <div className="environment-bar">
+          <ChoiceButton label={t('workbench.environment')} items={setupItems} disabled={busy}>
+            <ComputerIcon />
+            {localLabel}
+          </ChoiceButton>
+          <ChoiceButton
+            label={`${t('home.folder')} · ${label}`}
+            items={folderItems}
+            heading={t('jumpList.recentWorkspaces')}
+            testId="home-workspace"
+            value={workspace}
+            disabled={busy}
           >
-            {t('home.send')}
-          </button>
+            <FolderIcon />
+            <span className="truncate">{label}</span>
+          </ChoiceButton>
+          <span className="composer-spacer" />
+          <ChoiceButton
+            label={t('models.label')}
+            items={modelItems}
+            heading={t('models.label')}
+            buttonRef={modelButton}
+            disabled={!workspace || busy}
+            onOpen={() => {
+              setCatalogRequested(workspace);
+            }}
+            testId="home-model"
+          >
+            {resolved?.name ?? t('workbench.modelAuto')}
+          </ChoiceButton>
+          {resolved && resolved.efforts.length > 1 && (
+            <ChoiceButton
+              label={t('models.effort')}
+              disabled={busy}
+              heading={t('models.effort')}
+              items={effortItems}
+            >
+              {(effort ?? catalog?.effort)
+                ? t(`models.effort.${effort ?? catalog?.effort ?? 'off'}`)
+                : t('models.effort')}
+            </ChoiceButton>
+          )}
+          <ChoiceButton
+            label={t('approval.modeMenu')}
+            testId="home-mode"
+            disabled={!workspace || busy}
+            items={[
+              {
+                id: 'workspace-mode',
+                label: t('home.modeDefault'),
+                selected: !mode,
+                run: () => {
+                  setMode(undefined);
+                },
+              },
+              ...permissionChoices(t, preferences.permissions, mode, setMode, false),
+            ]}
+            heading={t('approval.modeMenu')}
+          >
+            {mode ? t(`approval.mode.${mode}`) : t('home.modeDefault')}
+          </ChoiceButton>
         </div>
       </div>
     </section>

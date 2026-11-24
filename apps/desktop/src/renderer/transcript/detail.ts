@@ -4,7 +4,7 @@
 // `reminder` items). A Monitor's output (T32) shows in every view: it can wake the session, and
 // the transcript tells what the model heard. The choice is presentation state, kept per session
 // in this window only.
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useSyncExternalStore } from 'react';
 
 import type { TranscriptRow } from '../store/transcript.js';
 
@@ -35,6 +35,17 @@ export function shownIn(row: TranscriptRow | undefined, detail: TranscriptDetail
 }
 
 const chosen = new Map<string, TranscriptDetail>();
+const listeners = new Set<() => void>();
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function useSessionDetail(id: string): TranscriptDetail {
+  return useSyncExternalStore(subscribe, () => detailOf(id));
+}
 
 /** The view session `id` uses in this window. */
 export function detailOf(id: string): TranscriptDetail {
@@ -43,4 +54,5 @@ export function detailOf(id: string): TranscriptDetail {
 
 export function chooseDetail(id: string, detail: TranscriptDetail): void {
   chosen.set(id, detail);
+  for (const listener of listeners) listener();
 }

@@ -1,13 +1,14 @@
 // One session in the sidebar: badge, title, pinned and archived marks, and its actions (menu
 // button or right click): rename in place, pin, archive, delete (confirmed by the main process).
-import { memo, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useT } from '../app/app-context.js';
 import { useSession } from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
-import { PinIcon } from './icons.js';
+import { MoreIcon, PinIcon } from './icons.js';
 import { MenuButton, MenuPopup, useMenu, type MenuItem } from './Menu.js';
+import { SessionTitleInput } from './SessionTitleInput.js';
 import { StatusBadge } from './StatusBadge.js';
 import { useUi } from './ui.js';
 
@@ -26,6 +27,7 @@ export const SessionRow = memo(function SessionRow({ id }: { readonly id: string
   const ui = useUi();
   const session = useSession(id);
   const menu = useMenu();
+  const titleButton = useRef<HTMLButtonElement>(null);
   const [renaming, setRenaming] = useState(false);
   if (session === undefined) {
     return null;
@@ -79,13 +81,6 @@ export const SessionRow = memo(function SessionRow({ id }: { readonly id: string
       },
     },
   ];
-  const commit = (value: string) => {
-    setRenaming(false);
-    const next = value.trim();
-    if (next.length > 0 && next !== session.title) {
-      window.piarc.renameSession(id, next).catch(report);
-    }
-  };
   return (
     <li
       className={`session-row${selected ? ' is-selected' : ''}${session.archived ? ' is-archived' : ''}`}
@@ -94,39 +89,37 @@ export const SessionRow = memo(function SessionRow({ id }: { readonly id: string
       data-badge={badgeOf(session)}
       aria-current={selected ? 'page' : undefined}
       onContextMenu={(event) => {
+        if (renaming) return;
         event.preventDefault();
+        titleButton.current?.focus();
         menu.openAt(event.clientX, event.clientY);
       }}
     >
       <StatusBadge state={badgeOf(session)} />
       {renaming ? (
-        <input
-          className="rename-input"
-          aria-label={t('session.renameLabel')}
-          defaultValue={session.title ?? ''}
-          maxLength={200}
-          // The input replaces the title while renaming; focus goes straight into it.
-          autoFocus
-          data-testid="rename-input"
-          onBlur={(event) => {
-            commit(event.currentTarget.value);
-          }}
-          onKeyDown={(event) => {
-            if (isImeComposing(event.nativeEvent)) {
-              return;
-            }
-            if (event.key === 'Enter') {
-              commit(event.currentTarget.value);
-            } else if (event.key === 'Escape') {
-              event.stopPropagation();
-              setRenaming(false);
-            }
+        <SessionTitleInput
+          id={id}
+          title={session.title}
+          trigger={titleButton}
+          onClose={() => {
+            setRenaming(false);
           }}
         />
       ) : (
         <button
           type="button"
           className="session-title"
+          ref={titleButton}
+          title={title}
+          aria-current={selected ? 'page' : undefined}
+          onKeyDown={(event) => {
+            if (isImeComposing(event.nativeEvent)) return;
+            if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+              event.preventDefault();
+              const rect = event.currentTarget.getBoundingClientRect();
+              menu.openAt(rect.left, rect.bottom);
+            }
+          }}
           data-testid="session-title"
           onClick={() => {
             ui.show({ kind: 'session', id });
@@ -142,7 +135,7 @@ export const SessionRow = memo(function SessionRow({ id }: { readonly id: string
         </button>
       )}
       <MenuButton label={t('session.actions', { title })} items={items} testId="session-actions">
-        ⋯
+        <MoreIcon />
       </MenuButton>
       {menu.open !== null && (
         <MenuPopup

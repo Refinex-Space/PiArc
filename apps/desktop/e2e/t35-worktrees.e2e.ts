@@ -66,7 +66,9 @@ test('starts a session in its own worktree and asks before archiving its changes
   git(ws, 'branch', 'release-1');
   await openFolder(page, app, ws);
 
-  await page.getByTestId('home-worktree').check();
+  await page.locator('.environment-change').click();
+  await page.getByTestId('menu-worktree').click();
+  await expect(page.getByTestId('home-worktree')).toBeChecked();
   const base = page.getByTestId('home-worktree-base');
   await expect(base).toBeEnabled();
   await expect(base.locator('option')).toHaveText(['Current commit (main)', 'release-1']);
@@ -127,7 +129,8 @@ test('starts a session in its own worktree and asks before archiving its changes
   expect(existsSync(path.join(tree, 'draft.txt'))).toBe(true);
 
   // Restored and archived again, discarding: the worktree goes, its branch stays.
-  await page.getByTestId('show-archived').check();
+  await page.getByTestId('sidebar-more').click();
+  await page.getByTestId('menu-archived').click();
   await sessionMenu(page, id, 'Unarchive');
   await expect(row(page, id).getByText('Archived')).toHaveCount(0);
   await stubMessageBox(app, 1);
@@ -158,6 +161,7 @@ test('finds a message by its words and opens its session at that message', async
   await expect(marker).toHaveCount(0);
 
   // Mixed Chinese and English terms; the snippet marks both.
+  await page.getByTestId('open-search').click();
   await page.getByTestId('session-filter').fill('灯塔 lighthouse');
   const results = page.getByTestId('message-search');
   const hit = results.getByTestId('search-hit').first();
@@ -165,7 +169,7 @@ test('finds a message by its words and opens its session at that message', async
   await expect(hit.locator('mark')).toHaveText(['灯塔', 'lighthouse']);
   await expect(results.locator(`[data-session="${id}"]`)).toBeVisible();
   await page
-    .getByTestId('shell-sidebar')
+    .getByTestId('workspace-search')
     .screenshot({ path: info.outputPath('search-results.png') });
 
   // Two characters: below a trigram, still found.

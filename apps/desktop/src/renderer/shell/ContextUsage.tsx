@@ -113,10 +113,25 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
       ) : (
         <>
           <div className="context-summary">
-            <Ring percent={percent} />
             <strong data-testid="context-percent">{t('context.percent', { percent })}</strong>
+            <span className="context-window" aria-hidden="true">
+              {format.number(usage.tokens, { notation: 'compact' })} /{' '}
+              {format.number(usage.contextWindow, { notation: 'compact' })}
+            </span>
           </div>
-          <p className="muted context-tokens">
+          <div className="context-meter" aria-hidden="true">
+            {CATEGORY_ORDER.map((category) => (
+              <span
+                key={category}
+                className={`context-swatch swatch-${category}`}
+                style={{
+                  inlineSize:
+                    String((100 * usage.categories[category]) / usage.contextWindow) + '%',
+                }}
+              />
+            ))}
+          </div>
+          <p className="context-tokens muted">
             {t('context.tokens', { tokens: usage.tokens, window: usage.contextWindow })} ·{' '}
             {t(usage.source === 'provider' ? 'context.source.provider' : 'context.source.estimate')}
           </p>
@@ -125,14 +140,17 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
               (category) => usage.categories[category] > 0 || category !== 'unclassified',
             ).map((category) => {
               const tokens = usage.categories[category];
-              const share = usage.tokens === 0 ? 0 : (tokens / usage.tokens) * 100;
               return (
                 <li key={category} className="context-category" data-category={category}>
+                  <span className={`context-swatch swatch-${category}`} aria-hidden="true" />
                   <span className="context-category-name">{t(`context.category.${category}`)}</span>
-                  <span className="context-category-bar" aria-hidden="true">
-                    <span style={{ inlineSize: `${share.toFixed(1)}%` }} />
-                  </span>
                   <span className="context-category-tokens">{format.number(tokens)}</span>
+                  <span className="context-share">
+                    {format.number(tokens / usage.contextWindow, {
+                      style: 'percent',
+                      maximumFractionDigits: 1,
+                    })}
+                  </span>
                 </li>
               );
             })}

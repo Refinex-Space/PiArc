@@ -7,10 +7,10 @@ import { UsageCard } from '../usage/UsageCard.js';
 import { ContextPanel } from './ContextUsage.js';
 import { registerPanel } from './registry.js';
 
-// After the task card: the rail shows its first panel, and the task list (when there is one)
-// is what changes during a turn; the usage ring opens this card (`showPanel('context')`).
+// The usage ring reveals this section even when the user has closed the session rail.
 registerPanel({
   id: 'context',
+  initiallyExpanded: true,
   area: 'rail',
   title: 'panel.context',
   order: 50,
@@ -32,6 +32,7 @@ registerPanel({
 
 registerPanel({
   id: 'tasks',
+  initiallyExpanded: true,
   area: 'rail',
   title: 'panel.tasks',
   order: 40,

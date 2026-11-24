@@ -10,6 +10,18 @@ import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { Fragment as ReactFragment, useEffect, useRef, useState, type ReactNode } from 'react';
 
+import type { EditorDraft } from './session-draft.js';
+import { IconButton } from '../app/IconButton.js';
+import {
+  CommandIcon,
+  FileIcon,
+  GearIcon,
+  PaperclipIcon,
+  PlusIcon,
+  SendIcon,
+  StopIcon,
+} from '../shell/icons.js';
+import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
 import { revealListOption } from '../app/list-navigation.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
@@ -54,7 +66,10 @@ export interface ComposerSubmission extends ComposerPayload {
 
 export interface ComposerHandlers {
   /** Enter, Mod+Enter: send when idle; steer or queue while running. */
-  submit(intent: 'send' | 'steer' | 'queue', submission: ComposerSubmission): void;
+  submit(
+    intent: 'send' | 'steer' | 'queue',
+    submission: ComposerSubmission,
+  ): boolean | Promise<boolean>;
   /** Esc while running. */
   stop(): void;
   /** `/` typed into an empty composer opened the palette. */
@@ -75,9 +90,10 @@ export interface MentionSource {
   cancel(): void;
 }
 
-function emptyState(): EditorState {
+function emptyState(doc?: EditorState['doc']): EditorState {
   return EditorState.create({
     schema: composerSchema,
+    ...(doc ? { doc } : {}),
     plugins: [
       mentionPlugin(),
       commandPlugin(),
@@ -128,6 +144,8 @@ function filesOf(transfer: DataTransfer | null): File[] {
 
 export function Composer({
   running,
+  savedDraft,
+  firstTurn = false,
   disabled = false,
   handlers,
   mentions,
@@ -140,6 +158,8 @@ export function Composer({
   insert,
 }: {
   running: boolean;
+  savedDraft?: EditorDraft | undefined;
+  firstTurn?: boolean;
   disabled?: boolean;
   handlers: ComposerHandlers;
   mentions: MentionSource;
@@ -160,6 +180,9 @@ export function Composer({
   insert?: { readonly snippets: readonly SnippetData[]; readonly nonce: number } | undefined;
 }) {
   const { t, platform } = useApp();
+  const add = useMenu();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const saved = useRef(savedDraft);
   const mount = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const [mention, setMention] = useState<MentionState>(CLOSED_MENTION);
@@ -168,9 +191,13 @@ export function Composer({
     query: '',
     items: [],
   });
-  const [pending, setPending] = useState<readonly PendingAttachment[]>([]);
+  const [pending, setPending] = useState<readonly PendingAttachment[]>(saved.current?.files ?? []);
   const [problems, setProblems] = useState<readonly AttachmentProblem[]>([]);
-  const [empty, setEmpty] = useState(true);
+  const [empty, setEmpty] = useState(
+    !saved.current?.doc?.content.size || saved.current.doc.content.size === 2,
+  );
+  const currentFiles = useRef(pending);
+  currentFiles.current = pending;
   // The editor's callbacks are created once; they read the latest values through this ref.
   const latest = useRef({
     running,
@@ -197,7 +224,7 @@ export function Composer({
 
   const addFiles = (files: readonly File[]): void => {
     const { limits: current, pending: attached } = latest.current;
-    if (files.length === 0) {
+    if (latest.current.disabled || files.length === 0) {
       return;
     }
     const { accepted, problems: refused } = checkFiles(
@@ -235,10 +262,24 @@ export function Composer({
     }
     const payload = serializeDoc(state.doc);
     if (locked || (isBlank(payload) && attachments.length === 0)) return;
-    current.submit(intent, { ...payload, attachments });
-    if (view) clearCommand()(state, view.dispatch.bind(view), view);
-    setPending([]);
-    setProblems([]);
+    const clear = () => {
+      if (savedDraft) {
+        delete savedDraft.doc;
+        delete savedDraft.files;
+      }
+      if (!view || view.isDestroyed || view.state.doc !== state.doc) return;
+      clearCommand()(view.state, view.dispatch.bind(view), view);
+      currentFiles.current = [];
+      setPending([]);
+      setProblems([]);
+    };
+    const result = current.submit(intent, { ...payload, attachments });
+    if (typeof result === 'boolean') {
+      if (result) clear();
+    } else
+      void result.then((sent) => {
+        if (sent) clear();
+      });
   };
   const send = useRef(submitInput);
   send.current = submitInput;
@@ -283,13 +324,14 @@ export function Composer({
     };
 
     const view = new EditorView(element, {
-      state: emptyState(),
+      state: emptyState(saved.current?.doc),
+      editable: () => !latest.current.disabled,
       attributes: {
         class: 'composer-editor',
         role: 'textbox',
         'aria-multiline': 'true',
-        'aria-label': t('composer.label'),
-        'data-testid': 'composer-input',
+        'aria-label': t(firstTurn ? 'home.placeholder' : 'composer.label'),
+        'data-testid': firstTurn ? 'home-input' : 'composer-input',
       },
       dispatchTransaction(tr) {
         const next = view.state.apply(tr);
@@ -325,7 +367,8 @@ export function Composer({
         }
         const picker = mentionKey.getState(editor.state) ?? CLOSED_MENTION;
         if (picker.active) {
-          const matches = latest.current.results.items;
+          const matches =
+            latest.current.results.query === picker.query ? latest.current.results.items : [];
           switch (event.key) {
             case 'ArrowDown':
             case 'ArrowUp':
@@ -413,12 +456,23 @@ export function Composer({
       },
     });
     viewRef.current = view;
+    if (firstTurn && !latest.current.disabled) view.focus();
     return () => {
+      if (savedDraft) {
+        if (isBlank(serializeDoc(view.state.doc))) delete savedDraft.doc;
+        else savedDraft.doc = view.state.doc;
+        if (currentFiles.current.length) savedDraft.files = currentFiles.current;
+        else delete savedDraft.files;
+      }
       viewRef.current = null;
       view.destroy();
     };
     // The editor is created once; translations of its label follow on the next mount.
   }, []);
+
+  useEffect(() => {
+    viewRef.current?.setProps({ editable: () => !disabled });
+  }, [disabled]);
 
   // A message given back for the input: plain text, one paragraph per line, then focus.
   const fillText = fill?.text;
@@ -501,6 +555,82 @@ export function Composer({
         return t('composer.attachment.count', { count: problem.maxCount });
     }
   };
+  const menuItems: MenuItem[] = [
+    {
+      id: 'attach',
+      label: t('composer.attach'),
+      icon: <PaperclipIcon />,
+      disabled: !limits?.kinds.length,
+      run: () => fileInput.current?.click(),
+    },
+    {
+      id: 'mention',
+      label: t('composer.mentions.label'),
+      icon: <FileIcon />,
+      run: () => {
+        const editor = viewRef.current;
+        if (!editor) return;
+        const { from, to } = editor.state.selection;
+        editor.dispatch(openMention(editor.state, from, to));
+        handlers.mentionOpened();
+        editor.focus();
+      },
+    },
+    {
+      id: 'commands',
+      label: t('composer.commands.label'),
+      icon: <CommandIcon />,
+      disabled: !empty,
+      run: () => {
+        const editor = viewRef.current;
+        if (!editor) return;
+        const { from, to } = editor.state.selection;
+        editor.dispatch(openCommands(editor.state, from, to));
+        handlers.command();
+        editor.focus();
+      },
+    },
+    ...(savedDraft !== undefined || firstTurn
+      ? [
+          {
+            id: 'skills',
+            label: t('skills.title'),
+            icon: <CommandIcon />,
+            submenu: [
+              ...commands
+                .filter((c) => c.kind === 'skill')
+                .map((c) => ({
+                  id: c.name,
+                  label: c.name,
+                  tooltip: c.description,
+                  disabled: !empty,
+                  run: () => {
+                    const view = viewRef.current;
+                    if (view) fillCommand(view, c.name);
+                  },
+                })),
+              {
+                id: 'manage-skills',
+                label: t('settings.skills'),
+                icon: <GearIcon />,
+                run: () => {
+                  void window.piarc.openSettings('skills');
+                },
+              },
+            ],
+          },
+          {
+            id: 'manage-connectors',
+            label: t('settings.mcp'),
+            icon: <GearIcon />,
+            run: () => {
+              void window.piarc.openSettings('mcp');
+            },
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div
       className="composer"
@@ -553,7 +683,8 @@ export function Composer({
                   }
                 }}
               >
-                <span className="mention-label">@{candidate.label}</span>
+                <FileIcon />
+                <span className="mention-label">{candidate.label}</span>
                 <span className="mention-path">{candidate.path}</span>
               </li>
             ))
@@ -671,60 +802,76 @@ export function Composer({
         </div>
       )}
       <div className={`composer-box${disabled ? ' is-disabled' : ''}`}>
+        <IconButton
+          label={t('composer.add')}
+          className="composer-attach"
+          data-testid="composer-add"
+          aria-haspopup="menu"
+          aria-expanded={add.open !== null}
+          disabled={disabled}
+          onClick={(event) => {
+            handlers.command();
+            add.openAbove(event.currentTarget);
+          }}
+        >
+          <PlusIcon />
+        </IconButton>
+        <input
+          ref={fileInput}
+          type="file"
+          hidden
+          aria-label={t('composer.attach')}
+          data-testid="composer-file-input"
+          accept={(limits?.kinds ?? []).flatMap((kind) => kind.mimeTypes).join(',')}
+          multiple
+          onChange={(event) => {
+            addFiles([...(event.currentTarget.files ?? [])]);
+            event.currentTarget.value = '';
+          }}
+        />
+        {add.open !== null && (
+          <MenuPopup
+            at={add.open}
+            onClose={add.close}
+            label={t('composer.add')}
+            items={menuItems}
+          />
+        )}
         <div
           ref={mount}
           className="composer-mount"
           data-empty={empty}
-          data-placeholder={t('composer.placeholder')}
+          data-placeholder={t(firstTurn ? 'home.placeholder' : 'composer.placeholder')}
         />
-        <div className="composer-actions">
-          <label className="icon-button composer-attach" title={t('composer.attach')}>
-            <input
-              type="file"
-              className="visually-hidden"
-              aria-label={t('composer.attach')}
-              data-testid="composer-file-input"
-              accept={(limits?.kinds ?? []).flatMap((kind) => kind.mimeTypes).join(',')}
-              multiple
-              onChange={(event) => {
-                addFiles([...(event.currentTarget.files ?? [])]);
-                event.currentTarget.value = '';
-              }}
-            />
-            <span aria-hidden="true">＋</span>
-            <span className="visually-hidden">{t('composer.attach')}</span>
-          </label>
-          {running ? (
-            <button
-              type="button"
-              className="button composer-stop"
-              data-testid="composer-stop"
-              onClick={() => {
-                handlers.stop();
-              }}
-            >
-              {t('composer.stop')}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="button button-primary composer-send"
-            data-testid="composer-send"
-            disabled={disabled}
+        {running && (
+          <IconButton
+            label={t('composer.stop')}
+            className="composer-stop"
+            data-testid="composer-stop"
             onClick={() => {
-              const view = viewRef.current;
-              if (view === null) {
-                return;
-              }
-              send.current(running ? 'steer' : 'send', view.state, view);
-              view.focus();
+              handlers.stop();
             }}
           >
-            {t('composer.send')}
-          </button>
-        </div>
+            <StopIcon />
+          </IconButton>
+        )}
+        <IconButton
+          label={t(firstTurn ? 'home.send' : 'composer.send')}
+          className="composer-send"
+          data-testid={firstTurn ? 'home-start' : 'composer-send'}
+          disabled={disabled || (empty && pending.length === 0)}
+          onClick={() => {
+            const editor = viewRef.current;
+            if (editor) {
+              send.current(running ? 'steer' : 'send', editor.state, editor);
+              editor.focus();
+            }
+          }}
+        >
+          <SendIcon />
+        </IconButton>
       </div>
-      <div className="composer-hint" aria-live="polite">
+      <div className={running ? 'composer-hint' : 'visually-hidden'} aria-live="polite">
         {running ? t('composer.hint.running', { queue: queueKey }) : t('composer.hint.idle')}
       </div>
     </div>

@@ -10,15 +10,10 @@ import { useWindowFocused } from '../app/window-focus.js';
 import type { PaletteCommand } from '../composer/command-plugin.js';
 import { builtin, typedBuiltin, type BuiltinAction } from '../composer/builtins.js';
 import { EMPTY_COMMANDS, parseCommandsList, type CommandsList } from '../composer/commands-list.js';
-import {
-  Composer,
-  type ComposerHandlers,
-  type ComposerSubmission,
-  type MentionSource,
-} from '../composer/Composer.js';
+import { Composer, type ComposerHandlers } from '../composer/Composer.js';
 import type { SnippetData } from '../composer/schema.js';
 import { onSnippet, takeSnippets } from '../composer/snippets.js';
-import type { MentionData } from '../composer/schema.js';
+import { coreMentions, draftOf } from '../composer/session-draft.js';
 import {
   useBranches,
   useNeedsReload,
@@ -27,7 +22,6 @@ import {
   useStore,
   useTurnInfo,
 } from '../store/hooks.js';
-import { badgeOf } from '../store/status.js';
 import type { SessionTranscript } from '../store/transcript.js';
 import { LiveRegion } from '../transcript/LiveRegion.js';
 import { HISTORY } from '../transcript/constants.js';
@@ -38,8 +32,7 @@ import { useBranchActions } from '../changes/use-branch-actions.js';
 import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
 import { onLocate, rowShowsEntry, takeLocate } from '../store/locate.js';
-import { chooseDetail, DetailContext, detailOf } from '../transcript/detail.js';
-import { DetailSwitch } from '../transcript/DetailSwitch.js';
+import { DetailContext, useSessionDetail } from '../transcript/detail.js';
 import { reason } from './errors.js';
 import { keyOf, useModelCatalog } from './model-catalog.js';
 import { ModelMenus } from './ModelMenus.js';
@@ -48,54 +41,13 @@ import { AutoReviewStatus } from './AutoReviewStatus.js';
 import { SandboxStatus } from './SandboxStatus.js';
 import { UsageRing } from './ContextUsage.js';
 import { QueueList } from './QueueList.js';
-import { compactFocus, SessionInput, type Draft } from './session-input.js';
-import { sessionTitle } from './SessionRow.js';
-import { StatusBadge } from './StatusBadge.js';
+import { compactFocus, SessionInput } from './session-input.js';
 import { useUi } from './ui.js';
 import { OutputStyleDialog } from './OutputStyleDialog.js';
 import { showPanel } from './registry.js';
 import { onCommandRequest, takeCommand } from './command-requests.js';
 import { parseWindow } from '../store/history-window.js';
 import { rememberMemoryTarget } from '../settings/memory-target.js';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Core's file search as the composer's `@` source, below the session's working directory. */
-function coreMentions(root: string | undefined, limit: number): MentionSource {
-  const searchId = `mention-${crypto.randomUUID()}`;
-  return {
-    search: async (query) => {
-      if (root === undefined) {
-        return [];
-      }
-      const value: unknown = JSON.parse(
-        await window.piarc.searchFiles(searchId, root, query, limit),
-      );
-      const results = isRecord(value) && Array.isArray(value.results) ? value.results : [];
-      return results.flatMap((result: unknown): MentionData[] =>
-        isRecord(result) && typeof result.path === 'string' && typeof result.name === 'string'
-          ? [{ id: result.path, label: result.name, path: result.path }]
-          : [],
-      );
-    },
-    cancel: () => {
-      window.piarc.cancelFileSearch(searchId).catch((error: unknown) => {
-        console.error('[conversation] cannot cancel the file search', error);
-      });
-    },
-  };
-}
-
-function draftOf(submission: ComposerSubmission): Draft {
-  return {
-    text: submission.text,
-    mentions: submission.spans,
-    pending: submission.attachments,
-    stored: [],
-  };
-}
 
 /** Earlier pages a search result may load to find its entry. */
 const LOCATE_PAGES = 50;
@@ -468,22 +420,23 @@ export function Conversation({
         const typed = plain ? typedBuiltin(draft.text) : undefined;
         if (typed !== undefined && typed.action !== 'compact' && typed.action !== 'subtask') {
           runBuiltin(typed.action, typed.args);
-          return;
+          return true;
         }
         const focus = compactFocus(draft);
         if (focus !== undefined) {
           window.piarc.compact(id, focus === '' ? undefined : focus).catch((failure: unknown) => {
             setError(t('composer.failed', { reason: reason(failure) }));
           });
-          return;
+          return true;
         }
         if (intent === 'send') {
           void input.send(draft);
-          return;
+          return true;
         }
         input.add(intent === 'steer' ? 'steer' : 'followUp', draft).catch((failure: unknown) => {
           setError(t('composer.failed', { reason: reason(failure) }));
         });
+        return true;
       },
       stop() {
         window.piarc.abort(id).catch((failure: unknown) => {
@@ -501,27 +454,10 @@ export function Conversation({
   );
 
   // The transcript's view (T29), remembered per session in this window.
-  const [detail, setDetail] = useState(() => detailOf(id));
-  useEffect(() => {
-    setDetail(detailOf(id));
-  }, [id]);
-  const title = sessionTitle(session?.title, t('session.untitled'));
+  const detail = useSessionDetail(id);
   const empty = !history.loading && !transcript.hasContent();
   return (
     <section className="conversation" data-testid="conversation" data-session-id={id}>
-      <header className="titlebar main-titlebar conversation-header">
-        {session !== undefined && <StatusBadge state={badgeOf(session)} />}
-        <h1 className="conversation-title truncate" data-testid="conversation-title">
-          {title}
-        </h1>
-        <DetailSwitch
-          value={detail}
-          onChange={(next) => {
-            chooseDetail(id, next);
-            setDetail(next);
-          }}
-        />
-      </header>
       <DetailContext.Provider value={detail}>
         <TranscriptContext.Provider value={view}>
           <div className="conversation-body">
@@ -540,6 +476,7 @@ export function Conversation({
       </DetailContext.Provider>
       <div className="conversation-composer">
         <Composer
+          savedDraft={store.editorDraft('session', id)}
           running={turn.running}
           handlers={handlers}
           mentions={mentions}

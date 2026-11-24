@@ -11,6 +11,7 @@ import { useT } from '../app/app-context.js';
 import { useSession, useSessions, useTasks } from '../store/hooks.js';
 import { durationParts, taskDuration, tasksOfSession } from '../store/tasks.js';
 import { showTerminal } from '../terminal/panel-state.js';
+import { ChevronDownIcon } from './icons.js';
 import { showPanel } from './registry.js';
 
 /** Bytes one read asks for (Core's chunk size). */
@@ -291,7 +292,6 @@ export function TasksPanel({ sessionId }: { readonly sessionId: string | undefin
   const all = useTasks();
   const sessions = useSessions();
   const workspace = useSession(sessionId)?.workspace;
-  const [open, setOpen] = useState<string>();
   const groups = useMemo(() => {
     const ofWorkspace = all.filter((task) => task.workspace === workspace);
     const order: string[] = [];
@@ -309,7 +309,7 @@ export function TasksPanel({ sessionId }: { readonly sessionId: string | undefin
     order.sort((a, b) => Number(b === sessionId) - Number(a === sessionId));
     return order.map((id) => ({ id, tasks: bySession.get(id) ?? [] }));
   }, [all, workspace, sessionId]);
-  const now = useNow(all.some((task) => task.status === 'running'));
+  const now = useNow(groups.some((group) => group.tasks.some((task) => task.status === 'running')));
   if (groups.length === 0) {
     return (
       <div className="bg-tasks-panel" data-testid="bg-tasks-panel">
@@ -324,36 +324,71 @@ export function TasksPanel({ sessionId }: { readonly sessionId: string | undefin
         return (
           <section key={group.id} className="bg-task-group">
             <h2 className="bg-task-group-title">{t('bgTasks.otherSession', { title })}</h2>
-            <ul className="bg-task-list">
-              {group.tasks.map((task) => (
-                <li
-                  key={task.taskId}
-                  className="bg-task"
-                  data-testid="bg-panel-task"
-                  data-task={task.taskId}
-                >
-                  <TaskSummary task={task} now={now} />
-                  <div className="bg-task-actions">
-                    <button
-                      type="button"
-                      className="button"
-                      aria-expanded={open === task.taskId}
-                      onClick={() => {
-                        setOpen(open === task.taskId ? undefined : task.taskId);
-                      }}
-                    >
-                      {t(open === task.taskId ? 'bgTasks.hideOutput' : 'bgTasks.showOutput')}
-                    </button>
-                    <StopButton task={task} />
-                    <OpenTerminalButton task={task} />
-                  </div>
-                  {open === task.taskId ? <TaskOutput task={task} /> : null}
-                </li>
-              ))}
-            </ul>
+            <SessionTaskList tasks={group.tasks} now={now} />
           </section>
         );
       })}
     </div>
+  );
+}
+
+/** Keep finished output reachable while the active jobs remain the first rows in a group. */
+function SessionTaskList({ tasks, now }: { tasks: readonly BackgroundTask[]; now: number }) {
+  const t = useT();
+  const [open, setOpen] = useState<string>();
+  const [showFinished, setShowFinished] = useState<boolean>();
+  const running = tasks.filter((task) => task.status === 'running');
+  const finished = tasks.filter((task) => task.status !== 'running');
+  const expanded =
+    showFinished ?? (running.length === 0 || finished.some((task) => task.taskId === open));
+  const list = (items: readonly BackgroundTask[]) => (
+    <ul className="bg-task-list">
+      {items.map((task) => (
+        <li
+          key={task.taskId}
+          className="bg-task"
+          data-testid="bg-panel-task"
+          data-task={task.taskId}
+        >
+          <TaskSummary task={task} now={now} />
+          <div className="bg-task-actions">
+            <button
+              type="button"
+              className="button"
+              aria-expanded={open === task.taskId}
+              onClick={() => {
+                setOpen(open === task.taskId ? undefined : task.taskId);
+              }}
+            >
+              {t(open === task.taskId ? 'bgTasks.hideOutput' : 'bgTasks.showOutput')}
+            </button>
+            <StopButton task={task} />
+            <OpenTerminalButton task={task} />
+          </div>
+          {open === task.taskId ? <TaskOutput task={task} /> : null}
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <>
+      {running.length > 0 && list(running)}
+      {finished.length > 0 && (
+        <div className="bg-task-history">
+          <button
+            type="button"
+            className="bg-task-history-toggle"
+            aria-expanded={expanded}
+            onClick={() => {
+              setShowFinished(!expanded);
+            }}
+          >
+            <ChevronDownIcon />
+            {t('bgTasks.finishedGroup', { count: finished.length })}
+          </button>
+          {expanded && list(finished)}
+        </div>
+      )}
+    </>
   );
 }

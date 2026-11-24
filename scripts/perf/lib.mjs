@@ -165,7 +165,8 @@ export async function openWorkspace(app, page, dir) {
 export async function startSession(page, scenarioId, options = {}) {
   await page.getByTestId('new-session').click();
   if (options.worktree !== undefined) {
-    await page.getByTestId('home-worktree').check();
+    await page.locator('.environment-change').click();
+    await page.getByTestId('menu-worktree').click();
     await page.getByTestId('home-worktree-name').fill(options.worktree);
   }
   await page.getByTestId('home-input').fill(`Work on it [[piarc-scenario:${scenarioId}]]`);

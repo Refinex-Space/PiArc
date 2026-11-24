@@ -30,7 +30,8 @@ test('a model switch hook can ask after the cost preview and either keep or swit
     'confirm.mjs': `process.stdin.resume(); process.stdin.on('end',()=>console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreModelSwitch',permissionDecision:'ask',permissionDecisionReason:'Confirm the destination model.'}})));`,
   });
   await openFolder(page, app, workspace);
-  await page.getByTestId('home-model').selectOption('relay-a/first');
+  await page.getByTestId('home-model').click();
+  await page.getByTestId('model-option-relay-a/first').click();
   await startSession(page, 'Read note.txt', 't21-models', 'trust');
   await expect(
     page.getByTestId('agent-message').filter({ hasText: 'First protocol read the note.' }),
@@ -50,9 +51,9 @@ test('a model switch hook can ask after the cost preview and either keep or swit
   const first = await change();
   await first.screenshot({ path: info.outputPath('switch-hook-question.png') });
   await first.getByTestId('question-decline').click();
-  await expect(page.getByTestId('session-model')).toContainText('relay-a/first');
+  await expect(page.getByTestId('session-model')).toHaveAttribute('title', 'relay-a/first');
   const second = await change();
   await second.getByLabel('relay-b/second', { exact: true }).check();
   await second.getByTestId('question-submit').click();
-  await expect(page.getByTestId('session-model')).toContainText('relay-b/second');
+  await expect(page.getByTestId('session-model')).toHaveAttribute('title', 'relay-b/second');
 });

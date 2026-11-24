@@ -37,8 +37,8 @@ test('text typed while the folder opens stays in the input', async ({ app, page,
   await input.fill('Typed while the folder opens');
   // Longer than the hold: the answer has arrived and been handled.
   await page.waitForTimeout(2500);
-  await expect(input).toHaveValue('Typed while the folder opens');
-  await expect(page.getByTestId('home-workspace')).toHaveValue(ws);
+  await expect(input).toHaveText('Typed while the folder opens');
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', ws);
 });
 
 test('the new message shows at once; a failed create rolls it back into the input', async ({
@@ -60,7 +60,7 @@ test('the new message shows at once; a failed create rolls it back into the inpu
   await page.getByTestId('home-start').click();
   await page.getByTestId('trust-accept').click();
   await expect(page.getByTestId('home-error')).toContainText('injected create failure');
-  await expect(page.getByTestId('home-input')).toHaveValue(text);
+  await expect(page.getByTestId('home-input')).toHaveText(text);
   await expect(page.getByTestId('optimistic-message')).toHaveCount(0);
   const seen = await optimisticSeen(page);
   expect(seen.appeared).toBeGreaterThan(0);
@@ -116,11 +116,16 @@ test('rename, pin, filter, archive and delete sessions; the result survives a re
   await expect(row(page, beta).getByTestId('pin-mark')).toBeVisible();
   await expect(page.getByTestId('session-row').first()).toHaveAttribute('data-session-id', beta);
 
-  // Filter.
+  // Search session titles without leaving the conversation.
+  await page.getByTestId('open-search').click();
   await page.getByTestId('session-filter').fill('gamma');
-  await expect(page.getByTestId('session-row')).toHaveCount(1);
-  await expect(page.getByTestId('session-row')).toHaveAttribute('data-session-id', gamma);
+  const titles = page.getByTestId('workspace-search').getByTestId('search-title');
+  await expect(titles).toHaveCount(1);
+  await expect(titles).toHaveAttribute('data-session-id', gamma);
   await page.getByTestId('session-filter').fill('');
+  await expect(titles).toHaveCount(3);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('open-search')).toBeFocused();
 
   // Archive: hidden until "show archived"; its temporary directory is removed.
   const temp = path.join(userDataDir, 'sessions', gamma);
@@ -129,10 +134,12 @@ test('rename, pin, filter, archive and delete sessions; the result survives a re
   await page.getByTestId('menu-archive').click();
   await expect(row(page, gamma)).toHaveCount(0);
   await expect.poll(() => existsSync(temp)).toBe(false);
-  await page.getByTestId('show-archived').check();
+  await page.getByTestId('sidebar-more').click();
+  await page.getByTestId('menu-archived').click();
   await expect(row(page, gamma)).toBeVisible();
   await expect(row(page, gamma)).toContainText(/已归档|Archived/);
-  await page.getByTestId('show-archived').uncheck();
+  await page.getByTestId('sidebar-more').click();
+  await page.getByTestId('menu-archived').click();
 
   // Delete: the main process asks (stubbed native dialog), then the Pi file and the temporary
   // directory are gone.
@@ -165,7 +172,8 @@ test('rename, pin, filter, archive and delete sessions; the result survives a re
     await expect(row(next, alpha).getByTestId('session-title')).toHaveText('重命名的会话 Renamed');
     await expect(row(next, beta)).toHaveCount(0);
     await expect(row(next, gamma)).toHaveCount(0);
-    await next.getByTestId('show-archived').check();
+    await next.getByTestId('sidebar-more').click();
+    await next.getByTestId('menu-archived').click();
     await expect(row(next, gamma)).toBeVisible();
     await next.screenshot({ path: testInfo.outputPath('after-restart.png') });
   } finally {
@@ -220,3 +228,48 @@ async function startSessionElsewhere(page: Page, ws: string): Promise<string> {
     return created.sessionId;
   }, ws);
 }
+
+test('project actions support drag ordering, keyboard access and project search', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
+  const first = await makeWorkspace(workspaces, 'Atlas');
+  const second = await makeWorkspace(workspaces, 'Birch');
+  await openFolder(page, app, first);
+  await openFolder(page, app, second);
+  const groups = page.getByTestId('workspace-group');
+  const atlas = groups.filter({ has: page.getByRole('button', { name: 'Atlas', exact: true }) });
+  const birch = groups.filter({ has: page.getByRole('button', { name: 'Birch', exact: true }) });
+  await expect(groups.first()).toHaveAttribute('data-path', second);
+
+  await atlas.getByTestId('project-toggle').dragTo(birch.getByTestId('project-toggle'));
+  await expect(groups.first()).toHaveAttribute('data-path', first);
+  await page.reload();
+  await expect(groups.first()).toHaveAttribute('data-path', first);
+
+  await atlas.getByTestId('project-toggle').press('Shift+F10');
+  await expect(page.getByTestId('menu-move-up')).toHaveAttribute('aria-disabled', 'true');
+  await page.getByTestId('menu-move-down').click();
+  await expect(groups.last()).toHaveAttribute('data-path', first);
+  await birch.getByTestId('project-toggle').click({ button: 'right' });
+  await expect(page.getByTestId('menu-trust')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(birch.getByTestId('project-toggle')).toBeFocused();
+  await atlas.getByTestId('project-toggle').click();
+  await expect(atlas.getByTestId('project-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await atlas.getByTestId('project-toggle').click();
+  await expect(atlas.getByTestId('project-toggle')).toHaveAttribute('aria-expanded', 'false');
+
+  await page.getByTestId('open-search').click();
+  await expect(page.getByTestId('session-filter')).toBeFocused();
+  await page.getByTestId('session-filter').fill('atlas');
+  await page.getByTestId('session-filter').press('ArrowDown');
+  await expect(page.getByTestId('search-project')).toBeFocused();
+  await page
+    .getByTestId('workspace-search')
+    .screenshot({ path: info.outputPath('project-search.png') });
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('workspace-search')).toHaveCount(0);
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', first);
+});

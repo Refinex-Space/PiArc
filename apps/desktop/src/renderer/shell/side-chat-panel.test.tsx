@@ -150,7 +150,7 @@ describe('side chat in a running session window', () => {
         ),
       });
     });
-    expect(element('[data-testid="composer-stop"]').textContent).toBe('Stop');
+    expect(element('[data-testid="composer-stop"]').getAttribute('aria-label')).toBe('Stop');
   });
 
   afterEach(() => {
@@ -199,7 +199,7 @@ describe('side chat in a running session window', () => {
       button('Copy text').click();
     });
     expect(write).toHaveBeenCalledExactlyOnceWith(answer);
-    expect(element('[data-testid="composer-stop"]').textContent).toBe('Stop');
+    expect(element('[data-testid="composer-stop"]').getAttribute('aria-label')).toBe('Stop');
     expect(element('[data-testid="queue-text"]').textContent).toBe('Main follow-up');
     expect(prompt).not.toHaveBeenCalled();
   });

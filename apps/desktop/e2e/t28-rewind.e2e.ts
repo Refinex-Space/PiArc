@@ -180,7 +180,8 @@ test('rewinding, switching branches and branching from a message', async ({
   await expect(userRow(page, 'Plan the work.')).toHaveCount(1);
   const tail = page.getByTestId('branch-tail');
   await expect(tail).toContainText('Make the file.');
-  await page.getByTestId('panel-tab-tasks').click();
+  const taskSection = page.getByTestId('panel-tab-tasks');
+  if ((await taskSection.getAttribute('aria-expanded')) !== 'true') await taskSection.click();
   // In-progress items show their active form.
   await expect(page.getByTestId('task-panel')).toContainText('Planning the work');
   await expect(page.getByTestId('task-panel')).not.toContainText('Making the file');
@@ -205,7 +206,7 @@ test('rewinding, switching branches and branching from a message', async ({
   );
   await expect(userRow(page, 'Try another way.')).toHaveCount(0);
   await expect(userRow(page, 'Make the file.').getByTestId('branch-position')).toHaveText('1 / 2');
-  await page.getByTestId('panel-tab-tasks').click();
+  if ((await taskSection.getAttribute('aria-expanded')) !== 'true') await taskSection.click();
   await expect(page.getByTestId('task-panel')).toContainText('Making the file');
   await shoot(page, info, 'branch-switched');
 

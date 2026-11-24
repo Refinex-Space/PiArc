@@ -37,9 +37,9 @@ test('external drafts preserve unsent text, ask about trust and never send', asy
   const draft = await nextWindow;
   await expect(draft.getByTestId('trust-dialog')).toBeVisible();
   await draft.getByTestId('trust-deny').click();
-  await expect(draft.getByTestId('home-workspace')).toHaveValue(target);
-  await expect(draft.getByTestId('home-input')).toHaveValue(prompt);
-  await expect(page.getByTestId('home-input')).toHaveValue('Existing private draft');
+  await expect(draft.getByTestId('home-workspace')).toHaveAttribute('value', target);
+  await expect(draft.getByTestId('home-input')).toHaveText(prompt);
+  await expect(page.getByTestId('home-input')).toHaveText('Existing private draft');
   await expect(draft.getByTestId('session-row')).toHaveCount(0);
   expect(await requests(mock, 't49-external')).toHaveLength(0);
   await draft.screenshot({ path: info.outputPath('external-draft.png') });

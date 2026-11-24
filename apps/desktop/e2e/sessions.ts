@@ -131,7 +131,7 @@ export async function stubMessageBox(app: ElectronApplication, response: number)
 export async function openFolder(page: Page, app: ElectronApplication, dir: string): Promise<void> {
   await stubFolderDialog(app, dir);
   await page.getByTestId('open-folder').click();
-  await expect(page.getByTestId('home-workspace')).toHaveValue(dir);
+  await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', dir);
 }
 
 /** Starts recording whether the optimistic message ever appeared. */

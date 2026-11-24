@@ -13,11 +13,18 @@ import { StoreContext, useHarnessOf, useSessionOf, useTasksOf } from '../store/h
 import { createTranscriptServices } from '../transcript/services.js';
 import { Conversation } from './Conversation.js';
 import { Home } from './Home.js';
-import { clampSidebar, loadLayout, localStore, saveLayout, type Layout } from './layout.js';
+import {
+  clampSidebar,
+  loadLayout,
+  loadSidebarGroups,
+  localStore,
+  saveLayout,
+  type Layout,
+} from './layout.js';
 import { NoticeBar } from './NoticeBar.js';
 import { WorktreeCleanupNotices, folderDrop, useLaunchTargets } from './worktree-ui.js';
 import { PageBoundary } from './PageBoundary.js';
-import { DockArea, RailArea } from './PanelAreas.js';
+import { DockArea, RailArea, SessionTools, WorkbenchPanels } from './PanelAreas.js';
 import type { PanelContext } from './registry.js';
 import './harness-panels.js';
 import './task-panels.js';
@@ -31,6 +38,8 @@ import { ShortcutsDialog } from './ShortcutsDialog.js';
 import { CommandPalette } from './CommandPalette.js';
 import { requestCommand } from './command-requests.js';
 import { Sidebar } from './Sidebar.js';
+import { WorkbenchHeader } from './WorkbenchHeader.js';
+import { useViewHistory } from './view-history.js';
 import { groupSessions } from './Sidebar.js';
 import { Toasts } from './Toasts.js';
 import { TrustDialog, needsDecision, parseTrustView } from './TrustDialog.js';
@@ -70,8 +79,6 @@ function usePanelContext(store: AppStore, sessionId: string | undefined): PanelC
   const tasks = useTasksOf(store);
   const backgroundTasks =
     sessionId !== undefined && tasks.some((t) => t.ownerSessionId === sessionId);
-  const workspaceTasks =
-    session !== undefined && tasks.some((t) => t.workspace === session.workspace);
   return useMemo(
     () => ({
       sessionId,
@@ -79,10 +86,9 @@ function usePanelContext(store: AppStore, sessionId: string | undefined): PanelC
       plan: harness?.plan !== undefined || pendingPlan === true,
       changes,
       backgroundTasks,
-      workspaceTasks,
       terminal,
     }),
-    [sessionId, harness, pendingPlan, changes, backgroundTasks, workspaceTasks, terminal],
+    [sessionId, harness, pendingPlan, changes, backgroundTasks, terminal],
   );
 }
 
@@ -134,7 +140,23 @@ export function Shell() {
       },
     );
   }, []);
-  const [view, setView] = useState<View>({ kind: 'home', workspace: undefined });
+  const history = useViewHistory(
+    (entry) => entry.kind === 'home' || store.session(entry.id) !== undefined,
+  );
+  const { view, visit: setView } = history;
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 699px)').matches);
+  const [sidebarPeek, setSidebarPeek] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 699px)');
+    const update = () => {
+      setNarrow(query.matches);
+      setSidebarPeek(false);
+    };
+    query.addEventListener('change', update);
+    return () => {
+      query.removeEventListener('change', update);
+    };
+  }, []);
   const [sideSession, setSideSession] = useState<string>();
   const selected = view.kind === 'session' ? view.id : undefined;
   useEffect(() => {
@@ -142,7 +164,20 @@ export function Shell() {
   }, [sideSession, selected]);
   const [viewNonce, setViewNonce] = useState(0);
   const [layout, setLayout] = useState<Layout>(() => loadLayout(localStore()));
+  const collapsed = narrow ? !sidebarPeek : layout.sidebarCollapsed;
   const [trust, setTrust] = useState<TrustRequest | undefined>(undefined);
+  const focusSidebarToggle = useRef(false);
+  useEffect(() => {
+    if (!focusSidebarToggle.current) return;
+    const selector = collapsed
+      ? '[data-testid="expand-sidebar"]'
+      : '[data-testid="collapse-sidebar"]';
+    document.querySelector<HTMLButtonElement>(selector)?.focus();
+    focusSidebarToggle.current = false;
+  }, [collapsed]);
+  useEffect(() => {
+    setSidebarPeek(false);
+  }, [view]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [settingsEntry, setSettingsEntry] = useState<number | null>(() =>
     isSettingsRoute() ? 0 : null,
@@ -191,7 +226,7 @@ export function Shell() {
           setView({ kind: 'session', id: event.sessionId });
         }
       }),
-    [closeSettings],
+    [closeSettings, setView],
   );
   // A session that disappears (deleted, archived elsewhere) leaves the main area. A session
   // just created may not be in the list yet: only one that was listed can disappear.
@@ -210,13 +245,17 @@ export function Shell() {
           setView({ kind: 'home', workspace: undefined });
         }
       }),
-    [store],
+    [store, setView],
   );
 
-  const show = useCallback((next: View) => {
-    setView(next);
-    setViewNonce((n) => n + 1);
-  }, []);
+  const show = useCallback(
+    (next: View) => {
+      setView(next);
+      setSidebarPeek(false);
+      setViewNonce((n) => n + 1);
+    },
+    [setView],
+  );
 
   const ensureTrust = useCallback(async (workspace: string, mode: TrustMode): Promise<boolean> => {
     if (mode === 'decide') {
@@ -231,23 +270,27 @@ export function Shell() {
   }, []);
 
   /** Opens `path` as a workspace and shows its home view; resolves Core's spelling of it. */
-  const openPath = useCallback(async (path: string): Promise<string> => {
-    const opened: unknown = JSON.parse(await window.piarc.openWorkspace(path));
-    const canonical =
-      typeof opened === 'object' &&
-      opened !== null &&
-      typeof (opened as { path?: unknown }).path === 'string'
-        ? (opened as { path: string }).path
-        : path;
-    // Core lists the folder before opening finishes and the home view shows it then: keep a
-    // home view the user may be typing in (no remount), and switch any other view to home.
-    setView((current) =>
-      current.kind === 'home'
-        ? { ...current, workspace: canonical }
-        : { kind: 'home', workspace: canonical },
-    );
-    return canonical;
-  }, []);
+  const openPath = useCallback(
+    async (path: string): Promise<string> => {
+      const opened: unknown = JSON.parse(await window.piarc.openWorkspace(path));
+      const canonical =
+        typeof opened === 'object' &&
+        opened !== null &&
+        typeof (opened as { path?: unknown }).path === 'string'
+          ? (opened as { path: string }).path
+          : path;
+      // Core lists the folder before opening finishes and the home view shows it then: keep a
+      // home view the user may be typing in (no remount), and switch any other view to home.
+      setView((current) =>
+        current.kind === 'home' && current.workspace === canonical
+          ? current
+          : { kind: 'home', workspace: canonical },
+      );
+      setSidebarPeek(false);
+      return canonical;
+    },
+    [setView],
+  );
 
   const openFolder = useCallback(async (): Promise<string | undefined> => {
     const path = await window.piarc.chooseFolder();
@@ -299,8 +342,10 @@ export function Shell() {
   );
 
   const toggleSidebar = useCallback(() => {
-    setLayout((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }));
-  }, []);
+    focusSidebarToggle.current = true;
+    if (narrow) setSidebarPeek((current) => !current);
+    else setLayout((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed }));
+  }, [narrow]);
 
   const runRef = useRef<(command: AppCommand) => void>(() => undefined);
   const ui = useMemo<Ui>(
@@ -354,6 +399,7 @@ export function Shell() {
         closeSettings();
       return;
     }
+    if (document.querySelector('[data-testid="workspace-search"]')) return;
     switch (command) {
       case 'session.new':
         show({
@@ -390,9 +436,14 @@ export function Shell() {
         if (!trust && !shortcutsOpen) modeButton.current?.click();
         break;
       case 'session.next': {
-        const order = groupSessions(store.workspaces(), store.sessions(), '', false, '').flatMap(
-          (g) => g.sessions.map((s) => s.id),
-        );
+        const order = groupSessions(
+          store.workspaces(),
+          store.sessions(),
+          '',
+          false,
+          '',
+          loadSidebarGroups().order,
+        ).flatMap((g) => g.sessions.map((s) => s.id));
         if (order.length === 0) {
           break;
         }
@@ -438,6 +489,8 @@ export function Shell() {
   useCommands(run);
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
     const start = event.clientX;
     const from = layout.sidebarWidth;
@@ -450,9 +503,11 @@ export function Shell() {
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
   const baseContext = usePanelContext(store, selected);
   const context =
@@ -472,16 +527,28 @@ export function Shell() {
       <UiContext.Provider value={ui}>
         <Attention covered={settingsOpen} />
         <div
-          className={`shell${layout.sidebarCollapsed ? ' is-collapsed' : ''}`}
+          className={`shell${collapsed ? ' is-collapsed' : ''}`}
           data-testid="app-shell"
+          onKeyDown={(event) => {
+            if (
+              sidebarPeek &&
+              event.key === 'Escape' &&
+              !event.defaultPrevented &&
+              !isImeComposing(event.nativeEvent)
+            ) {
+              event.preventDefault();
+              toggleSidebar();
+            }
+          }}
           onDragOver={drop.onDragOver}
           onDrop={drop.onDrop}
           style={
             { '--piarc-sidebar-width': `${String(layout.sidebarWidth)}px` } as React.CSSProperties
           }
         >
-          {!layout.sidebarCollapsed && (
+          {!collapsed && (
             <Sidebar
+              history={history}
               resizer={
                 <div
                   className="resizer resizer-x sidebar-resizer"
@@ -518,66 +585,68 @@ export function Shell() {
               }
             />
           )}
-          <div className="workspace-area">
-            <div className="main-row">
-              <main className="main" data-testid="shell-main">
-                {layout.sidebarCollapsed && (
-                  <button
-                    type="button"
-                    className="icon-button expand-sidebar"
-                    aria-label={t('sidebar.expand')}
-                    title={t('sidebar.expand')}
-                    data-testid="expand-sidebar"
-                    onClick={toggleSidebar}
+          {narrow && sidebarPeek && (
+            <button
+              type="button"
+              className="sidebar-backdrop"
+              tabIndex={-1}
+              aria-label={t('sidebar.collapse')}
+              onClick={toggleSidebar}
+            />
+          )}
+          <WorkbenchPanels context={context}>
+            <div className="workspace-area" inert={narrow && sidebarPeek}>
+              <WorkbenchHeader sessionId={selected} collapsed={collapsed} history={history}>
+                <SessionTools context={context} />
+              </WorkbenchHeader>
+              <div className="main-row">
+                <main className="main" data-testid="shell-main">
+                  <NoticeBar />
+                  <WorktreeCleanupNotices />
+                  <PageBoundary
+                    key={view.kind === 'home' ? `home:${String(viewNonce)}` : view.id}
+                    message={t('shell.pageFailed')}
                   >
-                    ☰
-                  </button>
-                )}
-                <NoticeBar />
-                <WorktreeCleanupNotices />
-                <PageBoundary
-                  key={view.kind === 'home' ? `home:${String(viewNonce)}` : view.id}
-                  message={t('shell.pageFailed')}
-                >
-                  {view.kind === 'home' ? (
-                    <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
-                  ) : (
-                    <Conversation
-                      covered={settingsOpen}
-                      id={view.id}
-                      modeButton={modeButton}
-                      modelButton={modelButton}
-                      effortButton={effortButton}
-                    />
-                  )}
-                </PageBoundary>
-              </main>
-              <RailArea
+                    {view.kind === 'home' ? (
+                      <Home workspace={view.workspace} draft={view.draft} failure={view.error} />
+                    ) : (
+                      <Conversation
+                        covered={settingsOpen}
+                        id={view.id}
+                        modeButton={modeButton}
+                        modelButton={modelButton}
+                        effortButton={effortButton}
+                      />
+                    )}
+                  </PageBoundary>
+                </main>
+                <RailArea
+                  context={context}
+                  size={layout.railWidth}
+                  min={RAIL_WIDTH.min}
+                  max={RAIL_WIDTH.max}
+                  onResize={(size) => {
+                    setLayout((current) => ({
+                      ...current,
+                      railWidth: Math.min(RAIL_WIDTH.max, Math.max(RAIL_WIDTH.min, size)),
+                    }));
+                  }}
+                />
+              </div>
+              <DockArea
                 context={context}
-                size={layout.railWidth}
-                min={RAIL_WIDTH.min}
-                max={RAIL_WIDTH.max}
+                size={layout.dockHeight}
+                min={DOCK_HEIGHT.min}
+                max={DOCK_HEIGHT.max}
                 onResize={(size) => {
                   setLayout((current) => ({
                     ...current,
-                    railWidth: Math.min(RAIL_WIDTH.max, Math.max(RAIL_WIDTH.min, size)),
+                    dockHeight: Math.min(DOCK_HEIGHT.max, Math.max(DOCK_HEIGHT.min, size)),
                   }));
                 }}
               />
             </div>
-            <DockArea
-              context={context}
-              size={layout.dockHeight}
-              min={DOCK_HEIGHT.min}
-              max={DOCK_HEIGHT.max}
-              onResize={(size) => {
-                setLayout((current) => ({
-                  ...current,
-                  dockHeight: Math.min(DOCK_HEIGHT.max, Math.max(DOCK_HEIGHT.min, size)),
-                }));
-              }}
-            />
-          </div>
+          </WorkbenchPanels>
         </div>
         <Toasts />
         {paletteOpen && (
