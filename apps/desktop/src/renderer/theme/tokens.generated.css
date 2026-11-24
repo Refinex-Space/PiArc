@@ -30,10 +30,10 @@
   --piarc-size-sidebar-min: 200px;
   --piarc-size-sidebar-max: 420px;
   --piarc-size-badge: 8px;
-  --piarc-button-height: 28px;
-  --piarc-button-radius: 8px;
-  --piarc-button-font-size: 14px;
-  --piarc-button-line-height: 20px;
+  --piarc-size-button-height: 28px;
+  --piarc-radius-button: 8px;
+  --piarc-font-size-button: 14px;
+  --piarc-line-height-button: 20px;
   --piarc-button-small-height: 28px;
   --piarc-button-small-radius: 7px;
   --piarc-button-small-padding: 10px;
@@ -65,10 +65,10 @@
   --piarc-c-button-primary-text: var(--piarc-text-on-accent);
   --piarc-c-button-secondary-background: var(--piarc-action-surface);
   --piarc-c-button-secondary-border: var(--piarc-action-edge);
-  --piarc-c-button-height: var(--piarc-button-height);
-  --piarc-c-button-radius: var(--piarc-button-radius);
-  --piarc-c-button-font-size: var(--piarc-button-font-size);
-  --piarc-c-button-line-height: var(--piarc-button-line-height);
+  --piarc-c-button-height: var(--piarc-size-button-height);
+  --piarc-c-button-radius: var(--piarc-radius-button);
+  --piarc-c-button-font-size: var(--piarc-font-size-button);
+  --piarc-c-button-line-height: var(--piarc-line-height-button);
   --piarc-c-dialog-background: var(--piarc-surface-raised);
   --piarc-c-dialog-border: var(--piarc-border-default);
   --piarc-c-dialog-scrim: var(--piarc-overlay-scrim);
@@ -438,10 +438,10 @@
 }
 
 :root[data-density='compact'] {
-  --piarc-button-height: 24px;
-  --piarc-button-radius: 6px;
-  --piarc-button-font-size: 13px;
-  --piarc-button-line-height: 19px;
+  --piarc-size-button-height: 24px;
+  --piarc-radius-button: 6px;
+  --piarc-font-size-button: 13px;
+  --piarc-line-height-button: 19px;
   --piarc-button-small-height: 20px;
   --piarc-button-small-radius: 5px;
   --piarc-button-small-padding: 6px;

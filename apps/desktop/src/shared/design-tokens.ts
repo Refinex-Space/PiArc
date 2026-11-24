@@ -92,10 +92,10 @@ export type ScaleToken =
   | 'size.sidebarMin'
   | 'size.sidebarMax'
   | 'size.badge'
-  | 'button.height'
-  | 'button.radius'
-  | 'button.fontSize'
-  | 'button.lineHeight'
+  | 'size.buttonHeight'
+  | 'radius.button'
+  | 'fontSize.button'
+  | 'lineHeight.button'
   | 'button.smallHeight'
   | 'button.smallRadius'
   | 'button.smallPadding'
@@ -463,10 +463,10 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'size.sidebarMin': '--piarc-size-sidebar-min',
   'size.sidebarMax': '--piarc-size-sidebar-max',
   'size.badge': '--piarc-size-badge',
-  'button.height': '--piarc-c-button-height',
-  'button.radius': '--piarc-c-button-radius',
-  'button.fontSize': '--piarc-c-button-font-size',
-  'button.lineHeight': '--piarc-c-button-line-height',
+  'size.buttonHeight': '--piarc-size-button-height',
+  'radius.button': '--piarc-radius-button',
+  'fontSize.button': '--piarc-font-size-button',
+  'lineHeight.button': '--piarc-line-height-button',
   'button.smallHeight': '--piarc-button-small-height',
   'button.smallRadius': '--piarc-button-small-radius',
   'button.smallPadding': '--piarc-button-small-padding',
@@ -498,6 +498,10 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'button.primaryText': '--piarc-c-button-primary-text',
   'button.secondaryBackground': '--piarc-c-button-secondary-background',
   'button.secondaryBorder': '--piarc-c-button-secondary-border',
+  'button.height': '--piarc-c-button-height',
+  'button.radius': '--piarc-c-button-radius',
+  'button.fontSize': '--piarc-c-button-font-size',
+  'button.lineHeight': '--piarc-c-button-line-height',
   'dialog.background': '--piarc-c-dialog-background',
   'dialog.border': '--piarc-c-dialog-border',
   'dialog.scrim': '--piarc-c-dialog-scrim',

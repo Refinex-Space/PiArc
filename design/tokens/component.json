@@ -19,10 +19,10 @@
     "primaryText": "text.onAccent",
     "secondaryBackground": "action.surface",
     "secondaryBorder": "action.edge",
-    "height": "button.height",
-    "radius": "button.radius",
-    "fontSize": "button.fontSize",
-    "lineHeight": "button.lineHeight"
+    "height": "size.buttonHeight",
+    "radius": "radius.button",
+    "fontSize": "fontSize.button",
+    "lineHeight": "lineHeight.button"
   },
   "dialog": {
     "background": "surface.raised",

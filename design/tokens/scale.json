@@ -41,10 +41,10 @@
   },
   "density": {
     "comfortable": {
-      "button.height": "28px",
-      "button.radius": "8px",
-      "button.fontSize": "14px",
-      "button.lineHeight": "20px",
+      "size.buttonHeight": "28px",
+      "radius.button": "8px",
+      "fontSize.button": "14px",
+      "lineHeight.button": "20px",
       "button.smallHeight": "28px",
       "button.smallRadius": "7px",
       "button.smallPadding": "10px",
@@ -64,10 +64,10 @@
       "size.controlHeight": "30px"
     },
     "compact": {
-      "button.height": "24px",
-      "button.radius": "6px",
-      "button.fontSize": "13px",
-      "button.lineHeight": "19px",
+      "size.buttonHeight": "24px",
+      "radius.button": "6px",
+      "fontSize.button": "13px",
+      "lineHeight.button": "19px",
       "button.smallHeight": "20px",
       "button.smallRadius": "5px",
       "button.smallPadding": "6px",
