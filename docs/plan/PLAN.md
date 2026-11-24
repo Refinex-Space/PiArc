@@ -309,7 +309,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
-### Files 精修与 Markdown（进行中）
+### Files 精修与 Markdown（桌面已验收，整仓待 I230）
 
 - [x] 核对两个编辑器项目的许可证、实时编辑/阅读路径，以及真实的本地图片设置。
 - [x] 标题栏、树行、筛选焦点和级联菜单已修正；两种密度、主窗口、独立窗、窄窗与左右翻转的真实 Electron 回归通过。
@@ -318,7 +318,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 按参考补齐默认阅读与编辑选区、正文菜单、表格把手、图片与图表大图、分组斜杠菜单。已在实包使用图片手势与弹窗、表格菜单和 8 种图表，最后的交互矩阵与整仓门禁见下一项。
 - [x] 实机对照页首、正文留白和代码块页脚。移除常驻格式栏，文件路径栏透明，重绘细线操作图标。目录在文档右侧居中，支持渐隐、悬停、搜索及跨视图跳转。
 - [x] 表格已覆盖长中英文、路径与极窄 32 列的分组折行，支持键盘和原生剪贴板。目录高亮按边界测量，横杆避开系统滚动条，目录和代码块语言菜单的明暗主题专项无障碍验收通过。
-- [ ] 最终打包版桌面矩阵、整仓门禁与记录。
+- [x] 最终开发包已签名并逐项验证 55 个桌面用例。中文交互和 81 个状态的无障碍报告见下方会话记录。
+- [ ] 整仓门禁 16/17。macOS 原生文件监听注册超过已有的 30 秒期限，见 I230。
 
 ## 登记事项
 
@@ -555,6 +556,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I227 | T47 | R5 推送后的 CI 运行 45036807604（提交 ee97d82）开工核对：`verify (windows-latest)` 两步失败：第 7 步 Windows clippy 报 `plugins/tests.rs` 的 `file_url` 未使用（只有 `cfg(unix)` 的用例用它，R5 的 8cdd10b 引入；T47 开工时已加 `#[cfg(unix)]`，本机 Windows 交叉 clippy 通过），第 8 步 `exec_commands` 的 `heredocs_and_syntax_errors_through_eval_on_windows` 断言输出以 `start` 开头，实际 bash 的语法错误行先于 `start` 到达（stdout 与 stderr 两个管道的先后在繁忙的 runner 上不固定，W2 起的用例此前在 Windows CI 通过）；`desktop L4` 两个平台各 3 处失败：macOS 是 I210 已登记的 `t34-terminal` 选区用例（两种形态）与 I32 的 `transcript-scroll` 阈值用例，Windows 是 `t34-terminal-windows` "hidden … shown again they catch up"（两种形态）与 `t18-sessions` "rename … survives a restart"（packaged）。R5-A01、T45-A02 因此仍为 blocked | W4：`exec_commands` 的输出顺序（合并两个管道或改为不依赖先后的断言须先确认 Core 的合并语义）、两个 Windows L4 用例在 Windows 实机复现；下一次推送后复核 Windows clippy。**bbc6b60 复核**：[Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807936) 的会话归档通过。T34 的 dev 用例等不到 PowerShell 报告子进程 PID；dev 和 packaged 两种形态重新显示面板后均只读到 tick 1。三项继续由 W4 核对。 **T47 收尾**：[9212335 的 Windows L4](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677946) 仅终端隐藏后重显用例在 dev 和 packaged 各失败一次。此前 [8d31bf2 的 L4](https://github.com/Refinex-Space/PiArc/actions/runs/45141919344/job/137581947186) 还出现过 T18 会话归档与 T35 worktree 归档后目录仍在。W4 实机复核这些行为。Windows clippy、Git Bash 语法诊断及完整 verify 已通过。 |
 | I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。**bbc6b60 复核**：[macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807623) 的 L2 为 239 通过、3 项仅 Windows；权限裁决 p95 为 2.544375 ms，仍超 2 ms 预算，沿 I103 跟进。 **9212335 复核**：[macOS CI](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677879) 的 L2 全部适用场景通过。权限裁决 p95 为 3.011083 ms；T33 的终端任务快照还出现一次 shell 提示符先后到达导致的不一致。本机同提交全量 verify 通过。 |
 | I229 | T49 | Windows 跳转列表的任务栏和开始菜单实机验收 | W4：安装 Velopack 构建后依次打开两个测试工作区。右键任务栏与开始菜单中的 PiArc，核对最近顺序。依次选一个工作区、“新建会话”和“打开文件夹”，确认复用进程、原窗口草稿保留、没有自动发送。移除一个最近条目，再打开其他工作区，确认被移除的条目没有被重新添加。 |
+| I230 | Files / Markdown 收尾 | macOS 文件监听测试在释放测试所持互斥锁后等待初次注册超时。相同监听代码在本会话较早一轮全量检查通过，之后在最终提交的两个全量运行，以及独立临时 APFS 卷上复现。采样栈停在系统 `FSEventStreamStart`。 | Core 文件监听：复核 macOS 原生流的启动时间和回执，在现有 30 秒断言下通过整仓门禁。原始用例位于 `crates/piarc-core/src/workspace_settings/tests.rs`。 |
 
 ## 技术债
 
@@ -1345,3 +1347,12 @@ Apple M1 Max / 32 GB、macOS arm64、接电。提交 0cbecdc 执行 node scripts
 - 用户委托决定 HTML 预览策略。静态预览默认启用；受信任项目可显式运行本地脚本，使用独立文档来源。Core 校验会话项目根、文件身份及写入版本。真实 Git 工作树在关闭与重启 Core 后只修改独立树内文件。Windows MSVC 交叉 Clippy 通过，Windows 11 的原生窗口与系统操作本次未实测。
 - macOS arm64 开发打包版通过 36 项 Playwright 用例，含 Files 五条真实工作流、原生弹窗、CSP、IPC 与无障碍。70 个状态共 140 份明暗 axe 报告，违规为零。ego-browser 中文页面实际操作 Markdown、右键加入草稿和全文搜索。601 个根目录文件的本机样例，目录首屏 63 ms，按名称筛选至正文可见 209 ms，8000 行文件滚到底仅挂载 52 行。
 - 产品提交 `6086409e` 已在干净工作区通过 `npm run verify` 17/17，Vitest 1907 项通过、1 项跳过，L2 252 项通过、3 项平台限定。开发包签名检查通过。本地证据为 `tmp/evidence/project-files/verify-delivery.log`、`final-desktop.log`、`final/axe/`、`final/l4/` 及 `core/`。
+
+### 2026-11-24 Files 与 Markdown 编辑细节（桌面已验收，整仓待 I230）
+
+- 即时编辑、源码、分栏和阅读使用同一份草稿。选区浮条和正文右键按编辑权限提供命令，可将选中的原文与行号加入对话。文件图片通过设置页选择本地相对目录或系统选定目录，选择、粘贴与拖入使用同一套规则。图片与 Mermaid 在窗口内共享缩放、平移、旋转和焦点恢复。8 种 Mermaid 模板均已离线绘制。
+- 路径栏采用透明底色和细线图标，正文使用可用面板宽度。4 px 圆角表格支持行列把手、粘贴和撤销，长单元格按宽度换行。32 列在极窄面板中按带表头的列组显示。即时编辑的代码块按 Markdown Studio 和 Marklyra 的实现复核，语言输入与复制位于右下角，源码模式直接编辑围栏。
+- 跨四种视图的右侧目录只在有两个以上标题（含两个）时显示。打包版实测 180 个标题的渐隐和可视范围渲染、搜索、键盘返回和同步跳转。常规与紧凑密度下相邻高亮之间均为 2 px，行点击高度分别为 28 和 24 px，刻度与文档滚动条之间分别为 7 和 6 px。
+- macOS arm64 开发包签名检查通过。最终提交 `73d55d1c` 的 Playwright 矩阵中 54 项通过，另 1 项在文件树第一次点击的环境超时后单独复跑通过。81 个状态生成 162 份明暗主题 axe 报告，违规为零。使用 ego-browser 在本地中文夹具操作并测量目录、格式菜单和代码块。Windows MSVC 对涉及的 Rust crate 交叉 Clippy 通过，Windows 11 原生界面本次未实测。
+- 最终 `npm run verify` 两次均为 16/17，剩余 I230。Vitest 1972 项通过、1 项跳过。L2 有 252 项通过、3 项平台限定。依赖审计通过，356 个 npm 发布依赖完成许可检查，间接 KaTeX 的低级别公告与已有 minimatch 例外均保留在报告中。
+- 本机证据在 `tmp/evidence/markdown-workspace/`。桌面用例见 `published-desktop.log` 和 `header-recheck.log`，几何测量与无障碍报告见 `published-check/`，目录实机截图为 `outline-hover-detail.png`。整仓检查见 `serial-verify.log`，系统调用采样与独立测试卷复核见 `settings-registration.sample.txt` 和 `apfs-registration-0.log`。
