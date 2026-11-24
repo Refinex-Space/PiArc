@@ -3,7 +3,7 @@
 import { waitForPanel } from './terminal-panel.js';
 import type { BrowserWindow } from 'electron';
 import type { Locator, Page } from '@playwright/test';
-import { expect, test } from './sessions.js';
+import { expect, makeWorkspace, openFolder, startSession, test } from './sessions.js';
 import { idle, openSession } from './t19.js';
 
 async function box(item: Locator) {
@@ -194,4 +194,32 @@ test('side chat keeps its unsent draft across sibling tools and maximization', a
   await expect(preview).toHaveCount(0);
   await expect(files).toBeVisible();
   await expect(input).toHaveValue('A question to finish later');
+});
+
+test('the terminal tab close control works inside a draggable tile header', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  await openFolder(page, app, await makeWorkspace(workspaces, 'Terminal header'));
+  await startSession(page, 'Start a session', 't18-chat');
+  await idle(page);
+  await page.getByTestId('tool-terminal').click();
+  const tabs = page.getByTestId('terminal-tab');
+  await expect(tabs).toHaveCount(1);
+  const first = await tabs.first().getAttribute('data-task');
+  await page.getByTestId('terminal-new').click();
+  await expect(tabs).toHaveCount(2);
+  await page.getByTestId('tool-changes').click();
+  await expect(page.getByTestId('tile-changes')).toBeVisible();
+  await tabs.first().focus();
+  await tabs.first().press('End');
+  await tabs.last().press('Shift+F10');
+  await expect(page.getByTestId('menu-terminal-rename-tab')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(tabs.last()).toBeFocused();
+  await page.getByTestId('terminal-tab-close').last().click();
+  await expect(tabs).toHaveCount(1);
+  await expect(tabs.first()).toHaveAttribute('data-task', first ?? '');
+  await expect(page.getByTestId('tile-changes')).toBeVisible();
 });
