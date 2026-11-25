@@ -182,18 +182,38 @@ test('session pane states for review', async ({ app, page }) => {
     await mark.screenshot({ path: path.join(EVIDENCE, `mark-tool-${String(frame)}.png`) });
     await page.waitForTimeout(100);
   }
-  // A narrow window, reduced motion and forced colors on the busiest sections.
+  // A narrow column (the window cannot go below 960 px, so the gallery's column is held at
+  // 400 px: what a 960 px window with the sidebar and the rail open leaves), reduced motion and
+  // forced colors on the busiest sections.
   await prefer(page, { key: 'appearance.theme', value: 'light' });
-  await resize(app, 560, 760);
   for (const section of SECTIONS.filter((s) => s !== 'thinking')) {
     await open(page, section);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          document
+            .querySelector<HTMLElement>('.session-gallery > .main')
+            ?.style.setProperty('max-width', '400px');
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        }),
+    );
     await page.screenshot({ path: path.join(EVIDENCE, `${section}-narrow.png`) });
     for (const p of await overflow(page)) problems.push(`${section}-narrow: ${p}`);
   }
-  await resize(app, 1180, 820);
   await prefer(page, { key: 'appearance.reduceMotion', value: 'on' });
   await page.emulateMedia({ forcedColors: 'active' });
-  for (const section of ['conversation', 'tools', 'approval-command', 'working']) {
+  for (const section of [
+    'conversation',
+    'tools',
+    'approval-command',
+    'working',
+    'input',
+    'cards',
+  ]) {
     if (!SECTIONS.includes(section)) continue;
     await open(page, section);
     await page.screenshot({ path: path.join(EVIDENCE, `${section}-forced-colors.png`) });

@@ -164,6 +164,17 @@
 .composer-box .icon-button.is-sm:disabled {
   color: var(--piarc-text-disabled);
 }
+@media (forced-colors: active) {
+  .composer-box,
+  .notice {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  .composer-box .composer-stop {
+    border: 1px solid ButtonText;
+  }
+}
+
 .composer-box .composer-stop {
   background: var(--piarc-session-fill-hover);
 }

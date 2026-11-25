@@ -759,6 +759,9 @@
 
 .row-agent .md .md-list > li > * {
   margin-top: calc(var(--md-flow) * 0.333);
+}
+
+.row-agent .md .md-list > li > :not(.md-list) {
   padding-inline: 0;
 }
 
@@ -822,12 +825,12 @@
 }
 
 .row-agent .md .md-inline-code {
-  padding: 0.0625em 0.25em;
-  border-radius: 0.4em;
-  background: var(--piarc-session-fill);
-  box-shadow: inset 0 0 0 0.5px var(--piarc-session-line);
+  padding: 0.125em 0.3em;
+  border-radius: 0.375em;
+  background: var(--piarc-session-inline-code-fill);
   color: var(--piarc-session-inline-code);
-  font-size: 0.9em;
+  font-size: 0.875em;
+  font-weight: var(--piarc-font-weight-medium);
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
@@ -1266,14 +1269,6 @@ button.file-change-path:hover {
   text-underline-offset: 3px;
 }
 
-.badge {
-  padding: 0 var(--piarc-space-1);
-  border-radius: var(--piarc-radius-sm);
-  background: var(--piarc-session-fill);
-  color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-caption);
-}
-
 .diff {
   max-height: 400px;
   overflow: auto;
@@ -1489,12 +1484,13 @@ button.file-change-path:hover {
   max-height: 240px;
 }
 
-/* working row: PiArc's mark hung in the gutter, the activity, then time, tokens and retries */
+/* working row: PiArc's mark at the start of the text column, the activity, then time, tokens and
+   retries */
 
 .row-working {
   display: flex;
   align-items: center;
-  gap: var(--piarc-session-gap-xs);
+  gap: var(--piarc-session-gap-sm);
   min-height: var(--piarc-session-row);
   color: var(--piarc-text-secondary);
   user-select: none;
@@ -1504,26 +1500,14 @@ button.file-change-path:hover {
   padding-inline-start: calc(var(--piarc-session-gutter) + var(--piarc-session-text-inset));
 }
 
-/* The mark's seat sits left of the text column, so the label lines up with the reply's text. */
 .working-mark {
   display: grid;
   flex: none;
   place-items: center;
   width: var(--piarc-session-mark-size);
   height: var(--piarc-session-mark-size);
-  margin-inline: calc(-1 * (var(--piarc-session-mark-size) + var(--piarc-session-mark-gap)))
-    calc(var(--piarc-session-mark-gap) - var(--piarc-session-gap-xs));
   animation: working-mark-in var(--piarc-motion-normal) var(--piarc-motion-curve-out)
     calc(var(--piarc-motion-fast) + 30ms) backwards;
-}
-
-@container (max-width: 560px) {
-  .conversation .transcript-row > .row-working {
-    padding-inline-start: calc(
-      var(--piarc-session-gutter-narrow) + var(--piarc-session-mark-size) +
-        var(--piarc-session-mark-gap)
-    );
-  }
 }
 
 @keyframes working-mark-in {
@@ -1910,10 +1894,9 @@ button.file-change-path:hover {
   gap: var(--piarc-session-gap-md);
   box-sizing: border-box;
   max-width: var(--piarc-session-approval-width);
-  max-height: 60vh;
   padding: var(--piarc-session-pad-lg);
-  overflow: auto;
   border-radius: var(--piarc-session-radius-card);
+  container-type: inline-size;
   background: var(--piarc-workbench-canvas);
   box-shadow: inset 0 0 0 1px var(--piarc-session-line);
   font-size: var(--piarc-session-body);
@@ -1931,8 +1914,16 @@ button.file-change-path:hover {
 }
 
 .approval-card:focus-visible > .approval-box {
-  outline: 1px solid var(--piarc-c-focus-ring);
-  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-c-focus-ring),
+    0 0 0 4px color-mix(in srgb, var(--piarc-c-focus-ring) 18%, transparent);
+}
+
+@media (forced-colors: active) {
+  .approval-card:focus-visible > .approval-box {
+    outline: 2px solid Highlight;
+    outline-offset: 0;
+  }
 }
 
 @keyframes approval-in {
@@ -2082,17 +2073,34 @@ button.file-change-path:hover {
   text-wrap: balance;
 }
 
+/* Decline, the session and the once decisions stay together on the right; a lasting permission
+   sits on the left and takes its own line when both do not fit. */
 .approval-actions,
-.approval-allow {
+.approval-main,
+.approval-persist {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--piarc-session-gap-sm);
 }
 
 .approval-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
   column-gap: var(--piarc-session-gap-md);
+}
+
+.approval-main {
+  flex-wrap: nowrap;
+  margin-inline-start: auto;
+}
+
+.approval-persist {
+  margin-inline-end: auto;
+}
+
+.approval-main > *,
+.approval-persist > * {
+  flex: none;
 }
 
 .approval-add-feedback {
@@ -2125,12 +2133,15 @@ button.file-change-path:hover {
   color: var(--piarc-text-danger);
 }
 
-/* A narrow card stacks its decisions, each full width. */
-@container (max-width: 520px) {
+/* A narrow card (measured on the card itself) stacks its decisions, each full width, the primary
+   last. */
+@container (max-width: 480px) {
   .approval-actions,
-  .approval-allow {
+  .approval-main,
+  .approval-persist {
     flex-direction: column;
     align-items: stretch;
+    margin-inline: 0;
   }
   .approval-gate {
     text-align: center;
@@ -2247,7 +2258,7 @@ button.file-change-path:hover {
 }
 
 .plan-preview {
-  max-height: 240px;
+  max-height: min(50vh, 420px);
   margin: 0;
   padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
   overflow: auto;
@@ -2332,8 +2343,17 @@ button.file-change-path:hover {
 }
 
 @media (forced-colors: active) {
-  .harness-box {
-    border: 1px solid CanvasText;
+  .harness-box,
+  .approval-box,
+  .approval-field input,
+  .approval-field textarea,
+  .row-error-box,
+  .subagent-box,
+  .tool-calls,
+  .bash-command-card,
+  .conversation .row-user-bubble {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
   }
 }
 

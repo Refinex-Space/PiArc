@@ -25,13 +25,20 @@ const PITCH = 5;
 
 export type Activity = 'think' | 'tool' | 'blocked';
 
-export function ActivityMark({ activity }: { readonly activity: Activity }) {
+export function ActivityMark({
+  activity,
+  size = 16,
+}: {
+  readonly activity: Activity;
+  /** CSS px: 16 on the working line, 14 beside a session title. */
+  readonly size?: 14 | 16;
+}) {
   return (
     <svg
       className="activity-mark"
       data-activity={activity}
-      width="20"
-      height="20"
+      width={size}
+      height={size}
       viewBox="0 0 20 20"
       aria-hidden="true"
       focusable="false"

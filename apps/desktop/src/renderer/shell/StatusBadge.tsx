@@ -3,6 +3,7 @@
 // idle shows nothing.
 import type { BadgeState } from '../store/status.js';
 import { useT } from '../app/app-context.js';
+import { ActivityMark } from '../transcript/rows/ActivityMark.js';
 
 export function StatusBadge({ state }: { readonly state: BadgeState }) {
   const t = useT();
@@ -15,11 +16,19 @@ export function StatusBadge({ state }: { readonly state: BadgeState }) {
       className={`badge badge-${state}`}
       role="img"
       aria-label={label}
-      title={label}
+      data-tooltip={label}
       data-testid="status-badge"
       data-state={state}
     >
-      {state === 'error' ? '!' : state === 'awaiting' ? '?' : ''}
+      {state === 'running' ? (
+        <ActivityMark activity="think" size={14} />
+      ) : state === 'error' ? (
+        '!'
+      ) : state === 'awaiting' ? (
+        '?'
+      ) : (
+        ''
+      )}
     </span>
   );
 }

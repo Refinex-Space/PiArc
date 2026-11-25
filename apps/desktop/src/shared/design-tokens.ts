@@ -74,6 +74,7 @@ export type ColorToken =
   | 'session.ghostHover'
   | 'session.line'
   | 'session.inlineCode'
+  | 'session.inlineCodeFill'
   | 'session.tooltip'
   | 'session.tooltipInk';
 
@@ -131,7 +132,6 @@ export type ScaleToken =
   | 'session.padBlock'
   | 'session.approvalWidth'
   | 'session.markSize'
-  | 'session.markGap'
   | 'session.textInset'
   | 'session.bubbleMax'
   | 'session.composerShadowFocus'
@@ -295,7 +295,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.fillHover': '#0b0b0b1a',
     'session.ghostHover': '#0000000d',
     'session.line': '#00000013',
-    'session.inlineCode': '#c0262d',
+    'session.inlineCode': '#1d2027',
+    'session.inlineCodeFill': '#e8e9ec',
     'session.tooltip': '#1d2027',
     'session.tooltipInk': '#ffffff',
   },
@@ -363,7 +364,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.fillHover': '#ffffff1a',
     'session.ghostHover': '#ffffff14',
     'session.line': '#ffffff1a',
-    'session.inlineCode': '#ff8c8c',
+    'session.inlineCode': '#eceef2',
+    'session.inlineCodeFill': '#33363d',
     'session.tooltip': '#303030',
     'session.tooltipInk': '#eceef2',
   },
@@ -431,7 +433,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.fillHover': '#0b0b0b1a',
     'session.ghostHover': '#0000000d',
     'session.line': '#5d626c',
-    'session.inlineCode': '#5c1418',
+    'session.inlineCode': '#1d2027',
+    'session.inlineCodeFill': '#e0e2e6',
     'session.tooltip': '#1d2027',
     'session.tooltipInk': '#ffffff',
   },
@@ -499,7 +502,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.fillHover': '#ffffff1a',
     'session.ghostHover': '#ffffff14',
     'session.line': '#a9adb7',
-    'session.inlineCode': '#ffd1d1',
+    'session.inlineCode': '#eceef2',
+    'session.inlineCodeFill': '#2b2e34',
     'session.tooltip': '#000000',
     'session.tooltipInk': '#ffffff',
   },
@@ -571,6 +575,7 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'session.ghostHover': '--piarc-session-ghost-hover',
   'session.line': '--piarc-session-line',
   'session.inlineCode': '--piarc-session-inline-code',
+  'session.inlineCodeFill': '--piarc-session-inline-code-fill',
   'session.tooltip': '--piarc-session-tooltip',
   'session.tooltipInk': '--piarc-session-tooltip-ink',
   'font.ui': '--piarc-font-ui',
@@ -625,7 +630,6 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'session.padBlock': '--piarc-session-pad-block',
   'session.approvalWidth': '--piarc-session-approval-width',
   'session.markSize': '--piarc-session-mark-size',
-  'session.markGap': '--piarc-session-mark-gap',
   'session.textInset': '--piarc-session-text-inset',
   'session.bubbleMax': '--piarc-session-bubble-max',
   'session.composerShadowFocus': '--piarc-session-composer-shadow-focus',

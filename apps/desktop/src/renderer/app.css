@@ -766,10 +766,8 @@ textarea.input {
 }
 
 .badge-running {
-  border: 2px solid var(--piarc-c-badge-running);
-  border-right-color: transparent;
-  border-radius: var(--piarc-radius-pill);
-  animation: piarc-spin 0.9s linear infinite;
+  width: 14px;
+  height: 14px;
 }
 
 .badge-unread::before {

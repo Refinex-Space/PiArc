@@ -511,8 +511,21 @@ export function Composer({
       viewRef.current = null;
       view.destroy();
     };
-    // The editor is created once; translations of its label follow on the next mount.
+    // The editor is created once; its name follows the language below.
   }, []);
+
+  const editorLabel = t(firstTurn ? 'home.placeholder' : 'composer.label');
+  useEffect(() => {
+    viewRef.current?.setProps({
+      attributes: {
+        class: 'composer-editor',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': editorLabel,
+        'data-testid': firstTurn ? 'home-input' : 'composer-input',
+      },
+    });
+  }, [editorLabel, firstTurn]);
 
   useEffect(() => {
     viewRef.current?.setProps({ editable: () => !disabled });

@@ -16,6 +16,7 @@
     { "fg": "text.danger", "bg": "workbench.canvas", "kind": "text" },
     { "fg": "text.warning", "bg": "workbench.canvas", "kind": "text" },
     { "fg": "session.inlineCode", "bg": "workbench.canvas", "kind": "text" },
+    { "fg": "session.inlineCode", "bg": "session.inlineCodeFill", "kind": "text" },
     { "fg": "session.tooltipInk", "bg": "session.tooltip", "kind": "text" },
     { "fg": "text.primary", "bg": "surface.app", "kind": "text" },
     { "fg": "text.primary", "bg": "surface.sidebar", "kind": "text" },

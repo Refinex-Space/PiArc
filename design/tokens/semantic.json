@@ -136,7 +136,8 @@
     "fillHover": { "light": "base.ink10", "dark": "base.white10" },
     "ghostHover": { "light": "base.black5", "dark": "base.white8" },
     "line": { "light": "base.black8", "dark": "base.white10", "highContrast": "neutral.11" },
-    "inlineCode": { "light": "danger.11", "dark": "danger.11", "highContrast": "danger.12" },
+    "inlineCode": "neutral.12",
+    "inlineCodeFill": { "light": "neutral.4", "dark": "neutral.6", "highContrast": "neutral.5" },
     "tooltip": { "light": "neutral.12", "dark": "base.controlDark", "darkHighContrast": "base.black" },
     "tooltipInk": { "light": "base.white", "dark": "neutral.12", "darkHighContrast": "base.white" }
   },
@@ -194,6 +195,7 @@
     "session.ghostHover": "Canvas",
     "session.line": "CanvasText",
     "session.inlineCode": "CanvasText",
+    "session.inlineCodeFill": "Canvas",
     "session.tooltip": "Canvas",
     "session.tooltipInk": "CanvasText"
   }

@@ -56,8 +56,7 @@
   --piarc-session-gutter-narrow: 16px;
   --piarc-session-pad-block: 48px;
   --piarc-session-approval-width: 560px;
-  --piarc-session-mark-size: 20px;
-  --piarc-session-mark-gap: 12px;
+  --piarc-session-mark-size: 16px;
   --piarc-session-text-inset: 4px;
   --piarc-session-bubble-max: 85%;
   --piarc-session-composer-shadow-focus: 0 4px 20px rgb(0 0 0 / 0.075);
@@ -215,7 +214,8 @@
   --piarc-session-fill-hover: #0b0b0b1a;
   --piarc-session-ghost-hover: #0000000d;
   --piarc-session-line: #00000013;
-  --piarc-session-inline-code: #c0262d;
+  --piarc-session-inline-code: #1d2027;
+  --piarc-session-inline-code-fill: #e8e9ec;
   --piarc-session-tooltip: #1d2027;
   --piarc-session-tooltip-ink: #ffffff;
 }
@@ -286,7 +286,8 @@
     --piarc-session-fill-hover: #ffffff1a;
     --piarc-session-ghost-hover: #ffffff14;
     --piarc-session-line: #ffffff1a;
-    --piarc-session-inline-code: #ff8c8c;
+    --piarc-session-inline-code: #eceef2;
+    --piarc-session-inline-code-fill: #33363d;
     --piarc-session-tooltip: #303030;
     --piarc-session-tooltip-ink: #eceef2;
   }
@@ -357,7 +358,8 @@
   --piarc-session-fill-hover: #0b0b0b1a;
   --piarc-session-ghost-hover: #0000000d;
   --piarc-session-line: #00000013;
-  --piarc-session-inline-code: #c0262d;
+  --piarc-session-inline-code: #1d2027;
+  --piarc-session-inline-code-fill: #e8e9ec;
   --piarc-session-tooltip: #1d2027;
   --piarc-session-tooltip-ink: #ffffff;
 }
@@ -427,7 +429,8 @@
   --piarc-session-fill-hover: #ffffff1a;
   --piarc-session-ghost-hover: #ffffff14;
   --piarc-session-line: #ffffff1a;
-  --piarc-session-inline-code: #ff8c8c;
+  --piarc-session-inline-code: #eceef2;
+  --piarc-session-inline-code-fill: #33363d;
   --piarc-session-tooltip: #303030;
   --piarc-session-tooltip-ink: #eceef2;
 }
@@ -497,7 +500,8 @@
   --piarc-session-fill-hover: #0b0b0b1a;
   --piarc-session-ghost-hover: #0000000d;
   --piarc-session-line: #5d626c;
-  --piarc-session-inline-code: #5c1418;
+  --piarc-session-inline-code: #1d2027;
+  --piarc-session-inline-code-fill: #e0e2e6;
   --piarc-session-tooltip: #1d2027;
   --piarc-session-tooltip-ink: #ffffff;
 }
@@ -567,7 +571,8 @@
   --piarc-session-fill-hover: #ffffff1a;
   --piarc-session-ghost-hover: #ffffff14;
   --piarc-session-line: #a9adb7;
-  --piarc-session-inline-code: #ffd1d1;
+  --piarc-session-inline-code: #eceef2;
+  --piarc-session-inline-code-fill: #2b2e34;
   --piarc-session-tooltip: #000000;
   --piarc-session-tooltip-ink: #ffffff;
 }
@@ -680,6 +685,7 @@
     --piarc-session-ghost-hover: Canvas;
     --piarc-session-line: CanvasText;
     --piarc-session-inline-code: CanvasText;
+    --piarc-session-inline-code-fill: Canvas;
     --piarc-session-tooltip: Canvas;
     --piarc-session-tooltip-ink: CanvasText;
   }

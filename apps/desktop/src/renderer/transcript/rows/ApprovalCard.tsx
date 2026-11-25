@@ -195,6 +195,9 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
                 value={rules}
                 rows={Math.min(Math.max(rules.split('\n').length, 1), 6)}
                 data-testid="approval-rules"
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
                 readOnly={request.kind === 'permissionExpansion' && request.tool === 'MemoryImport'}
                 onChange={(e) => {
                   setRules(e.target.value);
@@ -207,6 +210,9 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               <span className="approval-field-label">{t('approval.directory')}</span>
               <input
                 value={directory}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
                 onChange={(e) => {
                   setDirectory(e.target.value);
                 }}
@@ -250,42 +256,46 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
           <div className="approval-decide">
             {gated && <p className="approval-gate">{t('approval.readGate')}</p>}
             <div className="approval-actions">
-              <Button
-                disabled={waiting}
-                aria-keyshortcuts="Escape"
-                onClick={() => {
-                  answer('deny');
-                }}
-              >
-                {feedback.trim() === '' ? t('approval.deny') : t('approval.denyFeedback')}
-              </Button>
-              <span className="approval-allow">
-                {allowPersistent && (
-                  <Button
-                    disabled={
-                      waiting ||
-                      gated ||
-                      (offered.length > 0 && edited.length === 0) ||
-                      (request.directory != null && !directory.trim())
-                    }
-                    onClick={() => {
-                      answer('allowAlways');
-                    }}
-                  >
-                    {t('approval.always')}
-                  </Button>
-                )}
-                {network && (
-                  <Button
-                    disabled={waiting}
-                    data-testid="approval-add-domain"
-                    onClick={() => {
-                      answer('allowAlways');
-                    }}
-                  >
-                    {t('approval.addToAllowlist')}
-                  </Button>
-                )}
+              {(allowPersistent || network) && (
+                <span className="approval-persist">
+                  {allowPersistent && (
+                    <Button
+                      disabled={
+                        waiting ||
+                        gated ||
+                        (offered.length > 0 && edited.length === 0) ||
+                        (request.directory != null && !directory.trim())
+                      }
+                      onClick={() => {
+                        answer('allowAlways');
+                      }}
+                    >
+                      {t('approval.always')}
+                    </Button>
+                  )}
+                  {network && (
+                    <Button
+                      disabled={waiting}
+                      data-testid="approval-add-domain"
+                      onClick={() => {
+                        answer('allowAlways');
+                      }}
+                    >
+                      {t('approval.addToAllowlist')}
+                    </Button>
+                  )}
+                </span>
+              )}
+              <span className="approval-main">
+                <Button
+                  disabled={waiting}
+                  aria-keyshortcuts="Escape"
+                  onClick={() => {
+                    answer('deny');
+                  }}
+                >
+                  {feedback.trim() === '' ? t('approval.deny') : t('approval.denyFeedback')}
+                </Button>
                 {request.protectedPath !== true && (
                   <Button
                     disabled={waiting}
