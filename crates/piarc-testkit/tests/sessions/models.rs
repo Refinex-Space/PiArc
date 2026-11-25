@@ -69,3 +69,39 @@ async fn confirmed_model_and_effort_reach_the_wire_after_resume() {
     }
     shutdown(core).await;
 }
+
+/// I233: the list shows a session open as soon as Core starts reopening it; a model list asked
+/// for then waits until the Agent Host has the session instead of failing with `sessionNotFound`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn model_list_during_resume_waits_for_the_session() {
+    let env = Env::new("model-list-resume").await;
+    let (core, events) = env.start(env.config(&[]));
+    let id = open_session(&core, &env).await;
+    let turn = prompt(&core, &id, &prompt_text("First", "chat")).await;
+    assert_eq!(
+        events.turn_completed(&id, &turn).await["status"],
+        "completed"
+    );
+    shutdown(core).await;
+
+    let (core, events) = env.start(env.config(&[]));
+    let (resumed, resumed_rx) = reply();
+    core.resume_session(id.clone(), resumed).expect("queued");
+    events
+        .until("the session listed as open", |route, v| {
+            route == "core/sessions"
+                && v["sessions"].as_array().is_some_and(|s| {
+                    s.iter()
+                        .any(|s| s["id"] == id.as_str() && s["open"] == true)
+                })
+        })
+        .await;
+    let listed = model_op(&core, &id, ModelOp::List).await;
+    assert!(
+        listed["models"].as_array().is_some_and(|m| !m.is_empty()),
+        "{listed}"
+    );
+    assert_eq!(listed["model"]["provider"], "piarc-mock", "{listed}");
+    answer(resumed_rx).await.expect("resumed");
+    shutdown(core).await;
+}

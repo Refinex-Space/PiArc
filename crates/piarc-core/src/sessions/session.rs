@@ -14,7 +14,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use piarc_host::{CallRecord, HostSupervisor};
 use piarc_protocol::context::SessionGetContextUsage;
@@ -41,6 +41,7 @@ use crate::route::RouteKey;
 
 mod changes;
 pub(crate) mod notices;
+pub(crate) mod presence;
 mod rewind;
 mod side_chat;
 
@@ -172,7 +173,7 @@ pub(crate) struct SessionHandle {
     tx: mpsc::Sender<SessionMsg>,
     ws: WorkspaceHandle,
     /// Shared with the workspace's link: the session exists in the Agent Host.
-    in_host: Arc<AtomicBool>,
+    in_host: Arc<presence::InHost>,
     io: crate::tool_io::ToolIo,
 }
 
@@ -199,7 +200,7 @@ impl SessionHandle {
         ctx.tool_io.session_opened(&id);
         let (tx, rx) = mpsc::channel(MAILBOX);
         let last_seq = Arc::new(AtomicU64::new(0));
-        let in_host = Arc::new(AtomicBool::new(false));
+        let in_host = Arc::new(presence::InHost::default());
         workspace.attach(
             &id,
             SessionLink {
@@ -235,6 +236,7 @@ impl SessionHandle {
             notifying: false,
             notify_again: false,
             cancel: ctx.cancel.child_token(),
+            in_host: Arc::clone(&in_host),
         };
         actor.publish();
         ctx.handle.spawn(actor.run(rx));
@@ -276,7 +278,7 @@ impl SessionHandle {
                 .map_err(host_error)?,
             Err(error) => return Err(host_error(error)),
         };
-        self.in_host.store(true, Ordering::Release);
+        self.in_host.set();
         self.notices_waiting();
         if let Some(mode) = mode {
             supervisor
@@ -298,7 +300,7 @@ impl SessionHandle {
             .resume_session(&SessionId(self.id.clone()), &path_text(&self.cwd), None)
             .await
             .map_err(host_error)?;
-        self.in_host.store(true, Ordering::Release);
+        self.in_host.set();
         self.notices_waiting();
         self.io
             .set_initial_mode(&self.id, opened.permission_mode)
@@ -316,7 +318,7 @@ impl SessionHandle {
             .set_initial_mode(&self.id, mode)
             .await
             .map_err(|e| Error::feature(&e))?;
-        self.in_host.store(true, Ordering::Release);
+        self.in_host.set();
         self.info().await
     }
 
@@ -398,6 +400,7 @@ struct SessionActor {
     notify_again: bool,
     /// Cancelled when the session closes: its requests in flight stop waiting.
     cancel: CancellationToken,
+    in_host: Arc<presence::InHost>,
 }
 
 impl SessionActor {
@@ -722,6 +725,7 @@ impl SessionActor {
             tool_io: self.ctx.tool_io.clone(),
             cancel: self.cancel.clone(),
             events: self.ctx.events.clone(),
+            in_host: Arc::clone(&self.in_host),
         };
         let tx = self.tx.clone();
         self.ctx.handle.spawn(async move {
@@ -853,6 +857,7 @@ struct Request {
     tool_io: crate::tool_io::ToolIo,
     cancel: CancellationToken,
     events: crate::events::EventSender,
+    in_host: Arc<presence::InHost>,
 }
 
 impl Request {
@@ -924,13 +929,20 @@ impl Request {
         result
     }
 
+    /// The Agent Host, once it has this session: a request made while Core is still opening
+    /// the session there waits for the open (I233).
+    async fn host(&self) -> Result<HostSupervisor> {
+        self.in_host.wait().await;
+        self.ws.acquire().await
+    }
+
     async fn send(
         &self,
         op: Op,
         hook_context: Option<String>,
         command: Option<piarc_protocol::skills::PromptCommand>,
     ) -> Result<Value> {
-        let supervisor = self.ws.acquire().await?;
+        let supervisor = self.host().await?;
         // A turn starting now takes every finished task's notice with it (ADR-0049 rule 5).
         if matches!(op, Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_)) {
             notices::deliver(&supervisor, &self.id.0, &self.tool_io).await;

@@ -309,6 +309,15 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
+### 会话主块遗留（计划外维护：I233 与 ui-critic 的 P2/P3）
+
+- [x] I233：会话请求等 Agent Host 打开该会话后再发出（`sessions/session/presence.rs`），重启后恢复期间查模型列表的回归用例 `models::model_list_during_resume_waits_for_the_session`。
+- [ ] 计划卡：计划用 Markdown 渲染，去掉工具名与"0 条评论"，说明改为信息图标提示（UI-7）。
+- [ ] 审批卡与命令行：命令不在连字符处断行（UI-8）；文件改动卡不重复"附加目录"（UI-6）。
+- [ ] TodoWrite：只有最新一次显示整张任务卡，较早的更新收成一行变化记录（UI-14）。
+- [ ] 其余 P2/P3：模式菜单禁用项与层级（UI-10）、工具行等宽命令（UI-15）、箭头间距（UI-16）、环境栏当前值与"中等"（UI-17）、已回答的问题（UI-18）、数字格式（UI-19）、按行数折叠（UI-20）与 UI-21 的零散项。
+- [ ] 验收：受影响的 Vitest、L4、画廊截图与 ui-critic 复查，verify。
+
 ### Files 精修与 Markdown（桌面已验收，整仓待 I230）
 
 - [x] 核对两个编辑器项目的许可证、实时编辑/阅读路径，以及真实的本地图片设置。
@@ -559,7 +568,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I230 | Files / Markdown 收尾 | macOS 文件监听测试在释放测试所持互斥锁后等待初次注册超时。相同监听代码在本会话较早一轮全量检查通过，之后在最终提交的两个全量运行，以及独立临时 APFS 卷上复现。采样栈停在系统 `FSEventStreamStart`。 | Core 文件监听：复核 macOS 原生流的启动时间和回执，在现有 30 秒断言下通过整仓门禁。原始用例位于 `crates/piarc-core/src/workspace_settings/tests.rs`。 |
 | I231 | 会话主块对标开工 | 提交 `313279dc` 的基线中有三项检查失败。Prettier 不通过的文件是 `files/material-icons.ts`、`shell/WorkbenchHeader.tsx` 和 `shell/WorkspaceSearch.tsx`。`tsc --build` 在 `files/FileViewer.tsx` 第 477、560 行报类型错误。i18n 检查报 `shell/WorkspaceSearch.tsx:302` 的硬编码 `esc`，Vitest 的 `check-i18n.test.mjs` 也因此失败。均由 `ec0f84af`、`313279dc` 引入 | 另：同一批提交使三个 L4 失败：`t43-keyboard` 的"指针编辑与键盘导航只有一个焦点指示"（侧栏 `session-filter` 指针聚焦时描边 3px，用例期望 1px）、`t18-sessions` 的"项目操作……项目搜索"（搜索框 ArrowDown 后焦点不到 `search-project`），以及 `t37-commands` 的"工具栏面板……"（用例找标题栏里的 Command Palette 按钮，`313279dc` 起就没有这个按钮）。下一次 Files 或侧栏维护处理。会话主块对标在 `66ce851d` 中格式化了 `WorkbenchHeader.tsx` 与 `WorkspaceSearch.tsx`（只改格式；后者的 `esc` 随之移到第 298 行，仍待处理），Prettier 只剩 `files/material-icons.ts` |
 | I232 | 会话主块对标开工 | 在本机 Windows 上，`cargo test` 链接 `piarc-testkit`、`piarc-core` 时报 os error 1455（页面文件太小）。并行编译占满了提交内存。Vitest 的 `markdown/incremental.test.ts` 在全量负载下超过 5 s 默认时限，单独运行 9/9 通过，用时 1.8 s | 调大本机页面文件，或限制 `CARGO_BUILD_JOBS` 后复跑 |
-| I233 | 会话主块对标 | 会话的模型目录（`useModelCatalog` → `sessionModels`）在 Core 已把会话标为 `open`、Agent Host 尚未打开该会话时发出，答 `sessionNotFound: no open session <id>`，输入框上方一直显示"无法更新模型选择"，环境栏只剩"模型""推理强度"占位；之后不重试 | 属会话层状态同步：Core 的 `open` 与 Agent Host 的会话打开对齐后再查，或在 `sessionNotFound` 时随会话状态变化重取；需改 Core/Agent Host 语义时先写 ADR |
+| I233 | 会话主块对标 | 会话的模型目录（`useModelCatalog` → `sessionModels`）在 Core 已把会话标为 `open`、Agent Host 尚未打开该会话时发出，答 `sessionNotFound: no open session <id>`，输入框上方一直显示"无法更新模型选择"，环境栏只剩"模型""推理强度"占位；之后不重试 | 属会话层状态同步：Core 的 `open` 与 Agent Host 的会话打开对齐后再查，或在 `sessionNotFound` 时随会话状态变化重取；需改 Core/Agent Host 语义时先写 ADR；**已落地（会话主块遗留）**：会话 actor 的请求先等 `sessions/session/presence.rs` 的 `InHost`（创建、恢复、接管 fork 完成时置位，会话关闭即取消等待）再取 Agent Host，快照与 AHP 不变；回归用例 `crates/piarc-testkit/tests/sessions/models.rs` 的 `model_list_during_resume_waits_for_the_session`（修复前稳定复现 `no open session`） |
 | I234 | 会话主块对标 | MCP 工具、截图等工具结果里的图片字节只交给模型，条目只带输出文字，界面无法显示（Read 读取的图片按路径显示，已做） | 在工具条目增加图片引用（会话 blob 路径与哈希，ADR-0009 第 8 条），Core 经短期预览地址交给渲染进程；涉及 AHP 与 Core，按补充型处理并写 ADR |
 | I235 | 会话主块对标 | `bench:t19` 回退的定位与修复在用户同时使用本机时完成，两次基线复测就相差 74.9 / 40.4 fps，最终数值不可作验收：对照实验（同一时段只切换渲染层产物）确认 `:has()` 规则是主因（去掉后滚动 36→65 fps、冷加载约 160→80 ms、切换约 95→35 ms、流式 p99 约 11→6.6 ms），已修；长消息折叠的逐行强制布局、格式器重建与 O(n) 查找一并修掉 | 在空闲桌面上前台运行 `npm run bench:t19` 与开工值对比（流式 p99 6.32 ms、滚动 59.6 fps、冷加载 61–94 ms、缓存切换 17–25 ms）；仍有差距时继续按提交二分 |
 

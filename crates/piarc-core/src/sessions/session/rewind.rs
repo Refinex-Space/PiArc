@@ -143,7 +143,7 @@ impl Request {
     where
         M: RequestMethod<Result = SessionRewound>,
     {
-        let supervisor = self.ws.acquire().await?;
+        let supervisor = self.host().await?;
         let rewound = supervisor
             .session_call_within::<M>(&self.id, params, MOVE_TIMEOUT)
             .await
