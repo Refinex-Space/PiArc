@@ -65,6 +65,10 @@ pub struct HistoryItem {
     /// The enclosing turn, or its first user entry in session files without PiArc turn IDs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn_id: Option<TurnId>,
+    /// When the entry was written, in milliseconds since the Unix epoch (UTC); absent when the
+    /// session file does not say. Shown next to messages (ADR-0080).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<u64>,
     /// The item in its final state.
     pub item: Item,
 }

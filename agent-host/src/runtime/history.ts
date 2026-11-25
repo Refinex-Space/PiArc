@@ -59,6 +59,12 @@ interface InputRecord {
   readonly input: UserInput | undefined;
 }
 
+/** When an entry was written, as Unix milliseconds, for the messages' times (ADR-0080). */
+function entryTime(entry: SessionEntry): { readonly at?: number } {
+  const at = Date.parse(entry.timestamp);
+  return Number.isFinite(at) && at >= 0 ? { at } : {};
+}
+
 /** Every item of `branch` (root to leaf), in conversation order. */
 export function projectHistory(
   branch: readonly SessionEntry[],
@@ -202,6 +208,7 @@ export function projectHistory(
       items.push({
         entryId: entry.id,
         turnId: currentTurn,
+        ...entryTime(entry),
         item: userMessage(entry.id, text, matches ? own : undefined),
       });
     } else if (message.role === 'assistant' && !isInterruptionMarker(message)) {
@@ -209,6 +216,7 @@ export function projectHistory(
         ...assistantItems(
           entry.id,
           currentTurn ?? entry.id,
+          entryTime(entry),
           message,
           results,
           { declined, reviews },
@@ -223,6 +231,7 @@ export function projectHistory(
 function assistantItems(
   entryId: string,
   turnId: string,
+  time: { readonly at?: number },
   message: Extract<SessionEntry, { type: 'message' }>['message'] & { role: 'assistant' },
   results: ReadonlyMap<string, ToolResult>,
   marks: {
@@ -246,6 +255,7 @@ function assistantItems(
       items.push({
         entryId,
         turnId,
+        ...time,
         item: agentMessage(itemId, textStatus, part.text.toWellFormed()),
       });
     } else if (part.type === 'thinking') {

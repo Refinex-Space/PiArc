@@ -26,6 +26,19 @@ const image: InputAttachment = {
   blob: { path: '/d/sessions/s/attachments/a.png', sha256: 'f'.repeat(64), size: 4 },
 };
 
+describe('projectHistory times (ADR-0080)', () => {
+  it('gives messages the time their entry was written, and nothing for an unreadable one', () => {
+    const items = projectHistory(
+      [user('u1', 'Hello'), { ...user('u2', 'Later'), timestamp: 'not a time' }],
+      (tool) => tool,
+    );
+    expect(items.map((entry) => entry.at)).toEqual([
+      Date.parse('2026-11-18T00:00:00.000Z'),
+      undefined,
+    ]);
+  });
+});
+
 describe('projectHistory with input records', () => {
   it('shows a user message as the user wrote it when its record precedes it', () => {
     const record = {

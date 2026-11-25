@@ -4567,6 +4567,12 @@
     "HistoryItem": {
       "description": "One item of the history.",
       "properties": {
+        "at": {
+          "description": "When the entry was written, in milliseconds since the Unix epoch (UTC); absent when the\nsession file does not say. Shown next to messages (ADR-0080).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "entryId": {
           "description": "The Pi entry the item comes from (for a tool call: the assistant message's entry).",
           "type": "string"

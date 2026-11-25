@@ -3230,6 +3230,11 @@ export interface TodoItem {
  */
 export interface HistoryItem {
   /**
+   * When the entry was written, in milliseconds since the Unix epoch (UTC); absent when the
+   * session file does not say. Shown next to messages (ADR-0080).
+   */
+  at?: number | null;
+  /**
    * The Pi entry the item comes from (for a tool call: the assistant message's entry).
    */
   entryId: string;
