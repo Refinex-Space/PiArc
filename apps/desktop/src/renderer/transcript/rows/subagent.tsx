@@ -156,103 +156,108 @@ export function SubagentCard({
       data-row-id={id}
       data-status={state?.status ?? item.status}
     >
-      <div className="subagent-head">
-        <span
-          className="subagent-dot"
-          data-color={color ?? 'none'}
-          aria-hidden="true"
-          title={state?.color ?? undefined}
-        />
-        <span className="subagent-title truncate" data-testid="subagent-title">
-          {title}
-        </span>
-        {state === undefined ? null : (
-          <span className="subagent-type" data-testid="subagent-type">
-            {state.agentType}
+      <div className="subagent-box">
+        <div className="subagent-head">
+          <span
+            className="subagent-dot"
+            data-color={color ?? 'none'}
+            aria-hidden="true"
+            title={state?.color ?? undefined}
+          />
+          <span className="subagent-title truncate" data-testid="subagent-title">
+            {title}
           </span>
-        )}
-        {state?.background === true ? (
-          <span className="subagent-badge" data-testid="subagent-background">
-            {t('subagent.background')}
-          </span>
-        ) : null}
-        <span className="subagent-status" data-testid="subagent-status">
-          {t(status)}
-        </span>
-      </div>
-      <div className="subagent-facts muted" data-testid="subagent-facts">
-        {state?.model == null ? null : (
-          <span data-testid="subagent-model">
-            {t('subagent.model', { model: `${state.model.provider}/${state.model.id}` })}
-          </span>
-        )}
-        {duration === undefined ? null : <span>{elapsedText(duration)}</span>}
-        {state === undefined ? null : (
-          <span data-testid="subagent-tools">
-            {t('subagent.toolCalls', { count: state.toolCalls })}
-          </span>
-        )}
-        {tokens === undefined ? null : (
-          <span data-testid="subagent-tokens">
-            {t('subagent.tokens', {
-              input: tokens.input + tokens.cacheRead,
-              output: tokens.output,
-            })}
-          </span>
-        )}
-      </div>
-      {running && state?.activity != null && state.activity !== '' ? (
-        <div className="subagent-activity muted truncate" data-testid="subagent-activity">
-          {state.activity}
-        </div>
-      ) : null}
-      {state?.error == null ? null : (
-        <div className="row-status is-warning" data-testid="subagent-error">
-          {state.error}
-        </div>
-      )}
-      {warnings.length === 0 ? null : (
-        <ul className="subagent-warnings" data-testid="subagent-warnings">
-          {warnings.map((warning, index) => (
-            <li key={`${warning.kind}-${String(index)}`} className="muted">
-              {warningText(warning)}
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="subagent-actions">
-        {state === undefined || actions.subagentTranscript === undefined ? null : (
-          <button
-            type="button"
-            className="row-action"
-            data-testid="subagent-toggle"
-            aria-expanded={open}
-            onClick={() => {
-              setOpen(!open);
-            }}
+          {state === undefined ? null : (
+            <span className="subagent-type" data-testid="subagent-type">
+              {state.agentType}
+            </span>
+          )}
+          {state?.background === true ? (
+            <span className="subagent-badge" data-testid="subagent-background">
+              {t('subagent.background')}
+            </span>
+          ) : null}
+          <span
+            className={`subagent-status${running ? ' shimmer' : ''}`}
+            data-testid="subagent-status"
           >
-            {t(open ? 'subagent.hideTranscript' : 'subagent.showTranscript')}
-          </button>
+            {t(status)}
+          </span>
+        </div>
+        <div className="subagent-facts muted" data-testid="subagent-facts">
+          {state?.model == null ? null : (
+            <span data-testid="subagent-model">
+              {t('subagent.model', { model: `${state.model.provider}/${state.model.id}` })}
+            </span>
+          )}
+          {duration === undefined ? null : <span>{elapsedText(duration)}</span>}
+          {state === undefined ? null : (
+            <span data-testid="subagent-tools">
+              {t('subagent.toolCalls', { count: state.toolCalls })}
+            </span>
+          )}
+          {tokens === undefined ? null : (
+            <span data-testid="subagent-tokens">
+              {t('subagent.tokens', {
+                input: tokens.input + tokens.cacheRead,
+                output: tokens.output,
+              })}
+            </span>
+          )}
+        </div>
+        {running && state?.activity != null && state.activity !== '' ? (
+          <div className="subagent-activity shimmer truncate" data-testid="subagent-activity">
+            {state.activity}
+          </div>
+        ) : null}
+        {state?.error == null ? null : (
+          <div className="row-status is-warning" data-testid="subagent-error">
+            {state.error}
+          </div>
         )}
-        {running && state !== undefined && actions.stopSubagent !== undefined ? (
-          <button
-            type="button"
-            className="row-action"
-            data-testid="subagent-stop"
-            onClick={() => {
-              actions.stopSubagent?.(state.sessionId);
-            }}
-          >
-            {t('subagent.stop')}
-          </button>
+        {warnings.length === 0 ? null : (
+          <ul className="subagent-warnings" data-testid="subagent-warnings">
+            {warnings.map((warning, index) => (
+              <li key={`${warning.kind}-${String(index)}`} className="muted">
+                {warningText(warning)}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="subagent-actions">
+          {state === undefined || actions.subagentTranscript === undefined ? null : (
+            <button
+              type="button"
+              className="approval-link"
+              data-testid="subagent-toggle"
+              aria-expanded={open}
+              onClick={() => {
+                setOpen(!open);
+              }}
+            >
+              {t(open ? 'subagent.hideTranscript' : 'subagent.showTranscript')}
+            </button>
+          )}
+          {running && state !== undefined && actions.stopSubagent !== undefined ? (
+            <button
+              type="button"
+              className="button button-small"
+              data-testid="subagent-stop"
+              onClick={() => {
+                actions.stopSubagent?.(state.sessionId);
+              }}
+            >
+              {t('subagent.stop')}
+            </button>
+          ) : null}
+        </div>
+        {open && state !== undefined ? (
+          <ChildTranscript
+            child={state.sessionId}
+            version={`${state.status}:${String(state.toolCalls)}`}
+          />
         ) : null}
       </div>
-      {open && state !== undefined ? (
-        <ChildTranscript
-          child={state.sessionId}
-          version={`${state.status}:${String(state.toolCalls)}`}
-        />
-      ) : null}
     </div>
   );
 }

@@ -137,11 +137,11 @@
 |---|---|---|---|---|---|---|
 | 任务清单 | `generated/turn-box/turn-box.mjs`、`todo-list.mjs` | 卡片圆角 12 内嵌细线，内距 16，行距 8；完成 16 px 实心勾次色不划线，进行中转圈，待办空心圆 | 列表加 "1/3 done" | 复刻；保留计数 | 截图 | 已对齐（改造）：圆角 12 细线卡片、内距 16、行距 8，完成为 16 px 实心勾次色不划线，进行中转圈，待办空心圆；保留"1/3 done"计数；`gallery/cards/` |
 | 下一步 | 同上 | 内距 16，回顾次色、问题主色，最多两个按钮首个为主；300 ms 位移 4 入场 | 卡片 | 复刻 | 截图 | 已对齐（改造）：同一卡片，首条建议的"Run here"为主按钮；PiArc 的建议是多条"标题 + 提示"，不是一句回顾加问题；`gallery/cards/` |
-| 子 agent 卡 | `src/source-agent.{jsx,css}` | 行 "Ran agent {name}" 加模型；卡片内嵌细线圆角 8、悬停淡底 | 卡片 | 复刻；停止按钮保留（PiArc 有） | 截图 | 待实现 |
+| 子 agent 卡 | `src/source-agent.{jsx,css}` | 行 "Ran agent {name}" 加模型；卡片内嵌细线圆角 8、悬停淡底 | 卡片 | 复刻；停止按钮保留（PiArc 有） | 截图 | 已对齐（改造）：细线卡片（最宽 560），保留 PiArc 的类型、后台、模型、计时、调用数、token、警告、停止与展开子会话；运行中状态与活动走光；`gallery/status/cards-*` |
 | 工作流、提案、评审发现 | `workflow-card-v4`、`proposal-group-v4`、`review-findings-v4` | — | 无 | 不适用：PiArc 没有这些能力 | — | 不适用 |
-| 错误卡 | `src/source-turn-error.{jsx,css}` | 最小宽 min(480,100%)，圆角 12，细线环；淡底标题条 12×16 加 16 图标；"View details" 折叠；主按钮在最后 | 文本加按钮 | 复刻 | 截图 | 待实现 |
-| 压缩提示 | `c80ec48f8-*.mjs` | 状态行样式（运行中走光），"Compacted conversation" | 两侧细线的居中文字 | 复刻 | 截图 | 待实现 |
-| 模式变更 | — | 参考没有对应行 | 次色整行文字 | 改造：按状态行样式设计 | 截图 | 待实现 |
+| 错误卡 | `src/source-turn-error.{jsx,css}` | 最小宽 min(480,100%)，圆角 12，细线环；淡底标题条 12×16 加 16 图标；"View details" 折叠；主按钮在最后 | 文本加按钮 | 复刻 | 截图 | 已对齐：最小宽 min(480,100%)，淡底标题条带 16 px 图标，正文提示，"Details"折叠在左，主按钮"Retry"在右；"结果未知"卡同一结构；`gallery/status/status-*` |
+| 压缩提示 | `c80ec48f8-*.mjs` | 状态行样式（运行中走光），"Compacted conversation" | 两侧细线的居中文字 | 复刻 | 截图 | 已对齐：正文内缩上的次色状态行，压缩中走光；`gallery/status/status-*` |
+| 模式变更 | — | 参考没有对应行 | 次色整行文字 | 改造：按状态行样式设计 | 截图 | 已对齐（改造）：与压缩提示同一种次色状态行；`gallery/status/status-*` |
 | 空会话与加载失败 | `src/source-transcript-states.{jsx,css}`、`generated/session-load-error/*` | 居中，标题 14/20 主色，说明 13/17，主按钮 "Retry" | 绝对定位文字 | 复刻（加载失败加重试） | 截图 | 待实现 |
 | 加载骨架 | 同上 | 气泡条加三段灰条，2 s 呼吸，0.5 s 后淡入 | "加载中"文字 | 复刻 | 截图 | 待实现 |
 | 选中与复制 | `src/source-transcript-selection.jsx` | 选中后浮条 "Start a side chat"、"Reply" | 系统选中 | 不适用：本期不新增会话间交互入口 | — | 不适用 |

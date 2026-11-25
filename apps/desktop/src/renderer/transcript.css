@@ -1074,111 +1074,111 @@
   max-height: 200px;
 }
 
-/* subagent card (T31) */
-
-.row-subagent {
-  display: grid;
+/* subagent card (T31): the run in a hairline card; its status and activity shimmer while it runs */
+.subagent-box {
+  display: flex;
+  flex-direction: column;
   gap: var(--piarc-space-1);
-  padding: var(--piarc-space-2) var(--piarc-space-3);
-  border: 1px solid var(--piarc-border-subtle);
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-surface-panel);
+  box-sizing: border-box;
+  max-width: var(--piarc-session-approval-width);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
 }
-
 .subagent-head {
   display: flex;
   align-items: center;
   gap: var(--piarc-space-2);
   min-width: 0;
-  font-size: var(--piarc-font-size-small);
   color: var(--piarc-text-secondary);
 }
-
 .subagent-title {
   min-width: 0;
   color: var(--piarc-text-primary);
   font-weight: var(--piarc-font-weight-medium);
 }
-
 .subagent-type,
 .subagent-badge {
-  padding: 0 var(--piarc-space-1);
-  border: 1px solid var(--piarc-border-default);
-  border-radius: var(--piarc-radius-sm);
+  flex: none;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-footnote-line);
   white-space: nowrap;
 }
-
 .subagent-status {
-  margin-left: auto;
+  flex: none;
+  margin-inline-start: auto;
+  font-size: var(--piarc-session-footnote);
   white-space: nowrap;
 }
-
 .row-subagent.is-failed .subagent-status,
 .row-subagent.is-interrupted .subagent-status {
   color: var(--piarc-text-danger);
 }
-
 .row-subagent.is-partial .subagent-status {
   color: var(--piarc-text-warning);
 }
-
 .subagent-dot {
   flex: none;
-  width: var(--piarc-space-2);
-  height: var(--piarc-space-2);
+  width: 8px;
+  height: 8px;
   border-radius: var(--piarc-radius-pill);
   background: var(--piarc-border-strong);
 }
-
 .subagent-dot[data-color='red'],
 .subagent-dot[data-color='pink'] {
   background: var(--piarc-state-danger);
 }
-
 .subagent-dot[data-color='orange'],
 .subagent-dot[data-color='yellow'] {
   background: var(--piarc-state-warning);
 }
-
 .subagent-dot[data-color='green'] {
   background: var(--piarc-state-success);
 }
-
 .subagent-dot[data-color='blue'],
 .subagent-dot[data-color='purple'],
 .subagent-dot[data-color='cyan'] {
   background: var(--piarc-accent-solid);
 }
-
 .subagent-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--piarc-space-3);
-  font-size: var(--piarc-font-size-caption);
+  gap: 2px var(--piarc-space-3);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
 }
-
 .subagent-activity {
-  font-size: var(--piarc-font-size-caption);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
 }
-
 .subagent-warnings {
   margin: 0;
-  padding-left: var(--piarc-space-4);
-  font-size: var(--piarc-font-size-caption);
+  padding-inline-start: 1.2em;
+  font-size: var(--piarc-session-footnote);
 }
-
 .subagent-actions {
   display: flex;
-  gap: var(--piarc-space-2);
+  align-items: center;
+  gap: var(--piarc-space-3);
+  margin-top: var(--piarc-space-1);
 }
-
+.subagent-actions:empty {
+  display: none;
+}
 .subagent-transcript {
   max-height: 480px;
+  margin-top: var(--piarc-space-2);
+  padding-top: var(--piarc-space-2);
   overflow: auto;
-  padding: var(--piarc-space-2);
-  border-top: 1px solid var(--piarc-border-subtle);
+  border-top: 1px solid var(--piarc-session-line);
 }
-
 .approval-origin {
   font-size: var(--piarc-font-size-small);
 }
@@ -1365,21 +1365,25 @@ button.file-change-path:hover {
   }
 }
 
-/* compaction */
+/* status lines: compaction and permission mode changes, quiet lines on the text inset */
 
-.row-compaction {
+.row-compaction,
+.row-mode-change {
   display: flex;
   align-items: center;
-  gap: var(--piarc-space-3);
+  gap: var(--piarc-space-2);
+  min-height: var(--piarc-session-row);
+  padding-inline-start: var(--piarc-session-text-inset);
   color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-small);
   user-select: none;
 }
 
-.row-rule {
-  flex: 1;
-  height: 1px;
-  background: var(--piarc-border-subtle);
+.conversation .transcript-row > :is(.row-compaction, .row-mode-change) {
+  padding-inline-start: calc(var(--piarc-session-gutter) + var(--piarc-session-text-inset));
+}
+
+.row-compaction.is-failed {
+  color: var(--piarc-text-danger);
 }
 
 /* system reminders (detailed view, T29) */
@@ -1404,34 +1408,85 @@ button.file-change-path:hover {
   overflow-wrap: anywhere;
 }
 
-/* error and uncertain cards */
+/* error and uncertain cards: a quiet strip with the icon and what went wrong, the hint, then the
+   details disclosure and the retry on the right */
 
-.row-error {
-  margin-top: var(--piarc-space-1);
-  margin-bottom: var(--piarc-space-1);
-  border-left: 3px solid var(--piarc-state-danger);
-  background: var(--piarc-state-danger-subtle);
+.row-error-box {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: min(480px, 100%);
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
 }
 
-.row-error.is-uncertain {
-  border-left-color: var(--piarc-state-warning);
-  background: var(--piarc-state-warning-subtle);
+.row-error-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-danger);
+}
+
+.row-error.is-uncertain .row-error-head {
+  color: var(--piarc-text-secondary);
 }
 
 .row-error-title {
-  font-weight: var(--piarc-font-weight-semibold);
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.row-error-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-sm);
+  padding: var(--piarc-session-pad-lg) var(--piarc-session-pad-lg) var(--piarc-session-pad-md);
 }
 
 .row-error-hint {
   color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-small);
+  white-space: pre-line;
 }
 
 .row-error-actions {
   display: flex;
-  gap: var(--piarc-space-2);
-  margin-top: var(--piarc-space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--piarc-session-gap-sm);
   user-select: none;
+}
+
+.row-error-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-inline-end: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+}
+
+.row-error-more:hover {
+  color: var(--piarc-text-primary);
+}
+
+.row-error-more[aria-expanded='true'] .step-caret {
+  transform: rotate(90deg);
+}
+
+.row-error-details {
+  max-height: 240px;
 }
 
 /* working row: PiArc's mark hung in the gutter, the activity, then time, tokens and retries */

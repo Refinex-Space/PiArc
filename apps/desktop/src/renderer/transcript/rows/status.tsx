@@ -13,6 +13,7 @@ import { ActivityMark, type Activity } from './ActivityMark.js';
 import { Segments } from './parts.js';
 import { useElapsedText, useNow } from './common.js';
 import { targetOf } from './summary.js';
+import { InfoGlyph, StepCaret, WarningGlyph } from '../../shell/icons.js';
 
 type CompactionItem = Extract<Item, { type: 'contextCompaction' }>;
 type ReminderItem = Extract<Item, { type: 'reminder' }>;
@@ -85,8 +86,7 @@ export function CompactionRow({
       data-status={item.status}
       role="status"
     >
-      <span className="row-rule" aria-hidden="true" />
-      <span className="row-compaction-text">
+      <span className={`row-compaction-text${item.status === 'inProgress' ? ' shimmer' : ''}`}>
         {text}
         {item.autoCompactStopped == null ? null : (
           <span className="row-compaction-stopped" data-testid="compaction-stopped">
@@ -94,7 +94,6 @@ export function CompactionRow({
           </span>
         )}
       </span>
-      <span className="row-rule" aria-hidden="true" />
     </div>
   );
 }
@@ -132,41 +131,51 @@ export function ErrorCard({ row }: { readonly row: Extract<TranscriptRow, { kind
       data-retryable={row.retryable}
       role="alert"
     >
-      <div className="row-error-title" data-testid="error-title">
-        {t(ERROR_TITLE[row.errorKind])}
+      <div className="row-error-box">
+        <div className="row-error-head">
+          <WarningGlyph />
+          <span className="row-error-title" data-testid="error-title">
+            {t(ERROR_TITLE[row.errorKind])}
+          </span>
+        </div>
+        <div className="row-error-body">
+          <div className="row-error-hint">{t(ERROR_HINT[row.errorKind])}</div>
+          {details ? (
+            <pre className="row-error-details" data-testid="error-details">
+              {row.message}
+            </pre>
+          ) : null}
+          <div className="row-error-actions">
+            {row.message === '' ? null : (
+              <button
+                type="button"
+                className="row-error-more"
+                aria-expanded={details}
+                onClick={() => {
+                  setDetails(!details);
+                }}
+              >
+                {t('transcript.error.details')}
+                <span className="step-caret" aria-hidden="true">
+                  <StepCaret />
+                </span>
+              </button>
+            )}
+            {row.retryable ? (
+              <button
+                type="button"
+                className="button button-primary"
+                data-testid="error-retry"
+                onClick={() => {
+                  actions.retry(row.turnId);
+                }}
+              >
+                {t('transcript.error.retry')}
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
-      <div className="row-error-hint">{t(ERROR_HINT[row.errorKind])}</div>
-      <div className="row-error-actions">
-        {row.retryable ? (
-          <button
-            type="button"
-            className="button"
-            data-testid="error-retry"
-            onClick={() => {
-              actions.retry(row.turnId);
-            }}
-          >
-            {t('transcript.error.retry')}
-          </button>
-        ) : null}
-        {row.message === '' ? null : (
-          <button
-            type="button"
-            className="row-action"
-            aria-expanded={details}
-            onClick={() => {
-              setDetails(!details);
-            }}
-          >
-            {t('transcript.error.details')}
-          </button>
-        )}
-      </div>
-      {details ? (
-        <pre className="row-error-details" data-testid="error-details">
-          {row.message}
-        </pre>
-      ) : null}
     </div>
   );
 }
@@ -185,19 +194,26 @@ export function UncertainCard({
       data-row-id={row.id}
       role="alert"
     >
-      <div className="row-error-title">{t('transcript.uncertain')}</div>
-      <div className="row-error-hint">{t('transcript.uncertain.hint')}</div>
-      <div className="row-error-actions">
-        <button
-          type="button"
-          className="button"
-          data-testid="uncertain-retry"
-          onClick={() => {
-            actions.retry(row.turnId);
-          }}
-        >
-          {t('transcript.error.retry')}
-        </button>
+      <div className="row-error-box">
+        <div className="row-error-head">
+          <InfoGlyph />
+          <span className="row-error-title">{t('transcript.uncertain')}</span>
+        </div>
+        <div className="row-error-body">
+          <div className="row-error-hint">{t('transcript.uncertain.hint')}</div>
+          <div className="row-error-actions">
+            <button
+              type="button"
+              className="button button-primary"
+              data-testid="uncertain-retry"
+              onClick={() => {
+                actions.retry(row.turnId);
+              }}
+            >
+              {t('transcript.error.retry')}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

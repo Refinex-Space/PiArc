@@ -68,7 +68,7 @@ export class RowBoundary extends Component<
 function ModeChangeRow({ mode }: { readonly mode: PermissionMode }) {
   const t = useT();
   return (
-    <div className="row muted" data-testid="mode-change-row">
+    <div className="row row-mode-change" data-testid="mode-change-row">
       {t('approval.modeChanged', { mode: t(`approval.mode.${mode}`) })}
     </div>
   );
