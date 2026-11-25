@@ -155,6 +155,14 @@ test('session pane states for review', async ({ app, page }) => {
     await page.mouse.move(0, 0);
     await page.screenshot({ path: path.join(EVIDENCE, `conversation-open-${theme}.png`) });
   }
+  // The working mark's wave, frame by frame (motion evidence), while a tool runs.
+  await prefer(page, { key: 'appearance.theme', value: 'light' });
+  await open(page, 'working');
+  const mark = page.locator('.working-mark');
+  for (let frame = 0; frame < 10; frame += 1) {
+    await mark.screenshot({ path: path.join(EVIDENCE, `mark-tool-${String(frame)}.png`) });
+    await page.waitForTimeout(100);
+  }
   // A narrow window, reduced motion and forced colors on the busiest sections.
   await prefer(page, { key: 'appearance.theme', value: 'light' });
   await resize(app, 560, 760);

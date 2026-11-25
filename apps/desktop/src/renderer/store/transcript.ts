@@ -129,6 +129,14 @@ export interface TurnInfo {
 /** The id of the working row. */
 export const WORKING_ROW = 'working';
 
+/** The id prefix of approval rows (`setApprovals`). */
+const APPROVAL_ROW = 'approval:';
+
+/** Whether row `id` is an approval request waiting for the user. */
+export function isApprovalRow(id: string): boolean {
+  return id.startsWith(APPROVAL_ROW);
+}
+
 const IDLE: TurnInfo = {
   running: false,
   turnId: undefined,
@@ -335,7 +343,7 @@ export class SessionTranscript {
   /** Replaces the live approval rows from a revision-checked entity snapshot. */
   setApprovals(requests: readonly ApprovalRequest[]): void {
     const ids = requests.map(
-      (r) => `approval:${String(r.connectionEpoch)}:${r.requestId}:${String(r.revision)}`,
+      (r) => `${APPROVAL_ROW}${String(r.connectionEpoch)}:${r.requestId}:${String(r.revision)}`,
     );
     const batch = new Batch();
     for (const id of this.approvalIds) {

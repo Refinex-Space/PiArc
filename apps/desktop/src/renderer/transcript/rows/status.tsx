@@ -7,7 +7,10 @@ import type { Item, TurnErrorKind } from '@piarc/protocol';
 import { useT } from '../../app/app-context.js';
 import type { MessageId } from '../../../shared/i18n/index.js';
 import type { TranscriptRow, TurnInfo } from '../../store/transcript.js';
-import { useExpanded, useTranscriptView, useTurn } from '../services.js';
+import { useExpanded, useShownRowIds, useTranscriptView, useTurn } from '../services.js';
+import { isApprovalRow } from '../../store/transcript.js';
+import { ActivityMark, type Activity } from './ActivityMark.js';
+import { Segments } from './parts.js';
 import { useElapsedText, useNow } from './common.js';
 import { targetOf } from './summary.js';
 
@@ -200,11 +203,19 @@ export function UncertainCard({
   );
 }
 
-/** While a turn runs: what it is doing, for how long, how many tokens, retries, compaction. */
+/** Elapsed time and tokens show once the turn has run this long (ms). */
+const WORKING_DETAILS_AFTER_MS = 2_000;
+
+/**
+ * While a turn runs: the working mark hung in the gutter, what the turn is doing (the current
+ * tool, compaction, or that it waits for the user), and after a moment how long it has run, its
+ * tokens and its retries.
+ */
 export function WorkingRow() {
   const t = useT();
   const { transcript } = useTranscriptView();
   const turn: TurnInfo = useTurn();
+  const waiting = useShownRowIds().some(isApprovalRow);
   const now = useNow(1000, turn.running);
   const elapsedText = useElapsedText();
   const label = (item: Item): string =>
@@ -214,37 +225,60 @@ export function WorkingRow() {
     });
   const currentId = turn.openTools.at(-1);
   const current = currentId === undefined ? undefined : transcript.row(currentId);
-  const activity = turn.compacting
-    ? t('transcript.working.compacting')
-    : current?.kind === 'item'
-      ? label(current.item)
-      : t('transcript.working');
+  const text = waiting
+    ? t('transcript.needsInput')
+    : turn.compacting
+      ? t('transcript.working.compacting')
+      : current?.kind === 'item'
+        ? label(current.item)
+        : t('transcript.working');
+  const activity: Activity = waiting ? 'blocked' : current?.kind === 'item' ? 'tool' : 'think';
   const tokens = turn.usage === undefined ? undefined : turn.usage.outputTokens;
+  const elapsed = turn.startedAt === undefined ? undefined : now - turn.startedAt;
+  const details = elapsed !== undefined && elapsed >= WORKING_DETAILS_AFTER_MS;
   return (
-    <div className="row row-working" data-testid="working-row" aria-live="off">
-      <span className="working-spinner" aria-hidden="true" />
+    <div
+      className="row row-working"
+      data-testid="working-row"
+      data-activity={activity}
+      aria-live="off"
+    >
+      <span className="working-mark">
+        <ActivityMark activity={activity} />
+      </span>
+      {/* A new label eases in; the key starts its entrance again. */}
       <span
-        className="working-activity"
+        key={text}
+        className={`working-activity${waiting ? ' status-pill' : ' shimmer'}`}
         data-testid="working-activity"
         data-compacting={turn.compacting}
       >
-        {activity}
+        {text}
       </span>
-      {turn.startedAt === undefined ? null : (
-        <span className="working-elapsed" data-testid="working-elapsed">
-          {elapsedText(now - turn.startedAt)}
-        </span>
-      )}
-      {tokens === undefined ? null : (
-        <span className="working-tokens" data-testid="working-tokens">
-          {t('transcript.working.tokens', { count: tokens })}
-        </span>
-      )}
-      {turn.retry === undefined ? null : (
-        <span className="working-retry" data-testid="working-retry">
-          {t('transcript.working.retry', { attempt: turn.retry.attempt, max: turn.retry.max })}
-        </span>
-      )}
+      <span className="working-facts">
+        <Segments>
+          {[
+            details ? (
+              <span key="elapsed" className="working-elapsed" data-testid="working-elapsed">
+                {elapsedText(elapsed)}
+              </span>
+            ) : null,
+            details && tokens !== undefined ? (
+              <span key="tokens" className="working-tokens" data-testid="working-tokens">
+                {t('transcript.working.tokens', { count: tokens })}
+              </span>
+            ) : null,
+            turn.retry === undefined ? null : (
+              <span key="retry" className="working-retry" data-testid="working-retry">
+                {t('transcript.working.retry', {
+                  attempt: turn.retry.attempt,
+                  max: turn.retry.max,
+                })}
+              </span>
+            ),
+          ]}
+        </Segments>
+      </span>
     </div>
   );
 }

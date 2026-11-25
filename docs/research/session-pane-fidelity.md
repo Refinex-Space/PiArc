@@ -110,11 +110,11 @@
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 布局 | `generated/working-line-v4/working-line.mjs` | 最小高 28；20 px 标记槽悬挂进左侧留白（槽宽 20 加间距 12），文字与正文对齐 | 转圈加文字 | 复刻 | 测量 | 待实现 |
-| 标记 | `activity-mark.mjs`、`spark-thinking.json` | 30 fps 精灵图，按活动换图；离场 400 ms，入场延迟 150 淡入 200 | CSS 转圈 | 改造：PiArc 自有标记（P、i 两字的 10 个方块按笔画依次点亮），思考慢、工具快、待审批静止加琥珀色脉冲；不使用火花标记 | 录屏、减少动效 | 待实现 |
-| 文案 | 同上 | 停止中 > 重试 > 压缩 > 工具进行时 > "Working…"；思考分档 15/30/45/60 s | 当前工具名与 "Working" | 复刻优先级；思考分档文案自写 | 截图 | 待实现 |
-| 计时与 token | `elapsed-clock.mjs`、`count-tween.mjs` | 2 s 后出现，"12s / 1m 5s"，按整秒对齐；token 首次 1200 ms 计数补间 | 立即显示 "7 s"、token 数 | 复刻 | 截图 | 待实现 |
-| 待审批 | `source-approval-card.jsx` | 行内 "Needs your input" 警告色胶囊 | 无 | 复刻（PiArc 的待审批数） | 截图 | 待实现 |
+| 布局 | `generated/working-line-v4/working-line.mjs` | 最小高 28；20 px 标记槽悬挂进左侧留白（槽宽 20 加间距 12），文字与正文对齐 | 转圈加文字 | 复刻 | 测量 | 已对齐：`gallery/working/working-*`（窄于 560 px 时标记不悬挂，放进留白内） |
+| 标记 | `activity-mark.mjs`、`spark-thinking.json` | 30 fps 精灵图，按活动换图；离场 400 ms，入场延迟 150 淡入 200 | CSS 转圈 | 改造：PiArc 自有标记（P、i 两字的 10 个方块按笔画依次点亮），思考慢、工具快、待审批静止加琥珀色脉冲；不使用火花标记 | 录屏、减少动效 | 已对齐（改造）：PiArc 的 P、i 十格标记，思考 1.8 s 一轮、执行工具 1 s 一轮，等待审批时整体以警告色 2 s 呼吸；入场延迟 150 ms 淡入 200 ms；逐帧证据 `gallery/working/mark-tool-*` |
+| 文案 | 同上 | 停止中 > 重试 > 压缩 > 工具进行时 > "Working…"；思考分档 15/30/45/60 s | 当前工具名与 "Working" | 复刻优先级；思考分档文案自写 | 截图 | 已对齐（改造）：压缩 > 当前工具 > "Working"，待审批时改为"Needs your input"；工具标签保留 PiArc 的"工具 · 对象"句式；切换时 120 ms 上移 3 px 淡入 |
+| 计时与 token | `elapsed-clock.mjs`、`count-tween.mjs` | 2 s 后出现，"12s / 1m 5s"，按整秒对齐；token 首次 1200 ms 计数补间 | 立即显示 "7 s"、token 数 | 复刻 | 截图 | 已对齐（改造）：2 s 后出现，沿用 PiArc 的本地化时长格式；token 数不做补间（每秒随计时刷新） |
+| 待审批 | `source-approval-card.jsx` | 行内 "Needs your input" 警告色胶囊 | 无 | 复刻（PiArc 的待审批数） | 截图 | 已对齐：`gallery/working/approval-command-*` |
 
 ## 9. 审批卡
 

@@ -1434,29 +1434,73 @@ button.file-change-path:hover {
   user-select: none;
 }
 
-/* working row */
+/* working row: PiArc's mark hung in the gutter, the activity, then time, tokens and retries */
 
 .row-working {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--piarc-space-3);
+  gap: var(--piarc-session-gap-xs);
+  min-height: var(--piarc-session-row);
   color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-small);
   user-select: none;
 }
 
-.working-activity {
-  color: var(--piarc-text-primary);
+.conversation .transcript-row > .row-working {
+  padding-inline-start: calc(var(--piarc-session-gutter) + var(--piarc-session-text-inset));
 }
 
-.working-spinner {
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--piarc-border-default);
-  border-top-color: var(--piarc-agent-status-running);
-  border-radius: 50%;
-  animation: piarc-spin 0.9s linear infinite;
+/* The mark's seat sits left of the text column, so the label lines up with the reply's text. */
+.working-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--piarc-session-mark-size);
+  height: var(--piarc-session-mark-size);
+  margin-inline: calc(-1 * (var(--piarc-session-mark-size) + var(--piarc-session-mark-gap)))
+    calc(var(--piarc-session-mark-gap) - var(--piarc-session-gap-xs));
+  animation: working-mark-in var(--piarc-motion-normal) var(--piarc-motion-curve-out)
+    calc(var(--piarc-motion-fast) + 30ms) backwards;
+}
+
+@container (max-width: 560px) {
+  .conversation .transcript-row > .row-working {
+    padding-inline-start: calc(
+      var(--piarc-session-gutter-narrow) + var(--piarc-session-mark-size) +
+        var(--piarc-session-mark-gap)
+    );
+  }
+}
+
+@keyframes working-mark-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.working-activity {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: working-label-in var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.working-activity.status-pill {
+  overflow: visible;
+}
+
+@keyframes working-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.working-facts {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
 }
 
 .working-elapsed,
@@ -1467,6 +1511,71 @@ button.file-change-path:hover {
 
 .working-retry {
   color: var(--piarc-text-warning);
+}
+
+/* The mark: ten cells that light up in drawing order; the wave's speed is the activity. */
+.activity-mark {
+  --mark-cycle: 1.8s;
+  --mark-step: 0.11s;
+  color: var(--piarc-accent-solid);
+  overflow: visible;
+}
+
+.activity-mark[data-activity='tool'] {
+  --mark-cycle: 1s;
+  --mark-step: 0.06s;
+}
+
+.activity-mark-cell {
+  fill: currentColor;
+  opacity: 0.22;
+  animation: activity-cell var(--mark-cycle) var(--piarc-motion-easing) infinite;
+  animation-delay: calc(var(--cell) * var(--mark-step));
+}
+
+@keyframes activity-cell {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+  18% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.22;
+  }
+}
+
+/* Waiting for the user: the whole mark holds and breathes in the warning ink. */
+.activity-mark[data-activity='blocked'] {
+  color: var(--piarc-state-warning);
+  animation: activity-breathe 2s ease-in-out infinite;
+}
+
+.activity-mark[data-activity='blocked'] .activity-mark-cell {
+  opacity: 1;
+  animation: none;
+}
+
+@keyframes activity-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+:root[data-reduce-motion='true'] .activity-mark,
+:root[data-reduce-motion='true'] .activity-mark-cell {
+  animation: none;
+}
+
+:root[data-reduce-motion='true'] .activity-mark-cell {
+  opacity: 0.85;
+}
+
+@media (forced-colors: active) {
+  .activity-mark {
+    color: CanvasText;
+  }
 }
 
 @keyframes piarc-spin {

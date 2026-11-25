@@ -9,10 +9,8 @@ import { ScrollFollow, distanceFromBottom } from './scroll-follow.js';
 import { useShownRowIds } from './services.js';
 import { TranscriptList } from './TranscriptList.js';
 import { ArrowDownGlyph } from '../shell/icons.js';
+import { isApprovalRow } from '../store/transcript.js';
 import { pinToBottom, useFollowView, useScrollFollow } from './use-scroll-follow.js';
-
-/** The id prefix of approval rows (SessionTranscript.setApprovals). */
-const APPROVAL_ROW = 'approval:';
 
 export function Transcript({
   onFollow,
@@ -32,7 +30,7 @@ export function Transcript({
   const t = useT();
   const ids = useShownRowIds();
   // An approval card waits below: the jump says so.
-  const waiting = ids.some((id) => id.startsWith(APPROVAL_ROW));
+  const waiting = ids.some(isApprovalRow);
   const follow = useMemo(() => new ScrollFollow(), []);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const [content, setContent] = useState<HTMLElement | null>(null);
