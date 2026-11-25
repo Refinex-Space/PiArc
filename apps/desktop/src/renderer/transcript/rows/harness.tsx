@@ -3,7 +3,7 @@
 // next-step suggestions (SuggestNextSteps). They read the call's arguments and result as the
 // transcript holds them, live and in history alike; the rail's task card and the plan panel read
 // the session's harness state instead.
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { Item, TodoItem } from '@piarc/protocol';
 
 import { useT } from '../../app/app-context.js';
@@ -15,6 +15,9 @@ import { startSession } from '../../shell/start-session.js';
 import { SessionInput } from '../../shell/session-input.js';
 import { StoreContext } from '../../store/hooks.js';
 import { todosOf } from '../../store/harness.js';
+import { MarkdownView } from '../markdown/MarkdownView.js';
+import { useExpanded, useParsedDoc, useTaskPlace, useTranscriptView } from '../services.js';
+import { Segments, StepRow } from './parts.js';
 
 type ToolItem = Extract<Item, { type: 'dynamicToolCall' }>;
 
@@ -33,14 +36,23 @@ export function taskListOf(args: Record<string, unknown>): TodoItem[] | undefine
 }
 
 /** A task list with its progress: the task in progress stands out, done ones are struck. */
-export function TaskList({ todos }: { readonly todos: readonly TodoItem[] }) {
+export function TaskList({
+  todos,
+  counted = true,
+}: {
+  readonly todos: readonly TodoItem[];
+  /** Shows "n/m done" above the list (not when the line above already says it). */
+  readonly counted?: boolean;
+}) {
   const t = useT();
   const done = todos.filter((todo) => todo.status === 'completed').length;
   return (
     <div className="task-list">
-      <div className="task-count muted" data-testid="task-count">
-        {t('tasks.count', { done, total: todos.length })}
-      </div>
+      {counted && (
+        <div className="task-count muted" data-testid="task-count">
+          {t('tasks.count', { done, total: todos.length })}
+        </div>
+      )}
       <ol>
         {todos.map((todo, i) => (
           <li
@@ -68,10 +80,49 @@ export function TaskList({ todos }: { readonly todos: readonly TodoItem[] }) {
   );
 }
 
-function TaskCard({ item }: { readonly item: ToolItem }) {
+/** What one TodoWrite call changed, against the call before it. */
+export interface TaskChange {
+  readonly kind: 'listed' | 'completed' | 'started' | 'added' | 'updated';
+  /** The first task it names. */
+  readonly task?: string | undefined;
+  /** How many more tasks changed the same way. */
+  readonly more: number;
+}
+
+/** The change the line of an earlier TodoWrite call names: finished work first. */
+export function taskChange(
+  before: readonly TodoItem[] | undefined,
+  after: readonly TodoItem[],
+): TaskChange {
+  if (before === undefined) return { kind: 'listed', more: 0 };
+  const was = new Map(before.map((todo) => [todo.content, todo.status]));
+  const pick = (kind: TaskChange['kind'], tasks: readonly TodoItem[]): TaskChange | undefined =>
+    tasks[0] === undefined ? undefined : { kind, task: tasks[0].content, more: tasks.length - 1 };
+  return (
+    pick(
+      'completed',
+      after.filter((todo) => todo.status === 'completed' && was.get(todo.content) !== 'completed'),
+    ) ??
+    pick(
+      'started',
+      after.filter(
+        (todo) => todo.status === 'inProgress' && was.get(todo.content) !== 'inProgress',
+      ),
+    ) ??
+    pick(
+      'added',
+      after.filter((todo) => !was.has(todo.content)),
+    ) ?? { kind: 'updated', more: 0 }
+  );
+}
+
+function TaskCard({ id, item }: { readonly id: string; readonly item: ToolItem }) {
   const t = useT();
   const todos = taskListOf(item.arguments);
+  const place = useTaskPlace(id);
   if (todos === undefined) return null;
+  // A later call replaced this list: one line names what changed, the list opens below it.
+  if (!place.latest) return <TaskUpdate id={id} todos={todos} previous={place.previous} />;
   return (
     <section
       className="row harness-card task-card"
@@ -88,10 +139,108 @@ function TaskCard({ item }: { readonly item: ToolItem }) {
   );
 }
 
-/** The first lines of a plan. */
-export function planPreview(plan: string, lines = 8): string {
-  const all = plan.split('\n');
-  return all.length > lines ? all.slice(0, lines).join('\n') + '\n…' : plan;
+function TaskUpdate({
+  id,
+  todos,
+  previous,
+}: {
+  readonly id: string;
+  readonly todos: readonly TodoItem[];
+  readonly previous: string | undefined;
+}) {
+  const t = useT();
+  const { transcript } = useTranscriptView();
+  const [expanded, setExpanded] = useExpanded(`tasks:${id}`, false);
+  // The call before is finished: reading it once per render is enough.
+  const before = previous === undefined ? undefined : transcript.row(previous);
+  const change = taskChange(
+    before?.kind === 'item' && before.item.type === 'dynamicToolCall'
+      ? taskListOf(before.item.arguments)
+      : undefined,
+    todos,
+  );
+  const done = todos.filter((todo) => todo.status === 'completed').length;
+  return (
+    <section className="row row-task-update" data-testid="task-update" data-change={change.kind}>
+      <StepRow
+        verb={t(`tasks.change.${change.kind}`)}
+        meta={change.task}
+        metaTitle={change.task}
+        state="done"
+        trail={
+          <Segments>
+            {[
+              change.more > 0 ? t('tasks.change.more', { count: change.more }) : null,
+              t('tasks.count', { done, total: todos.length }),
+            ]}
+          </Segments>
+        }
+        expanded={expanded}
+        onToggle={() => {
+          setExpanded(!expanded);
+        }}
+      >
+        <TaskList todos={todos} counted={false} />
+      </StepRow>
+    </section>
+  );
+}
+
+/**
+ * A plan as Markdown. On the card waiting for review it scrolls (and takes focus then, so the
+ * keyboard can scroll it); in the transcript it shows the start, faded, and the plan panel
+ * holds the rest.
+ */
+export function PlanMarkdown({
+  id,
+  plan,
+  scroll,
+}: {
+  /** The call or request the plan belongs to: one parse per plan. */
+  readonly id: string;
+  readonly plan: string;
+  readonly scroll: boolean;
+}) {
+  const t = useT();
+  const { services, transcript } = useTranscriptView();
+  const docKey = transcript.cacheKey(`plan:${id}`);
+  const parsed = useParsedDoc(docKey);
+  useEffect(() => {
+    services.markdown.parseFinished(docKey, plan);
+  }, [services, docKey, plan]);
+  const box = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const element = box.current;
+    const Observer = element?.ownerDocument.defaultView?.ResizeObserver;
+    if (element === null || Observer === undefined) return;
+    // The box stops growing at its cap: watch the content too.
+    const observer = new Observer(() => {
+      setOverflows(element.scrollHeight > element.clientHeight + 1);
+    });
+    observer.observe(element);
+    if (element.firstElementChild !== null) observer.observe(element.firstElementChild);
+    return () => {
+      observer.disconnect();
+    };
+  }, [parsed]);
+  const focusable = scroll && overflows;
+  return (
+    <div
+      ref={box}
+      className="plan-preview"
+      data-testid="plan-preview"
+      data-scroll={scroll}
+      data-overflows={overflows}
+      {...(focusable ? { tabIndex: 0, role: 'region', 'aria-label': t('plan.title') } : {})}
+    >
+      {parsed === undefined ? (
+        <p className="md-fallback">{plan}</p>
+      ) : (
+        <MarkdownView blocks={parsed.blocks} />
+      )}
+    </div>
+  );
 }
 
 /** Where a submitted plan stands, from its `ExitPlanMode` call. */
@@ -127,7 +276,7 @@ function PlanCard({ item }: { readonly item: ToolItem }) {
             {t('plan.openPanel')}
           </button>
         </header>
-        <pre className="plan-preview">{planPreview(plan)}</pre>
+        <PlanMarkdown id={item.itemId} plan={plan} scroll={false} />
       </div>
     </section>
   );
@@ -324,10 +473,10 @@ function NextStepsRow({ item }: { readonly item: ToolItem }) {
 }
 
 /** The row of a host tool call, or null for the calls that stay in tool groups. */
-export function HostToolRow({ item }: { readonly item: ToolItem }) {
+export function HostToolRow({ id, item }: { readonly id: string; readonly item: ToolItem }) {
   switch (item.tool) {
     case 'TodoWrite':
-      return <TaskCard item={item} />;
+      return <TaskCard id={id} item={item} />;
     case 'ExitPlanMode':
       return <PlanCard item={item} />;
     case 'AskUserQuestion':

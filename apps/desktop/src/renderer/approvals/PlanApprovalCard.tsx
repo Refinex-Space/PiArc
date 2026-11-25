@@ -1,5 +1,5 @@
-// The plan card (T26): an ExitPlanMode call waiting for the user. It shows the start of the
-// plan and the comment count; the plan panel shows the whole text and takes inline comments.
+// The plan card (T26): an ExitPlanMode call waiting for the user. It shows the plan as
+// Markdown and, once there are any, the comment count; the plan panel takes inline comments.
 // Three answers: approve and accept edits (Mod+Enter), approve and review edits
 // (Mod+Shift+Enter), keep planning (Esc) with the feedback and the comments. The answer names
 // the card's revision and Agent Host connection, like every approval.
@@ -11,7 +11,8 @@ import { useApp } from '../app/app-context.js';
 import { Keycaps } from '../app/Keycaps.js';
 import { reason } from '../shell/errors.js';
 import { showPanel } from '../shell/registry.js';
-import { planPreview } from '../transcript/rows/harness.js';
+import { InfoGlyph } from '../shell/icons.js';
+import { PlanMarkdown } from '../transcript/rows/harness.js';
 import { answerRequest } from './answer.js';
 import { planComments, usePlanComments } from './plan-comments.js';
 import { useApprovalKeys } from './use-approval-keys.js';
@@ -89,28 +90,35 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
       <div className="approval-box">
         <header className="approval-title">
           <strong>{t('approval.kind.plan')}</strong>
-          <span className="approval-tool">{request.tool}</span>
+          <span className="approval-title-end">
+            {comments.length > 0 && (
+              <span className="approval-tool" data-testid="plan-comment-count">
+                {t('plan.comments', { count: comments.length })}
+              </span>
+            )}
+            <button
+              type="button"
+              className="approval-link"
+              data-testid="plan-open-panel"
+              onClick={() => {
+                showPanel('plan');
+              }}
+            >
+              {t('plan.openPanel')}
+            </button>
+            <span
+              className="approval-hint"
+              role="img"
+              tabIndex={0}
+              aria-label={t('plan.commentsHint')}
+              data-tooltip={t('plan.commentsHint')}
+            >
+              <InfoGlyph />
+            </span>
+          </span>
         </header>
         <ApprovalOrigin request={request} />
-        <pre className="plan-preview" data-testid="plan-preview">
-          {planPreview(plan)}
-        </pre>
-        <div className="plan-card-meta">
-          <span data-testid="plan-comment-count">
-            {t('plan.comments', { count: comments.length })}
-          </span>
-          <button
-            type="button"
-            className="approval-link"
-            data-testid="plan-open-panel"
-            onClick={() => {
-              showPanel('plan');
-            }}
-          >
-            {t('plan.openPanel')}
-          </button>
-        </div>
-        <p className="muted">{t('plan.commentsHint')}</p>
+        <PlanMarkdown id={request.requestId} plan={plan} scroll />
         <label className="approval-field">
           <span className="approval-field-label">{t('approval.feedback')}</span>
           <textarea

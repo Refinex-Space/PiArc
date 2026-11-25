@@ -186,6 +186,16 @@ test('session pane states for review', async ({ app, page }) => {
     await page.getByTestId('back-to-bottom').waitFor();
     await page.screenshot({ path: path.join(EVIDENCE, `jump-${theme}.png`) });
   }
+  // Earlier task lists are lines naming the change; one opened (UI-14).
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'cards');
+    await page.getByTestId('transcript-scroller').hover();
+    await page.mouse.wheel(0, -4000);
+    await page.getByTestId('task-update').first().locator('button').click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `tasks-history-${theme}.png`) });
+  }
   // The working mark's wave, frame by frame (motion evidence), while a tool runs.
   await prefer(page, { key: 'appearance.theme', value: 'light' });
   await open(page, 'working');

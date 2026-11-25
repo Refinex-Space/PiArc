@@ -244,6 +244,54 @@ function endsTurn(transcript: SessionTranscript, id: string): boolean {
   return true;
 }
 
+/** Where a TodoWrite call stands among the session's TodoWrite calls. */
+export interface TaskPlace {
+  /** No later call replaced its list. */
+  readonly latest: boolean;
+  /** The row of the call before it, when that one is loaded. */
+  readonly previous: string | undefined;
+}
+
+/** Where TodoWrite row `id` stands; re-renders only when that changes. */
+export function useTaskPlace(id: string): TaskPlace {
+  const { transcript } = useTranscriptView();
+  const subscribe = useCallback((l: () => void) => transcript.subscribeList(l), [transcript]);
+  // A string, so the snapshot compares by value.
+  const read = useCallback(() => taskPlace(transcript, id), [transcript, id]);
+  const place = useSyncExternalStore(subscribe, read);
+  return useMemo(
+    () => ({
+      latest: place.startsWith('1'),
+      previous: place.length > 1 ? place.slice(1) : undefined,
+    }),
+    [place],
+  );
+}
+
+function writesTasks(row: TranscriptRow | undefined): boolean {
+  return (
+    row?.kind === 'item' && row.item.type === 'dynamicToolCall' && row.item.tool === 'TodoWrite'
+  );
+}
+
+function taskPlace(transcript: SessionTranscript, id: string): string {
+  const ids = transcript.rowIds();
+  const at = transcript.rowIndex(id);
+  if (at < 0) return '1';
+  let latest = '1';
+  for (let next = at + 1; next < ids.length; next += 1) {
+    if (writesTasks(transcript.row(ids[next] ?? ''))) {
+      latest = '0';
+      break;
+    }
+  }
+  for (let before = at - 1; before >= 0; before -= 1) {
+    const rowId = ids[before] ?? '';
+    if (writesTasks(transcript.row(rowId))) return latest + rowId;
+  }
+  return latest;
+}
+
 /** One row; re-renders only when that row changes. */
 export function useTranscriptRow(id: string): TranscriptRow | undefined {
   const { transcript } = useTranscriptView();

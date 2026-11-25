@@ -11,13 +11,13 @@
 | 图表、图片与时间（ADR-0080） | ` ```mermaid ` 由 `markdown/ChatDiagram.tsx` 经 Files 的隔离绘图文档画成图片（流式时占位；源码切换、复制、经 `saveImage` 下载 SVG/PNG、点开放大；失败时显示源码、原因与"请模型修复"，经 `TranscriptActions.prompt` 发出）。图片由 `markdown/ReplyImage.tsx` 处理：项目内的本地图片经 `projectFilePreview(..., 'media')` 内联，远程图片只显示卡片；Read 读取的图片显示在调用行下。用户消息与回合末回复的操作行显示 `rows/common.tsx` 的 `MessageTime`（历史取 `HistoryItem.at`，实时取 Core 事件时间，共用每分钟一次的时钟）。 |
 | 思考块 | 默认折叠，生成中也是（标签"正在思考…"走光，用户可展开）；有起止时间才显示时长。与工具调用相邻时并入工具组（ADR-0079）。 |
 | 工具组摘要 | 同一回合里连续的工具调用（含命令与网页搜索）与其间的思考归为一组（`store/transcript.ts` 的 `relist`），按动词、不同对象数、增删行数汇总，超过四段折成"另外 N 项"。组是运行中回合的最新内容时默认展开（`services.ts` 的 `useLiveTail`），之后默认收起，用户的选择优先（ADR-0079）。展开后显示成员：命令、文件改动、网页搜索用各自的卡片，思考按视图档位显示。Read 的文件名可在所属会话的 Files 中打开，并定位到调用的起始行。 |
-| Bash 卡 | 读取 `commandExecution.execution` 的 cwd、语义状态、退出码和截断落盘路径。运行满 10 秒才显示计时。 |
+| Bash 卡 | 读取 `commandExecution.execution` 的 cwd、语义状态、退出码和截断落盘路径。运行满 10 秒才显示计时。命令（含审批卡里的）经 `rows/parts.tsx` 的 `CommandText` 按词换行，只有比一行长的词才在词内断开，不在 `--flag`、`some-name` 的连字符处断，文字与复制内容不变。 |
 | 文件改动卡 | 读取 `fileChange.diff` 的计数、hunk 与降级信息，保留 Core 提供的路径。 |
 | 压缩提示 | 使用 `contextCompaction` 中可用的原因和 token 计数；原因 `rewind` 是"从此处摘要"留下的分支摘要（T28）。 |
 | 错误卡 | 读取 `turn/completed` 的 `errorKind` 与 `retryable`。`session/uncertain` 有独立提示与重试按钮。 |
 | Working 行 | 当前工具、计时、用量、自动重试次数和压缩状态由同一回合的事件驱动。 |
 | 子 agent 卡（T31） | `rows/subagent.tsx`：`subagent` 条目的 `subagent`（`SubagentState`，由 `subagent/*` 通知经 `SessionTranscript.onSubagent` 保持最新）给出任务名、类型、颜色、实际模型、状态、耗时、工具调用数、token、后台标记与警告；运行中显示当前活动与停止（`actions.stopSubagent`）。展开后 `ChildTranscript` 经 `actions.subagentTranscript` 读子会话的历史窗口，用同样的行组件只读显示（新的 `SessionTranscript`，不提供重试与回退），状态或工具调用数变化时重新读取。子 agent 条目不进工具组。 |
-| 宿主工具（T26） | `rows/harness.tsx`：`TodoWrite` 是任务卡（从参数读清单，Claude Code 的 `in_progress` 换成 `inProgress`），`ExitPlanMode` 是计划卡（状态取条目状态），`AskUserQuestion` 列出结果首行之后的 JSON，`SuggestNextSteps` 是下一步建议（"在此执行"经 `SessionInput`，运行中为 follow-up；"开始新会话"走 `startSession`；没有窗口外壳的原型页不显示按钮）。这四个工具不进工具组（`store/transcript.ts` 的 `OWN_ROW_TOOLS`）。 |
+| 宿主工具（T26） | `rows/harness.tsx`：`TodoWrite` 只有最新一次是任务卡（从参数读清单，Claude Code 的 `in_progress` 换成 `inProgress`），较早的每次一行，写明相对上一次的变化（`taskChange`：完成优先，其次开始、添加），可展开为当时的清单；位置由 `services.ts` 的 `useTaskPlace` 按列表订阅。`ExitPlanMode` 是计划卡（状态取条目状态，计划经 Markdown worker 渲染为 `PlanMarkdown`，在 transcript 里截在约 200 px 并渐隐，审批卡里可滚动），`AskUserQuestion` 列出结果首行之后的 JSON，`SuggestNextSteps` 是下一步建议（"在此执行"经 `SessionInput`，运行中为 follow-up；"开始新会话"走 `startSession`；没有窗口外壳的原型页不显示按钮）。这四个工具不进工具组（`store/transcript.ts` 的 `OWN_ROW_TOOLS`）。 |
 
 - 思考块、工具与工具组、Bash、文件改动、网页搜索共用 `rows/parts.tsx` 的 `StepRow`（次色动词、主色对象、尾段与结果词、末尾箭头、运行中走光、常显说明行），增删胶囊与复制按钮也在这里；新的工具行先用它，不另写标题行。working 行的活动标记是 PiArc 自己的 `rows/ActivityMark.tsx`。回复的复制与选中本回合只出现在回合的最后一条回复上（`services.ts` 的 `useEndsTurn`，按布尔值订阅，流式期间不触发额外渲染）。
 - 行只订阅自己的 ID，工具组额外订阅成员。行级错误边界把单条渲染失败限制在该行。会话页与新建页另由主区的页面边界保护，切换页面后重新挂载，侧栏仍可导航。显示模型文本、命令输出或路径一律用文本节点。

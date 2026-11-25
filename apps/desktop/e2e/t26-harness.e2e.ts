@@ -127,12 +127,15 @@ test('task card and the rail task list follow TodoWrite', async ({
 }, info) => {
   await openSession(app, page, workspaces, 'todo list', 't26-todo', 'Fix the loop bound');
   await idle(page);
-  const cards = page.getByTestId('task-card');
-  await expect(cards).toHaveCount(2);
-  await expect(cards.first().getByTestId('task-count')).toHaveText('1/3 done');
-  await expect(cards.first().locator('[data-status="inProgress"]')).toHaveText(
-    /Fixing the loop bound/u,
-  );
+  // The latest list is the card; the earlier one is a line naming the change, opening to it.
+  const card = page.getByTestId('task-card');
+  await expect(card).toHaveCount(1);
+  await expect(card.getByTestId('task-count')).toHaveText('2/3 done');
+  const earlier = page.getByTestId('task-update');
+  await expect(earlier).toHaveCount(1);
+  await expect(earlier).toContainText('1/3 done');
+  await earlier.locator('button').click();
+  await expect(earlier.locator('[data-status="inProgress"]')).toHaveText(/Fixing the loop bound/u);
   const rail = page.getByTestId('task-panel');
   await expect(rail).toBeVisible();
   await expect(rail.getByTestId('task-count')).toHaveText('2/3 done');

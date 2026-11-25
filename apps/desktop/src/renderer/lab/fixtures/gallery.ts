@@ -435,6 +435,26 @@ function cards(): GallerySection {
     notifications: [
       turn('t1'),
       ...done('t1', user('u1', 'Plan the parser work and split it up.')),
+      // Earlier lists: a line each, naming what changed (UI-14).
+      ...done(
+        't1',
+        tool('todo0', 'TodoWrite', {
+          todos: [
+            { content: 'Read the parser', status: 'in_progress', activeForm: 'Reading' },
+            { content: 'Cache closed blocks', status: 'pending' },
+          ],
+        }),
+      ),
+      ...done(
+        't1',
+        tool('todo1', 'TodoWrite', {
+          todos: [
+            { content: 'Read the parser', status: 'completed' },
+            { content: 'Cache closed blocks', status: 'pending' },
+            { content: 'Measure streaming', status: 'pending' },
+          ],
+        }),
+      ),
       ...done(
         't1',
         tool('todo', 'TodoWrite', {
@@ -465,7 +485,12 @@ function cards(): GallerySection {
           tokens: { input: 9_200, output: 640, cacheRead: 0, cacheWrite: 0 },
         },
       }),
-      ...done('t1', tool('plan', 'ExitPlanMode', { plan: '1. Cache blocks\n2. Measure' })),
+      ...done(
+        't1',
+        tool('plan', 'ExitPlanMode', {
+          plan: '## Parser cache\n\n1. Cache **closed** blocks in the worker.\n2. Re-parse only the open tail.\n3. Measure with `npm run bench:t19`.\n\n### Risks\n\n- A fence that closes late re-opens the tail.\n- Tables keep their row count.\n- The cache is per document.',
+        }),
+      ),
       ...done(
         't1',
         tool(

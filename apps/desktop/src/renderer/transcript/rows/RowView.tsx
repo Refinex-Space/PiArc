@@ -129,7 +129,7 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
     case 'webSearch':
       return <WebSearchCard id={id} item={item} />;
     case 'dynamicToolCall':
-      if (OWN_ROW_TOOLS.has(item.tool)) return <HostToolRow item={item} />;
+      if (OWN_ROW_TOOLS.has(item.tool)) return <HostToolRow id={id} item={item} />;
       return <ToolGroupRow id={id} members={[id]} />;
     default:
       // Other tool calls are shown inside tool groups.

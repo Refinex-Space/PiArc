@@ -1430,6 +1430,13 @@
   user-select: none;
 }
 
+/* `CommandText`: a word moves to the next line whole; only one longer than the line breaks. */
+.command-word {
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-all;
+}
+
 /* the approval card's command and diff blocks share these */
 .approval-card .bash-command {
   border-radius: var(--piarc-radius-md);
@@ -2471,6 +2478,8 @@ button.file-change-path:hover {
   font: inherit;
 }
 
+/* A plan reads as Markdown: scrolling on the card under review, the start of it (faded) in the
+   transcript, where the plan panel holds the rest. */
 .plan-preview {
   max-height: min(50vh, 420px);
   margin: 0;
@@ -2479,25 +2488,66 @@ button.file-change-path:hover {
   border-radius: var(--piarc-session-radius);
   background: var(--piarc-session-fill);
   color: var(--piarc-text-primary);
-  font-family: var(--piarc-font-ui);
   font-size: var(--piarc-session-body);
   line-height: var(--piarc-session-body-line);
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.plan-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--piarc-space-2);
-  color: var(--piarc-text-secondary);
-  font-size: var(--piarc-session-footnote);
+.plan-preview[data-scroll='false'] {
+  max-height: 200px;
+  overflow: hidden;
 }
 
-.plan-card .muted {
-  margin: 0;
-  font-size: var(--piarc-session-footnote);
+.plan-preview[data-scroll='false'][data-overflows='true'] {
+  mask-image: linear-gradient(#000 calc(100% - 48px), transparent);
+}
+
+.plan-preview .md > :last-child {
+  margin-bottom: 0;
+}
+
+/* Headings on the reply's scale: a plan's title is not a page title. */
+.plan-preview .md :is(h1, h2, h3, h4, h5, h6) {
+  margin: var(--piarc-space-3) 0 var(--piarc-space-1);
+  font-size: 1em;
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: inherit;
+}
+
+.plan-preview .md :is(h1, h2) {
+  font-size: calc(1em + 2px);
+}
+
+.plan-preview .md > :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+
+.approval-card:focus-within .plan-preview:focus-visible {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+
+.approval-title-end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin-inline-start: auto;
+}
+
+.approval-hint {
+  display: inline-flex;
+  border-radius: 3px;
+  color: var(--piarc-text-secondary);
+  cursor: help;
+}
+
+.approval-hint:hover {
+  color: var(--piarc-text-primary);
+}
+
+.approval-hint:focus-visible {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
 }
 
 /* T46: the Auto mode reviewer on approval cards and on the calls it decided. */

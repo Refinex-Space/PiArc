@@ -204,3 +204,24 @@ export function CopyIconButton({
     </IconButton>
   );
 }
+
+/** Longer commands keep the browser's wrapping: one span per word would cost too much. */
+const COMMAND_WORDS_UP_TO = 4000;
+
+/**
+ * A command wrapped for reading: lines break between words, and only a word longer than the line
+ * breaks inside, anywhere. The browser alone also breaks after the hyphens of `--flag` and
+ * `some-name`, which splits options from their names. The text (and what is copied) is unchanged.
+ */
+export function CommandText({ text }: { readonly text: string }) {
+  if (text.length > COMMAND_WORDS_UP_TO) return text;
+  return text.split(/(\s+)/u).map((part, i) =>
+    i % 2 === 1 || part === '' ? (
+      part
+    ) : (
+      <span key={String(i)} className="command-word">
+        {part}
+      </span>
+    ),
+  );
+}

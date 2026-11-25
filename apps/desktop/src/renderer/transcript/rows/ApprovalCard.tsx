@@ -13,6 +13,7 @@ import { reason } from '../../shell/errors.js';
 import { useApprovalKeys } from '../../approvals/use-approval-keys.js';
 import { canAlwaysAllow } from './approval-keys.js';
 import { DiffView } from './tools.js';
+import { CommandText } from './parts.js';
 import { ApprovalOrigin } from '../../approvals/ApprovalOrigin.js';
 import { Button } from '../../app/Button.js';
 import { Keycaps } from '../../app/Keycaps.js';
@@ -143,22 +144,27 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               </div>
             )}
             {request.path && <div className="approval-path">{revealBidi(request.path)}</div>}
-            {request.directory && (
+            {/* The editable field below names the directory when "always" can keep it. */}
+            {request.directory && (reviewing || !allowPersistent) && (
               <div className="approval-path">
                 {t('approval.directory')} · {revealBidi(request.directory)}
               </div>
             )}
             {long && !expanded ? (
               <pre className="bash-command approval-value is-clipped">
-                {revealBidi(
-                  content.split('\n').slice(0, PREVIEW_LINES).join('\n').slice(0, PREVIEW_CHARS),
-                )}
+                <CommandText
+                  text={revealBidi(
+                    content.split('\n').slice(0, PREVIEW_LINES).join('\n').slice(0, PREVIEW_CHARS),
+                  )}
+                />
                 …
               </pre>
             ) : (
               <>
                 {request.command && (
-                  <pre className="bash-command approval-value">{revealBidi(request.command)}</pre>
+                  <pre className="bash-command approval-value">
+                    <CommandText text={revealBidi(request.command)} />
+                  </pre>
                 )}
                 {request.diff &&
                   (request.diff.hunks.length ? (

@@ -25,7 +25,7 @@ import { useElapsedText, useNow } from './common.js';
 import { revealBidi } from '../reveal.js';
 import { projectPath } from '../../files/file-path.js';
 import { ReviewNote } from './review.js';
-import { DiffPill, Segments, StepRow, type StepState } from './parts.js';
+import { CommandText, DiffPill, Segments, StepRow, type StepState } from './parts.js';
 import {
   STATUS_MESSAGE,
   readPath,
@@ -524,7 +524,7 @@ export function BashCard({
               <span className="bash-prompt" aria-hidden="true">
                 ${' '}
               </span>
-              {item.command}
+              <CommandText text={item.command} />
             </pre>
           </div>
           {output === '' ? null : (

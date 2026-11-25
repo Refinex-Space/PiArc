@@ -2,7 +2,7 @@
 // T19-A01, A02: every P0 row type through the real row dispatcher (RowView), fed by the session
 // store with Core-shaped notifications; the thinking block stays open while it is generated and
 // folds to "thought for N seconds" afterwards.
-import type { Item } from '@piarc/protocol';
+import type { Item, TodoItem } from '@piarc/protocol';
 import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -24,6 +24,7 @@ import {
   type TranscriptServices,
 } from '../services.js';
 import { StreamingDriver } from '../streaming-driver.js';
+import { taskChange } from './harness.js';
 import { RowView } from './RowView.js';
 
 declare global {
@@ -681,15 +682,19 @@ it('renders the five ledger card kinds, keeps approvals through a history reload
   expect(form?.textContent).toContain('Which database?');
   expect(form?.querySelectorAll('input[type="radio"]')).toHaveLength(3);
   expect(form?.textContent).toContain('Other');
-  expect(root.querySelector('[data-approval-card="plan"]')?.textContent).toContain('1. Fix it');
+  // The plan reads as Markdown; the card does not name the ExitPlanMode tool.
+  const planCard = root.querySelector('[data-approval-card="plan"]');
+  expect(planCard?.querySelector('li')?.textContent).toBe('Fix it');
+  expect(planCard?.textContent).not.toContain('ExitPlanMode');
   expect(root.querySelector('[data-approval-card="fileChange"]')?.textContent).not.toContain(
     'Always allow',
   );
   expect(root.querySelector('.diff-line.is-added')?.textContent).toContain('new');
   expect(root.querySelector('[data-approval-card="command"]')?.textContent).toContain('echo first');
-  expect(root.querySelector('[data-approval-card="permissionExpansion"]')?.textContent).toContain(
-    '/other',
-  );
+  // The directory "always" would keep is named once, in its editable field (UI-6).
+  const expansion = root.querySelector('[data-approval-card="permissionExpansion"]');
+  expect(expansion?.querySelector('input')?.value).toBe('/other');
+  expect(expansion?.textContent).not.toContain('/other');
   act(() => {
     store.applySessions({
       revision: 2,
@@ -749,7 +754,10 @@ it('gives host tools rows of their own: task list, plan, answers and next steps 
   expect(root.querySelector('[data-testid="plan-row"]')?.getAttribute('data-status')).toBe(
     'approved',
   );
-  expect(root.querySelector('[data-testid="plan-row"]')?.textContent).toContain('1. Fix');
+  // The plan reads as Markdown: its numbered steps are a list.
+  expect(
+    [...root.querySelectorAll('[data-testid="plan-row"] li')].map((li) => li.textContent),
+  ).toEqual(['Fix', 'Test']);
   expect(root.querySelector('[data-testid="question-row"]')?.textContent).toContain('SQLite');
   const next = root.querySelector('[data-testid="next-steps"]');
   expect(next?.textContent).toContain('Run tests');
@@ -1074,4 +1082,103 @@ it('opens a reply’s local markdown and Read call in the session Files panel, w
     byTestId(root, 'read-file-path').click();
   });
   expect(openFile).toHaveBeenCalledWith('guide.md', 5);
+});
+
+describe('host tool rows after the session pane review', () => {
+  const todoWrite = (itemId: string, todos: readonly [string, string][]): Item => ({
+    type: 'dynamicToolCall',
+    itemId,
+    status: 'completed',
+    tool: 'TodoWrite',
+    arguments: { todos: todos.map(([content, status]) => ({ content, status })) },
+  });
+
+  it('TodoWrite: the latest list is a card, earlier ones are a line naming the change', async () => {
+    const items = [
+      todoWrite('w1', [
+        ['Write the test', 'in_progress'],
+        ['Fix the parser', 'pending'],
+      ]),
+      todoWrite('w2', [
+        ['Write the test', 'completed'],
+        ['Fix the parser', 'in_progress'],
+      ]),
+      todoWrite('w3', [
+        ['Write the test', 'completed'],
+        ['Fix the parser', 'completed'],
+      ]),
+    ];
+    const root = await render(transcriptOf(items.map((item) => ({ item }))), ['w1', 'w2', 'w3']);
+    expect(root.querySelectorAll('[data-testid="task-card"]')).toHaveLength(1);
+    const lines = [...root.querySelectorAll<HTMLElement>('[data-testid="task-update"]')];
+    expect(lines.map((line) => line.dataset.change)).toEqual(['listed', 'completed']);
+    expect(lines[1]?.textContent).toContain('CompletedWrite the test');
+    expect(lines[1]?.textContent).toContain('1/2 done');
+    // An earlier list opens under its line.
+    act(() => {
+      lines[0]?.querySelector('button')?.click();
+    });
+    expect(lines[0]?.querySelectorAll('[data-testid="task"]')).toHaveLength(2);
+  });
+
+  it('task change: finished work first, then started, then added', () => {
+    const list = (...todos: [string, TodoItem['status']][]): TodoItem[] =>
+      todos.map(([content, status]) => ({ content, status }));
+    expect(taskChange(undefined, list(['a', 'pending']))).toEqual({ kind: 'listed', more: 0 });
+    expect(
+      taskChange(
+        list(['a', 'inProgress'], ['b', 'pending'], ['c', 'pending']),
+        list(['a', 'completed'], ['b', 'completed'], ['c', 'inProgress']),
+      ),
+    ).toEqual({ kind: 'completed', task: 'a', more: 1 });
+    expect(taskChange(list(['a', 'pending']), list(['a', 'inProgress'], ['b', 'pending']))).toEqual(
+      { kind: 'started', task: 'a', more: 0 },
+    );
+    expect(taskChange(list(['a', 'pending']), list(['a', 'pending'], ['b', 'pending']))).toEqual({
+      kind: 'added',
+      task: 'b',
+      more: 0,
+    });
+    expect(taskChange(list(['a', 'pending']), list(['a', 'pending']))).toEqual({
+      kind: 'updated',
+      more: 0,
+    });
+  });
+
+  it('plan row: the plan reads as Markdown', async () => {
+    const item: Item = {
+      type: 'dynamicToolCall',
+      itemId: 'p1',
+      status: 'completed',
+      tool: 'ExitPlanMode',
+      arguments: { plan: '# Steps\n\n1. **Fix** the `loop` bound' },
+    };
+    const root = await render(transcriptOf([{ item }]), ['p1']);
+    const preview = byTestId(root, 'plan-preview');
+    expect(preview.querySelector('h1')?.textContent).toBe('Steps');
+    expect(preview.querySelector('strong')?.textContent).toBe('Fix');
+    expect(preview.querySelector('.md-inline-code')?.textContent).toBe('loop');
+  });
+
+  it('bash card: a command wraps between words, the text unchanged', async () => {
+    const command = 'npm run package:desktop -- --flavor development';
+    const item: Item = {
+      type: 'commandExecution',
+      itemId: 'c1',
+      status: 'completed',
+      tool: 'Bash',
+      arguments: {},
+      command,
+      output: '',
+    };
+    const root = await render(transcriptOf([{ item }]), ['c1']);
+    act(() => {
+      byTestId(root, 'bash-output-toggle').click();
+    });
+    const shown = byTestId(root, 'bash-command');
+    expect(shown.textContent).toBe(`$ ${command}`);
+    expect([...shown.querySelectorAll('.command-word')].map((w) => w.textContent)).toEqual(
+      command.split(' '),
+    );
+  });
 });
