@@ -825,7 +825,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
 
   'session.untitled': '新会话',
   'session.status.error': '出错',
-  'session.status.awaiting': '等待审批',
+  'session.status.awaiting': '等待你的输入',
   'session.status.running': '运行中',
   'session.status.unread': '未读',
   'session.status.idle': '空闲',

@@ -772,21 +772,30 @@ textarea.input {
   justify-content: center;
   width: 12px;
   height: 12px;
-  font-size: 9px;
-  font-weight: var(--piarc-font-weight-semibold);
-  line-height: 1;
 }
 
+/* An error is a warning sign in the error ink (the reference's sidebar glyph). */
 .badge-error {
-  border-radius: var(--piarc-radius-pill);
-  background: var(--piarc-c-badge-error);
-  color: var(--piarc-text-on-accent);
+  color: var(--piarc-c-badge-error);
 }
 
+/* Waiting for the user: the reference's amber dot, inside a thin ring so that it differs from the
+   unread dot by shape as well as color. */
 .badge-awaiting {
-  border-radius: 3px;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  margin: 1px;
+  border: 1.5px solid var(--piarc-c-badge-awaiting);
+  border-radius: var(--piarc-radius-pill);
+}
+
+.badge-awaiting::before {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--piarc-radius-pill);
   background: var(--piarc-c-badge-awaiting);
-  color: var(--piarc-text-on-accent);
+  content: '';
 }
 
 .badge-running {
@@ -809,11 +818,14 @@ textarea.input {
 }
 
 @media (forced-colors: active) {
-  .badge-error,
   .badge-awaiting {
-    border: 1px solid CanvasText;
+    border-color: CanvasText;
   }
-  /* The unread dot is a background: keep it, in a system color. */
+  /* The dots are backgrounds: keep them, in a system color. */
+  .badge-awaiting::before {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
   .badge-unread::before {
     forced-color-adjust: none;
     background: Highlight;

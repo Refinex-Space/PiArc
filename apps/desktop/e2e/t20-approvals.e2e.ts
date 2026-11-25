@@ -28,6 +28,9 @@ test('edits and confirms an exact rule, declines protected writes and restores t
   // `echo` alone is a read-only command (T23); `env` makes it one that asks.
   await expect(card).toContainText('env echo one');
   await expect(row(page, id)).toHaveAttribute('data-badge', 'awaiting');
+  // The sidebar row and the title mark a session that waits for the user (ADR-0081).
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: info.outputPath('awaiting-badges.png') });
   await card.getByLabel('Rules to save').fill('Bash(env echo approved)');
   await app.evaluate(({ dialog }) => {
     const seen: string[] = [];

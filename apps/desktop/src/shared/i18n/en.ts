@@ -838,7 +838,7 @@ export const en = {
 
   'session.untitled': 'New session',
   'session.status.error': 'Error',
-  'session.status.awaiting': 'Waiting for approval',
+  'session.status.awaiting': 'Awaiting input',
   'session.status.running': 'Running',
   'session.status.unread': 'Unread',
   'session.status.idle': 'Idle',

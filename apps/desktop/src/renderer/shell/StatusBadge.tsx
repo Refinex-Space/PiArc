@@ -1,9 +1,11 @@
-// The session status badge (architecture section 8.2): error, waiting for approval, running and
-// unread each look different by shape, not only by color (forced colors and color blindness);
-// idle shows nothing.
+// The session status badge (architecture section 8.2): quiet marks like the reference's sidebar
+// (a small dot family, a warning sign for errors), still told apart by shape, not only by color
+// (forced colors and color blindness): error a warning triangle, awaiting a ring around a dot,
+// running PiArc's activity mark, unread a dot; idle shows nothing.
 import type { BadgeState } from '../store/status.js';
 import { useT } from '../app/app-context.js';
 import { ActivityMark } from '../transcript/rows/ActivityMark.js';
+import { WarningGlyph } from './icons.js';
 
 export function StatusBadge({ state }: { readonly state: BadgeState }) {
   const t = useT();
@@ -23,12 +25,8 @@ export function StatusBadge({ state }: { readonly state: BadgeState }) {
       {state === 'running' ? (
         <ActivityMark activity="think" size={14} />
       ) : state === 'error' ? (
-        '!'
-      ) : state === 'awaiting' ? (
-        '?'
-      ) : (
-        ''
-      )}
+        <WarningGlyph size={12} />
+      ) : null}
     </span>
   );
 }
