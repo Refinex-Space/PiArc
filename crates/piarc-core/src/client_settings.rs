@@ -14,12 +14,14 @@ use crate::error::{Error, Result};
 
 /// Top-level keys of the user's settings the client may write.
 /// `autoMode` (T46): the reviewer model and the user's review policy, user-level only.
+/// `proxy` (ADR-0082): the Agent Hosts' proxy, checked by `network::check_setting`.
 pub const CLIENT_KEYS: &[&str] = &[
     "language",
     "appearance",
     "keybindings",
     "notifications",
     "autoMode",
+    "proxy",
 ];
 
 /// The user's settings file as a JSON object; `{}` when it does not exist.
@@ -90,6 +92,14 @@ pub fn write(
                 CLIENT_KEYS.join(", /")
             ),
         });
+    }
+    if top == Some("proxy") {
+        crate::network::check_setting(pointer, value.as_ref()).map_err(|reason| {
+            Error::InvalidArgument {
+                field: "value",
+                reason,
+            }
+        })?;
     }
     write_user_value(data_dir, managed, pointer, value)?;
     read(data_dir)

@@ -165,6 +165,8 @@ pub(crate) struct Ctx {
     pub worktrees: crate::worktrees::Worktrees,
     /// The diagnostic bundle the client previewed (T45).
     pub diagnostics: diagnostics::PreparedBundle,
+    /// The Agent Hosts' proxy (ADR-0082).
+    pub proxy: Arc<crate::network::Proxy>,
 }
 
 /// The entry of the session layer. Cheap to clone.
@@ -654,6 +656,25 @@ impl Hub {
         for workspace in workspaces {
             workspace.trust_changed(checkout.to_owned()).await;
         }
+    }
+
+    /// The proxy may have changed (the system's, or the user's choice): when the effective one
+    /// did, the open workspaces restart their Agent Host with it once idle (ADR-0082).
+    pub fn refresh_network(&self) {
+        let data = self.ctx.storage.dirs().data().to_owned();
+        if !self.ctx.proxy.refresh(&data) {
+            return;
+        }
+        let workspaces: Vec<workspace::WorkspaceHandle> =
+            lock(&self.routes).workspaces.values().cloned().collect();
+        for workspace in workspaces {
+            workspace.network_changed();
+        }
+    }
+
+    /// The Agent Hosts' proxy state.
+    pub fn proxy(&self) -> Arc<crate::network::Proxy> {
+        Arc::clone(&self.ctx.proxy)
     }
 
     /// Reads the lists from the database again and sends them (after an index sync).

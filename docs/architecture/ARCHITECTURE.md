@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.70（2026-11-25） |
+| 版本 | 2.71（2026-11-25） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -414,7 +414,7 @@ PiArc.app/Contents/
   - macOS：Core 执行 `/usr/bin/sandbox-exec -p <profile> -DWRITABLE_0=<工作区> -DWRITABLE_1=<数据目录> -- <内置 node> agent-host.mjs`。配置正文由 `piarc_sandbox::agent_host_launch` 生成，路径只经 `-D` 传入，与沙箱命令的做法一致（第 6.10 节），所以用 `-p` 而不是写临时文件给 `-f`；配置内容见第 10.3 节；
   - Windows：Core 用 `CreateProcess` 启动，把进程挂进 Job Object（`KILL_ON_JOB_CLOSE`），宿主退出时整棵进程树被清理；
   - 两个平台都经 `piarc_exec::ProcessTreeSpawner` 启动（macOS 新进程组），由 Core 持有 stdio 管道，工作目录为工作区根；
-  - 环境变量最小化：`piarc_host::DEFAULT_ENV_PASSTHROUGH` 中除 `PATH`、`TMPDIR` 以外 Core 自己有的变量；`PATH` 为内置 Node 的 `bin`、`bin/`（rg、fd）再接 Core 的 `PATH`，`npx` 拉起的 MCP server 因此也跑在内置 node 上（T36 起 server 的环境取 Core 的命令环境，PATH 最前仍是内置 Node 的目录，见第 6.8 节）；`PI_PACKAGE_DIR`、`PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0`；`TMPDIR` 与 `npm_config_cache` 指向数据目录下的 `agent-host/tmp`、`agent-host/npm-cache`（Seatbelt 只放行数据目录的写入），`npm_config_update_notifier=false`。凭据不经环境变量（第 5.4 节）。
+  - 环境变量最小化：`piarc_host::DEFAULT_ENV_PASSTHROUGH` 中除 `PATH`、`TMPDIR` 以外 Core 自己有的变量；`PATH` 为内置 Node 的 `bin`、`bin/`（rg、fd）再接 Core 的 `PATH`，`npx` 拉起的 MCP server 因此也跑在内置 node 上（T36 起 server 的环境取 Core 的命令环境，PATH 最前仍是内置 Node 的目录，见第 6.8 节）；`PI_PACKAGE_DIR`、`PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0`；`TMPDIR` 与 `npm_config_cache` 指向数据目录下的 `agent-host/tmp`、`agent-host/npm-cache`（Seatbelt 只放行数据目录的写入），`npm_config_update_notifier=false`。用户设置了代理或系统有代理时（ADR-0082）另加 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY=localhost,127.0.0.1,::1` 与 `NODE_USE_ENV_PROXY=1`：模型请求与服务商登录经代理，本机地址直连；代理变化时工作区的 Agent Host 空闲后换新进程。凭据不经环境变量（第 5.4 节），代理地址也不带用户名和密码。
 
 ### 5.7 跟随上游
 
@@ -1902,6 +1902,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.57 | 2026-11-22 | W3 补充第 11 章：Windows 的全部可测行由 W3 在一台 i5-1340P / 16 GB 笔记本（非基准机型）上实测，数据与配置差异见[性能测量](../engineering/performance.md)第 6.1 节，超出项登记 I201、I202、I207，不调整预算；第 16 章 M3 行加 Windows 结论（内存一项未达标，与 macOS 相同）。 |
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
+| 2.71 | 2026-11-25 | 第 5.5 节：Agent Host 的网络代理，用户设置或系统代理经启动环境生效（ADR-0082）。 |
 | 2.70 | 2026-11-25 | 第 16 章：M3 的内存退出标准在 Windows 上按 ADR-0063 的口径复测达标（W3 收尾）。 |
 | 2.69 | 2026-11-25 | 第 8.2 节：会话状态徽标改用参考的安静小标记，等待为带细环的圆点以保留形状区分（ADR-0081）。 |
 | 2.68 | 2026-11-25 | 第 7.4、8.2 节：历史条目的可选时间 `at`，回复里的 Mermaid、图片与消息时间，输入框的命令芯片（ADR-0080）。 |

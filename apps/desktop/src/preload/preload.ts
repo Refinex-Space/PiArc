@@ -487,6 +487,8 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.diagnosticsExport, id)
       .then((v: unknown) => expectStringOrNull(v)),
+  detectProxy: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.proxyDetect).then((v: unknown) => expectStringOrNull(v)),
   // Passed as given: the main process checks the request (a malformed one is its TypeError).
   saveImage: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.imageSave, request).then((v: unknown) => expectBoolean(v)),

@@ -17,7 +17,7 @@ fn view<'a>(snapshot: &'a Value, id: &str) -> Option<&'a Value> {
         .find(|s| s["id"] == id)
 }
 
-async fn pending(events: &Events, id: &str) -> (ApprovalRequest, u64) {
+pub(crate) async fn pending(events: &Events, id: &str) -> (ApprovalRequest, u64) {
     let snapshot = events
         .until("pending approval", |route, v| {
             route == "core/sessions" && view(v, id).is_some_and(|s| s["pendingApprovals"] == 1)
@@ -30,7 +30,7 @@ async fn pending(events: &Events, id: &str) -> (ApprovalRequest, u64) {
     )
 }
 
-fn allow(card: &ApprovalRequest) -> ApprovalAnswer {
+pub(crate) fn allow(card: &ApprovalRequest) -> ApprovalAnswer {
     ApprovalAnswer {
         elicitation: None,
         confirmed_url: None,

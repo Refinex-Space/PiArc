@@ -72,9 +72,33 @@ impl CoreRuntime {
         on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
     ) -> Result<()> {
         let managed = self.storage()?.dirs().managed().clone();
+        // A new proxy choice reaches the Agent Hosts (ADR-0082).
+        let hub = pointer
+            .starts_with("/proxy")
+            .then(|| self.services().map(|s| s.sessions))
+            .transpose()?;
         self.client_settings_job(on_done, move |dir| {
-            crate::client_settings::write(dir, &managed, &pointer, value)
+            let written = crate::client_settings::write(dir, &managed, &pointer, value)?;
+            if let Some(hub) = &hub {
+                hub.refresh_network();
+            }
+            Ok(written)
         })
+    }
+
+    /// Records the system's proxy as the main process resolved it (`None`: direct); with the
+    /// proxy choice at `auto`, the workspaces' Agent Hosts restart with it once idle
+    /// (ADR-0082).
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`].
+    pub fn set_system_proxy(&self, url: Option<String>) -> Result<()> {
+        self.ensure_running()?;
+        let hub = self.services()?.sessions;
+        hub.proxy().set_system(url.as_deref());
+        hub.refresh_network();
+        Ok(())
     }
 
     /// Reads or updates local Markdown image storage. Only the native host supplies folder grants.

@@ -594,6 +594,17 @@ impl Drop for Shared {
 
 /// Creates the data directory layout, routes the logs to `logs/`, opens the database and starts
 /// the session layer.
+/// The credential vault of the data directory: the configured store (tests), else the system's.
+fn state_secrets(config: &CoreConfig, data: &std::path::Path) -> SecretsService {
+    match &config.secret_store {
+        Some(setup) => SecretsService::new(
+            SecretsConfig::with_master_key(data, setup.master_key.clone()),
+            Arc::clone(&setup.store),
+        ),
+        None => SecretsService::new(SecretsConfig::new(data), crate::secrets::system_store()),
+    }
+}
+
 fn open_state(
     dirs: DataDirs,
     config: &CoreConfig,
@@ -620,13 +631,7 @@ fn open_state(
     let storage = open_storage(dirs, config, handle, cancel)?;
     let trust = TrustService::new(storage.clone());
     let data = storage.dirs().data().to_owned();
-    let secrets = match &config.secret_store {
-        Some(setup) => SecretsService::new(
-            SecretsConfig::with_master_key(&data, setup.master_key.clone()),
-            Arc::clone(&setup.store),
-        ),
-        None => SecretsService::new(SecretsConfig::new(&data), crate::secrets::system_store()),
-    };
+    let secrets = state_secrets(config, &data);
     let snapshots = crate::sessions::Snapshots::spawn(handle, events.clone(), storage.clone());
     let checkpoints =
         crate::checkpoints::Checkpoints::open(storage.clone(), config.checkpoints.clone())?;
@@ -667,6 +672,7 @@ fn open_state(
         files: crate::composer::file_search::FileSearch::default(),
         worktrees,
         diagnostics: crate::sessions::PreparedBundle::default(),
+        proxy: Arc::new(crate::network::Proxy::starting(&data)),
     });
     tasks.set_outlet(sessions.task_outlet());
     sessions.connect_hooks();

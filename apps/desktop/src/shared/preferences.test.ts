@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_PREFERENCES, pointerOf, preferencesFrom } from './preferences.js';
+import { DEFAULT_PREFERENCES, pointerOf, preferencesFrom, proxyUrlProblem } from './preferences.js';
 
 describe('preferences', () => {
   it('reads valid values and falls back to defaults', () => {
@@ -118,5 +118,48 @@ describe('preferences', () => {
     ]) {
       expect(pointerOf(bad)).toBeUndefined();
     }
+  });
+});
+
+describe('the proxy preference (ADR-0082)', () => {
+  it('reads auto by default and a manual address as written', () => {
+    expect(preferencesFrom({}).proxy).toEqual({ mode: 'auto', url: '' });
+    expect(
+      preferencesFrom({ proxy: { mode: 'manual', url: 'http://127.0.0.1:7897' } }).proxy,
+    ).toEqual({
+      mode: 'manual',
+      url: 'http://127.0.0.1:7897',
+    });
+    expect(preferencesFrom({ proxy: { mode: 'pac' } }).proxy.mode).toBe('auto');
+  });
+
+  it('accepts a host and port, like Core, and says what is wrong otherwise', () => {
+    expect(proxyUrlProblem('http://127.0.0.1:7897')).toBeUndefined();
+    expect(proxyUrlProblem(' https://proxy.example.com/ ')).toBeUndefined();
+    expect(proxyUrlProblem('http://[::1]:8080')).toBeUndefined();
+    expect(proxyUrlProblem('socks5://127.0.0.1:1080')).toBe('scheme');
+    expect(proxyUrlProblem('127.0.0.1:7897')).toBe('scheme');
+    expect(proxyUrlProblem('http://user:secret@host:1')).toBe('credentials');
+    expect(proxyUrlProblem('http://host:1/pac')).toBe('path');
+    expect(proxyUrlProblem('http://host:0')).toBe('port');
+    expect(proxyUrlProblem('http://host:70000')).toBe('port');
+    expect(proxyUrlProblem('http://:1')).toBe('host');
+  });
+
+  it('writes a manual address or the return to auto, and nothing else', () => {
+    expect(
+      pointerOf({ key: 'proxy', value: { mode: 'manual', url: ' http://127.0.0.1:7897 ' } }),
+    ).toEqual({
+      pointer: '/proxy',
+      value: { mode: 'manual', url: 'http://127.0.0.1:7897' },
+    });
+    expect(pointerOf({ key: 'proxy', value: { mode: 'auto' } })).toEqual({
+      pointer: '/proxy/mode',
+      value: 'auto',
+    });
+    expect(
+      pointerOf({ key: 'proxy', value: { mode: 'manual', url: 'http://u:p@h:1' } }),
+    ).toBeUndefined();
+    expect(pointerOf({ key: 'proxy', value: { mode: 'system' } })).toBeUndefined();
   });
 });

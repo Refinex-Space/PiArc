@@ -44,6 +44,36 @@ export interface Preferences {
   /** T37: the user's default output style (`outputStyle`); `''` when unset. Written through
    * Core's `setOutputStyle`, not as a preference change. */
   readonly outputStyle: string;
+  /** ADR-0082: the Agent Hosts' proxy: the system's (`auto`, the default) or `url`. */
+  readonly proxy: { readonly mode: ProxyMode; readonly url: string };
+}
+
+/** How the Agent Hosts find their proxy (ADR-0082). */
+export const PROXY_MODES = ['auto', 'manual'] as const;
+export type ProxyMode = (typeof PROXY_MODES)[number];
+
+/** Why a proxy address is refused (Core's `network::check_url`, which has the last word). */
+export type ProxyUrlProblem = 'scheme' | 'host' | 'port' | 'credentials' | 'path';
+
+/**
+ * The problem with `text` as a proxy address, or `undefined` when it is `http(s)://host[:port]`
+ * without credentials or a path (the same rules as Core's check).
+ */
+export function proxyUrlProblem(text: string): ProxyUrlProblem | undefined {
+  const match = /^(https?):\/\/([^/?#]*)([/?#].*)?$/iu.exec(text.trim());
+  if (match === null) return 'scheme';
+  const authority = match[2] ?? '';
+  const tail = match[3] ?? '';
+  if (tail !== '' && tail !== '/') return 'path';
+  if (authority.includes('@')) return 'credentials';
+  const bracketed = /^\[([0-9a-f:.]+)\](?::(.*))?$/iu.exec(authority);
+  const plain = /^([a-z0-9.-]+)(?::(.*))?$/iu.exec(authority);
+  const parts = bracketed ?? plain;
+  if (parts === null || (parts[1] ?? '') === '') return 'host';
+  const port = parts[2];
+  if (port === undefined) return undefined;
+  const number = /^\d{1,5}$/u.test(port) ? Number(port) : 0;
+  return number >= 1 && number <= 65535 ? undefined : 'port';
 }
 
 /** The four lists of `autoMode` (T46), by their settings key. */
@@ -77,6 +107,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     lists: { environment: [], allow: [], soft_deny: [], hard_deny: [] },
   },
   outputStyle: '',
+  proxy: { mode: 'auto', url: '' },
 };
 
 /** A `provider/model` reference as the reviewer setting takes it (no alias). */
@@ -147,6 +178,10 @@ export function preferencesFrom(settings: unknown): Preferences {
     },
     autoMode: autoModeFrom(file.autoMode),
     outputStyle: typeof file.outputStyle === 'string' ? file.outputStyle : '',
+    proxy: {
+      mode: oneOf(PROXY_MODES, isRecord(file.proxy) ? file.proxy.mode : undefined, 'auto'),
+      url: isRecord(file.proxy) && typeof file.proxy.url === 'string' ? file.proxy.url : '',
+    },
   };
 }
 
@@ -189,7 +224,9 @@ export type PreferenceChange =
       readonly value: readonly string[];
     }
   /** `value` `null` restores the default key. */
-  | { readonly key: 'keybinding'; readonly command: string; readonly value: string | null };
+  | { readonly key: 'keybinding'; readonly command: string; readonly value: string | null }
+  /** ADR-0082: `manual` with an address, or back to the system's proxy. */
+  | { readonly key: 'proxy'; readonly value: { readonly mode: ProxyMode; readonly url?: string } };
 
 /**
  * Validates a change received over IPC and returns the settings-file pointer and value to
@@ -255,6 +292,16 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
       }
       return typeof value === 'string' && (value === '' || parseKey(value) !== undefined)
         ? { pointer, value }
+        : undefined;
+    }
+    case 'proxy': {
+      if (!isRecord(value) || !(PROXY_MODES as readonly unknown[]).includes(value.mode)) {
+        return undefined;
+      }
+      if (value.mode === 'auto') return { pointer: '/proxy/mode', value: 'auto' };
+      const url = typeof value.url === 'string' ? value.url.trim() : '';
+      return proxyUrlProblem(url) === undefined
+        ? { pointer: '/proxy', value: { mode: 'manual', url } }
         : undefined;
     }
     default:

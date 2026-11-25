@@ -457,3 +457,43 @@
   align-items: center;
   gap: var(--piarc-space-2);
 }
+
+/* ADR-0082: the proxy page. The explanation is a tooltip on the label's info sign; the detected
+   proxy and the typed address read as addresses. */
+.proxy-settings .proxy-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+.proxy-settings .proxy-info {
+  display: inline-flex;
+  border-radius: var(--piarc-radius-sm);
+  color: var(--piarc-text-secondary);
+  cursor: help;
+}
+.proxy-settings .proxy-info:hover {
+  color: var(--piarc-text-primary);
+}
+.proxy-settings .proxy-info:focus-visible {
+  outline: 2px solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+.proxy-settings .proxy-value {
+  overflow-wrap: anywhere;
+  font-family: var(--piarc-font-mono);
+  color: var(--piarc-text-secondary);
+}
+.proxy-settings .proxy-field {
+  display: flex;
+  flex: 0 1 26rem;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+.proxy-settings .proxy-field > .input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--piarc-font-mono);
+}
+.proxy-settings > .error-text {
+  margin: 0 0 var(--piarc-space-3);
+}

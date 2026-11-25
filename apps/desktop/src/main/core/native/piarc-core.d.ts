@@ -368,9 +368,14 @@ export declare class CoreRuntime {
   /** The user's settings file (`<data>/settings.json`) as JSON; `{}` when it does not exist. */
   userSettings(): Promise<string>;
   /**
+   * Records the system's proxy as the main process resolved it (`null`: direct). With the
+   * proxy choice at `auto`, the workspaces' Agent Hosts restart with it once idle (ADR-0082).
+   */
+  setSystemProxy(url?: string | null): void;
+  /**
    * Sets one client preference in the user's settings file: `pointer` is `/memory/readBoth`
-   * or lies under `/language`, `/appearance`, `/keybindings` or `/notifications`; `value` is JSON text,
-   * `null` removes the key. Resolves with the file's new content as JSON.
+   * or lies under `/language`, `/appearance`, `/keybindings`, `/notifications` or `/proxy`;
+   * `value` is JSON text, `null` removes the key. Resolves with the file's new content as JSON.
    */
   writeClientSetting(pointer: string, value?: string | null): Promise<string>;
   /**

@@ -20,6 +20,12 @@ const symbols: Record<string, ReactNode> = {
   providers: <path d="m11.2 2-8 10h5.5l-.4 6 8-10.5h-5.4z" />,
   permissions: <path d="m10 2 6.5 2.5V9c0 4-3 7-6.5 9-3.5-2-6.5-5-6.5-9V4.5z M7 9.5l2 2 4-4" />,
   sandbox: <path d="m10 2 7 4v8l-7 4-7-4V6z M3 6l7 4 7-4 M10 10v8" />,
+  proxy: (
+    <>
+      <circle cx="10" cy="10" r="7.6" />
+      <path d="M2.4 10h15.2 M10 2.4c2.1 2.2 3.2 4.7 3.2 7.6s-1.1 5.4-3.2 7.6c-2.1-2.2-3.2-4.7-3.2-7.6S7.9 4.6 10 2.4Z" />
+    </>
+  ),
   agents: (
     <>
       <circle cx="7.3" cy="6.3" r="2.6" />

@@ -21,6 +21,7 @@ const NO_PARAMETERS = new Set([
   'managedSettings',
   'resendSnapshots',
   'takeLaunchTargets',
+  'detectProxy',
 ]);
 
 /** Synchronous preload functions (no IPC round trip). */

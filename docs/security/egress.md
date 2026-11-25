@@ -16,6 +16,7 @@ Core（Rust）在这次会话里不发起连接：它的网络出口只有下表
 | 外连 | 由谁发起 | 发出什么 | 何时 | 状态 |
 |---|---|---|---|---|
 | 模型服务商 | Agent Host（pi-ai） | 会话内容 | 每次模型请求 | 用户配置；本页测试中是 mock |
+| 网络代理 | Agent Host（Node 的 `fetch` 与 pi-ai 的 WebSocket） | 模型请求与服务商登录（HTTPS 经 CONNECT 隧道，代理看不到内容） | 用户设置了代理，或设置为自动检测且系统有代理时（ADR-0082） | 用户配置；本机地址直连，测试环境没有系统代理 |
 | MCP server（HTTP 传输）及其 OAuth | Agent Host 的连接池 | 工具调用参数与结果 | 用户配置的 server | 用户配置；stdio server 不经网络 |
 | hooks 的 `http` 类型与命令 | Core | hook 输入 | 用户与受信任项目配置的 hook | 用户配置 |
 | WebFetch | Core（`piarc-web`） | 请求的 URL | 获准的工具调用 | 每次经权限裁决，SSRF 检查 |

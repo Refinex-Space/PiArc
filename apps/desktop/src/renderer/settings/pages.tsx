@@ -28,6 +28,7 @@ import { reason } from '../shell/errors.js';
 import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { SandboxPage } from './SandboxPage.js';
+import { ProxyPage } from './ProxyPage.js';
 import { ProvidersPage } from './ProvidersPage.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { registerSettingsPage } from './registry.js';
@@ -545,6 +546,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.sandbox',
     order: 35,
     component: SandboxPage,
+  });
+  registerSettingsPage({
+    id: 'proxy',
+    title: 'settings.proxy',
+    order: 37,
+    component: ProxyPage,
   });
   registerSettingsPage({
     id: 'agents',

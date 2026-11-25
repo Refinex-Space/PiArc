@@ -27,6 +27,7 @@ const PIARC_API_SNAPSHOT = [
   'deleteProvider',
   'deleteQueueItem',
   'deleteSession',
+  'detectProxy',
   'discardChange',
   'editQueueItem',
   'exportDiagnostics',

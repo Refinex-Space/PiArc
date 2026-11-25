@@ -78,10 +78,13 @@ impl Hub {
         let root = dir.join("agent-host").join("settings");
         std::fs::create_dir_all(&root).map_err(io_error)?;
         let tune = self.ctx.config.tune_host.clone();
+        // Sign-in and provider checks go through the proxy too (ADR-0082).
+        let proxy = self.ctx.proxy.env(&dir);
         let (host, mut events) =
             crate::agent_host::start_for(launch, root, dir, inbound, &|config| {
                 // Catalog discovery for settings is local. A preference change refreshes workspaces.
                 config.allow_model_network = None;
+                config.extra_env.extend(proxy.iter().cloned());
                 if let Some(tune) = &tune {
                     tune(config);
                 }

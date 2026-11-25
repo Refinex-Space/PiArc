@@ -28,6 +28,7 @@ import { registerSandboxHandlers } from './core/sandbox-ipc.js';
 import { registerUsageHandlers } from './core/usage-ipc.js';
 import { registerDiagnosticsHandlers } from './core/diagnostics-ipc.js';
 import { registerImageExportHandlers } from './core/image-export-ipc.js';
+import { registerProxyHandlers, SystemProxy } from './core/proxy-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
 import { startupFailure } from './core/startup-error.js';
 import { installTestHooks } from './core/test-hooks.js';
@@ -283,6 +284,15 @@ function start(dirs: DataDirs): void {
     registerUsageHandlers(registerHandler, core.runtime);
     registerDiagnosticsHandlers(registerHandler, core.runtime, () => appShell.t());
     registerImageExportHandlers(registerHandler, () => appShell.t());
+    // ADR-0082: the system's proxy for the Agent Hosts, resolved now and as windows come forward.
+    const systemProxy = new SystemProxy(core.runtime, session.defaultSession);
+    systemProxy.detect().catch((error: unknown) => {
+      console.warn('[proxy] resolving the system proxy failed', error);
+    });
+    app.on('browser-window-focus', () => {
+      systemProxy.focused();
+    });
+    registerProxyHandlers(registerHandler, systemProxy);
     registerMcpHandlers(registerHandler, core.runtime);
     registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerWorktreeHandlers(

@@ -1965,6 +1965,25 @@ export const en = {
   'error.kind.internalError': 'Something went wrong inside PiArc: {detail}',
   'error.kind.unencodableText': 'The text has characters that cannot be sent.',
   'error.kind.cancelled': 'Cancelled.',
+  'settings.proxy': 'Proxy',
+  'proxy.mode': 'Connect through',
+  'proxy.mode.auto': 'Detect automatically',
+  'proxy.mode.manual': 'Set manually',
+  'proxy.info':
+    "Model providers and sign-in go through this proxy; this computer's own addresses connect directly. Sessions switch to a new setting once they are idle.",
+  'proxy.system': 'System proxy',
+  'proxy.system.detecting': 'Detecting…',
+  'proxy.system.none': 'None, connecting directly',
+  'proxy.detect': 'Detect again',
+  'proxy.address': 'Proxy address',
+  'proxy.address.example': 'http://127.0.0.1:7897',
+  'proxy.save': 'Save',
+  'proxy.saved': 'Saved',
+  'proxy.problem.scheme': 'Start with http:// or https://. SOCKS proxies are not supported.',
+  'proxy.problem.host': 'Add a host name or IP address.',
+  'proxy.problem.port': 'The port must be between 1 and 65535.',
+  'proxy.problem.credentials': 'A user name or password cannot be saved here.',
+  'proxy.problem.path': 'Use a host and a port only, without a path.',
 } as const;
 
 export type MessageId = keyof typeof en;

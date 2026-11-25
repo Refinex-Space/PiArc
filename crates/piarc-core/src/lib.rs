@@ -87,6 +87,7 @@ pub mod keychain_probe;
 pub mod managed;
 mod markdown_images;
 pub mod mcp;
+pub mod network;
 pub mod plugins;
 pub mod providers;
 pub mod release;

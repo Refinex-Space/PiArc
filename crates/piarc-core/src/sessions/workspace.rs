@@ -63,6 +63,12 @@ enum WsMsg {
         checkout: PathBuf,
         done: oneshot::Sender<()>,
     },
+    /// The Agent Hosts' proxy changed (ADR-0082).
+    NetworkChanged,
+    /// The process the proxy change replaces has stopped: start the new one.
+    NetworkRestart {
+        generation: u64,
+    },
     Close(oneshot::Sender<()>),
 }
 
@@ -146,6 +152,7 @@ impl WorkspaceHandle {
             idle_generation: 0,
             connected_epoch: 0,
             trust_restart_epoch: None,
+            network_pending: false,
             settings,
         };
         if let Some(changes) = actor.settings.as_ref().map(WorkspaceSettings::changes) {
@@ -196,6 +203,12 @@ impl WorkspaceHandle {
             // A closed actor has no Agent Host to restart.
             let _ = rx.await;
         }
+    }
+
+    /// The Agent Hosts' proxy changed: the workspace's process restarts with it once idle.
+    pub fn network_changed(&self) {
+        // A closed actor has no Agent Host to restart.
+        let _ = self.send(WsMsg::NetworkChanged);
     }
 
     /// The session's activity changed: the Agent Host stays while any session is busy.
@@ -298,6 +311,8 @@ struct WorkspaceActor {
     /// A trust restart was asked for: the host is ready only once a process of this epoch or
     /// later connected (the process before it is about to restart).
     trust_restart_epoch: Option<u64>,
+    /// The proxy changed while the Agent Host was busy or starting: it restarts once it can.
+    network_pending: bool,
 }
 
 /// `ConfigChange` hooks (T41): when the watcher sees a settings layer change, every open session
@@ -363,6 +378,15 @@ impl WorkspaceActor {
                         self.busy.remove(&session);
                     }
                     self.arm_idle();
+                    if self.network_pending {
+                        self.restart_for_network();
+                    }
+                }
+                WsMsg::NetworkChanged => self.restart_for_network(),
+                WsMsg::NetworkRestart { generation } => {
+                    if generation == self.generation && matches!(self.host, Host::Restarting(_)) {
+                        self.start_host();
+                    }
                 }
                 WsMsg::Host { generation, event } if generation == self.generation => {
                     self.on_host_event(event);
@@ -452,6 +476,9 @@ impl WorkspaceActor {
                 &|config| {
                     config.allow_model_network = Some(self.ctx.catalog_network.clone());
                     config.model_preferences = Some(self.ctx.model_preferences.clone());
+                    // ADR-0082: providers and sign-in through the user's or the system's proxy.
+                    let data = self.ctx.storage.dirs().data();
+                    config.extra_env.extend(self.ctx.proxy.env(data));
                     if let Some(tune) = &tune {
                         tune(config);
                     }
@@ -491,6 +518,38 @@ impl WorkspaceActor {
         self.ctx
             .handle
             .spawn(async move { supervisor.restart().await });
+    }
+
+    /// The proxy changed (ADR-0082): a process keeps the environment it started with, so the
+    /// Agent Host stops and a new one starts (its sessions reopen on it, as after an idle stop).
+    /// Only when nothing is in flight: a running turn finishes on the old process, and a
+    /// process still starting is replaced once it is ready.
+    fn restart_for_network(&mut self) {
+        self.network_pending = false;
+        let supervisor = match &self.host {
+            Host::Ready(supervisor) if self.busy.is_empty() && self.waiting.is_empty() => {
+                supervisor.clone()
+            }
+            Host::Ready(_) | Host::Starting(_) | Host::Restarting(_) => {
+                self.network_pending = true;
+                return;
+            }
+            // The next process starts with the proxy as it is then.
+            Host::Stopped | Host::Failed(_) => return,
+        };
+        tracing::info!(target: "piarc_core::sessions", workspace = %self.handle.path.display(),
+            "the proxy changed; restarting the workspace's Agent Host");
+        // The old process's events from now on belong to an older generation: ignored.
+        self.generation += 1;
+        self.idle_generation += 1;
+        self.host = Host::Restarting(supervisor.clone());
+        self.publish(HostState::Restarting, true);
+        let generation = self.generation;
+        let tx = self.tx.clone();
+        self.ctx.handle.spawn(async move {
+            supervisor.shutdown().await;
+            let _ = tx.send(WsMsg::NetworkRestart { generation });
+        });
     }
 
     fn on_host_event(&mut self, event: HostEvent) {
@@ -598,6 +657,9 @@ impl WorkspaceActor {
         }
         self.publish(HostState::Ready, true);
         self.arm_idle();
+        if self.network_pending {
+            self.restart_for_network();
+        }
     }
 
     fn fail(&mut self, error: Error) {

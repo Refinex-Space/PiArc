@@ -141,6 +141,7 @@ export const IPC_CHANNELS = {
   diagnosticsPrepare: 'piarc:diagnostics.prepare',
   diagnosticsExport: 'piarc:diagnostics.export',
   imageSave: 'piarc:image.save',
+  proxyDetect: 'piarc:proxy.detect',
   worktreeBranches: 'piarc:worktree.branches',
   worktreeIgnore: 'piarc:worktree.ignore',
   worktreeRemove: 'piarc:worktree.remove',
@@ -767,6 +768,11 @@ export interface PiarcApi {
    * Saves an image the window drew (a transcript diagram, ADR-0080) where the user picks in the
    * main process's save dialog. Resolves true once written, false when the user cancelled.
    */
+  /**
+   * Resolves the system's proxy again (ADR-0082) and answers it, `null` for direct: what the
+   * Agent Hosts use while the proxy choice is `auto`.
+   */
+  detectProxy(): Promise<string | null>;
   saveImage(request: {
     readonly kind: 'svg' | 'png';
     readonly name: string;

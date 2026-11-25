@@ -55,6 +55,8 @@
 
 会话主块对标（ADR-0080）给 preload 白名单增加 `saveImage`：页面交出图片字节与建议的文件名，主进程核对类型（SVG 的开头或 PNG 的签名）、大小（≤ 16 MiB）与文件名（一段、去掉控制字符和路径分隔符），只写到用户在原生保存对话框里选的位置，取消时不写任何文件（单元 `image-export-ipc.test.ts`）。
 
+代理设置（ADR-0082）给 preload 白名单增加 `detectProxy`：没有参数，主进程经 Electron 的 `session.resolveProxy` 重新解析系统代理（系统设置与 PAC），只把 Node 能用的 HTTP/HTTPS 代理交给 Core 并答复页面，页面不能指定地址；手动地址经偏好通道写入，主进程与 Core 都只接受不含用户名、密码与路径的 `http(s)://主机[:端口]`（单元 `proxy-ipc.test.ts`、`network.rs`）。
+
 T49 给同一 preload 白名单增加 `askSideChat` 和 `controlSideChat`。主进程验证会话、面板、问题和控制参数，按发送窗口分配 Host 侧的面板编号。窗口销毁、渲染进程退出或整页导航会触发释放。Host 用内存会话生成回答，模型的工具请求只能得到本地拒绝结果。外部草稿的导航约束见 ADR-0069。
 
 | 项 | 发布构建 | 开发构建（`--flavor development` 打包） | 开发服务器模式（`electron-forge start`） |

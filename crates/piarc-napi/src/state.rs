@@ -97,9 +97,22 @@ impl CoreRuntime {
         Ok(promise)
     }
 
+    /// Records the system's proxy as the main process resolved it (`null`: direct). With the
+    /// proxy choice at `auto`, the workspaces' Agent Hosts restart with it once idle (ADR-0082).
+    #[napi(catch_unwind)]
+    pub fn set_system_proxy(
+        &self,
+        env: Env,
+        #[napi(ts_arg_type = "string | null")] url: Option<String>,
+    ) -> napi::Result<()> {
+        boundary::call(&env, "CoreRuntime.setSystemProxy", || {
+            self.core.set_system_proxy(url)
+        })
+    }
+
     /// Sets one client preference in the user's settings file: `pointer` is `/memory/readBoth`
-    /// or lies under `/language`, `/appearance`, `/keybindings` or `/notifications`; `value` is JSON text,
-    /// `null` removes the key. Resolves with the file's new content as JSON.
+    /// or lies under `/language`, `/appearance`, `/keybindings`, `/notifications` or `/proxy`;
+    /// `value` is JSON text, `null` removes the key. Resolves with the file's new content as JSON.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn write_client_setting<'env>(
         &self,

@@ -8,6 +8,7 @@ mod login;
 mod mcp;
 mod metadata;
 mod models;
+mod network;
 mod permissions;
 mod project_files;
 mod provider_settings;

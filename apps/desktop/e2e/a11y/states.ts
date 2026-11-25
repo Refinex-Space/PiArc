@@ -58,6 +58,7 @@ export const A11Y_STATES = [
   { id: 'settings:providers', area: 'settings', page: 'providers', note: 'Models and providers' },
   { id: 'settings:permissions', area: 'settings', page: 'permissions', note: 'Permissions' },
   { id: 'settings:sandbox', area: 'settings', page: 'sandbox', note: 'Sandbox' },
+  { id: 'settings:proxy', area: 'settings', page: 'proxy', note: 'Proxy (detected system proxy)' },
   { id: 'settings:agents', area: 'settings', page: 'agents', note: 'Subagents' },
   {
     id: 'settings:skills',
