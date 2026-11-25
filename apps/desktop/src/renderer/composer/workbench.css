@@ -77,16 +77,28 @@
 .environment-card .worktree-fields .input {
   width: 100%;
 }
+/* The input sits on the reading column: the measure plus the session gutters, narrower gutters in
+   a narrow pane. One row is 44 px (28 px controls in 8 px of padding) in either density. */
+.home,
+.conversation {
+  container-type: inline-size;
+}
 .home .conversation-composer,
 .conversation .conversation-composer {
   flex: none;
   box-sizing: border-box;
-  width: min(var(--piarc-workbench-reading-width), calc(100% - 2 * var(--piarc-space-4)));
+  width: min(calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter)), 100%);
   min-width: 0;
   margin-inline: auto;
-  padding-block: var(--piarc-space-2) calc(var(--piarc-space-3) - 1px);
+  padding: var(--piarc-space-2) var(--piarc-session-gutter);
   border: 0;
   background: transparent;
+}
+@container (max-width: 560px) {
+  .home .conversation-composer,
+  .conversation .conversation-composer {
+    padding-inline: var(--piarc-session-gutter-narrow);
+  }
 }
 .conversation-composer .composer {
   width: 100%;
@@ -95,71 +107,248 @@
 }
 .composer .composer-box {
   box-sizing: border-box;
-  /* Center the row in the spare height. When the editor grows, actions follow its last line. */
   display: grid;
-  grid-auto-flow: column;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-content: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'shelf shelf shelf'
+    'add editor send';
   align-items: end;
   min-height: var(--piarc-workbench-composer-height);
-  gap: var(--piarc-space-1);
-  padding: var(--piarc-space-2);
-  border: 1px solid var(--piarc-border-subtle);
+  gap: 0 var(--piarc-space-1);
+  padding: var(--piarc-session-composer-pad);
+  border: 0;
   border-radius: var(--piarc-workbench-composer-radius);
   background: var(--piarc-workbench-editor);
-  box-shadow: var(--piarc-workbench-composer-shadow);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-workbench-composer-shadow);
+  cursor: text;
+  transition: box-shadow var(--piarc-motion-normal) var(--piarc-motion-easing);
 }
-:root[data-app] .composer-box:has(.composer-editor:focus) {
+:root[data-app] .composer-box:focus-within {
   outline: none;
-  box-shadow: 0 4px 20px rgb(0 0 0 / 0.075);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-composer-shadow-focus);
 }
 /* Keep a composed draft readable while the user decides workspace trust. */
 .composer .composer-box.is-disabled {
   opacity: 1;
+  cursor: default;
 }
-.composer-box .workbench-icon {
-  width: calc(var(--piarc-space-4) + var(--piarc-space-3));
-  /* Match one editor line plus its vertical padding in either density. */
-  height: calc(var(--piarc-space-5) + var(--piarc-space-1));
+.composer-box > .composer-attach {
+  grid-area: add;
+}
+.composer-box > .composer-mount {
+  grid-area: editor;
+}
+.composer-box > .composer-swap {
+  grid-area: send;
+  animation: composer-swap-in var(--piarc-motion-fast) var(--piarc-motion-curve-out)
+    calc(var(--piarc-motion-fast) * 2 / 3) backwards;
+}
+@keyframes composer-swap-in {
+  from {
+    opacity: 0;
+  }
+}
+.composer-box .icon-button.is-sm {
+  --icon-button-size: var(--piarc-session-composer-row);
+  border-radius: var(--piarc-c-button-radius);
+  color: var(--piarc-text-primary);
+}
+.composer-box .icon-button.is-sm svg {
+  width: var(--piarc-session-icon-large);
+  height: var(--piarc-session-icon-large);
+}
+.composer-box .icon-button.is-sm:disabled {
+  color: var(--piarc-text-disabled);
+}
+.composer-box .composer-stop {
+  background: var(--piarc-session-fill-hover);
+}
+.composer-box .composer-stop svg {
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
 }
 .composer .composer-editor,
 .composer-mount[data-empty='true']::before {
-  font-size: var(--piarc-font-size-title);
-  line-height: var(--piarc-space-5);
+  font-size: var(--piarc-session-prose);
+  line-height: var(--piarc-session-prose-line);
 }
 .composer .composer-editor {
   box-sizing: border-box;
-  min-height: calc(var(--piarc-space-4) + var(--piarc-space-3));
-  padding: calc(var(--piarc-space-1) / 2) var(--piarc-space-1);
+  min-height: var(--piarc-session-composer-row);
+  max-height: min(384px, 40vh);
+  padding: calc((var(--piarc-session-composer-row) - var(--piarc-session-prose-line)) / 2)
+    var(--piarc-session-pad-xs);
 }
 .composer .composer-mount[data-empty='true']::before {
-  top: calc(var(--piarc-space-1) / 2);
-  left: var(--piarc-space-1);
+  top: calc((var(--piarc-session-composer-row) - var(--piarc-session-prose-line)) / 2);
+  left: var(--piarc-session-pad-xs);
   right: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--piarc-text-secondary);
 }
+/* A mention in the editor reads as a link-colored word, a terminal snippet as a quiet chip. */
+.composer-editor .mention-chip {
+  margin-inline: 2px;
+  padding: 0;
+  border-radius: var(--piarc-radius-md);
+  background: none;
+  color: var(--piarc-text-accent);
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    box-shadow var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+.composer-editor .mention-chip:hover {
+  background: var(--piarc-session-ghost-hover);
+  box-shadow: 0 0 0 2px var(--piarc-session-ghost-hover);
+}
+.composer-editor .snippet-chip {
+  padding: 0 var(--piarc-space-1);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-primary);
+}
+/* Attachments waiting to be sent: file cards above the editor row. */
+.composer-box > .composer-attachments {
+  grid-area: shelf;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-session-gap-xs);
+  margin: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-1) calc(var(--piarc-space-2) + 2px);
+  cursor: default;
+}
+.composer-attachments .attachment-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  min-width: 120px;
+  max-width: 240px;
+  height: var(--piarc-workbench-composer-height);
+  padding: 0 var(--piarc-session-pad-md) 0 var(--piarc-session-pad-sm);
+  border: 0;
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-workbench-editor);
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+}
+.composer-attachments .attachment-chip-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--piarc-session-composer-row);
+  height: var(--piarc-session-composer-row);
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+}
+.attachment-chip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.composer-attachments .attachment-chip-name {
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-chip-size {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+  font-variant-numeric: tabular-nums;
+}
+.composer-attachments .attachment-remove {
+  position: absolute;
+  top: calc(-1 * var(--piarc-space-2));
+  right: calc(-1 * var(--piarc-space-2));
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--piarc-workbench-editor);
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+  color: var(--piarc-text-secondary);
+  opacity: 0;
+  transition: opacity var(--piarc-motion-fast) var(--piarc-motion-curve-snap);
+}
+.attachment-chip:hover > .attachment-remove,
+.attachment-remove:focus-visible {
+  opacity: 1;
+}
+.composer-attachments .attachment-remove:hover {
+  color: var(--piarc-text-primary);
+}
+@media (hover: none) {
+  .composer-attachments .attachment-remove {
+    opacity: 1;
+  }
+}
+/* The row under the input: model and effort, mode, sandbox and usage, at the end. */
 .conversation-composer .environment-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0 var(--piarc-space-1);
-  padding: var(--piarc-space-1) var(--piarc-space-2) 0;
-  font-size: var(--piarc-font-size-body);
+  min-height: var(--piarc-session-row-small);
+  padding: var(--piarc-space-2) 0 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-body-line);
 }
 .environment-bar .choice-button {
   max-width: min(40%, var(--piarc-workbench-environment-width));
+  height: var(--piarc-session-row-small);
+  min-height: 0;
+  padding: 0 var(--piarc-session-pad-xs);
+  border-radius: calc(var(--piarc-session-radius) - 2px);
   overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-regular);
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-curve-out);
+}
+.environment-bar .choice-button:is(:hover, [aria-expanded='true']):enabled {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+.environment-bar .choice-button[data-mode='bypassPermissions'] {
+  color: var(--piarc-text-warning);
 }
 .environment-bar .composer-spacer {
   flex: 1 1 0;
 }
 .environment-bar .usage-ring {
-  margin-inline-start: 0;
+  justify-content: center;
+  min-width: var(--piarc-session-row-small);
+  height: var(--piarc-session-row-small);
+  margin-inline-start: 1px;
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: calc(var(--piarc-session-radius) - 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.environment-bar .usage-ring:hover {
+  background: var(--piarc-session-ghost-hover);
 }
 .environment-bar .usage-ring[data-level='normal'] .usage-ring-text {
   position: absolute;
@@ -168,31 +357,91 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
+/* Menus and the input's pickers share one frame: a hairline ring over the popover shadow. */
 .composer .composer-popup,
 .interactive-list.menu {
   max-height: min(58vh, 32rem);
-  border: 1px solid var(--piarc-border-subtle);
+  border: 0;
   border-radius: var(--piarc-workbench-menu-radius);
-  box-shadow: var(--piarc-shadow-overlay);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-popover-shadow);
   background: var(--piarc-surface-raised);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
 }
 .composer .composer-popup {
-  left: var(--piarc-space-4);
+  left: calc(var(--piarc-session-composer-pad) + var(--piarc-space-1));
   max-width: calc(100% - 2 * var(--piarc-space-4));
+  max-height: min(384px, 58vh);
+  margin-bottom: var(--piarc-space-2);
+  padding: var(--piarc-session-pad-xs);
+  row-gap: 0;
   z-index: 5;
 }
 .composer .command-popup {
-  width: min(26rem, 92%);
+  width: max-content;
+  min-width: min(240px, 100%);
+  max-width: min(512px, calc(100% - 2 * var(--piarc-space-4)));
 }
 .composer .mention-popup {
-  width: min(35rem, 92%);
+  width: min(420px, calc(100% - 2 * var(--piarc-space-4)));
 }
-.composer .mention-option {
+.composer .mention-option,
+.composer .mention-empty {
   align-items: center;
-  min-height: var(--piarc-space-5);
+  gap: var(--piarc-session-gap-xs);
+  min-height: var(--piarc-session-row);
+  box-sizing: border-box;
+  padding: calc((var(--piarc-session-row) - var(--piarc-session-body-line)) / 2)
+    calc(var(--piarc-session-pad-sm) + 2px);
+  border-radius: var(--piarc-session-radius);
+}
+.composer .mention-empty {
+  color: var(--piarc-text-secondary);
 }
 .composer-popup .mention-label {
-  overflow-wrap: anywhere;
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-popup .mention-path {
+  flex: 1;
+  min-width: 0;
+  margin-inline-start: auto;
+  padding-inline-start: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  text-align: end;
+}
+.composer .mention-popup .mention-path {
+  text-align: start;
+}
+.composer .command-group {
+  padding: var(--piarc-space-1) calc(var(--piarc-session-pad-sm) + 2px);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: var(--piarc-session-footnote-line);
+}
+.composer .command-group:not(:first-child) {
+  margin-top: var(--piarc-space-1);
+}
+.composer .command-hint {
+  color: var(--piarc-text-secondary);
+}
+.composer .command-kind {
+  margin-inline-start: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  font-weight: var(--piarc-font-weight-medium);
 }
 .menu-item-line {
   display: flex;
@@ -242,13 +491,13 @@
   display: none;
 }
 .interactive-list.menu .menu-item {
-  min-height: var(--piarc-space-5);
+  min-height: var(--piarc-session-row);
   box-sizing: border-box;
-  border-radius: var(--piarc-radius-md);
+  border-radius: var(--piarc-session-radius);
 }
 .interactive-list.menu .menu-item.is-active,
 .composer .composer-popup .is-active {
-  background: var(--piarc-surface-hover);
+  background: var(--piarc-session-ghost-hover);
 }
 
 @media (forced-colors: active) {

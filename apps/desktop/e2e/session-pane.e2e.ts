@@ -110,9 +110,38 @@ test('session pane states for review', async ({ app, page }) => {
       }
     }
   }
-  // A narrow window, reduced motion and forced colors on the busiest sections.
+  // The input's pickers and menus, open, in both themes.
   await prefer(page, { key: 'language', value: 'en' });
   await prefer(page, { key: 'appearance.density', value: 'comfortable' });
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'conversation');
+    const editor = page.locator('.composer-editor');
+    await editor.click();
+    await page.keyboard.type('/');
+    await page.getByTestId('command-popup').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `picker-commands-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('@');
+    await page.getByTestId('mention-popup').locator('[role="option"]').first().waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `picker-mentions-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Backspace');
+    await page.getByTestId('composer-add').click();
+    await page.screenshot({ path: path.join(EVIDENCE, `menu-add-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('permission-mode').click();
+    await page.screenshot({ path: path.join(EVIDENCE, `menu-mode-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('session-model').click();
+    await page.screenshot({ path: path.join(EVIDENCE, `menu-model-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('composer-add').hover();
+    await page.locator('.tooltip[data-placed="true"]').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `tooltip-${theme}.png`) });
+  }
+  // A narrow window, reduced motion and forced colors on the busiest sections.
   await prefer(page, { key: 'appearance.theme', value: 'light' });
   await resize(app, 560, 760);
   for (const section of SECTIONS.filter((s) => s !== 'thinking')) {

@@ -10,8 +10,8 @@ import { useContextUsage, useTurnInfo } from '../store/hooks.js';
 import { showPanel } from './registry.js';
 
 /** Ring geometry (SVG user units). */
-const SIZE = 16;
-const STROKE = 2.5;
+const SIZE = 14;
+const STROKE = 2;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -60,12 +60,12 @@ export function UsageRing({ sessionId }: { readonly sessionId: string }) {
   return (
     <button
       type="button"
-      className="row-action usage-ring"
+      className="usage-ring"
       data-testid="usage-ring"
       data-level={level}
       data-percent={percent ?? ''}
       aria-label={label}
-      title={label}
+      data-tooltip={label}
       onClick={() => {
         showPanel('context');
       }}

@@ -1014,7 +1014,8 @@ export const en = {
   'transcript.elapsed': '{minutes, plural, =0 {{seconds} s} other {{minutes} min {seconds} s}}',
 
   'composer.label': 'Message',
-  'composer.placeholder': 'Message the agent — @ to mention a file, / for commands',
+  'composer.placeholder': 'Type / for commands, @ to mention files',
+  'composer.placeholder.running': 'Enter to steer, {queue} to queue for later',
   'composer.hint.idle': 'Enter to send · Shift+Enter for a new line',
   'composer.hint.running': 'Enter to steer · {queue} to queue · Esc to stop',
   'composer.send': 'Send',
@@ -1057,6 +1058,7 @@ export const en = {
   'composer.command.compact': 'Summarize the conversation to free up context',
   'composer.command.help': 'Show commands and keyboard shortcuts',
   'composer.queue.label': 'Queued',
+  'composer.queue.count': '{count, plural, one {# message queued} other {# messages queued}}',
   'composer.queue.steer': 'Steer',
   'composer.queue.followUp': 'Next',
   'composer.queue.edit': 'Edit',

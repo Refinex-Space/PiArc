@@ -47,10 +47,10 @@
   "workbench": {
     "readingWidth": "768px",
     "environmentWidth": "320px",
-    "composerHeight": "46px",
+    "composerHeight": "44px",
     "composerRadius": "14px",
     "composerShadow": "0 4px 20px rgb(0 0 0 / 0.035)",
-    "menuRadius": "10px",
+    "menuRadius": "12px",
     "iconSize": "18px"
   },
   "settings": {
@@ -75,7 +75,9 @@
     "bubbleMax": "85%",
     "composerShadowFocus": "0 4px 20px rgb(0 0 0 / 0.075)",
     "popoverShadow": "0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08)",
-    "liftShadow": "0 1px 2px rgb(0 0 0 / 0.05)"
+    "liftShadow": "0 1px 2px rgb(0 0 0 / 0.05)",
+    "composerPad": "8px",
+    "composerRow": "28px"
   },
   "density": {
     "comfortable": {

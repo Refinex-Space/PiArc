@@ -4,9 +4,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Catalog } from '../shell/model-catalog.js';
+import type { PaletteCommand } from '../composer/command-plugin.js';
 import { Composer, type ComposerHandlers, type MentionSource } from '../composer/Composer.js';
+import { matchCandidates } from '../composer/mention-plugin.js';
+import { MENTION_CANDIDATES } from './fixtures/mention-candidates.js';
 import { ModelMenus } from '../shell/ModelMenus.js';
 import { PermissionModeMenu } from '../shell/PermissionModeMenu.js';
+import { QueueList } from '../shell/QueueList.js';
 import { SessionTranscript } from '../store/transcript.js';
 import {
   TranscriptContext,
@@ -43,10 +47,29 @@ const HANDLERS: ComposerHandlers = {
   mentionChosen: () => undefined,
 };
 
-const NO_MENTIONS: MentionSource = {
-  search: () => Promise.resolve([]),
+const MENTIONS: MentionSource = {
+  search: (query) => Promise.resolve(matchCandidates(MENTION_CANDIDATES, query)),
   cancel: () => undefined,
 };
+
+const COMMANDS: readonly PaletteCommand[] = [
+  { name: 'compact', description: '', source: 'builtIn', kind: 'builtIn', argumentHint: '[focus]' },
+  { name: 'model', description: '', source: 'builtIn', kind: 'builtIn' },
+  { name: 'rewind', description: '', source: 'builtIn', kind: 'builtIn' },
+  {
+    name: 'review',
+    description: 'Review the working tree against the plan',
+    source: 'projectClaude',
+    kind: 'command',
+    argumentHint: '[scope]',
+  },
+  {
+    name: 'release-notes',
+    description: 'Draft release notes from merged changes',
+    source: 'user',
+    kind: 'skill',
+  },
+];
 
 function sectionOf(hash: string): string {
   const query = hash.split('?')[1] ?? '';
@@ -95,9 +118,18 @@ export function SessionGallery() {
             <Composer
               running={section.running === true}
               handlers={HANDLERS}
-              mentions={NO_MENTIONS}
-              commands={[]}
+              mentions={MENTIONS}
+              commands={COMMANDS}
               limits={undefined}
+              above={
+                section.queue === undefined ? null : (
+                  <QueueList
+                    items={section.queue}
+                    onEdit={() => undefined}
+                    onDelete={() => undefined}
+                  />
+                )
+              }
             />
             <div className="environment-bar">
               <ModelMenus

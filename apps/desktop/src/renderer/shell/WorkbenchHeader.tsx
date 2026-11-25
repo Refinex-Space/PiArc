@@ -7,12 +7,7 @@ import { useSession } from '../store/hooks.js';
 import { badgeOf } from '../store/status.js';
 import { chooseDetail, useSessionDetail } from '../transcript/detail.js';
 import { DetailSwitch } from '../transcript/DetailSwitch.js';
-import {
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  SidebarIcon,
-} from './icons.js';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, SidebarIcon } from './icons.js';
 import { sessionTitle } from './SessionRow.js';
 import { StatusBadge } from './StatusBadge.js';
 import { useUi } from './ui.js';

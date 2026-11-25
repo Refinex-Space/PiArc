@@ -40,6 +40,7 @@ import { PermissionModeMenu } from './PermissionModeMenu.js';
 import { AutoReviewStatus } from './AutoReviewStatus.js';
 import { SandboxStatus } from './SandboxStatus.js';
 import { UsageRing } from './ContextUsage.js';
+import { NoticeBar } from './NoticeBar.js';
 import { QueueList } from './QueueList.js';
 import { compactFocus, SessionInput } from './session-input.js';
 import { useUi } from './ui.js';
@@ -496,6 +497,7 @@ export function Conversation({
         </TranscriptContext.Provider>
       </DetailContext.Provider>
       <div className="conversation-composer">
+        <NoticeBar />
         <Composer
           sessionId={id}
           fileScope={{ root: fileRoot, directory: fileDirectory }}

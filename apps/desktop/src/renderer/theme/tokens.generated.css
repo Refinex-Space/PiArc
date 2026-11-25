@@ -37,10 +37,10 @@
   --piarc-size-badge: 8px;
   --piarc-workbench-reading-width: 768px;
   --piarc-workbench-environment-width: 320px;
-  --piarc-workbench-composer-height: 46px;
+  --piarc-workbench-composer-height: 44px;
   --piarc-workbench-composer-radius: 14px;
   --piarc-workbench-composer-shadow: 0 4px 20px rgb(0 0 0 / 0.035);
-  --piarc-workbench-menu-radius: 10px;
+  --piarc-workbench-menu-radius: 12px;
   --piarc-workbench-icon-size: 18px;
   --piarc-settings-width: 1000px;
   --piarc-settings-height: 780px;
@@ -62,6 +62,8 @@
   --piarc-session-composer-shadow-focus: 0 4px 20px rgb(0 0 0 / 0.075);
   --piarc-session-popover-shadow: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
   --piarc-session-lift-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  --piarc-session-composer-pad: 8px;
+  --piarc-session-composer-row: 28px;
   --piarc-size-button-height: 28px;
   --piarc-radius-button: 8px;
   --piarc-font-size-button: 14px;

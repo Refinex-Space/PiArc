@@ -1,12 +1,15 @@
 // The queued inputs above the composer (architecture section 8.2): steering messages waiting for
 // the current step and follow-ups waiting for the turn to end, each editable and removable until
-// the model gets it. The queue itself is Core's (`session/queueChanged`).
+// the model gets it. The queue itself is Core's (`session/queueChanged`). One quiet band: a count
+// that folds the list away, then a row per input with its actions on hover or focus.
 import { useState } from 'react';
 
 import { useT } from '../app/app-context.js';
+import { IconButton } from '../app/IconButton.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import type { QueuedInput } from '../store/transcript.js';
 import { AttachmentChips } from '../transcript/rows/common.js';
+import { StepCaret, CloseGlyph, CheckGlyph, PencilIcon } from './icons.js';
 
 function QueueEntry({
   item,
@@ -27,7 +30,7 @@ function QueueEntry({
   };
   return (
     <li
-      className="queue-item"
+      className={`queue-item${editing === undefined ? '' : ' is-editing'}`}
       data-testid="queue-item"
       data-kind={item.kind}
       data-item-id={item.itemId}
@@ -67,44 +70,54 @@ function QueueEntry({
         />
       )}
       <AttachmentChips attachments={item.attachments} />
-      <span className="queue-actions">
+      <span
+        className={`queue-actions${editing === undefined ? ' reveal-actions' : ''}`}
+        data-pinned={editing !== undefined}
+      >
         {editing === undefined ? (
-          <button
-            type="button"
-            className="row-action"
+          <IconButton
+            label={t('composer.queue.edit')}
+            size="xs"
             data-testid="queue-edit"
             onClick={() => {
               setEditing(item.text);
             }}
           >
-            {t('composer.queue.edit')}
-          </button>
+            <PencilIcon />
+          </IconButton>
         ) : (
           <>
-            <button type="button" className="row-action" data-testid="queue-save" onClick={save}>
-              {t('composer.queue.save')}
-            </button>
-            <button
-              type="button"
-              className="row-action"
+            <IconButton
+              label={t('composer.queue.save')}
+              size="xs"
+              data-testid="queue-save"
+              onClick={save}
+            >
+              <CheckGlyph />
+            </IconButton>
+            <IconButton
+              label={t('composer.queue.cancel')}
+              size="xs"
               onClick={() => {
                 setEditing(undefined);
               }}
             >
-              {t('composer.queue.cancel')}
-            </button>
+              <CloseGlyph />
+            </IconButton>
           </>
         )}
-        <button
-          type="button"
-          className="row-action"
-          data-testid="queue-delete"
-          onClick={() => {
-            onDelete(item.itemId);
-          }}
-        >
-          {t('composer.queue.delete')}
-        </button>
+        {editing === undefined ? (
+          <IconButton
+            label={t('composer.queue.delete')}
+            size="xs"
+            data-testid="queue-delete"
+            onClick={() => {
+              onDelete(item.itemId);
+            }}
+          >
+            <CloseGlyph />
+          </IconButton>
+        ) : null}
       </span>
     </li>
   );
@@ -120,11 +133,32 @@ export function QueueList({
   readonly onDelete: (itemId: string) => void;
 }) {
   const t = useT();
+  const [open, setOpen] = useState(true);
+  const next = items[0];
   return (
-    <ul className="queue-list" data-testid="queue-list" aria-label={t('composer.queue.label')}>
-      {items.map((item) => (
-        <QueueEntry key={item.itemId} item={item} onEdit={onEdit} onDelete={onDelete} />
-      ))}
-    </ul>
+    <section className="queue-band" data-testid="queue-band" data-open={open}>
+      <button
+        type="button"
+        className="queue-head"
+        aria-expanded={open}
+        data-testid="queue-toggle"
+        onClick={() => {
+          setOpen(!open);
+        }}
+      >
+        <span className="queue-count">{t('composer.queue.count', { count: items.length })}</span>
+        {!open && next !== undefined ? <span className="queue-next">{next.text}</span> : null}
+        <span className="queue-caret" aria-hidden="true">
+          <StepCaret />
+        </span>
+      </button>
+      {open ? (
+        <ul className="queue-list" data-testid="queue-list" aria-label={t('composer.queue.label')}>
+          {items.map((item) => (
+            <QueueEntry key={item.itemId} item={item} onEdit={onEdit} onDelete={onDelete} />
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }

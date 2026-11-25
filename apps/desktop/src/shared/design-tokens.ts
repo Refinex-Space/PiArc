@@ -136,6 +136,8 @@ export type ScaleToken =
   | 'session.composerShadowFocus'
   | 'session.popoverShadow'
   | 'session.liftShadow'
+  | 'session.composerPad'
+  | 'session.composerRow'
   | 'size.buttonHeight'
   | 'radius.button'
   | 'fontSize.button'
@@ -627,6 +629,8 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'session.composerShadowFocus': '--piarc-session-composer-shadow-focus',
   'session.popoverShadow': '--piarc-session-popover-shadow',
   'session.liftShadow': '--piarc-session-lift-shadow',
+  'session.composerPad': '--piarc-session-composer-pad',
+  'session.composerRow': '--piarc-session-composer-row',
   'size.buttonHeight': '--piarc-size-button-height',
   'radius.button': '--piarc-radius-button',
   'fontSize.button': '--piarc-font-size-button',

@@ -313,8 +313,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 - [x] 开工：基线 verify 12/17（失败项见 I231、I232）。t19 开工基准为每帧主线程工作 p99 6.32 ms，滚动 59.6 fps，冷加载 61–94 ms，缓存切换 17–25 ms；流式吞吐 84 token/s，低于用例自身 100 的门限（本机 mock 与 Core 所限）。现状截图由会话画廊（`#/session-gallery`，`e2e/session-pane.e2e.ts`）生成，在 `tmp/evidence/session-pane/gallery/before/`。
 - [x] 盘点与规格：`docs/research/session-pane-fidelity.md` 差异表与补充 ADR-0078。
-- [ ] 基础层：会话区组件令牌（间距、圆角、描边、阴影、动效）与共享组件（图标入口、图标按钮、卡片外壳、工具行、展开折叠、菜单、tooltip、键帽、胶囊、状态点）。
-- [ ] 输入区与环境栏。
+- [x] 基础层：会话令牌（`design/tokens/` 的 `session` 分组与两档密度、淡底、细线、tooltip 色），lucide-react 1.66.0 经 `shell/icons.tsx` 统一出口，委托式 `app/Tooltip.tsx`，`IconButton` 三档尺寸，`session.css` 与 `transcript/rows/parts.tsx` 的步骤行、增删胶囊、卡片外壳、走光与悬停显隐（`c7d00936`）。
+- [x] 输入区与环境栏：44 px 输入卡片、附件文件卡、运行中停止与发送互换（500 ms 防反向误点）、占位文字承载插话与排队说明、`/` 与 `@` 面板及全应用菜单的统一外框、排队带、提示卡片移到输入列上方、24 px 环境栏与 14 px 用量环。附件、提及胶囊、提示卡与用量环待真实会话截图核对。
 - [ ] 用户消息、回复 Markdown 与代码块。
 - [ ] 思考块。
 - [ ] 工具行、工具组与 diff 卡。

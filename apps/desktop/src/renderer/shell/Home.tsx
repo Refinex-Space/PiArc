@@ -17,6 +17,7 @@ import { permissionChoices } from './PermissionModeMenu.js';
 import { reason } from './errors.js';
 import { startSession } from './start-session.js';
 import { baseName, useUi } from './ui.js';
+import { NoticeBar } from './NoticeBar.js';
 
 interface HomeProps {
   readonly workspace: string | undefined;
@@ -270,6 +271,7 @@ function HomeForm({
         )}
       </div>
       <div className="conversation-composer">
+        <NoticeBar />
         <Composer
           savedDraft={
             workspace && draft === undefined ? store.editorDraft('workspace', workspace) : undefined

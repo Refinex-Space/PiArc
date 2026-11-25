@@ -54,8 +54,8 @@ test('hook messages and errors show in the notice bar and unsupported hooks in d
   const notices = page.getByTestId('notices');
   await expect(notices.getByRole('alert')).toHaveText(
     [
-      'UserPromptSubmit hookTicket PIA-42 is in review.×',
-      'Stop hook errorexited with code 1: lint failed×',
+      'UserPromptSubmit hookTicket PIA-42 is in review.',
+      'Stop hook errorexited with code 1: lint failed',
     ],
     { timeout: 30_000 },
   );

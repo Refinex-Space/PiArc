@@ -4,6 +4,8 @@
 // Test-only: no product feature reads it.
 import type { ApprovalRequest, Item } from '@piarc/protocol';
 
+import type { QueuedInput } from '../../store/transcript.js';
+
 /** A Core session notification, as the session store reads it. */
 export interface GalleryNote {
   readonly jsonrpc: '2.0';
@@ -16,8 +18,8 @@ export interface GallerySection {
   readonly approvals?: readonly ApprovalRequest[];
   /** The composer shows a running turn. */
   readonly running?: boolean;
-  /** Text put into the composer. */
-  readonly draft?: string;
+  /** Inputs waiting above the composer. */
+  readonly queue?: readonly QueuedInput[];
 }
 
 const SESSION = 'gallery';
@@ -456,6 +458,15 @@ function working(): GallerySection {
   const now = Date.now();
   return {
     running: true,
+    queue: [
+      { itemId: 'q1', kind: 'steer', text: 'Skip the vendored folders.', attachments: [] },
+      {
+        itemId: 'q2',
+        kind: 'followUp',
+        text: 'Then update the index docs with the new options and run the docs build.',
+        attachments: [],
+      },
+    ],
     notifications: [
       turn('t1', now - 23_000),
       ...done('t1', user('u1', 'Rebuild the index and check the results.')),

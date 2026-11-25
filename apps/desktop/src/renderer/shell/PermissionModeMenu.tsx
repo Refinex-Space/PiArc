@@ -58,6 +58,7 @@ export function PermissionModeMenu({
         aria-expanded={menu.open !== null}
         disabled={mode === undefined}
         data-testid="permission-mode"
+        data-mode={mode}
         aria-label={choiceName(label, t('approval.modeMenu'))}
         onClick={(event) => {
           menu.openAbove(event.currentTarget);

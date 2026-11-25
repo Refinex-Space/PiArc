@@ -23,7 +23,6 @@ import {
   saveLayout,
   type Layout,
 } from './layout.js';
-import { NoticeBar } from './NoticeBar.js';
 import { WorktreeCleanupNotices, folderDrop, useLaunchTargets } from './worktree-ui.js';
 import { PageBoundary } from './PageBoundary.js';
 import { RailArea } from './PanelAreas.js';
@@ -594,7 +593,6 @@ export function Shell() {
                 </WorkbenchHeader>
                 <div className="main-row">
                   <main className="main" data-testid="shell-main">
-                    <NoticeBar />
                     <WorktreeCleanupNotices />
                     <PageBoundary
                       key={view.kind === 'home' ? `home:${String(viewNonce)}` : view.id}

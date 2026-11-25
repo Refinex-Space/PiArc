@@ -15,9 +15,12 @@ import { onFileAttachment, droppedFiles, FILE_DRAG_TYPE } from '../files/navigat
 import type { EditorDraft } from './session-draft.js';
 import { IconButton } from '../app/IconButton.js';
 import {
+  CloseGlyph,
   CommandIcon,
   FileCodeCornerIcon,
+  FileGlyph,
   GearIcon,
+  ImageGlyph,
   LayoutFreeformIcon,
   PaperclipIcon,
   PlusIcon,
@@ -93,6 +96,9 @@ export interface MentionSource {
   /** The picker closed: stop searching. */
   cancel(): void;
 }
+
+/** Presses this soon after send and stop swapped places are ignored (ms). */
+const SWAP_GUARD_MS = 500;
 
 function emptyState(doc?: EditorState['doc']): EditorState {
   return EditorState.create({
@@ -588,6 +594,16 @@ export function Composer({
       ? -1
       : ((palette.index % paletteMatches.length) + paletteMatches.length) % paletteMatches.length;
   const queueKey = platform === 'darwin' ? '⌘↩' : 'Ctrl+Enter';
+  // Running with nothing typed, the button stops the turn; a draft turns it back into send (a
+  // steer). A press within SWAP_GUARD_MS of the swap is ignored: a double click does not do both.
+  const stopping = running && empty && pending.length === 0;
+  const swappedAt = useRef(Number.NEGATIVE_INFINITY);
+  const shownStop = useRef(stopping);
+  useEffect(() => {
+    if (shownStop.current !== stopping) swappedAt.current = performance.now();
+    shownStop.current = stopping;
+  }, [stopping]);
+  const swapGuard = () => performance.now() - swappedAt.current >= SWAP_GUARD_MS;
   const problemText = (problem: AttachmentProblem): string => {
     switch (problem.reason) {
       case 'vision':
@@ -821,35 +837,6 @@ export function Composer({
           )}
         </ul>
       ) : null}
-      {pending.length === 0 ? null : (
-        <div className="composer-attachments" data-testid="composer-attachments">
-          {pending.map((attachment) => (
-            <span
-              key={attachment.id}
-              className={`attachment-chip is-${attachment.kind}`}
-              data-testid="pending-attachment"
-              data-kind={attachment.kind}
-            >
-              <span className="attachment-chip-icon" aria-hidden="true">
-                {attachment.kind === 'pdf' ? 'PDF' : 'IMG'}
-              </span>
-              <span className="attachment-chip-name">
-                {attachment.name} · {formatSize(attachment.size)}
-              </span>
-              <button
-                type="button"
-                className="attachment-remove"
-                aria-label={t('composer.attachment.remove', { name: attachment.name })}
-                onClick={() => {
-                  setPending((list) => list.filter((entry) => entry.id !== attachment.id));
-                }}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
       {problems.length === 0 && error === undefined ? null : (
         <div className="composer-problems" role="alert" data-testid="composer-problems">
           {problems.map((problem, index) => (
@@ -859,8 +846,40 @@ export function Composer({
         </div>
       )}
       <div className={`composer-box${disabled ? ' is-disabled' : ''}`}>
+        {pending.length === 0 ? null : (
+          <div className="composer-attachments" data-testid="composer-attachments">
+            {pending.map((attachment) => (
+              <span
+                key={attachment.id}
+                className={`attachment-chip is-${attachment.kind}`}
+                data-testid="pending-attachment"
+                data-kind={attachment.kind}
+              >
+                <span className="attachment-chip-icon" aria-hidden="true">
+                  {attachment.kind === 'pdf' ? <FileGlyph size={20} /> : <ImageGlyph size={20} />}
+                </span>
+                <span className="attachment-chip-text">
+                  <span className="attachment-chip-name">{attachment.name}</span>
+                  <span className="attachment-chip-size">{formatSize(attachment.size)}</span>
+                </span>
+                <button
+                  type="button"
+                  className="attachment-remove"
+                  aria-label={t('composer.attachment.remove', { name: attachment.name })}
+                  data-tooltip={t('composer.attachment.remove', { name: attachment.name })}
+                  onClick={() => {
+                    setPending((list) => list.filter((entry) => entry.id !== attachment.id));
+                  }}
+                >
+                  <CloseGlyph size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <IconButton
           label={t('composer.add')}
+          size="sm"
           className="composer-attach"
           data-testid="composer-add"
           aria-haspopup="menu"
@@ -871,7 +890,7 @@ export function Composer({
             add.openAbove(event.currentTarget);
           }}
         >
-          <PlusIcon strokeWidth={1} />
+          <PlusIcon strokeWidth={1.25} />
         </IconButton>
         <input
           ref={fileInput}
@@ -898,37 +917,50 @@ export function Composer({
           ref={mount}
           className="composer-mount"
           data-empty={empty}
-          data-placeholder={t(firstTurn ? 'home.placeholder' : 'composer.placeholder')}
+          data-placeholder={
+            firstTurn
+              ? t('home.placeholder')
+              : running
+                ? t('composer.placeholder.running', { queue: queueKey })
+                : t('composer.placeholder')
+          }
         />
-        {running && (
+        {stopping ? (
           <IconButton
+            key="stop"
             label={t('composer.stop')}
-            className="composer-stop"
+            keys="Escape"
+            size="sm"
+            className="composer-stop composer-swap"
             data-testid="composer-stop"
             onClick={() => {
-              handlers.stop();
+              if (swapGuard()) handlers.stop();
             }}
           >
             <StopIcon />
           </IconButton>
+        ) : (
+          <IconButton
+            key="send"
+            label={t(firstTurn ? 'home.send' : 'composer.send')}
+            keys="Enter"
+            size="sm"
+            className="composer-send composer-swap"
+            data-testid={firstTurn ? 'home-start' : 'composer-send'}
+            disabled={disabled || (empty && pending.length === 0)}
+            onClick={() => {
+              const editor = viewRef.current;
+              if (editor && swapGuard()) {
+                send.current(running ? 'steer' : 'send', editor.state, editor);
+                editor.focus();
+              }
+            }}
+          >
+            <SendIcon />
+          </IconButton>
         )}
-        <IconButton
-          label={t(firstTurn ? 'home.send' : 'composer.send')}
-          className="composer-send"
-          data-testid={firstTurn ? 'home-start' : 'composer-send'}
-          disabled={disabled || (empty && pending.length === 0)}
-          onClick={() => {
-            const editor = viewRef.current;
-            if (editor) {
-              send.current(running ? 'steer' : 'send', editor.state, editor);
-              editor.focus();
-            }
-          }}
-        >
-          <SendIcon />
-        </IconButton>
       </div>
-      <div className={running ? 'composer-hint' : 'visually-hidden'} aria-live="polite">
+      <div className="visually-hidden" aria-live="polite">
         {running ? t('composer.hint.running', { queue: queueKey }) : t('composer.hint.idle')}
       </div>
     </div>

@@ -273,11 +273,7 @@ export function WorkspaceSearch({
                       <span className="workspace-search-meta truncate">{project.path}</span>
                     </span>
                     <span className="workspace-search-time">
-                      {active ? (
-                        <ReturnIcon />
-                      ) : (
-                        whenLabel(activity.get(project.path), t)
-                      )}
+                      {active ? <ReturnIcon /> : whenLabel(activity.get(project.path), t)}
                     </span>
                   </button>
                 );

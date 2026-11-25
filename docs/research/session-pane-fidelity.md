@@ -36,22 +36,22 @@
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 外壳 | `src/source-composer.css`、`generated/code-composer-v4/chat-composer-shell.mjs` | 单行高 44，内距 8，圆角 14，亮 #fff 暗 #303030；1 px 细线环加 0 4 20 3.5% 阴影，聚焦 7.5%；200 ms 过渡 | 46 高、圆角 15、阴影 5.5% | 复刻 | 两档密度测量 | 待实现 |
-| 编辑区 | `chat-composer-layout.mjs`、`source-composer-editor.css` | 15/21，最高 min(384, 40svh) 后内部滚动，占位色 #878787 | 15/24，自动增高 | 复刻行高与最高值 | 多行、长文截图 | 待实现 |
-| 占位文字 | `src/composer-placeholder.mjs` | 空闲 "Type / for commands"；运行中 "⏎ to send, ⌘⏎ to queue for later" | 一句长占位；运行中提示在框下另起一行 | 改造：空闲短占位，运行中把 steer 与排队写进占位，删除框下提示行 | 截图、读屏名称 | 待实现 |
+| 外壳 | `src/source-composer.css`、`generated/code-composer-v4/chat-composer-shell.mjs` | 单行高 44，内距 8，圆角 14，亮 #fff 暗 #303030；1 px 细线环加 0 4 20 3.5% 阴影，聚焦 7.5%；200 ms 过渡 | 46 高、圆角 15、阴影 5.5% | 复刻 | 两档密度测量 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
+| 编辑区 | `chat-composer-layout.mjs`、`source-composer-editor.css` | 15/21，最高 min(384, 40svh) 后内部滚动，占位色 #878787 | 15/24，自动增高 | 复刻行高与最高值 | 多行、长文截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
+| 占位文字 | `src/composer-placeholder.mjs` | 空闲 "Type / for commands"；运行中 "⏎ to send, ⌘⏎ to queue for later" | 一句长占位；运行中提示在框下另起一行 | 改造：空闲短占位，运行中把 steer 与排队写进占位，删除框下提示行 | 截图、读屏名称 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 | 附件 | `composer-attachment-tiles.mjs` | 120×120 方块，圆角 12，细线环，右上 20 圆形移除按钮悬停才显示 | 文字胶囊 "IMG/PDF" | 改造：PiArc 发送前没有缩略图数据，做成 120×44 的文件卡（图标、名称、大小），移除按钮同参考 | 截图 | 待实现 |
 | 提及 | `source-composer-editor.jsx` | 编辑器内是强调色文字，悬停淡底光晕，无胶囊底色 | 胶囊底色 | 复刻 | 截图 | 待实现 |
-| `/` 面板 | `src/source-slash-menu.{jsx,css}` | 宽 240–512，最高 384，行高 28，左右 10，圆角 14，面板内距 6；匹配字加粗；描述在行尾 | 分组列表，行高 24 | 复刻尺寸；分组标题保留（PiArc 的命令来源有意义） | 键盘、筛选截图 | 待实现 |
-| `@` 面板 | `src/source-mention-dropdown.{jsx,css}` | 宽 420（有描述 560），行内距 (28−20)/2×8，16 图标 | 35rem 宽列表 | 复刻 | 截图 | 待实现 |
-| 添加菜单 | `src/source-composer-add-menu.jsx`、`src/source-menu.css` | 28 幽灵按钮；菜单最小 128、最大 320，圆角 12，内距 4，行内距 4×8 | `MenuPopup` | 复刻菜单尺寸（共享 `Menu`） | 截图 | 待实现 |
-| 发送与停止 | `composer-send-cell.mjs` | 28×28 幽灵图标按钮，图标 20；运行中草稿为空显示停止，有草稿显示发送；切换淡入 120（延迟 80）淡出 80；500 ms 内反向点击忽略 | 两个按钮同时出现 | 复刻 | 运行中切换录屏 | 待实现 |
+| `/` 面板 | `src/source-slash-menu.{jsx,css}` | 宽 240–512，最高 384，行高 28，左右 10，圆角 14，面板内距 6；匹配字加粗；描述在行尾 | 分组列表，行高 24 | 复刻尺寸；分组标题保留（PiArc 的命令来源有意义） | 键盘、筛选截图 | 已对齐：`gallery/composer/picker-*`、`menu-add-*` |
+| `@` 面板 | `src/source-mention-dropdown.{jsx,css}` | 宽 420（有描述 560），行内距 (28−20)/2×8，16 图标 | 35rem 宽列表 | 复刻 | 截图 | 已对齐：`gallery/composer/picker-*`、`menu-add-*` |
+| 添加菜单 | `src/source-composer-add-menu.jsx`、`src/source-menu.css` | 28 幽灵按钮；菜单最小 128、最大 320，圆角 12，内距 4，行内距 4×8 | `MenuPopup` | 复刻菜单尺寸（共享 `Menu`） | 截图 | 已对齐：`gallery/composer/picker-*`、`menu-add-*` |
+| 发送与停止 | `composer-send-cell.mjs` | 28×28 幽灵图标按钮，图标 20；运行中草稿为空显示停止，有草稿显示发送；切换淡入 120（延迟 80）淡出 80；500 ms 内反向点击忽略 | 两个按钮同时出现 | 复刻 | 运行中切换录屏 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 | 麦克风 | 同上 | 空草稿时显示听写按钮 | 无听写 | 不适用：PiArc 没有听写能力 | — | 不适用 |
 | Bash 模式与历史检索 | `src/source-composer.jsx` | `!` 进入命令模式；↑ 历史检索条 | 无 | 不适用：PiArc 没有这两项能力 | — | 不适用 |
-| 排队条 | `src/source-queued-messages.{jsx,css}`、`generated/queued-bar-v4/*` | 折叠行高 44、圆角 12、淡底，"{n} 条排队 · 下一条预览"；展开后行内距 5，悬停显示操作；进出 120 ms 位移 6 | 列表 | 复刻（编辑、删除沿用现有 IPC；PiArc 没有拖动排序与"立即发送"） | 截图 | 待实现 |
+| 排队条 | `src/source-queued-messages.{jsx,css}`、`generated/queued-bar-v4/*` | 折叠行高 44、圆角 12、淡底，"{n} 条排队 · 下一条预览"；展开后行内距 5，悬停显示操作；进出 120 ms 位移 6 | 列表 | 复刻（编辑、删除沿用现有 IPC；PiArc 没有拖动排序与"立即发送"） | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 | 提示带 | `src/source-session-notices.{jsx,css}` | 卡片圆角 12、细线环、页面底色，严重程度只体现在图标；200 ms 位移 4 出现 | `NoticeBar` 在主区顶部，整条警告底色 | 改造：会话提示移到输入框上方并用参考样式；全局提示仍在顶部 | 截图 | 待实现 |
-| 环境栏 | `src/source-composer-row-chin.jsx`、`composer-row-chin.mjs` | 卡片下方 8，xs 行高 24，字号 13/20，次文字色；模型（推理强度作尾词）→ 模式 → 用量环；按钮内距 6、圆角 6 | 普通文字按钮，模型与强度分开 | 复刻顺序与尺寸；强度合并为模型按钮的尾词，菜单仍分开（快捷键不变） | 截图 | 待实现 |
+| 环境栏 | `src/source-composer-row-chin.jsx`、`composer-row-chin.mjs` | 卡片下方 8，xs 行高 24，字号 13/20，次文字色；模型（推理强度作尾词）→ 模式 → 用量环；按钮内距 6、圆角 6 | 普通文字按钮，模型与强度分开 | 复刻顺序与尺寸；强度合并为模型按钮的尾词，菜单仍分开（快捷键不变） | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 | 用量环 | `usage-ring.mjs` | 24 按钮内 14 px 圆环，线宽 2，<75 强调、75–89 警告、≥90 危险，弧长 300 ms | `UsageRing` | 复刻 | 三档截图 | 待实现 |
-| 模式菜单 | `src/source-permission-menu.{jsx,css}` | 标题 "Mode"，每行名称加说明，选中强调色勾，行尾数字快捷键 | `MenuPopup` 带说明 | 复刻 | 截图 | 待实现 |
+| 模式菜单 | `src/source-permission-menu.{jsx,css}` | 标题 "Mode"，每行名称加说明，选中强调色勾，行尾数字快捷键 | `MenuPopup` 带说明 | 复刻 | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 
 ## 4. 对话区与消息
 

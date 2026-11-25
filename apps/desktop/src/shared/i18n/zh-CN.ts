@@ -992,7 +992,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'transcript.elapsed': '{minutes, plural, =0 {{seconds} 秒} other {{minutes} 分 {seconds} 秒}}',
 
   'composer.label': '消息',
-  'composer.placeholder': '给智能体发消息——@ 提及文件，/ 使用命令',
+  'composer.placeholder': '输入 / 使用命令，@ 提及文件',
+  'composer.placeholder.running': 'Enter 插话，{queue} 排队',
   'composer.hint.idle': 'Enter 发送 · Shift+Enter 换行',
   'composer.hint.running': 'Enter 插话 · {queue} 排队 · Esc 停止',
   'composer.send': '发送',
@@ -1034,6 +1035,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'composer.command.compact': '总结对话，腾出上下文',
   'composer.command.help': '显示命令与快捷键',
   'composer.queue.label': '已排队',
+  'composer.queue.count': '{count} 条消息在排队',
   'composer.queue.steer': '插话',
   'composer.queue.followUp': '下一条',
   'composer.queue.edit': '编辑',
