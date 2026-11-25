@@ -47,6 +47,8 @@ import {
   filterCommands,
   moveCommands,
   openCommands,
+  continueCommand,
+  slashBefore,
   type CommandState,
   type PaletteCommand,
 } from './command-plugin.js';
@@ -114,17 +116,33 @@ function emptyState(doc?: EditorState['doc']): EditorState {
   });
 }
 
-/** Puts `/name ` in the input with the cursor after it, the palette closed. */
-function fillCommand(view: EditorView, name: string): void {
-  const text = `/${name} `;
-  const paragraph = composerSchema.nodes.paragraph.create(null, composerSchema.text(text));
-  const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, paragraph);
+/**
+ * Puts a chip for `command` and a space in place of `from`–`to` (the typed `/query`), the
+ * cursor after them and the palette closed (ADR-0080). It is sent as `/name`.
+ */
+function insertCommand(view: EditorView, command: PaletteCommand, from: number, to: number): void {
+  const chip = composerSchema.nodes.command.create({
+    name: command.name,
+    kind: command.kind,
+    description: command.description,
+  });
+  const tr = view.state.tr.replaceWith(from, to, [chip, composerSchema.text(' ')]);
   view.dispatch(
     tr
-      .setSelection(TextSelection.create(tr.doc, text.length + 1))
-      .setMeta(commandKey, { type: 'close' }),
+      .setSelection(TextSelection.create(tr.doc, from + 2))
+      .setMeta(commandKey, { type: 'close' })
+      .scrollIntoView(),
   );
   view.focus();
+}
+
+/** The commands the palette offers: built-in ones only for a `/` that starts the message. */
+function paletteChoices(
+  commands: readonly PaletteCommand[],
+  state: CommandState,
+): readonly PaletteCommand[] {
+  const offered = state.atStart ? commands : commands.filter((c) => c.kind !== 'builtIn');
+  return filterCommands(offered, state.query);
 }
 
 function clearCommand(): Command {
@@ -349,14 +367,18 @@ export function Composer({
       Object.fromEntries(COMPOSER_KEYS.map((key) => [key, command(key)])),
     );
     const runPaletteCommand = (editor: EditorView, choice: PaletteCommand | undefined): void => {
-      editor.dispatch(closeCommands(editor.state));
-      if (choice === undefined) return;
-      if (choice.kind !== 'builtIn') {
-        // A command file or skill goes to Core as `/name arguments`: the user types the
-        // arguments after it (T37).
-        fillCommand(editor, choice.name);
+      const open = commandKey.getState(editor.state) ?? CLOSED_COMMANDS;
+      if (choice === undefined) {
+        editor.dispatch(closeCommands(editor.state));
         return;
       }
+      if (choice.kind !== 'builtIn') {
+        // A command file or skill becomes a chip sent as `/name`: at the start Core runs it with
+        // the text after it as arguments (T37); in the middle it is text for the model.
+        insertCommand(editor, choice, open.from, editor.state.selection.from);
+        return;
+      }
+      editor.dispatch(closeCommands(editor.state));
       clearCommand()(editor.state, editor.dispatch.bind(editor), editor);
       latest.current.handlers.runCommand?.(choice);
     };
@@ -442,7 +464,7 @@ export function Composer({
         }
         const open = commandKey.getState(editor.state) ?? CLOSED_COMMANDS;
         if (open.active) {
-          const matches = filterCommands(latest.current.commands, open.query);
+          const matches = paletteChoices(latest.current.commands, open);
           const count = matches.length;
           switch (event.key) {
             case 'ArrowDown':
@@ -483,6 +505,16 @@ export function Composer({
           editor.dispatch(openCommands(editor.state, from, to));
           latest.current.handlers.command();
           return true;
+        }
+        // A name typed right after a `/` that starts a word opens the palette there.
+        const palette = commandKey.getState(editor.state) ?? CLOSED_COMMANDS;
+        if (!palette.active && /^[A-Za-z0-9_]$/u.test(text) && from === to) {
+          const slash = slashBefore(editor.state, from);
+          if (slash === from - 1) {
+            editor.dispatch(continueCommand(editor.state, slash, from, to, text));
+            latest.current.handlers.command();
+            return true;
+          }
         }
         return false;
       },
@@ -601,7 +633,7 @@ export function Composer({
     matches.length === 0
       ? -1
       : ((mention.index % matches.length) + matches.length) % matches.length;
-  const paletteMatches = palette.active ? filterCommands(commands, palette.query) : [];
+  const paletteMatches = palette.active ? paletteChoices(commands, palette) : [];
   const paletteIndex =
     paletteMatches.length === 0
       ? -1
@@ -683,7 +715,7 @@ export function Composer({
                   disabled: !empty,
                   run: () => {
                     const view = viewRef.current;
-                    if (view) fillCommand(view, c.name);
+                    if (view) insertCommand(view, c, 1, view.state.doc.content.size - 1);
                   },
                 })),
               {
@@ -811,15 +843,16 @@ export function Composer({
                     className={
                       index === paletteIndex ? 'mention-option is-active' : 'mention-option'
                     }
+                    data-tooltip={choice.description === '' ? undefined : choice.description}
                     onMouseDown={(event) => {
                       event.preventDefault();
                       const view = viewRef.current;
                       if (view === null) return;
-                      view.dispatch(closeCommands(view.state));
                       if (choice.kind !== 'builtIn') {
-                        fillCommand(view, choice.name);
+                        insertCommand(view, choice, palette.from, view.state.selection.from);
                         return;
                       }
+                      view.dispatch(closeCommands(view.state));
                       clearCommand()(view.state, view.dispatch.bind(view), view);
                       handlers.runCommand?.(choice);
                     }}

@@ -5,7 +5,7 @@
 import type { InputMention } from '@piarc/protocol';
 import type { Node } from 'prosemirror-model';
 
-import { mentionOf, snippetOf, type MentionData } from './schema.js';
+import { commandOf, mentionOf, snippetOf, type MentionData } from './schema.js';
 
 export interface ComposerPayload {
   /** The text for the model; paragraphs joined by newlines, mentions as `@path`. */
@@ -27,6 +27,8 @@ export function serializeDoc(doc: Node): ComposerPayload {
     paragraph.forEach((child) => {
       if (child.type.name === 'snippet') {
         text += snippetText(snippetOf(child));
+      } else if (child.type.name === 'command') {
+        text += `/${commandOf(child).name}`;
       } else if (child.type.name === 'mention') {
         const mention = mentionOf(child);
         mentions.push(mention);

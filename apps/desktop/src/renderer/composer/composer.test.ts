@@ -16,7 +16,14 @@ import {
 } from './mention-plugin.js';
 import { composerSchema, type MentionData } from './schema.js';
 import { isBlank, serializeDoc } from './serialize.js';
-import { commandKey, commandPlugin, filterCommands, openCommands } from './command-plugin.js';
+import {
+  commandKey,
+  commandPlugin,
+  continueCommand,
+  filterCommands,
+  openCommands,
+  slashBefore,
+} from './command-plugin.js';
 
 const README: MentionData = { id: 'readme', label: 'README.md', path: 'docs/README.md' };
 
@@ -180,5 +187,37 @@ describe('command palette', () => {
     expect(commandKey.getState(current)).toMatchObject({ active: true, query: 'co' });
     current = current.apply(current.tr.insertText(' '));
     expect(commandKey.getState(current)?.active).toBe(false);
+  });
+
+  it('opens mid-text once a name follows a slash that starts a word (ADR-0080)', () => {
+    let current = EditorState.create({ schema: composerSchema, plugins: [commandPlugin()] });
+    current = current.apply(current.tr.insertText('Run /'));
+    // A slash alone in the text does not open it; a name typed after one that starts a word does.
+    expect(commandKey.getState(current)?.active).toBe(false);
+    const slash = slashBefore(current, current.selection.from);
+    expect(slash).toBe(5);
+    current = current.apply(continueCommand(current, slash ?? 0, 6, 6, 'r'));
+    expect(commandKey.getState(current)).toMatchObject({
+      active: true,
+      query: 'r',
+      from: 5,
+      atStart: false,
+    });
+    // Not after a word: `src/` is a path.
+    let path = EditorState.create({ schema: composerSchema, plugins: [commandPlugin()] });
+    path = path.apply(path.tr.insertText('src/'));
+    expect(slashBefore(path, path.selection.from)).toBeUndefined();
+  });
+
+  it('sends a command chip as /name, where it stands', () => {
+    const doc = composerSchema.node('doc', null, [
+      composerSchema.node('paragraph', null, [
+        composerSchema.text('Then '),
+        composerSchema.nodes.command.create({ name: 'review', kind: 'command', description: 'd' }),
+        composerSchema.text(' the diff'),
+      ]),
+    ]);
+    expect(serializeDoc(doc).text).toBe('Then /review the diff');
+    expect(isBlank(serializeDoc(doc))).toBe(false);
   });
 });

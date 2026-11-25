@@ -218,6 +218,25 @@
   background: var(--piarc-session-ghost-hover);
   box-shadow: 0 0 0 2px var(--piarc-session-ghost-hover);
 }
+/* A picked command or skill (ADR-0080): its name in the accent ink after a quiet slash, a soft
+   glow under the pointer; its description is the tooltip. */
+.composer-editor .command-chip {
+  margin-inline: 2px;
+  border-radius: var(--piarc-radius-md);
+  color: var(--piarc-text-accent);
+  font-weight: var(--piarc-font-weight-medium);
+  white-space: nowrap;
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    box-shadow var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+.composer-editor .command-chip:hover {
+  background: var(--piarc-session-ghost-hover);
+  box-shadow: 0 0 0 2px var(--piarc-session-ghost-hover);
+}
+.composer-editor .command-chip-slash {
+  opacity: 0.5;
+}
 .composer-editor .snippet-chip {
   padding: 0 var(--piarc-space-1);
   background: var(--piarc-session-fill);

@@ -15,6 +15,15 @@ export interface SnippetData {
   readonly text: string;
 }
 
+/** The data a command chip stores: a slash command or skill the user picked (ADR-0080). */
+export interface CommandData {
+  readonly name: string;
+  /** `command`, `skill`, ... as Core lists it. */
+  readonly kind: string;
+  /** Shown as the chip's tooltip. */
+  readonly description: string;
+}
+
 /** The data a mention stores. */
 export interface MentionData {
   /** Stable id of the candidate (for example the file's workspace-relative path). */
@@ -56,6 +65,35 @@ export const composerSchema = new Schema({
         `@${mentionOf(node).label}`,
       ],
     },
+    // A picked command or skill: its name in the accent ink after a quiet slash, its description
+    // as the tooltip. Sent as `/name`; only one at the start of the message runs (Core).
+    command: {
+      inline: true,
+      group: 'inline',
+      atom: true,
+      selectable: false,
+      attrs: {
+        name: { validate: 'string' },
+        kind: { validate: 'string' },
+        description: { validate: 'string', default: '' },
+      },
+      leafText: (node) => `/${commandOf(node).name}`,
+      toDOM: (node) => {
+        const command = commandOf(node);
+        return [
+          'span',
+          {
+            class: 'command-chip',
+            'data-piarc-command': command.name,
+            'data-kind': command.kind,
+            ...(command.description === '' ? {} : { 'data-tooltip': command.description }),
+            contenteditable: 'false',
+          },
+          ['span', { class: 'command-chip-slash', 'aria-hidden': 'true' }, '/'],
+          command.name,
+        ];
+      },
+    },
     snippet: {
       inline: true,
       group: 'inline',
@@ -87,6 +125,15 @@ export function snippetOf(node: Node): SnippetData {
     throw new TypeError('A snippet node lost its attributes');
   }
   return { label, source, text };
+}
+
+/** The data of a command node. */
+export function commandOf(node: Node): CommandData {
+  const { name, kind, description } = node.attrs;
+  if (typeof name !== 'string' || typeof kind !== 'string' || typeof description !== 'string') {
+    throw new TypeError('A command node lost its attributes');
+  }
+  return { name, kind, description };
 }
 
 /** The data of a mention node. */
