@@ -10,6 +10,7 @@ import { TranscriptContext } from '../services.js';
 import { revealBidi } from '../reveal.js';
 import { useT } from '../../app/app-context.js';
 import { CodeBlock } from '../highlight/CodeBlock.js';
+import { MarkdownMath } from '../../files/markdown/RichBlock.js';
 import type { Align, Block, Span } from './ir.js';
 
 // File documents opt into rich media and document-local navigation; chat keeps its own policy.
@@ -95,7 +96,11 @@ function SpanView({ span }: { span: Span }): ReactNode {
   const document = useContext(DocumentElements);
   switch (span.kind) {
     case 'math':
-      return document?.rich('math', span.text, true) ?? span.text;
+      return document ? (
+        document.rich('math', span.text, true)
+      ) : (
+        <MarkdownMath source={span.text} inline />
+      );
     case 'note':
       return (
         <sup data-anchor={'fnref-' + span.label}>
@@ -227,8 +232,14 @@ const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNod
     }
     case 'code':
       if (document && block.lang === 'mermaid') return document.rich('mermaid', block.text, false);
-      if (document && (block.lang === 'math' || block.lang === 'latex'))
-        return document.rich('math', block.text, false);
+      if (block.lang === 'math' || block.lang === 'latex')
+        return document ? (
+          document.rich('math', block.text, false)
+        ) : block.complete ? (
+          <MarkdownMath source={block.text} inline={false} />
+        ) : (
+          <CodeBlock lang={block.lang} code={block.text} complete={false} />
+        );
       return <CodeBlock lang={block.lang} code={block.text} complete={block.complete} />;
     case 'list': {
       const items = block.items.map((item, index) => (

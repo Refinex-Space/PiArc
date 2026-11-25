@@ -9,6 +9,8 @@ import { useDarkScheme } from '../use-color-scheme.js';
 import { HighlightClient } from './highlight-client.js';
 import type { HighlightLines, HighlightToken } from './protocol.js';
 import { revealBidi } from '../reveal.js';
+import { useT } from '../../app/app-context.js';
+import { CopyIconButton } from '../rows/parts.js';
 
 const ITALIC = 1;
 const BOLD = 2;
@@ -92,6 +94,7 @@ export const CodeBlock = memo(function CodeBlock({
   code: string;
   complete: boolean;
 }) {
+  const t = useT();
   const lines = useHighlight(lang, code, complete);
   // Highlighting can change the block's height on its own: keep the bottom in view.
   useRowCommitted();
@@ -109,6 +112,12 @@ export const CodeBlock = memo(function CodeBlock({
           {lang}
         </div>
       )}
+      {/* The copy button stays in view while a tall block scrolls by; not while it streams. */}
+      {complete ? (
+        <div className="md-code-rail">
+          <CopyIconButton label={t('transcript.copyCode')} text={() => code} testId="code-copy" />
+        </div>
+      ) : null}
       <pre>
         <code>
           {lines === undefined || lines === null ? code : <HighlightedCode lines={lines} />}

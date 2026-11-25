@@ -21,6 +21,7 @@ import {
   Split,
   SquareTerminal,
   TextSelect,
+  Type,
   TriangleAlert,
   WrapText,
   X,
@@ -362,6 +363,7 @@ export const CheckGlyph = glyph(Check);
 export const RewindGlyph = glyph(RotateCcw);
 export const BranchGlyph = glyph(Split);
 export const SelectTurnGlyph = glyph(TextSelect);
+export const PlainTextGlyph = glyph(Type);
 export const CaretGlyph = glyph(ChevronRight);
 export const CaretDownGlyph = glyph(ChevronDown);
 export const CaretUpGlyph = glyph(ChevronUp);

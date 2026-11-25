@@ -1,14 +1,25 @@
 // The message rows (architecture section 8.2): the user's input with its mention and attachment
 // chips, the agent's reply (Markdown from the worker, raw HTML as text), and the thinking block
 // (open and not collapsible while it is generated, then folded to "thought for N seconds").
+// The user's bubble folds a long message; both rows keep their actions as icon buttons that
+// show on hover or keyboard focus (ADR-0078).
 import type { Item } from '@piarc/protocol';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 import { useT } from '../../app/app-context.js';
+import { IconButton } from '../../app/IconButton.js';
 import { chipOf, type ShownInput, type TranscriptRow } from '../../store/transcript.js';
 import { blocksText } from '../copy.js';
 import { MarkdownView } from '../markdown/MarkdownView.js';
 import { BranchSwitcher } from '../../changes/BranchSwitcher.js';
+import {
+  BranchGlyph,
+  CaretDownGlyph,
+  CaretUpGlyph,
+  PlainTextGlyph,
+  RewindGlyph,
+  SelectTurnGlyph,
+} from '../../shell/icons.js';
 import {
   useBranchPoint,
   useExpanded,
@@ -16,12 +27,16 @@ import {
   useTranscriptView,
   useTurn,
 } from '../services.js';
-import { AttachmentChips, CopyButton, MentionText } from './common.js';
+import { AttachmentChips, MentionText } from './common.js';
 import { useListActions, useRowCommitted } from './list-actions.js';
+import { CopyIconButton } from './parts.js';
 
 type AgentMessageItem = Extract<Item, { type: 'agentMessage' }>;
 type ReasoningItem = Extract<Item, { type: 'reasoning' }>;
 type UserMessageItem = Extract<Item, { type: 'userMessage' }>;
+
+/** A user message taller than this folds (CSS px). */
+const FOLD_ABOVE_PX = 300;
 
 /** A user message from Core; the first of a turn can be rewound to and branched from (T28). */
 export function UserMessageRow({
@@ -50,29 +65,29 @@ export function UserMessageRow({
       extra={
         <>
           {start && rewind !== undefined ? (
-            <button
-              type="button"
-              className="row-action"
+            <IconButton
+              label={t('transcript.rewind')}
+              size="xs"
               data-testid="rewind-here"
               disabled={running}
               onClick={() => {
                 rewind(turnId, item.text);
               }}
             >
-              {t('transcript.rewind')}
-            </button>
+              <RewindGlyph />
+            </IconButton>
           ) : null}
           {start && branchFrom !== undefined ? (
-            <button
-              type="button"
-              className="row-action"
+            <IconButton
+              label={t('transcript.branchFrom')}
+              size="xs"
               data-testid="branch-from-here"
               onClick={() => {
                 branchFrom(turnId, item.text);
               }}
             >
-              {t('transcript.branchFrom')}
-            </button>
+              <BranchGlyph />
+            </IconButton>
           ) : null}
         </>
       }
@@ -100,7 +115,7 @@ export function OptimisticRow({
           <span>{t('transcript.user.undelivered', { reason: row.failure ?? '' })}</span>
           <button
             type="button"
-            className="row-action"
+            className="row-link"
             data-testid="resend"
             onClick={() => {
               actions.resend(row.clientId);
@@ -138,6 +153,15 @@ function UserBubble({
   const { openFile } = useTranscriptView().actions;
   const t = useT();
   const list = useListActions();
+  // A long message folds to a fixed height with a fade; the reader opens it in place.
+  const body = useRef<HTMLDivElement>(null);
+  const [tall, setTall] = useState(false);
+  const [open, setOpen] = useExpanded(`more:${id}`, false);
+  useLayoutEffect(() => {
+    const element = body.current;
+    if (element !== null) setTall(element.scrollHeight > FOLD_ABOVE_PX);
+  }, [input.text]);
+  const folded = tall && !open;
   return (
     <div
       className={`row row-user${state === undefined ? '' : ` is-${state}`}`}
@@ -145,25 +169,39 @@ function UserBubble({
       data-row-id={id}
       data-state={state}
     >
+      <AttachmentChips attachments={input.attachments} />
       <div className="row-user-bubble" data-testid="user-message" data-state={state}>
-        <div className="row-user-text">
+        <div ref={body} className="row-user-text" data-folded={folded}>
           <MentionText text={input.text} mentions={input.mentions} onOpen={openFile} />
         </div>
-        <AttachmentChips attachments={input.attachments} />
+        {tall ? (
+          <button
+            type="button"
+            className="row-user-more"
+            aria-expanded={open}
+            data-testid="user-message-more"
+            onClick={() => {
+              setOpen(!open);
+            }}
+          >
+            {t(open ? 'transcript.user.showLess' : 'transcript.user.showMore')}
+            {open ? <CaretUpGlyph size={12} /> : <CaretDownGlyph size={12} />}
+          </button>
+        ) : null}
       </div>
       {children}
-      <div className="row-actions is-hover" data-testid="user-actions">
-        <CopyButton label={t('transcript.copyText')} text={() => input.text} />
-        <button
-          type="button"
-          className="row-action"
+      <div className="row-actions reveal-actions" data-testid="user-actions">
+        <CopyIconButton label={t('transcript.copyText')} text={() => input.text} />
+        <IconButton
+          label={t('transcript.selectTurn')}
+          size="xs"
           data-testid="select-turn"
           onClick={() => {
             list.selectExchange(id);
           }}
         >
-          {t('transcript.selectTurn')}
-        </button>
+          <SelectTurnGlyph />
+        </IconButton>
         {extra}
       </div>
       {branches}
@@ -212,19 +250,23 @@ export function AgentMessageRow({
     >
       {body}
       {complete && parsed?.final === true ? (
-        <div className="row-actions is-hover" data-testid="message-actions">
-          <CopyButton label={t('transcript.copyMarkdown')} text={() => item.text} />
-          <CopyButton label={t('transcript.copyText')} text={() => blocksText(parsed.blocks)} />
-          <button
-            type="button"
-            className="row-action"
+        <div className="row-actions reveal-actions" data-testid="message-actions">
+          <CopyIconButton label={t('transcript.copyMarkdown')} text={() => item.text} />
+          <CopyIconButton
+            label={t('transcript.copyText')}
+            text={() => blocksText(parsed.blocks)}
+            glyph={<PlainTextGlyph />}
+          />
+          <IconButton
+            label={t('transcript.selectTurn')}
+            size="xs"
             data-testid="select-turn"
             onClick={() => {
               list.selectExchange(id);
             }}
           >
-            {t('transcript.selectTurn')}
-          </button>
+            <SelectTurnGlyph />
+          </IconButton>
         </div>
       ) : null}
     </article>

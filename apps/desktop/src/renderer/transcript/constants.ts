@@ -45,6 +45,9 @@ export const VIRTUAL_LIST = {
   estimatedLineHeightPx: 22,
   /** Assumed average character width of message text before a row is measured (px). */
   estimatedCharWidthPx: 7.5,
+  /** Space above the first row and below the last (px). */
+  paddingStartPx: 40,
+  paddingEndPx: 24,
 } as const;
 
 /** History windows (Core's `transcript_window`). */

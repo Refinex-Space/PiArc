@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 
 import { useT } from '../../app/app-context.js';
 import type { AttachmentChip } from '../../store/transcript.js';
+import { FileGlyph, ImageGlyph } from '../../shell/icons.js';
 import { baseName } from './summary.js';
 
 /** How long a copy button shows its confirmation (ms). */
@@ -114,9 +115,17 @@ export function AttachmentChips({
           data-kind={attachment.kind}
         >
           <span className="attachment-chip-icon" aria-hidden="true">
-            {attachment.kind === 'pdf' ? 'PDF' : 'IMG'}
+            {attachment.kind === 'pdf' ? <FileGlyph size={20} /> : <ImageGlyph size={20} />}
           </span>
-          <span className="attachment-chip-name">
+          <span className="attachment-chip-text" aria-hidden="true">
+            <span className="attachment-chip-name">{attachment.name}</span>
+            <span className="attachment-chip-size">
+              {attachment.kind === 'pdf'
+                ? t('transcript.attachment.pages', { pages: attachment.pageCount ?? 0 })
+                : formatSize(attachment.size)}
+            </span>
+          </span>
+          <span className="visually-hidden">
             {attachment.kind === 'pdf'
               ? t('transcript.attachment.pdf', {
                   name: attachment.name,

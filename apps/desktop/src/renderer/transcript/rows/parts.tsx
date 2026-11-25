@@ -135,11 +135,14 @@ export function CopyIconButton({
   text,
   testId,
   size = 'xs',
+  glyph,
 }: {
   readonly label: string;
   readonly text: () => string;
   readonly testId?: string;
   readonly size?: 'xs' | 'sm';
+  /** The icon before copying (the copy glyph by default). */
+  readonly glyph?: ReactNode;
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -173,7 +176,7 @@ export function CopyIconButton({
         );
       }}
     >
-      {copied ? <CheckGlyph /> : <CopyGlyph />}
+      {copied ? <CheckGlyph /> : (glyph ?? <CopyGlyph />)}
     </IconButton>
   );
 }

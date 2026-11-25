@@ -1,7 +1,8 @@
 /* The transcript and the composer (architecture sections 8.2, 8.4): the session view of the app
    and the prototype page share these rules. Colors, sizes and spacing come from the design
-   tokens only (ADR-0029). Labels, buttons and chips' decorations are not selectable, so copying
-   a selection gets the conversation's text only (section 8.4). */
+   tokens only (ADR-0029); the session pane follows ADR-0078. Labels, buttons and chips'
+   decorations are not selectable, so copying a selection gets the conversation's text only
+   (section 8.4). */
 
 /* ---- the list ---- */
 
@@ -9,6 +10,7 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  timeline-scope: --transcript-scroll;
 }
 
 .transcript-scroller {
@@ -17,6 +19,7 @@
   overflow-anchor: none;
   outline: none;
   user-select: text;
+  scroll-timeline: --transcript-scroll block;
 }
 
 /* A styled scrollbar is never an overlay scrollbar, so it stays visible and draggable on every
@@ -35,6 +38,64 @@
   background-color: var(--piarc-text-secondary);
 }
 
+/* Text fades under the edges once there is more to scroll to; the strips follow the scroll
+   position (a scroll-driven animation), so they cost nothing while nothing moves. */
+.conversation .transcript::before,
+.conversation .transcript::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0 12px;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: --transcript-scroll;
+}
+
+.conversation .transcript::before {
+  top: 0;
+  height: 32px;
+  background: linear-gradient(var(--piarc-workbench-canvas), transparent);
+  animation-name: transcript-fade-top;
+  animation-range: 0 32px;
+}
+
+.conversation .transcript::after {
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(transparent, var(--piarc-workbench-canvas));
+  animation-name: transcript-fade-bottom;
+  animation-range: calc(100% - 48px) 100%;
+}
+
+@keyframes transcript-fade-top {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes transcript-fade-bottom {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+:root[data-reduce-motion='true'] .transcript::before,
+:root[data-reduce-motion='true'] .transcript::after {
+  display: none;
+}
+
+@media (forced-colors: active) {
+  .conversation .transcript::before,
+  .conversation .transcript::after {
+    display: none;
+  }
+}
+
 .transcript-sizer {
   position: relative;
   width: 100%;
@@ -47,34 +108,66 @@
   width: 100%;
 }
 
-.transcript-loading {
+/* The loading chip and the jump to the end: small chips centred on the column. */
+.transcript-loading,
+.back-to-bottom {
   position: absolute;
-  top: var(--piarc-space-2);
   left: 50%;
-  z-index: 1;
-  transform: translateX(-50%);
-  padding: 2px var(--piarc-space-3);
-  border-radius: var(--piarc-radius-pill);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  height: var(--piarc-session-row-small);
+  padding: 0 var(--piarc-session-pad-xs);
+  border: 0;
+  border-radius: var(--piarc-session-radius);
   background: var(--piarc-surface-raised);
-  font-size: var(--piarc-font-size-small);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  transform: translateX(-50%);
   user-select: none;
+  animation: transcript-chip-in var(--piarc-motion-fast) var(--piarc-motion-curve-out);
+}
+
+.transcript-loading {
+  top: var(--piarc-space-2);
+  padding-inline: var(--piarc-session-pad-sm);
 }
 
 .back-to-bottom {
-  position: absolute;
-  right: 50%;
-  bottom: var(--piarc-space-3);
-  transform: translateX(50%);
-  padding: 6px 14px;
-  border: 1px solid var(--piarc-border-default);
-  border-radius: var(--piarc-radius-pill);
-  background: var(--piarc-surface-raised);
+  bottom: var(--piarc-space-2);
+}
+
+.back-to-bottom:hover {
+  background-image: linear-gradient(
+    var(--piarc-session-ghost-hover),
+    var(--piarc-session-ghost-hover)
+  );
   color: var(--piarc-text-primary);
-  box-shadow: var(--piarc-shadow-overlay);
-  font: inherit;
-  font-size: var(--piarc-font-size-small);
-  user-select: none;
-  cursor: pointer;
+}
+
+.back-to-bottom[data-waiting='true'] {
+  padding-inline: var(--piarc-session-pad-sm) var(--piarc-session-pad-xs);
+  color: var(--piarc-text-primary);
+}
+
+.back-to-bottom-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--piarc-accent-solid);
+}
+
+@keyframes transcript-chip-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* ---- rows ---- */
@@ -102,18 +195,8 @@
   user-select: none;
 }
 
-.row-actions.is-hover {
-  opacity: 0;
-  transition: opacity var(--piarc-motion-fast) var(--piarc-motion-easing);
-}
-
 .row-user > .row-actions {
   justify-content: flex-end;
-}
-
-.row:hover > .row-actions.is-hover,
-.row:focus-within > .row-actions.is-hover {
-  opacity: 1;
 }
 
 .row-action {
@@ -135,6 +218,19 @@
 
 .row-action:enabled:active {
   background-color: var(--piarc-action-pressed);
+}
+
+/* An inline text action ("Retry"): underlined in the surrounding ink. */
+.row-link {
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .row-status {
@@ -200,11 +296,41 @@
   white-space: nowrap;
 }
 
-/* Keep the reading measure aligned with the composer at every rail width. */
+/* The session pane's rhythm: rows on the reading column, a block gap between the parts of a
+   turn and a wider gap before the user's next message. */
 .conversation .transcript-row > .row {
-  max-width: calc(var(--piarc-workbench-reading-width) + 2 * var(--piarc-space-4));
-  padding-inline: var(--piarc-space-4);
-  font-size: var(--piarc-c-button-font-size);
+  max-width: calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter));
+  padding: var(--piarc-session-block-gap) var(--piarc-session-gutter) 0;
+  font-size: var(--piarc-session-prose);
+  line-height: var(--piarc-session-prose-line);
+}
+
+.conversation .transcript-row > .row-user {
+  padding-top: var(--piarc-session-turn-gap);
+}
+
+.conversation .transcript-row[data-index='0'] > .row {
+  padding-top: 0;
+}
+
+:root:lang(zh) .conversation .transcript-row > .row {
+  line-height: var(--piarc-session-prose-line-cjk);
+}
+
+@container (max-width: 560px) {
+  .conversation .transcript-row > .row {
+    padding-inline: var(--piarc-session-gutter-narrow);
+  }
+}
+
+.conversation .row-status {
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.conversation .row-actions {
+  gap: 3px;
+  margin-top: var(--piarc-space-1);
 }
 
 /* the user's message */
@@ -215,23 +341,69 @@
   align-items: flex-end;
 }
 
+.row-user > .attachment-chips {
+  justify-content: flex-end;
+  margin: 0 0 var(--piarc-session-gap-xs);
+}
+
 .row-user-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  box-sizing: border-box;
   max-width: min(100%, 640px);
   padding: var(--piarc-space-2) var(--piarc-space-3);
   border-radius: var(--piarc-radius-lg);
   background: var(--piarc-action-surface);
 }
 
+.conversation .row-user-bubble {
+  max-width: var(--piarc-session-bubble-max);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-session-fill);
+}
+
 .row-user.is-sending .row-user-bubble {
-  opacity: 0.8;
+  color: var(--piarc-text-secondary);
 }
 
 .row-user.is-undelivered .row-user-bubble {
-  outline: 1px dashed var(--piarc-state-danger);
+  box-shadow: inset 0 0 0 1px var(--piarc-state-danger);
 }
 
 .row-user-text {
+  max-width: 100%;
   white-space: pre-wrap;
+  unicode-bidi: plaintext;
+}
+
+.row-user-text[data-folded='true'] {
+  max-height: 200px;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 calc(100% - 48px), transparent);
+}
+
+.row-user-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  height: var(--piarc-session-row-small);
+  margin-inline-start: calc(-1 * var(--piarc-session-pad-xs));
+  padding: 0 var(--piarc-session-pad-xs);
+  border: 0;
+  border-radius: calc(var(--piarc-session-radius) - 2px);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  user-select: none;
+}
+
+.row-user-more:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
 }
 
 .mention-chip {
@@ -242,6 +414,20 @@
   white-space: nowrap;
 }
 
+/* In the transcript a mention reads as a link-colored word that opens the file. */
+.conversation .row-user-text .mention-chip {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.conversation .row-user-text .mention-chip:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .attachment-chips,
 .composer-attachments {
   display: flex;
@@ -250,32 +436,56 @@
   margin-top: var(--piarc-space-1);
 }
 
+/* An attachment: a file card with its kind's icon, name and size. */
 .attachment-chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--piarc-space-1);
-  max-width: 100%;
-  padding: 2px var(--piarc-space-2);
-  border: 1px solid var(--piarc-border-subtle);
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-surface-raised);
-  font-size: var(--piarc-font-size-small);
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  min-width: 120px;
+  max-width: 240px;
+  height: var(--piarc-workbench-composer-height);
+  padding: 0 var(--piarc-session-pad-md) 0 var(--piarc-session-pad-sm);
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-workbench-editor);
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+  user-select: none;
 }
 
 .attachment-chip-icon {
-  padding: 0 3px;
-  border-radius: var(--piarc-radius-sm);
-  background: var(--piarc-surface-active);
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--piarc-session-composer-row);
+  height: var(--piarc-session-composer-row);
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
   color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-caption);
-  font-weight: var(--piarc-font-weight-semibold);
-  user-select: none;
+}
+
+.attachment-chip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .attachment-chip-name {
   overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.attachment-chip-size {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+  font-variant-numeric: tabular-nums;
 }
 
 .attachment-remove {
@@ -382,6 +592,35 @@
   user-select: none;
 }
 
+/* The copy button runs down the block's right edge and sticks while a tall block scrolls by. */
+.md-code-rail {
+  position: absolute;
+  inset: 0 var(--piarc-space-1) 0 auto;
+  z-index: 1;
+  padding-block: var(--piarc-space-1);
+  pointer-events: none;
+}
+
+.md-code-rail > .icon-button {
+  position: sticky;
+  top: var(--piarc-space-1);
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity var(--piarc-motion-surface) var(--piarc-motion-curve-snap);
+}
+
+.md-code:hover .md-code-rail > .icon-button,
+.md-code-rail > .icon-button:focus-visible,
+.md-code-rail > .icon-button[data-copied='true'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .md-code-rail > .icon-button {
+    opacity: 1;
+  }
+}
+
 .hl-italic {
   font-style: italic;
 }
@@ -430,6 +669,273 @@
 
 .md-link-blocked {
   text-decoration: underline dotted;
+}
+
+/* A reply or message that arrives while the pane is open eases in; rows mounted by scrolling are
+   already complete and do not. */
+.conversation .row-agent.is-inProgress,
+.conversation .row-user.is-sending {
+  animation: row-arrive var(--piarc-motion-normal) var(--piarc-motion-curve-out);
+}
+
+@keyframes row-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---- the reply in the session pane: the prose scale (ADR-0078), F is the block flow ---- */
+
+.row-agent .md {
+  --md-flow: 0.75em;
+  --md-text-inset: 4px;
+  --md-text-stop: clamp(0px, (100% - 384px) * 0.175, 56px);
+}
+
+.row-agent .md :is(p, h1, h2, h3, h4, h5, h6, ul, ol) {
+  margin: var(--md-flow) 0 0;
+}
+
+.row-agent .md :is(p, h1, h2, h3, h4, h5, h6) {
+  padding-inline: var(--md-text-inset) var(--md-text-stop);
+}
+
+.row-agent .md > :first-child {
+  margin-top: 0;
+}
+
+.row-agent .md :is(h1, h2) {
+  font-size: calc(1em + 2px);
+  line-height: calc(var(--piarc-session-prose-line) + 3px);
+}
+
+.row-agent .md :is(h3, h4, h5, h6) {
+  font-size: 1em;
+  line-height: inherit;
+}
+
+.row-agent .md :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: var(--piarc-font-weight-semibold);
+  letter-spacing: normal;
+}
+
+.row-agent .md h1 {
+  margin-top: calc(var(--md-flow) * 3);
+}
+
+.row-agent .md h2 {
+  margin-top: calc(var(--md-flow) * 2.5);
+}
+
+.row-agent .md h3 {
+  margin-top: calc(var(--md-flow) * 2);
+}
+
+.row-agent .md :is(h4, h5, h6) {
+  margin-top: calc(var(--md-flow) * 1.667);
+}
+
+.row-agent .md h6 {
+  color: var(--piarc-text-secondary);
+}
+
+.row-agent .md :is(h1, h2, h3, h4, h5, h6) + * {
+  margin-top: calc(var(--md-flow) * 0.667);
+}
+
+.row-agent .md .md-list {
+  padding-inline-start: 2em;
+}
+
+.row-agent .md .md-list > li {
+  margin-top: calc(var(--md-flow) * 0.333);
+  padding-inline-start: 0.5em;
+}
+
+.row-agent .md .md-list > li::marker {
+  color: var(--piarc-text-secondary);
+}
+
+.row-agent .md .md-list > li > * {
+  margin-top: calc(var(--md-flow) * 0.333);
+  padding-inline: 0;
+}
+
+.row-agent .md .md-list > li > :first-child {
+  margin-top: 0;
+}
+
+.row-agent .md .md-task {
+  padding-inline-start: 0;
+}
+
+.row-agent .md .md-task > input {
+  margin: 0 0.5em 0 -1.375em;
+  accent-color: var(--piarc-accent-solid);
+  translate: 0 0.1em;
+}
+
+.row-agent .md :is(.md-list, .md-table-wrap, .md-code, blockquote, hr) + * {
+  margin-top: calc(var(--md-flow) * 2);
+}
+
+.row-agent .md blockquote {
+  margin: var(--md-flow) 0 0 0.5em;
+  padding-inline-start: 1em;
+  border-inline-start: 4px solid var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+}
+
+.row-agent .md blockquote > :first-child {
+  margin-top: 0;
+}
+
+.row-agent .md hr {
+  height: 0;
+  margin: calc(var(--md-flow) * 2) 0.375em 0;
+  border: 0;
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.row-agent .md strong {
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.row-agent .md .md-link {
+  color: var(--piarc-text-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--piarc-motion-surface) var(--piarc-motion-curve-out);
+}
+
+.row-agent .md .md-link:is(:hover, :focus-visible) {
+  text-decoration-color: currentColor;
+}
+
+.row-agent .md button.md-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+}
+
+.row-agent .md .md-inline-code {
+  padding: 0.0625em 0.25em;
+  border-radius: 0.4em;
+  background: var(--piarc-session-fill);
+  box-shadow: inset 0 0 0 0.5px var(--piarc-session-line);
+  color: var(--piarc-session-inline-code);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.row-agent .md .md-link .md-inline-code {
+  background: none;
+  color: inherit;
+}
+
+.row-agent .md .md-table-wrap {
+  margin-top: var(--md-flow);
+  border-radius: var(--piarc-session-radius);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+}
+
+.row-agent .md table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.row-agent .md :is(th, td) {
+  min-width: 96px;
+  padding: 0.4375em 0.75em;
+  border: 0;
+  vertical-align: top;
+  text-align: start;
+}
+
+.row-agent .md th {
+  border-bottom: 1px solid var(--piarc-session-line);
+  background: var(--piarc-session-fill);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.row-agent .md tr:first-child > th:first-child {
+  border-start-start-radius: calc(var(--piarc-session-radius) - 1px);
+}
+
+.row-agent .md tr:first-child > th:last-child {
+  border-start-end-radius: calc(var(--piarc-session-radius) - 1px);
+}
+
+.row-agent .md tbody tr + tr > td {
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.row-agent .md :is(.md-align-center, .md-align-right) {
+  text-align: revert;
+}
+
+.row-agent .md .md-align-center {
+  text-align: center;
+}
+
+.row-agent .md .md-align-right {
+  text-align: end;
+}
+
+.row-agent .md .md-code {
+  margin-top: var(--md-flow);
+  border-radius: var(--piarc-session-radius);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  overflow: hidden;
+}
+
+.row-agent .md .md-code-lang {
+  padding: var(--piarc-space-2) calc(10px + 1ch) 0;
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+}
+
+.row-agent .md .md-code pre {
+  padding: var(--piarc-session-pad-md) calc(var(--piarc-session-row) + 1ch)
+    var(--piarc-session-pad-md) calc(10px + 1ch);
+  font-size: var(--piarc-session-code);
+  line-height: var(--piarc-session-code-line);
+}
+
+.row-agent .md .md-code-lang + pre,
+.row-agent .md .md-code-lang + .md-code-rail + pre {
+  padding-top: var(--piarc-space-1);
+}
+
+.row-agent .md :is(.markdown-display-math) {
+  display: block;
+  margin-top: var(--md-flow);
+  padding-block: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Scrollbars inside tables and code: thin pills that do not crowd the text. */
+.row-agent .md :is(.md-table-wrap, .md-code pre)::-webkit-scrollbar {
+  height: 8px;
+}
+
+.row-agent .md :is(.md-table-wrap, .md-code pre)::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-border-strong) padding-box;
+}
+
+@media (forced-colors: active) {
+  .row-agent .md :is(.md-table-wrap, .md-code) {
+    border: 1px solid CanvasText;
+  }
 }
 
 /* thinking */

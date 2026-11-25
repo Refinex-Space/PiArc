@@ -136,6 +136,8 @@ export function TranscriptList({
       return heights.estimate(transcript.row(id), transcript.cacheKey(id), width);
     },
     getItemKey: (index) => ids[index] ?? index,
+    paddingStart: VIRTUAL_LIST.paddingStartPx,
+    paddingEnd: VIRTUAL_LIST.paddingEndPx,
     // ScrollFollow already pins a growing reply before paint. Preserve a visible history
     // entry during a prepend only while the reader is away from the bottom.
     anchorTo: following ? 'start' : 'end',

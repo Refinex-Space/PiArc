@@ -107,6 +107,12 @@ const MARKDOWN = [
   '',
   '---',
   '',
+  'The total stays within the budget:',
+  '',
+  '```math',
+  '\\sum_{i=1}^{n} t_i \\le T',
+  '```',
+  '',
   'That is the whole change.',
 ].join('\n');
 

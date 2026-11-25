@@ -230,10 +230,14 @@ describe('P0 row types', () => {
     expect(chip.textContent).toBe('@main.ts');
     expect(chip.dataset.path).toBe('src/app/main.ts');
     expect(byTestId(root, 'user-message').textContent).toContain('Look at @main.ts please');
-    const chips = [...root.querySelectorAll('[data-testid="attachment-chip"]')].map(
-      (c) => c.textContent,
-    );
-    expect(chips).toEqual(['IMGImage shot.png, 2.0 KB', 'PDFPDF spec.pdf, 3 pages']);
+    const chips = [...root.querySelectorAll('[data-testid="attachment-chip"]')].map((c) => [
+      c.querySelector('.attachment-chip-text')?.textContent,
+      c.querySelector('.visually-hidden')?.textContent,
+    ]);
+    expect(chips).toEqual([
+      ['shot.png2.0 KB', 'Image shot.png, 2.0 KB'],
+      ['spec.pdf3 pages', 'PDF spec.pdf, 3 pages'],
+    ]);
   });
 
   it('user message not delivered: the reason and a resend button', async () => {
@@ -263,8 +267,8 @@ describe('P0 row types', () => {
     expect(message.querySelector('strong')?.textContent).toBe('Done');
     expect(message.querySelector('img')).toBeNull();
     expect(message.textContent).toContain('<img src=x onerror="alert(1)">');
-    const labels = [...byTestId(root, 'message-actions').querySelectorAll('button')].map(
-      (b) => b.textContent,
+    const labels = [...byTestId(root, 'message-actions').querySelectorAll('button')].map((b) =>
+      b.getAttribute('aria-label'),
     );
     expect(labels).toEqual(['Copy Markdown', 'Copy text', 'Select turn']);
   });
