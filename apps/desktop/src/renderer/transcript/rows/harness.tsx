@@ -7,6 +7,7 @@ import { useContext, useState } from 'react';
 import type { Item, TodoItem } from '@piarc/protocol';
 
 import { useT } from '../../app/app-context.js';
+import { DoneGlyph, PendingGlyph, SpinnerGlyph } from '../../shell/icons.js';
 import { useUi, UiContext } from '../../shell/ui.js';
 import { showPanel } from '../../shell/registry.js';
 import { reason } from '../../shell/errors.js';
@@ -49,7 +50,13 @@ export function TaskList({ todos }: { readonly todos: readonly TodoItem[] }) {
             data-testid="task"
           >
             <span className="task-mark" role="img" aria-label={t(`tasks.status.${todo.status}`)}>
-              {todo.status === 'completed' ? '✓' : todo.status === 'inProgress' ? '◐' : '○'}
+              {todo.status === 'completed' ? (
+                <DoneGlyph />
+              ) : todo.status === 'inProgress' ? (
+                <SpinnerGlyph />
+              ) : (
+                <PendingGlyph />
+              )}
             </span>
             <span className="task-text">
               {todo.status === 'inProgress' ? (todo.activeForm ?? todo.content) : todo.content}
@@ -71,10 +78,12 @@ function TaskCard({ item }: { readonly item: ToolItem }) {
       data-testid="task-card"
       data-status={item.status}
     >
-      <header>
-        <strong>{t('tasks.title')}</strong>
-      </header>
-      <TaskList todos={todos} />
+      <div className="harness-box">
+        <header className="harness-title">
+          <strong>{t('tasks.title')}</strong>
+        </header>
+        <TaskList todos={todos} />
+      </div>
     </section>
   );
 }
@@ -102,22 +111,24 @@ function PlanCard({ item }: { readonly item: ToolItem }) {
   const status = planStatus(item);
   return (
     <section className="row harness-card plan-row" data-testid="plan-row" data-status={status}>
-      <header>
-        <strong>{t('plan.title')}</strong>{' '}
-        <span className="muted" data-testid="plan-status">
-          {t(`plan.status.${status}`)}
-        </span>
-      </header>
-      <pre className="plan-preview">{planPreview(plan)}</pre>
-      <button
-        type="button"
-        className="row-action"
-        onClick={() => {
-          showPanel('plan');
-        }}
-      >
-        {t('plan.openPanel')}
-      </button>
+      <div className="harness-box">
+        <header className="harness-title">
+          <strong>{t('plan.title')}</strong>
+          <span className="harness-status" data-testid="plan-status">
+            {t(`plan.status.${status}`)}
+          </span>
+          <button
+            type="button"
+            className="approval-link harness-link"
+            onClick={() => {
+              showPanel('plan');
+            }}
+          >
+            {t('plan.openPanel')}
+          </button>
+        </header>
+        <pre className="plan-preview">{planPreview(plan)}</pre>
+      </div>
     </section>
   );
 }
@@ -164,12 +175,13 @@ function QuestionSummary({ item }: { readonly item: ToolItem }) {
   if (answers.length === 0) return null;
   return (
     <section className="row harness-card question-row" data-testid="question-row">
-      <dl>
+      <dl className="harness-box answers">
         {answers.map((a, i) => (
           <div key={String(i)} data-outcome={a.outcome}>
             <dt>{a.question}</dt>
             <dd>
-              {a.answer || '—'} <span className="muted">{t(`question.outcome.${a.outcome}`)}</span>
+              {a.answer || '—'}{' '}
+              <span className="harness-status">{t(`question.outcome.${a.outcome}`)}</span>
             </dd>
           </div>
         ))}
@@ -227,7 +239,14 @@ function useNextStepActions(): {
   };
 }
 
-function NextStepActions({ prompt }: { readonly prompt: string }) {
+function NextStepActions({
+  prompt,
+  primary,
+}: {
+  readonly prompt: string;
+  /** The first suggestion leads: its "Run here" is the primary action. */
+  readonly primary: boolean;
+}) {
   const t = useT();
   const actions = useNextStepActions();
   const [error, setError] = useState('');
@@ -248,7 +267,7 @@ function NextStepActions({ prompt }: { readonly prompt: string }) {
       <div className="next-step-actions">
         <button
           type="button"
-          className="button button-small"
+          className={`button button-small${primary ? ' button-primary' : ''}`}
           disabled={busy}
           data-testid="next-run-here"
           onClick={() => {
@@ -269,7 +288,11 @@ function NextStepActions({ prompt }: { readonly prompt: string }) {
           {t('next.newSession')}
         </button>
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className="approval-error" role="alert">
+          {error}
+        </p>
+      )}
     </>
   );
 }
@@ -282,18 +305,20 @@ function NextStepsRow({ item }: { readonly item: ToolItem }) {
   if (suggestions.length === 0) return null;
   return (
     <section className="row harness-card next-steps" data-testid="next-steps">
-      <header>
-        <strong>{t('next.title')}</strong>
-      </header>
-      <ul>
-        {suggestions.map((s, i) => (
-          <li key={String(i)} data-testid="next-step">
-            <div className="next-step-title">{s.title}</div>
-            <div className="next-step-prompt muted">{s.prompt}</div>
-            {shell && <NextStepActions prompt={s.prompt} />}
-          </li>
-        ))}
-      </ul>
+      <div className="harness-box">
+        <header className="harness-title">
+          <strong>{t('next.title')}</strong>
+        </header>
+        <ul>
+          {suggestions.map((s, i) => (
+            <li key={String(i)} data-testid="next-step">
+              <div className="next-step-title">{s.title}</div>
+              <div className="next-step-prompt muted">{s.prompt}</div>
+              {shell && <NextStepActions prompt={s.prompt} primary={i === 0} />}
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
