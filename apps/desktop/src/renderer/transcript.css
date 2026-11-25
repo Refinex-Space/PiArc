@@ -329,6 +329,7 @@
 }
 
 .conversation .row-actions {
+  align-items: center;
   gap: 3px;
   margin-top: var(--piarc-space-1);
 }
@@ -903,8 +904,8 @@
 .row-time {
   display: inline-flex;
   align-items: center;
-  height: var(--piarc-session-row);
   padding-inline: var(--piarc-space-1);
+  line-height: var(--piarc-session-footnote-line);
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-session-footnote);
   font-variant-numeric: tabular-nums;
@@ -1758,8 +1759,12 @@ button.file-change-path:hover {
 .activity-mark {
   --mark-cycle: 1.8s;
   --mark-step: 0.11s;
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--mark-size, 16px);
+  height: var(--mark-size, 16px);
   color: var(--piarc-accent-solid);
-  overflow: visible;
 }
 
 .activity-mark[data-activity='tool'] {
@@ -1768,8 +1773,13 @@ button.file-change-path:hover {
 }
 
 .activity-mark-cell {
-  fill: currentColor;
+  position: absolute;
+  width: 20%;
+  height: 20%;
+  border-radius: 1px;
+  background: currentColor;
   opacity: 0.22;
+  will-change: opacity;
   animation: activity-cell var(--mark-cycle) var(--piarc-motion-easing) infinite;
   animation-delay: calc(var(--cell) * var(--mark-step));
 }
@@ -1814,8 +1824,10 @@ button.file-change-path:hover {
 }
 
 @media (forced-colors: active) {
+  /* The cells are backgrounds: keep them in the text color the system chose. */
   .activity-mark {
     color: CanvasText;
+    forced-color-adjust: none;
   }
 }
 

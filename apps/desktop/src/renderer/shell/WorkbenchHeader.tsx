@@ -27,7 +27,11 @@ function SessionHeading({ id }: { readonly id: string }) {
   };
   return (
     <>
-      {session && badgeOf(session) !== 'idle' && <StatusBadge state={badgeOf(session)} />}
+      {/* Running shows in the sidebar row and the working line; the title marks only what needs
+          the user (an error, a pending approval). */}
+      {session && badgeOf(session) !== 'idle' && badgeOf(session) !== 'running' && (
+        <StatusBadge state={badgeOf(session)} />
+      )}
       {renaming ? (
         <SessionTitleInput
           id={id}

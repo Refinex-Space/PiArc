@@ -43,6 +43,23 @@ const RELATIVE_UNITS: readonly (readonly [Intl.RelativeTimeFormatUnit, number])[
   ['minute', 60],
 ];
 
+/** Intl formatters are costly to make: one of each per language and options, reused. */
+const formatters = new Map<
+  string,
+  Intl.NumberFormat | Intl.DateTimeFormat | Intl.RelativeTimeFormat
+>();
+
+function cached<T extends Intl.NumberFormat | Intl.DateTimeFormat | Intl.RelativeTimeFormat>(
+  key: string,
+  make: () => T,
+): T {
+  const found = formatters.get(key);
+  if (found !== undefined) return found as T;
+  const made = make();
+  formatters.set(key, made);
+  return made;
+}
+
 function relativeTime(
   locale: string,
   translator: { t: (id: MessageId) => string },
@@ -52,10 +69,10 @@ function relativeTime(
   const seconds = Math.round((ms - now) / 1000);
   const unit = RELATIVE_UNITS.find(([, size]) => Math.abs(seconds) >= size);
   if (unit === undefined) return translator.t('time.justNow');
-  return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(
-    Math.round(seconds / unit[1]),
-    unit[0],
-  );
+  return cached(
+    `relative:${locale}`,
+    () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
+  ).format(Math.round(seconds / unit[1]), unit[0]);
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -110,12 +127,20 @@ export function AppProvider({
       locale: state.locale,
       t: (id, values) => translator.t(id, values),
       format: {
-        number: (value, options) => new Intl.NumberFormat(state.locale, options).format(value),
+        number: (value, options) =>
+          cached(
+            `number:${state.locale}:${options === undefined ? '' : JSON.stringify(options)}`,
+            () => new Intl.NumberFormat(state.locale, options),
+          ).format(value),
         dateTime: (ms) =>
-          new Intl.DateTimeFormat(state.locale, {
-            dateStyle: 'medium',
-            timeStyle: 'medium',
-          }).format(ms),
+          cached(
+            `dateTime:${state.locale}`,
+            () =>
+              new Intl.DateTimeFormat(state.locale, {
+                dateStyle: 'medium',
+                timeStyle: 'medium',
+              }),
+          ).format(ms),
         relative: (ms, now) => relativeTime(state.locale, translator, ms, now),
       },
     };

@@ -380,6 +380,14 @@ export class SessionTranscript {
     return this.display;
   }
 
+  /** Where row `id` is in `rowIds()`, or -1; kept with the list, so rows can ask cheaply. */
+  rowIndex(id: string): number {
+    this.indexOf ??= new Map(this.display.map((rowId, at) => [rowId, at]));
+    return this.indexOf.get(id) ?? -1;
+  }
+
+  private indexOf: Map<string, number> | undefined;
+
   row(id: string): TranscriptRow | undefined {
     return this.rows.get(id);
   }
@@ -977,6 +985,7 @@ export class SessionTranscript {
     }
     if (!sameList(this.display, next)) {
       this.display = next;
+      this.indexOf = undefined;
       batch.listChanged = true;
     }
   }

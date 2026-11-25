@@ -19,9 +19,9 @@ const CELLS: readonly (readonly [number, number])[] = [
   [3, 3],
 ];
 
-/** Cell size and pitch in the 20-unit view box. */
-const CELL = 4;
+/** Cell pitch in a 20-unit square; a cell is four fifths of it. */
 const PITCH = 5;
+const VIEW = 20;
 
 export type Activity = 'think' | 'tool' | 'blocked';
 
@@ -33,28 +33,28 @@ export function ActivityMark({
   /** CSS px: 16 on the working line, 14 beside a session title. */
   readonly size?: 14 | 16;
 }) {
+  // HTML cells, not SVG: the browser runs their opacity animations on the compositor, so the
+  // mark costs the main thread nothing while a reply streams.
   return (
-    <svg
+    <span
       className="activity-mark"
       data-activity={activity}
-      width={size}
-      height={size}
-      viewBox="0 0 20 20"
+      style={{ '--mark-size': `${String(size)}px` } as CSSProperties}
       aria-hidden="true"
-      focusable="false"
     >
       {CELLS.map(([column, row], index) => (
-        <rect
+        <span
           key={index}
           className="activity-mark-cell"
-          x={0.5 + column * PITCH}
-          y={0.5 + row * PITCH}
-          width={CELL}
-          height={CELL}
-          rx="1"
-          style={{ '--cell': index } as CSSProperties}
+          style={
+            {
+              '--cell': index,
+              left: `${String(((column * PITCH) / VIEW) * 100)}%`,
+              top: `${String(((row * PITCH) / VIEW) * 100)}%`,
+            } as CSSProperties
+          }
         />
       ))}
-    </svg>
+    </span>
   );
 }

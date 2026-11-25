@@ -217,12 +217,10 @@ button.step-line:focus-visible {
   white-space: nowrap;
 }
 
+/* The words give way with an ellipsis so the outcome and line counts stay; an object beside
+   them (a command, a query) gives way first. No :has() here: it would make every row the
+   virtual list adds re-check styles across the document. */
 .step-verb {
-  flex: none;
-}
-
-/* A group's summary gives way first, with an ellipsis, so the outcome and line counts stay. */
-.step-verb:has(> .step-summary) {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -230,6 +228,7 @@ button.step-line:focus-visible {
 }
 
 .step-meta {
+  flex-shrink: 1000;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

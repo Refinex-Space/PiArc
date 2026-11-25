@@ -4,7 +4,7 @@
 // The user's bubble folds a long message; both rows keep their actions as icon buttons that
 // show on hover or keyboard focus (ADR-0078).
 import type { Item } from '@piarc/protocol';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { useT } from '../../app/app-context.js';
 import { IconButton } from '../../app/IconButton.js';
@@ -165,9 +165,23 @@ function UserBubble({
   const body = useRef<HTMLDivElement>(null);
   const [tall, setTall] = useState(false);
   const [open, setOpen] = useExpanded(`more:${id}`, false);
-  useLayoutEffect(() => {
+  useEffect(() => {
     const element = body.current;
-    if (element !== null) setTall(element.scrollHeight > FOLD_ABOVE_PX);
+    if (element === null) return;
+    const measure = () => {
+      setTall(element.scrollHeight > FOLD_ABOVE_PX);
+    };
+    const Observer = (element.ownerDocument.defaultView ?? window).ResizeObserver;
+    // Read after layout, with every other row's reads, instead of forcing a layout per row.
+    if (typeof Observer !== 'function') {
+      measure();
+      return;
+    }
+    const observer = new Observer(measure);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
   }, [input.text]);
   const folded = tall && !open;
   return (

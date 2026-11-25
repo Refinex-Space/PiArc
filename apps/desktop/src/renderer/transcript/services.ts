@@ -194,12 +194,15 @@ export function useLiveTail(id: string): boolean {
 
 function liveTail(transcript: SessionTranscript, id: string): boolean {
   const ids = transcript.rowIds();
-  const at = ids.indexOf(id);
-  if (at < 0 || ids.at(-1) !== WORKING_ROW) return false;
-  return ids.slice(at + 1).every((other) => {
+  if (ids.at(-1) !== WORKING_ROW) return false;
+  // From the end: only the working line and pending approvals may follow the row.
+  for (let at = ids.length - 1; at >= 0; at -= 1) {
+    const other = ids[at] ?? '';
+    if (other === id) return true;
     const kind = transcript.row(other)?.kind;
-    return kind === 'working' || kind === 'approval';
-  });
+    if (kind !== 'working' && kind !== 'approval') return false;
+  }
+  return false;
 }
 
 export function useEndsTurn(id: string): boolean {
@@ -211,7 +214,7 @@ export function useEndsTurn(id: string): boolean {
 
 function endsTurn(transcript: SessionTranscript, id: string): boolean {
   const ids = transcript.rowIds();
-  for (let at = ids.indexOf(id) + 1; at > 0 && at < ids.length; at += 1) {
+  for (let at = transcript.rowIndex(id) + 1; at > 0 && at < ids.length; at += 1) {
     const row = transcript.row(ids[at] ?? '');
     switch (row?.kind) {
       case 'optimistic':
