@@ -51,10 +51,9 @@ test('always allow saves one edited rule per subcommand; bypass needs settings a
   const rules = card.getByTestId('approval-rules');
   await expect(rules).toHaveValue('Bash(awk *)\nBash(printenv *)');
   await rules.fill('Bash(awk *)\nBash(printenv PATH *)\nBash(printenv HOME)');
-  await card
-    .getByRole('button', { name: 'Show full request' })
-    .click()
-    .catch(() => undefined);
+  // A short command shows whole and has no "Show full request" (I237: never wait for it).
+  const showFull = card.getByRole('button', { name: 'Show full request' });
+  if ((await showFull.count()) > 0) await showFull.click();
   await card.screenshot({ path: path.join(EVIDENCE, 'always-allow-rules.png') });
   await scriptDialogs(app, [0]);
   await card.getByRole('button', { name: 'Always allow', exact: true }).click();
