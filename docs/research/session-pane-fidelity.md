@@ -87,9 +87,9 @@
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 标题行 | `generated/transcript-rows/group-status.mjs`、`generated/chat-thinking/*` | 一行 20，正文字号，淡色；悬停转次色；"Thought for Ns"；箭头 16 在文字后，展开转 90°（60 ms） | 三角字符在前 | 复刻 | 截图 | 待实现 |
-| 正文 | 同上 | 上 8，14/20 次色，pre-wrap；不做高度动画 | 次色斜体 | 复刻 | 截图 | 待实现 |
-| 生成中 | 同上与 `CdsShimmer` | 标签走光 3 s 线性；减少动效时纯色 | 静态文字 | 复刻，生成中仍强制展开（PiArc 不变量） | 录屏、减少动效截图 | 待实现 |
+| 标题行 | `generated/transcript-rows/group-status.mjs`、`generated/chat-thinking/*` | 一行 20，正文字号，淡色；悬停转次色；"Thought for Ns"；箭头 16 在文字后，展开转 90°（60 ms） | 三角字符在前 | 复刻 | 截图 | 已对齐：`gallery/thinking/` |
+| 正文 | 同上 | 上 8，14/20 次色，pre-wrap；不做高度动画 | 次色斜体 | 复刻 | 截图 | 已对齐：`gallery/thinking/` |
+| 生成中 | 同上与 `CdsShimmer` | 标签走光 3 s 线性；减少动效时纯色 | 静态文字 | 复刻，生成中仍强制展开（PiArc 不变量） | 录屏、减少动效截图 | 已对齐（改造）：标签走光，生成中仍强制展开并隐藏箭头（PiArc 不变量）；`gallery/thinking/` |
 
 ## 7. 工具行、工具组与 diff
 

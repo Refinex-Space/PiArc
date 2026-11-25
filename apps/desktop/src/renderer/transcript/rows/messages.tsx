@@ -29,7 +29,7 @@ import {
 } from '../services.js';
 import { AttachmentChips, MentionText } from './common.js';
 import { useListActions, useRowCommitted } from './list-actions.js';
-import { CopyIconButton } from './parts.js';
+import { CopyIconButton, StepRow } from './parts.js';
 
 type AgentMessageItem = Extract<Item, { type: 'agentMessage' }>;
 type ReasoningItem = Extract<Item, { type: 'reasoning' }>;
@@ -301,35 +301,29 @@ export function ThinkingRow({
       : t('transcript.thinking.done', { seconds });
   return (
     <div
-      className={`row row-thinking${expanded ? ' is-expanded' : ''}`}
+      className="row row-thinking"
       data-testid="thinking-block"
       data-row-id={id}
       data-live={live}
       data-expanded={expanded}
     >
-      <button
-        type="button"
-        className="row-disclosure"
-        aria-expanded={expanded}
-        aria-disabled={live}
-        data-testid="thinking-toggle"
-        onClick={() => {
+      <StepRow
+        verb={<span data-testid="thinking-label">{label}</span>}
+        state={live ? 'busy' : 'done'}
+        expanded={expanded}
+        toggleDisabled={live}
+        lineTestId="thinking-toggle"
+        onToggle={() => {
           // While the model thinks the block stays open: the toggle does nothing.
           if (!live) {
             setExpanded(!chosen);
           }
         }}
       >
-        <span className="row-disclosure-mark" aria-hidden="true">
-          {expanded ? '▾' : '▸'}
-        </span>
-        <span data-testid="thinking-label">{label}</span>
-      </button>
-      {expanded ? (
         <div className="row-thinking-text" data-testid="thinking-text">
           {item.text}
         </div>
-      ) : null}
+      </StepRow>
     </div>
   );
 }

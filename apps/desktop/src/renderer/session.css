@@ -126,16 +126,20 @@
   min-width: 0;
 }
 
-.step-line {
+/* The line's box reaches past the text by the outset on each side, so its text stays on the
+   reply's text inset while hover and focus get room to breathe. */
+.step-line,
+:root[data-app] .step-line {
   --step-outset: var(--piarc-session-pad-xs);
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--piarc-session-gap-xs);
   box-sizing: border-box;
-  width: calc(100% + 2 * var(--step-outset));
+  width: calc(100% + 2 * var(--step-outset) - var(--piarc-session-text-inset));
   min-height: var(--piarc-session-row);
-  margin-inline: calc(-1 * var(--step-outset));
+  margin-inline: calc(var(--piarc-session-text-inset) - var(--step-outset))
+    calc(-1 * var(--step-outset));
   padding: 0 var(--step-outset);
   border: 0;
   border-radius: var(--piarc-session-radius);

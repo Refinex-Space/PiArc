@@ -28,6 +28,8 @@ export interface StepRowProps {
   readonly expanded?: boolean;
   readonly onToggle?: () => void;
   readonly toggleLabel?: string;
+  /** The disclosure cannot be used right now (it stays open while the model thinks). */
+  readonly toggleDisabled?: boolean;
   readonly testId?: string;
   readonly lineTestId?: string;
   readonly textTestId?: string;
@@ -50,6 +52,7 @@ export function StepRow({
   expanded,
   onToggle,
   toggleLabel,
+  toggleDisabled,
   testId,
   lineTestId,
   textTestId,
@@ -87,6 +90,7 @@ export function StepRow({
           type="button"
           className="step-line"
           aria-expanded={expanded}
+          aria-disabled={toggleDisabled}
           aria-label={toggleLabel}
           data-testid={lineTestId}
           onClick={onToggle}

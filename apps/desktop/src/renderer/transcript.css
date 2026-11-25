@@ -689,7 +689,7 @@
 
 .row-agent .md {
   --md-flow: 0.75em;
-  --md-text-inset: 4px;
+  --md-text-inset: var(--piarc-session-text-inset);
   --md-text-stop: clamp(0px, (100% - 384px) * 0.175, 56px);
 }
 
@@ -938,15 +938,19 @@
   }
 }
 
-/* thinking */
+/* thinking: a step row with its duration; the text below in the secondary ink */
 
 .row-thinking-text {
-  margin: var(--piarc-space-1) 0 0 calc(1em + var(--piarc-space-2));
-  padding-left: var(--piarc-space-3);
-  border-left: 2px solid var(--piarc-border-subtle);
+  padding-inline: var(--piarc-session-text-inset) var(--piarc-space-5);
   color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-small);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.row-thinking .step-line[aria-disabled='true'] .step-caret {
+  visibility: hidden;
 }
 
 /* tools */

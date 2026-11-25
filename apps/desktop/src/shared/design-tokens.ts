@@ -132,6 +132,7 @@ export type ScaleToken =
   | 'session.approvalWidth'
   | 'session.markSize'
   | 'session.markGap'
+  | 'session.textInset'
   | 'session.bubbleMax'
   | 'session.composerShadowFocus'
   | 'session.popoverShadow'
@@ -625,6 +626,7 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'session.approvalWidth': '--piarc-session-approval-width',
   'session.markSize': '--piarc-session-mark-size',
   'session.markGap': '--piarc-session-mark-gap',
+  'session.textInset': '--piarc-session-text-inset',
   'session.bubbleMax': '--piarc-session-bubble-max',
   'session.composerShadowFocus': '--piarc-session-composer-shadow-focus',
   'session.popoverShadow': '--piarc-session-popover-shadow',
