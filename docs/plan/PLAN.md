@@ -168,7 +168,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | T37 | [Skills、斜杠命令、命令面板与输出风格](tasks/T37-skills-commands-and-output-styles.md) | 4 | T36 | macOS | high / 高 | 大 | 无 | 已完成 | b9012bb |
 | T38 | [WebSearch 与 hooks 扩展（M3）](tasks/T38-websearch-and-hooks-m3.md) | 4 | T37 | macOS | high / 高 | 中 | 无 | 已完成 | fc9c022 |
 | R4 | [M3 评审](tasks/R4-m3-review.md) | 4 | T38、W2 | macOS | high / 高 | 中 | 无 | 已完成 | ab27901 |
-| W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 部分完成 | 9879474 |
+| W3 | [Windows：M3 达标](tasks/W3-windows-m3-parity.md) | 5 | R4（建议在 T43、T44 之后，需要读屏清单与性能测量脚本） | Windows | high / 高 | 中 | 无 | 已完成 | 943a1a45 |
 | T39 | [macOS 沙箱正式版与 Windows 隔离评估](tasks/T39-sandbox-and-windows-isolation.md) | 5 | R4 | macOS | xhigh / 极高 | 大 | 无 | 已完成 | 607809d |
 | T40 | [插件、Pi 包与 MCP prompts](tasks/T40-plugins-pi-packages-mcp-prompts.md) | 5 | T39（只阻塞在 Windows 设计关口时也可开始） | macOS | high / 高 | 大 | 无 | 已完成 | c4e5f75 |
 | T41 | [配置诊断完善、M4 hooks 事件与用量成本](tasks/T41-config-diagnostics-hooks-m4-usage.md) | 5 | T40 | macOS | high / 高 | 中 | 无 | 已完成 | 10fbeff |
@@ -318,6 +318,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 其余 P2/P3：模式菜单禁用项与层级（UI-10）、工具行等宽命令（UI-15）、箭头间距（UI-16）、环境栏最高档强度着色与"中等"（UI-17，按参考源码只给最高档着色）、已回答的问题（UI-18）、数字格式（UI-19）、按行数折叠（UI-20）与 UI-21 的零散项（`@` 面板根目录重名、窄列占位符、消息操作的提示放下方、展开后的文件路径、任务复选框、行间公式）；上下文卡片的"记忆"已翻译，未送达原因的英文登记为 I236。
 - [x] I236：Core 错误带类别跨 IPC（`main/ipc/page-errors.ts`），`reason()` 按 `error.kind.*` 本地化，设置页等 20 个文件的直接 `error.message` 改走 `reason()`；顺带修了上一轮 `saveImage` 的 preload 在校验前读 `.kind`（t45 畸形参数用例因此失败）。
 - [x] I237：t23 只在按钮存在时点"Show full request"，第一个用例由 36 s 降到 7 s。
+- [x] 用户追加：新会话首条消息在会话建立前按对话的样子显示（阅读列顶部的气泡、底部"正在启动会话…"，会话一建立就切过去，e5f14443）；等待你的输入的徽标对齐参考并保留形状区分（ADR-0081，59a9e0f6）；问题卡的标题带不再盖住圆角细边（9ee04ede）；排队的 follow-up 可"立即发送"进当前回合（a093fdc3）。
 - [ ] 验收：已完成渲染进程 Vitest 93 个文件 385 项、会话层端到端 41 项、L4（t26 5 项、t19-security、t20、t23、composer、t19-composer、t21 共 22 项）与画廊全矩阵（`tmp/evidence/session-pane/gallery/followup*/`）；t43-a11y、t46 的 L4 因本机内存紧张被中止未跑完，ui-critic 复查与 verify 未执行。
 
 ### Files 精修与 Markdown（桌面已验收，整仓待 I230）
@@ -538,7 +539,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I198 | T45 | Windows 与 Linux 上 Chromium 的拼写检查从 Google CDN（`redirector.gvt1.com`）下载 Hunspell 词典，只含语言代码，已列入 `docs/security/egress.md`，`t45-egress` 在 Windows 上允许这个主机 | W3 实测下载时机，决定保留或用 `session.setSpellCheckerEnabled(false)` 关闭；**W3**：已安装的应用启动、打开两个工作区与窗口后，数据目录没有 `Dictionaries`（启动时不下载）；首次在输入框键入时是否下载留给 W4 用 `t45-egress` 核对 |
 | I199 | T45 | `t45-xss` 的设置面覆盖 MCP、扩展包与配置诊断；服务商名称、子 agent 定义、skills 页同样渲染外部文本 | R5 把同一断言扩展到这些页；**R5**：交 T48（THR-11 的覆盖），进入 R6 前完成 |
 | I200 | T45 | 威胁映射 THR-09（更新通道被劫持）的"HTTPS"与"私钥只在需要维护者审批的发布环境中使用"两项是 `deferred`（任务 T50）：更新流程与发布流水线还没有 | T50 实现更新流程后为 THR-09 补测试（清单校验接进更新、篡改拒绝、受保护环境），把这两项改为 automated 并更新映射；T50 完成后 `check-threats.mjs` 会因待补项的任务已完成而失败，迫使更新 |
-| I201 | W3 | Windows 的 M3 内存（`npm run perf:m3`，i5-1340P / 16 GB）：Agent Host 最大 163 MB（≤ 270），应用其余进程最大 576、563 MB，超出 Windows 预算 450 MB（GPU 进程约 205–216 MB，浏览器 143–150、渲染 150–156、网络 58）；私有工作集合计 256 MB（工作集 537 MB）。Nightly 的 `app-memory` 558 MB | 与 I26、I146 同一口径问题，用户经 ADR 决定口径或由优化达标；R5 汇总两个平台；**R5**：ADR-0063 采纳，Windows 按私有工作集判定（W3 测得 256 MB ≤ 450）；W4 用改过的 `perf:m3` 复测确认 |
+| I201 | W3 | Windows 的 M3 内存（`npm run perf:m3`，i5-1340P / 16 GB）：Agent Host 最大 163 MB（≤ 270），应用其余进程最大 576、563 MB，超出 Windows 预算 450 MB（GPU 进程约 205–216 MB，浏览器 143–150、渲染 150–156、网络 58）；私有工作集合计 256 MB（工作集 537 MB）。Nightly 的 `app-memory` 558 MB | 与 I26、I146 同一口径问题，用户经 ADR 决定口径或由优化达标；R5 汇总两个平台；**R5**：ADR-0063 采纳，Windows 按私有工作集判定（W3 测得 256 MB ≤ 450）；W4 用改过的 `perf:m3` 复测确认；**已落地（W3 收尾，2026-11-25）**：按改过的 `perf:m3` 在本机两轮复测，私有工作集最大 305.7、313.7 MB（≤ 450 MB），Agent Host 最大 130.1、162.8 MB（≤ 270 MB），W3-A01 通过 |
 | I202 | W3 | Windows 发布构建的安装包与安装后体积没有实测：本机没有 .NET SDK，`pack-windows.mjs` 只在 CI 运行；CI 的开发构建 `Setup.exe` 235.9 MB、安装后 551.5 MB（未裁剪，T44 的 `trim.mjs` 只在发布构建） | T50 的发布流水线在 CI 上量发布构建，并纳入 Nightly 的 `installer-size`、`installed-size`；超出时按 I41 裁剪 |
 | I203 | W3 | Git 包源的克隆目录照搬源路径（`<pi>/git/local/<整条本地路径>`）：本地深路径的 `file://` 源让 git 目录超过 Git for Windows 约 220 字符的上限（`'$GIT_DIR' too big`，`core.longpaths` 管不到），安装失败；远端源（`github.com/<owner>/<repo>`）不受影响 | R5 评估：本地源的克隆目录改用短名（例如路径哈希），或安装前检查长度并给出说明；**R5**：Windows 专属，交 W4 实测并决定（短名或安装前检查长度） |
 | I204 | W3 | Windows 上用户打开的会话终端是 `%COMSPEC%`（cmd.exe，`piarc_term::default_shell`）：PiArc 的 PowerShell 与 Git Bash shell integration 用不上，没有 OSC 133 命令边界与 OSC 7 目录 | T48 的终端完善：Windows 的默认 shell 改为 PowerShell 或可在设置中选择（需用户决定） |
@@ -1381,3 +1382,12 @@ Apple M1 Max / 32 GB、macOS arm64、接电。提交 0cbecdc 执行 node scripts
 - 决策：ADR-0078（补充）、ADR-0079（按用户要求取代"思考块生成中强制展开"）、ADR-0080（补充，AHP 新增可选字段与 `saveImage`）。
 - 性能：`bench:t19` 曾明显回退，二分与对照实验定位到一条 `:has()` 规则（已去掉），并修了逐行强制布局、格式器重建与 O(n) 查找；最终数值因测量时本机有人使用而不可作验收，复测登记为 I235。
 - 遗留：I233（模型目录在 Agent Host 打开会话前查询报 "no open session"）、I234（MCP 等工具返回的图片）、I235（空闲桌面复测 t19 基准）；ui-critic 的其余 P2/P3（计划卡用 Markdown 渲染与去掉 `ExitPlanMode` 字样、命令在连字符处断行、模式菜单禁用项与层级、TodoWrite 重复整卡、等宽命令偏重、环境栏当前值着色、"已回答"的分隔、数字格式、按行数折叠、`@` 面板根目录重名等）未处理；macOS 上的 vibrancy、原生标题栏与真实滚动条下的复核未做。
+
+### 2026-11-25 W3 已完成（提交 943a1a45）
+
+- 开工：用户要求闭环 W3。W3 只剩 A01（3 会话 + 子 agent 的内存）；ADR-0063 已采纳 Windows 按私有工作集判定，R5 要求用改过的 `perf:m3` 在 Windows 重测。A12 已由 CI 的 Windows verify 17/17 补记。没有跑全量 verify 基线：本机的已知失败见 I231、I232，且机器可用内存只有 2–3 GB。
+- 交付：测量脚本在首页输入框可编辑之后才输入（943a1a45：worktree 会话等分支列表时输入框只读，Playwright 的 `fill` 不等待，负载高时 perf:m3 失败）；W3 报告第 4 节、`docs/perf/M3-memory.md` 的 Windows 一节、`performance.md` 第 6.1 节、架构 2.70 的第 16 章 M3 状态。
+- 验收：W3-A01 通过。i5-1340P / 16 GB，打包开发构建 326d5ba8，两轮（4 与 9 个样本，负载按场景到位）：应用其余进程私有工作集最大 305.7、313.7 MB（≤ 450 MB），Agent Host 最大 130.1、162.8 MB（≤ 270 MB）。测量时本机有其他程序，可用内存 3.1–3.3 GB。W3 全部 12 项通过。
+- 决策：没有新 ADR；按 ADR-0063 的口径与用户的闭环要求关闭 A01。
+- 登记：I201 已落地。
+- 下一项：T50（发布流水线与更新，macOS）；W4 依赖 R5 与 T50。本地提交，未推送。

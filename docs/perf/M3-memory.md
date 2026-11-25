@@ -105,10 +105,14 @@ R4 在 T35 的场景上加了 T35 之后的能力：项目 `.mcp.json` 里一个
 | 应用其余进程的 RSS 之和（参考） | 570 | 573 | 584 | — |
 | Agent Host（4 个活动会话） | 215 | 225 | 229 | 270，达标 |
 
-空闲（打开工作区、没有会话）时物理占用 190 MB、RSS 517 MB。M3 的内存退出标准在 macOS 上按新口径达标；Windows 由 W4 用同一脚本复测（W3 用性能计数器测得的私有工作集为 256 MB）。
+空闲（打开工作区、没有会话）时物理占用 190 MB、RSS 517 MB。M3 的内存退出标准在 macOS 上按新口径达标；Windows 由 W3 收尾时用同一脚本复测，见下面的"2026-11-25 Windows 复测"（W3 首次用性能计数器测得的私有工作集为 256 MB）。
 
 ## 2026-11-24 收尾复测
 
 Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。
 
 打包构建 0cbecdc 在相同 3 个会话加 1 个子 agent 负载下复跑，12 个稳态样本。Agent Host RSS 峰值 174.46/270 MB，应用其余进程物理占用峰值 259.25/510 MB。完整负载与两项预算均通过，原始报告为 tmp/evidence/partial-closure/m3-final.json。
+
+## 2026-11-25 Windows 复测（W3-A01）
+
+Windows 11 专业版 26200、i5-1340P（12 核 16 线程）/ 16 GB、电源已接；打包开发构建 326d5ba8，`npm run perf:m3 -- --form packaged`（943a1a45 的脚本），两轮：30 s 4 个样本与 60 s 9 个样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享的 stdio MCP server 只启动 1 次，4 个会话都拿到 MCP 工具与 skills 索引（`loadAsDescribed: true`）。应用其余进程的私有工作集最大 305.7、313.7 MB（中位 302.0、306.0 MB，预算 450 MB，达标；工作集 592–622 MB 只作参考），Agent Host 最大 130.1、162.8 MB（预算 270 MB，达标）。按类型（工作集）：浏览器进程约 150 MB，GPU 196–212 MB，网络等辅助进程 58 MB，渲染进程约 195 MB；空闲（打开工作区、没有会话）时私有工作集约 228 MB、工作集约 508 MB。测量时本机还有其他程序（可用内存 3.1–3.3 GB）。M3 的内存退出标准在 Windows 上按 ADR-0063 的口径达标。原始报告 `tmp/evidence/W3/m3-memory-a01-run{1,2}.json`。
