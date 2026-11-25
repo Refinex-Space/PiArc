@@ -63,6 +63,19 @@ body,
   font-weight: 600;
 }
 
+/* Session gallery (#/session-gallery): the conversation column at full window height. */
+.session-gallery {
+  display: flex;
+  height: 100%;
+  background: var(--piarc-workbench-canvas);
+}
+
+.session-gallery > .main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
 /* Terminal prototype page (T10, #/terminal-lab). */
 .terminal-lab {
   display: flex;

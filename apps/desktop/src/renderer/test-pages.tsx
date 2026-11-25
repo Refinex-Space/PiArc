@@ -1,4 +1,4 @@
-// The test pages (T04's event probe, T09's transcript prototype, T10's terminal prototype) for
+// The test pages (T04's event probe, T09's transcript prototype, T10's terminal prototype, the session gallery) for
 // L4 and the benchmarks. main.tsx loads this module only outside the release flavor, so the
 // release build's renderer does not carry them (T45, I13, I24, I30).
 import { StrictMode } from 'react';
@@ -6,8 +6,9 @@ import type { Root } from 'react-dom/client';
 
 import { EVENT_PROBE_HASH } from '../shared/event-probe.js';
 import { TERMINAL_LAB_HASH } from '../shared/terminal-lab.js';
-import { TRANSCRIPT_LAB_HASH } from '../shared/transcript-lab.js';
+import { SESSION_GALLERY_HASH, TRANSCRIPT_LAB_HASH } from '../shared/transcript-lab.js';
 import { AppProvider } from './app/app-context.js';
+import { SessionGallery } from './lab/SessionGallery.js';
 import { TranscriptLab } from './lab/TranscriptLab.js';
 import { EventProbe, installEventProbe } from './probe/EventProbe.js';
 import { TerminalLab } from './terminal/TerminalLab.js';
@@ -37,6 +38,20 @@ export function renderTestPage(root: Root, hash: string): boolean {
             }}
           >
             <TranscriptLab />
+          </AppProvider>
+        </StrictMode>,
+      );
+    });
+    return true;
+  }
+  if (hash.startsWith(SESSION_GALLERY_HASH)) {
+    // The gallery is styled as the workbench and follows the app's theme, density and language.
+    document.documentElement.dataset.app = 'piarc';
+    void window.piarc.getAppState().then((state) => {
+      root.render(
+        <StrictMode>
+          <AppProvider initial={state}>
+            <SessionGallery />
           </AppProvider>
         </StrictMode>,
       );

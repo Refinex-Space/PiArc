@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 
 import { EVENT_PROBE_HASH } from '../shared/event-probe.js';
 import { TERMINAL_LAB_HASH } from '../shared/terminal-lab.js';
-import { TRANSCRIPT_LAB_HASH } from '../shared/transcript-lab.js';
+import { SESSION_GALLERY_HASH, TRANSCRIPT_LAB_HASH } from '../shared/transcript-lab.js';
 import { AppProvider } from './app/app-context.js';
 import { Shell } from './shell/Shell.js';
 
@@ -53,7 +53,7 @@ function renderApp(target: Root): void {
 // The test pages exist outside the release flavor only: the bundler drops this branch and the
 // chunk with the pages when `__PIARC_RELEASE_BUILD__` is true (T45, I13, I24, I30). The app's
 // own windows render at once, without waiting for that chunk.
-const TEST_PAGES = [EVENT_PROBE_HASH, TRANSCRIPT_LAB_HASH, TERMINAL_LAB_HASH];
+const TEST_PAGES = [EVENT_PROBE_HASH, TRANSCRIPT_LAB_HASH, TERMINAL_LAB_HASH, SESSION_GALLERY_HASH];
 if (!__PIARC_RELEASE_BUILD__ && TEST_PAGES.some((page) => hash.startsWith(page))) {
   void import('./test-pages.js').then(({ renderTestPage }) => {
     if (!renderTestPage(root, hash)) renderApp(root);

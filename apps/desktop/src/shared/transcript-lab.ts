@@ -6,6 +6,27 @@ import type { ApprovalRequest } from '@piarc/protocol';
 /** Hash that opens the prototype page. */
 export const TRANSCRIPT_LAB_HASH = '#/transcript-lab';
 
+/** Hash of the session gallery (`?section=<name>`): production rows in fixed states. */
+export const SESSION_GALLERY_HASH = '#/session-gallery';
+
+/** The gallery's sections, in review order. */
+export const GALLERY_SECTIONS = [
+  'conversation',
+  'messages',
+  'markdown',
+  'thinking',
+  'tools',
+  'cards',
+  'status',
+  'working',
+  'approval-command',
+  'approval-edit',
+  'approval-network',
+  'approval-plan',
+  'approval-question',
+  'approval-elicitation',
+] as const;
+
 /** A business action the composer triggered. */
 export type ComposerActionRecord =
   | {
