@@ -45,6 +45,10 @@ export default defineConfig({
           ['Mermaid', path.join(path.dirname(engineFile), '../LICENSE')],
           ['KaTeX', path.join(path.dirname(resolve('katex')), '../LICENSE')],
           ['khroma', path.join(licences, 'khroma-2.1.0.LICENSE')],
+          [
+            'Material Icon Theme',
+            path.join(path.dirname(resolve('material-icon-theme/package.json')), 'LICENSE'),
+          ],
           ...[
             '@codemirror/commands',
             '@codemirror/lang-markdown',

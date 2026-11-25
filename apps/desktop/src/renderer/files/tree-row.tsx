@@ -1,65 +1,64 @@
-import type { CSSProperties, DragEvent, MouseEvent } from 'react';
+import { useEffect, useState, type CSSProperties, type DragEvent, type MouseEvent } from 'react';
 import { useT } from '../app/app-context.js';
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  FileIcon,
-  FolderIcon,
-  GlobeIcon,
-} from '../shell/icons.js';
+import { ChevronDownIcon, ChevronRightIcon, FileIcon, FolderIcon } from '../shell/icons.js';
 import { revealBidi } from '../transcript/reveal.js';
+import { iconSchemeFromMode, materialIconUrl, type IconScheme } from './material-icons.js';
 import type { TreeRow } from './tree-model.js';
 
-function FileGlyph({ name }: { readonly name: string }) {
-  const extension = name.split('.').at(-1)?.toLowerCase();
-  if (extension === 'html' || extension === 'htm') return <GlobeIcon />;
-  const image = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'avif', 'bmp', 'ico'].includes(
-    extension ?? '',
-  );
-  const code = [
-    'ts',
-    'tsx',
-    'js',
-    'jsx',
-    'rs',
-    'py',
-    'go',
-    'css',
-    'c',
-    'cpp',
-    'json',
-    'toml',
-    'yaml',
-    'yml',
-    'sh',
-  ].includes(extension ?? '');
-  if (!image && !code) return <FileIcon />;
-  return (
-    <svg
-      className="icon"
-      viewBox="0 0 16 16"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {image ? (
-        <>
-          <rect x="1.7" y="2" width="12.6" height="12" rx="2" />
-          <circle cx="10.5" cy="5.5" r="1" />
-          <path d="m2.4 11 3.4-4 5.9 6" />
-        </>
-      ) : (
-        <>
-          <path d="m4.5 5-3 3 3 3m7-6 3 3-3 3m-2-8-3 10" />
-        </>
-      )}
-    </svg>
-  );
+let iconScheme: IconScheme = 'base';
+const schemeListeners = new Set<() => void>();
+let schemeWatching = false;
+
+function currentIconScheme(): IconScheme {
+  if (typeof document === 'undefined') return 'base';
+  return iconSchemeFromMode(document.documentElement.dataset.colorMode);
+}
+
+function watchIconScheme() {
+  if (schemeWatching || typeof document === 'undefined') return;
+  schemeWatching = true;
+  iconScheme = currentIconScheme();
+  const observer = new MutationObserver(() => {
+    const next = currentIconScheme();
+    if (next === iconScheme) return;
+    iconScheme = next;
+    for (const listener of schemeListeners) listener();
+  });
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-color-mode'],
+  });
+}
+
+function useIconScheme(): IconScheme {
+  const [scheme, setScheme] = useState(currentIconScheme);
+  useEffect(() => {
+    watchIconScheme();
+    setScheme(iconScheme);
+    const listener = () => {
+      setScheme(iconScheme);
+    };
+    schemeListeners.add(listener);
+    return () => {
+      schemeListeners.delete(listener);
+    };
+  }, []);
+  return scheme;
+}
+
+function TreeTypeIcon({
+  name,
+  directory,
+  open,
+}: {
+  readonly name: string;
+  readonly directory: boolean;
+  readonly open: boolean;
+}) {
+  const scheme = useIconScheme();
+  const src = materialIconUrl(name, directory, open, scheme);
+  if (!src) return directory ? <FolderIcon /> : <FileIcon />;
+  return <img className="project-tree-type" alt="" draggable={false} src={src} />;
 }
 
 function Marked({
@@ -250,17 +249,8 @@ export function ProjectTreeRow({
         </>
       ) : (
         <>
-          {row.directory ? (
-            searchResult ? (
-              <FolderIcon />
-            ) : open ? (
-              <ChevronDownIcon />
-            ) : (
-              <ChevronRightIcon />
-            )
-          ) : (
-            <FileGlyph name={row.name} />
-          )}
+          {row.directory && !searchResult && (open ? <ChevronDownIcon /> : <ChevronRightIcon />)}
+          <TreeTypeIcon name={row.name} directory={row.directory} open={open} />
           <span className="project-tree-name" dir="ltr">
             <Marked text={row.name} ranges={nameRanges} />
           </span>

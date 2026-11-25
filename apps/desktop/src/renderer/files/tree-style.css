@@ -111,11 +111,16 @@
   cursor: default;
   min-width: 0;
 }
-.project-tree-row > svg {
+.project-tree-row > svg,
+.project-tree-type {
   flex: none;
-  width: var(--piarc-font-size-body);
-  height: var(--piarc-font-size-body);
+  width: 16px;
+  height: 16px;
   color: var(--piarc-text-secondary);
+}
+.project-tree-type {
+  object-fit: contain;
+  pointer-events: none;
 }
 .project-tree-row[aria-selected='true'],
 .project-tree-row[data-current] {
