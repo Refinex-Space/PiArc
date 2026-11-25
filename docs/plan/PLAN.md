@@ -309,6 +309,23 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 进行中的任务在这里维护自己的检查清单，每完成一项就勾选并提交。任务完成时清空本节。
 
+### 会话主块对标（计划外维护，ADR-0073）
+
+- [x] 开工：基线 verify 12/17（失败项见 I231、I232）。t19 开工基准为每帧主线程工作 p99 6.32 ms，滚动 59.6 fps，冷加载 61–94 ms，缓存切换 17–25 ms；流式吞吐 84 token/s，低于用例自身 100 的门限（本机 mock 与 Core 所限）。现状截图由会话画廊（`#/session-gallery`，`e2e/session-pane.e2e.ts`）生成，在 `tmp/evidence/session-pane/gallery/before/`。
+- [x] 盘点与规格：`docs/research/session-pane-fidelity.md` 差异表与补充 ADR-0078。
+- [ ] 基础层：会话区组件令牌（间距、圆角、描边、阴影、动效）与共享组件（图标入口、图标按钮、卡片外壳、工具行、展开折叠、菜单、tooltip、键帽、胶囊、状态点）。
+- [ ] 输入区与环境栏。
+- [ ] 用户消息、回复 Markdown 与代码块。
+- [ ] 思考块。
+- [ ] 工具行、工具组与 diff 卡。
+- [ ] working 行。
+- [ ] 审批卡与提问卡。
+- [ ] 任务清单、计划卡、下一步。
+- [ ] 排队条、重试与错误、压缩提示、子 agent 卡。
+- [ ] 标题行、空态、加载失败、回到底部、消息操作。
+- [ ] 验收与打磨：ui-craft 状态矩阵复查，ui-critic 独立审查，修完 P0、P1。
+- [ ] 收尾：相关 L4 与 Vitest、i18n、t19 对比、`npm run verify`、报告。
+
 ### Files 精修与 Markdown（桌面已验收，整仓待 I230）
 
 - [x] 核对两个编辑器项目的许可证、实时编辑/阅读路径，以及真实的本地图片设置。
@@ -557,6 +574,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。**bbc6b60 复核**：[macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807623) 的 L2 为 239 通过、3 项仅 Windows；权限裁决 p95 为 2.544375 ms，仍超 2 ms 预算，沿 I103 跟进。 **9212335 复核**：[macOS CI](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677879) 的 L2 全部适用场景通过。权限裁决 p95 为 3.011083 ms；T33 的终端任务快照还出现一次 shell 提示符先后到达导致的不一致。本机同提交全量 verify 通过。 |
 | I229 | T49 | Windows 跳转列表的任务栏和开始菜单实机验收 | W4：安装 Velopack 构建后依次打开两个测试工作区。右键任务栏与开始菜单中的 PiArc，核对最近顺序。依次选一个工作区、“新建会话”和“打开文件夹”，确认复用进程、原窗口草稿保留、没有自动发送。移除一个最近条目，再打开其他工作区，确认被移除的条目没有被重新添加。 |
 | I230 | Files / Markdown 收尾 | macOS 文件监听测试在释放测试所持互斥锁后等待初次注册超时。相同监听代码在本会话较早一轮全量检查通过，之后在最终提交的两个全量运行，以及独立临时 APFS 卷上复现。采样栈停在系统 `FSEventStreamStart`。 | Core 文件监听：复核 macOS 原生流的启动时间和回执，在现有 30 秒断言下通过整仓门禁。原始用例位于 `crates/piarc-core/src/workspace_settings/tests.rs`。 |
+| I231 | 会话主块对标开工 | 提交 `313279dc` 的基线中有三项检查失败。Prettier 不通过的文件是 `files/material-icons.ts`、`shell/WorkbenchHeader.tsx` 和 `shell/WorkspaceSearch.tsx`。`tsc --build` 在 `files/FileViewer.tsx` 第 477、560 行报类型错误。i18n 检查报 `shell/WorkspaceSearch.tsx:302` 的硬编码 `esc`，Vitest 的 `check-i18n.test.mjs` 也因此失败。均由 `ec0f84af`、`313279dc` 引入 | 下一次 Files 或侧栏维护处理。会话主块对标只格式化本任务改动的 `WorkbenchHeader.tsx` |
+| I232 | 会话主块对标开工 | 在本机 Windows 上，`cargo test` 链接 `piarc-testkit`、`piarc-core` 时报 os error 1455（页面文件太小）。并行编译占满了提交内存。Vitest 的 `markdown/incremental.test.ts` 在全量负载下超过 5 s 默认时限，单独运行 9/9 通过，用时 1.8 s | 调大本机页面文件，或限制 `CARGO_BUILD_JOBS` 后复跑 |
 
 ## 技术债
 

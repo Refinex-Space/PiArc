@@ -93,3 +93,4 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0075](0075-session-tool-tiles.md) | 会话工具右侧分块、比例与窗口生命周期 | 已接受 |
 | [0076](0076-project-files.md) | 工作树文件浏览、冲突安全的编辑和独立本地文档预览 | 已接受 |
 | [0077](0077-markdown-file-authoring.md) | Markdown 的即时编辑、源码、对照阅读及本地图片目录 | 已接受（补充） |
+| [0078](0078-session-pane-reference.md) | 会话主块对标 Claude Desktop 的 Code 会话：参考值取法、会话令牌、Lucide 图标出口与 PiArc 自有 working 标记 | 已接受（补充） |
