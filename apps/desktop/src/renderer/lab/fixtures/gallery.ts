@@ -289,7 +289,6 @@ function markdown(): GallerySection {
 /** Mermaid in replies (ADR-0080): drawn, broken, and still streaming. */
 function diagram(): GallerySection {
   return {
-    running: true,
     notifications: [
       turn('t1'),
       ...done('t1', user('u1', 'Draw the request flow.')),
@@ -324,12 +323,15 @@ function diagram(): GallerySection {
           ].join('\n'),
         ),
       ),
-      started('t1', {
-        type: 'agentMessage',
-        itemId: 'a3',
-        status: 'inProgress',
-        text: ['And the retry path:', '', '```mermaid', 'flowchart TD', '  A --> B'].join('\n'),
-      }),
+      // A fence the reply left open closes at its end (CommonMark): it is drawn too.
+      ...done(
+        't1',
+        reply(
+          'a3',
+          ['And the retry path:', '', '```mermaid', 'flowchart TD', '  A --> B'].join('\n'),
+        ),
+      ),
+      ended('t1'),
     ],
   };
 }

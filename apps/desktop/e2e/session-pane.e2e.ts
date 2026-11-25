@@ -65,7 +65,10 @@ async function open(page: Page, section: string): Promise<void> {
     () =>
       document.querySelectorAll('.md-fallback').length === 0 &&
       document.querySelectorAll('[data-testid="code-block"][data-highlight="pending"]').length ===
-        0,
+        0 &&
+      // Diagrams and images draw after the text; the rows settle at their final heights.
+      document.querySelectorAll('[data-testid="md-diagram"][data-state="drawing"]').length === 0 &&
+      document.querySelectorAll('[data-testid="reply-image"][data-state="loading"]').length === 0,
   );
   await page.evaluate(
     () =>
