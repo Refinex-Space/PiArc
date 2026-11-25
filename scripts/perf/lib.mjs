@@ -169,6 +169,9 @@ export async function startSession(page, scenarioId, options = {}) {
     await page.getByTestId('menu-worktree').click();
     await page.getByTestId('home-worktree-name').fill(options.worktree);
   }
+  // The input stays read-only while the home view loads (a worktree's branches, for one), and
+  // `fill` does not wait for a contenteditable to become editable.
+  await page.locator('[data-testid="home-input"][contenteditable="true"]').waitFor();
   await page.getByTestId('home-input').fill(`Work on it [[piarc-scenario:${scenarioId}]]`);
   await page.getByTestId('home-start').click();
   if (options.trust === true) await page.getByTestId('trust-accept').click();
