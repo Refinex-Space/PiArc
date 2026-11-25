@@ -3,7 +3,7 @@
 // composer with the queue above it. A session shown before in this window is still in the store
 // and shows at once; one shown for the first time loads its last page of history, and earlier
 // pages when the user scrolls to the top.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { useWindowFocused } from '../app/window-focus.js';
@@ -51,6 +51,33 @@ import { openProjectFile, projectFileRoot } from '../files/navigation.js';
 import { onCommandRequest, takeCommand } from './command-requests.js';
 import { parseWindow } from '../store/history-window.js';
 import { rememberMemoryTarget } from '../settings/memory-target.js';
+
+/** The pane while its history loads: the shape of a message and a reply, gently breathing. */
+function ConversationSkeleton({ label }: { readonly label: string }) {
+  return (
+    <div className="conversation-skeleton" role="status" data-testid="conversation-loading">
+      <span className="visually-hidden">{label}</span>
+      <div className="skeleton-bubble" aria-hidden="true" />
+      {[
+        [96, 100, 92, 58],
+        [100, 94, 41],
+        [97, 90, 66],
+      ].map((widths, paragraph) => (
+        <div key={paragraph} className="skeleton-paragraph" aria-hidden="true">
+          {widths.map((width, line) => (
+            <div
+              key={line}
+              className="skeleton-line"
+              style={
+                { width: `${String(width)}%`, '--line': paragraph * 4 + line } as CSSProperties
+              }
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Earlier pages a search result may load to find its entry. */
 const LOCATE_PAGES = 50;
@@ -124,11 +151,15 @@ function useHistory(
   transcript: SessionTranscript,
 ): {
   loading: boolean;
+  failed: boolean;
+  retry: () => void;
   loadingEarlier: boolean;
   loadEarlier: () => Promise<void>;
 } {
   const needsReload = useNeedsReload(id);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const earlierRequest = useRef<Promise<void> | undefined>(undefined);
   useEffect(() => {
@@ -137,6 +168,7 @@ function useHistory(
     }
     let active = true;
     setLoading(true);
+    setFailed(false);
     window.piarc.transcriptWindow(id, null, HISTORY.pageItems).then(
       (text) => {
         if (!active) {
@@ -153,6 +185,7 @@ function useHistory(
       (failure: unknown) => {
         if (active) {
           setLoading(false);
+          setFailed(true);
           console.error('[conversation] cannot load the transcript', failure);
         }
       },
@@ -160,7 +193,7 @@ function useHistory(
     return () => {
       active = false;
     };
-  }, [id, transcript, needsReload]);
+  }, [id, transcript, needsReload, attempt]);
   const loadEarlier = useCallback(() => {
     if (earlierRequest.current !== undefined) return earlierRequest.current;
     const start = transcript.historyStart();
@@ -182,7 +215,10 @@ function useHistory(
       });
     return earlierRequest.current;
   }, [id, transcript]);
-  return { loading, loadingEarlier, loadEarlier };
+  const retry = useCallback(() => {
+    setAttempt((n) => n + 1);
+  }, []);
+  return { loading, failed, retry, loadingEarlier, loadEarlier };
 }
 
 export function Conversation({
@@ -484,9 +520,21 @@ export function Conversation({
         <TranscriptContext.Provider value={view}>
           <div className="conversation-body">
             {history.loading && !transcript.hasContent() ? (
-              <p className="muted conversation-note">{t('conversation.loading')}</p>
+              <ConversationSkeleton label={t('conversation.loading')} />
             ) : null}
-            {empty ? <p className="muted conversation-note">{t('conversation.empty')}</p> : null}
+            {empty && history.failed ? (
+              <div className="conversation-state" role="alert" data-testid="conversation-failed">
+                <p className="conversation-state-title">{t('conversation.loadFailed')}</p>
+                <p className="conversation-state-hint">{t('conversation.loadFailed.hint')}</p>
+                <button type="button" className="button button-primary" onClick={history.retry}>
+                  {t('transcript.error.retry')}
+                </button>
+              </div>
+            ) : empty ? (
+              <div className="conversation-state" data-testid="conversation-empty">
+                <p className="conversation-state-title">{t('conversation.empty')}</p>
+              </div>
+            ) : null}
             <Transcript
               onReachTop={history.loadEarlier}
               loadingEarlier={history.loadingEarlier}

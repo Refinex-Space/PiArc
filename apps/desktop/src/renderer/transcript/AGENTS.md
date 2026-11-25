@@ -25,7 +25,7 @@
 
 ## 无障碍（T43）
 
-- 列表是 `role="feed"`、每行 `role="article"`（`TranscriptList` 的 `RowFrame`，子 agent 的转录用 `RowView.tsx` 的 `RowArticle`），名称来自 `row-label.ts` 的 `rowLabel`（与行显示的文字共用消息）；回合运行时 feed `aria-busy`。不要改回 `role="log"`：它隐含 `aria-live`，逐字播报流式输出。
+- 列表是 `role="feed"`、每行 `role="article"`（`TranscriptList` 的 `RowFrame`，子 agent 的转录用 `RowView.tsx` 的 `RowArticle`），名称来自 `row-label.ts` 的 `rowLabel`（与行显示的文字共用消息）；回合运行时 feed `aria-busy`；没有行时（历史读取中、读取失败、空会话）滚动容器不是 feed，由 `shell/Conversation.tsx` 的状态块说明（空 feed 违反 axe 的 `aria-required-children`）。不要改回 `role="log"`：它隐含 `aria-live`，逐字播报流式输出。
 - 行 kind 在 `src/shared/row-kinds.ts` 的 `ROW_KINDS`：新增行类型加 kind 与名称（`rowKind` 的穷尽检查），并登记到 `e2e/a11y/states.ts`。
 - 会话的 live region 是 `LiveRegion.tsx`（挂在 `Conversation` 的 transcript 上下文里）：运行中的进展至多每 `LIVE_ANNOUNCE.intervalMs` 播报一次，回合结束播报一次结果；节流在 `live-announcer.ts`（可注入时钟，测试用假时钟统计次数）。L4 按文字找回复时限定在 `agent-message` 里，live region 会重复结果。
 - 代码高亮的主题在 `highlight/themes.ts`（GitHub 高对比度两套，浅色的注释灰换成主题里更深的灰），`themes.test.ts` 核对每个 token 在代码与 diff 底色上不低于 4.5:1；明暗跟随应用的主题选择（`use-color-scheme.ts`，I186），不只看系统。

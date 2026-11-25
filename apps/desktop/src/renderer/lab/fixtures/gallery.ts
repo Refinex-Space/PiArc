@@ -18,8 +18,12 @@ export interface GallerySection {
   readonly approvals?: readonly ApprovalRequest[];
   /** The composer shows a running turn. */
   readonly running?: boolean;
+  /** A message the user sent that did not reach Core, with the reason. */
+  readonly undelivered?: { readonly text: string; readonly reason: string };
   /** Inputs waiting above the composer. */
   readonly queue?: readonly QueuedInput[];
+  /** The input's own states: a draft with a mention and attachments, notices, the usage levels. */
+  readonly input?: boolean;
 }
 
 const SESSION = 'gallery';
@@ -262,6 +266,7 @@ function messages(): GallerySection {
       ...done('t2', reply('a2', 'Thanks — the log shows the retry loop starting at line 9.')),
       ended('t2'),
     ],
+    undelivered: { text: 'Also check the retry delay.', reason: 'the app is offline' },
   };
 }
 
@@ -585,6 +590,8 @@ export function gallerySection(name: string): GallerySection {
       return status();
     case 'working':
       return working();
+    case 'input':
+      return { ...conversation(), input: true };
     default:
       if (name.startsWith('approval-')) return approvals(name.slice('approval-'.length));
       return conversation();

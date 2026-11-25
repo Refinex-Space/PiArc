@@ -10,7 +10,8 @@ import {
   type ReactNode,
 } from 'react';
 import { IconButton } from '../app/IconButton.js';
-import { useT } from '../app/app-context.js';
+import { effectiveBindings } from '../../shared/keybindings.js';
+import { useApp, useT } from '../app/app-context.js';
 import { requestTerminalFocus } from '../terminal/panel-state.js';
 import {
   ChangesIcon,
@@ -226,12 +227,14 @@ export function SessionTools({ context }: { context: PanelContext }) {
   const t = useT();
   const menu = useMenu();
   const { railOpen, setRailOpen, openIds } = usePanelPresentation();
+  const { preferences } = useApp();
   if (!context.sessionId) return null;
+  const bindings = effectiveBindings(preferences.keybindings);
   const controls = [
-    ['terminal', 'panel.terminal', <TerminalIcon />],
-    ['changes', 'panel.changes', <ChangesIcon />],
-    ['preview', 'tiles.preview', <PreviewIcon />],
-    ['files', 'tiles.files', <FolderIcon />],
+    ['terminal', 'panel.terminal', <TerminalIcon />, bindings['terminal.toggle']],
+    ['changes', 'panel.changes', <ChangesIcon />, bindings['changes.toggle']],
+    ['preview', 'tiles.preview', <PreviewIcon />, ''],
+    ['files', 'tiles.files', <FolderIcon />, bindings['files.toggle']],
   ] as const;
   const names = [
     ['side-chat', 'sideChat.title', <SideChatIcon />],
@@ -261,10 +264,11 @@ export function SessionTools({ context }: { context: PanelContext }) {
       >
         <LayoutListIcon />
       </IconButton>
-      {controls.map(([id, label, icon]) => (
+      {controls.map(([id, label, icon, keys]) => (
         <IconButton
           key={id}
           label={t(label)}
+          {...(keys === '' ? {} : { keys })}
           data-testid={'tool-' + id}
           aria-pressed={openIds.includes(id)}
           onClick={() => {

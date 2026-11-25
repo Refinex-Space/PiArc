@@ -271,12 +271,17 @@ export function TranscriptList({
         }}
         className="transcript-scroller"
         data-testid="transcript-scroller"
-        tabIndex={0}
         // A feed of articles, not a live log: streamed text is announced by the conversation's
-        // throttled live region (`LiveAnnouncer`), not token by token.
-        role="feed"
-        aria-label={t('transcript.label')}
-        aria-busy={busy}
+        // throttled live region (`LiveAnnouncer`), not token by token. Without rows (the history
+        // still loading, failed or empty) there is no feed: the pane's state speaks for itself.
+        {...(ids.length === 0
+          ? {}
+          : {
+              tabIndex: 0,
+              role: 'feed',
+              'aria-label': t('transcript.label'),
+              'aria-busy': busy,
+            })}
       >
         <div
           ref={onContent}

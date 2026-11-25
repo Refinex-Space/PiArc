@@ -855,6 +855,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'conversation.loading': '正在加载对话…',
   'conversation.error': '上一个回合失败：{message}',
   'conversation.empty': '还没有消息。',
+  'conversation.loadFailed': '无法加载这段对话',
+  'conversation.loadFailed.hint': '读取消息时出了问题。',
 
   'a11y.live.tool': '正在运行 {tool}：{target}',
   'a11y.live.writing': '正在撰写回复：已写 {count} 个词',

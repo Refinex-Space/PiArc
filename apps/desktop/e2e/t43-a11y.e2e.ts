@@ -533,6 +533,28 @@ test.describe('failures, compaction, reminders and model dialogs', () => {
     await killAgentHost(app);
     await expect(page.getByTestId('uncertain-card')).toBeVisible({ timeout: 30_000 });
     await checkState(page, 'row:uncertain');
+
+    // A session's history while it is read, and when the read fails.
+    const reopen = async () => {
+      await page.reload();
+      await page
+        .getByTestId('session-row')
+        .filter({ hasText: 'First question' })
+        .getByTestId('session-title')
+        .click();
+    };
+    await app.evaluate((_electron, channel) => {
+      globalThis.__piarcTestHooks?.holdNext(channel, 30_000);
+    }, IPC_CHANNELS.sessionTranscript);
+    await reopen();
+    await expect(page.getByTestId('conversation-loading')).toBeVisible();
+    await checkState(page, 'state:conversation-loading');
+    await app.evaluate((_electron, channel) => {
+      globalThis.__piarcTestHooks?.failNext(channel, 'unreadable');
+    }, IPC_CHANNELS.sessionTranscript);
+    await reopen();
+    await expect(page.getByTestId('conversation-failed')).toBeVisible();
+    await checkState(page, 'state:conversation-failed');
   });
 });
 

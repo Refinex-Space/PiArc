@@ -423,3 +423,102 @@ button.step-line:focus-visible {
     opacity: 1;
   }
 }
+
+/* ---- the conversation's own states: loading, empty, failed ---- */
+
+/* While the history loads: a message and three paragraphs of bars that breathe in a wave. */
+.conversation-skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--piarc-session-prose-line) * 0.75);
+  box-sizing: border-box;
+  max-width: calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter));
+  margin: 0 auto;
+  padding: 40px var(--piarc-session-gutter) 0;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(#000 65%, transparent);
+  animation: skeleton-reveal var(--piarc-motion-fast) var(--piarc-motion-curve-out) 0.5s backwards;
+}
+
+.skeleton-bubble,
+.skeleton-line {
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill-hover);
+  animation: skeleton-breathe 2s ease-in-out infinite;
+  animation-delay: calc(var(--line, 0) * 90ms);
+}
+
+.skeleton-bubble {
+  align-self: flex-end;
+  width: min(288px, var(--piarc-session-bubble-max));
+  height: calc(var(--piarc-session-prose-line) + 2 * var(--piarc-session-pad-md));
+  margin-bottom: var(--piarc-session-turn-gap);
+  border-radius: var(--piarc-session-radius-card);
+}
+
+.skeleton-paragraph {
+  display: flex;
+  flex-direction: column;
+  padding-inline-start: var(--piarc-session-text-inset);
+}
+
+.skeleton-line {
+  height: calc(var(--piarc-session-prose) * 0.72);
+  margin-block: calc((var(--piarc-session-prose-line) - var(--piarc-session-prose) * 0.72) / 2);
+}
+
+@keyframes skeleton-breathe {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes skeleton-reveal {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Empty, or the history could not be read: a centred message with what to do next. */
+.conversation-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-4);
+  text-align: center;
+  /* Above the (empty) transcript, which still takes the wheel and the selection. */
+  z-index: 1;
+  pointer-events: none;
+}
+
+.conversation-state > .button {
+  pointer-events: auto;
+}
+
+.conversation-state p {
+  max-width: 36ch;
+  margin: 0;
+}
+
+.conversation-state-title {
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+
+.conversation-state-hint {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.conversation-state > .button {
+  margin-top: var(--piarc-space-3);
+}

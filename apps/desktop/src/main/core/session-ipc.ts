@@ -774,14 +774,17 @@ export function registerSessionHandlers(
     await core.deleteSession(target);
     return true;
   });
-  registerHandler(IPC_CHANNELS.sessionTranscript, (_event, [id, start, limit]) => {
+  registerHandler(IPC_CHANNELS.sessionTranscript, async (_event, [id, start, limit]) => {
     if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 1000) {
       throw new TypeError('limit must be an integer from 1 to 1000');
     }
     if (start !== null && (typeof start !== 'number' || !Number.isInteger(start) || start < 0)) {
       throw new TypeError('start must be a non-negative integer or null');
     }
-    return core.transcriptWindow(sessionId(id), start, limit);
+    const session = sessionId(id);
+    await faults.hold(IPC_CHANNELS.sessionTranscript);
+    faults.check(IPC_CHANNELS.sessionTranscript);
+    return core.transcriptWindow(session, start, limit);
   });
   registerHandler(IPC_CHANNELS.subagentTranscript, (_event, [parent, child, start, limit]) => {
     if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 1000) {

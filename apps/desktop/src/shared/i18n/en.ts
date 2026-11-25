@@ -868,6 +868,8 @@ export const en = {
   'conversation.loading': 'Loading the conversation…',
   'conversation.error': 'The last turn failed: {message}',
   'conversation.empty': 'No messages yet.',
+  'conversation.loadFailed': 'Couldn’t load this conversation',
+  'conversation.loadFailed.hint': 'Something went wrong while reading its messages.',
 
   'a11y.live.tool': 'Running {tool}: {target}',
   'a11y.live.writing': 'Writing the reply: {count, plural, one {# word} other {# words}} so far',

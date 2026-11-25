@@ -11,7 +11,17 @@ import type { ElectronApplication, Page } from '@playwright/test';
 
 import { GALLERY_SECTIONS, SESSION_GALLERY_HASH } from '../src/shared/transcript-lab.js';
 import type { PreferenceChange } from '../src/shared/preferences.js';
+import { IPC_CHANNELS } from '../src/shared/ipc.js';
+import { expectTestHooks } from './core.js';
 import { expect, test } from './fixtures.js';
+import {
+  focusMain,
+  makeWorkspace,
+  openFolder,
+  row,
+  startSession,
+  test as sessionTest,
+} from './sessions.js';
 
 const EVIDENCE = path.join(
   import.meta.dirname,
@@ -155,6 +165,15 @@ test('session pane states for review', async ({ app, page }) => {
     await page.mouse.move(0, 0);
     await page.screenshot({ path: path.join(EVIDENCE, `conversation-open-${theme}.png`) });
   }
+  // Scrolled away from the end: the jump back appears.
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'markdown');
+    await page.getByTestId('transcript-scroller').hover();
+    await page.mouse.wheel(0, -600);
+    await page.getByTestId('back-to-bottom').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `jump-${theme}.png`) });
+  }
   // The working mark's wave, frame by frame (motion evidence), while a tool runs.
   await prefer(page, { key: 'appearance.theme', value: 'light' });
   await open(page, 'working');
@@ -183,3 +202,64 @@ test('session pane states for review', async ({ app, page }) => {
   await prefer(page, { key: 'appearance.reduceMotion', value: 'system' });
   expect(problems).toEqual([]);
 });
+
+// A real session (Core, Agent Host and the mock provider): the whole window with the title row,
+// in both themes and languages; then the history read held (the loading placeholder) and failed
+// (the error with its retry).
+sessionTest(
+  'a real session pane, and its loading and failed states',
+  async ({ app, page, workspaces }) => {
+    test.setTimeout(240_000);
+    await mkdir(EVIDENCE, { recursive: true });
+    const ws = await makeWorkspace(workspaces, 'session pane 会话', {
+      'notes.txt': 'The release is on Friday.\n',
+    });
+    await openFolder(page, app, ws);
+    const id = await startSession(page, 'Read the notes.', 't43-rows');
+    await focusMain(app);
+    await expect(page.getByTestId('composer')).toHaveAttribute('data-running', 'false', {
+      timeout: 30_000,
+    });
+    for (const language of ['en', 'zh-CN'] as const) {
+      await prefer(page, { key: 'language', value: language });
+      for (const theme of ['light', 'dark'] as const) {
+        await prefer(page, { key: 'appearance.theme', value: theme });
+        await page.mouse.move(0, 0);
+        await page.screenshot({ path: path.join(EVIDENCE, `real-${theme}-${language}.png`) });
+      }
+    }
+    await prefer(page, { key: 'language', value: 'en' });
+    await prefer(page, { key: 'appearance.theme', value: 'light' });
+    await page.getByTestId('conversation-title').hover();
+    await page.locator('.tooltip[data-placed="true"]').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-title-hover.png') });
+    await page.getByTestId('tool-terminal').hover();
+    await expect(page.locator('.tooltip[data-placed="true"]')).toContainText(/Terminal|终端/u);
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-tool-hover.png') });
+
+    // The history read held (the placeholder), then failed (the error); Retry reads it again.
+    await expectTestHooks(app);
+    await app.evaluate((_electron, channel) => {
+      globalThis.__piarcTestHooks?.holdNext(channel, 3_000);
+    }, IPC_CHANNELS.sessionTranscript);
+    await page.reload();
+    await row(page, id).getByTestId('session-title').click();
+    await expect(page.getByTestId('conversation-loading')).toBeVisible();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-loading.png') });
+    await expect(page.getByTestId('agent-message').last()).toContainText('Friday', {
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId('conversation-loading')).toHaveCount(0);
+    await app.evaluate((_electron, channel) => {
+      globalThis.__piarcTestHooks?.failNext(channel, 'unreadable');
+    }, IPC_CHANNELS.sessionTranscript);
+    await page.reload();
+    await row(page, id).getByTestId('session-title').click();
+    await expect(page.getByTestId('conversation-failed')).toBeVisible();
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-failed.png') });
+    await page.getByTestId('conversation-failed').getByRole('button').click();
+    await expect(page.getByTestId('agent-message').last()).toContainText('Friday');
+    await expect(page.getByTestId('conversation-failed')).toHaveCount(0);
+  },
+);

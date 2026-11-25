@@ -14,22 +14,22 @@
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 控件高度 | `public/assets/v1/c6a992d55-*.css`（`.cds-root` 与 panels 覆盖） | 舒适 28，紧凑 24；xs 24/20；嵌套 22/18 | `size.buttonHeight` 28/24 | 复用，新增嵌套高度 | 令牌生成与画廊测量 | 待实现 |
-| 圆角 | 同上 | 控件 8/6，卡片 12/10，胶囊 5.5/4.5，代码块 8 | `radius.button` 8/6，`radius.lg` 10 | 新增会话卡片、胶囊圆角 | 同上 | 待实现 |
-| 内距与间距 | 同上 | pad 6/8/12/16（紧凑 4/6/8/12），gap 8/12/16 | `space.1–5` 4/8/12/16/24 | 新增 pad-xs 6/4 | 同上 | 待实现 |
-| 文字 | 同上与 `.epitaxy-transcript-typography` | 正文 15/21，卡片 body 14/20，footnote 13/17，caption 12/17，代码 13/19；CJK 正文行高 24 | `fontSize` 11/12/13/15/20，行高 1.55 | 新增会话字阶（含紧凑与中文行高） | 同上 | 待实现 |
-| 层级色 | 同上（fizzy color） | 主 90%、次 60%、淡 47% 黑；淡底 5%、悬停 10%、细线 8%（暗色 5%、10%、4%） | 有主、次、禁用文字与不透明边框 | 新增淡底、淡底悬停、细线三个语义令牌 | 对比度检查与 axe | 待实现 |
-| 动效 | 同上 | fast 60，snap 120（cubic-bezier(.32,.72,0,1)），base 200，slow 450；ease-out cubic-bezier(.165,.84,.44,1)；按下缩放 .975 | `motion.surface` 60、`fast` 120、`normal` 200，一条曲线 | 新增 snap 与 ease-out 曲线、显隐延迟 100 | 画廊录屏逐帧 | 待实现 |
-| 焦点 | 同上（`--cds-focus-shadow`） | 1 px 强调色外圈加 6 px 柔光；行级为内嵌 1 px 强调色 | 全局 `border.focus` 描边 | 改造：沿用 PiArc 焦点色，行级用内嵌 1 px | 键盘走查截图 | 待实现 |
-| 图标 | `src/generated/cds-core/shared-frame.mjs` | 图标字体，xs 12（线宽 1）、sm 16（1.25）、md 20（1.25） | 自绘 16 px 线框图标 | 改造：Lucide 经 `shell/icons.tsx` 统一出口，固定线宽 | 截图 | 待实现 |
+| 控件高度 | `public/assets/v1/c6a992d55-*.css`（`.cds-root` 与 panels 覆盖） | 舒适 28，紧凑 24；xs 24/20；嵌套 22/18 | `size.buttonHeight` 28/24 | 复用，新增嵌套高度 | 令牌生成与画廊测量 | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
+| 圆角 | 同上 | 控件 8/6，卡片 12/10，胶囊 5.5/4.5，代码块 8 | `radius.button` 8/6，`radius.lg` 10 | 新增会话卡片、胶囊圆角 | 同上 | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
+| 内距与间距 | 同上 | pad 6/8/12/16（紧凑 4/6/8/12），gap 8/12/16 | `space.1–5` 4/8/12/16/24 | 新增 pad-xs 6/4 | 同上 | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
+| 文字 | 同上与 `.epitaxy-transcript-typography` | 正文 15/21，卡片 body 14/20，footnote 13/17，caption 12/17，代码 13/19；CJK 正文行高 24 | `fontSize` 11/12/13/15/20，行高 1.55 | 新增会话字阶（含紧凑与中文行高） | 同上 | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
+| 层级色 | 同上（fizzy color） | 主 90%、次 60%、淡 47% 黑；淡底 5%、悬停 10%、细线 8%（暗色 5%、10%、4%） | 有主、次、禁用文字与不透明边框 | 新增淡底、淡底悬停、细线三个语义令牌 | 对比度检查与 axe | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
+| 动效 | 同上 | fast 60，snap 120（cubic-bezier(.32,.72,0,1)），base 200，slow 450；ease-out cubic-bezier(.165,.84,.44,1)；按下缩放 .975 | `motion.surface` 60、`fast` 120、`normal` 200，一条曲线 | 新增 snap 与 ease-out 曲线、显隐延迟 100 | 画廊录屏逐帧 | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
+| 焦点 | 同上（`--cds-focus-shadow`） | 1 px 强调色外圈加 6 px 柔光；行级为内嵌 1 px 强调色 | 全局 `border.focus` 描边 | 改造：沿用 PiArc 焦点色，行级用内嵌 1 px | 键盘走查截图 | 已对齐（改造）：全局焦点环不变；步骤行、标题按钮用内嵌 1 px 焦点色，审批卡用 1 px 外圈 |
+| 图标 | `src/generated/cds-core/shared-frame.mjs` | 图标字体，xs 12（线宽 1）、sm 16（1.25）、md 20（1.25） | 自绘 16 px 线框图标 | 改造：Lucide 经 `shell/icons.tsx` 统一出口，固定线宽 | 截图 | 已对齐：lucide-react 1.66.0 经 `shell/icons.tsx` 的 `glyph()`，12/16/20 与线宽 1/1.25 |
 
 ## 2. 标题行
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 行高与分隔 | `generated/titlebar-frame/*`、`src/source-titlebar.css` | 32 行高加上下 4 内距，底部 1 px 细线，总高约 44 | 44 px 标题栏（`size.titlebarHeight`） | 复刻细线与内距 | 截图测量 | 待实现 |
-| 标题 | 同上 | 14/20、字重 500，可点重命名：悬停淡底、左右 6 内距、圆角 8 | 标题按钮与重命名输入 | 复刻 | 悬停、重命名截图 | 待实现 |
-| 工具按钮 | 同上与 `src/code-ui.jsx` | 32×32 幽灵按钮，图标 20，间距 4，按下态淡灰底，tooltip 带快捷键 | `IconButton` 与会话工具 | 复刻尺寸与按下态 | 开合状态截图 | 待实现 |
+| 行高与分隔 | `generated/titlebar-frame/*`、`src/source-titlebar.css` | 32 行高加上下 4 内距，底部 1 px 细线，总高约 44 | 44 px 标题栏（`size.titlebarHeight`） | 复刻细线与内距 | 截图测量 | 已对齐：`gallery/shell/real-*` |
+| 标题 | 同上 | 14/20、字重 500，可点重命名：悬停淡底、左右 6 内距、圆角 8 | 标题按钮与重命名输入 | 复刻 | 悬停、重命名截图 | 已对齐：控件高、左右 6 并外扩对齐文字、圆角 8、悬停淡底；tooltip 在截断时给全名、否则 "Rename"；`gallery/shell/real-title-hover.png` |
+| 工具按钮 | 同上与 `src/code-ui.jsx` | 控件高的幽灵图标按钮（`CdsButton` ghost iconOnly，舒适 28），间距 4，选中态淡灰底，tooltip 带快捷键 | `IconButton` 与会话工具 | 复刻尺寸与按下态 | 开合状态截图 | 已对齐（改造）：沿用工作台的 28 高幽灵按钮与 18 图标（ADR-0075 已定）；终端、Changes、Files 的 tooltip 带快捷键；`gallery/shell/real-tool-hover.png` |
 | 溢出菜单 | `generated/code-current-v4/titlebar-fold-*` | 空间不足时按钮依次折入 "View options" | 窄窗由工具布局处理 | 不适用：PiArc 窄窗已由 ADR-0075 的分块布局切换，不再折叠标题按钮 | — | 不适用 |
 
 ## 3. 输入区
@@ -39,8 +39,8 @@
 | 外壳 | `src/source-composer.css`、`generated/code-composer-v4/chat-composer-shell.mjs` | 单行高 44，内距 8，圆角 14，亮 #fff 暗 #303030；1 px 细线环加 0 4 20 3.5% 阴影，聚焦 7.5%；200 ms 过渡 | 46 高、圆角 15、阴影 5.5% | 复刻 | 两档密度测量 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 | 编辑区 | `chat-composer-layout.mjs`、`source-composer-editor.css` | 15/21，最高 min(384, 40svh) 后内部滚动，占位色 #878787 | 15/24，自动增高 | 复刻行高与最高值 | 多行、长文截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 | 占位文字 | `src/composer-placeholder.mjs` | 空闲 "Type / for commands"；运行中 "⏎ to send, ⌘⏎ to queue for later" | 一句长占位；运行中提示在框下另起一行 | 改造：空闲短占位，运行中把 steer 与排队写进占位，删除框下提示行 | 截图、读屏名称 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
-| 附件 | `composer-attachment-tiles.mjs` | 120×120 方块，圆角 12，细线环，右上 20 圆形移除按钮悬停才显示 | 文字胶囊 "IMG/PDF" | 改造：PiArc 发送前没有缩略图数据，做成 120×44 的文件卡（图标、名称、大小），移除按钮同参考 | 截图 | 待实现 |
-| 提及 | `source-composer-editor.jsx` | 编辑器内是强调色文字，悬停淡底光晕，无胶囊底色 | 胶囊底色 | 复刻 | 截图 | 待实现 |
+| 附件 | `composer-attachment-tiles.mjs` | 120×120 方块，圆角 12，细线环，右上 20 圆形移除按钮悬停才显示 | 文字胶囊 "IMG/PDF" | 改造：PiArc 发送前没有缩略图数据，做成 120×44 的文件卡（图标、名称、大小），移除按钮同参考 | 截图 | 已对齐（改造）：文件卡（图标、名称、大小），截断长名；`gallery/input/` |
+| 提及 | `source-composer-editor.jsx` | 编辑器内是强调色文字，悬停淡底光晕，无胶囊底色 | 胶囊底色 | 复刻 | 截图 | 已对齐：`gallery/input/` |
 | `/` 面板 | `src/source-slash-menu.{jsx,css}` | 宽 240–512，最高 384，行高 28，左右 10，圆角 14，面板内距 6；匹配字加粗；描述在行尾 | 分组列表，行高 24 | 复刻尺寸；分组标题保留（PiArc 的命令来源有意义） | 键盘、筛选截图 | 已对齐：`gallery/composer/picker-*`、`menu-add-*` |
 | `@` 面板 | `src/source-mention-dropdown.{jsx,css}` | 宽 420（有描述 560），行内距 (28−20)/2×8，16 图标 | 35rem 宽列表 | 复刻 | 截图 | 已对齐：`gallery/composer/picker-*`、`menu-add-*` |
 | 添加菜单 | `src/source-composer-add-menu.jsx`、`src/source-menu.css` | 28 幽灵按钮；菜单最小 128、最大 320，圆角 12，内距 4，行内距 4×8 | `MenuPopup` | 复刻菜单尺寸（共享 `Menu`） | 截图 | 已对齐：`gallery/composer/picker-*`、`menu-add-*` |
@@ -48,9 +48,9 @@
 | 麦克风 | 同上 | 空草稿时显示听写按钮 | 无听写 | 不适用：PiArc 没有听写能力 | — | 不适用 |
 | Bash 模式与历史检索 | `src/source-composer.jsx` | `!` 进入命令模式；↑ 历史检索条 | 无 | 不适用：PiArc 没有这两项能力 | — | 不适用 |
 | 排队条 | `src/source-queued-messages.{jsx,css}`、`generated/queued-bar-v4/*` | 折叠行高 44、圆角 12、淡底，"{n} 条排队 · 下一条预览"；展开后行内距 5，悬停显示操作；进出 120 ms 位移 6 | 列表 | 复刻（编辑、删除沿用现有 IPC；PiArc 没有拖动排序与"立即发送"） | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
-| 提示带 | `src/source-session-notices.{jsx,css}` | 卡片圆角 12、细线环、页面底色，严重程度只体现在图标；200 ms 位移 4 出现 | `NoticeBar` 在主区顶部，整条警告底色 | 改造：会话提示移到输入框上方并用参考样式；全局提示仍在顶部 | 截图 | 待实现 |
+| 提示带 | `src/source-session-notices.{jsx,css}` | 卡片圆角 12、细线环、页面底色，严重程度只体现在图标；200 ms 位移 4 出现 | `NoticeBar` 在主区顶部，整条警告底色 | 改造：会话提示移到输入框上方并用参考样式；全局提示仍在顶部 | 截图 | 已对齐：`gallery/input/` |
 | 环境栏 | `src/source-composer-row-chin.jsx`、`composer-row-chin.mjs` | 卡片下方 8，xs 行高 24，字号 13/20，次文字色；模型（推理强度作尾词）→ 模式 → 用量环；按钮内距 6、圆角 6 | 普通文字按钮，模型与强度分开 | 复刻顺序与尺寸；强度合并为模型按钮的尾词，菜单仍分开（快捷键不变） | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
-| 用量环 | `usage-ring.mjs` | 24 按钮内 14 px 圆环，线宽 2，<75 强调、75–89 警告、≥90 危险，弧长 300 ms | `UsageRing` | 复刻 | 三档截图 | 待实现 |
+| 用量环 | `usage-ring.mjs` | 24 按钮内 14 px 圆环，线宽 2，<75 强调、75–89 警告、≥90 危险，弧长 300 ms | `UsageRing` | 复刻 | 三档截图 | 已对齐：42%、81%、94% 三档；`gallery/input/` |
 | 模式菜单 | `src/source-permission-menu.{jsx,css}` | 标题 "Mode"，每行名称加说明，选中强调色勾，行尾数字快捷键 | `MenuPopup` 带说明 | 复刻 | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 
 ## 4. 对话区与消息
@@ -60,7 +60,7 @@
 | 阅读列 | `src/source-transcript.{jsx,css}` | 宽 768，两侧留白 32（容器 ≤560 时 16），上下内距 48 | 768 加 16 内距 | 复刻 | 宽、窄窗测量 | 已对齐：`gallery/messages/` 的 conversation、messages |
 | 回合间距 | `generated/code-transcript/c97f58e7c-*.mjs` | 用户消息上方 24（紧凑 20），回复内块间 20（紧凑 16） | 每行上下 8 | 复刻 | 测量 | 已对齐：`gallery/messages/` 的 conversation、messages |
 | 上下渐隐 | 同上 | 顶部 32、底部 48 渐隐条，随滚动显隐 | 无 | 复刻（滚动驱动动画不可用时省略） | 截图 | 已对齐：顶部 32、底部 48 渐隐条由滚动驱动，减少动效与强制颜色下不画；`gallery/messages/markdown-*` |
-| 回到底部 | `src/source-transcript.jsx` | 高 24、左右 6、圆角 8、距底 8 居中，细线环阴影，16 px 向下图标；有待审批时前加 6 px 强调点与 "Needs your input"；150 ms 淡入 | 文字胶囊 "回到底部" | 复刻，待审批变体用 PiArc 审批数据 | 截图 | 待实现 |
+| 回到底部 | `src/source-transcript.jsx` | 高 24、左右 6、圆角 8、距底 8 居中，细线环阴影，16 px 向下图标；有待审批时前加 6 px 强调点与 "Needs your input"；150 ms 淡入 | 文字胶囊 "回到底部" | 复刻，待审批变体用 PiArc 审批数据 | 截图 | 已对齐：图标胶囊与渐隐；有待审批时前加强调点与 "Needs your input"；`gallery/shell/jump-*` |
 | 用户消息 | `generated/code-transcript/shared-2-*.mjs` | 右对齐，最宽 85%，内距 12×16，圆角 12，淡底 5%，15/21 | 640 宽、圆角 10、`action.surface` | 复刻 | 截图 | 已对齐：`gallery/messages/` 的 conversation、messages |
 | 长消息折叠 | 同上 | 超过 300 高折到 200，底部 48 渐隐，"Show more/less" | 无 | 复刻 | 截图 | 已对齐：`gallery/messages/` 的 conversation、messages |
 | 用户消息操作 | `code-transcript.mjs`（工具栏） | 气泡下右对齐，24 按钮 16 图标间距 3；悬停延迟 100 后 120 ms 淡入，离开 60 ms；顺序：复制、回退、分叉 | 文字按钮：复制、选中本回合、回退、分支 | 复刻为图标按钮加 tooltip；保留"选中本回合" | 悬停、焦点截图 | 已对齐：`gallery/messages/` 的 conversation、messages |
@@ -68,7 +68,7 @@
 | 回复正文 | `c80ec48f8-*.mjs`、`chat-prose.mjs` | 15/21，段落内缩 4，行尾留白 clamp(0,(100%−384)×.175,56) | 15/1.55 | 复刻 | 截图 | 已对齐：`gallery/messages/` 的 conversation、messages |
 | 回复操作 | 同上 | 最近一条常显，其余悬停显示；复制（勾 1200）等图标按钮 | 文字按钮：复制 Markdown、复制文本、选中本回合 | 复刻为图标按钮；反馈与章节不适用 | 截图 | 已对齐（改造）：只在回合最后一条回复下出现（与参考的回合尾操作一致），悬停或聚焦时显示；`gallery/messages/` |
 | 新回复入场 | 同上 | 透明加 10 px 上移，1.1 s 弹簧 | 无 | 改造：只做 200 ms 淡入与 6 px 上移，避免流式时整块位移 | 录屏 | 已对齐（改造）：生成中的回复与发送中的消息 200 ms 淡入加 6 px 位移，滚动挂载的旧行不动画 |
-| 未送达与发送中 | `shared-2-*.mjs` | 发送中次色脉冲；失败行下 caption 危险色 "Failed to send" 加 "Retry" | 文字状态 | 复刻 | 截图 | 待实现 |
+| 未送达与发送中 | `shared-2-*.mjs` | 发送中次色脉冲；失败行下 caption 危险色 "Failed to send" 加 "Retry" | 文字状态 | 复刻 | 截图 | 已对齐：失败行细线转危险色，下方 caption 原因加 "Resend"；`gallery/shell/messages-*` |
 
 ## 5. Markdown 与代码块
 
@@ -142,10 +142,24 @@
 | 错误卡 | `src/source-turn-error.{jsx,css}` | 最小宽 min(480,100%)，圆角 12，细线环；淡底标题条 12×16 加 16 图标；"View details" 折叠；主按钮在最后 | 文本加按钮 | 复刻 | 截图 | 已对齐：最小宽 min(480,100%)，淡底标题条带 16 px 图标，正文提示，"Details"折叠在左，主按钮"Retry"在右；"结果未知"卡同一结构；`gallery/status/status-*` |
 | 压缩提示 | `c80ec48f8-*.mjs` | 状态行样式（运行中走光），"Compacted conversation" | 两侧细线的居中文字 | 复刻 | 截图 | 已对齐：正文内缩上的次色状态行，压缩中走光；`gallery/status/status-*` |
 | 模式变更 | — | 参考没有对应行 | 次色整行文字 | 改造：按状态行样式设计 | 截图 | 已对齐（改造）：与压缩提示同一种次色状态行；`gallery/status/status-*` |
-| 空会话与加载失败 | `src/source-transcript-states.{jsx,css}`、`generated/session-load-error/*` | 居中，标题 14/20 主色，说明 13/17，主按钮 "Retry" | 绝对定位文字 | 复刻（加载失败加重试） | 截图 | 待实现 |
-| 加载骨架 | 同上 | 气泡条加三段灰条，2 s 呼吸，0.5 s 后淡入 | "加载中"文字 | 复刻 | 截图 | 待实现 |
+| 空会话与加载失败 | `src/source-transcript-states.{jsx,css}`、`generated/session-load-error/*` | 居中，标题 14/20 主色，说明 13/17，主按钮 "Retry" | 绝对定位文字 | 复刻（加载失败加重试） | 截图 | 已对齐：居中标题、说明与 "Retry"（重新读取历史）；`gallery/shell/real-failed.png` |
+| 加载骨架 | 同上 | 气泡条加三段灰条，2 s 呼吸，0.5 s 后淡入 | "加载中"文字 | 复刻 | 截图 | 已对齐：气泡条加三段灰条呼吸，减少动效时静止；`gallery/shell/real-loading.png` |
 | 选中与复制 | `src/source-transcript-selection.jsx` | 选中后浮条 "Start a side chat"、"Reply" | 系统选中 | 不适用：本期不新增会话间交互入口 | — | 不适用 |
 
 ## 统计
 
-尚未开始实现。
+| 节 | 已对齐 | 已对齐（改造） | 不适用 | 合计 |
+|---|---|---|---|---|
+| 1. 基础令牌 | 7 | 1 | 0 | 8 |
+| 2. 标题行 | 2 | 1 | 1 | 4 |
+| 3. 输入区 | 13 | 1 | 2 | 16 |
+| 4. 对话区与消息 | 9 | 2 | 1 | 12 |
+| 5. Markdown 与代码块 | 7 | 1 | 0 | 8 |
+| 6. 思考块 | 2 | 1 | 0 | 3 |
+| 7. 工具行、工具组与 diff | 5 | 4 | 1 | 10 |
+| 8. working 行 | 2 | 3 | 0 | 5 |
+| 9. 审批卡 | 3 | 7 | 0 | 10 |
+| 10. 宿主卡片与状态行 | 4 | 4 | 2 | 10 |
+| 合计 | 54 | 25 | 7 | 86 |
+
+没有"待实现"的行。"改造"多集中在审批卡与宿主卡片：PiArc 的审批语义（规则逐行编辑、沙箱与目录、读完门控、来源标记）比参考多，外壳与层级按参考，内容按 PiArc 的数据。

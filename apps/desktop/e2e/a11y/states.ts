@@ -274,6 +274,16 @@ export const A11Y_STATES = [
     area: 'state',
     note: 'Changes panel of a session that changed nothing',
   },
+  {
+    id: 'state:conversation-loading',
+    area: 'state',
+    note: 'a session whose history is still being read: the placeholder',
+  },
+  {
+    id: 'state:conversation-failed',
+    area: 'state',
+    note: 'a session whose history could not be read: the error with Retry',
+  },
 ] as const satisfies readonly A11yState[];
 
 export type A11yStateId = (typeof A11Y_STATES)[number]['id'];

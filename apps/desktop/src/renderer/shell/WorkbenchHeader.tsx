@@ -20,6 +20,11 @@ function SessionHeading({ id }: { readonly id: string }) {
   const popoverId = useId();
   const [renaming, setRenaming] = useState(false);
   const title = sessionTitle(session?.title, t('session.untitled'));
+  // The tip names the whole title while it is cut off, and the action otherwise.
+  const titleTooltip = (event: { readonly currentTarget: HTMLButtonElement }) => {
+    const button = event.currentTarget;
+    button.dataset.tooltip = button.scrollWidth > button.clientWidth ? title : t('session.rename');
+  };
   return (
     <>
       {session && badgeOf(session) !== 'idle' && <StatusBadge state={badgeOf(session)} />}
@@ -39,7 +44,9 @@ function SessionHeading({ id }: { readonly id: string }) {
             className="workbench-title truncate"
             ref={titleButton}
             aria-label={t('session.rename') + ' · ' + title}
-            title={t('session.rename')}
+            data-tooltip={t('session.rename')}
+            onPointerEnter={titleTooltip}
+            onFocus={titleTooltip}
             onClick={() => {
               setRenaming(true);
             }}

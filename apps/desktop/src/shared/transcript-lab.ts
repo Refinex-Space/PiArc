@@ -19,6 +19,7 @@ export const GALLERY_SECTIONS = [
   'cards',
   'status',
   'working',
+  'input',
   'approval-command',
   'approval-edit',
   'approval-network',
