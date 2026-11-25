@@ -138,7 +138,11 @@
     "line": { "light": "base.black8", "dark": "base.white10", "highContrast": "neutral.11" },
     "inlineCode": "neutral.12",
     "inlineCodeFill": { "light": "neutral.4", "dark": "neutral.6", "highContrast": "neutral.5" },
-    "tooltip": { "light": "neutral.12", "dark": "base.controlDark", "darkHighContrast": "base.black" },
+    "tooltip": {
+      "light": "neutral.12",
+      "dark": "base.controlDark",
+      "darkHighContrast": "base.black"
+    },
     "tooltipInk": { "light": "base.white", "dark": "neutral.12", "darkHighContrast": "base.white" }
   },
   "forcedColors": {
