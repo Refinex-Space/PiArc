@@ -2436,14 +2436,23 @@
   border: 0;
 }
 
-/* Each question is the quiet strip at the top of its options. */
+/* Each question is the quiet strip at the top of its options. The card's hairline is an inset
+   shadow that a child's background would paint over: the strip stays 1px inside it, and at the
+   top of the card it follows the card's corners. */
 .question-card legend {
   float: left;
   box-sizing: border-box;
-  width: 100%;
+  width: calc(100% - 2px);
+  margin: 0 1px;
   padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
   background: var(--piarc-session-fill);
   color: var(--piarc-text-primary);
+}
+
+.approval-strip + fieldset.question > legend {
+  margin-top: 1px;
+  border-radius: calc(var(--piarc-session-radius-card) - 1px)
+    calc(var(--piarc-session-radius-card) - 1px) 0 0;
 }
 
 .approval-box.is-question > .approval-strip {
