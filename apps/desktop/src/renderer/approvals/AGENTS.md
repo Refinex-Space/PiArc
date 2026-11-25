@@ -4,6 +4,7 @@
 
 ## 不变量
 
+- 工具审批卡、计划卡、提问表单与 MCP 表单共用 `.approval-box` 外壳（透明行内的细线卡片，宽 `session.approvalWidth`）：一句话标题、淡底参数块、右对齐的决策区，主按钮带键帽（`aria-hidden`，快捷键另由 `aria-keyshortcuts` 声明）；焦点环画在外壳上，不画在透明的行上。
 - 所有审批卡共用 `use-approval-keys.ts`：只有首个与滚动窗口相交的卡响应 Mod+Enter、Mod+Shift+Enter、Esc，出现后 400 ms 内与输入法合成期间不响应，Esc 要求卡片有焦点或 composer 为空。计划卡映射为批准并自动接受编辑、批准并手动审批、继续规划；提问表单映射为提交、不回答（Mod+Shift+Enter 被吞掉不作答）。
 - 答复经 `answer.ts` 发给 Core，名字是卡片的 `requestId`、`revision`、`connectionEpoch`；`stale`、`alreadyHandled` 时请 Core 重发快照，卡片只由新快照移除。
 - 计划批准只发 `allowOnce` 加 `mode`（`acceptEdits` 或 `default`）；继续规划发 `deny` 加反馈与 `comments`。提问表单每题必须有选项或自由回答才能提交。

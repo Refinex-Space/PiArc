@@ -11,4 +11,5 @@ ProseMirror 处理编辑、候选面板和键盘意图。新会话与正式会�
 - 当前会话的模型能力由 `sessionModels` 返回。拖放、粘贴和文件选择都在 `checkFiles` 按 `vision` 检查。草稿已有图片时，发送前再按当前模型检查并保留被拒的草稿。Agent Host 在送到模型前也检查图片，以覆盖会话切换与已排队的输入。
 - pi-ai 1.5.2 的 `UserMessage.content` 支持文本或图像块。图片作为图像块送给模型，PDF 由 Agent Host 通过 `fs/pdf` 请求 Core 提取前 20 页以内的文本。原文件留在会话附件目录，后续页由 Read 按页读取。归档保留附件，删除会话才移除。
 - 合成期间的 `isComposing`、键码 229 和 `view.composing` 都经过输入法守卫。按键在 `handleDOMEvents.keydown` 层处理，让 Enter/Esc 留给候选框，合成文本中的 `/`、`@` 保持普通输入。
+- 运行中草稿为空时发送位显示停止，有草稿时显示发送；两者互换后 `SWAP_GUARD_MS`（500 ms）内落在新按钮上的点击被忽略，防止连点把刚写的消息当成停止。运行中的占位文字说明 Enter 插话、Mod+Enter 排队。会话提示（`shell/NoticeBar.tsx`）在输入卡片上方。
 - 运行中 Enter 为 steer，Mod+Enter 为 follow-up，Esc 停止。排队项以 `session/queueChanged` 为准。编辑已排队的文本会清除原提及区间并保留附件。

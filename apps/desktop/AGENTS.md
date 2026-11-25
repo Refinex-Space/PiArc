@@ -28,6 +28,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 | `npx vite build -c apps/desktop/vite.renderer.config.ts` | 只重建渲染进程的 `.vite/renderer/`（在 `apps/desktop` 下运行）：只改了 `src/renderer/` 时，`dev` 形态 L4 不必重新打包 |
 | `PIARC_EVIDENCE_TASK=T18 npx playwright test t18- --project dev` | T18 的 L4 流程（会话、信任、设置与快捷键、语言、通知、评审截图），mock provider 的脚本在 `e2e/scenarios/` |
 | `PIARC_EVIDENCE_TASK=W1 npm run test:e2e -w @piarc/desktop -- w1-windows-shells` | Windows：Git Bash 与 PowerShell 两个工具、Manual 下询问、中文输出；隐藏 Git 后只剩 PowerShell 并显示安装提示（夹具选项 `appEnv` 覆盖应用的环境变量） |
+| `PIARC_EVIDENCE_TASK=session-pane npx playwright test -c apps/desktop/playwright.config.ts session-pane --project dev` | 会话主块的评审截图（ADR-0078）：会话画廊每一节的亮暗、两档密度、中英文，加窄窗、减少动效、强制颜色与菜单、提示、展开态，再加真实会话的整窗、标题提示、历史读取中与失败（`PIARC_GALLERY_LABEL` 选子目录，`PIARC_GALLERY_SECTIONS`、`PIARC_GALLERY_QUICK=1` 缩小范围）；每个状态检查横向溢出 |
 | `npm run bench:t18`、`npm run bench:t19` | 冷启动到侧栏（100 个会话）就绪的 10 次测量（打包产物，`tmp/evidence/T18/bench/`）；在前台测开发打包产物的真实会话（本地 mock provider，`tmp/evidence/T19/bench/`） |
 
 ## 结构
@@ -36,6 +37,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 安全基线（架构第 10.3 节）的实现位置与逐条对照见 `docs/spikes/S10-electron-security.md` 第 3 节；`src/main/security/` 与 `src/main/ipc/` 是入口。
 - Core 只在 `src/main/core/` 加载与转发（ADR-0014）：`.node` 路径的唯一解析处是 `native-path.ts`；`router.ts` 按路由键转发事件批次；`terminal-ipc.ts` 管终端归属；`test-hooks.ts` 只在加载开发版 Core 时安装。`native/*.d.ts` 是 NAPI-RS 生成的 L1 快照，不手改。
 - 渲染进程：transcript 在 `src/renderer/transcript/`（常量只在 `constants.ts`），Worker 在 `src/renderer/workers/`（ES module，受同一 CSP 约束），composer 在 `src/renderer/composer/`，终端在 `src/renderer/terminal/`（`vendor/ghostty-web/` 是 fork 的 MIT 代码，改动清单在其 README）。消息形状与守卫在各目录的 `protocol.ts`。
+- 会话画廊 `#/session-gallery?section=<名称>`（`lab/SessionGallery.tsx`，分区与夹具在 `shared/transcript-lab.ts` 的 `GALLERY_SECTIONS` 与 `lab/fixtures/gallery.ts`）用正式的行组件、审批卡与 composer 渲染固定状态，只给评审截图用，和下面的原型页一样只在开发构建里。
 - 原型页 `#/event-probe`、`#/transcript-lab`、`#/terminal-lab` 经 `globalThis.__piarc*` 给 L4 与基准用（类型在 `src/shared/`），只在开发构建里（`renderer/test-pages.tsx`，T45 起发布构建不带；终端原型页只能接测试钩子创建的终端）。
 - 正式会话与原型共用 transcript 和 composer。行类型、历史窗口与滚动参数见 [transcript/AGENTS.md](src/renderer/transcript/AGENTS.md)，提及、附件与键盘约定见 [composer/AGENTS.md](src/renderer/composer/AGENTS.md)。
 - 窗口（T18，ADR-0029）：主窗口的根是 `src/renderer/shell/Shell.tsx`（侧栏、主区、注册式右栏与面板区、对话框、提醒），设置是同一工作台内 `#/settings` 的原生模态面板（ADR-0074，`src/renderer/settings/SettingsModal.tsx`、`SettingsApp.tsx`）；两者共用 `src/renderer/app/app-context.tsx`（平台、偏好、翻译）与 `app.css`（只读令牌；元素级规则写在 `:root[data-app]` 之下，`main.tsx` 只给工作台设 `data-app`，原型页不受影响）。主进程的窗口、菜单、偏好、通知在 `src/main/app-shell.ts`、`menu.ts`、`preferences.ts`、`platform/attention.ts`、`platform/window-chrome.ts`；会话、工作区与信任命令在 `src/main/core/session-ipc.ts`。
@@ -85,6 +87,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 滚动跟随只认用户输入（滚轮、触摸、键盘、按住滚动条）引起的滚动；行或虚拟列表提交后在布局阶段对齐底部，尺寸变化再经 ResizeObserver 对齐。阈值只改 `transcript/constants.ts`。
 - 设置的操作按钮使用 `src/renderer/app/Button.tsx`，普通操作为 secondary，提交为 primary，低优先级操作为 ghost，删除或丢弃为 destructive。按钮表面与键盘焦点共用 `app.css` 的按钮规则。为正在运行的动作传 `loading` 并保留原标签以稳定尺寸；其他操作占用资源时传 `disabled`。原生提交按钮显式传 `type="submit"`。
 - 分段切换统一使用 `src/renderer/app/SegmentedControl.tsx`。调用方提供选项、当前值、可访问名称和保存回调；原生单选与 fieldset 负责方向键和禁用。轨道与当前选项尺寸随 `design/tokens/` 的密度令牌变化。其视觉基准是 ADR-0073 指定版本的设置页 Default transcript view。
+- 图标只经 `shell/icons.tsx`：线框图标都是 lucide-react 的字形，由同一个 `glyph()` 固定尺寸与线宽（12/16/20，1/1.25，`nonScalingStroke`）；只有 Lucide 没有的实心形状在这里自绘（侧栏标记、项目展开三角、停止方块、完成圆、转圈、步骤箭头）；不手绘线框图标，不引入第二套图标。工具栏的提示走委托式 `app/Tooltip.tsx`（元素上写 `data-tooltip`、可选 `data-tooltip-keys`），图标按钮用 `app/IconButton.tsx`（`label` 是可访问名称与提示，`keys` 显示键帽并写 `aria-keyshortcuts`，`size` 为 xs/sm/md），不用原生 `title`。会话主块的尺寸、字阶与淡底、细线来自 `session.*` 令牌，共用规则在 `renderer/session.css`（ADR-0078）。
 - 组件只读语义令牌与组件令牌（`var(--piarc-…)`，或 TS 的 `tokenVar`），不写颜色字面量；改视觉方向只改 `design/tokens/` 再 `npm run gen:tokens`。主题、对比度、密度、减少动效经 `<html>` 的 `data-color-mode`、`data-density`、`data-reduce-motion` 切换（`app/appearance.ts`），组件不读这些属性。
 - store（`src/renderer/store/`）：业务状态只来自 Core 的事件；组件用 `hooks.ts` 的细粒度订阅（列表、单个会话条目、单行），不要订阅整个 store；快照按 `revision` 门控；乐观行以 `clientId` 对账，Core 未确认时显示未送达，重发复用原键。"需要处理"的定义与徽标优先级只在 `store/status.ts`。
 - 窗口是否在前台以主进程的应用事件为准（`app/window-focus.ts`），不要用 `document.hasFocus()`：自动化下它恒为真。

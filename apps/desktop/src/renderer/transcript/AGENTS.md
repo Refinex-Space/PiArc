@@ -18,6 +18,7 @@
 | 子 agent 卡（T31） | `rows/subagent.tsx`：`subagent` 条目的 `subagent`（`SubagentState`，由 `subagent/*` 通知经 `SessionTranscript.onSubagent` 保持最新）给出任务名、类型、颜色、实际模型、状态、耗时、工具调用数、token、后台标记与警告；运行中显示当前活动与停止（`actions.stopSubagent`）。展开后 `ChildTranscript` 经 `actions.subagentTranscript` 读子会话的历史窗口，用同样的行组件只读显示（新的 `SessionTranscript`，不提供重试与回退），状态或工具调用数变化时重新读取。子 agent 条目不进工具组。 |
 | 宿主工具（T26） | `rows/harness.tsx`：`TodoWrite` 是任务卡（从参数读清单，Claude Code 的 `in_progress` 换成 `inProgress`），`ExitPlanMode` 是计划卡（状态取条目状态），`AskUserQuestion` 列出结果首行之后的 JSON，`SuggestNextSteps` 是下一步建议（"在此执行"经 `SessionInput`，运行中为 follow-up；"开始新会话"走 `startSession`；没有窗口外壳的原型页不显示按钮）。这四个工具不进工具组（`store/transcript.ts` 的 `OWN_ROW_TOOLS`）。 |
 
+- 思考块、工具与工具组、Bash、文件改动、网页搜索共用 `rows/parts.tsx` 的 `StepRow`（次色动词、主色对象、尾段与结果词、末尾箭头、运行中走光、常显说明行），增删胶囊与复制按钮也在这里；新的工具行先用它，不另写标题行。working 行的活动标记是 PiArc 自己的 `rows/ActivityMark.tsx`。回复的复制与选中本回合只出现在回合的最后一条回复上（`services.ts` 的 `useEndsTurn`，按布尔值订阅，流式期间不触发额外渲染）。
 - 行只订阅自己的 ID，工具组额外订阅成员。行级错误边界把单条渲染失败限制在该行。会话页与新建页另由主区的页面边界保护，切换页面后重新挂载，侧栏仍可导航。显示模型文本、命令输出或路径一律用文本节点。
 - Pi 历史 entry id 只在所属会话内唯一。窗口共享的 Markdown 结果、流式进度、行高与展开状态使用 `SessionTranscript.cacheKey(id)` 隔离各会话。
 - 初次打开读最近 1,000 个 item，向上滚到距顶部 400 px 内再加载一页。重同步用整段历史窗口替换已确认的行，因为同一文本块的历史 ID 与实时 ID 可能不同。
