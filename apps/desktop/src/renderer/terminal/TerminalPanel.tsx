@@ -371,7 +371,7 @@ export function TerminalPanel({ sessionId }: { readonly sessionId: string }) {
                   },
                 ]}
               >
-                <MoreIcon dot={0.7} />
+                <MoreIcon />
               </MenuButton>
             </div>
           )}

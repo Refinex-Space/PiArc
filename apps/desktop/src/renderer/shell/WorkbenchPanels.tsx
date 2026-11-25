@@ -288,7 +288,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
           menu.openAt(b.left, b.bottom + 4);
         }}
       >
-        <MoreIcon dot={0.7} />
+        <MoreIcon />
       </IconButton>
       {menu.open && (
         <MenuPopup at={menu.open} items={items} label={t('panels.tools')} onClose={menu.close} />

@@ -890,7 +890,7 @@ export function Composer({
             add.openAbove(event.currentTarget);
           }}
         >
-          <PlusIcon strokeWidth={1.25} />
+          <PlusIcon />
         </IconButton>
         <input
           ref={fileInput}

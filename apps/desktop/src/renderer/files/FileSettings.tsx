@@ -98,7 +98,7 @@ export function FileSettings({
           menu.openAt(r.left, r.bottom, e.currentTarget);
         }}
       >
-        <MoreIcon dot={0.7} />
+        <MoreIcon />
       </IconButton>
       {menu.open && (
         <MenuPopup label={t('files.settings')} at={menu.open} items={items} onClose={menu.close} />

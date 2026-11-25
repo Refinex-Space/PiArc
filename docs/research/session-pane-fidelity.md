@@ -21,7 +21,7 @@
 | 层级色 | 同上（fizzy color） | 主 90%、次 60%、淡 47% 黑；淡底 5%、悬停 10%、细线 8%（暗色 5%、10%、4%） | 有主、次、禁用文字与不透明边框 | 新增淡底、淡底悬停、细线三个语义令牌 | 对比度检查与 axe | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
 | 动效 | 同上 | fast 60，snap 120（cubic-bezier(.32,.72,0,1)），base 200，slow 450；ease-out cubic-bezier(.165,.84,.44,1)；按下缩放 .975 | `motion.surface` 60、`fast` 120、`normal` 200，一条曲线 | 新增 snap 与 ease-out 曲线、显隐延迟 100 | 画廊录屏逐帧 | 已对齐：`design/tokens/` 的 `session.*` 与 motion 令牌，令牌检查 292/292 对比度通过；用法见各节截图 |
 | 焦点 | 同上（`--cds-focus-shadow`） | 1 px 强调色外圈加 6 px 柔光；行级为内嵌 1 px 强调色 | 全局 `border.focus` 描边 | 改造：沿用 PiArc 焦点色，行级用内嵌 1 px | 键盘走查截图 | 已对齐（改造）：全局焦点环不变；步骤行、标题按钮用内嵌 1 px 焦点色，审批卡用 1 px 外圈 |
-| 图标 | `src/generated/cds-core/shared-frame.mjs` | 图标字体，xs 12（线宽 1）、sm 16（1.25）、md 20（1.25） | 自绘 16 px 线框图标 | 改造：Lucide 经 `shell/icons.tsx` 统一出口，固定线宽 | 截图 | 已对齐：lucide-react 1.66.0 经 `shell/icons.tsx` 的 `glyph()`，12/16/20 与线宽 1/1.25 |
+| 图标 | `src/generated/cds-core/shared-frame.mjs` | 图标字体，xs 12（线宽 1）、sm 16（1.25）、md 20（1.25） | 自绘 16 px 线框图标 | 改造：Lucide 经 `shell/icons.tsx` 统一出口，固定线宽 | 截图 | 已对齐：全应用的线框图标都是 lucide-react 1.66.0，经 `shell/icons.tsx` 的 `glyph()`，12/16/20 与线宽 1/1.25；只有 Lucide 没有的实心形状自绘 |
 
 ## 2. 标题行
 

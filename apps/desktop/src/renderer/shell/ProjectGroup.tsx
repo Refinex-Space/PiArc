@@ -150,14 +150,14 @@ export function ProjectGroup({
             menu.openAt(rect.left, rect.bottom);
           }}
         >
-          <MoreIcon dot={0.75} />
+          <MoreIcon />
         </IconButton>
         <IconButton
           label={t('workspace.newSession', { name: group.name })}
           onClick={start}
           data-testid="project-new"
         >
-          <PlusIcon strokeWidth={1.15} />
+          <PlusIcon />
         </IconButton>
       </header>
       <div id={listId} hidden={!expanded}>
