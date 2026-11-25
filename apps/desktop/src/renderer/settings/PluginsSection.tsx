@@ -15,6 +15,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { ManagedBadge, pointerToken, useIsManaged } from './managed.js';
 import { Button } from '../app/Button.js';
+import { reason } from '../shell/errors.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -399,7 +400,7 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
         setError('');
       })
       .catch((e: unknown) => {
-        setError(t('plugins.failed', { reason: e instanceof Error ? e.message : String(e) }));
+        setError(t('plugins.failed', { reason: reason(e) }));
       });
   }, [workspace, t]);
   useEffect(load, [load]);
@@ -438,7 +439,7 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
           }
         })
         .catch((e: unknown) => {
-          setStatus(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+          setStatus(`${label}: ${reason(e)}`);
         })
         .finally(() => {
           setOperation(undefined);

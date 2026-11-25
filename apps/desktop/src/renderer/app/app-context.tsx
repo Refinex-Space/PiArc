@@ -13,6 +13,7 @@ import {
 import { keyPlatformOf, type KeyPlatform } from '../../shared/keybindings.js';
 import type { Preferences } from '../../shared/preferences.js';
 import { applyAppearance } from './appearance.js';
+import { setErrorLocale } from './error-text.js';
 import { setWindowFocused } from './window-focus.js';
 import { setWindowVisible } from './window-visibility.js';
 
@@ -119,6 +120,9 @@ export function AppProvider({
   }, [state.locale]);
   const value = useMemo<AppContextValue>(() => {
     const translator = new Translator(state.locale);
+    // Failed calls describe themselves outside React (`shell/errors.ts`); set before the
+    // children render, so even a first render reads errors in the window's language.
+    setErrorLocale(state.locale);
     return {
       platform: initial.platform,
       keyPlatform: keyPlatformOf(initial.platform),

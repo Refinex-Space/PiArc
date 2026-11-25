@@ -10,6 +10,7 @@ import { parseWorkspaces } from './AgentsPage.js';
 import { ManagedBadge, useManaged } from './managed.js';
 import { takeMemoryTarget } from './memory-target.js';
 import { Button } from '../app/Button.js';
+import { reason } from '../shell/errors.js';
 
 const TYPES = ['user', 'feedback', 'project', 'reference'] as const;
 type MemoryType = (typeof TYPES)[number];
@@ -279,7 +280,7 @@ export function MemoryPage() {
   const [target] = useState(takeMemoryTarget);
   const filterId = useId();
   const fail = useCallback((e: unknown) => {
-    setError(e instanceof Error ? e.message : String(e));
+    setError(reason(e));
   }, []);
   useEffect(() => {
     window.piarc

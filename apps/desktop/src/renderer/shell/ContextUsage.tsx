@@ -8,6 +8,7 @@ import { useApp, useT } from '../app/app-context.js';
 import { CATEGORY_ORDER, levelOf, percentOf } from '../store/context-usage.js';
 import { useContextUsage, useTurnInfo } from '../store/hooks.js';
 import { showPanel } from './registry.js';
+import { reason } from './errors.js';
 
 /** Ring geometry (SVG user units). */
 const SIZE = 14;
@@ -191,7 +192,7 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
         onClick={() => {
           setFailure(undefined);
           window.piarc.compact(sessionId).catch((error: unknown) => {
-            setFailure(error instanceof Error ? error.message : String(error));
+            setFailure(reason(error));
           });
         }}
       >

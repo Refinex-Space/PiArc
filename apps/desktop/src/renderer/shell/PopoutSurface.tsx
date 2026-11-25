@@ -15,6 +15,7 @@ import { SurfaceDocument } from '../app/surface-document.js';
 import { TooltipLayer } from '../app/Tooltip.js';
 import { PinIcon } from './icons.js';
 import { useUi } from './ui.js';
+import { reason } from './errors.js';
 
 interface NativeTool {
   readonly ticket: string;
@@ -127,7 +128,7 @@ export function PopoutSurface({
       callbacks.current.ui.addToast({
         sessionId,
         text: callbacks.current.t('tiles.popoutFailed', {
-          reason: failure instanceof Error ? failure.message : String(failure),
+          reason: reason(failure),
         }),
       });
     },

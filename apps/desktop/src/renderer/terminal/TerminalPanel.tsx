@@ -40,6 +40,7 @@ import {
 } from './panel-state.js';
 import { scrollFor, step } from './search.js';
 import { TerminalSurface, type SurfaceHandlers } from './TerminalSurface.js';
+import { reason as message } from '../shell/errors.js';
 
 function tabsOf(tasks: readonly BackgroundTask[], sessionId: string): Tab[] {
   return tasks
@@ -93,10 +94,6 @@ function useTitles(tabs: readonly Tab[]): Readonly<Record<number, string>> {
 /** The program's title, or `fallback` when it set none. */
 function titleOr(title: string | undefined, fallback: string): string {
   return title === undefined || title === '' ? fallback : title;
-}
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function TerminalPanel({ sessionId }: { readonly sessionId: string }) {

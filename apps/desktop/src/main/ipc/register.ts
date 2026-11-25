@@ -1,7 +1,9 @@
 // The only place that calls `ipcMain.handle` (enforced by ESLint). Every handler is wrapped
-// so that a request from an untrusted frame is rejected and logged before the handler runs.
+// so that a request from an untrusted frame is rejected and logged before the handler runs, and
+// so that a Core error keeps its kind on the way to the page (`page-errors.ts`).
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 
+import { answer } from './page-errors.js';
 import { isTrustedSender } from './sender.js';
 
 /** A command handler. `args` come from the renderer and must be validated by the handler. */
@@ -16,7 +18,7 @@ export function createIpcRegistrar(trustedOrigins: readonly string[]) {
         console.warn(`[ipc] rejected ${channel} from ${frame?.origin ?? '<no frame>'}`);
         throw new Error(`IPC request ${channel} rejected: untrusted sender`);
       }
-      return handler(event, args);
+      return answer(() => handler(event, args));
     });
   };
 }

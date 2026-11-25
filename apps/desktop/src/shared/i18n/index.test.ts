@@ -129,6 +129,7 @@ describe('i18n', () => {
             panel: 'Terminal',
             number: 1,
             position: 2,
+            detail: 'the Agent Host stopped',
           }),
         ).not.toThrow();
       }

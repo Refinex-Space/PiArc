@@ -10,6 +10,7 @@ import { parseWorkspaces } from '../settings/AgentsPage.js';
 import { Cost, TokenList, purposeLabel } from './UsageViews.js';
 import { parseUsageReport, totalTokens } from './usage.js';
 import { Button } from '../app/Button.js';
+import { reason } from '../shell/errors.js';
 
 const RATES = ['input', 'output', 'cacheRead', 'cacheWrite'] as const;
 type Rate = (typeof RATES)[number];
@@ -54,7 +55,7 @@ function PriceEditor({
       .setModelPrice(model.provider, model.model, rates)
       .then(onDone)
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(reason(e));
       });
   };
   return (
@@ -345,7 +346,7 @@ export function UsagePage() {
         setReport(parseUsageReport(raw));
       })
       .catch((e: unknown) => {
-        setError(t('usage.failed', { reason: e instanceof Error ? e.message : String(e) }));
+        setError(t('usage.failed', { reason: reason(e) }));
       });
   }, [chosen, t]);
   useEffect(load, [load]);

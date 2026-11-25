@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cancelProjectSearch, searchProjectFiles, type ProjectMatch } from './api.js';
+import { reason } from '../shell/errors.js';
 
 export interface SearchOptions {
   readonly matchCase: boolean;
@@ -58,7 +59,7 @@ export function useProjectSearch(
               result: {
                 ...EMPTY,
                 phase: 'error',
-                error: error instanceof Error ? error.message : String(error),
+                error: reason(error),
               },
             });
         },

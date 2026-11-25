@@ -17,6 +17,7 @@ import { AutoReviewSection } from './AutoReviewSection.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { revealBidi } from '../transcript/reveal.js';
 import { Button } from '../app/Button.js';
+import { reason } from '../shell/errors.js';
 
 const BEHAVIORS: readonly RuleBehavior[] = ['deny', 'ask', 'allow'];
 
@@ -510,7 +511,7 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
         setRows(parseAudit(raw));
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(reason(e));
       });
   }, [workspace, kind, session, tool, conclusion, since]);
   useEffect(load, [load]);
@@ -719,7 +720,7 @@ export function PermissionsPage() {
   const workspaceId = useId();
   const managedBypass = useIsManaged('/permissions/enableBypassPermissions');
   const report = (e: unknown) => {
-    setError(e instanceof Error ? e.message : String(e));
+    setError(reason(e));
   };
   const show = (raw: string) => {
     setError('');

@@ -3,6 +3,7 @@ import { isProjectPath } from '../../shared/project-files.js';
 import { listProjectFiles } from './api.js';
 import { parentPath } from './file-path.js';
 import type { FolderPage } from './tree-model.js';
+import { reason } from '../shell/errors.js';
 
 export interface TreeReveal {
   readonly path: string;
@@ -50,7 +51,7 @@ export function useDirectories(sessionId: string, revision: number) {
           (error: unknown): FolderPage => ({
             entries: [],
             truncated: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: reason(error),
           }),
         )
         .then((page) => {

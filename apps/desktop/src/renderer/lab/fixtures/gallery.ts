@@ -5,6 +5,7 @@
 import type { ApprovalRequest, Item } from '@piarc/protocol';
 
 import type { QueuedInput } from '../../store/transcript.js';
+import { encodeIpcError } from '../../../shared/ipc-error.js';
 
 /** A Core session notification, as the session store reads it. */
 export interface GalleryNote {
@@ -19,7 +20,8 @@ export interface GallerySection {
   /** The composer shows a running turn. */
   readonly running?: boolean;
   /** A message the user sent that did not reach Core, with the reason. */
-  readonly undelivered?: { readonly text: string; readonly reason: string };
+  /** An input Core did not accept, with the error the call failed with. */
+  readonly undelivered?: { readonly text: string; readonly failure: Error };
   /** Inputs waiting above the composer. */
   readonly queue?: readonly QueuedInput[];
   /** The input's own states: a draft with a mention and attachments, notices, the usage levels. */
@@ -271,7 +273,10 @@ function messages(): GallerySection {
       ...done('t2', reply('a2', 'Thanks — the log shows the retry loop starting at line 9.')),
       ended('t2'),
     ],
-    undelivered: { text: 'Also check the retry delay.', reason: 'the app is offline' },
+    undelivered: {
+      text: 'Also check the retry delay.',
+      failure: new Error(encodeIpcError('timeout', 'session/prompt timed out after 30 s')),
+    },
   };
 }
 

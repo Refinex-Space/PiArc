@@ -51,7 +51,7 @@ function useSave(): { save: (change: PreferenceChange) => void; error: string | 
       window.piarc.setPreference(change).catch((failure: unknown) => {
         setError(
           t('settings.saveFailed', {
-            reason: failure instanceof Error ? failure.message : String(failure),
+            reason: reason(failure),
           }),
         );
       });

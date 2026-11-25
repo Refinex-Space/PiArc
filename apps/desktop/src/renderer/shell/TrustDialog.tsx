@@ -8,6 +8,7 @@ import { isMessageId } from '../../shared/i18n/index.js';
 import { useT } from '../app/app-context.js';
 import { Dialog } from './Dialog.js';
 import { baseName, type TrustMode } from './ui.js';
+import { reason } from './errors.js';
 
 interface TrustItem {
   readonly category: string;
@@ -123,7 +124,7 @@ export function TrustDialog({
       },
       (error: unknown) => {
         if (active) {
-          setView({ failed: error instanceof Error ? error.message : String(error) });
+          setView({ failed: reason(error) });
         }
       },
     );
@@ -152,7 +153,7 @@ export function TrustDialog({
       },
       (error: unknown) => {
         setBusy(false);
-        setView({ failed: error instanceof Error ? error.message : String(error) });
+        setView({ failed: reason(error) });
       },
     );
   };

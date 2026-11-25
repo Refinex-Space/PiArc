@@ -14,6 +14,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { DiagnosticBundleSection } from './DiagnosticBundleSection.js';
 import { Button } from '../app/Button.js';
+import { reason } from '../shell/errors.js';
 
 const STATUSES = [
   'loaded',
@@ -542,7 +543,7 @@ export function ConfigDiagnosticsPage() {
         });
     };
     function reportError(e: unknown) {
-      if (active) setError(e instanceof Error ? e.message : String(e));
+      if (active) setError(reason(e));
     }
 
     refresh.current = load;

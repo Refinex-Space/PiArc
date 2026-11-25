@@ -20,6 +20,7 @@ import {
 import { Transcript } from '../transcript/Transcript.js';
 import { gallerySection } from './fixtures/gallery.js';
 import { TooltipLayer } from '../app/Tooltip.js';
+import { reason } from '../shell/errors.js';
 import { AppStore } from '../store/app-store.js';
 import { StoreContext } from '../store/hooks.js';
 import { composerSchema } from '../composer/schema.js';
@@ -192,7 +193,7 @@ export function SessionGallery() {
         mentions: [],
         attachments: [],
       });
-      created.markUndelivered('gallery-1', section.undelivered.reason);
+      created.markUndelivered('gallery-1', reason(section.undelivered.failure));
     }
     return created;
   });

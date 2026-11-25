@@ -14,6 +14,7 @@ import { styleDescription } from '../shell/OutputStyleDialog.js';
 import { parseWorkspaces } from './AgentsPage.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { PluginsSection } from './PluginsSection.js';
+import { reason } from '../shell/errors.js';
 
 interface SkillsView {
   readonly skills: readonly SkillInfo[];
@@ -134,7 +135,7 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
         setList(parseCommandsList(raw));
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(reason(e));
       });
   }, [workspace]);
   useEffect(load, [load]);
@@ -169,7 +170,7 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
               load();
             })
             .catch((failure: unknown) => {
-              setError(failure instanceof Error ? failure.message : String(failure));
+              setError(reason(failure));
             });
         }}
       >
@@ -205,7 +206,7 @@ export function SkillsPage() {
         setChosen((current) => current ?? known.workspace);
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(reason(e));
       });
   }, []);
   const load = useCallback(() => {
@@ -218,7 +219,7 @@ export function SkillsPage() {
         setView(parseSkills(raw));
       })
       .catch((e: unknown) => {
-        setError(t('skills.failed', { reason: e instanceof Error ? e.message : String(e) }));
+        setError(t('skills.failed', { reason: reason(e) }));
       });
   }, [chosen, t]);
   useEffect(load, [load]);

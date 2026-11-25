@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 
 import { useApp } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
+import { reason } from '../shell/errors.js';
 
 interface AgentsView {
   readonly agents: readonly AgentDefinition[];
@@ -145,7 +146,7 @@ export function AgentsPage() {
         setChosen((current) => current ?? known.workspace);
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(reason(e));
       });
   }, []);
   const load = useCallback(() => {
@@ -158,7 +159,7 @@ export function AgentsPage() {
         setView(parseAgents(raw));
       })
       .catch((e: unknown) => {
-        setError(t('agents.failed', { reason: e instanceof Error ? e.message : String(e) }));
+        setError(t('agents.failed', { reason: reason(e) }));
       });
   }, [chosen, t]);
   useEffect(load, [load]);

@@ -3,6 +3,7 @@
 // wrote it. The Changes panel and the rail's changes card read it; it is fetched when shown,
 // after each turn and after a discard, a rewind or a branch change.
 import type { ChangesFile, ChangesView, DiffHunk, DiffLine } from '@piarc/protocol';
+import { reason } from '../shell/errors.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -124,7 +125,7 @@ export class SessionChanges {
           this.set({
             ...this.snapshot,
             loading: false,
-            failure: error instanceof Error ? error.message : String(error),
+            failure: reason(error),
           });
         }
       },

@@ -19,6 +19,7 @@ import {
   type Side,
 } from './comments.js';
 import { Button } from '../app/Button.js';
+import { reason } from '../shell/errors.js';
 
 /** A comment being written or edited. */
 export interface CommentDraft {
@@ -171,7 +172,7 @@ export function useDiffCommentsState(
         const sent = new Set(live.map((c) => c.id));
         setComments((current) => current.filter((c) => !sent.has(c.id)));
       } catch (error) {
-        setFailure(error instanceof Error ? error.message : String(error));
+        setFailure(reason(error));
       } finally {
         setSending(false);
       }

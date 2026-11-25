@@ -26,6 +26,7 @@ import { useProjectSearch, DEFAULT_SEARCH, type SearchOptions } from './tree-sea
 import { searchRows, selectRow, treeRows, type TreeRow, type TreeSelection } from './tree-model.js';
 import { ProjectTreeRow } from './tree-row.js';
 import { listProjectFiles } from './api.js';
+import { reason } from '../shell/errors.js';
 
 export interface TreeOpenOptions {
   readonly pinned?: boolean;
@@ -283,7 +284,7 @@ function TreeBrowser({
         (error: unknown) => {
           actions.onError?.(
             t('files.tree.inspectFailed', {
-              reason: error instanceof Error ? error.message : String(error),
+              reason: reason(error),
             }),
           );
           return null;

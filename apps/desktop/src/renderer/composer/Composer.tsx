@@ -67,6 +67,7 @@ import {
 } from './mention-plugin.js';
 import { composerSchema, type MentionData, type SnippetData } from './schema.js';
 import { isBlank, serializeDoc, type ComposerPayload } from './serialize.js';
+import { failureKind } from '../shell/errors.js';
 
 /** What the composer hands over on Enter / Mod+Enter. */
 export interface ComposerSubmission extends ComposerPayload {
@@ -617,7 +618,8 @@ export function Composer({
         }
       },
       (failure: unknown) => {
-        if (current && !(failure instanceof Error && failure.message.includes('cancelled'))) {
+        // A newer search replaced this one: Core ends it as `cancelled`.
+        if (current && failureKind(failure) !== 'cancelled') {
           console.error('[composer] the file search failed', failure);
         }
       },

@@ -19,6 +19,7 @@ import { IconButton } from '../app/IconButton.js';
 import { StopIcon } from './icons.js';
 import { Button } from '../app/Button.js';
 import { showPanel } from './registry.js';
+import { reason as failureText } from './errors.js';
 
 /** Bytes one read asks for (Core's chunk size). */
 const CHUNK = 64 * 1024;
@@ -70,7 +71,7 @@ function StopButton({ task }: { readonly task: BackgroundTask }) {
     window.piarc
       .stopTask(task.taskId)
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : String(reason));
+        setError(failureText(reason));
       })
       .finally(() => {
         setStopping(false);
@@ -245,7 +246,7 @@ function TaskOutput({ task }: { readonly task: BackgroundTask }) {
           setError(undefined);
         })
         .catch((reason: unknown) => {
-          setError(reason instanceof Error ? reason.message : String(reason));
+          setError(failureText(reason));
         })
         .finally(() => {
           reading.current = false;
@@ -284,7 +285,7 @@ function TaskOutput({ task }: { readonly task: BackgroundTask }) {
         );
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : String(reason));
+        setError(failureText(reason));
       });
   };
   return (

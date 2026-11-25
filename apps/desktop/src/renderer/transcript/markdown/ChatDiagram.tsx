@@ -25,6 +25,7 @@ import { useRowCommitted } from '../rows/list-actions.js';
 import { COPIED_MS, CopyIconButton } from '../rows/parts.js';
 import { useTranscriptView } from '../services.js';
 import { useDarkScheme } from '../use-color-scheme.js';
+import { reason } from '../../shell/errors.js';
 
 /** A drawn image or the reason it could not be drawn, for one source and theme. */
 interface Drawn {
@@ -65,10 +66,6 @@ async function pngBytes(
   });
   if (blob === null) throw new Error('Could not encode the image');
   return new Uint8Array(await blob.arrayBuffer());
-}
-
-function reason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export const ChatDiagram = memo(function ChatDiagram({

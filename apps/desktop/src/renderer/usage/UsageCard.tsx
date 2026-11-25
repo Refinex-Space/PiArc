@@ -8,6 +8,7 @@ import { useApp } from '../app/app-context.js';
 import { useTurnInfo } from '../store/hooks.js';
 import { Cost, TokenList, purposeLabel } from './UsageViews.js';
 import { parseSessionUsage, totalTokens, usageChanged } from './usage.js';
+import { reason } from '../shell/errors.js';
 
 export function UsageCard({ sessionId }: { readonly sessionId: string }) {
   const { t } = useApp();
@@ -34,7 +35,7 @@ export function UsageCard({ sessionId }: { readonly sessionId: string }) {
         setUsage(parseSessionUsage(raw));
       })
       .catch((e: unknown) => {
-        if (current) setError(e instanceof Error ? e.message : String(e));
+        if (current) setError(reason(e));
       });
     return () => {
       current = false;
