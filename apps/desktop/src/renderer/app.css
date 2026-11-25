@@ -986,36 +986,6 @@ textarea.input {
   background: var(--piarc-surface-app);
 }
 
-.message {
-  margin-bottom: var(--piarc-space-4);
-}
-
-.message-author {
-  margin-bottom: 2px;
-  color: var(--piarc-text-secondary);
-  font-size: var(--piarc-font-size-small);
-  font-weight: var(--piarc-font-weight-semibold);
-}
-
-.message-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.message-user .message-text {
-  padding: var(--piarc-space-2) var(--piarc-space-3);
-  border-radius: var(--piarc-radius-lg);
-  background: var(--piarc-accent-subtle);
-}
-
-.message.is-pending .message-text {
-  border: 1px dashed var(--piarc-border-default);
-}
-
-.message-note {
-  margin-bottom: var(--piarc-space-3);
-}
-
 /* ---- dialogs, menus, toasts ---- */
 
 .scrim {

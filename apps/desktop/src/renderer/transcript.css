@@ -359,7 +359,7 @@
   background: var(--piarc-action-surface);
 }
 
-.conversation .row-user-bubble {
+:is(.conversation, .home-pending) .row-user-bubble {
   max-width: var(--piarc-session-bubble-max);
   padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
   border-radius: var(--piarc-session-radius-card);

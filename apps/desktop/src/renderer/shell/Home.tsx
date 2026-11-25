@@ -18,6 +18,7 @@ import { reason } from './errors.js';
 import { startSession } from './start-session.js';
 import { baseName, useUi } from './ui.js';
 import { NoticeBar } from './NoticeBar.js';
+import { ActivityMark } from '../transcript/rows/ActivityMark.js';
 
 interface HomeProps {
   readonly workspace: string | undefined;
@@ -133,6 +134,9 @@ function HomeForm({
     starting.current = true;
     setBusy(true);
     setError(undefined);
+    // Once the session exists the view moves to it (its transcript holds the message); a later
+    // failure brings the user back here, where the saved draft refills the input.
+    const session = { created: false };
     try {
       if (!(await ui.ensureTrust(workspace, 'decide'))) return false;
       const message = draftOf(submission);
@@ -149,11 +153,13 @@ function HomeForm({
         clientId: crypto.randomUUID(),
         watch: (id) => ui.connection.watchSession(id),
         onStep: (step) => {
-          if (step.kind === 'echo')
+          if (step.kind === 'echo') {
             flushSync(() => {
               setEcho(step.text);
             });
-          else if (step.unignoredWorktree === true)
+            return;
+          }
+          if (step.unignoredWorktree === true)
             store.addLocalNotice({
               key: `gitignore:${workspace}`,
               type: 'gitignore',
@@ -161,12 +167,16 @@ function HomeForm({
               downloadUrl: undefined,
               workspace,
             });
+          session.created = true;
+          ui.show({ kind: 'session', id: step.sessionId });
         },
       });
-      ui.show({ kind: 'session', id });
+      if (!session.created) ui.show({ kind: 'session', id });
       return true;
     } catch (cause) {
-      setError(t('home.failed', { reason: reason(cause) }));
+      const failed = t('home.failed', { reason: reason(cause) });
+      if (session.created) ui.show({ kind: 'home', workspace, error: failed });
+      else setError(failed);
       return false;
     } finally {
       starting.current = false;
@@ -236,12 +246,23 @@ function HomeForm({
     },
   ];
   return (
-    <section className="home workbench-home" data-testid="home">
+    <section className="home workbench-home" data-testid="home" data-starting={echo !== undefined}>
       <div className="environment-stage">
         {echo !== undefined ? (
-          <div className="message message-user is-pending" data-testid="optimistic-message">
-            <div className="message-text">{echo}</div>
-            <span className="small muted">{t('home.starting')}</span>
+          // Where the conversation will show it: the user's message at the top of the reading
+          // column (quiet while it is on its way), the working line at the foot.
+          <div className="home-pending">
+            <div className="row row-user is-sending">
+              <div className="row-user-bubble" data-testid="optimistic-message">
+                <div className="row-user-text">{echo}</div>
+              </div>
+            </div>
+            <div className="row row-working" role="status" data-testid="home-starting">
+              <span className="working-mark">
+                <ActivityMark activity="think" />
+              </span>
+              <span className="working-activity shimmer">{t('home.starting')}</span>
+            </div>
           </div>
         ) : (
           <div className="environment-card">

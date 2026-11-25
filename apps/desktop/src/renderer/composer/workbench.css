@@ -10,6 +10,35 @@
   padding: var(--piarc-space-4);
   padding-block-end: calc(var(--piarc-space-4) + min(5vh, 44px));
 }
+.home[data-starting='true'] .environment-stage {
+  place-items: stretch center;
+  padding: 0 0 var(--piarc-space-2);
+}
+.home-pending {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: min(calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter)), 100%);
+  box-sizing: border-box;
+  padding: var(--piarc-session-block-gap) var(--piarc-session-gutter) 0;
+  font-size: var(--piarc-session-prose);
+  line-height: var(--piarc-session-prose-line);
+}
+/* The transcript's rows, without the generic row's centred measure (the column has it). */
+.home-pending > .row {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  line-height: inherit;
+}
+.home-pending > .row-working {
+  padding-inline-start: var(--piarc-session-text-inset);
+}
+@container (max-width: 560px) {
+  .home-pending {
+    padding-inline: var(--piarc-session-gutter-narrow);
+  }
+}
 .environment-card {
   width: min(var(--piarc-workbench-environment-width), 100%);
   box-sizing: border-box;
@@ -183,7 +212,8 @@
   height: var(--piarc-session-icon);
 }
 .composer .composer-editor,
-.composer-mount[data-empty='true']::before {
+.composer-mount[data-empty='true']::before,
+.home[data-starting='true'] .composer-mount::before {
   font-size: var(--piarc-session-prose);
   line-height: var(--piarc-session-prose-line);
 }
@@ -194,7 +224,18 @@
   padding: calc((var(--piarc-session-composer-row) - var(--piarc-session-prose-line)) / 2)
     var(--piarc-session-pad-xs);
 }
-.composer .composer-mount[data-empty='true']::before {
+.home[data-starting='true'] .composer-mount::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  pointer-events: none;
+}
+.home[data-starting='true'] .composer .composer-editor {
+  max-height: var(--piarc-session-composer-row);
+  overflow: hidden;
+  opacity: 0;
+}
+.composer .composer-mount[data-empty='true']::before,
+.home[data-starting='true'] .composer .composer-mount::before {
   top: calc((var(--piarc-session-composer-row) - var(--piarc-session-prose-line)) / 2);
   left: var(--piarc-session-pad-xs);
   right: 0;

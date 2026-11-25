@@ -68,9 +68,23 @@ test('the new message shows at once; a failed create rolls it back into the inpu
   await expect(page.getByTestId('session-row')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('rolled-back.png') });
 
-  // The same text starts the session once creating works.
+  // The same text starts the session once creating works. While the session starts (held here),
+  // the message sits where the conversation will show it, under it the working line, and the
+  // input shows its placeholder instead of the same text again.
   await watchOptimistic(page);
+  await app.evaluate((_electron, channel) => {
+    globalThis.__piarcTestHooks?.holdNext(channel, 2000);
+  }, IPC_CHANNELS.sessionCreate);
   await page.getByTestId('home-start').click();
+  const pending = page.getByTestId('optimistic-message');
+  await expect(page.getByTestId('home-starting')).toBeVisible();
+  await expect(pending).toContainText('Plan the refactor 计划');
+  const stage = await page.getByTestId('home').boundingBox();
+  const bubble = await pending.boundingBox();
+  // At the top of the stage and on the column's right, not centred.
+  expect(bubble !== null && stage !== null && bubble.y - stage.y < 60).toBe(true);
+  await expect(page.locator('.home .composer-editor')).toHaveCSS('opacity', '0');
+  await page.screenshot({ path: testInfo.outputPath('starting.png') });
   const conversation = page.getByTestId('conversation');
   await expect(conversation).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('agent-message')).toHaveText(/Done\./, { timeout: 30_000 });
