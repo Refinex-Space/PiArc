@@ -3,7 +3,8 @@
 // shortcut's keycaps; `data-tooltip-side="below"` on it or an ancestor opens it below (controls
 // under text they would otherwise cover). The element keeps its own accessible name, so the bubble is hidden from
 // assistive technology. Moving between tooltipped controls within the warm window shows the next
-// one at once.
+// one at once. An anchor inside a modal dialog promotes the bubble into the popover top layer;
+// a bubble portaled to the body would paint underneath the dialog.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -24,6 +25,8 @@ interface Tip {
   readonly keys: string | undefined;
   readonly anchor: DOMRect;
   readonly below: boolean;
+  /** The anchor sits in a modal dialog, which paints above anything portaled to the body. */
+  readonly overlay: boolean;
 }
 
 /** The tooltipped element at the target, checked against the realm of the document it is in. */
@@ -60,6 +63,7 @@ export function TooltipLayer() {
         keys: element.dataset.tooltipKeys,
         anchor: element.getBoundingClientRect(),
         below: element.closest<HTMLElement>('[data-tooltip-side]')?.dataset.tooltipSide === 'below',
+        overlay: element.closest('dialog') !== null,
       });
     };
     const arm = (element: HTMLElement, immediate: boolean) => {
@@ -117,6 +121,15 @@ export function TooltipLayer() {
       setPlace(undefined);
       return;
     }
+    // A modal dialog is in the top layer. Join it, or the bubble paints underneath the dialog.
+    if (
+      tip.overlay &&
+      node.popover === 'manual' &&
+      !node.matches(':popover-open') &&
+      typeof node.showPopover === 'function'
+    ) {
+      node.showPopover();
+    }
     const { width, height } = node.getBoundingClientRect();
     const { anchor } = tip;
     const view = documentWindow(doc);
@@ -134,6 +147,7 @@ export function TooltipLayer() {
     <div
       ref={bubble}
       className="tooltip"
+      popover={tip.overlay ? 'manual' : undefined}
       aria-hidden="true"
       data-placed={place !== undefined}
       style={place === undefined ? undefined : { left: place.left, top: place.top }}

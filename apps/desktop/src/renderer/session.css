@@ -6,17 +6,24 @@
 
 .tooltip {
   position: fixed;
+  /* `inset`/`margin`/`border` reset the user-agent popover rules. Dialog tooltips use the
+     popover top layer so they paint above a modal `<dialog>`; other tooltips stay in place. */
+  inset: auto;
   top: -1000px;
   left: -1000px;
   z-index: 1000;
-  display: flex;
   align-items: center;
   gap: var(--piarc-space-2);
   box-sizing: border-box;
+  width: max-content;
   max-width: 240px;
+  height: auto;
   min-height: 24px;
+  margin: 0;
   padding: 3px var(--piarc-space-2);
+  border: 0;
   border-radius: var(--piarc-radius-md);
+  overflow: visible;
   background: var(--piarc-session-tooltip);
   color: var(--piarc-session-tooltip-ink);
   box-shadow: var(--piarc-session-lift-shadow);
@@ -31,6 +38,12 @@
   transition:
     opacity var(--piarc-motion-fast) var(--piarc-motion-curve-snap),
     transform var(--piarc-motion-fast) var(--piarc-motion-curve-snap);
+}
+
+/* Closed popovers stay `display: none` (user agent) until `showPopover`. Everything else is a flex row. */
+.tooltip:not([popover]),
+.tooltip:popover-open {
+  display: flex;
 }
 
 .tooltip[data-placed='true'] {

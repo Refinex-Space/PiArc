@@ -23,6 +23,19 @@ test('the proxy page detects, refuses a bad address, saves a manual one and goes
   // Auto by default: the detected proxy (or none) shows once resolved.
   await expect(panel.getByTestId('proxy-mode-auto')).toBeChecked();
   await expect(panel.getByTestId('proxy-system')).not.toHaveText(/Detecting|正在检测/u);
+  const systemLabel = panel.locator('.proxy-system-label');
+  const detect = panel.getByTestId('proxy-detect');
+  const labelBox = await systemLabel.boundingBox();
+  const detectBox = await detect.boundingBox();
+  if (labelBox === null || detectBox === null) throw new Error('proxy row is not visible');
+  expect(
+    Math.abs(labelBox.y + labelBox.height / 2 - (detectBox.y + detectBox.height / 2)),
+  ).toBeLessThan(2);
+  await panel.locator('.proxy-info').hover();
+  const tip = page.locator('.tooltip[data-placed="true"]');
+  await expect(tip).toContainText(/connect directly|直接连接/u);
+  await page.mouse.move(0, 0);
+  await expect(tip).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('proxy-auto.png') });
 
   await panel.getByText(/Set manually|手动设置/u).click();

@@ -104,9 +104,9 @@ export function ProxyPage() {
         />
       </div>
       {chosen === 'auto' ? (
-        <div className="preference-row">
+        <div className="preference-row proxy-detected">
           <div className="preference-copy">
-            <span>{t('proxy.system')}</span>
+            <span className="proxy-system-label">{t('proxy.system')}</span>
             <span className="proxy-value" data-testid="proxy-system" aria-live="polite">
               {system === undefined
                 ? t('proxy.system.detecting')

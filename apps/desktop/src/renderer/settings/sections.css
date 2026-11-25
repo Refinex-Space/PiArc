@@ -459,11 +459,34 @@
 }
 
 /* ADR-0082: the proxy page. The explanation is a tooltip on the label's info sign; the detected
-   proxy and the typed address read as addresses. */
+   proxy and the typed address read as addresses. The detect action shares a line with the
+   "system proxy" label; the address sits on the line below. */
 .proxy-settings .proxy-label {
   display: inline-flex;
   align-items: center;
   gap: var(--piarc-space-1);
+}
+.proxy-settings .preference-row.proxy-detected {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: var(--piarc-c-button-line-height) auto;
+  column-gap: var(--piarc-c-button-height);
+  row-gap: var(--piarc-space-1);
+  align-items: center;
+}
+.proxy-settings .proxy-detected > .preference-copy {
+  display: contents;
+}
+.proxy-settings .proxy-detected .proxy-system-label {
+  grid-area: 1 / 1;
+}
+.proxy-settings .proxy-detected > .button {
+  grid-area: 1 / 2;
+  justify-self: end;
+}
+.proxy-settings .proxy-detected .proxy-value {
+  grid-area: 2 / 1;
+  align-self: start;
 }
 .proxy-settings .proxy-info {
   display: inline-flex;
