@@ -81,6 +81,7 @@ const PIARC_API_SNAPSHOT = [
   'rewind',
   'rewindPreview',
   'sandboxSettings',
+  'saveImage',
   'saveProvider',
   'searchFiles',
   'searchSessions',

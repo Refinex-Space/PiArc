@@ -108,6 +108,7 @@ describe('i18n', () => {
             tools: 'Read, Grep',
             transport: 'SSE',
             source: '/w/.mcp.json',
+            host: 'example.com',
             by: '/w/.piarc/settings.json',
             hint: '[issue]',
             paths: 'src/**/*.rs',

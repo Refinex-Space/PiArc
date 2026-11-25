@@ -27,6 +27,7 @@ import { registerPermissionHandlers } from './core/permissions-ipc.js';
 import { registerSandboxHandlers } from './core/sandbox-ipc.js';
 import { registerUsageHandlers } from './core/usage-ipc.js';
 import { registerDiagnosticsHandlers } from './core/diagnostics-ipc.js';
+import { registerImageExportHandlers } from './core/image-export-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
 import { startupFailure } from './core/startup-error.js';
 import { installTestHooks } from './core/test-hooks.js';
@@ -281,6 +282,7 @@ function start(dirs: DataDirs): void {
     registerSandboxHandlers(registerHandler, core.runtime, () => appShell.t());
     registerUsageHandlers(registerHandler, core.runtime);
     registerDiagnosticsHandlers(registerHandler, core.runtime, () => appShell.t());
+    registerImageExportHandlers(registerHandler, () => appShell.t());
     registerMcpHandlers(registerHandler, core.runtime);
     registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerWorktreeHandlers(

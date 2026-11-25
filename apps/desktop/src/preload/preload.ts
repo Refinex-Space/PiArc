@@ -487,6 +487,14 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.diagnosticsExport, id)
       .then((v: unknown) => expectStringOrNull(v)),
+  saveImage: (request) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.imageSave, {
+        kind: request.kind,
+        name: request.name,
+        bytes: request.bytes,
+      })
+      .then((v: unknown) => expectBoolean(v)),
   providerSettings: () =>
     ipcRenderer.invoke(IPC_CHANNELS.providerSettings).then((v: unknown) => expectString(v)),
   saveProvider: (config, secret) =>

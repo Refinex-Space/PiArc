@@ -945,6 +945,27 @@ export const en = {
     '{seconds, plural, one {Thought for # second} other {Thought for # seconds}}',
   'transcript.thinking.doneUnknown': 'Thought',
   'transcript.tool.read': '{count, plural, one {Read {target}} other {Read # files}}',
+  'transcript.diagram.label': 'Mermaid diagram',
+  'transcript.diagram.drawing': 'Drawing the diagram…',
+  'transcript.diagram.source': 'View source',
+  'transcript.diagram.preview': 'Preview',
+  'transcript.diagram.copy': 'Copy Mermaid source',
+  'transcript.diagram.download': 'Download',
+  'transcript.diagram.downloadSvg': 'Download as SVG',
+  'transcript.diagram.downloadPng': 'Download as PNG',
+  'transcript.diagram.saved': 'Diagram saved.',
+  'transcript.diagram.saveFailed': 'Couldn’t save the diagram: {reason}',
+  'transcript.diagram.failed': 'This diagram couldn’t be drawn: {reason}',
+  'transcript.diagram.fix': 'Ask to fix the diagram',
+  'transcript.diagram.fixPrompt':
+    'The Mermaid diagram you sent couldn’t be drawn: {reason}\n\nPlease send a corrected version.\n\n```mermaid\n{source}\n```',
+  'image.saveTitle': 'Save image',
+  'time.justNow': 'just now',
+  'markdown.remoteImage.tooltip': 'Not loaded here. Opens {host} in your browser.',
+  'transcript.tool.command': '{count, plural, one {Ran {target}} other {Ran # commands}}',
+  'transcript.tool.web':
+    '{count, plural, one {Searched the web for {target}} other {Searched the web # times}}',
+  'transcript.tool.more': '{count, plural, one {# more} other {# more}}',
   'transcript.tool.search':
     '{count, plural, one {Searched “{target}”} other {Searched # patterns}}',
   'transcript.tool.find':

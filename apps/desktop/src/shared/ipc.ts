@@ -140,6 +140,7 @@ export const IPC_CHANNELS = {
   configDiagnostics: 'piarc:config.diagnostics',
   diagnosticsPrepare: 'piarc:diagnostics.prepare',
   diagnosticsExport: 'piarc:diagnostics.export',
+  imageSave: 'piarc:image.save',
   worktreeBranches: 'piarc:worktree.branches',
   worktreeIgnore: 'piarc:worktree.ignore',
   worktreeRemove: 'piarc:worktree.remove',
@@ -762,6 +763,15 @@ export interface PiarcApi {
    * with `{path, bytes}` (JSON), or null when the user cancelled.
    */
   exportDiagnostics(id: string): Promise<string | null>;
+  /**
+   * Saves an image the window drew (a transcript diagram, ADR-0080) where the user picks in the
+   * main process's save dialog. Resolves true once written, false when the user cancelled.
+   */
+  saveImage(request: {
+    readonly kind: 'svg' | 'png';
+    readonly name: string;
+    readonly bytes: Uint8Array;
+  }): Promise<boolean>;
   answerApproval(answer: ApprovalAnswer): Promise<string>;
   /**
    * Compacts the conversation as a turn of its own (`/compact [focus]`); `instructions` is what
