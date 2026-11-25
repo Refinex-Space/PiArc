@@ -131,6 +131,15 @@
   "overlay": {
     "scrim": { "light": "base.scrimLight", "dark": "base.scrimDark" }
   },
+  "session": {
+    "fill": { "light": "base.black5", "dark": "base.white5" },
+    "fillHover": { "light": "base.ink10", "dark": "base.white10" },
+    "ghostHover": { "light": "base.black5", "dark": "base.white8" },
+    "line": { "light": "base.black8", "dark": "base.white10", "highContrast": "neutral.11" },
+    "inlineCode": { "light": "danger.11", "dark": "danger.11", "highContrast": "danger.12" },
+    "tooltip": { "light": "neutral.12", "dark": "base.controlDark", "darkHighContrast": "base.black" },
+    "tooltipInk": { "light": "base.white", "dark": "neutral.12", "darkHighContrast": "base.white" }
+  },
   "forcedColors": {
     "workbench.canvas": "Canvas",
     "workbench.navigation": "Canvas",
@@ -179,6 +188,13 @@
     "agentStatus.unread": "Highlight",
     "agentStatus.idle": "GrayText",
     "code.background": "Canvas",
-    "code.text": "CanvasText"
+    "code.text": "CanvasText",
+    "session.fill": "Canvas",
+    "session.fillHover": "Canvas",
+    "session.ghostHover": "Canvas",
+    "session.line": "CanvasText",
+    "session.inlineCode": "CanvasText",
+    "session.tooltip": "Canvas",
+    "session.tooltipInk": "CanvasText"
   }
 }

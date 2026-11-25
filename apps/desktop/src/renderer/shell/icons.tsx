@@ -1,4 +1,31 @@
 // PiArc's own line icons (16 px grid, `currentColor`), drawn as React SVG elements.
+import {
+  ArrowDown,
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Circle,
+  CircleDashed,
+  CircleStop,
+  Copy,
+  ExternalLink,
+  FileText,
+  Globe,
+  Image,
+  Info,
+  Plug,
+  RotateCcw,
+  Search,
+  Split,
+  SquareTerminal,
+  TextSelect,
+  TriangleAlert,
+  WrapText,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
 function Icon({
@@ -302,3 +329,116 @@ export const PopoutIcon = () => (
     <path d="M5 5H3.6C2.7 5 2 5.7 2 6.6v5.7c0 .9.7 1.7 1.6 1.7h6c.9 0 1.6-.8 1.6-1.7v-1.8" />
   </Icon>
 );
+
+// ---- Lucide glyphs (ISC, lucide-react 1.66.0) ----
+// The session pane draws its line icons from Lucide through this one entry, with the stroke held
+// at the reference's optical weights: 12 px at 1, 16 px and 20 px at 1.25 (ADR-0078). Glyphs
+// Lucide lacks are drawn above on the same 16 px grid.
+
+/** The icon sizes the session pane uses (CSS px). */
+export type GlyphSize = 12 | 16 | 20;
+
+function glyph(Shape: LucideIcon) {
+  function Glyph({ size = 16, label }: { readonly size?: GlyphSize; readonly label?: string }) {
+    return (
+      <Shape
+        className="icon"
+        size={size}
+        strokeWidth={size === 12 ? 1 : 1.25}
+        nonScalingStroke
+        aria-hidden={label === undefined ? true : undefined}
+        role={label === undefined ? undefined : 'img'}
+        aria-label={label}
+        focusable="false"
+      />
+    );
+  }
+  Glyph.displayName = `Glyph(${Shape.displayName ?? 'icon'})`;
+  return Glyph;
+}
+
+export const CopyGlyph = glyph(Copy);
+export const CheckGlyph = glyph(Check);
+export const RewindGlyph = glyph(RotateCcw);
+export const BranchGlyph = glyph(Split);
+export const SelectTurnGlyph = glyph(TextSelect);
+export const CaretGlyph = glyph(ChevronRight);
+export const CaretDownGlyph = glyph(ChevronDown);
+export const CaretUpGlyph = glyph(ChevronUp);
+export const ArrowDownGlyph = glyph(ArrowDown);
+export const CloseGlyph = glyph(X);
+export const TerminalGlyph = glyph(SquareTerminal);
+export const FileGlyph = glyph(FileText);
+export const ImageGlyph = glyph(Image);
+export const SearchGlyph = glyph(Search);
+export const GlobeGlyph = glyph(Globe);
+export const PlugGlyph = glyph(Plug);
+export const AgentGlyph = glyph(Bot);
+export const WarningGlyph = glyph(TriangleAlert);
+export const InfoGlyph = glyph(Info);
+export const PendingGlyph = glyph(Circle);
+export const BlockedGlyph = glyph(CircleDashed);
+export const WrapGlyph = glyph(WrapText);
+export const ExternalGlyph = glyph(ExternalLink);
+export const StopGlyph = glyph(CircleStop);
+
+/** A finished step: a filled disc with the check cut out (Lucide has no filled form). */
+export function DoneGlyph({ size = 16 }: { readonly size?: GlyphSize }) {
+  return (
+    <svg
+      className="icon"
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="8" cy="8" r="6.5" fill="currentColor" />
+      <path
+        d="m5.2 8.2 1.9 1.9 3.8-4"
+        fill="none"
+        stroke="var(--piarc-workbench-canvas)"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A step in progress: a quarter arc that turns (static under reduced motion). */
+export function SpinnerGlyph({ size = 16 }: { readonly size?: GlyphSize }) {
+  return (
+    <svg
+      className="icon spinner-glyph"
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeOpacity="0.22" strokeWidth="1.5" />
+      <path d="M8 2a6 6 0 0 1 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The disclosure caret of a step row: a small filled triangle pointing right. */
+export function StepCaret() {
+  return (
+    <svg
+      className="icon step-caret-glyph"
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M4.5 3.2v5.6a.4.4 0 0 0 .66.3l3.2-2.8a.4.4 0 0 0 0-.6l-3.2-2.8a.4.4 0 0 0-.66.3z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}

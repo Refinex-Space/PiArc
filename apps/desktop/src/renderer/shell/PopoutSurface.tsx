@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { IconButton } from '../app/IconButton.js';
 import { useT } from '../app/app-context.js';
 import { SurfaceDocument } from '../app/surface-document.js';
+import { TooltipLayer } from '../app/Tooltip.js';
 import { PinIcon } from './icons.js';
 import { useUi } from './ui.js';
 
@@ -227,6 +228,7 @@ export function PopoutSurface({
             }
           >
             {children}
+            {native ? <TooltipLayer /> : null}
           </Pinned.Provider>
         </SurfaceDocument.Provider>,
         content,

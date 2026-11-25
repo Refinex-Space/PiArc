@@ -68,7 +68,14 @@ export type ColorToken =
   | 'diff.removedText'
   | 'code.background'
   | 'code.text'
-  | 'overlay.scrim';
+  | 'overlay.scrim'
+  | 'session.fill'
+  | 'session.fillHover'
+  | 'session.ghostHover'
+  | 'session.line'
+  | 'session.inlineCode'
+  | 'session.tooltip'
+  | 'session.tooltipInk';
 
 /** Mode- and density-dependent sizes, fonts and motion values. */
 export type ScaleToken =
@@ -90,7 +97,12 @@ export type ScaleToken =
   | 'motion.surface'
   | 'motion.fast'
   | 'motion.normal'
+  | 'motion.slow'
+  | 'motion.revealDelay'
+  | 'motion.shimmer'
   | 'motion.easing'
+  | 'motion.curveSnap'
+  | 'motion.curveOut'
   | 'shadow.button'
   | 'shadow.overlay'
   | 'size.titlebarHeight'
@@ -113,6 +125,17 @@ export type ScaleToken =
   | 'settings.headerText'
   | 'settings.pageTitle'
   | 'settings.navText'
+  | 'session.measure'
+  | 'session.gutter'
+  | 'session.gutterNarrow'
+  | 'session.padBlock'
+  | 'session.approvalWidth'
+  | 'session.markSize'
+  | 'session.markGap'
+  | 'session.bubbleMax'
+  | 'session.composerShadowFocus'
+  | 'session.popoverShadow'
+  | 'session.liftShadow'
   | 'size.buttonHeight'
   | 'radius.button'
   | 'fontSize.button'
@@ -133,7 +156,35 @@ export type ScaleToken =
   | 'space.4'
   | 'space.5'
   | 'size.rowHeight'
-  | 'size.controlHeight';
+  | 'size.controlHeight'
+  | 'session.prose'
+  | 'session.proseLine'
+  | 'session.proseLineCjk'
+  | 'session.body'
+  | 'session.bodyLine'
+  | 'session.footnote'
+  | 'session.footnoteLine'
+  | 'session.caption'
+  | 'session.captionLine'
+  | 'session.code'
+  | 'session.codeLine'
+  | 'session.row'
+  | 'session.rowSmall'
+  | 'session.rowNested'
+  | 'session.radius'
+  | 'session.radiusCard'
+  | 'session.radiusChip'
+  | 'session.padXs'
+  | 'session.padSm'
+  | 'session.padMd'
+  | 'session.padLg'
+  | 'session.gapXs'
+  | 'session.gapSm'
+  | 'session.gapMd'
+  | 'session.blockGap'
+  | 'session.turnGap'
+  | 'session.icon'
+  | 'session.iconLarge';
 
 /** Component tokens. */
 export type ComponentToken =
@@ -237,6 +288,13 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'code.background': '#f8f9fa',
     'code.text': '#1d2027',
     'overlay.scrim': '#1d202733',
+    'session.fill': '#0000000d',
+    'session.fillHover': '#0b0b0b1a',
+    'session.ghostHover': '#0000000d',
+    'session.line': '#00000013',
+    'session.inlineCode': '#c0262d',
+    'session.tooltip': '#1d2027',
+    'session.tooltipInk': '#ffffff',
   },
   dark: {
     'surface.app': '#111214',
@@ -298,6 +356,13 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'code.background': '#17181b',
     'code.text': '#eceef2',
     'overlay.scrim': '#00000080',
+    'session.fill': '#ffffff0d',
+    'session.fillHover': '#ffffff1a',
+    'session.ghostHover': '#ffffff14',
+    'session.line': '#ffffff1a',
+    'session.inlineCode': '#ff8c8c',
+    'session.tooltip': '#303030',
+    'session.tooltipInk': '#eceef2',
   },
   lightHighContrast: {
     'surface.app': '#ffffff',
@@ -359,6 +424,13 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'code.background': '#ffffff',
     'code.text': '#1d2027',
     'overlay.scrim': '#1d202733',
+    'session.fill': '#0000000d',
+    'session.fillHover': '#0b0b0b1a',
+    'session.ghostHover': '#0000000d',
+    'session.line': '#5d626c',
+    'session.inlineCode': '#5c1418',
+    'session.tooltip': '#1d2027',
+    'session.tooltipInk': '#ffffff',
   },
   darkHighContrast: {
     'surface.app': '#000000',
@@ -420,6 +492,13 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'code.background': '#000000',
     'code.text': '#eceef2',
     'overlay.scrim': '#00000080',
+    'session.fill': '#ffffff0d',
+    'session.fillHover': '#ffffff1a',
+    'session.ghostHover': '#ffffff14',
+    'session.line': '#a9adb7',
+    'session.inlineCode': '#ffd1d1',
+    'session.tooltip': '#000000',
+    'session.tooltipInk': '#ffffff',
   },
 };
 
@@ -484,6 +563,13 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'code.background': '--piarc-code-background',
   'code.text': '--piarc-code-text',
   'overlay.scrim': '--piarc-overlay-scrim',
+  'session.fill': '--piarc-session-fill',
+  'session.fillHover': '--piarc-session-fill-hover',
+  'session.ghostHover': '--piarc-session-ghost-hover',
+  'session.line': '--piarc-session-line',
+  'session.inlineCode': '--piarc-session-inline-code',
+  'session.tooltip': '--piarc-session-tooltip',
+  'session.tooltipInk': '--piarc-session-tooltip-ink',
   'font.ui': '--piarc-font-ui',
   'font.mono': '--piarc-font-mono',
   'fontSize.caption': '--piarc-font-size-caption',
@@ -502,7 +588,12 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'motion.surface': '--piarc-motion-surface',
   'motion.fast': '--piarc-motion-fast',
   'motion.normal': '--piarc-motion-normal',
+  'motion.slow': '--piarc-motion-slow',
+  'motion.revealDelay': '--piarc-motion-reveal-delay',
+  'motion.shimmer': '--piarc-motion-shimmer',
   'motion.easing': '--piarc-motion-easing',
+  'motion.curveSnap': '--piarc-motion-curve-snap',
+  'motion.curveOut': '--piarc-motion-curve-out',
   'shadow.button': '--piarc-shadow-button',
   'shadow.overlay': '--piarc-shadow-overlay',
   'size.titlebarHeight': '--piarc-size-titlebar-height',
@@ -525,6 +616,17 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'settings.headerText': '--piarc-settings-header-text',
   'settings.pageTitle': '--piarc-settings-page-title',
   'settings.navText': '--piarc-settings-nav-text',
+  'session.measure': '--piarc-session-measure',
+  'session.gutter': '--piarc-session-gutter',
+  'session.gutterNarrow': '--piarc-session-gutter-narrow',
+  'session.padBlock': '--piarc-session-pad-block',
+  'session.approvalWidth': '--piarc-session-approval-width',
+  'session.markSize': '--piarc-session-mark-size',
+  'session.markGap': '--piarc-session-mark-gap',
+  'session.bubbleMax': '--piarc-session-bubble-max',
+  'session.composerShadowFocus': '--piarc-session-composer-shadow-focus',
+  'session.popoverShadow': '--piarc-session-popover-shadow',
+  'session.liftShadow': '--piarc-session-lift-shadow',
   'size.buttonHeight': '--piarc-size-button-height',
   'radius.button': '--piarc-radius-button',
   'fontSize.button': '--piarc-font-size-button',
@@ -546,6 +648,34 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'space.5': '--piarc-space-5',
   'size.rowHeight': '--piarc-size-row-height',
   'size.controlHeight': '--piarc-size-control-height',
+  'session.prose': '--piarc-session-prose',
+  'session.proseLine': '--piarc-session-prose-line',
+  'session.proseLineCjk': '--piarc-session-prose-line-cjk',
+  'session.body': '--piarc-session-body',
+  'session.bodyLine': '--piarc-session-body-line',
+  'session.footnote': '--piarc-session-footnote',
+  'session.footnoteLine': '--piarc-session-footnote-line',
+  'session.caption': '--piarc-session-caption',
+  'session.captionLine': '--piarc-session-caption-line',
+  'session.code': '--piarc-session-code',
+  'session.codeLine': '--piarc-session-code-line',
+  'session.row': '--piarc-session-row',
+  'session.rowSmall': '--piarc-session-row-small',
+  'session.rowNested': '--piarc-session-row-nested',
+  'session.radius': '--piarc-session-radius',
+  'session.radiusCard': '--piarc-session-radius-card',
+  'session.radiusChip': '--piarc-session-radius-chip',
+  'session.padXs': '--piarc-session-pad-xs',
+  'session.padSm': '--piarc-session-pad-sm',
+  'session.padMd': '--piarc-session-pad-md',
+  'session.padLg': '--piarc-session-pad-lg',
+  'session.gapXs': '--piarc-session-gap-xs',
+  'session.gapSm': '--piarc-session-gap-sm',
+  'session.gapMd': '--piarc-session-gap-md',
+  'session.blockGap': '--piarc-session-block-gap',
+  'session.turnGap': '--piarc-session-turn-gap',
+  'session.icon': '--piarc-session-icon',
+  'session.iconLarge': '--piarc-session-icon-large',
   'window.background': '--piarc-c-window-background',
   'window.titlebarHeight': '--piarc-c-window-titlebar-height',
   'sidebar.background': '--piarc-c-sidebar-background',

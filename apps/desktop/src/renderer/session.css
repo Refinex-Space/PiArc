@@ -1,0 +1,381 @@
+/* Parts the session pane shares (ADR-0078): the tooltip, icon buttons in their three sizes, step
+   rows (tool calls, thinking, status lines), pills, the card shell, the in-progress shimmer and
+   the hover reveal of row actions. Sizes, colors and motion come from the design tokens only. */
+
+/* ---- tooltip (app/Tooltip.tsx) ---- */
+
+.tooltip {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  box-sizing: border-box;
+  max-width: 240px;
+  min-height: 24px;
+  padding: 3px var(--piarc-space-2);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-session-tooltip);
+  color: var(--piarc-session-tooltip-ink);
+  box-shadow: var(--piarc-session-lift-shadow);
+  font-family: var(--piarc-font-ui);
+  font-size: 13px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  transform: scale(0.98);
+  transition:
+    opacity var(--piarc-motion-fast) var(--piarc-motion-curve-snap),
+    transform var(--piarc-motion-fast) var(--piarc-motion-curve-snap);
+}
+
+.tooltip[data-placed='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+:root[data-app] .tooltip .keycaps-visual kbd {
+  height: 18px;
+  min-width: 18px;
+  padding: 0 3px;
+  border-color: color-mix(in srgb, currentColor 28%, transparent);
+  background: transparent;
+  color: inherit;
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-regular);
+}
+
+.tooltip .keycap-joiner {
+  color: inherit;
+  opacity: 0.6;
+}
+
+@media (forced-colors: active) {
+  .tooltip {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---- icon buttons (app/IconButton.tsx) ---- */
+
+.icon-button.is-xs,
+.icon-button.is-sm,
+.icon-button.is-md {
+  --icon-button-size: var(--piarc-session-row);
+  flex: none;
+  box-sizing: border-box;
+  width: var(--icon-button-size);
+  min-width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  padding: 0;
+  border-radius: var(--piarc-session-radius);
+  color: var(--piarc-text-secondary);
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-curve-out),
+    color var(--piarc-motion-surface) var(--piarc-motion-curve-out),
+    transform var(--piarc-motion-surface) var(--piarc-motion-curve-out);
+}
+
+.icon-button.is-xs {
+  --icon-button-size: var(--piarc-session-row-small);
+  border-radius: calc(var(--piarc-session-radius) - 2px);
+}
+
+.icon-button.is-md {
+  --icon-button-size: calc(var(--piarc-session-row) + 4px);
+}
+
+.icon-button.is-xs svg,
+.icon-button.is-sm svg {
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+
+.icon-button.is-md svg {
+  width: var(--piarc-session-icon-large);
+  height: var(--piarc-session-icon-large);
+}
+
+:is(.icon-button.is-xs, .icon-button.is-sm, .icon-button.is-md):hover:not(:disabled) {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+
+:is(.icon-button.is-xs, .icon-button.is-sm, .icon-button.is-md):not(:disabled):active {
+  background: var(--piarc-session-fill-hover);
+  transform: scale(0.975);
+}
+
+:is(.icon-button.is-xs, .icon-button.is-sm, .icon-button.is-md):is(
+  [aria-pressed='true'],
+  [aria-expanded='true']
+) {
+  background: var(--piarc-session-fill-hover);
+  color: var(--piarc-text-primary);
+}
+
+/* ---- step rows: tool calls, thinking, status lines ---- */
+
+.step {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.step-line {
+  --step-outset: var(--piarc-session-pad-xs);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  width: calc(100% + 2 * var(--step-outset));
+  min-height: var(--piarc-session-row);
+  margin-inline: calc(-1 * var(--step-outset));
+  padding: 0 var(--step-outset);
+  border: 0;
+  border-radius: var(--piarc-session-radius);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  text-align: start;
+  user-select: none;
+}
+
+button.step-line {
+  cursor: default;
+}
+
+button.step-line:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--piarc-c-focus-ring);
+}
+
+.step-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--piarc-session-gap-xs);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.step-verb {
+  flex: none;
+}
+
+.step-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--piarc-text-primary);
+}
+
+.step-line:hover .step-meta,
+.step-line:focus-visible .step-meta {
+  color: var(--piarc-text-primary);
+}
+
+.step-outcome {
+  flex: none;
+}
+
+.step[data-state='failed'] .step-outcome,
+.step[data-state='failed'] .step-verb.is-failed {
+  color: var(--piarc-text-danger);
+}
+
+.step[data-state='blocked'] .step-outcome {
+  color: var(--piarc-text-warning);
+}
+
+.step-trail {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.step-caret {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  color: var(--piarc-text-secondary);
+  translate: 0 0.5px;
+  transition: transform var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+.step-line[aria-expanded='true'] .step-caret {
+  transform: rotate(90deg);
+}
+
+.step-line:hover .step-caret {
+  color: var(--piarc-text-primary);
+}
+
+.step-body {
+  min-width: 0;
+  padding-top: var(--piarc-session-pad-xs);
+}
+
+/* ---- pills ---- */
+
+.diff-pill {
+  display: inline-flex;
+  flex: none;
+  gap: 1px;
+  height: var(--piarc-session-row-nested);
+  overflow: hidden;
+  border-radius: var(--piarc-session-radius-chip);
+  font-size: var(--piarc-session-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  font-variant-numeric: tabular-nums lining-nums;
+  line-height: 1;
+  direction: ltr;
+}
+
+.diff-pill > span {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: var(--piarc-session-pad-sm);
+}
+
+.diff-pill .diff-added {
+  background: var(--piarc-diff-added-background);
+  color: var(--piarc-diff-added-text);
+}
+
+.diff-pill .diff-removed {
+  background: var(--piarc-diff-removed-background);
+  color: var(--piarc-diff-removed-text);
+}
+
+.status-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--piarc-session-row-nested);
+  padding-inline: var(--piarc-session-pad-sm);
+  border: 1px solid color-mix(in srgb, var(--piarc-state-warning) 45%, transparent);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: var(--piarc-session-footnote-line);
+  white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+  .diff-pill > span,
+  .status-pill {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---- card shell ---- */
+
+.session-card {
+  box-sizing: border-box;
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  background: transparent;
+}
+
+.session-card-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-md);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card) var(--piarc-session-radius-card) 0 0;
+  background: var(--piarc-session-fill);
+}
+
+@media (forced-colors: active) {
+  .session-card {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---- in-progress shimmer: a light band sweeps the text every 3 s ---- */
+
+.shimmer {
+  background-image: linear-gradient(
+    120deg,
+    currentColor 37.5%,
+    color-mix(in srgb, currentColor 30%, var(--piarc-workbench-canvas)) 50%,
+    currentColor 62.5%
+  );
+  background-size: 400% 100%;
+  background-position: 83.333% 0;
+  background-repeat: no-repeat;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: piarc-shimmer var(--piarc-motion-shimmer) linear infinite;
+}
+
+@keyframes piarc-shimmer {
+  0%,
+  15% {
+    background-position: 83.333% 0;
+    animation-timing-function: cubic-bezier(0.714, 0.121, 0.211, 0.888);
+  }
+  85%,
+  100% {
+    background-position: 16.667% 0;
+  }
+}
+
+:root[data-reduce-motion='true'] .shimmer {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  animation: none;
+}
+
+@media (forced-colors: active) {
+  .shimmer {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    animation: none;
+  }
+}
+
+/* ---- the spinner glyph (icons.tsx SpinnerGlyph) ---- */
+
+.spinner-glyph {
+  animation: piarc-spin 1.6s linear infinite;
+}
+
+/* ---- actions that appear on row hover or keyboard focus ---- */
+
+.reveal-actions {
+  opacity: 0;
+  transition: opacity var(--piarc-motion-surface) var(--piarc-motion-curve-snap);
+}
+
+:is(:hover, :focus-within) > .reveal-actions,
+.reveal-actions:focus-within,
+.reveal-actions[data-pinned='true'] {
+  opacity: 1;
+  transition: opacity var(--piarc-motion-fast) var(--piarc-motion-curve-snap)
+    var(--piarc-motion-reveal-delay);
+}
+
+:focus-within > .reveal-actions,
+.reveal-actions:focus-within {
+  transition-delay: 0s;
+}
+
+@media (hover: none) {
+  .reveal-actions {
+    opacity: 1;
+  }
+}

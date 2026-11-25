@@ -15,6 +15,7 @@ import {
 } from '../transcript/services.js';
 import { Transcript } from '../transcript/Transcript.js';
 import { gallerySection } from './fixtures/gallery.js';
+import { TooltipLayer } from '../app/Tooltip.js';
 
 const CATALOG: Catalog = {
   model: { provider: 'mock', id: 'balanced' },
@@ -118,6 +119,7 @@ export function SessionGallery() {
           </div>
         </section>
       </main>
+      <TooltipLayer />
     </div>
   );
 }

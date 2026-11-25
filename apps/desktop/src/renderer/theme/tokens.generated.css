@@ -23,7 +23,12 @@
   --piarc-motion-surface: 60ms;
   --piarc-motion-fast: 120ms;
   --piarc-motion-normal: 200ms;
+  --piarc-motion-slow: 450ms;
+  --piarc-motion-reveal-delay: 100ms;
+  --piarc-motion-shimmer: 3s;
   --piarc-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+  --piarc-motion-curve-snap: cubic-bezier(0.32, 0.72, 0, 1);
+  --piarc-motion-curve-out: cubic-bezier(0.165, 0.84, 0.44, 1);
   --piarc-shadow-button: 0 1px 2px rgb(0 0 0 / 0.05);
   --piarc-shadow-overlay: 0 8px 28px rgb(0 0 0 / 0.18), 0 1px 3px rgb(0 0 0 / 0.12);
   --piarc-size-titlebar-height: 44px;
@@ -33,8 +38,8 @@
   --piarc-workbench-reading-width: 768px;
   --piarc-workbench-environment-width: 320px;
   --piarc-workbench-composer-height: 46px;
-  --piarc-workbench-composer-radius: 15px;
-  --piarc-workbench-composer-shadow: 0 3px 16px rgb(0 0 0 / 0.055);
+  --piarc-workbench-composer-radius: 14px;
+  --piarc-workbench-composer-shadow: 0 4px 20px rgb(0 0 0 / 0.035);
   --piarc-workbench-menu-radius: 10px;
   --piarc-workbench-icon-size: 18px;
   --piarc-settings-width: 1000px;
@@ -46,6 +51,17 @@
   --piarc-settings-header-text: 16px;
   --piarc-settings-page-title: 18px;
   --piarc-settings-nav-text: 14.5px;
+  --piarc-session-measure: 768px;
+  --piarc-session-gutter: 32px;
+  --piarc-session-gutter-narrow: 16px;
+  --piarc-session-pad-block: 48px;
+  --piarc-session-approval-width: 480px;
+  --piarc-session-mark-size: 20px;
+  --piarc-session-mark-gap: 12px;
+  --piarc-session-bubble-max: 85%;
+  --piarc-session-composer-shadow-focus: 0 4px 20px rgb(0 0 0 / 0.075);
+  --piarc-session-popover-shadow: 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
+  --piarc-session-lift-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
   --piarc-size-button-height: 28px;
   --piarc-radius-button: 8px;
   --piarc-font-size-button: 14px;
@@ -67,6 +83,34 @@
   --piarc-space-5: 24px;
   --piarc-size-row-height: 32px;
   --piarc-size-control-height: 30px;
+  --piarc-session-prose: 15px;
+  --piarc-session-prose-line: 21px;
+  --piarc-session-prose-line-cjk: 24px;
+  --piarc-session-body: 14px;
+  --piarc-session-body-line: 20px;
+  --piarc-session-footnote: 13px;
+  --piarc-session-footnote-line: 17px;
+  --piarc-session-caption: 12px;
+  --piarc-session-caption-line: 17px;
+  --piarc-session-code: 13px;
+  --piarc-session-code-line: 19px;
+  --piarc-session-row: 28px;
+  --piarc-session-row-small: 24px;
+  --piarc-session-row-nested: 22px;
+  --piarc-session-radius: 8px;
+  --piarc-session-radius-card: 12px;
+  --piarc-session-radius-chip: 5.5px;
+  --piarc-session-pad-xs: 6px;
+  --piarc-session-pad-sm: 8px;
+  --piarc-session-pad-md: 12px;
+  --piarc-session-pad-lg: 16px;
+  --piarc-session-gap-xs: 8px;
+  --piarc-session-gap-sm: 12px;
+  --piarc-session-gap-md: 16px;
+  --piarc-session-block-gap: 14px;
+  --piarc-session-turn-gap: 24px;
+  --piarc-session-icon: 16px;
+  --piarc-session-icon-large: 20px;
   --piarc-c-window-background: var(--piarc-surface-app);
   --piarc-c-window-titlebar-height: var(--piarc-size-titlebar-height);
   --piarc-c-sidebar-background: var(--piarc-surface-sidebar);
@@ -164,6 +208,13 @@
   --piarc-code-background: #f8f9fa;
   --piarc-code-text: #1d2027;
   --piarc-overlay-scrim: #1d202733;
+  --piarc-session-fill: #0000000d;
+  --piarc-session-fill-hover: #0b0b0b1a;
+  --piarc-session-ghost-hover: #0000000d;
+  --piarc-session-line: #00000013;
+  --piarc-session-inline-code: #c0262d;
+  --piarc-session-tooltip: #1d2027;
+  --piarc-session-tooltip-ink: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -228,6 +279,13 @@
     --piarc-code-background: #17181b;
     --piarc-code-text: #eceef2;
     --piarc-overlay-scrim: #00000080;
+    --piarc-session-fill: #ffffff0d;
+    --piarc-session-fill-hover: #ffffff1a;
+    --piarc-session-ghost-hover: #ffffff14;
+    --piarc-session-line: #ffffff1a;
+    --piarc-session-inline-code: #ff8c8c;
+    --piarc-session-tooltip: #303030;
+    --piarc-session-tooltip-ink: #eceef2;
   }
 }
 
@@ -292,6 +350,13 @@
   --piarc-code-background: #f8f9fa;
   --piarc-code-text: #1d2027;
   --piarc-overlay-scrim: #1d202733;
+  --piarc-session-fill: #0000000d;
+  --piarc-session-fill-hover: #0b0b0b1a;
+  --piarc-session-ghost-hover: #0000000d;
+  --piarc-session-line: #00000013;
+  --piarc-session-inline-code: #c0262d;
+  --piarc-session-tooltip: #1d2027;
+  --piarc-session-tooltip-ink: #ffffff;
 }
 
 :root[data-color-mode='dark'] {
@@ -355,6 +420,13 @@
   --piarc-code-background: #17181b;
   --piarc-code-text: #eceef2;
   --piarc-overlay-scrim: #00000080;
+  --piarc-session-fill: #ffffff0d;
+  --piarc-session-fill-hover: #ffffff1a;
+  --piarc-session-ghost-hover: #ffffff14;
+  --piarc-session-line: #ffffff1a;
+  --piarc-session-inline-code: #ff8c8c;
+  --piarc-session-tooltip: #303030;
+  --piarc-session-tooltip-ink: #eceef2;
 }
 
 :root[data-color-mode='lightHighContrast'] {
@@ -418,6 +490,13 @@
   --piarc-code-background: #ffffff;
   --piarc-code-text: #1d2027;
   --piarc-overlay-scrim: #1d202733;
+  --piarc-session-fill: #0000000d;
+  --piarc-session-fill-hover: #0b0b0b1a;
+  --piarc-session-ghost-hover: #0000000d;
+  --piarc-session-line: #5d626c;
+  --piarc-session-inline-code: #5c1418;
+  --piarc-session-tooltip: #1d2027;
+  --piarc-session-tooltip-ink: #ffffff;
 }
 
 :root[data-color-mode='darkHighContrast'] {
@@ -481,6 +560,13 @@
   --piarc-code-background: #000000;
   --piarc-code-text: #eceef2;
   --piarc-overlay-scrim: #00000080;
+  --piarc-session-fill: #ffffff0d;
+  --piarc-session-fill-hover: #ffffff1a;
+  --piarc-session-ghost-hover: #ffffff14;
+  --piarc-session-line: #a9adb7;
+  --piarc-session-inline-code: #ffd1d1;
+  --piarc-session-tooltip: #000000;
+  --piarc-session-tooltip-ink: #ffffff;
 }
 
 :root[data-density='compact'] {
@@ -505,6 +591,34 @@
   --piarc-space-5: 18px;
   --piarc-size-row-height: 26px;
   --piarc-size-control-height: 26px;
+  --piarc-session-prose: 14px;
+  --piarc-session-prose-line: 20px;
+  --piarc-session-prose-line-cjk: 22px;
+  --piarc-session-body: 13px;
+  --piarc-session-body-line: 19px;
+  --piarc-session-footnote: 12px;
+  --piarc-session-footnote-line: 15px;
+  --piarc-session-caption: 11px;
+  --piarc-session-caption-line: 17px;
+  --piarc-session-code: 12px;
+  --piarc-session-code-line: 17px;
+  --piarc-session-row: 24px;
+  --piarc-session-row-small: 20px;
+  --piarc-session-row-nested: 18px;
+  --piarc-session-radius: 6px;
+  --piarc-session-radius-card: 10px;
+  --piarc-session-radius-chip: 4.5px;
+  --piarc-session-pad-xs: 4px;
+  --piarc-session-pad-sm: 6px;
+  --piarc-session-pad-md: 8px;
+  --piarc-session-pad-lg: 12px;
+  --piarc-session-gap-xs: 6px;
+  --piarc-session-gap-sm: 8px;
+  --piarc-session-gap-md: 12px;
+  --piarc-session-block-gap: 10px;
+  --piarc-session-turn-gap: 20px;
+  --piarc-session-icon: 16px;
+  --piarc-session-icon-large: 16px;
 }
 
 @media (forced-colors: active) {
@@ -558,5 +672,12 @@
     --piarc-agent-status-idle: GrayText;
     --piarc-code-background: Canvas;
     --piarc-code-text: CanvasText;
+    --piarc-session-fill: Canvas;
+    --piarc-session-fill-hover: Canvas;
+    --piarc-session-ghost-hover: Canvas;
+    --piarc-session-line: CanvasText;
+    --piarc-session-inline-code: CanvasText;
+    --piarc-session-tooltip: Canvas;
+    --piarc-session-tooltip-ink: CanvasText;
   }
 }

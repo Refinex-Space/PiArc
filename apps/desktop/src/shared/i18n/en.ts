@@ -918,6 +918,7 @@ export const en = {
   'transcript.copyMarkdown': 'Copy Markdown',
   'transcript.copyText': 'Copy text',
   'transcript.copied': 'Copied',
+  'transcript.diffCounts': '{added, plural, one {# line} other {# lines}} added, {removed} removed',
   'transcript.selectTurn': 'Select turn',
   'transcript.user.sending': 'Sending…',
   'transcript.user.undelivered': 'Not delivered: {reason}',

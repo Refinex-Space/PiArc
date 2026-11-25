@@ -45,6 +45,7 @@ import { WorkbenchHeader } from './WorkbenchHeader.js';
 import { useViewHistory } from './view-history.js';
 import { groupSessions } from './Sidebar.js';
 import { Toasts } from './Toasts.js';
+import { TooltipLayer } from '../app/Tooltip.js';
 import { TrustDialog, needsDecision, parseTrustView } from './TrustDialog.js';
 import { UiContext, type Toast, type TrustMode, type Ui, type View } from './ui.js';
 import { useAttention } from './use-attention.js';
@@ -630,6 +631,7 @@ export function Shell() {
           </div>
         </div>
         <Toasts />
+        <TooltipLayer />
         {paletteOpen && (
           <CommandPalette
             current={

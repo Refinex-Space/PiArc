@@ -904,6 +904,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'transcript.copyMarkdown': '复制 Markdown',
   'transcript.copyText': '复制纯文本',
   'transcript.copied': '已复制',
+  'transcript.diffCounts': '新增 {added} 行，删除 {removed} 行',
   'transcript.selectTurn': '选中本回合',
   'transcript.user.sending': '发送中…',
   'transcript.user.undelivered': '未送达：{reason}',
