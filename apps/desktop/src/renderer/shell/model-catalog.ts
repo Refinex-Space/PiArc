@@ -1,6 +1,6 @@
 // The same model directory drives first-turn selection, in-session switching and attachments.
 // Session and workspace directory responses come from Core as JSON.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   ModelRef,
   ModelsListResult,
@@ -8,7 +8,7 @@ import type {
   CatalogModel,
   EffortLevel,
 } from '@piarc/protocol';
-import { reason } from './errors.js';
+import { failureKind, reason } from './errors.js';
 
 export const EFFORTS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = EffortLevel;
@@ -63,10 +63,26 @@ export function parseCatalog(text: string): Catalog {
   };
 }
 
-export function useModelCatalog(target: string | undefined, session: boolean) {
+/** Failures that pass once the session or its Agent Host is ready: retried quietly first. */
+const TRANSIENT = new Set(['sessionNotFound', 'hostUnavailable', 'busy', 'timeout', 'uncertain']);
+
+/** Waits between the quiet retries (ms); the failure shows once they are used up. */
+const RETRY_MS = [250, 500, 1_000, 2_000, 4_000] as const;
+
+/**
+ * The models of a session (or of a workspace, for a new one). A failure is not final: a passing
+ * one (the session still opening in its Agent Host) is retried quietly, and a shown one is asked
+ * again when `again` changes (the session's turn starts or ends), so it clears once things work.
+ */
+export function useModelCatalog(target: string | undefined, session: boolean, again?: unknown) {
   const [data, setData] = useState<{ target: string; catalog: Catalog }>();
   const [failure, setFailure] = useState<string>();
   const [version, setVersion] = useState(0);
+  const failed = useRef(false);
+  failed.current = failure !== undefined;
+  useEffect(() => {
+    if (failed.current) setVersion((v) => v + 1);
+  }, [again]);
   useEffect(
     () =>
       window.piarc.onAppEvent((event) => {
@@ -76,25 +92,39 @@ export function useModelCatalog(target: string | undefined, session: boolean) {
   );
   useEffect(() => {
     let current = true;
-    setFailure(undefined);
-    if (target !== undefined) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (target === undefined) {
+      setFailure(undefined);
+      return;
+    }
+    const load = (attempt: number): void => {
       const promise = session
         ? window.piarc.sessionModels(target)
         : window.piarc.workspaceModels(target);
       promise
         .then(parseCatalog)
         .then((catalog) => {
-          if (current) setData({ target, catalog });
+          if (!current) return;
+          setData({ target, catalog });
+          setFailure(undefined);
         })
         .catch((e: unknown) => {
-          if (current) {
-            setData(undefined);
-            setFailure(reason(e));
+          if (!current) return;
+          const wait = TRANSIENT.has(failureKind(e) ?? '') ? RETRY_MS[attempt] : undefined;
+          if (wait !== undefined) {
+            timer = setTimeout(() => {
+              load(attempt + 1);
+            }, wait);
+            return;
           }
+          setData(undefined);
+          setFailure(reason(e));
         });
-    }
+    };
+    load(0);
     return () => {
       current = false;
+      clearTimeout(timer);
     };
   }, [target, session, version]);
   const catalog = data && data.target === target ? data.catalog : undefined;

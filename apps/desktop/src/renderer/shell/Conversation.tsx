@@ -242,7 +242,7 @@ export function Conversation({
     catalog,
     refresh,
     failure: catalogFailure,
-  } = useModelCatalog(session?.open ? id : undefined, true);
+  } = useModelCatalog(session?.open ? id : undefined, true, session?.status);
   const model = catalog?.models.find((m) => catalog.model && keyOf(m) === keyOf(catalog.model));
   const transcript = store.transcript(id);
   const turn = useTurnInfo(id);
