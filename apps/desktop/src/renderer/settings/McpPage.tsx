@@ -3,6 +3,7 @@
 // with reconnect, turn on, turn off and sign in. Core stores the on/off choice per workspace;
 // the pool's state arrives on `core/mcp`, a sign-in's steps on `core/login`.
 import type { McpServerStatus, McpStatus } from '@piarc/protocol';
+import { WorkspaceOptions } from './WorkspaceOptions.js';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { useApp } from '../app/app-context.js';
@@ -283,11 +284,7 @@ export function McpPage() {
               setChosen(e.currentTarget.value);
             }}
           >
-            {workspaces.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
+            <WorkspaceOptions workspaces={workspaces} />
           </select>
         </div>
       )}

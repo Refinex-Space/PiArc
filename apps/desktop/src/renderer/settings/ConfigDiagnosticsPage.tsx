@@ -8,6 +8,7 @@
 // (`.mcp.json`, memory files and imports, rules, subagent definitions, skills, commands, output
 // styles, extension packages, the enterprise place), grouped by kind after the settings files.
 import { useEffect, useId, useRef, useState } from 'react';
+import { WorkspaceOptions } from './WorkspaceOptions.js';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
@@ -586,11 +587,7 @@ export function ConfigDiagnosticsPage() {
                 setChosen(e.currentTarget.value);
               }}
             >
-              {view.workspaces.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
+              <WorkspaceOptions workspaces={view.workspaces} />
             </select>
             <Button
               size="small"

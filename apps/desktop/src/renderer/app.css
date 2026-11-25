@@ -461,6 +461,30 @@ textarea.input {
   padding-right: 148px;
 }
 
+/* ...and a short divider, clear of the top and the bottom, separates the app's own buttons from
+   the window's (138 px of caption buttons sit inside the 148 px kept for them). */
+:root[data-platform='windows'] .workbench-header.has-session::after,
+:root[data-platform='windows']
+  .tool-tile-slot[data-overlay-edge='true']:not([data-compact-caption='true'])
+  .tool-tile-header::after {
+  position: absolute;
+  top: 50%;
+  right: 143px;
+  width: 1px;
+  height: 16px;
+  background: var(--piarc-border-subtle);
+  content: '';
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+:root[data-platform='windows']
+  .tool-tiles[data-has-tools='true']
+  .tile-primary
+  .workbench-header::after {
+  display: none;
+}
+
 .resizer {
   position: relative;
   background: var(--piarc-border-subtle);

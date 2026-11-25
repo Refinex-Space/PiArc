@@ -41,6 +41,7 @@ body[data-tool-window] > #tool-root {
   height: 100dvh;
 }
 .tool-tile-header {
+  position: relative;
   flex: none;
   display: flex;
   box-sizing: border-box;
@@ -221,9 +222,10 @@ body[data-tool-window] > #tool-root {
   .workbench-header .history-buttons > button:not(:first-child) {
     display: none;
   }
+  /* Tight, but a hover or pressed fill never touches its neighbour. */
   .workbench-header,
   .session-tools {
-    gap: 0;
+    gap: 2px;
   }
   .workbench-header .view-control > button {
     min-width: var(--piarc-space-5);

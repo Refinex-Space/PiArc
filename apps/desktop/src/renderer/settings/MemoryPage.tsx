@@ -3,6 +3,7 @@
 // repository (view, edit, delete), deleting them all and importing Claude Code's memory once.
 // Core does every change (`memoryEdit`) and answers the page anew; it audits each edit.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { WorkspaceOptions } from './WorkspaceOptions.js';
 
 import { useApp } from '../app/app-context.js';
 import { parseWorkspaces } from './AgentsPage.js';
@@ -343,11 +344,7 @@ export function MemoryPage() {
               setChosen(e.currentTarget.value);
             }}
           >
-            {workspaces.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
+            <WorkspaceOptions workspaces={workspaces} />
           </select>
         </div>
       )}

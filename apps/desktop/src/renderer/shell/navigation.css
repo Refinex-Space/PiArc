@@ -1,6 +1,6 @@
 /* The sidebar has one reading axis for global actions, projects and sessions. */
 .workbench-navigation .titlebar-actions {
-  gap: 0;
+  gap: 2px;
   margin-inline-start: 0;
 }
 .workbench-navigation .titlebar-actions .icon-button,

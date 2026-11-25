@@ -3,6 +3,7 @@
 // switch, and the audit of permission decisions. Core parses and saves; the main process
 // shows the native confirmation for new or changed allow rules.
 import { useCallback, useEffect, useId, useState } from 'react';
+import { WorkspaceOptions } from './WorkspaceOptions.js';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import {
@@ -772,11 +773,7 @@ export function PermissionsPage() {
               load(e.currentTarget.value);
             }}
           >
-            {view.workspaces.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
+            <WorkspaceOptions workspaces={view.workspaces} />
           </select>
         </div>
       )}

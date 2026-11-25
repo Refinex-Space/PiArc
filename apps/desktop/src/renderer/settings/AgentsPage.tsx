@@ -2,6 +2,7 @@
 // types, with where each came from, what it replaces, the model it resolves to, ignored and
 // inactive fields, and the files that are not valid definitions (with their line).
 import type { AgentDefinition, AgentIssue, AgentWarning } from '@piarc/protocol';
+import { WorkspaceOptions } from './WorkspaceOptions.js';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { useApp } from '../app/app-context.js';
@@ -180,11 +181,7 @@ export function AgentsPage() {
               setChosen(e.currentTarget.value);
             }}
           >
-            {workspaces.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
+            <WorkspaceOptions workspaces={workspaces} />
           </select>
         </div>
       )}

@@ -115,6 +115,10 @@
   border: 1px solid color-mix(in srgb, var(--piarc-text-primary) 12%, transparent);
   border-radius: var(--piarc-c-button-radius);
   background-color: var(--piarc-surface-raised);
+  /* A long value (a workspace path) stays on one line, cut at the edge; the list shows it whole. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-page select.preference-language {
@@ -197,6 +201,7 @@
     min-height: var(--piarc-c-button-height);
     padding: var(--piarc-space-1) var(--piarc-space-3);
     border-radius: var(--piarc-c-button-radius);
+    white-space: normal;
     overflow-wrap: anywhere;
   }
 

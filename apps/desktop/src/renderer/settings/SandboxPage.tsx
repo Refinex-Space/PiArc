@@ -6,6 +6,7 @@
 // turning auto-approval on and adding domains natively. On Windows the switch is disabled and
 // says why (requirement D7).
 import { useCallback, useEffect, useId, useState } from 'react';
+import { WorkspaceOptions } from './WorkspaceOptions.js';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import type { SandboxChange } from '../../shared/ipc.js';
@@ -284,11 +285,7 @@ export function SandboxPage() {
               load(e.currentTarget.value);
             }}
           >
-            {view.workspaces.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
+            <WorkspaceOptions workspaces={view.workspaces} />
           </select>
         </div>
       )}
