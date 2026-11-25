@@ -120,16 +120,16 @@
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 外壳 | `src/source-approval-card.{jsx,css}` | 嵌在对话里，最宽 480，内距 16，圆角 12，1 px 细线环，无阴影无底色；块间 24；最高 60vh 内部滚动、边缘 28 渐隐；160 ms 淡入 | 全宽卡片、粗边框 | 复刻 | 各类卡截图 | 待实现 |
-| 标题 | `generated/question-card/card-header.mjs` | 14/20 字重 520 一句话 "Allow … to run?" | "Run command? Bash" 加徽标 | 复刻句式，助手名用 "PiArc 的智能体"（不用模型名） | 中英文截图 | 待实现 |
-| 参数块 | 同上 | 淡底、圆角 5、内距 12×16，13/19 等宽次色，pre-wrap | 代码块 | 复刻 | 截图 | 待实现 |
-| 决策按钮 | `generated/cowork-approval/shared-10-*.mjs` | 右对齐；拒绝与允许组间 16，组内 12；高 28；"Allow once" 主按钮带 ⌘↵ 键帽（18 高，圆角 4）；卡宽 ≤420 时纵排撑满 | 四个同级按钮 | 复刻层级；主色沿用 PiArc 强调色 | 截图、窄窗 | 待实现 |
-| 拒绝反馈 | `src/source-approval-card.jsx` | 行首 "Add feedback" 文字按钮，点开两行文本框；有内容时拒绝改名 "Deny with feedback" | 常驻输入框 | 复刻 | 截图 | 待实现 |
-| 总是允许的规则 | — | 参考只给前缀说明 | 可编辑规则文本框，原生确认 | 改造：规则编辑收进 "Always allow…" 的展开区，原生确认不变（PiArc 不变量） | 截图、T23 L4 | 待实现 |
-| 阅读闸门 | `src/approval-read-gate-model.mjs` | 首末行都上屏才算读过；未读时允许按钮禁用并提示 "Scroll through …" | 展开后才允许"总是允许" | 改造：保留 PiArc 闸门逻辑（`approval-keys.ts`），提示文案与位置按参考 | 键盘与 L4 | 待实现 |
-| 热键 | `src/card-hotkeys-model.mjs` | Esc 拒绝，⌘↵ 允许一次，⇧⌘↵ 持久允许；400 ms 防误触；首张可见卡响应 | 同语义 | 保留，补键帽显示 | T20、T43 L4 | 待实现 |
-| 网络、沙箱、MCP、计划、提问 | `source-approval-card.jsx`、`source-plan-card.jsx`、`source-question-card.jsx` | 各自标题句式；计划卡只给 "Open plan"；提问卡行内距 16、单选 20 px 圆、分隔线 | 各自组件 | 复刻；计划卡保留预览折叠（PiArc 计划面板可不在场） | 截图 | 待实现 |
-| 答复后 | 同上 | 工具卡立即卸载；提问留下问答回执 | 行移除 | 复刻 | L4 | 待实现 |
+| 外壳 | `src/source-approval-card.{jsx,css}` | 嵌在对话里，最宽 480，内距 16，圆角 12，1 px 细线环，无阴影无底色；块间 24；最高 60vh 内部滚动、边缘 28 渐隐；160 ms 淡入 | 全宽卡片、粗边框 | 复刻 | 各类卡截图 | 已对齐（改造）：最宽 560（PiArc 多一个"总是允许"，480 放不下四个决策），内距 16、圆角 12、细线环、无阴影无底色，最高 60vh，160 ms 淡入；获得焦点时卡片画 1 px 外框；`gallery/approvals/` |
+| 标题 | `generated/question-card/card-header.mjs` | 14/20 字重 520 一句话 "Allow … to run?" | "Run command? Bash" 加徽标 | 复刻句式，助手名用 "PiArc 的智能体"（不用模型名） | 中英文截图 | 已对齐：一句话标题（命令、修改文件），参数块淡底圆角 5；`gallery/approvals/` |
+| 参数块 | 同上 | 淡底、圆角 5、内距 12×16，13/19 等宽次色，pre-wrap | 代码块 | 复刻 | 截图 | 已对齐：一句话标题（命令、修改文件），参数块淡底圆角 5；`gallery/approvals/` |
+| 决策按钮 | `generated/cowork-approval/shared-10-*.mjs` | 右对齐；拒绝与允许组间 16，组内 12；高 28；"Allow once" 主按钮带 ⌘↵ 键帽（18 高，圆角 4）；卡宽 ≤420 时纵排撑满 | 四个同级按钮 | 复刻层级；主色沿用 PiArc 强调色 | 截图、窄窗 | 已对齐（改造）：右对齐，拒绝 → 总是允许 → 本会话允许 → 仅本次（主按钮带 Ctrl/⌘ + Enter 键帽，其余热键用 aria-keyshortcuts）；主色沿用 PiArc 强调色；窄卡纵排；保留"Decline"文案 |
+| 拒绝反馈 | `src/source-approval-card.jsx` | 行首 "Add feedback" 文字按钮，点开两行文本框；有内容时拒绝改名 "Deny with feedback" | 常驻输入框 | 复刻 | 截图 | 已对齐（改造）："Add feedback"移到详情末尾，点开两行文本框并聚焦，有内容时按钮变为"Decline with feedback"；t20、t22 先点开再填写 |
+| 总是允许的规则 | — | 参考只给前缀说明 | 可编辑规则文本框，原生确认 | 改造：规则编辑收进 "Always allow…" 的展开区，原生确认不变（PiArc 不变量） | 截图、T23 L4 | 已对齐（改造）：规则编辑、长参数展开后才可总是允许、400 ms 防误触、首张可见卡响应、输入法守卫与原生确认全部保留；闸门提示放在决策行上方；t20、t23、t43-approval-focus 通过 |
+| 阅读闸门 | `src/approval-read-gate-model.mjs` | 首末行都上屏才算读过；未读时允许按钮禁用并提示 "Scroll through …" | 展开后才允许"总是允许" | 改造：保留 PiArc 闸门逻辑（`approval-keys.ts`），提示文案与位置按参考 | 键盘与 L4 | 已对齐（改造）：规则编辑、长参数展开后才可总是允许、400 ms 防误触、首张可见卡响应、输入法守卫与原生确认全部保留；闸门提示放在决策行上方；t20、t23、t43-approval-focus 通过 |
+| 热键 | `src/card-hotkeys-model.mjs` | Esc 拒绝，⌘↵ 允许一次，⇧⌘↵ 持久允许；400 ms 防误触；首张可见卡响应 | 同语义 | 保留，补键帽显示 | T20、T43 L4 | 已对齐（改造）：规则编辑、长参数展开后才可总是允许、400 ms 防误触、首张可见卡响应、输入法守卫与原生确认全部保留；闸门提示放在决策行上方；t20、t23、t43-approval-focus 通过 |
+| 网络、沙箱、MCP、计划、提问 | `source-approval-card.jsx`、`source-plan-card.jsx`、`source-question-card.jsx` | 各自标题句式；计划卡只给 "Open plan"；提问卡行内距 16、单选 20 px 圆、分隔线 | 各自组件 | 复刻；计划卡保留预览折叠（PiArc 计划面板可不在场） | 截图 | 已对齐（改造）：同一卡片外壳；计划卡保留预览、评论与反馈（计划面板不一定在场）；提问卡每题一条淡底标题条、分隔线选项行、18 px 强调色单选；MCP 表单仍在对话框里填写；t26、t22 通过 |
+| 答复后 | 同上 | 工具卡立即卸载；提问留下问答回执 | 行移除 | 复刻 | L4 | 已对齐：卡片由 Core 新快照移除，工具行继续显示其结果；提问留下问答行 |
 
 ## 10. 宿主卡片与状态行
 

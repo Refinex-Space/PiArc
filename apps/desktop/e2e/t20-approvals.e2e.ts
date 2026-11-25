@@ -56,6 +56,7 @@ test('edits and confirms an exact rule, declines protected writes and restores t
   await expect(card).toContainText(/\.piarc[\\/]note\.txt/u);
   await expect(card.getByRole('button', { name: 'Always allow' })).toHaveCount(0);
   await card.screenshot({ path: info.outputPath('protected-file.png') });
+  await card.getByTestId('approval-add-feedback').click();
   await card
     .getByLabel('Feedback for the model (optional)')
     .fill('Keep the project configuration as it is.');
@@ -147,6 +148,7 @@ test('guards approval shortcuts with the actual composer, focused card and visib
   await page.keyboard.press(MOD + '+Enter');
   expect(await answers()).toHaveLength(1);
   await cdp.send('Input.imeSetComposition', { text: '', selectionStart: 0, selectionEnd: 0 });
+  await first.getByTestId('approval-add-feedback').click();
   await first.getByLabel('Feedback for the model (optional)').fill('Wait for review');
   await page.keyboard.press('Escape');
   await expect

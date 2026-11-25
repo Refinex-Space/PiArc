@@ -26,8 +26,8 @@ test('a session finishing in the background notifies and counts on the Dock badg
   // command asks first (`sleep` alone is read-only and would run without a card, T23).
   const id = await startSession(page, 'Take a while', 't18-slow#notify');
   await page
-    .locator('[data-approval-card=command] button')
-    .filter({ hasText: /^(Allow once|仅本次允许)$/u })
+    .locator('[data-approval-card=command]')
+    .getByRole('button', { name: /^(Allow once|仅本次允许)$/u })
     .click();
   const { page: front } = await openProbe(app);
   // The main window is no longer in front.

@@ -198,20 +198,25 @@ export function ElicitationCard({ request }: { readonly request: ApprovalRequest
       data-approval-card="elicitation"
       data-request-id={request.requestId}
     >
-      <header>
-        <strong>{t('approval.kind.elicitation')}</strong> {request.tool}
-      </header>
-      <ApprovalOrigin request={request} />
-      <p>{revealBidi(elicitation.message)}</p>
-      <button
-        type="button"
-        className="button"
-        onClick={() => {
-          setOpen(true);
-        }}
-      >
-        {t('mcp.elicit.review')}
-      </button>
+      <div className="approval-box">
+        <header className="approval-title">
+          <strong>{t('approval.kind.elicitation')}</strong>
+          <span className="approval-tool">{request.tool}</span>
+        </header>
+        <ApprovalOrigin request={request} />
+        <p className="approval-message">{revealBidi(elicitation.message)}</p>
+        <div className="approval-actions">
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => {
+              setOpen(true);
+            }}
+          >
+            {t('mcp.elicit.review')}
+          </button>
+        </div>
+      </div>
       {open && (
         <Dialog
           labelledBy={title}

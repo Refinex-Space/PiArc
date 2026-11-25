@@ -7,7 +7,8 @@ import { approvalLabel } from './approval-label.js';
 import type { ApprovalRequest, Question } from '@piarc/protocol';
 import { useRef, useState } from 'react';
 
-import { useT } from '../app/app-context.js';
+import { useApp } from '../app/app-context.js';
+import { Keycaps } from '../app/Keycaps.js';
 import { reason } from '../shell/errors.js';
 import { answerRequest } from './answer.js';
 import { useApprovalKeys } from './use-approval-keys.js';
@@ -50,7 +51,7 @@ function QuestionFields({
   readonly draft: Draft;
   readonly onChange: (draft: Draft) => void;
 }) {
-  const t = useT();
+  const { t } = useApp();
   const many = question.multiSelect === true;
   const pick = (label: string, on: boolean) => {
     if (many) {
@@ -77,9 +78,11 @@ function QuestionFields({
               pick(option.label, e.target.checked);
             }}
           />
-          <span>
-            {option.label}
-            {option.description && <span className="muted"> — {option.description}</span>}
+          <span className="question-option-text">
+            <span className="question-option-label">{option.label}</span>
+            {option.description && (
+              <span className="question-option-description">{option.description}</span>
+            )}
           </span>
         </label>
       ))}
@@ -119,7 +122,7 @@ function QuestionFields({
 }
 
 export function QuestionForm({ request }: { readonly request: ApprovalRequest }) {
-  const t = useT();
+  const { t, keyPlatform } = useApp();
   const card = useRef<HTMLElement>(null);
   const questions = request.questions ?? [];
   const [drafts, setDrafts] = useState<readonly Draft[]>(() => questions.map(() => EMPTY));
@@ -175,55 +178,65 @@ export function QuestionForm({ request }: { readonly request: ApprovalRequest })
       data-approval-card="question"
       data-request-id={request.requestId}
     >
-      <header>
-        <strong>{t('approval.kind.question')}</strong>
-      </header>
-      <ApprovalOrigin request={request} />
-      {questions.map((question, i) => (
-        <QuestionFields
-          key={String(i)}
-          name={`${request.requestId}-${String(i)}`}
-          question={question}
-          draft={drafts[i] ?? EMPTY}
-          onChange={(draft) => {
-            setDrafts((current) => current.map((d, j) => (j === i ? draft : d)));
-          }}
-        />
-      ))}
-      <label>
-        {t('approval.feedback')}
-        <input
-          value={feedback}
-          onChange={(e) => {
-            setFeedback(e.target.value);
-          }}
-        />
-      </label>
-      <div className="approval-actions">
-        <button
-          type="button"
-          className="button"
-          disabled={waiting}
-          data-testid="question-decline"
-          onClick={() => {
-            send(true);
-          }}
-        >
-          {t('question.decline')}
-        </button>
-        <button
-          type="button"
-          className="button button-primary"
-          disabled={waiting || answers === undefined}
-          data-testid="question-submit"
-          onClick={() => {
-            send(false);
-          }}
-        >
-          {t('question.submit')}
-        </button>
+      <div className="approval-box is-question">
+        <header className="approval-title approval-strip">
+          <strong>{t('approval.kind.question')}</strong>
+        </header>
+        <ApprovalOrigin request={request} />
+        {questions.map((question, i) => (
+          <QuestionFields
+            key={String(i)}
+            name={`${request.requestId}-${String(i)}`}
+            question={question}
+            draft={drafts[i] ?? EMPTY}
+            onChange={(draft) => {
+              setDrafts((current) => current.map((d, j) => (j === i ? draft : d)));
+            }}
+          />
+        ))}
+        <label className="approval-field question-feedback">
+          <span className="visually-hidden">{t('approval.feedback')}</span>
+          <input
+            placeholder={t('approval.feedback')}
+            value={feedback}
+            onChange={(e) => {
+              setFeedback(e.target.value);
+            }}
+          />
+        </label>
+        <div className="approval-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={waiting}
+            data-testid="question-decline"
+            onClick={() => {
+              send(true);
+            }}
+          >
+            {t('question.decline')}
+          </button>
+          <button
+            type="button"
+            className="button button-primary"
+            disabled={waiting || answers === undefined}
+            data-testid="question-submit"
+            onClick={() => {
+              send(false);
+            }}
+          >
+            {t('question.submit')}
+            <span className="approval-keys" aria-hidden="true">
+              <Keycaps binding="Mod+Enter" platform={keyPlatform} />
+            </span>
+          </button>
+        </div>
+        {error && (
+          <p className="approval-error" role="alert">
+            {error}
+          </p>
+        )}
       </div>
-      {error && <p role="alert">{error}</p>}
     </section>
   );
 }

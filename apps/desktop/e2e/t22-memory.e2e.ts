@@ -74,6 +74,7 @@ sessionTest(
       true,
     );
     const feedback = 'Use only the project notes.';
+    await card.getByTestId('approval-add-feedback').click();
     await card.getByLabel('Feedback for the model (optional)').fill(feedback);
     expect(await requests(mock, 't18-chat')).toHaveLength(0);
     await card.screenshot({ path: info.outputPath('external-memory-approval.png') });
