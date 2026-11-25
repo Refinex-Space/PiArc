@@ -292,6 +292,42 @@ export interface QueuedInput {
   readonly kind: 'steer' | 'followUp';
   readonly text: string;
   readonly attachments: readonly AttachmentChip[];
+  /** The files the text mentions, to send it again ("Send now"). */
+  readonly mentions: readonly InputMention[];
+  /** The stored attachments themselves, to send it again. */
+  readonly stored: readonly InputAttachment[];
+}
+
+/** The mentions in `value` that have the protocol's shape. */
+function mentionsOf(value: unknown): InputMention[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((m: unknown) =>
+    isRecord(m) &&
+    typeof m.path === 'string' &&
+    typeof m.start === 'number' &&
+    typeof m.end === 'number'
+      ? [{ path: m.path, start: m.start, end: m.end }]
+      : [],
+  );
+}
+
+/** An attachment Core stored, with its blob: what an input carries to Core. */
+export function storedAttachmentOf(value: unknown): InputAttachment[] {
+  const [chip] = chipOf(value);
+  if (chip === undefined || !isRecord(value) || !isRecord(value.blob)) return [];
+  const { path, sha256, size } = value.blob;
+  if (typeof path !== 'string' || typeof sha256 !== 'string' || typeof size !== 'number') {
+    return [];
+  }
+  return [
+    {
+      kind: chip.kind,
+      name: chip.name,
+      mimeType: chip.mimeType,
+      blob: { path, sha256, size },
+      ...(chip.pageCount === undefined ? {} : { pageCount: chip.pageCount }),
+    },
+  ];
 }
 
 function queueItemOf(value: unknown): QueuedInput[] {
@@ -303,8 +339,17 @@ function queueItemOf(value: unknown): QueuedInput[] {
   ) {
     return [];
   }
-  const attachments = Array.isArray(value.attachments) ? value.attachments.flatMap(chipOf) : [];
-  return [{ itemId: value.itemId, kind: value.kind, text: value.text, attachments }];
+  const raw: unknown[] = Array.isArray(value.attachments) ? value.attachments : [];
+  return [
+    {
+      itemId: value.itemId,
+      kind: value.kind,
+      text: value.text,
+      attachments: raw.flatMap(chipOf),
+      mentions: mentionsOf(value.mentions),
+      stored: raw.flatMap(storedAttachmentOf),
+    },
+  ];
 }
 
 function optimisticId(clientId: string): string {

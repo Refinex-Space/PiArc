@@ -1080,6 +1080,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'composer.queue.count': '{count} 条消息在排队',
   'composer.queue.steer': '插话',
   'composer.queue.followUp': '下一条',
+  'composer.queue.sendNow': '立即发送',
   'composer.queue.edit': '编辑',
   'composer.queue.save': '保存',
   'composer.queue.cancel': '取消',

@@ -13,4 +13,4 @@ ProseMirror 处理编辑、候选面板和键盘意图。新会话与正式会�
 - 命令与 skill 选中后是 `schema.ts` 的 `command` 原子节点（强调色名字、半透明 `/`，描述是 `data-tooltip`），序列化为 `/名称`；`/` 在空输入框直接唤起面板，在句中要位于词首且已输入一个名字字符（`command-plugin.ts` 的 `slashBefore`、`continueCommand`），面板状态记着 `/` 的位置，内置命令只在开头提供（`paletteChoices`）。Core 只展开开头的命令（ADR-0080）。
 - 合成期间的 `isComposing`、键码 229 和 `view.composing` 都经过输入法守卫。按键在 `handleDOMEvents.keydown` 层处理，让 Enter/Esc 留给候选框，合成文本中的 `/`、`@` 保持普通输入。
 - 运行中草稿为空时发送位显示停止，有草稿时显示发送；两者互换后 `SWAP_GUARD_MS`（500 ms）内落在新按钮上的点击被忽略，防止连点把刚写的消息当成停止。运行中的占位文字说明 Enter 插话、Mod+Enter 排队。会话提示（`shell/NoticeBar.tsx`）在输入卡片上方。
-- 运行中 Enter 为 steer，Mod+Enter 为 follow-up，Esc 停止。排队项以 `session/queueChanged` 为准。编辑已排队的文本会清除原提及区间并保留附件。
+- 运行中 Enter 为 steer，Mod+Enter 为 follow-up，Esc 停止。排队项以 `session/queueChanged` 为准。编辑已排队的文本会清除原提及区间并保留附件。回合运行中，排队的 follow-up 悬停时有“立即发送”（与发送键同一图标，参考版的 Send now）：`SessionInput.sendNow` 先删排队项，再以同样的文字、提及与已存附件作为 steer 发出，在当前步骤之后进入本回合；steer 被拒时重新作为 follow-up 排回队尾（没有 reorder 的 IPC），一次只处理一条。插话项本来就在当前回合，不提供。

@@ -1104,6 +1104,7 @@ export const en = {
   'composer.queue.count': '{count, plural, one {# message queued} other {# messages queued}}',
   'composer.queue.steer': 'Steer',
   'composer.queue.followUp': 'Next',
+  'composer.queue.sendNow': 'Send now',
   'composer.queue.edit': 'Edit',
   'composer.queue.save': 'Save',
   'composer.queue.cancel': 'Cancel',

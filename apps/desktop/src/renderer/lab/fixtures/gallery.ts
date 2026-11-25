@@ -555,12 +555,21 @@ function working(): GallerySection {
   return {
     running: true,
     queue: [
-      { itemId: 'q1', kind: 'steer', text: 'Skip the vendored folders.', attachments: [] },
+      {
+        itemId: 'q1',
+        kind: 'steer',
+        text: 'Skip the vendored folders.',
+        attachments: [],
+        mentions: [],
+        stored: [],
+      },
       {
         itemId: 'q2',
         kind: 'followUp',
         text: 'Then update the index docs with the new options and run the docs build.',
         attachments: [],
+        mentions: [],
+        stored: [],
       },
     ],
     notifications: [

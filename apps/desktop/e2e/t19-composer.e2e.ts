@@ -349,6 +349,35 @@ test('running: Enter steers, Mod+Enter queues (edit, delete), Esc stops', async 
   expect(sent.flatMap((request) => userTexts(request.body))).not.toContain('Never mind');
 });
 
+test('running: a queued follow-up sent now steers the running turn', async ({
+  app,
+  page,
+  mock,
+  workspaces,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  await openSession(app, page, workspaces, 'send now 立即', 't19-steer', 'Wait for the signal');
+  const composer = page.getByTestId('composer');
+  await expect(composer).toHaveAttribute('data-running', 'true', { timeout: 20_000 });
+  // The command waits for approval: the turn runs, and the follow-up waits for its end.
+  await expect(page.getByTestId('bash-card')).toBeVisible();
+  await typeInComposer(page, 'Then follow up');
+  await page.keyboard.press(`${MOD}+Enter`);
+  const queued = page.getByTestId('queue-item').filter({ hasText: 'Then follow up' });
+  await expect(queued).toHaveAttribute('data-kind', 'followUp');
+  await queued.hover();
+  await page.screenshot({ path: testInfo.outputPath('send-now.png') });
+  await queued.getByTestId('queue-send-now').click();
+  // It left the follow-ups and now goes in after the current step, like Enter would have.
+  await expect(queued).toHaveAttribute('data-kind', 'steer');
+  await page.getByRole('button', { name: 'Allow once', exact: true }).click();
+  await idle(page, 40_000);
+  const sent = await requests(mock, 't19-steer');
+  // The model hears it in the same turn, beside the command's result; no turn of its own.
+  expect(sent).toHaveLength(2);
+  expect(userTexts(sent[1]?.body ?? {})).toContain('Then follow up');
+});
+
 test('Esc stops the running turn', async ({ app, page, workspaces }) => {
   await openSession(app, page, workspaces, 'stop 停止', 't19-stop', 'Write a long answer');
   await expect(page.getByTestId('composer')).toHaveAttribute('data-running', 'true', {

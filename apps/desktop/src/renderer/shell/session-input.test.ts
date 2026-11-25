@@ -11,6 +11,7 @@ function setup() {
     steer: vi.fn<PiarcApi['steer']>(),
     followUp: vi.fn<PiarcApi['followUp']>(),
     resumeSession: vi.fn<PiarcApi['resumeSession']>().mockResolvedValue('{}'),
+    deleteQueueItem: vi.fn<PiarcApi['deleteQueueItem']>().mockResolvedValue('{"items":[]}'),
     storeAttachment: vi
       .fn<PiarcApi['storeAttachment']>()
       .mockImplementation((_id, name, mimeType, bytes) =>
@@ -43,6 +44,58 @@ function draft(...names: string[]): Draft {
     })),
   };
 }
+
+describe('sending a queued follow-up now', () => {
+  const item = {
+    itemId: 'q2',
+    kind: 'followUp' as const,
+    text: 'Then @a.ts',
+    attachments: [],
+    mentions: [{ path: 'src/a.ts', start: 5, end: 10 }],
+    stored: [
+      {
+        kind: 'image' as const,
+        name: 'a.png',
+        mimeType: 'image/png',
+        blob: { path: '/s/a.png', sha256: 'f', size: 3 },
+      },
+    ],
+  };
+
+  it('takes it out of the queue, then steers the turn with the same input', async () => {
+    const { enter, api } = setup();
+    const order: string[] = [];
+    api.deleteQueueItem.mockImplementation(() => {
+      order.push('delete');
+      return Promise.resolve('{"items":[]}');
+    });
+    api.steer.mockImplementation(() => {
+      order.push('steer');
+      return Promise.resolve('{"disposition":"queued","itemId":"q3"}');
+    });
+    await enter().sendNow(item);
+    expect(order).toEqual(['delete', 'steer']);
+    expect(api.deleteQueueItem).toHaveBeenCalledWith('s', 'q2');
+    expect(api.steer.mock.calls[0]?.[1]).toMatchObject({
+      text: 'Then @a.ts',
+      mentions: item.mentions,
+      attachments: item.stored,
+    });
+    expect(api.followUp).not.toHaveBeenCalled();
+  });
+
+  it('puts it back in the queue when the steer is refused', async () => {
+    const { enter, api } = setup();
+    api.steer.mockRejectedValueOnce(new Error('refused'));
+    api.followUp.mockResolvedValue('{"disposition":"queued","itemId":"q4"}');
+    await expect(enter().sendNow(item)).rejects.toThrow('refused');
+    expect(api.followUp.mock.calls[0]?.[1]).toMatchObject({
+      text: 'Then @a.ts',
+      mentions: item.mentions,
+      attachments: item.stored,
+    });
+  });
+});
 
 describe('session input delivery', () => {
   it('resends from a reopened view once, with the same key and stored attachments', async () => {

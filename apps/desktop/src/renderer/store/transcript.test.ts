@@ -225,7 +225,8 @@ describe('SessionTranscript rows', () => {
           {
             itemId: 'q2',
             kind: 'followUp',
-            text: 'then that',
+            text: 'then that @a.ts',
+            mentions: [{ path: 'src/a.ts', start: 10, end: 15 }, { path: 7 }],
             attachments: [
               {
                 kind: 'pdf',
@@ -241,14 +242,32 @@ describe('SessionTranscript rows', () => {
       }),
       note('session/resync', { since: 1, next: 5 }),
     ]);
+    // What the band shows, and what "Send now" sends again: the mentions and the stored files.
     expect(transcript.queue()).toEqual([
-      { itemId: 'q1', kind: 'steer', text: 'also this', attachments: [] },
+      {
+        itemId: 'q1',
+        kind: 'steer',
+        text: 'also this',
+        attachments: [],
+        mentions: [],
+        stored: [],
+      },
       {
         itemId: 'q2',
         kind: 'followUp',
-        text: 'then that',
+        text: 'then that @a.ts',
         attachments: [
           { kind: 'pdf', name: 'a.pdf', mimeType: 'application/pdf', size: 10, pageCount: 2 },
+        ],
+        mentions: [{ path: 'src/a.ts', start: 10, end: 15 }],
+        stored: [
+          {
+            kind: 'pdf',
+            name: 'a.pdf',
+            mimeType: 'application/pdf',
+            blob: { path: '/x', sha256: 'f', size: 10 },
+            pageCount: 2,
+          },
         ],
       },
     ]);

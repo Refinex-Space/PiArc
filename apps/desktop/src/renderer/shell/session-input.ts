@@ -11,10 +11,19 @@ import type { InputAttachment, InputMention } from '@piarc/protocol';
 
 import type { OutgoingInput, PiarcApi } from '../../shared/ipc.js';
 import type { AppStore } from '../store/app-store.js';
-import { chipOf, type AttachmentChip, type DraftFiles } from '../store/transcript.js';
+import {
+  chipOf,
+  storedAttachmentOf,
+  type AttachmentChip,
+  type DraftFiles,
+  type QueuedInput,
+} from '../store/transcript.js';
 import { reason } from './errors.js';
 
-type Api = Pick<PiarcApi, 'prompt' | 'steer' | 'followUp' | 'storeAttachment' | 'resumeSession'>;
+type Api = Pick<
+  PiarcApi,
+  'prompt' | 'steer' | 'followUp' | 'storeAttachment' | 'resumeSession' | 'deleteQueueItem'
+>;
 
 /** An input on its way: what the user wrote and what is attached. */
 export interface Draft extends DraftFiles {
@@ -62,33 +71,9 @@ export function chipsOf(draft: Draft): AttachmentChip[] {
 
 /** Core's description of a stored attachment. */
 function parseAttachment(text: string): InputAttachment {
-  const value: unknown = JSON.parse(text);
-  const [chip] = chipOf(value);
-  if (
-    chip === undefined ||
-    typeof value !== 'object' ||
-    value === null ||
-    !('blob' in value) ||
-    typeof value.blob !== 'object' ||
-    value.blob === null
-  ) {
-    throw new Error('Core did not describe the attachment');
-  }
-  const blob = value.blob as Record<string, unknown>;
-  if (
-    typeof blob.path !== 'string' ||
-    typeof blob.sha256 !== 'string' ||
-    typeof blob.size !== 'number'
-  ) {
-    throw new Error('Core did not describe the attachment');
-  }
-  return {
-    kind: chip.kind,
-    name: chip.name,
-    mimeType: chip.mimeType,
-    blob: { path: blob.path, sha256: blob.sha256, size: blob.size },
-    ...(chip.pageCount === undefined ? {} : { pageCount: chip.pageCount }),
-  };
+  const [attachment] = storedAttachmentOf(JSON.parse(text));
+  if (attachment === undefined) throw new Error('Core did not describe the attachment');
+  return attachment;
 }
 
 /** One session's input path. Recovery data lives with the optimistic row until Core echoes it. */
@@ -160,6 +145,29 @@ export class SessionInput {
     await (kind === 'steer'
       ? this.api.steer(this.sessionId, input)
       : this.api.followUp(this.sessionId, input));
+  }
+
+  /**
+   * Sends a queued follow-up now: it leaves the queue and steers the running turn (the reference's
+   * "Send now"). When Core refuses the steer, the input goes back into the queue (at its end, as a
+   * follow-up again) and the error is thrown.
+   */
+  async sendNow(item: QueuedInput): Promise<void> {
+    const input = (): OutgoingInput => ({
+      requestId: crypto.randomUUID(),
+      text: item.text,
+      mentions: item.mentions,
+      attachments: item.stored,
+    });
+    await this.api.deleteQueueItem(this.sessionId, item.itemId);
+    try {
+      await this.api.steer(this.sessionId, input());
+    } catch (error) {
+      await this.api.followUp(this.sessionId, input()).catch((requeue: unknown) => {
+        console.error('[queue] putting a refused input back failed', requeue);
+      });
+      throw error;
+    }
   }
 
   /** Opens the session in Core when it is not (a session from the list, never opened here). */

@@ -249,6 +249,8 @@ export function Conversation({
   const queue = useQueue(id);
   const [error, setError] = useState<string | undefined>(undefined);
   const input = useMemo(() => new SessionInput(window.piarc, store, id), [store, id]);
+  // A queued follow-up being sent now (one at a time, like the reference).
+  const [promoting, setPromoting] = useState(false);
   // T28: the rewind dialog (at a message, or `/rewind` listing them), text given back for the
   // input (a rewound message, or the message a branch started from).
   const [rewinding, setRewinding] = useState<{ target: RewindTarget | undefined }>();
@@ -590,6 +592,25 @@ export function Conversation({
                     setError(t('composer.failed', { reason: reason(failure) }));
                   });
                 }}
+                sendNow={
+                  turn.running
+                    ? {
+                        busy: promoting,
+                        send: (item) => {
+                          setPromoting(true);
+                          setError(undefined);
+                          input
+                            .sendNow(item)
+                            .catch((failure: unknown) => {
+                              setError(t('composer.failed', { reason: reason(failure) }));
+                            })
+                            .finally(() => {
+                              setPromoting(false);
+                            });
+                        },
+                      }
+                    : undefined
+                }
               />
             )
           }
