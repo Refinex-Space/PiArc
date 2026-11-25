@@ -51,11 +51,14 @@ test('normal, thinking and detailed views of one turn', async ({ page, app, work
   await page.getByTestId('session-view-options').click();
   await expect(page.getByTestId('detail-thinking')).toBeChecked();
   await page.keyboard.press('Escape');
-  await expect(page.getByTestId('thinking-block')).toHaveAttribute('data-expanded', 'false');
   await expect(page.getByTestId('tool-group')).toHaveCount(1);
   await expect(page.getByTestId('tool-group-toggle')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByTestId('reminder-row')).toHaveCount(0);
+  // The thinking before the read is in the read's group (ADR-0079); opened, it shows folded.
+  await page.getByTestId('tool-group-toggle').click();
+  await expect(page.getByTestId('thinking-block')).toHaveAttribute('data-expanded', 'false');
   await shoot(page, 'views-thinking');
+  await page.getByTestId('tool-group-toggle').click();
 
   await choose(page, 'normal');
   await expect(page.getByTestId('thinking-block')).toHaveCount(0);
@@ -77,5 +80,7 @@ test('normal, thinking and detailed views of one turn', async ({ page, app, work
   await expect(page.getByTestId('tool-group-toggle')).toHaveAttribute('aria-expanded', 'false');
   await choose(page, 'thinking');
   await expect(page.getByTestId('reminder-row')).toHaveCount(0);
+  await expect(page.getByTestId('tool-group-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await page.getByTestId('tool-group-toggle').click();
   await expect(page.getByTestId('thinking-block')).toHaveAttribute('data-expanded', 'false');
 });

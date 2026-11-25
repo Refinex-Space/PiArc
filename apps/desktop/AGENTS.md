@@ -74,6 +74,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 通用设置的「项目指令」复选框写用户级 `/memory/readBoth`。Core 负责 memory 文件取舍和外部导入审批；窗口只在 Core 确认写入后更新勾选状态。真实设置和首次导入审批见 `e2e/t22-memory.e2e.ts`。
 - T20 审批卡来自 `core/sessions` 的 `approvals` 实体快照，以 `requestId`、`connectionEpoch`、`revision` 绑定答复。审批入口是 `window.piarc.answerApproval`；`allowAlways` 必须由主进程用原生确认框显示准备保存的每条规则和目录，用户确认后才交给 Core。模式菜单使用注册表命令 `session.permissionMode`，模式与变更记录以 Core 为准。运行 `PIARC_EVIDENCE_TASK=T20 npm run test:e2e -w @piarc/desktop -- t20-approvals.e2e.ts` 覆盖端到端流程。
 - preload 不暴露 `ipcRenderer`，只能 `require('electron')`（ESLint 禁止 Node 内置模块）；以后的事件 API 必须剥掉 Electron 的 event 对象再交给页面回调。
+- `saveImage`（ADR-0080，`src/main/core/image-export-ipc.ts`）：主进程核对字节是 SVG 或 PNG、不超过 16 MiB、文件名只有一段，只写到原生保存对话框里选的位置；对话里的 Mermaid 下载用它，不要让页面经下载或别的通道写文件。
 - 新增权限放行：在 `PERMISSION_ALLOWLIST` 加条目并写 `reason`，补 L4 用例，记入 S10 报告。
 - 不得放宽 `PRODUCTION_CSP`。开发服务器模式的放宽只放在 `dev-server.ts`，主进程只在 `import.meta.env.DEV` 下调用，打包时被删除。
 - 窗口只经 `createMainWindow` 创建（ESLint 禁止别处 `new BrowserWindow`）；导航与新窗口守卫由 `app.on('web-contents-created')` 装到所有 webContents。
@@ -81,7 +82,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - 主进程只按路由键转发事件批次，不解析载荷；批次一律经结构化克隆复制（Electron 45 的 `MessagePortMain` 只能转移端口，ADR-0019）；不要尝试转移 `ArrayBuffer`。
 - 终端（`terminal-ipc.ts` 的 `TerminalOwners`，ADR-0051）：会话终端归会话，任何窗口可用、重载不关闭；没有会话的终端只由测试钩子创建，归页面所有，页面消失（窗口销毁、渲染进程崩溃、重载）即关闭。写入、打开与共享要求窗口 5 秒内有真实输入（`input-event`，从 `web-contents-created` 起记录），每会话至多 16 个终端，每窗口每终端一个在途拉帧；主进程不解析拉取请求与帧。改 `vendor/ghostty-web/` 下的代码要同步其 README 的改动清单，保留 MIT 声明。
 - 渲染进程不加载原生模块；Core 只经主进程（`window.piarc.subscribeEvents` 等）。页面回调只收到批次，没有 Electron 的 event 对象。
-- 安全渲染（架构第 10.3 节）：渲染进程不从 HTML 字符串建 DOM，ESLint 禁止 `innerHTML`、`outerHTML`、`dangerouslySetInnerHTML`、`insertAdjacentHTML`、`createContextualFragment`、`setHTMLUnsafe`、`document.write`；模型输出里的原始 HTML 作为 `html` 节点按文本显示；链接只保留 `safeHref` 通过的 `https:`、`http:`、`mailto:`，点击经 `window.piarc.openExternal`（主进程确认框）；图片不加载，显示为链接；代码高亮只输出 token 与颜色。
+- 安全渲染（架构第 10.3 节）：渲染进程不从 HTML 字符串建 DOM，ESLint 禁止 `innerHTML`、`outerHTML`、`dangerouslySetInnerHTML`、`insertAdjacentHTML`、`createContextualFragment`、`setHTMLUnsafe`、`document.write`；模型输出里的原始 HTML 作为 `html` 节点按文本显示；链接只保留 `safeHref` 通过的 `https:`、`http:`、`mailto:`，点击经 `window.piarc.openExternal`（主进程确认框）；远程图片不加载，显示为带主机名的卡片（点击经同一确认在浏览器打开），会话项目内的本地图片经 Files 的短期预览地址显示（`transcript/markdown/ReplyImage.tsx`，ADR-0080）；Mermaid 只经隔离的绘图文档回传图片（`transcript/markdown/ChatDiagram.tsx`）；代码高亮只输出 token 与颜色。
 - 高亮不放宽 CSP：shiki 用 `@shikijs/engine-javascript`，不用需要 `wasm-unsafe-eval` 的 Oniguruma 引擎；语法按需加载，每种一个 chunk，`GRAMMARS` 与 `languages.ts` 的别名表一起改。
 - 输入法守卫：所有键盘处理先过 `isImeComposing`（`isComposing`、`keyCode === 229`、`view.composing`）。composer 在 `handleDOMEvents.keydown` 里先拦，ProseMirror 的按键处理整个跳过且不 `preventDefault`；`handleTextInput` 里的 `@`、`/` 触发也先查 `view.composing`。
 - 滚动跟随只认用户输入（滚轮、触摸、键盘、按住滚动条）引起的滚动；行或虚拟列表提交后在布局阶段对齐底部，尺寸变化再经 ResizeObserver 对齐。阈值只改 `transcript/constants.ts`。

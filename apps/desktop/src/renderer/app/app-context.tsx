@@ -28,7 +28,34 @@ export interface AppContextValue {
   readonly format: {
     number(value: number, options?: Intl.NumberFormatOptions): string;
     dateTime(ms: number): string;
+    /** How long ago `ms` was at `now` ("5 minutes ago", "yesterday"); "just now" under a minute. */
+    relative(ms: number, now: number): string;
   };
+}
+
+/** Seconds in each unit, largest first, for relative times. */
+const RELATIVE_UNITS: readonly (readonly [Intl.RelativeTimeFormatUnit, number])[] = [
+  ['year', 31_536_000],
+  ['month', 2_592_000],
+  ['week', 604_800],
+  ['day', 86_400],
+  ['hour', 3_600],
+  ['minute', 60],
+];
+
+function relativeTime(
+  locale: string,
+  translator: { t: (id: MessageId) => string },
+  ms: number,
+  now: number,
+): string {
+  const seconds = Math.round((ms - now) / 1000);
+  const unit = RELATIVE_UNITS.find(([, size]) => Math.abs(seconds) >= size);
+  if (unit === undefined) return translator.t('time.justNow');
+  return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(
+    Math.round(seconds / unit[1]),
+    unit[0],
+  );
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -89,6 +116,7 @@ export function AppProvider({
             dateStyle: 'medium',
             timeStyle: 'medium',
           }).format(ms),
+        relative: (ms, now) => relativeTime(state.locale, translator, ms, now),
       },
     };
   }, [initial.platform, initial.notificationsSupported, state]);

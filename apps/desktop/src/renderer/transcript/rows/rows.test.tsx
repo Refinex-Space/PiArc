@@ -273,14 +273,16 @@ describe('P0 row types', () => {
     expect(labels).toEqual(['Copy Markdown', 'Copy text', 'Select turn']);
   });
 
-  it('thinking: open and not collapsible while generated, folded with its duration after', async () => {
+  it('thinking: folded while generated and after, with its duration once done (ADR-0079)', async () => {
     const live = transcriptOf([
       { item: { type: 'reasoning', itemId: 'th', status: 'inProgress', text: 'pondering' } },
     ]);
     let root = await render(live, ['th']);
     let block = byTestId(root, 'thinking-block');
-    expect(block.dataset.expanded).toBe('true');
+    expect(block.dataset.expanded).toBe('false');
     expect(byTestId(root, 'thinking-label').textContent).toBe('Thinking…');
+    expect(root.querySelector('[data-testid="thinking-text"]')).toBeNull();
+    // The user can open it while it is generated, to follow along.
     act(() => {
       byTestId(root, 'thinking-toggle').click();
     });

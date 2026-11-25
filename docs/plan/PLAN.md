@@ -324,11 +324,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 排队条、重试与错误、压缩提示、子 agent 卡：排队带见输入区一项；错误与"结果未知"卡的淡底标题条、折叠详情与右侧主按钮；压缩与模式变更的次色状态行；子 agent 的细线卡片与走光状态。
 - [x] 标题行、空态、加载失败、回到底部、消息操作：标题按钮外扩对齐与截断时的全名提示，工具按钮提示带快捷键；历史读取中的骨架、读取失败的居中说明与 Retry（开发构建的故障钩子覆盖读取的延迟与失败，Retry 重读成功），未送达行；没有行时滚动容器不再是空 feed；t43 新增两个状态，axe 亮暗零违规。差异表无待实现行。
 - [x] 补充一（用户追加）：working 标记缩到 16 px 并收回内容列；行内代码改为 slate 冷灰底与主文字色；标题与侧栏的运行状态改用 Pi 活动标记（去掉漏到徽标上的遗留 `.badge` 规则）；ui-critic 的 3 项 P1（审批卡主决策同行、持久化选项另起；不再整卡限高滚动；强制颜色下的表面边界）与拼写检查、嵌套列表缩进、审批卡焦点、输入框名称随语言等 P2；窄列截图改为真正的 400 px 列。
-- [ ] 补充二：回合过程合并与收起（思考并入相邻工具组，运行中展开，正文开始或回合结束后收成摘要，记住手动选择），步骤行悬停、整行点击与摘要文案。
-- [ ] 补充三：对话里的 Mermaid（隔离绘制、流式占位、源码切换、复制与下载、展开查看、出错时的修复按钮）。
-- [ ] 补充四：回复里的图片（本地图片内联与放大，远程图片占位并经外链确认，工具返回的图片）。
-- [ ] 补充五：消息时间（用户消息与回合末回复的相对时间与完整时间提示，历史条目带时间）。
-- [ ] 补充六：输入框的命令与 skill 芯片、句中唤起 `/`、描述提示。
+- [x] 补充二：回合过程合并与收起（ADR-0079）：同一回合里连续的工具调用（含命令、网页搜索）与其间的思考合成一组，运行中展开、正文开始或回合结束后收成摘要，用户选择优先；思考默认折叠（生成中也是）；摘要按不同对象计数、超过四段折叠、长摘要省略号；步骤行悬停提亮、按下回落。受影响的 L4（t19-transcript、t29-views、t46）改为先展开组，断言不变。
+- [x] 补充三：对话里的 Mermaid（ADR-0080）：复用 Files 的隔离绘图文档，流式占位，源码切换、复制、下载 SVG/PNG（新 IPC `saveImage`，原生保存框）、点开放大，失败时显示原因与"请模型修复"。真实会话 L4 `session-pane` 覆盖绘制、源码、下载菜单与修复发送。
+- [x] 补充四：回复里的图片（ADR-0080）：项目内的本地图片经 Files 预览地址内联并可放大，远程图片为带主机名的卡片（不加载，点击经原生确认），Read 读取的图片显示在调用行下；MCP 等工具返回的图片登记为 I234。
+- [x] 补充五：消息时间（ADR-0080）：AHP `HistoryItem` 增加可选 `at`（Agent Host 取 Pi 条目时间），用户消息与回合末回复的操作行显示相对时间、提示框为完整时间，共用每分钟一次的时钟。
+- [x] 补充六：输入框的命令与 skill 芯片（ADR-0080）：原子芯片（强调色名字、半透明 `/`、描述为提示），句中词首 `/` 加名字字符唤起，内置命令只在开头，面板每项以描述为提示；Core 只展开开头的命令（不变）。
 - [ ] 验收与打磨：ui-craft 状态矩阵复查，ui-critic 独立审查，修完 P0、P1（第一轮已完成：3 项 P1 见补充一）。
 - [ ] 收尾：相关 L4 与 Vitest、i18n、t19 对比、`npm run verify`、报告。
 
@@ -580,8 +580,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I228 | T47 核对 CI | [e7262b0 的 macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45110810423/job/137482483262) 还报出两项：权限裁决延迟 p95 2.009917 ms（I103），L2 的 `sec-malicious-repo-new-item` 在提示步骤收到 `SessionNotFound`，随后能力文档与威胁映射检查随该场景失败。本机 e2ffefa 同一预算与场景均通过。 | 后续 CI 复核；如重现，分别沿 I103 和项目信任变化后的会话重开顺序定位。**bbc6b60 复核**：[macOS verify](https://github.com/Refinex-Space/PiArc/actions/runs/45119779192/job/137510807623) 的 L2 为 239 通过、3 项仅 Windows；权限裁决 p95 为 2.544375 ms，仍超 2 ms 预算，沿 I103 跟进。 **9212335 复核**：[macOS CI](https://github.com/Refinex-Space/PiArc/actions/runs/45159997698/job/137642677879) 的 L2 全部适用场景通过。权限裁决 p95 为 3.011083 ms；T33 的终端任务快照还出现一次 shell 提示符先后到达导致的不一致。本机同提交全量 verify 通过。 |
 | I229 | T49 | Windows 跳转列表的任务栏和开始菜单实机验收 | W4：安装 Velopack 构建后依次打开两个测试工作区。右键任务栏与开始菜单中的 PiArc，核对最近顺序。依次选一个工作区、“新建会话”和“打开文件夹”，确认复用进程、原窗口草稿保留、没有自动发送。移除一个最近条目，再打开其他工作区，确认被移除的条目没有被重新添加。 |
 | I230 | Files / Markdown 收尾 | macOS 文件监听测试在释放测试所持互斥锁后等待初次注册超时。相同监听代码在本会话较早一轮全量检查通过，之后在最终提交的两个全量运行，以及独立临时 APFS 卷上复现。采样栈停在系统 `FSEventStreamStart`。 | Core 文件监听：复核 macOS 原生流的启动时间和回执，在现有 30 秒断言下通过整仓门禁。原始用例位于 `crates/piarc-core/src/workspace_settings/tests.rs`。 |
-| I231 | 会话主块对标开工 | 提交 `313279dc` 的基线中有三项检查失败。Prettier 不通过的文件是 `files/material-icons.ts`、`shell/WorkbenchHeader.tsx` 和 `shell/WorkspaceSearch.tsx`。`tsc --build` 在 `files/FileViewer.tsx` 第 477、560 行报类型错误。i18n 检查报 `shell/WorkspaceSearch.tsx:302` 的硬编码 `esc`，Vitest 的 `check-i18n.test.mjs` 也因此失败。均由 `ec0f84af`、`313279dc` 引入 | 下一次 Files 或侧栏维护处理。会话主块对标在 `66ce851d` 中格式化了 `WorkbenchHeader.tsx` 与 `WorkspaceSearch.tsx`（只改格式；后者的 `esc` 随之移到第 298 行，仍待处理），Prettier 只剩 `files/material-icons.ts` |
+| I231 | 会话主块对标开工 | 提交 `313279dc` 的基线中有三项检查失败。Prettier 不通过的文件是 `files/material-icons.ts`、`shell/WorkbenchHeader.tsx` 和 `shell/WorkspaceSearch.tsx`。`tsc --build` 在 `files/FileViewer.tsx` 第 477、560 行报类型错误。i18n 检查报 `shell/WorkspaceSearch.tsx:302` 的硬编码 `esc`，Vitest 的 `check-i18n.test.mjs` 也因此失败。均由 `ec0f84af`、`313279dc` 引入 | 另：同一批提交使三个 L4 失败：`t43-keyboard` 的"指针编辑与键盘导航只有一个焦点指示"（侧栏 `session-filter` 指针聚焦时描边 3px，用例期望 1px）、`t18-sessions` 的"项目操作……项目搜索"（搜索框 ArrowDown 后焦点不到 `search-project`），以及 `t37-commands` 的"工具栏面板……"（用例找标题栏里的 Command Palette 按钮，`313279dc` 起就没有这个按钮）。下一次 Files 或侧栏维护处理。会话主块对标在 `66ce851d` 中格式化了 `WorkbenchHeader.tsx` 与 `WorkspaceSearch.tsx`（只改格式；后者的 `esc` 随之移到第 298 行，仍待处理），Prettier 只剩 `files/material-icons.ts` |
 | I232 | 会话主块对标开工 | 在本机 Windows 上，`cargo test` 链接 `piarc-testkit`、`piarc-core` 时报 os error 1455（页面文件太小）。并行编译占满了提交内存。Vitest 的 `markdown/incremental.test.ts` 在全量负载下超过 5 s 默认时限，单独运行 9/9 通过，用时 1.8 s | 调大本机页面文件，或限制 `CARGO_BUILD_JOBS` 后复跑 |
+| I233 | 会话主块对标 | 会话的模型目录（`useModelCatalog` → `sessionModels`）在 Core 已把会话标为 `open`、Agent Host 尚未打开该会话时发出，答 `sessionNotFound: no open session <id>`，输入框上方一直显示"无法更新模型选择"，环境栏只剩"模型""推理强度"占位；之后不重试 | 属会话层状态同步：Core 的 `open` 与 Agent Host 的会话打开对齐后再查，或在 `sessionNotFound` 时随会话状态变化重取；需改 Core/Agent Host 语义时先写 ADR |
+| I234 | 会话主块对标 | MCP 工具、截图等工具结果里的图片字节只交给模型，条目只带输出文字，界面无法显示（Read 读取的图片按路径显示，已做） | 在工具条目增加图片引用（会话 blob 路径与哈希，ADR-0009 第 8 条），Core 经短期预览地址交给渲染进程；涉及 AHP 与 Core，按补充型处理并写 ADR |
 
 ## 技术债
 

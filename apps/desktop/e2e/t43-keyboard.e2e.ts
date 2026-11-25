@@ -209,7 +209,7 @@ test('reduced motion, more contrast and forced colors', async ({ app, page, work
   // The hover actions of a message fade; reduced motion makes it instant.
   const fade = () =>
     page
-      .locator('.row-actions.is-hover')
+      .locator('.row-actions.reveal-actions')
       .first()
       .evaluate((el) => getComputedStyle(el).transitionDuration);
   await expect(html).toHaveAttribute('data-reduce-motion', 'false');
@@ -249,16 +249,17 @@ test('reduced motion, more contrast and forced colors', async ({ app, page, work
       ),
     )
     .toBe('CanvasText');
-  const mark = page.getByTestId('tool-group').first().locator('.tool-status');
-  await expect(mark.locator('.visually-hidden')).toHaveText('Done');
+  const step = page.getByTestId('tool-group').first();
+  await expect(step).toHaveAttribute('data-status', 'completed');
   expect(
-    await mark
-      .locator('.tool-status-dot')
-      .evaluate((el) => [
-        getComputedStyle(el).forcedColorAdjust,
-        getComputedStyle(el).backgroundColor,
-      ]),
-  ).toEqual(['none', expect.not.stringMatching(/rgba\(0, 0, 0, 0\)|transparent/u)]);
+    await step
+      .locator('.step-caret')
+      .first()
+      .evaluate((el) => getComputedStyle(el).color),
+  ).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/u);
+  expect(
+    await step.getByTestId('tool-summary').evaluate((el) => getComputedStyle(el).color),
+  ).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/u);
   // Primary buttons take the system's button colors: text over the backplate stays readable.
   expect(
     await page.getByTestId('composer-send').evaluate((el) => {

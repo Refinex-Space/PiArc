@@ -1,9 +1,9 @@
 // Pieces several rows share: the copy button, the attachment and mention chips, the clock for
 // running timers, sizes and durations as text.
 import type { InputMention } from '@piarc/protocol';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 
-import { useT } from '../../app/app-context.js';
+import { useApp, useT } from '../../app/app-context.js';
 import type { AttachmentChip } from '../../store/transcript.js';
 import { FileGlyph, ImageGlyph } from '../../shell/icons.js';
 import { baseName } from './summary.js';
@@ -70,6 +70,47 @@ export function formatSize(bytes: number): string {
 }
 
 /** The current time, refreshed every `intervalMs` while `active`. */
+/** One clock for every message time: it ticks once a minute while any time is shown. */
+const minuteListeners = new Set<() => void>();
+let minuteTimer: number | undefined;
+let minuteNow = Date.now();
+
+function subscribeMinute(listener: () => void): () => void {
+  if (minuteTimer === undefined) {
+    minuteNow = Date.now();
+    minuteTimer = window.setInterval(() => {
+      minuteNow = Date.now();
+      for (const each of [...minuteListeners]) each();
+    }, 60_000);
+  }
+  minuteListeners.add(listener);
+  return () => {
+    minuteListeners.delete(listener);
+    if (minuteListeners.size === 0 && minuteTimer !== undefined) {
+      window.clearInterval(minuteTimer);
+      minuteTimer = undefined;
+    }
+  };
+}
+
+/** When a message was sent or answered (ADR-0080): relative, the full time as its tooltip. */
+export function MessageTime({ at }: { readonly at: number }) {
+  const { format } = useApp();
+  const now = useSyncExternalStore(subscribeMinute, () => minuteNow);
+  const full = format.dateTime(at);
+  return (
+    <time
+      className="row-time"
+      dateTime={new Date(at).toISOString()}
+      data-tooltip={full}
+      aria-label={full}
+      data-testid="message-time"
+    >
+      {format.relative(at, Math.max(now, at))}
+    </time>
+  );
+}
+
 export function useNow(intervalMs: number, active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

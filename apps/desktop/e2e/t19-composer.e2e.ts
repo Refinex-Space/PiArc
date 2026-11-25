@@ -134,7 +134,7 @@ test('the first prompt preserves mentions and attachments through trust and uses
     'data-path',
     'src/main.ts',
   );
-  await expect(page.getByTestId('user-message').getByTestId('attachment-chip')).toContainText(
+  await expect(page.getByTestId('user-row').getByTestId('attachment-chip')).toContainText(
     'pixel.png',
   );
   await expect(page.getByTestId('permission-mode')).toHaveText(/Plan|计划/u);
@@ -277,7 +277,7 @@ test('images and PDFs by drop and paste reach the model; refused files say why',
   await send(page, 'What is in these?');
   await idle(page);
 
-  const chips = page.getByTestId('user-message').nth(1).getByTestId('attachment-chip');
+  const chips = page.getByTestId('user-row').nth(1).getByTestId('attachment-chip');
   await expect(chips).toHaveCount(2);
   await expect(chips.nth(0)).toHaveAttribute('data-kind', 'image');
   await expect(chips.nth(1)).toContainText('PDF report.pdf, 12 pages');

@@ -66,6 +66,8 @@ export interface DraftFiles {
 export interface TranscriptEntry {
   readonly entryId: string;
   readonly turnId?: string;
+  /** When the entry was written (ms since the epoch), when the session file says. */
+  readonly at?: number;
   readonly item: unknown;
 }
 
@@ -79,6 +81,8 @@ export type TranscriptRow =
       readonly startedAt?: number;
       /** Core's time of `item/completed`; absent in history. */
       readonly endedAt?: number;
+      /** The history entry's time (ms since the epoch), when the session file says (ADR-0080). */
+      readonly at?: number;
     }
   | { readonly kind: 'group'; readonly id: string; readonly members: readonly string[] }
   | {
@@ -148,11 +152,18 @@ const IDLE: TurnInfo = {
 };
 
 /**
- * Item types folded into a tool group: every tool call but shell commands and subagents (T31),
- * which keep a card of their own (status, exit code, timer; the run). A group expands to its calls; file changes then show
- * their diff cards.
+ * Item types folded into a tool group: every tool call but subagents (T31), which keep a card of
+ * their own. A group expands to its calls; shell commands, file changes and web searches then show
+ * their own cards (ADR-0079).
  */
-const GROUPED_TYPES = new Set(['dynamicToolCall', 'mcpToolCall', 'webFetch', 'fileChange']);
+const GROUPED_TYPES = new Set([
+  'dynamicToolCall',
+  'mcpToolCall',
+  'webFetch',
+  'fileChange',
+  'commandExecution',
+  'webSearch',
+]);
 
 /** Host tools with rows of their own (T26): the task card, the plan card, the answered
  * questions and the next steps. */
@@ -452,9 +463,15 @@ export class SessionTranscript {
       }
     }
     this.order = [];
-    for (const { turnId, item } of items) {
+    for (const { turnId, item, at } of items) {
       if (isItem(item) && !this.rows.has(item.itemId)) {
-        this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId, item });
+        this.rows.set(item.itemId, {
+          kind: 'item',
+          id: item.itemId,
+          turnId,
+          item,
+          ...(at === undefined ? {} : { at }),
+        });
         this.order.push(item.itemId);
       }
     }
@@ -473,9 +490,15 @@ export class SessionTranscript {
     this.loadedFrom = start;
     const batch = new Batch();
     const earlier: string[] = [];
-    for (const { turnId, item } of items) {
+    for (const { turnId, item, at } of items) {
       if (isItem(item) && !this.rows.has(item.itemId)) {
-        this.rows.set(item.itemId, { kind: 'item', id: item.itemId, turnId, item });
+        this.rows.set(item.itemId, {
+          kind: 'item',
+          id: item.itemId,
+          turnId,
+          item,
+          ...(at === undefined ? {} : { at }),
+        });
         earlier.push(item.itemId);
       }
     }
@@ -905,6 +928,17 @@ export class SessionTranscript {
       if (first === undefined) {
         return;
       }
+      // Thinking alone stays a row of its own; with a tool call it joins the group (ADR-0079).
+      if (
+        !members.some((member) => {
+          const row = this.rows.get(member);
+          return row?.kind === 'item' && isGrouped(row.item);
+        })
+      ) {
+        next.push(...members);
+        members = [];
+        return;
+      }
       const id = `group:${first}`;
       const previous = this.rows.get(id);
       if (previous?.kind !== 'group' || !sameList(previous.members, members)) {
@@ -915,9 +949,11 @@ export class SessionTranscript {
       next.push(id);
       members = [];
     };
+    // A run of tool calls and the thinking between them, within one turn, is one group: text, a
+    // message, a card of its own or a new turn ends it.
     for (const id of this.order) {
       const row = this.rows.get(id);
-      if (row?.kind === 'item' && isGrouped(row.item)) {
+      if (row?.kind === 'item' && (isGrouped(row.item) || row.item.type === 'reasoning')) {
         if (groupTurn !== row.turnId) flush();
         groupTurn = row.turnId;
         members.push(id);

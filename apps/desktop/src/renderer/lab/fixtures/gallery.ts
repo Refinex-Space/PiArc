@@ -29,9 +29,14 @@ export interface GallerySection {
 const SESSION = 'gallery';
 let seq = 0;
 
+/** Fixture times below this are offsets from three hours ago; above it, real times. */
+const REAL_TIME = 1e12;
+const EARLIER = Date.now() - 3 * 3_600_000;
+
 function note(method: string, params: Record<string, unknown>, ts = 0): GalleryNote {
   seq += 1;
-  return { jsonrpc: '2.0', method, params: { sessionId: SESSION, seq, ts, ...params } };
+  const at = ts < REAL_TIME ? EARLIER + ts : ts;
+  return { jsonrpc: '2.0', method, params: { sessionId: SESSION, seq, ts: at, ...params } };
 }
 
 function done(turnId: string, item: Item, start = 0, end = start): GalleryNote[] {
@@ -277,6 +282,54 @@ function markdown(): GallerySection {
       ...done('t1', user('u1', 'Summarize the release.')),
       ...done('t1', reply('a1', MARKDOWN)),
       ended('t1'),
+    ],
+  };
+}
+
+/** Mermaid in replies (ADR-0080): drawn, broken, and still streaming. */
+function diagram(): GallerySection {
+  return {
+    running: true,
+    notifications: [
+      turn('t1'),
+      ...done('t1', user('u1', 'Draw the request flow.')),
+      ...done(
+        't1',
+        reply(
+          'a1',
+          [
+            'The request passes the gateway, then the service and its cache:',
+            '',
+            '```mermaid',
+            'flowchart LR',
+            '  C[Client] --> G[Gateway]',
+            '  G --> S[Service]',
+            '  S --> K[(Cache)]',
+            '  S --> D[(Database)]',
+            '```',
+          ].join('\n'),
+        ),
+      ),
+      ...done(
+        't1',
+        reply(
+          'a2',
+          [
+            'A sequence I got wrong:',
+            '',
+            '```mermaid',
+            'sequenceDiagram',
+            '  A->>: hello',
+            '```',
+          ].join('\n'),
+        ),
+      ),
+      started('t1', {
+        type: 'agentMessage',
+        itemId: 'a3',
+        status: 'inProgress',
+        text: ['And the retry path:', '', '```mermaid', 'flowchart TD', '  A --> B'].join('\n'),
+      }),
     ],
   };
 }
@@ -580,6 +633,8 @@ export function gallerySection(name: string): GallerySection {
       return messages();
     case 'markdown':
       return markdown();
+    case 'diagram':
+      return diagram();
     case 'thinking':
       return thinking();
     case 'tools':

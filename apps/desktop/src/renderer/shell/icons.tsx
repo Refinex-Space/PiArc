@@ -13,11 +13,14 @@ import {
   ChevronRight,
   ChevronUp,
   Circle,
+  Code,
   CircleDashed,
   CircleStop,
   Copy,
+  Download,
   CornerDownLeft,
   Ellipsis,
+  Eye,
   ExternalLink,
   File as FileShape,
   FileCodeCorner,
@@ -55,6 +58,7 @@ import {
   Type,
   TriangleAlert,
   Unplug,
+  WandSparkles,
   WrapText,
   X,
   type LucideIcon,
@@ -204,6 +208,10 @@ export const BlockedGlyph = glyph(CircleDashed);
 export const WrapGlyph = glyph(WrapText);
 export const ExternalGlyph = glyph(ExternalLink);
 export const StopGlyph = glyph(CircleStop);
+export const CodeGlyph = glyph(Code);
+export const PreviewGlyph = glyph(Eye);
+export const DownloadGlyph = glyph(Download);
+export const FixGlyph = glyph(WandSparkles);
 
 /** A finished step: a filled disc with the check cut out (Lucide has no filled form). */
 export function DoneGlyph({ size = 16 }: { readonly size?: GlyphSize }) {

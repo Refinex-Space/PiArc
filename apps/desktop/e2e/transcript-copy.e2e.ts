@@ -91,7 +91,8 @@ test('copies a selection across two messages without the buttons between them', 
   const second = await addMessage(page, 'The second message starts here.');
   await settled(page, first);
   await settled(page, second);
-  await expect(page.getByTestId('message-actions')).toHaveCount(2);
+  // Both replies are in one turn: only the last carries the actions (ADR-0078).
+  await expect(page.getByTestId('message-actions')).toHaveCount(1);
   await withSavedClipboard(app, async () => {
     await select(page, 'message ends', ' starts here');
     await page.keyboard.press(`${MOD}+C`);

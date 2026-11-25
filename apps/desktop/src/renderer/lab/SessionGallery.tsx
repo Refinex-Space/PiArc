@@ -132,13 +132,23 @@ function inputDraft(): EditorDraft {
   return {
     doc: nodes.doc.create(null, [
       nodes.paragraph.create(null, [
-        composerSchema.text('Compare '),
+        nodes.command.create({
+          name: 'review',
+          kind: 'command',
+          description: 'Review the working tree against the plan',
+        }),
+        composerSchema.text(' Compare '),
         nodes.mention.create({
           id: 'file:src/parser/blocks.ts',
           label: 'blocks.ts',
           path: 'src/parser/blocks.ts',
         }),
-        composerSchema.text(' with the two layouts in the screenshot.'),
+        composerSchema.text(' with the layouts, then '),
+        nodes.command.create({
+          name: 'release-notes',
+          kind: 'skill',
+          description: 'Draft release notes from merged changes',
+        }),
       ]),
     ]),
     files: [
@@ -194,6 +204,7 @@ export function SessionGallery() {
       actions: {
         retry: () => undefined,
         resend: () => undefined,
+        prompt: () => undefined,
         rewind: () => undefined,
         branchFrom: () => undefined,
         openFile: () => undefined,

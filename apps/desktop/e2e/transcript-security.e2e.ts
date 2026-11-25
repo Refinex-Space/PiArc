@@ -36,11 +36,12 @@ test('renders the payloads inertly while they stream', async ({ page }) => {
   expectInert(await inspect(page));
 });
 
-test('shows remote images as links and never loads them', async ({ page }) => {
+test('shows remote images as cards and never loads them', async ({ page }) => {
   const id = await addMessage(page, '![tracking pixel](https://example.com/pixel.png "title")');
-  const link = page.locator(`[data-row-id="${id}"] a.md-link`);
-  await expect(link).toHaveAttribute('href', 'https://example.com/pixel.png');
-  await expect(link).toHaveText('Image: tracking pixel');
+  const card = page.locator(`[data-row-id="${id}"] [data-testid="remote-image"]`);
+  await expect(card).toContainText('tracking pixel');
+  await expect(card).toContainText('example.com');
+  await expect(page.locator(`[data-row-id="${id}"] img`)).toHaveCount(0);
   const result = await inspect(page);
   expect(result.forbidden).toEqual([]);
   expect(result.remoteRequests).toEqual([]);

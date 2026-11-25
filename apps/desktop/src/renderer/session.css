@@ -191,6 +191,16 @@
 
 button.step-line {
   cursor: default;
+  transition: color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+/* The whole line is the toggle: its words brighten under the pointer and settle when pressed. */
+button.step-line:hover:not(:disabled) {
+  color: var(--piarc-text-primary);
+}
+
+button.step-line:active:not(:disabled) {
+  color: var(--piarc-text-secondary);
 }
 
 button.step-line:focus-visible {
@@ -209,6 +219,14 @@ button.step-line:focus-visible {
 
 .step-verb {
   flex: none;
+}
+
+/* A group's summary gives way first, with an ellipsis, so the outcome and line counts stay. */
+.step-verb:has(> .step-summary) {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .step-meta {

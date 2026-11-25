@@ -11,6 +11,8 @@ import { revealBidi } from '../reveal.js';
 import { useT } from '../../app/app-context.js';
 import { CodeBlock } from '../highlight/CodeBlock.js';
 import { MarkdownMath } from '../../files/markdown/RichBlock.js';
+import { ChatDiagram } from './ChatDiagram.js';
+import { ProjectImage, RemoteImage, useProjectImage } from './ReplyImage.js';
 import type { Align, Block, Span } from './ir.js';
 
 // File documents opt into rich media and document-local navigation; chat keeps its own policy.
@@ -92,7 +94,6 @@ function Spans({ spans }: { spans: readonly Span[] }): ReactNode {
 }
 
 function SpanView({ span }: { span: Span }): ReactNode {
-  const t = useT();
   const document = useContext(DocumentElements);
   switch (span.kind) {
     case 'math':
@@ -171,18 +172,30 @@ function SpanView({ span }: { span: Span }): ReactNode {
       );
     case 'image':
       if (document && span.documentSource) return document.image(span.documentSource, span.alt);
-      return (
-        <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
-          <span className="md-image-label">
-            {t('markdown.image', {
-              name: span.alt === '' ? (span.href ?? span.projectTarget ?? '') : span.alt,
-            })}
-          </span>
-        </Link>
-      );
+      return <ImageSpan span={span} />;
     case 'html':
       return <span className="md-raw-html">{span.text}</span>;
   }
+}
+
+/** An image in a reply (ADR-0080): a project image inline, a remote one as a card, else a link. */
+function ImageSpan({ span }: { readonly span: Extract<Span, { kind: 'image' }> }) {
+  const t = useT();
+  const local = useProjectImage(span.projectTarget);
+  const link = (
+    <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
+      <span className="md-image-label">
+        {t('markdown.image', {
+          name: span.alt === '' ? (span.href ?? span.projectTarget ?? '') : span.alt,
+        })}
+      </span>
+    </Link>
+  );
+  if (local !== undefined) return <ProjectImage path={local} alt={span.alt} fallback={link} />;
+  if (span.href !== null && /^https?:/iu.test(span.href)) {
+    return <RemoteImage href={span.href} alt={span.alt} />;
+  }
+  return link;
 }
 
 /** `tight`: the items of a tight list, whose paragraphs render without paragraph spacing. */
@@ -231,7 +244,12 @@ const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNod
       }
     }
     case 'code':
-      if (document && block.lang === 'mermaid') return document.rich('mermaid', block.text, false);
+      if (block.lang === 'mermaid')
+        return document ? (
+          document.rich('mermaid', block.text, false)
+        ) : (
+          <ChatDiagram lang={block.lang} source={block.text} complete={block.complete} />
+        );
       if (block.lang === 'math' || block.lang === 'latex')
         return document ? (
           document.rich('math', block.text, false)

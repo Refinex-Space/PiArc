@@ -107,9 +107,11 @@ const RowContent = memo(function RowContent({ id }: { readonly id: string }) {
   const { item } = row;
   switch (item.type) {
     case 'userMessage':
-      return <UserMessageRow id={id} item={item} turnId={row.turnId} />;
+      return (
+        <UserMessageRow id={id} item={item} turnId={row.turnId} at={row.at ?? row.startedAt} />
+      );
     case 'agentMessage':
-      return <AgentMessageRow id={id} item={item} />;
+      return <AgentMessageRow id={id} item={item} at={row.at ?? row.endedAt ?? row.startedAt} />;
     case 'reasoning':
       return <ThinkingRow id={id} item={item} startedAt={row.startedAt} endedAt={row.endedAt} />;
     case 'commandExecution':

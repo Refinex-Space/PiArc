@@ -8,8 +8,9 @@
 |---|---|
 | 用户消息 | 用原始提及区间和附件引用显示胶囊。Core 确认前保留乐观行，未送达可原位重发。T28 起带"回退到这里""从这里分支"（`TranscriptServices` 的可选动作，原型页没有）与分支切换控件（`changes/`）。 |
 | 回复正文 | Worker 增量解析 Markdown，闭合的代码块才高亮。复制 Markdown 使用源文本，复制纯文本使用块的文本表示。Markdown 的工作区文件目标与外部 URL 在中间结构里分开。前者由所属会话在自己的 Files 面板定位，支持行号和行段；后者沿用主进程原生确认。 |
-| 思考块 | 生成中强制展开。结束后默认折叠，有起止时间才显示时长。 |
-| 工具组摘要 | 连续工具条目归为一组，按动词、对象、增删行数汇总。展开后显示成员。Read 的文件名可在所属会话的 Files 中打开，并定位到调用的起始行。 |
+| 图表、图片与时间（ADR-0080） | ` ```mermaid ` 由 `markdown/ChatDiagram.tsx` 经 Files 的隔离绘图文档画成图片（流式时占位；源码切换、复制、经 `saveImage` 下载 SVG/PNG、点开放大；失败时显示源码、原因与"请模型修复"，经 `TranscriptActions.prompt` 发出）。图片由 `markdown/ReplyImage.tsx` 处理：项目内的本地图片经 `projectFilePreview(..., 'media')` 内联，远程图片只显示卡片；Read 读取的图片显示在调用行下。用户消息与回合末回复的操作行显示 `rows/common.tsx` 的 `MessageTime`（历史取 `HistoryItem.at`，实时取 Core 事件时间，共用每分钟一次的时钟）。 |
+| 思考块 | 默认折叠，生成中也是（标签"正在思考…"走光，用户可展开）；有起止时间才显示时长。与工具调用相邻时并入工具组（ADR-0079）。 |
+| 工具组摘要 | 同一回合里连续的工具调用（含命令与网页搜索）与其间的思考归为一组（`store/transcript.ts` 的 `relist`），按动词、不同对象数、增删行数汇总，超过四段折成"另外 N 项"。组是运行中回合的最新内容时默认展开（`services.ts` 的 `useLiveTail`），之后默认收起，用户的选择优先（ADR-0079）。展开后显示成员：命令、文件改动、网页搜索用各自的卡片，思考按视图档位显示。Read 的文件名可在所属会话的 Files 中打开，并定位到调用的起始行。 |
 | Bash 卡 | 读取 `commandExecution.execution` 的 cwd、语义状态、退出码和截断落盘路径。运行满 10 秒才显示计时。 |
 | 文件改动卡 | 读取 `fileChange.diff` 的计数、hunk 与降级信息，保留 Core 提供的路径。 |
 | 压缩提示 | 使用 `contextCompaction` 中可用的原因和 token 计数；原因 `rewind` 是"从此处摘要"留下的分支摘要（T28）。 |

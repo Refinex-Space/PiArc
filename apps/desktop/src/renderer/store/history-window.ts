@@ -23,6 +23,7 @@ export function parseWindow(text: string): {
           {
             entryId: entry.entryId,
             ...(typeof entry.turnId === 'string' ? { turnId: entry.turnId } : {}),
+            ...(typeof entry.at === 'number' && Number.isFinite(entry.at) ? { at: entry.at } : {}),
             item: entry.item,
           },
         ]

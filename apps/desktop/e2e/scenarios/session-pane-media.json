@@ -1,0 +1,23 @@
+{
+  "id": "session-pane-media",
+  "steps": [
+    {
+      "thinking": "The chart is a file in the project. I will read it first.",
+      "tool_calls": [
+        {
+          "id": "read1",
+          "name": "Read",
+          "input": {
+            "path": "chart.svg"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Here is the release chart:\n\n![Release chart](chart.svg)\n\nThe logo stays on its site: ![Logo](https://example.com/logo.png)\n\n```mermaid\nflowchart LR\n  C[Client] --> G[Gateway]\n  G --> S[Service]\n  S --> K[(Cache)]\n```\n\nAnd a sequence that does not parse:\n\n```mermaid\nsequenceDiagram\n  A->>: hello\n```"
+    },
+    {
+      "text": "Here is the corrected diagram."
+    }
+  ]
+}

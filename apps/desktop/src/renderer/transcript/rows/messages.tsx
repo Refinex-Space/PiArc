@@ -28,7 +28,7 @@ import {
   useTranscriptView,
   useTurn,
 } from '../services.js';
-import { AttachmentChips, MentionText } from './common.js';
+import { AttachmentChips, MentionText, MessageTime } from './common.js';
 import { useListActions, useRowCommitted } from './list-actions.js';
 import { CopyIconButton, StepRow } from './parts.js';
 
@@ -44,10 +44,13 @@ export function UserMessageRow({
   id,
   item,
   turnId,
+  at,
 }: {
   readonly id: string;
   readonly item: UserMessageItem;
   readonly turnId: string | undefined;
+  /** When it was sent (ms since the epoch), when known. */
+  readonly at?: number | undefined;
 }) {
   const t = useT();
   const { actions, transcript } = useTranscriptView();
@@ -58,6 +61,7 @@ export function UserMessageRow({
   return (
     <UserBubble
       id={id}
+      at={at}
       input={{
         text: item.text,
         mentions: item.mentions ?? [],
@@ -136,6 +140,7 @@ export function OptimisticRow({
 
 function UserBubble({
   id,
+  at,
   input,
   state,
   children,
@@ -143,6 +148,8 @@ function UserBubble({
   branches,
 }: {
   readonly id: string;
+  /** When it was sent, shown first in its actions. */
+  readonly at?: number | undefined;
   readonly input: ShownInput;
   readonly state?: 'sending' | 'undelivered';
   readonly children?: ReactNode;
@@ -192,6 +199,7 @@ function UserBubble({
       </div>
       {children}
       <div className="row-actions reveal-actions" data-testid="user-actions">
+        {at === undefined ? null : <MessageTime at={at} />}
         <CopyIconButton label={t('transcript.copyText')} text={() => input.text} />
         <IconButton
           label={t('transcript.selectTurn')}
@@ -214,9 +222,12 @@ function UserBubble({
 export function AgentMessageRow({
   id,
   item,
+  at,
 }: {
   readonly id: string;
   readonly item: AgentMessageItem;
+  /** When it was written (ms since the epoch), when known; shown last in the turn's actions. */
+  readonly at?: number | undefined;
 }) {
   const t = useT();
   const { services, transcript } = useTranscriptView();
@@ -270,6 +281,7 @@ export function AgentMessageRow({
           >
             <SelectTurnGlyph />
           </IconButton>
+          {at === undefined ? null : <MessageTime at={at} />}
         </div>
       ) : null}
     </article>
@@ -290,9 +302,8 @@ export function ThinkingRow({
 }) {
   const t = useT();
   const live = item.status === 'inProgress';
-  // Folded once done unless the user opens it; the user cannot fold it while it is generated.
-  const [chosen, setExpanded] = useExpanded(id, false);
-  const expanded = live || chosen;
+  // Folded unless the user opens it, also while it is generated: its label says it is thinking.
+  const [expanded, setExpanded] = useExpanded(id, false);
   const seconds =
     startedAt !== undefined && endedAt !== undefined
       ? Math.max(1, Math.round((endedAt - startedAt) / 1000))
@@ -314,13 +325,9 @@ export function ThinkingRow({
         verb={<span data-testid="thinking-label">{label}</span>}
         state={live ? 'busy' : 'done'}
         expanded={expanded}
-        toggleDisabled={live}
         lineTestId="thinking-toggle"
         onToggle={() => {
-          // While the model thinks the block stays open: the toggle does nothing.
-          if (!live) {
-            setExpanded(!chosen);
-          }
+          setExpanded(!expanded);
         }}
       >
         <div className="row-thinking-text" data-testid="thinking-text">

@@ -52,6 +52,7 @@
 | 环境栏 | `src/source-composer-row-chin.jsx`、`composer-row-chin.mjs` | 卡片下方 8，xs 行高 24，字号 13/20，次文字色；模型（推理强度作尾词）→ 模式 → 用量环；按钮内距 6、圆角 6 | 普通文字按钮，模型与强度分开 | 复刻顺序与尺寸；强度合并为模型按钮的尾词，菜单仍分开（快捷键不变） | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
 | 用量环 | `usage-ring.mjs` | 24 按钮内 14 px 圆环，线宽 2，<75 强调、75–89 警告、≥90 危险，弧长 300 ms | `UsageRing` | 复刻 | 三档截图 | 已对齐：42%、81%、94% 三档；`gallery/input/` |
 | 模式菜单 | `src/source-permission-menu.{jsx,css}` | 标题 "Mode"，每行名称加说明，选中强调色勾，行尾数字快捷键 | `MenuPopup` 带说明 | 复刻 | 截图 | 已对齐：`gallery/composer/` 的 working、conversation 与 menu-mode |
+| 命令与 skill 芯片 | `src/source-composer-editor.jsx`（`CommandChip`）、`session-command-model.mjs` | 原子芯片：强调色名字、前置 50% 的 `/`，选中时淡强调底；悬停 300 ms 弹描述卡；句中词首 `/` 后输入名字字符唤起，单独的 `/` 只在开头；只有开头的芯片被解析 | 选中后填入 `/name ` 文本，只能在开头唤起 | 改造：芯片与唤起规则复刻；描述用 PiArc 的 tooltip，面板每项也以描述为提示；内置命令只在开头提供（ADR-0080） | 单测、截图 | 已对齐（改造）：`gallery/input/`、`composer.test.ts` |
 
 ## 4. 对话区与消息
 
@@ -69,6 +70,7 @@
 | 回复操作 | 同上 | 最近一条常显，其余悬停显示；复制（勾 1200）等图标按钮 | 文字按钮：复制 Markdown、复制文本、选中本回合 | 复刻为图标按钮；反馈与章节不适用 | 截图 | 已对齐（改造）：只在回合最后一条回复下出现（与参考的回合尾操作一致），悬停或聚焦时显示；`gallery/messages/` |
 | 新回复入场 | 同上 | 透明加 10 px 上移，1.1 s 弹簧 | 无 | 改造：只做 200 ms 淡入与 6 px 上移，避免流式时整块位移 | 录屏 | 已对齐（改造）：生成中的回复与发送中的消息 200 ms 淡入加 6 px 位移，滚动挂载的旧行不动画 |
 | 未送达与发送中 | `shared-2-*.mjs` | 发送中次色脉冲；失败行下 caption 危险色 "Failed to send" 加 "Retry" | 文字状态 | 复刻 | 截图 | 已对齐：失败行细线转危险色，下方 caption 原因加 "Resend"；`gallery/shell/messages-*` |
+| 消息时间 | `code-transcript.mjs`（`PA`、`CdsRelativeTime`） | 用户消息操作行最左、回合末回复操作行最后；相对时间，不到一分钟为 "just now"，提示框是完整日期时间；随操作行悬停 100 ms 后淡入 | 无 | 复刻；历史时间经 AHP `HistoryItem.at`，实时取 Core 事件时间（ADR-0080） | 截图、L4 | 已对齐：`gallery/supplement/real-time-hover.png`、`real-diagram-fixed.png` |
 
 ## 5. Markdown 与代码块
 
@@ -78,10 +80,12 @@
 | 段落与列表 | 同上 | 块间 11.25；列表缩进 30，项内距 7.5、项间 3.75，标记次色；任务列表勾选框强调色 | 部分 | 复刻 | 截图 | 已对齐：`gallery/messages/markdown-*`（代码块保持横向滚动不软换行，与现有复制和测试一致） |
 | 引用与分隔线 | 同上 | 左 4 px 细线、内距 1em、次色；hr 0.5 px | 有 | 复刻 | 截图 | 已对齐：`gallery/messages/markdown-*`（代码块保持横向滚动不软换行，与现有复制和测试一致） |
 | 表格 | 同上 | 外框圆角 8 细线，表头字重 500 淡底，单元格 .4375em×.75em，最小宽 96，横向滚动 | 基础表格 | 复刻；"展开表格"对话框不适用（横向滚动足够） | 截图 | 已对齐：`gallery/messages/markdown-*`（代码块保持横向滚动不软换行，与现有复制和测试一致） |
-| 行内代码 | 同上 | 等宽 .9em，危险色字，淡底，0.5 px 细线，圆角 .4em | 选中色底 | 复刻 | 截图 | 已对齐：`gallery/messages/markdown-*`（代码块保持横向滚动不软换行，与现有复制和测试一致） |
+| 行内代码 | 同上 | 等宽 .9em，危险色字，淡底，0.5 px 细线，圆角 .4em | 选中色底 | 复刻 | 截图 | 已对齐（改造）：按用户要求改为 slate 冷灰底、主文字色、字重 500、不描边（参考为暖色红字）；`gallery/process/`、`supplement/` |
 | 链接 | 同上 | 强调色，常驻下划线（偏移 3，40% 色），悬停全色，60 ms | 有 | 复刻 | 截图 | 已对齐：`gallery/messages/markdown-*`（代码块保持横向滚动不软换行，与现有复制和测试一致） |
 | 代码块 | `c19e90103-*.mjs`、`src/source-code-block.css` | 圆角 8，内嵌 1 px 细线，13/19，上下 12、左 10+1ch；右侧按钮栏：复制图标（勾 1200）吸顶；语言标签 caption 次色 | 语言标签加文字复制 | 复刻；"运行"按钮不适用 | 截图、复制 | 已对齐：`gallery/messages/markdown-*`（代码块保持横向滚动不软换行，与现有复制和测试一致） |
 | 数学公式 | 同上 | KaTeX，块级可横向滚动、可聚焦 | KaTeX | 复刻滚动与焦点 | 截图 | 已对齐（改造）：`math`、`latex` 代码块按 KaTeX MathML 显示，可横向滚动；对话解析器不识别行内 `$…$`，避免金额误判；`gallery/messages/markdown-*` |
+| Mermaid | 原版 `shared-10-*`、`c19e90103-*`（参考应用中关闭，对话里显示为代码） | 隔离绘制只回传图，流式时骨架占位；"View source"/"Preview" 切换、"Expand"；失败回退源码并显示说明；无下载、无修复 | 代码块 | 改造（超越参考）：复用 Files 的隔离绘图文档；加复制源码、下载 SVG/PNG（`saveImage` 原生保存框）、点开放大，失败时"请模型修复"（ADR-0080） | L4、截图 | 已对齐（改造）：`gallery/supplement/real-diagram-*`、`gallery/diagram/` |
+| 图片 | `c19e90103-*`（`Sb`）、`src/source-tool-images.jsx`、`src/source-image-viewer.jsx` | 远程图片不加载，显示 "Show Image" 占位，点击经外链确认；本地路径内联，点开放大；工具返回的图片在行下方显示缩略图 | 一律显示为链接 | 复刻：项目内的本地图片经 Files 的预览地址内联，远程图片为带主机名的卡片，Read 读取的图片在调用行下；MCP 等工具的图片字节未随条目传来，列为后续（ADR-0080） | L4、截图 | 已对齐（改造）：`gallery/supplement/real-media-*`、`real-read-image.png` |
 
 ## 6. 思考块
 
@@ -89,7 +93,7 @@
 |---|---|---|---|---|---|---|
 | 标题行 | `generated/transcript-rows/group-status.mjs`、`generated/chat-thinking/*` | 一行 20，正文字号，淡色；悬停转次色；"Thought for Ns"；箭头 16 在文字后，展开转 90°（60 ms） | 三角字符在前 | 复刻 | 截图 | 已对齐：`gallery/thinking/` |
 | 正文 | 同上 | 上 8，14/20 次色，pre-wrap；不做高度动画 | 次色斜体 | 复刻 | 截图 | 已对齐：`gallery/thinking/` |
-| 生成中 | 同上与 `CdsShimmer` | 标签走光 3 s 线性；减少动效时纯色 | 静态文字 | 复刻，生成中仍强制展开（PiArc 不变量） | 录屏、减少动效截图 | 已对齐（改造）：标签走光，生成中仍强制展开并隐藏箭头（PiArc 不变量）；`gallery/thinking/` |
+| 生成中 | 同上与 `CdsShimmer` | 标签走光 3 s 线性；减少动效时纯色 | 静态文字 | 复刻，生成中仍强制展开（PiArc 不变量） | 录屏、减少动效截图 | 已对齐（改造）：标签走光，减少动效时纯色；按 ADR-0079 生成中也默认折叠、可随时展开（取代原先的强制展开）；`gallery/process/thinking-*` |
 
 ## 7. 工具行、工具组与 diff
 
@@ -97,7 +101,7 @@
 |---|---|---|---|---|---|---|
 | 单行 | `generated/working-line-v4/turn-status.mjs` | 高 28/24，左右外扩 6；动词次色、对象主色；末尾 12 px 实心右箭头，展开转 90°（60 ms）；无悬停底色，整行可点；超长末尾 24 px 渐隐 | 圆点加文字摘要 | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
 | 状态词 | 同上 | 运行中走光，等待审批 "Needs approval" 警告色，失败 "Failed" 危险色，停止与拒绝次色 | 彩色圆点 | 复刻（状态与结果来自 Core） | 截图 | 已对齐（改造）：运行中走光，失败、拒绝、中断用结果词；"Needs approval" 不放在工具行上，待审批由审批卡与 working 行承担；`gallery/tools/` |
-| 组摘要 | `generated/transcript-rows/rows-c24951e9f-*.mjs` | "Read 2 files, edited a file, ran a command"，只大写首词，最多三类加 "and N more actions" | "Read 3 files · Edited a.ts" | 复刻（中文按同样结构） | 截图 | 已对齐（改造）：保留 PiArc 的"· 分隔"句式与中英文案，动词次色、对象主色；单个调用展开直接显示内容，多个调用展开为细线卡片；`gallery/tools/` |
+| 组摘要 | `generated/transcript-rows/rows-c24951e9f-*.mjs` | "Read 2 files, edited a file, ran a command"，只大写首词，最多三类加 "and N more actions" | "Read 3 files · Edited a.ts" | 复刻（中文按同样结构） | 截图 | 已对齐（改造）：按 ADR-0079，连续工具调用（含命令、网页搜索）与其间的思考合成一组，运行中展开、正文开始或回合结束后收起，用户选择优先；按不同对象计数，超过四段折成"另外 N 项"，长摘要省略号；`gallery/process/` |
 | 增删胶囊 | `generated/transcript-rows/diff-counts.mjs` | 高 22/18，caption 12 字重 500，圆角 5.5，左右 8，绿红 20% 底 | 彩色文字 | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
 | 展开成员卡 | `turn-status.mjs` | 上 8 下 6；卡片圆角 12，1 px 细线环，分隔线；成员格内距 8×12，行距 37；无高度动画 | 缩进列表 | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
 | 命令卡 | `generated/transcript-rows/turn-mark.mjs`（`xd`、`Na`） | 命令行代码底圆角 8，`$` 前缀次色；输出最高 400 滚动，失败时输出危险色；复制悬停显示 | 卡片加文字按钮 | 复刻；退出码与 cwd 改作尾部次色段（PiArc 有这些数据） | 截图 | 已对齐（改造）：行内"Ran ‹命令›"，退出码与时长作尾段，后台任务、截断与超时作常显说明行，展开后是 `$` 命令卡与输出；`gallery/tools/tools-open-*` |
@@ -110,8 +114,8 @@
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 布局 | `generated/working-line-v4/working-line.mjs` | 最小高 28；20 px 标记槽悬挂进左侧留白（槽宽 20 加间距 12），文字与正文对齐 | 转圈加文字 | 复刻 | 测量 | 已对齐：`gallery/working/working-*`（窄于 560 px 时标记不悬挂，放进留白内） |
-| 标记 | `activity-mark.mjs`、`spark-thinking.json` | 30 fps 精灵图，按活动换图；离场 400 ms，入场延迟 150 淡入 200 | CSS 转圈 | 改造：PiArc 自有标记（P、i 两字的 10 个方块按笔画依次点亮），思考慢、工具快、待审批静止加琥珀色脉冲；不使用火花标记 | 录屏、减少动效 | 已对齐（改造）：PiArc 的 P、i 十格标记，思考 1.8 s 一轮、执行工具 1 s 一轮，等待审批时整体以警告色 2 s 呼吸；入场延迟 150 ms 淡入 200 ms；逐帧证据 `gallery/working/mark-tool-*` |
+| 布局 | `generated/working-line-v4/working-line.mjs` | 最小高 28；20 px 标记槽悬挂进左侧留白（槽宽 20 加间距 12），文字与正文对齐 | 转圈加文字 | 复刻 | 测量 | 已对齐（改造）：按用户要求缩到 16 px，起点与回复正文对齐，不再悬挂进留白；`gallery/p1fix/working-*` |
+| 标记 | `activity-mark.mjs`、`spark-thinking.json` | 30 fps 精灵图，按活动换图；离场 400 ms，入场延迟 150 淡入 200 | CSS 转圈 | 改造：PiArc 自有标记（P、i 两字的 10 个方块按笔画依次点亮），思考慢、工具快、待审批静止加琥珀色脉冲；不使用火花标记 | 录屏、减少动效 | 已对齐（改造）：PiArc 自有的 P、i 十格标记，按用户要求 16 px；标题行与侧栏的运行状态也用它（14 px） |
 | 文案 | 同上 | 停止中 > 重试 > 压缩 > 工具进行时 > "Working…"；思考分档 15/30/45/60 s | 当前工具名与 "Working" | 复刻优先级；思考分档文案自写 | 截图 | 已对齐（改造）：压缩 > 当前工具 > "Working"，待审批时改为"Needs your input"；工具标签保留 PiArc 的"工具 · 对象"句式；切换时 120 ms 上移 3 px 淡入 |
 | 计时与 token | `elapsed-clock.mjs`、`count-tween.mjs` | 2 s 后出现，"12s / 1m 5s"，按整秒对齐；token 首次 1200 ms 计数补间 | 立即显示 "7 s"、token 数 | 复刻 | 截图 | 已对齐（改造）：2 s 后出现，沿用 PiArc 的本地化时长格式；token 数不做补间（每秒随计时刷新） |
 | 待审批 | `source-approval-card.jsx` | 行内 "Needs your input" 警告色胶囊 | 无 | 复刻（PiArc 的待审批数） | 截图 | 已对齐：`gallery/working/approval-command-*` |
@@ -152,14 +156,14 @@
 |---|---|---|---|---|
 | 1. 基础令牌 | 7 | 1 | 0 | 8 |
 | 2. 标题行 | 2 | 1 | 1 | 4 |
-| 3. 输入区 | 13 | 1 | 2 | 16 |
-| 4. 对话区与消息 | 9 | 2 | 1 | 12 |
-| 5. Markdown 与代码块 | 7 | 1 | 0 | 8 |
+| 3. 输入区 | 13 | 2 | 2 | 17 |
+| 4. 对话区与消息 | 10 | 2 | 1 | 13 |
+| 5. Markdown 与代码块 | 6 | 4 | 0 | 10 |
 | 6. 思考块 | 2 | 1 | 0 | 3 |
 | 7. 工具行、工具组与 diff | 5 | 4 | 1 | 10 |
-| 8. working 行 | 2 | 3 | 0 | 5 |
+| 8. working 行 | 1 | 4 | 0 | 5 |
 | 9. 审批卡 | 3 | 7 | 0 | 10 |
 | 10. 宿主卡片与状态行 | 4 | 4 | 2 | 10 |
-| 合计 | 54 | 25 | 7 | 86 |
+| 合计 | 53 | 30 | 7 | 90 |
 
-没有"待实现"的行。"改造"多集中在审批卡与宿主卡片：PiArc 的审批语义（规则逐行编辑、沙箱与目录、读完门控、来源标记）比参考多，外壳与层级按参考，内容按 PiArc 的数据。
+没有"待实现"的行。"改造"多集中在审批卡与宿主卡片：PiArc 的审批语义（规则逐行编辑、沙箱与目录、读完门控、来源标记）比参考多，外壳与层级按参考，内容按 PiArc 的数据。用户追加要求带来的偏离（行内代码冷灰、working 标记不悬挂、回合过程收起、思考默认折叠）与超越参考的部分（Mermaid 的下载与修复、命令芯片的句中唤起）都记为"改造"，依据见 ADR-0079、ADR-0080。

@@ -39,12 +39,43 @@ describe('tool summaries', () => {
       edit('4', 3, 1),
       edit('5', 10, 0),
     ]);
+    // Two edits of one file are one edited file; their lines still add up.
     expect(summary.parts).toEqual([
       { verb: 'read', count: 2, target: undefined },
       { verb: 'search', count: 1, target: 'TODO' },
-      { verb: 'edit', count: 2, target: undefined },
+      { verb: 'edit', count: 1, target: '中文.ts' },
     ]);
     expect([summary.added, summary.removed, summary.status]).toEqual([13, 1, 'failed']);
+    // Reading the same file twice is reading one file.
+    expect(summarize([read('1', 'a.ts'), read('2', 'a.ts')]).parts).toEqual([
+      { verb: 'read', count: 1, target: 'a.ts' },
+    ]);
+  });
+
+  it('counts commands and web searches, and leaves thinking out (ADR-0079)', () => {
+    const summary = summarize([
+      { type: 'reasoning', itemId: 't', status: 'completed', text: 'hmm' },
+      {
+        type: 'commandExecution',
+        itemId: 'c1',
+        status: 'completed',
+        tool: 'Bash',
+        arguments: {},
+        command: 'npm test\nnpm run lint',
+      },
+      {
+        type: 'webSearch',
+        itemId: 'w1',
+        status: 'completed',
+        tool: 'WebSearch',
+        arguments: {},
+        query: 'vite 7 release',
+      },
+    ] as Item[]);
+    expect(summary.parts).toEqual([
+      { verb: 'command', count: 1, target: 'npm test' },
+      { verb: 'web', count: 1, target: 'vite 7 release' },
+    ]);
   });
 
   it('says what Memory calls did, merging repeated ones (T47)', () => {

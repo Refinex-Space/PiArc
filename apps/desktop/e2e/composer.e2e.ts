@@ -78,7 +78,7 @@ test('a mention keeps its data, chip and sent text apart', async ({ page }, test
   await page.keyboard.type('@');
   await expect(page.getByTestId('mention-popup')).toBeVisible();
   await page.keyboard.type('main');
-  await expect(page.getByRole('option')).toHaveText(['@main.tsapps/desktop/src/main/main.ts']);
+  await expect(page.getByRole('option')).toHaveText(['main.tsapps/desktop/src/main/main.ts']);
   await page.screenshot({ path: testInfo.outputPath('mention-popup.png') });
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('mention-popup')).toBeHidden();

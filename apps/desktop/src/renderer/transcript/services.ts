@@ -14,7 +14,7 @@ import {
 
 import type { ProjectFileLinks } from '../files/navigation.js';
 import type { BranchPoint } from '@piarc/protocol';
-import { OWN_ROW_TOOLS } from '../store/transcript.js';
+import { OWN_ROW_TOOLS, WORKING_ROW } from '../store/transcript.js';
 import type { SessionTranscript, TranscriptRow, TurnInfo } from '../store/transcript.js';
 import { HighlightClient } from './highlight/highlight-client.js';
 import { MarkdownClient, type ParsedDoc } from './markdown/markdown-client.js';
@@ -130,6 +130,11 @@ export interface TranscriptActions {
   ) => Promise<string>;
   /** Stops a running subagent (T31). */
   readonly stopSubagent?: (child: string) => void;
+  /**
+   * Sends `text` to the session as the user would (a follow-up while a turn runs): a diagram's
+   * "ask to fix" (ADR-0080). Absent where nothing can be sent.
+   */
+  readonly prompt?: (text: string) => void;
   /** Opens the settings window's memory page, at `note` when given (T47). */
   readonly openMemory?: (note: string | undefined) => void;
 }
@@ -176,6 +181,27 @@ export function useShownRowIds(): readonly string[] {
  * it before the next user message. The turn's actions sit under it. Re-renders only when the
  * answer changes.
  */
+/**
+ * Whether row `id` is the running turn's newest work: only pending approvals and the working
+ * line follow it. Its group stays open while it is; text or the turn's end closes it (ADR-0079).
+ */
+export function useLiveTail(id: string): boolean {
+  const { transcript } = useTranscriptView();
+  const subscribe = useCallback((l: () => void) => transcript.subscribeList(l), [transcript]);
+  const read = useCallback(() => liveTail(transcript, id), [transcript, id]);
+  return useSyncExternalStore(subscribe, read);
+}
+
+function liveTail(transcript: SessionTranscript, id: string): boolean {
+  const ids = transcript.rowIds();
+  const at = ids.indexOf(id);
+  if (at < 0 || ids.at(-1) !== WORKING_ROW) return false;
+  return ids.slice(at + 1).every((other) => {
+    const kind = transcript.row(other)?.kind;
+    return kind === 'working' || kind === 'approval';
+  });
+}
+
 export function useEndsTurn(id: string): boolean {
   const { transcript } = useTranscriptView();
   const subscribe = useCallback((l: () => void) => transcript.subscribeList(l), [transcript]);

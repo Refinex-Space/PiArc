@@ -85,8 +85,17 @@ function overflow(page: Page): Promise<string[]> {
     const column = document.querySelector('.conversation');
     if (column === null) return ['no conversation column'];
     const box = column.getBoundingClientRect();
+    // Content an ancestor inside the column clips (an ellipsis, a scroller) is not cut off.
+    const clipped = (el: HTMLElement): boolean => {
+      for (let p = el.parentElement; p !== null && p !== column; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX === 'visible') continue;
+        const r = p.getBoundingClientRect();
+        if (r.right <= box.right + 1 && r.left >= box.left - 1) return true;
+      }
+      return false;
+    };
     return [...column.querySelectorAll<HTMLElement>('*')]
-      .filter((el) => el.offsetParent !== null)
+      .filter((el) => el.offsetParent !== null && !clipped(el))
       .filter((el) => {
         const r = el.getBoundingClientRect();
         const scrolls = ['auto', 'scroll'].includes(getComputedStyle(el).overflowX);
@@ -151,13 +160,13 @@ test('session pane states for review', async ({ app, page }) => {
     await page.locator('.tooltip[data-placed="true"]').waitFor();
     await page.screenshot({ path: path.join(EVIDENCE, `tooltip-${theme}.png`) });
   }
-  // Steps opened: a group of calls, a failed command with its output, a file change's diff.
+  // Steps opened: the groups of calls, a failed command with its output, a file change's diff.
   for (const theme of themes) {
     await prefer(page, { key: 'appearance.theme', value: theme });
     await open(page, 'tools');
-    await page.getByTestId('tool-group-toggle').first().click();
+    // Both groups open (the second holds the failed command), then the command's output.
+    for (const toggle of await page.getByTestId('tool-group-toggle').all()) await toggle.click();
     await page.getByTestId('bash-output-toggle').first().click();
-    await page.getByTestId('tool-group-toggle').last().click();
     await page.mouse.move(0, 0);
     await page.screenshot({ path: path.join(EVIDENCE, `tools-open-${theme}.png`) });
     await open(page, 'conversation');
@@ -281,5 +290,85 @@ sessionTest(
     await page.getByTestId('conversation-failed').getByRole('button').click();
     await expect(page.getByTestId('agent-message').last()).toContainText('Friday');
     await expect(page.getByTestId('conversation-failed')).toHaveCount(0);
+
+    // Read from the session file, the messages carry their times (ADR-0080).
+    await page.getByTestId('user-row').first().hover();
+    const sent = page.getByTestId('user-row').first().getByTestId('message-time');
+    await expect(sent).toBeVisible();
+    await expect(sent).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}T/u);
+    await sent.hover();
+    await page.locator('.tooltip[data-placed="true"]').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-time-hover.png') });
   },
 );
+
+// Images and diagrams in a real reply (ADR-0080): a project image inline, a remote one as a card,
+// a Mermaid diagram drawn with its tools and one that cannot be drawn with its fix; the image a
+// Read returned shows under the call.
+const CHART = [
+  '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160">',
+  '<rect width="320" height="160" fill="#f4f6ff"/>',
+  '<rect x="30" y="90" width="40" height="50" fill="#3b5bdb"/>',
+  '<rect x="100" y="60" width="40" height="80" fill="#3b5bdb"/>',
+  '<rect x="170" y="40" width="40" height="100" fill="#3b5bdb"/>',
+  '<rect x="240" y="20" width="40" height="120" fill="#3b5bdb"/>',
+  '</svg>',
+].join('');
+
+sessionTest('images and diagrams in a real reply', async ({ app, page, workspaces }) => {
+  test.setTimeout(240_000);
+  await mkdir(EVIDENCE, { recursive: true });
+  const ws = await makeWorkspace(workspaces, 'media 图', { 'chart.svg': CHART });
+  await openFolder(page, app, ws);
+  await startSession(page, 'Show me the release chart.', 'session-pane-media');
+  await focusMain(app);
+  await expect(page.getByTestId('composer')).toHaveAttribute('data-running', 'false', {
+    timeout: 30_000,
+  });
+  const reply = page.getByTestId('agent-message').last();
+  await expect(reply.getByTestId('reply-image')).toHaveAttribute('data-state', 'shown', {
+    timeout: 15_000,
+  });
+  await expect(reply.getByTestId('remote-image')).toContainText('example.com');
+  const diagrams = reply.getByTestId('md-diagram');
+  await expect(diagrams.first()).toHaveAttribute('data-state', 'drawn', { timeout: 20_000 });
+  await expect(diagrams.last()).toHaveAttribute('data-state', 'failed');
+  await expect(diagrams.last().getByTestId('diagram-error')).toBeVisible();
+  for (const theme of ['light', 'dark'] as const) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await expect(diagrams.first()).toHaveAttribute('data-state', 'drawn', { timeout: 20_000 });
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `real-media-${theme}.png`) });
+    await diagrams.first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(EVIDENCE, `real-diagram-${theme}.png`) });
+  }
+  await prefer(page, { key: 'appearance.theme', value: 'light' });
+
+  // The source, and back; the download menu.
+  await diagrams.first().getByTestId('diagram-toggle').click();
+  await expect(diagrams.first().getByTestId('code-block')).toBeVisible();
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-diagram-source.png') });
+  await diagrams.first().getByTestId('diagram-toggle').click();
+  await diagrams.first().getByTestId('diagram-download').click();
+  await expect(page.getByTestId('diagram-download-png')).toBeVisible();
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-diagram-download.png') });
+  await page.keyboard.press('Escape');
+
+  // The Read's image under its line in the opened group.
+  await page.getByTestId('tool-group-toggle').first().click();
+  await expect(page.getByTestId('tool-group').first().getByTestId('reply-image')).toHaveAttribute(
+    'data-state',
+    'shown',
+  );
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-read-image.png') });
+
+  // Asking to fix the broken diagram sends a message with the reason and the source.
+  await diagrams.last().getByTestId('diagram-fix').click();
+  await expect(page.getByTestId('user-message').last()).toContainText('sequenceDiagram', {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('agent-message').last()).toContainText('corrected diagram', {
+    timeout: 30_000,
+  });
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-diagram-fixed.png') });
+});

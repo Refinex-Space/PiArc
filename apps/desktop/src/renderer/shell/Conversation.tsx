@@ -346,6 +346,13 @@ export function Conversation({
         resend: (clientId) => {
           void input.resend(clientId);
         },
+        prompt: (text) => {
+          const draft = { text, mentions: [], pending: [], stored: [] };
+          const sent = transcript.isRunning() ? input.add('followUp', draft) : input.send(draft);
+          sent.catch((failure: unknown) => {
+            setError(t('composer.failed', { reason: reason(failure) }));
+          });
+        },
         rewind: (turnId, text) => {
           setRewinding({ target: { turnId, text } });
         },

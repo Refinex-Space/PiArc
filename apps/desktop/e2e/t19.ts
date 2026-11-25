@@ -62,6 +62,13 @@ export async function send(page: Page, text: string): Promise<void> {
   await page.keyboard.press('Enter');
 }
 
+/** Opens every folded tool group: a finished turn's calls fold into their summary (ADR-0079). */
+export async function openToolGroups(page: Page): Promise<void> {
+  for (const toggle of await page.getByTestId('tool-group-toggle').all()) {
+    if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+  }
+}
+
 /** Waits for the session's running turn to end (the working row goes away). */
 export async function idle(page: Page, timeout = 30_000): Promise<void> {
   await expect(page.getByTestId('working-row')).toHaveCount(0, { timeout });

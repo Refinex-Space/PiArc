@@ -6,11 +6,13 @@ import type { Item, ItemStatus } from '@piarc/protocol';
 import type { MessageId } from '../../../shared/i18n/index.js';
 
 export type ToolVerb =
+  | 'command'
   | 'read'
   | 'search'
   | 'find'
   | 'edit'
   | 'fetch'
+  | 'web'
   | 'mcp'
   | 'agent'
   | 'memorySave'
@@ -39,7 +41,9 @@ const VERB_ORDER: readonly ToolVerb[] = [
   'search',
   'find',
   'edit',
+  'command',
   'fetch',
+  'web',
   'mcp',
   'agent',
   'memorySave',
@@ -66,8 +70,12 @@ export function verbOf(item: Item): ToolVerb {
   switch (item.type) {
     case 'fileChange':
       return 'edit';
+    case 'commandExecution':
+      return 'command';
     case 'webFetch':
       return 'fetch';
+    case 'webSearch':
+      return 'web';
     case 'mcpToolCall':
       return 'mcp';
     case 'subagent':
@@ -130,7 +138,9 @@ export function targetOf(item: Item): string {
     case 'subagent':
       return item.description ?? item.tool;
     case 'commandExecution':
-      return item.command;
+      return item.command.split('\n', 1)[0] ?? item.command;
+    case 'webSearch':
+      return item.query;
     default:
       break;
   }
@@ -159,13 +169,17 @@ const STATUS_RANK: Record<ItemStatus, number> = {
   inProgress: 4,
 };
 
-/** The summary of a group's calls. */
+/** Verbs counted by what they act on: reading one file twice is reading one file. */
+const COUNT_TARGETS: ReadonlySet<ToolVerb> = new Set(['read', 'edit', 'fetch']);
+
+/** The summary of a group's calls; thinking in the group is not a call. */
 export function summarize(items: readonly Item[]): GroupSummary {
   const byVerb = new Map<ToolVerb, Item[]>();
   let added = 0;
   let removed = 0;
   let status: ItemStatus = 'completed';
   for (const item of items) {
+    if (item.type === 'reasoning') continue;
     const verb = verbOf(item);
     byVerb.set(verb, [...(byVerb.get(verb) ?? []), item]);
     if (item.type === 'fileChange' && item.diff !== undefined && item.diff !== null) {
@@ -181,14 +195,19 @@ export function summarize(items: readonly Item[]): GroupSummary {
     if (calls === undefined) {
       return [];
     }
-    const only = calls.length === 1 ? calls[0] : undefined;
-    return [{ verb, count: calls.length, target: only === undefined ? undefined : targetOf(only) }];
+    const count = COUNT_TARGETS.has(verb)
+      ? new Set(calls.map((call) => targetOf(call))).size
+      : calls.length;
+    const only = count === 1 ? calls[0] : undefined;
+    return [{ verb, count, target: only === undefined ? undefined : targetOf(only) }];
   });
   return { parts, added, removed, status };
 }
 
 /** The message of each verb ("Read 3 files"). */
 export const VERB_MESSAGE: Record<ToolVerb, MessageId> = {
+  command: 'transcript.tool.command',
+  web: 'transcript.tool.web',
   read: 'transcript.tool.read',
   search: 'transcript.tool.search',
   find: 'transcript.tool.find',

@@ -14,6 +14,7 @@ export const GALLERY_SECTIONS = [
   'conversation',
   'messages',
   'markdown',
+  'diagram',
   'thinking',
   'tools',
   'cards',

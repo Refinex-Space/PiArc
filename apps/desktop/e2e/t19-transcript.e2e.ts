@@ -3,7 +3,7 @@
 // current tool, the timer, the token count, the automatic retry (n / max) and the compaction.
 import { expect, test } from './sessions.js';
 import { readClipboard, withSavedClipboard } from './transcript.js';
-import { idle, openSession, screenshots, seedCompaction, send } from './t19.js';
+import { idle, openSession, openToolGroups, screenshots, seedCompaction, send } from './t19.js';
 
 const FILES = {
   'src/main.ts': '// TODO: greet\nexport const greet = (name: string) => `Hi ${name}`;\n',
@@ -57,18 +57,20 @@ test('the P0 rows of a real turn, and the working row through its phases', async
   await expect(page.getByTestId('thinking-label').first()).toHaveText(
     /^Thought for \d+ seconds?$/u,
   );
+  // The read, search, command and edit run back to back: one group, folded once the reply came
+  // (ADR-0079). Opening it shows each call.
   const groups = page.getByTestId('tool-group');
   await expect(groups.first()).toContainText('Read main.ts · Searched “TODO”');
+  const edit = groups.filter({ hasText: 'Edited main.ts' });
+  await expect(edit.getByTestId('tool-lines').first()).toHaveText('+1 −1');
+  await openToolGroups(page);
   const bash = page.getByTestId('bash-card');
   await expect(bash).toHaveAttribute('data-outcome', 'success');
   await expect(bash.getByTestId('bash-exit')).toHaveText('exit 0');
   // The command card is in the open step.
   await bash.getByTestId('bash-output-toggle').click();
   await expect(bash.getByTestId('bash-command')).toHaveText('$ sleep 2; env echo checked');
-  // The edit is a group of one; opening it shows the file change with Core's diff.
-  const edit = groups.filter({ hasText: 'Edited main.ts' });
-  await expect(edit.getByTestId('tool-lines')).toHaveText('+1 −1');
-  await edit.getByTestId('tool-group-toggle').click();
+  // The edit in the open group shows the file change with Core's diff.
   const change = page.getByTestId('file-change-body');
   await expect(change.getByTestId('file-change-path')).toHaveText('src/main.ts');
   await expect(change.locator('.diff-line[data-kind="added"]')).toContainText(

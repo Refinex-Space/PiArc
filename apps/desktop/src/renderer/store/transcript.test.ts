@@ -42,6 +42,12 @@ const text = (id: string, value: string, status: Item['status'] = 'completed'): 
   status,
   text: value,
 });
+const thought = (id: string): Item => ({
+  type: 'reasoning',
+  itemId: id,
+  status: 'completed',
+  text: 'Considering the options.',
+});
 const user = (id: string, value: string): Item => ({
   type: 'userMessage',
   itemId: id,
@@ -72,14 +78,37 @@ describe('SessionTranscript rows', () => {
     text('m1', 'Done.'),
   ];
 
-  it('folds consecutive tool calls other than commands into groups', () => {
+  it('folds a run of tool calls, commands included, into one group', () => {
     const transcript = new SessionTranscript();
     transcript.apply(liveTurn('t1', items));
-    expect(transcript.rowIds()).toEqual(['u1', 'group:r1', 'b1', 'group:r3', 'm1']);
+    expect(transcript.rowIds()).toEqual(['u1', 'group:r1', 'm1']);
     expect(transcript.row('group:r1')).toEqual({
       kind: 'group',
       id: 'group:r1',
-      members: ['r1', 'r2', 'e1'],
+      members: ['r1', 'r2', 'e1', 'b1', 'r3'],
+    });
+  });
+
+  it('puts the thinking between calls in their group and leaves thinking alone a row', () => {
+    const transcript = new SessionTranscript();
+    transcript.apply(
+      liveTurn('t1', [
+        user('u1', 'Fix it'),
+        thought('th1'),
+        read('r1'),
+        thought('th2'),
+        bash('b1'),
+        thought('th3'),
+        text('m1', 'Done.'),
+        thought('th4'),
+        text('m2', 'And that is all.'),
+      ]),
+    );
+    expect(transcript.rowIds()).toEqual(['u1', 'group:th1', 'm1', 'th4', 'm2']);
+    expect(transcript.row('group:th1')).toEqual({
+      kind: 'group',
+      id: 'group:th1',
+      members: ['th1', 'r1', 'th2', 'b1', 'th3'],
     });
   });
 
@@ -234,7 +263,7 @@ describe('SessionTranscript rows', () => {
       ...liveTurn('t1', items),
       ...liveTurn('t2', [user('u2', 'More'), text('m2', 'Ok')]),
     ]);
-    expect(transcript.exchangeOf('b1')).toEqual(['u1', 'group:r1', 'b1', 'group:r3', 'm1']);
+    expect(transcript.exchangeOf('m1')).toEqual(['u1', 'group:r1', 'm1']);
     expect(transcript.exchangeOf('m2')).toEqual(['u2', 'm2']);
   });
 

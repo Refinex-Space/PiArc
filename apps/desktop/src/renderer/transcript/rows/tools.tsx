@@ -12,10 +12,15 @@ import { IconButton } from '../../app/IconButton.js';
 import { ExternalGlyph } from '../../shell/icons.js';
 import {
   useExpanded,
+  useLiveTail,
   useTranscriptRow,
   useTranscriptRows,
   useTranscriptView,
 } from '../services.js';
+import { useDetail } from '../detail.js';
+import { ThinkingRow } from './messages.js';
+import { WebSearchCard } from './web-search.js';
+import { ProjectImage, useProjectImage } from '../markdown/ReplyImage.js';
 import { useElapsedText, useNow } from './common.js';
 import { revealBidi } from '../reveal.js';
 import { projectPath } from '../../files/file-path.js';
@@ -83,13 +88,25 @@ function PartText({ part }: { readonly part: ToolPart }) {
   );
 }
 
+/** Parts shown before the rest folds into "N more". */
+const SUMMARY_PARTS = 3;
+
 function SummaryText({ summary }: { readonly summary: GroupSummary }) {
-  return summary.parts.map((part, index) => (
-    <span key={part.verb}>
-      {index > 0 ? ' · ' : null}
-      <PartText part={part} />
+  const t = useT();
+  const folds = summary.parts.length > SUMMARY_PARTS + 1;
+  const shown = folds ? summary.parts.slice(0, SUMMARY_PARTS) : summary.parts;
+  const rest = summary.parts.length - shown.length;
+  return (
+    <span className="step-summary">
+      {shown.map((part, index) => (
+        <span key={part.verb}>
+          {index > 0 ? ' · ' : null}
+          <PartText part={part} />
+        </span>
+      ))}
+      {rest > 0 ? ` · ${t('transcript.tool.more', { count: rest })}` : null}
     </span>
-  ));
+  );
 }
 
 /** The step state a tool call's lifecycle shows as. */
@@ -140,9 +157,15 @@ export function ToolGroupRow({
   const items = useMemberItems(members);
   const summary = summarize(items);
   const outcome = useOutcome();
-  const [expanded, setExpanded] = useExpanded(id, false);
+  // Open while it is the running turn's newest work; folded into its summary once text follows
+  // or the turn ends. The user's own choice wins either way (ADR-0079).
+  const live = useLiveTail(id);
+  const [expanded, setExpanded] = useExpanded(id, live);
   const only = members.length === 1 ? items[0] : undefined;
   const opens = only === undefined || hasBody(only);
+  if (only?.type === 'commandExecution' || only?.type === 'webSearch') {
+    return <ToolCall id={members[0] ?? ''} />;
+  }
   return (
     <div
       className={`row row-tool-group${expanded ? ' is-expanded' : ''}`}
@@ -161,6 +184,11 @@ export function ToolGroupRow({
           setExpanded(!expanded);
         }}
         lineTestId="tool-group-toggle"
+        notes={
+          only !== undefined && 'review' in only && only.review != null ? (
+            <ReviewNote review={only.review} />
+          ) : undefined
+        }
         textTestId="tool-summary"
         aside={only === undefined ? undefined : <CallAside id={members[0] ?? ''} item={only} />}
       >
@@ -174,6 +202,7 @@ export function ToolGroupRow({
           <CallBody id={members[0] ?? ''} item={only} />
         )}
       </StepRow>
+      {only === undefined ? null : <ReadImage item={only} />}
     </div>
   );
 }
@@ -194,6 +223,17 @@ function hasBody(item: Item): boolean {
 }
 
 /** What one call shows when opened: a file change's diff, or the tool's output. */
+/** The image a finished Read of an image file returned, under its line (ADR-0080). */
+function ReadImage({ item }: { readonly item: Item }) {
+  const image = useProjectImage(readPath(item));
+  if (image === undefined || item.status !== 'completed') return null;
+  return (
+    <span className="tool-image">
+      <ProjectImage path={image} alt={baseName(image)} fallback={null} />
+    </span>
+  );
+}
+
 function CallBody({ id, item }: { readonly id: string; readonly item: Item }) {
   const t = useT();
   if (item.type === 'fileChange') {
@@ -202,7 +242,6 @@ function CallBody({ id, item }: { readonly id: string; readonly item: Item }) {
   const output = outputOf(item);
   return (
     <>
-      {'review' in item ? <ReviewNote review={item.review} /> : null}
       {output === undefined ? null : (
         <pre
           className={`tool-output${item.status === 'failed' ? ' is-failed' : ''}`}
@@ -276,13 +315,26 @@ function CallAside({ item }: { readonly id: string; readonly item: Item }) {
 const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
   const row = useTranscriptRow(id);
   const outcome = useOutcome();
+  const detail = useDetail();
   const [open, setOpen] = useExpanded(`call:${id}`, false);
   if (row?.kind !== 'item') {
     return null;
   }
   const { item } = row;
-  if (item.type === 'fileChange') {
-    return <FileChangeCard id={id} item={item} />;
+  switch (item.type) {
+    case 'fileChange':
+      return <FileChangeCard id={id} item={item} />;
+    case 'commandExecution':
+      return <BashCard id={id} item={item} startedAt={row.startedAt} />;
+    case 'webSearch':
+      return <WebSearchCard id={id} item={item} />;
+    case 'reasoning':
+      // The normal view shows no thinking (T29).
+      return detail === 'normal' ? null : (
+        <ThinkingRow id={id} item={item} startedAt={row.startedAt} endedAt={row.endedAt} />
+      );
+    default:
+      break;
   }
   return (
     <div className="tool-call" data-testid="tool-call" data-row-id={id} data-status={item.status}>
@@ -295,9 +347,13 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
           setOpen(!open);
         }}
         aside={<CallAside id={id} item={item} />}
+        notes={
+          'review' in item && item.review != null ? <ReviewNote review={item.review} /> : undefined
+        }
       >
         <CallBody id={id} item={item} />
       </StepRow>
+      <ReadImage item={item} />
     </div>
   );
 });
@@ -365,6 +421,7 @@ export function BashCard({
   else if (finished) stateText = outcome === 'success' ? undefined : t('transcript.bash.failure');
   else stateText = t(STATUS_MESSAGE[item.status]);
   const notes: ReactNode[] = [];
+  if (item.review != null) notes.push(<ReviewNote key="review" review={item.review} />);
   if (task !== undefined) {
     notes.push(
       <div key="task" className="step-note" data-testid="bash-task">
@@ -457,7 +514,6 @@ export function BashCard({
         notes={notes.length === 0 ? undefined : notes}
       >
         <div className="bash-body">
-          <ReviewNote review={item.review} />
           <div className="bash-command-card">
             {execution === undefined ? null : (
               <div className="bash-cwd" data-testid="bash-cwd" title={execution.cwd}>
@@ -523,6 +579,7 @@ export function FileChangeCard({
         onToggle={() => {
           setOpen(!open);
         }}
+        notes={item.review == null ? undefined : <ReviewNote review={item.review} />}
       >
         <FileChangeBody id={id} item={item} />
       </StepRow>
@@ -557,7 +614,6 @@ function FileChangeBody({ id, item }: { readonly id: string; readonly item: File
           </span>
         )}
       </div>
-      <ReviewNote review={item.review} />
       {diff === undefined ? (
         item.status === 'inProgress' ? null : (
           <div className="step-note">{t('transcript.file.noDiff')}</div>

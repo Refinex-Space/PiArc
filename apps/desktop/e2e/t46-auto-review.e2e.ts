@@ -12,7 +12,7 @@ import path from 'node:path';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { expect, test } from './sessions.js';
-import { idle, openSession, prefer, requests, send } from './t19.js';
+import { idle, openSession, openToolGroups, prefer, requests, send } from './t19.js';
 
 const EVIDENCE = path.join(import.meta.dirname, '..', '..', '..', 'tmp', 'evidence', 'T46');
 const REVIEWER = 'piarc-mock/mock-reviewer';
@@ -175,6 +175,7 @@ test('auto review: enabling, decisions on calls, cards, pause, status, audit and
   await expect(status).toHaveCount(0);
 
   // The reviewer's decisions show on the calls, with the reason behind a disclosure.
+  await openToolGroups(page);
   const allowed = page.locator('[data-testid="bash-card"]', { hasText: 'printenv HOME' }).first();
   await expect(allowed.getByTestId('tool-review')).toHaveAttribute('data-verdict', 'allow');
   const refused = page.locator('[data-testid="bash-card"]', { hasText: 'sed -i.bak' });

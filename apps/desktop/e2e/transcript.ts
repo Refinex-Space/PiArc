@@ -179,7 +179,11 @@ export async function inspect(page: Page): Promise<Inspection> {
     return {
       sentinel: globalThis.__piarcXssSentinel,
       violations: globalThis.__piarcCspViolations ?? [],
-      forbidden: tags.filter((tag) => transcript.querySelector(tag) !== null),
+      // The app draws its icons as SVG with its own classes; content cannot set a class.
+      forbidden: tags.filter(
+        (tag) =>
+          transcript.querySelector(tag === 'svg' ? 'svg:not(.icon, .activity-mark)' : tag) !== null,
+      ),
       eventAttributes: elements.flatMap((element) =>
         element
           .getAttributeNames()

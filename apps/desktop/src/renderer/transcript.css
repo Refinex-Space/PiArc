@@ -599,6 +599,8 @@
   z-index: 1;
   padding-block: var(--piarc-space-1);
   pointer-events: none;
+  /* Not part of a selection: copying across the block gives only its code. */
+  user-select: none;
 }
 
 .md-code-rail > .icon-button {
@@ -897,6 +899,200 @@
   overflow: hidden;
 }
 
+/* A message's time in its actions (ADR-0080): quiet, the full date and time as its tooltip. */
+.row-time {
+  display: inline-flex;
+  align-items: center;
+  height: var(--piarc-session-row);
+  padding-inline: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Images in replies (ADR-0080): a project image inline with a hairline, a remote one as a card
+   that opens in the browser; a quiet placeholder while the preview address comes. */
+.md-reply-image {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.md-reply-image img {
+  max-height: 420px;
+  border-radius: 5px;
+  outline: 1px solid var(--piarc-session-line);
+  outline-offset: -1px;
+}
+
+.md-reply-image-pending {
+  display: block;
+  width: min(320px, 100%);
+  height: 120px;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  animation:
+    skeleton-reveal var(--piarc-motion-fast) var(--piarc-motion-curve-out) 0.3s backwards,
+    skeleton-breathe 2s ease-in-out 0.3s infinite;
+}
+
+:root[data-app] .md-remote-image {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  max-width: 100%;
+  margin: 2px 0;
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-md);
+  border: 0;
+  border-radius: var(--piarc-session-radius);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-align: start;
+  vertical-align: middle;
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+:root[data-app] .md-remote-image:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+
+.md-remote-image > .icon {
+  flex: none;
+  color: var(--piarc-text-secondary);
+}
+
+.md-remote-image-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.md-remote-image-name,
+.md-remote-image-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-remote-image-name {
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+
+.md-remote-image-host {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.tool-image {
+  display: block;
+  padding: var(--piarc-space-1) 0 var(--piarc-space-1) var(--piarc-session-text-inset);
+}
+
+.tool-image .md-reply-image img {
+  max-height: 360px;
+}
+
+@media (forced-colors: active) {
+  :root[data-app] .md-remote-image {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+
+/* Mermaid diagrams (ADR-0080): a hairline box with the language and its tools on top and the
+   drawn image centred below; while the fence streams or the image draws, a quiet placeholder. */
+.row-agent .md .md-diagram {
+  margin: var(--md-flow) 0 0;
+  border-radius: var(--piarc-session-radius);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  overflow: hidden;
+}
+
+.md-diagram-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-2);
+  min-height: var(--piarc-session-row);
+  padding: var(--piarc-space-1) var(--piarc-space-1) 0 calc(10px + 1ch);
+}
+
+.md-diagram-lang {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+  user-select: none;
+}
+
+.md-diagram-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.md-diagram-tools > .md-diagram-fix {
+  color: var(--piarc-text-accent);
+}
+
+.md-diagram-body {
+  display: flex;
+  justify-content: center;
+  padding: var(--piarc-session-pad-sm) var(--piarc-session-pad-lg) var(--piarc-session-pad-lg);
+  overflow-x: auto;
+}
+
+.md-diagram-placeholder {
+  height: 88px;
+  margin: var(--piarc-session-pad-sm) var(--piarc-session-pad-lg) var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  animation:
+    skeleton-reveal var(--piarc-motion-fast) var(--piarc-motion-curve-out) 0.3s backwards,
+    skeleton-breathe 2s ease-in-out 0.3s infinite;
+}
+
+.md-diagram-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: var(--piarc-space-1) var(--piarc-session-pad-lg) 0 calc(10px + 1ch);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.md-diagram-error > .icon {
+  flex: none;
+  margin-top: 0.5px;
+  color: var(--piarc-text-warning);
+}
+
+/* The source inside the box: the box is its frame, the head its language and copy. */
+.row-agent .md .md-diagram .md-code {
+  margin-top: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.md-diagram .md-code-lang,
+.md-diagram .md-code-rail {
+  display: none;
+}
+
+@media (forced-colors: active) {
+  .row-agent .md .md-diagram {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+
 .row-agent .md .md-code-lang {
   padding: var(--piarc-space-2) calc(10px + 1ch) 0;
   font-family: var(--piarc-font-ui);
@@ -1036,6 +1232,12 @@
 
 .tool-calls > * + * {
   border-top: 1px solid var(--piarc-session-line);
+}
+
+/* Thinking, commands and web searches keep their own rows inside the group's cells. */
+.tool-calls > .row {
+  max-width: none;
+  margin: 0;
 }
 
 .tool-calls .step-head {
