@@ -141,6 +141,20 @@ test('session pane states for review', async ({ app, page }) => {
     await page.locator('.tooltip[data-placed="true"]').waitFor();
     await page.screenshot({ path: path.join(EVIDENCE, `tooltip-${theme}.png`) });
   }
+  // Steps opened: a group of calls, a failed command with its output, a file change's diff.
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'tools');
+    await page.getByTestId('tool-group-toggle').first().click();
+    await page.getByTestId('bash-output-toggle').first().click();
+    await page.getByTestId('tool-group-toggle').last().click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `tools-open-${theme}.png`) });
+    await open(page, 'conversation');
+    for (const toggle of await page.getByTestId('tool-group-toggle').all()) await toggle.click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `conversation-open-${theme}.png`) });
+  }
   // A narrow window, reduced motion and forced colors on the busiest sections.
   await prefer(page, { key: 'appearance.theme', value: 'light' });
   await resize(app, 560, 760);

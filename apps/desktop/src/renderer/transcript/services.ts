@@ -14,6 +14,7 @@ import {
 
 import type { ProjectFileLinks } from '../files/navigation.js';
 import type { BranchPoint } from '@piarc/protocol';
+import { OWN_ROW_TOOLS } from '../store/transcript.js';
 import type { SessionTranscript, TranscriptRow, TurnInfo } from '../store/transcript.js';
 import { HighlightClient } from './highlight/highlight-client.js';
 import { MarkdownClient, type ParsedDoc } from './markdown/markdown-client.js';
@@ -168,6 +169,50 @@ export function useShownRowIds(): readonly string[] {
     () => (detail === 'detailed' ? ids : ids.filter((id) => shownIn(transcript.row(id), detail))),
     [ids, detail, transcript],
   );
+}
+
+/**
+ * Whether the row is the turn's last reply or step: nothing that the model says or does follows
+ * it before the next user message. The turn's actions sit under it. Re-renders only when the
+ * answer changes.
+ */
+export function useEndsTurn(id: string): boolean {
+  const { transcript } = useTranscriptView();
+  const subscribe = useCallback((l: () => void) => transcript.subscribeList(l), [transcript]);
+  const read = useCallback(() => endsTurn(transcript, id), [transcript, id]);
+  return useSyncExternalStore(subscribe, read);
+}
+
+function endsTurn(transcript: SessionTranscript, id: string): boolean {
+  const ids = transcript.rowIds();
+  for (let at = ids.indexOf(id) + 1; at > 0 && at < ids.length; at += 1) {
+    const row = transcript.row(ids[at] ?? '');
+    switch (row?.kind) {
+      case 'optimistic':
+        return true;
+      case 'working':
+      case 'group':
+        return false;
+      case 'item':
+        switch (row.item.type) {
+          case 'userMessage':
+            return true;
+          case 'dynamicToolCall':
+            if (!OWN_ROW_TOOLS.has(row.item.tool)) return false;
+            break;
+          case 'permissionModeChanged':
+          case 'contextCompaction':
+          case 'reminder':
+            break;
+          default:
+            return false;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return true;
 }
 
 /** One row; re-renders only when that row changes. */

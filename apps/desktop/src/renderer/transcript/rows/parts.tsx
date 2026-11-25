@@ -1,6 +1,6 @@
 // Parts the session pane's rows share (ADR-0078): the step row (a tool call, a group of them,
 // thinking, a status line), the +/− pill and the icon copy button. Styles in session.css.
-import { useEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 
 import { useT } from '../../app/app-context.js';
 import { IconButton } from '../../app/IconButton.js';
@@ -16,26 +16,28 @@ export interface StepRowProps {
   /** The verb ("Read", "Ran"), in the secondary ink. */
   readonly verb: ReactNode;
   /** The object ("index.html", the command), in the primary ink. */
-  readonly meta?: ReactNode;
+  readonly meta?: ReactNode | undefined;
   /** The full object, shown as the tooltip when the line cuts it. */
-  readonly metaTitle?: string;
+  readonly metaTitle?: string | undefined;
   readonly state: StepState;
   /** The outcome word after the object ("Failed", "Needs approval"). */
-  readonly outcome?: string;
+  readonly outcome?: ReactNode | undefined;
   /** Pills, counts and durations after the text. */
-  readonly trail?: ReactNode;
+  readonly trail?: ReactNode | undefined;
   /** Defined: the line is a disclosure button. */
-  readonly expanded?: boolean;
-  readonly onToggle?: () => void;
-  readonly toggleLabel?: string;
+  readonly expanded?: boolean | undefined;
+  readonly onToggle?: (() => void) | undefined;
   /** The disclosure cannot be used right now (it stays open while the model thinks). */
-  readonly toggleDisabled?: boolean;
-  readonly testId?: string;
-  readonly lineTestId?: string;
-  readonly textTestId?: string;
-  readonly children?: ReactNode;
-  readonly className?: string;
-  readonly rowProps?: Readonly<Record<`data-${string}`, string | number | boolean | undefined>>;
+  readonly toggleDisabled?: boolean | undefined;
+  /** Controls after the line (not inside its button): open a file, a settings link. */
+  readonly aside?: ReactNode | undefined;
+  /** Lines under the head that stay visible whether the step is open or not. */
+  readonly notes?: ReactNode | undefined;
+  readonly testId?: string | undefined;
+  readonly lineTestId?: string | undefined;
+  readonly textTestId?: string | undefined;
+  readonly children?: ReactNode | undefined;
+  readonly className?: string | undefined;
 }
 
 /**
@@ -51,14 +53,14 @@ export function StepRow({
   trail,
   expanded,
   onToggle,
-  toggleLabel,
   toggleDisabled,
+  aside,
+  notes,
   testId,
   lineTestId,
   textTestId,
   children,
   className,
-  rowProps,
 }: StepRowProps) {
   const text = (
     <>
@@ -79,33 +81,52 @@ export function StepRow({
       className={`step${className === undefined ? '' : ` ${className}`}`}
       data-state={state}
       data-testid={testId}
-      {...rowProps}
     >
-      {expanded === undefined ? (
-        <div className="step-line" data-testid={lineTestId}>
-          {text}
-        </div>
-      ) : (
-        <button
-          type="button"
-          className="step-line"
-          aria-expanded={expanded}
-          aria-disabled={toggleDisabled}
-          aria-label={toggleLabel}
-          data-testid={lineTestId}
-          onClick={onToggle}
-        >
-          {text}
-          <span className="step-caret" aria-hidden="true">
-            <StepCaret />
-          </span>
-        </button>
-      )}
+      <div className="step-head">
+        {expanded === undefined ? (
+          <div className="step-line" data-testid={lineTestId}>
+            {text}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="step-line"
+            aria-expanded={expanded}
+            aria-disabled={toggleDisabled}
+            data-testid={lineTestId}
+            onClick={onToggle}
+          >
+            {text}
+            <span className="step-caret" aria-hidden="true">
+              <StepCaret />
+            </span>
+          </button>
+        )}
+        {aside === undefined ? null : <span className="step-aside">{aside}</span>}
+      </div>
+      {notes === undefined ? null : <div className="step-notes">{notes}</div>}
       {expanded === true && children !== undefined ? (
         <div className="step-body">{children}</div>
       ) : null}
     </div>
   );
+}
+
+/** Segments after a step's text, separated by middle dots. */
+export function Segments({ children }: { readonly children: readonly ReactNode[] }) {
+  const shown = children.filter(
+    (child) => child !== null && child !== undefined && child !== false,
+  );
+  return shown.map((child, index) => (
+    <Fragment key={index}>
+      {index > 0 ? (
+        <span className="step-dot" aria-hidden="true">
+          ·
+        </span>
+      ) : null}
+      {child}
+    </Fragment>
+  ));
 }
 
 /** Lines added and removed as a green and a red segment; nothing when both are zero. */
@@ -121,14 +142,13 @@ export function DiffPill({
   const t = useT();
   if (added === 0 && removed === 0) return null;
   return (
-    <span className="diff-pill" data-testid={testId}>
-      <span className="diff-added" aria-hidden="true">
-        +{added}
-      </span>
-      <span className="diff-removed" aria-hidden="true">
-        −{removed}
-      </span>
-      <span className="visually-hidden">{t('transcript.diffCounts', { added, removed })}</span>
+    <span
+      className="diff-pill"
+      data-testid={testId}
+      role="img"
+      aria-label={t('transcript.diffCounts', { added, removed })}
+    >
+      <span className="diff-added">+{added}</span> <span className="diff-removed">−{removed}</span>
     </span>
   );
 }

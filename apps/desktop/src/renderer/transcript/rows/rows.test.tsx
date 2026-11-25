@@ -398,6 +398,10 @@ describe('P0 row types', () => {
     const root = await render(transcriptOf([{ item }]), ['b1']);
     const card = byTestId(root, 'bash-card');
     expect(card.dataset.outcome).toBe('failure');
+    // The command and its directory are in the open step.
+    act(() => {
+      byTestId(root, 'bash-output-toggle').click();
+    });
     expect(byTestId(root, 'bash-command').textContent).toBe('$ npm test');
     expect(byTestId(root, 'bash-cwd').textContent).toBe('in /work/space 工作区');
     expect(byTestId(root, 'bash-state').textContent).toBe('Failed');
@@ -449,7 +453,8 @@ describe('P0 row types', () => {
       act(() => {
         vi.advanceTimersByTime(7_000);
       });
-      expect(byTestId(root, 'bash-state').textContent).toBe('Running · 12 s');
+      expect(byTestId(root, 'bash-state').textContent).toBe('Running');
+      expect(byTestId(root, 'bash-elapsed').textContent).toBe('12 s');
     } finally {
       vi.useRealTimers();
     }

@@ -126,27 +126,66 @@
   min-width: 0;
 }
 
-/* The line's box reaches past the text by the outset on each side, so its text stays on the
-   reply's text inset while hover and focus get room to breathe. */
+/* The head reaches past the text by the outset on each side, so the text stays on the reply's
+   text inset while hover and focus get room to breathe. Controls (open a file) follow the line. */
+.step-head {
+  --step-outset: var(--piarc-session-pad-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  margin-inline: calc(var(--piarc-session-text-inset) - var(--step-outset))
+    calc(-1 * var(--step-outset));
+}
+
 .step-line,
 :root[data-app] .step-line {
-  --step-outset: var(--piarc-session-pad-xs);
   position: relative;
   display: flex;
+  flex: 1;
   align-items: center;
   gap: var(--piarc-session-gap-xs);
   box-sizing: border-box;
-  width: calc(100% + 2 * var(--step-outset) - var(--piarc-session-text-inset));
+  min-width: 0;
   min-height: var(--piarc-session-row);
-  margin-inline: calc(var(--piarc-session-text-inset) - var(--step-outset))
-    calc(-1 * var(--step-outset));
-  padding: 0 var(--step-outset);
+  margin: 0;
+  padding: 0 var(--piarc-session-pad-xs);
   border: 0;
   border-radius: var(--piarc-session-radius);
   background: transparent;
   color: var(--piarc-text-secondary);
   font: inherit;
   text-align: start;
+  user-select: none;
+}
+
+.step-aside {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.step-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-inline-start: var(--piarc-session-text-inset);
+}
+
+.step-note {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  overflow-wrap: anywhere;
+}
+
+.step-note.is-warning {
+  color: var(--piarc-text-warning);
+}
+
+.step-dot {
+  color: var(--piarc-text-secondary);
   user-select: none;
 }
 
@@ -201,7 +240,8 @@ button.step-line:focus-visible {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: var(--piarc-session-gap-xs);
+  gap: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 

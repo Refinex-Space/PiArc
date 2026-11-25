@@ -61,13 +61,15 @@ test('the P0 rows of a real turn, and the working row through its phases', async
   await expect(groups.first()).toContainText('Read main.ts · Searched “TODO”');
   const bash = page.getByTestId('bash-card');
   await expect(bash).toHaveAttribute('data-outcome', 'success');
-  await expect(bash.getByTestId('bash-command')).toHaveText('$ sleep 2; env echo checked');
   await expect(bash.getByTestId('bash-exit')).toHaveText('exit 0');
-  // The edit is a group of one; opening it shows the file change card with Core's diff.
+  // The command card is in the open step.
+  await bash.getByTestId('bash-output-toggle').click();
+  await expect(bash.getByTestId('bash-command')).toHaveText('$ sleep 2; env echo checked');
+  // The edit is a group of one; opening it shows the file change with Core's diff.
   const edit = groups.filter({ hasText: 'Edited main.ts' });
   await expect(edit.getByTestId('tool-lines')).toHaveText('+1 −1');
   await edit.getByTestId('tool-group-toggle').click();
-  const change = page.getByTestId('file-change-card');
+  const change = page.getByTestId('file-change-body');
   await expect(change.getByTestId('file-change-path')).toHaveText('src/main.ts');
   await expect(change.locator('.diff-line[data-kind="added"]')).toContainText(
     '// Greets the user.',
@@ -88,7 +90,7 @@ test('the P0 rows of a real turn, and the working row through its phases', async
       'thinking-block',
       'tool-group',
       'bash-card',
-      'file-change-card',
+      'file-change-body',
     ]) {
       await page
         .getByTestId(kind)

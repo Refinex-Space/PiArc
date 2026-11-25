@@ -1,12 +1,15 @@
 // The tool rows (architecture section 8.2): the tool group summary (verb + object + lines added
-// and removed, expandable to its calls), the bash card (command, directory, Core's semantic
-// status, exit code, a timer after ten seconds, where the full output went when it was cut) and
-// the file change card (path, line counts, Core's structured diff). States, outcomes and exit
-// codes are Core's; nothing is judged here from an exit code or the output.
+// and removed, expandable to its calls), the shell command (command, Core's semantic status,
+// exit code, duration, where the full output went when it was cut, the output on demand) and
+// the file change (path, line counts, Core's structured diff). States, outcomes and exit codes
+// are Core's; nothing is judged here from an exit code or the output. Each is a step row
+// (ADR-0078): the verb in the secondary ink, the object in the primary ink, a caret at the end.
 import type { DiffHunk, Item, ItemStatus } from '@piarc/protocol';
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 
 import { useApp, useT } from '../../app/app-context.js';
+import { IconButton } from '../../app/IconButton.js';
+import { ExternalGlyph } from '../../shell/icons.js';
 import {
   useExpanded,
   useTranscriptRow,
@@ -17,6 +20,7 @@ import { useElapsedText, useNow } from './common.js';
 import { revealBidi } from '../reveal.js';
 import { projectPath } from '../../files/file-path.js';
 import { ReviewNote } from './review.js';
+import { DiffPill, Segments, StepRow, type StepState } from './parts.js';
 import {
   STATUS_MESSAGE,
   readPath,
@@ -26,6 +30,7 @@ import {
   VERB_MESSAGE,
   verbOf,
   type GroupSummary,
+  type ToolPart,
 } from './summary.js';
 
 type CommandItem = Extract<Item, { type: 'commandExecution' }>;
@@ -34,11 +39,17 @@ type FileChangeItem = Extract<Item, { type: 'fileChange' }>;
 /** A running command shows its timer after this long (ms, section 8.2). */
 export const BASH_TIMER_AFTER_MS = 10_000;
 
-/** Diff lines a file change card shows before "show all". */
+/** Diff lines a file change shows before "show all". */
 const DIFF_PREVIEW_LINES = 40;
 
 /** Output lines a tool call shows when expanded. */
 const OUTPUT_PREVIEW_LINES = 30;
+
+/** Output lines a running command shows under its row. */
+const LIVE_OUTPUT_LINES = 10;
+
+/** Stands in for a part's object while its message is formatted, so the object gets its ink. */
+const TARGET = '\u{E000}';
 
 /** The summary as text: "Read 3 files · Edited a.ts". */
 export function useSummaryText(): (summary: GroupSummary) => string {
@@ -55,6 +66,55 @@ export function useToolLabel(): (item: Item) => string {
   return (item) => t(VERB_MESSAGE[verbOf(item)], { count: 1, target: targetOf(item) });
 }
 
+/** A part of a summary: its words in the line's ink, its object in the primary ink. */
+function PartText({ part }: { readonly part: ToolPart }) {
+  const t = useT();
+  const text = t(VERB_MESSAGE[part.verb], { count: part.count, target: TARGET });
+  if (part.target === undefined || !text.includes(TARGET)) {
+    return t(VERB_MESSAGE[part.verb], { count: part.count, target: part.target ?? '' });
+  }
+  const [before = '', after = ''] = text.split(TARGET);
+  return (
+    <>
+      {before}
+      <span className="step-object">{revealBidi(part.target)}</span>
+      {after}
+    </>
+  );
+}
+
+function SummaryText({ summary }: { readonly summary: GroupSummary }) {
+  return summary.parts.map((part, index) => (
+    <span key={part.verb}>
+      {index > 0 ? ' · ' : null}
+      <PartText part={part} />
+    </span>
+  ));
+}
+
+/** The step state a tool call's lifecycle shows as. */
+function stepState(status: ItemStatus): StepState {
+  switch (status) {
+    case 'inProgress':
+      return 'busy';
+    case 'failed':
+      return 'failed';
+    case 'declined':
+      return 'denied';
+    case 'interrupted':
+      return 'stopped';
+    case 'completed':
+      return 'done';
+  }
+}
+
+/** The outcome word after a finished call that did not complete. */
+function useOutcome(): (status: ItemStatus) => string | undefined {
+  const t = useT();
+  return (status) =>
+    status === 'completed' || status === 'inProgress' ? undefined : t(STATUS_MESSAGE[status]);
+}
+
 export function StatusMark({ status }: { readonly status: ItemStatus }) {
   const t = useT();
   return (
@@ -69,7 +129,7 @@ export function StatusMark({ status }: { readonly status: ItemStatus }) {
   );
 }
 
-/** Consecutive tool calls as one summary; expands to the calls. */
+/** Consecutive tool calls as one summary; one call opens to its content, several to a card. */
 export function ToolGroupRow({
   id,
   members,
@@ -77,11 +137,12 @@ export function ToolGroupRow({
   readonly id: string;
   readonly members: readonly string[];
 }) {
-  const t = useT();
   const items = useMemberItems(members);
   const summary = summarize(items);
-  const text = useSummaryText();
+  const outcome = useOutcome();
   const [expanded, setExpanded] = useExpanded(id, false);
+  const only = members.length === 1 ? items[0] : undefined;
+  const opens = only === undefined || hasBody(only);
   return (
     <div
       className={`row row-tool-group${expanded ? ' is-expanded' : ''}`}
@@ -90,37 +151,29 @@ export function ToolGroupRow({
       data-status={summary.status}
       data-count={members.length}
     >
-      <button
-        type="button"
-        className="row-disclosure"
-        aria-expanded={expanded}
-        title={t(expanded ? 'transcript.tool.collapse' : 'transcript.tool.expand')}
-        data-testid="tool-group-toggle"
-        onClick={() => {
+      <StepRow
+        verb={<SummaryText summary={summary} />}
+        state={stepState(summary.status)}
+        outcome={outcome(summary.status)}
+        trail={<DiffPill added={summary.added} removed={summary.removed} testId="tool-lines" />}
+        expanded={opens ? expanded : undefined}
+        onToggle={() => {
           setExpanded(!expanded);
         }}
+        lineTestId="tool-group-toggle"
+        textTestId="tool-summary"
+        aside={only === undefined ? undefined : <CallAside id={members[0] ?? ''} item={only} />}
       >
-        <span className="row-disclosure-mark" aria-hidden="true">
-          {expanded ? '▾' : '▸'}
-        </span>
-        <StatusMark status={summary.status} />
-        <span className="tool-summary" data-testid="tool-summary">
-          {text(summary)}
-        </span>
-        {summary.added > 0 || summary.removed > 0 ? (
-          <span className="diff-counts" data-testid="tool-lines">
-            <span className="diff-added">+{summary.added}</span>{' '}
-            <span className="diff-removed">−{summary.removed}</span>
-          </span>
-        ) : null}
-      </button>
-      {expanded ? (
-        <div className="tool-calls" data-testid="tool-calls">
-          {members.map((member) => (
-            <ToolCall key={member} id={member} />
-          ))}
-        </div>
-      ) : null}
+        {only === undefined ? (
+          <div className="tool-calls" data-testid="tool-calls">
+            {members.map((member) => (
+              <ToolCall key={member} id={member} />
+            ))}
+          </div>
+        ) : (
+          <CallBody id={members[0] ?? ''} item={only} />
+        )}
+      </StepRow>
     </div>
   );
 }
@@ -130,24 +183,47 @@ function useMemberItems(members: readonly string[]): Item[] {
   return useTranscriptRows(members).flatMap((row) => (row?.kind === 'item' ? [row.item] : []));
 }
 
-/** One call inside an expanded group. */
-const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
-  const row = useTranscriptRow(id);
-  const label = useToolLabel();
+function outputOf(item: Item): string | undefined {
+  const output = ('output' in item ? item.output : undefined) ?? undefined;
+  return output === '' ? undefined : output;
+}
+
+/** Whether a call has something to show when opened. */
+function hasBody(item: Item): boolean {
+  return item.type === 'fileChange' || outputOf(item) !== undefined;
+}
+
+/** What one call shows when opened: a file change's diff, or the tool's output. */
+function CallBody({ id, item }: { readonly id: string; readonly item: Item }) {
   const t = useT();
-  const [open, setOpen] = useExpanded(`call:${id}`, false);
+  if (item.type === 'fileChange') {
+    return <FileChangeBody id={id} item={item} />;
+  }
+  const output = outputOf(item);
+  return (
+    <>
+      {'review' in item ? <ReviewNote review={item.review} /> : null}
+      {output === undefined ? null : (
+        <pre
+          className={`tool-output${item.status === 'failed' ? ' is-failed' : ''}`}
+          aria-label={t('transcript.tool.output')}
+          // The output scrolls inside its box: a keyboard user can reach it.
+          tabIndex={0}
+        >
+          {lastLines(output, OUTPUT_PREVIEW_LINES)}
+        </pre>
+      )}
+    </>
+  );
+}
+
+/** A call's controls next to its line: open the file it read, open a memory's settings. */
+function CallAside({ item }: { readonly id: string; readonly item: Item }) {
+  const t = useT();
   const {
     actions: { openMemory, openFile },
     fileLinks,
   } = useTranscriptView();
-  if (row?.kind !== 'item') {
-    return null;
-  }
-  const { item } = row;
-  if (item.type === 'fileChange') {
-    return <FileChangeCard id={id} item={item} />;
-  }
-  const output = ('output' in item ? item.output : undefined) ?? undefined;
   const rawPath = readPath(item);
   const offset = 'arguments' in item ? item.arguments.offset : undefined;
   const target =
@@ -159,29 +235,15 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
     item.type === 'dynamicToolCall' && item.tool === 'Memory' && openMemory !== undefined
       ? memoryNoteOf(item)
       : null;
+  if (!(target && openFile) && memory === null) return null;
   return (
-    <div className="tool-call" data-testid="tool-call" data-row-id={id} data-status={item.status}>
-      <button
-        type="button"
-        className="row-disclosure"
-        aria-expanded={open}
-        disabled={output === undefined || output === ''}
-        onClick={() => {
-          setOpen(!open);
-        }}
-      >
-        <StatusMark status={item.status} />
-        <span className="tool-call-label">
-          {target && openFile ? t('files.tree.readAction') : label(item)}
-        </span>
-      </button>
-      {target && openFile && (
-        <button
-          type="button"
-          className="file-path-action tool-open-file"
+    <>
+      {target && openFile ? (
+        <IconButton
+          label={t('files.tree.openPath', { path: revealBidi(target) })}
+          size="xs"
+          className="tool-open-file"
           data-testid="read-file-path"
-          title={revealBidi(target)}
-          aria-label={t('files.tree.openPath', { path: revealBidi(target) })}
           onClick={() => {
             openFile(
               target,
@@ -191,13 +253,13 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
             );
           }}
         >
-          {revealBidi(baseName(target))}
-        </button>
-      )}
+          <ExternalGlyph />
+        </IconButton>
+      ) : null}
       {memory !== null && openMemory !== undefined ? (
         <button
           type="button"
-          className="button button-small tool-call-link"
+          className="button button-small button-ghost tool-call-link"
           data-testid="memory-open-settings"
           onClick={() => {
             openMemory(memory.note);
@@ -206,12 +268,36 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
           {t('transcript.memory.openSettings')}
         </button>
       ) : null}
-      {'review' in item ? <ReviewNote review={item.review} /> : null}
-      {open && output !== undefined ? (
-        <pre className="tool-output" aria-label={t('transcript.tool.output')}>
-          {lastLines(output, OUTPUT_PREVIEW_LINES)}
-        </pre>
-      ) : null}
+    </>
+  );
+}
+
+/** One call inside an expanded group. */
+const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
+  const row = useTranscriptRow(id);
+  const outcome = useOutcome();
+  const [open, setOpen] = useExpanded(`call:${id}`, false);
+  if (row?.kind !== 'item') {
+    return null;
+  }
+  const { item } = row;
+  if (item.type === 'fileChange') {
+    return <FileChangeCard id={id} item={item} />;
+  }
+  return (
+    <div className="tool-call" data-testid="tool-call" data-row-id={id} data-status={item.status}>
+      <StepRow
+        verb={<PartText part={{ verb: verbOf(item), count: 1, target: targetOf(item) }} />}
+        state={stepState(item.status)}
+        outcome={outcome(item.status)}
+        expanded={hasBody(item) ? open : undefined}
+        onToggle={() => {
+          setOpen(!open);
+        }}
+        aside={<CallAside id={id} item={item} />}
+      >
+        <CallBody id={id} item={item} />
+      </StepRow>
     </div>
   );
 });
@@ -229,6 +315,12 @@ function memoryNoteOf(item: Extract<Item, { type: 'dynamicToolCall' }>): {
 function lastLines(text: string, count: number): string {
   const lines = text.replace(/\n$/u, '').split('\n');
   return lines.length <= count ? lines.join('\n') : lines.slice(-count).join('\n');
+}
+
+/** The first line of a command, for its row. */
+function firstLine(text: string): string {
+  const line = text.split('\n', 1)[0] ?? text;
+  return line === text ? text : `${line} …`;
 }
 
 /** A shell command. */
@@ -257,6 +349,54 @@ export function BashCard({
   const [open, setOpen] = useExpanded(id, false);
   const output = item.output ?? '';
   const outcome = execution?.outcome ?? (item.status === 'completed' ? 'success' : 'failure');
+  const background = task !== undefined && item.status === 'completed';
+  const finished = item.status === 'completed' || item.status === 'failed';
+  const state: StepState = running
+    ? 'busy'
+    : finished
+      ? outcome === 'success'
+        ? 'done'
+        : 'failed'
+      : stepState(item.status);
+  // The outcome word: none for a success; the failure, the background or the stop otherwise.
+  let stateText: string | undefined;
+  if (running) stateText = undefined;
+  else if (background) stateText = t('transcript.bash.background');
+  else if (finished) stateText = outcome === 'success' ? undefined : t('transcript.bash.failure');
+  else stateText = t(STATUS_MESSAGE[item.status]);
+  const notes: ReactNode[] = [];
+  if (task !== undefined) {
+    notes.push(
+      <div key="task" className="step-note" data-testid="bash-task">
+        {task.reason === 'timeout'
+          ? t('transcript.bash.movedToBackground', {
+              seconds: Math.round((execution?.timeoutMs ?? 0) / 1000),
+              task: task.taskId,
+            })
+          : t('transcript.bash.inBackground', { task: task.taskId })}
+      </div>,
+    );
+  } else if (execution?.timedOut === true) {
+    notes.push(
+      <div key="timeout" className="step-note is-warning">
+        {t('transcript.bash.timedOut', { seconds: Math.round(execution.timeoutMs / 1000) })}
+      </div>,
+    );
+  }
+  if (execution?.truncated === true && fullOutputPath !== undefined) {
+    notes.push(
+      <div key="truncated" className="step-note" data-testid="bash-truncated">
+        {t('transcript.bash.truncated', { path: fullOutputPath })}
+      </div>,
+    );
+  }
+  if (cwdReset !== undefined) {
+    notes.push(
+      <div key="cwd" className="step-note">
+        {t('transcript.bash.cwdReset', { path: cwdReset.resetTo, reason: cwdReset.reason })}
+      </div>,
+    );
+  }
   return (
     <div
       className={`row row-bash is-${item.status}`}
@@ -265,100 +405,93 @@ export function BashCard({
       data-status={item.status}
       data-outcome={running ? 'running' : outcome}
     >
-      <div className="bash-head">
-        <StatusMark status={item.status} />
-        <span className="bash-label">{t('transcript.bash.label')}</span>
-        {execution === undefined ? null : (
-          <span className="bash-cwd" data-testid="bash-cwd" title={execution.cwd}>
-            {t('transcript.bash.cwd', { cwd: execution.cwd })}
-          </span>
-        )}
-        <span className="bash-state" data-testid="bash-state">
-          {running
-            ? elapsed >= BASH_TIMER_AFTER_MS
-              ? t('transcript.bash.running', { elapsed: elapsedText(elapsed) })
-              : t('transcript.tool.status.inProgress')
-            : task !== undefined && item.status === 'completed'
-              ? t('transcript.bash.background')
-              : item.status === 'completed' || item.status === 'failed'
-                ? t(outcome === 'success' ? 'transcript.bash.success' : 'transcript.bash.failure')
-                : t(STATUS_MESSAGE[item.status])}
-        </span>
-        {exitCode === undefined ? null : (
-          <span className="bash-exit" data-testid="bash-exit">
-            {t('transcript.bash.exit', { code: exitCode })}
-            {meaning === undefined ? '' : ` · ${meaning}`}
-          </span>
-        )}
-        {signal === undefined ? null : (
-          <span className="bash-exit">{t('transcript.bash.signal', { signal })}</span>
-        )}
-        {execution === undefined ? null : (
-          <span className="bash-duration">
-            {t('transcript.bash.duration', {
-              seconds: format.number(execution.durationMs / 1000, {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              }),
-            })}
-          </span>
-        )}
-      </div>
-      <ReviewNote review={item.review} />
-      <pre className="bash-command" data-testid="bash-command">
-        <span className="bash-prompt" aria-hidden="true">
-          ${' '}
-        </span>
-        {item.command}
-      </pre>
-      {task !== undefined ? (
-        <div className="row-status muted" data-testid="bash-task">
-          {task.reason === 'timeout'
-            ? t('transcript.bash.movedToBackground', {
-                seconds: Math.round((execution?.timeoutMs ?? 0) / 1000),
-                task: task.taskId,
-              })
-            : t('transcript.bash.inBackground', { task: task.taskId })}
-        </div>
-      ) : execution?.timedOut === true ? (
-        <div className="row-status is-warning">
-          {t('transcript.bash.timedOut', { seconds: Math.round(execution.timeoutMs / 1000) })}
-        </div>
-      ) : null}
-      {execution?.truncated === true && fullOutputPath !== undefined ? (
-        <div className="row-status muted" data-testid="bash-truncated">
-          {t('transcript.bash.truncated', { path: fullOutputPath })}
-        </div>
-      ) : null}
-      {cwdReset === undefined ? null : (
-        <div className="row-status muted">
-          {t('transcript.bash.cwdReset', { path: cwdReset.resetTo, reason: cwdReset.reason })}
-        </div>
-      )}
-      {output === '' ? null : (
-        <>
-          <button
-            type="button"
-            className="row-action"
-            data-testid="bash-output-toggle"
-            onClick={() => {
-              setOpen(!open);
-            }}
-          >
-            {t(open ? 'transcript.bash.hideOutput' : 'transcript.bash.showOutput')}
-          </button>
-          {open || running ? (
-            <pre className="tool-output" data-testid="bash-output">
-              {lastLines(output, open ? Number.MAX_SAFE_INTEGER : OUTPUT_PREVIEW_LINES / 3)}
+      <StepRow
+        verb={
+          running ? (
+            <span data-testid="bash-state">{t('transcript.tool.status.inProgress')}</span>
+          ) : (
+            t('transcript.bash.ran')
+          )
+        }
+        meta={<span className="step-code">{firstLine(item.command)}</span>}
+        metaTitle={item.command}
+        state={state}
+        outcome={
+          stateText === undefined ? undefined : <span data-testid="bash-state">{stateText}</span>
+        }
+        trail={
+          <Segments>
+            {[
+              running && elapsed >= BASH_TIMER_AFTER_MS ? (
+                <span key="elapsed" data-testid="bash-elapsed">
+                  {elapsedText(elapsed)}
+                </span>
+              ) : null,
+              exitCode === undefined ? null : (
+                <span key="exit" data-testid="bash-exit">
+                  {t('transcript.bash.exit', { code: exitCode })}
+                  {meaning === undefined ? '' : ` · ${meaning}`}
+                </span>
+              ),
+              signal === undefined ? null : (
+                <span key="signal">{t('transcript.bash.signal', { signal })}</span>
+              ),
+              execution === undefined ? null : (
+                <span key="duration">
+                  {t('transcript.bash.duration', {
+                    seconds: format.number(execution.durationMs / 1000, {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    }),
+                  })}
+                </span>
+              ),
+            ]}
+          </Segments>
+        }
+        expanded={open}
+        onToggle={() => {
+          setOpen(!open);
+        }}
+        lineTestId="bash-output-toggle"
+        notes={notes.length === 0 ? undefined : notes}
+      >
+        <div className="bash-body">
+          <ReviewNote review={item.review} />
+          <div className="bash-command-card">
+            {execution === undefined ? null : (
+              <div className="bash-cwd" data-testid="bash-cwd" title={execution.cwd}>
+                {t('transcript.bash.cwd', { cwd: execution.cwd })}
+              </div>
+            )}
+            <pre className="bash-command" data-testid="bash-command">
+              <span className="bash-prompt" aria-hidden="true">
+                ${' '}
+              </span>
+              {item.command}
             </pre>
-          ) : null}
-        </>
-      )}
+          </div>
+          {output === '' ? null : (
+            <pre
+              className={`tool-output${state === 'failed' ? ' is-failed' : ''}`}
+              data-testid="bash-output"
+              tabIndex={0}
+            >
+              {output.replace(/\n$/u, '')}
+            </pre>
+          )}
+        </div>
+      </StepRow>
+      {running && !open && output !== '' ? (
+        <pre className="tool-output is-live" data-testid="bash-output">
+          {lastLines(output, LIVE_OUTPUT_LINES)}
+        </pre>
+      ) : null}
     </div>
   );
 }
 
-/** A file change with Core's diff. */
+/** A file change with Core's diff: a step that opens on its diff. */
 export function FileChangeCard({
   id,
   item,
@@ -367,18 +500,45 @@ export function FileChangeCard({
   readonly item: FileChangeItem;
 }) {
   const t = useT();
+  const outcome = useOutcome();
   const diff = item.diff ?? undefined;
-  const { openFile } = useTranscriptView().actions;
-  const [all, setAll] = useExpanded(`diff:${id}`, false);
+  const [open, setOpen] = useExpanded(`change:${id}`, true);
   return (
     <div
-      className={`row row-file-change is-${item.status}`}
+      className={`row-file-change is-${item.status}`}
       data-testid="file-change-card"
       data-row-id={id}
       data-status={item.status}
     >
+      <StepRow
+        verb={<PartText part={{ verb: 'edit', count: 1, target: baseName(item.path) }} />}
+        state={stepState(item.status)}
+        outcome={diff?.created === true ? t('transcript.file.created') : outcome(item.status)}
+        trail={
+          diff === undefined ? undefined : (
+            <DiffPill added={diff.added} removed={diff.removed} testId="file-change-lines" />
+          )
+        }
+        expanded={open}
+        onToggle={() => {
+          setOpen(!open);
+        }}
+      >
+        <FileChangeBody id={id} item={item} />
+      </StepRow>
+    </div>
+  );
+}
+
+/** A file change's path and Core's diff. */
+function FileChangeBody({ id, item }: { readonly id: string; readonly item: FileChangeItem }) {
+  const t = useT();
+  const diff = item.diff ?? undefined;
+  const { openFile } = useTranscriptView().actions;
+  const [all, setAll] = useExpanded(`diff:${id}`, false);
+  return (
+    <div className="file-change-body" data-testid="file-change-body">
       <div className="file-change-head">
-        <StatusMark status={item.status} />
         {openFile ? (
           <button
             type="button"
@@ -396,23 +556,14 @@ export function FileChangeCard({
             {revealBidi(item.path)}
           </span>
         )}
-        {diff?.created === true ? (
-          <span className="badge">{t('transcript.file.created')}</span>
-        ) : null}
-        {diff === undefined ? null : (
-          <span className="diff-counts" data-testid="file-change-lines">
-            <span className="diff-added">+{diff.added}</span>{' '}
-            <span className="diff-removed">−{diff.removed}</span>
-          </span>
-        )}
       </div>
       <ReviewNote review={item.review} />
       {diff === undefined ? (
         item.status === 'inProgress' ? null : (
-          <div className="row-status muted">{t('transcript.file.noDiff')}</div>
+          <div className="step-note">{t('transcript.file.noDiff')}</div>
         )
       ) : diff.degraded === true || diff.hunks.length === 0 ? (
-        <div className="row-status muted">{t('transcript.file.degraded')}</div>
+        <div className="step-note">{t('transcript.file.degraded')}</div>
       ) : (
         <DiffView
           hunks={diff.hunks}
@@ -453,6 +604,7 @@ export function DiffView({
   readonly limit: number;
   readonly onShowAll: () => void;
 }) {
+  const t = useT();
   let shown = 0;
   let total = 0;
   const blocks = hunks.map((hunk, index) => {
@@ -493,13 +645,8 @@ export function DiffView({
     <div className="diff" data-testid="diff">
       <table className="diff-table">{blocks}</table>
       {total > shown ? (
-        <button
-          type="button"
-          className="row-action"
-          data-testid="diff-show-all"
-          onClick={onShowAll}
-        >
-          +{total - shown}
+        <button type="button" className="diff-more" data-testid="diff-show-all" onClick={onShowAll}>
+          {t('transcript.diff.showMore', { count: total - shown })}
         </button>
       ) : null}
     </div>

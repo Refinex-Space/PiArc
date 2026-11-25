@@ -22,6 +22,7 @@ import {
 } from '../../shell/icons.js';
 import {
   useBranchPoint,
+  useEndsTurn,
   useExpanded,
   useParsedDoc,
   useTranscriptView,
@@ -222,6 +223,8 @@ export function AgentMessageRow({
   const list = useListActions();
   const docKey = transcript.cacheKey(id);
   const parsed = useParsedDoc(docKey);
+  // Only the turn's last reply carries the actions, like the turn's footer.
+  const endsTurn = useEndsTurn(id);
   useRowCommitted();
   const complete = item.status !== 'inProgress';
   const streamed = services.driver.streams(docKey);
@@ -249,7 +252,7 @@ export function AgentMessageRow({
       aria-busy={!complete}
     >
       {body}
-      {complete && parsed?.final === true ? (
+      {complete && parsed?.final === true && endsTurn ? (
         <div className="row-actions reveal-actions" data-testid="message-actions">
           <CopyIconButton label={t('transcript.copyMarkdown')} text={() => item.text} />
           <CopyIconButton

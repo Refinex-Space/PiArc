@@ -13,6 +13,7 @@ vi.mock('./ui.js', () => ({
 }));
 vi.mock('../store/hooks.js', () => ({
   useStore: () => ({ editorDraft: () => ({}) }),
+  useNotices: () => [],
   useWorkspaces: () =>
     ['/a', '/b', '/c'].map((path) => ({ path, displayName: path.slice(1), open: false })),
 }));

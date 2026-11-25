@@ -5,7 +5,8 @@ import type { Item, WebSearchSource } from '@piarc/protocol';
 
 import { useT } from '../../app/app-context.js';
 import { safeHref } from '../markdown/text.js';
-import { StatusMark } from './tools.js';
+import { useExpanded } from '../services.js';
+import { StepRow, type StepState } from './parts.js';
 import { ReviewNote } from './review.js';
 
 type WebSearchItem = Extract<Item, { type: 'webSearch' }>;
@@ -53,6 +54,10 @@ export function WebSearchCard({ id, item }: { readonly id: string; readonly item
   const t = useT();
   const sources = item.sources ?? [];
   const backend = item.backend ?? undefined;
+  const [open, setOpen] = useExpanded(id, true);
+  const state: StepState =
+    item.status === 'inProgress' ? 'busy' : item.status === 'failed' ? 'failed' : 'done';
+  const hasBody = sources.length > 0 || item.status === 'completed' || item.review != null;
   return (
     <div
       className={`row row-web-search is-${item.status}`}
@@ -60,30 +65,41 @@ export function WebSearchCard({ id, item }: { readonly id: string; readonly item
       data-row-id={id}
       data-status={item.status}
     >
-      <div className="bash-head">
-        <StatusMark status={item.status} />
-        <span className="bash-label">{t('transcript.webSearch.label')}</span>
-        <span className="web-search-query" data-testid="web-search-query">
-          {item.query}
-        </span>
-        {backend === undefined ? null : (
-          <span className="web-search-backend">
-            {backend === 'native'
-              ? t('transcript.webSearch.native')
-              : t('transcript.webSearch.service', { name: backend })}
+      <StepRow
+        verb={t('transcript.webSearch.verb')}
+        meta={
+          <span className="web-search-query" data-testid="web-search-query">
+            {item.query}
           </span>
-        )}
-      </div>
-      <ReviewNote review={item.review} />
-      {sources.length > 0 ? (
-        <ol className="web-search-sources" aria-label={t('transcript.webSearch.sources')}>
-          {sources.map((source, n) => (
-            <Source key={`${String(n)}:${source.url}`} source={source} />
-          ))}
-        </ol>
-      ) : item.status === 'completed' ? (
-        <div className="web-search-empty">{t('transcript.webSearch.none')}</div>
-      ) : null}
+        }
+        metaTitle={item.query}
+        state={state}
+        outcome={item.status === 'failed' ? t('transcript.tool.status.failed') : undefined}
+        trail={
+          backend === undefined ? undefined : (
+            <span className="web-search-backend">
+              {backend === 'native'
+                ? t('transcript.webSearch.native')
+                : t('transcript.webSearch.service', { name: backend })}
+            </span>
+          )
+        }
+        expanded={hasBody ? open : undefined}
+        onToggle={() => {
+          setOpen(!open);
+        }}
+      >
+        <ReviewNote review={item.review} />
+        {sources.length > 0 ? (
+          <ol className="web-search-sources" aria-label={t('transcript.webSearch.sources')}>
+            {sources.map((source, n) => (
+              <Source key={`${String(n)}:${source.url}`} source={source} />
+            ))}
+          </ol>
+        ) : item.status === 'completed' ? (
+          <div className="step-note web-search-empty">{t('transcript.webSearch.none')}</div>
+        ) : null}
+      </StepRow>
     </div>
   );
 }

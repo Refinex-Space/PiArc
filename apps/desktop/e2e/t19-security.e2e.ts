@@ -76,11 +76,10 @@ test('renders reply, tool output, command output and file paths as inert text', 
   await expect(page.getByTestId('agent-message').last()).toContainText('Read finished.');
   await idle(page);
   const read = page.getByTestId('tool-group').filter({ hasText: 'Read samples.txt' });
+  // A group of one opens straight to the call's output.
   await read.getByTestId('tool-group-toggle').click();
-  const call = read.getByTestId('tool-call');
-  await call.getByRole('button').click();
   for (const sample of XSS_PAYLOADS) {
-    await expect(call.locator('.tool-output')).toContainText(sample.markdown);
+    await expect(read.locator('.tool-output')).toContainText(sample.markdown);
   }
   expectInertDom(await inspect(page));
   await read.getByTestId('tool-group-toggle').click();

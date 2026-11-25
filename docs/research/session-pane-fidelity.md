@@ -66,7 +66,7 @@
 | 用户消息操作 | `code-transcript.mjs`（工具栏） | 气泡下右对齐，24 按钮 16 图标间距 3；悬停延迟 100 后 120 ms 淡入，离开 60 ms；顺序：复制、回退、分叉 | 文字按钮：复制、选中本回合、回退、分支 | 复刻为图标按钮加 tooltip；保留"选中本回合" | 悬停、焦点截图 | 已对齐：`gallery/messages/` 的 conversation、messages |
 | 时间戳 | 同上 | 操作条首位相对时间 | 行模型没有时间 | 不适用：历史条目不带可靠时间 | — | 不适用 |
 | 回复正文 | `c80ec48f8-*.mjs`、`chat-prose.mjs` | 15/21，段落内缩 4，行尾留白 clamp(0,(100%−384)×.175,56) | 15/1.55 | 复刻 | 截图 | 已对齐：`gallery/messages/` 的 conversation、messages |
-| 回复操作 | 同上 | 最近一条常显，其余悬停显示；复制（勾 1200）等图标按钮 | 文字按钮：复制 Markdown、复制文本、选中本回合 | 复刻为图标按钮；反馈与章节不适用 | 截图 | 已对齐（改造）：全部回复的操作都在悬停或聚焦时出现，参考对最新一条常显；`gallery/messages/markdown-*` |
+| 回复操作 | 同上 | 最近一条常显，其余悬停显示；复制（勾 1200）等图标按钮 | 文字按钮：复制 Markdown、复制文本、选中本回合 | 复刻为图标按钮；反馈与章节不适用 | 截图 | 已对齐（改造）：只在回合最后一条回复下出现（与参考的回合尾操作一致），悬停或聚焦时显示；`gallery/messages/` |
 | 新回复入场 | 同上 | 透明加 10 px 上移，1.1 s 弹簧 | 无 | 改造：只做 200 ms 淡入与 6 px 上移，避免流式时整块位移 | 录屏 | 已对齐（改造）：生成中的回复与发送中的消息 200 ms 淡入加 6 px 位移，滚动挂载的旧行不动画 |
 | 未送达与发送中 | `shared-2-*.mjs` | 发送中次色脉冲；失败行下 caption 危险色 "Failed to send" 加 "Retry" | 文字状态 | 复刻 | 截图 | 待实现 |
 
@@ -95,15 +95,15 @@
 
 | 项 | 参考来源 | 实测规格 | PiArc 现状 | 处理 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| 单行 | `generated/working-line-v4/turn-status.mjs` | 高 28/24，左右外扩 6；动词次色、对象主色；末尾 12 px 实心右箭头，展开转 90°（60 ms）；无悬停底色，整行可点；超长末尾 24 px 渐隐 | 圆点加文字摘要 | 复刻 | 截图 | 待实现 |
-| 状态词 | 同上 | 运行中走光，等待审批 "Needs approval" 警告色，失败 "Failed" 危险色，停止与拒绝次色 | 彩色圆点 | 复刻（状态与结果来自 Core） | 截图 | 待实现 |
-| 组摘要 | `generated/transcript-rows/rows-c24951e9f-*.mjs` | "Read 2 files, edited a file, ran a command"，只大写首词，最多三类加 "and N more actions" | "Read 3 files · Edited a.ts" | 复刻（中文按同样结构） | 截图 | 待实现 |
-| 增删胶囊 | `generated/transcript-rows/diff-counts.mjs` | 高 22/18，caption 12 字重 500，圆角 5.5，左右 8，绿红 20% 底 | 彩色文字 | 复刻 | 截图 | 待实现 |
-| 展开成员卡 | `turn-status.mjs` | 上 8 下 6；卡片圆角 12，1 px 细线环，分隔线；成员格内距 8×12，行距 37；无高度动画 | 缩进列表 | 复刻 | 截图 | 待实现 |
-| 命令卡 | `generated/transcript-rows/turn-mark.mjs`（`xd`、`Na`） | 命令行代码底圆角 8，`$` 前缀次色；输出最高 400 滚动，失败时输出危险色；复制悬停显示 | 卡片加文字按钮 | 复刻；退出码与 cwd 改作尾部次色段（PiArc 有这些数据） | 截图 | 待实现 |
-| 文件改动 | `src/source-diff*.css`、`source-file-tool.css` | 行号列 3ch，增删行底色混合 12%（暗 20%），符号列 2ch，最高 400 滚动 | 表格 diff | 复刻 | 截图 | 待实现 |
-| 搜索、网页、MCP、通用 | `source-generic-tool.css` | 参数一行一项：键名等宽 70% 不透明，值次色；输出 400 滚动 | 预览 30 行 | 复刻 | 截图 | 待实现 |
-| 网页搜索 | 同上 | 行 "Searched web {query}"，正文为来源链接 | 卡片 | 改造：来源列表沿用原生确认 | 截图 | 待实现 |
+| 单行 | `generated/working-line-v4/turn-status.mjs` | 高 28/24，左右外扩 6；动词次色、对象主色；末尾 12 px 实心右箭头，展开转 90°（60 ms）；无悬停底色，整行可点；超长末尾 24 px 渐隐 | 圆点加文字摘要 | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
+| 状态词 | 同上 | 运行中走光，等待审批 "Needs approval" 警告色，失败 "Failed" 危险色，停止与拒绝次色 | 彩色圆点 | 复刻（状态与结果来自 Core） | 截图 | 已对齐（改造）：运行中走光，失败、拒绝、中断用结果词；"Needs approval" 不放在工具行上，待审批由审批卡与 working 行承担；`gallery/tools/` |
+| 组摘要 | `generated/transcript-rows/rows-c24951e9f-*.mjs` | "Read 2 files, edited a file, ran a command"，只大写首词，最多三类加 "and N more actions" | "Read 3 files · Edited a.ts" | 复刻（中文按同样结构） | 截图 | 已对齐（改造）：保留 PiArc 的"· 分隔"句式与中英文案，动词次色、对象主色；单个调用展开直接显示内容，多个调用展开为细线卡片；`gallery/tools/` |
+| 增删胶囊 | `generated/transcript-rows/diff-counts.mjs` | 高 22/18，caption 12 字重 500，圆角 5.5，左右 8，绿红 20% 底 | 彩色文字 | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
+| 展开成员卡 | `turn-status.mjs` | 上 8 下 6；卡片圆角 12，1 px 细线环，分隔线；成员格内距 8×12，行距 37；无高度动画 | 缩进列表 | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
+| 命令卡 | `generated/transcript-rows/turn-mark.mjs`（`xd`、`Na`） | 命令行代码底圆角 8，`$` 前缀次色；输出最高 400 滚动，失败时输出危险色；复制悬停显示 | 卡片加文字按钮 | 复刻；退出码与 cwd 改作尾部次色段（PiArc 有这些数据） | 截图 | 已对齐（改造）：行内"Ran ‹命令›"，退出码与时长作尾段，后台任务、截断与超时作常显说明行，展开后是 `$` 命令卡与输出；`gallery/tools/tools-open-*` |
+| 文件改动 | `src/source-diff*.css`、`source-file-tool.css` | 行号列 3ch，增删行底色混合 12%（暗 20%），符号列 2ch，最高 400 滚动 | 表格 diff | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
+| 搜索、网页、MCP、通用 | `source-generic-tool.css` | 参数一行一项：键名等宽 70% 不透明，值次色；输出 400 滚动 | 预览 30 行 | 复刻 | 截图 | 已对齐：`gallery/tools/` 的 tools、conversation 与 *-open-* |
+| 网页搜索 | 同上 | 行 "Searched web {query}"，正文为来源链接 | 卡片 | 改造：来源列表沿用原生确认 | 截图 | 已对齐（改造）："Searched web ‹查询›"，来源默认展开，链接仍经原生确认；`gallery/tools/` |
 | 回合末改动卡 | `generated/r3b-transcript/turn-edits-card.mjs` | "Edited N files" 加 Undo、See all | 无 | 不适用：本期只改呈现；回合级撤销已有回退与 Changes 入口 | — | 不适用 |
 
 ## 8. working 行

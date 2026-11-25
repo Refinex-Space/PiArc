@@ -953,22 +953,23 @@
   visibility: hidden;
 }
 
-/* tools */
+/* tools: step rows (session.css) with their bodies */
 
 .tool-status {
   display: inline-flex;
-  flex: none;
+  align-items: center;
+  user-select: none;
 }
 
 .tool-status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--piarc-state-success);
 }
 
 .tool-status.is-inProgress .tool-status-dot {
-  background: var(--piarc-agent-status-running);
+  background: var(--piarc-accent-solid);
   animation: piarc-pulse 1.2s ease-in-out infinite;
 }
 
@@ -978,7 +979,7 @@
 
 .tool-status.is-declined .tool-status-dot,
 .tool-status.is-interrupted .tool-status-dot {
-  background: var(--piarc-state-warning);
+  background: var(--piarc-text-secondary);
 }
 
 /* Forced colors drop backgrounds: the status keeps a shape in system colors (filled when done,
@@ -1007,50 +1008,70 @@
   }
 }
 
-.tool-summary,
-.tool-call-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* A summary part's object, and a command or path shown in a step's line. */
+.step-object {
+  color: var(--piarc-text-primary);
 }
 
-.diff-counts {
-  flex: none;
+.step-code {
   font-family: var(--piarc-font-mono);
-  font-size: var(--piarc-font-size-caption);
+  font-size: 0.9em;
 }
 
-.diff-added {
-  color: var(--piarc-diff-added-text);
-}
-
-.diff-removed {
-  color: var(--piarc-diff-removed-text);
-}
-
+/* Several calls open into a card: a hairline ring, rows divided, no fill. */
 .tool-calls {
   display: flex;
   flex-direction: column;
-  gap: var(--piarc-space-1);
-  margin: var(--piarc-space-1) 0 0 calc(1em + var(--piarc-space-2));
+  margin-block: var(--piarc-session-pad-xs) var(--piarc-space-1);
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
 }
 
-.tool-calls > .row {
-  max-width: none;
-  margin: 0;
-  padding: 0;
+.tool-calls > * {
+  padding: var(--piarc-session-pad-sm) var(--piarc-session-pad-md);
+}
+
+.tool-calls > * + * {
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.tool-calls .step-head {
+  margin-inline: calc(-1 * var(--piarc-session-pad-xs));
+}
+
+.tool-calls .step-line {
+  min-height: var(--piarc-session-prose-line);
 }
 
 .tool-output,
 .row-error-details {
-  max-height: 320px;
-  margin: var(--piarc-space-1) 0 0;
-  padding: var(--piarc-space-2) var(--piarc-space-3);
+  box-sizing: border-box;
+  max-height: 400px;
+  margin: 0;
+  padding: var(--piarc-session-pad-sm) var(--piarc-session-pad-md);
   overflow: auto;
-  border-radius: var(--piarc-radius-md);
+  border-radius: var(--piarc-session-radius);
   background: var(--piarc-code-background);
-  color: var(--piarc-code-text);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+  line-height: var(--piarc-session-code-line);
   white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.tool-output.is-failed {
+  color: var(--piarc-text-danger);
+}
+
+.tool-output.is-live {
+  max-height: calc(var(--piarc-session-code-line) * 10 + 2 * var(--piarc-session-pad-sm));
+  margin-top: var(--piarc-session-pad-xs);
+}
+
+.tool-calls .tool-output {
+  max-height: 200px;
 }
 
 /* subagent card (T31) */
@@ -1162,50 +1183,40 @@
   font-size: var(--piarc-font-size-small);
 }
 
-/* bash card */
+/* shell commands: the command card and the output when the step is open */
 
-.row-bash > .bash-head,
-.row-bash > .bash-command,
-.row-bash > .row-status,
-.row-bash > .tool-output {
-  margin-left: 0;
-}
-
-.bash-head,
-.file-change-head {
+.bash-body {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--piarc-space-2);
-  font-size: var(--piarc-font-size-small);
-  color: var(--piarc-text-secondary);
-  user-select: none;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-xs);
 }
 
-.bash-label {
-  color: var(--piarc-text-primary);
-  font-weight: var(--piarc-font-weight-medium);
+.bash-command-card {
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-code-background);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
 }
 
 .bash-cwd {
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-md) 0;
   overflow: hidden;
-  max-width: 40ch;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.row-bash.is-failed .bash-state {
-  color: var(--piarc-text-danger);
+  user-select: none;
 }
 
 .bash-command {
-  margin: var(--piarc-space-1) 0 0;
-  padding: var(--piarc-space-2) var(--piarc-space-3);
-  overflow-x: auto;
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-code-background);
-  color: var(--piarc-code-text);
+  margin: 0;
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-md);
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+  line-height: var(--piarc-session-code-line);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .bash-prompt {
@@ -1213,71 +1224,145 @@
   user-select: none;
 }
 
-/* file change card */
+/* the approval card's command and diff blocks share these */
+.approval-card .bash-command {
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-code-background);
+}
+
+/* a file change: its path, then Core's diff */
+
+.file-change-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+}
+
+.file-change-head {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
 
 .file-change-path {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
   overflow: hidden;
-  color: var(--piarc-text-primary);
-  font-family: var(--piarc-font-mono);
+  border: 0;
+  background: none;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-align: start;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+button.file-change-path:hover {
+  color: var(--piarc-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .badge {
   padding: 0 var(--piarc-space-1);
   border-radius: var(--piarc-radius-sm);
-  background: var(--piarc-surface-active);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
   font-size: var(--piarc-font-size-caption);
 }
 
 .diff {
-  margin-top: var(--piarc-space-1);
-  overflow-x: auto;
-  border: 1px solid var(--piarc-border-subtle);
-  border-radius: var(--piarc-radius-md);
+  max-height: 400px;
+  overflow: auto;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-code-background);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
 }
 
 .diff-table {
   width: 100%;
   border-collapse: collapse;
-  line-height: 1.4;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+  line-height: calc(var(--piarc-session-code-line) + 1px);
 }
 
 .diff-hunk-head td {
-  padding: 2px var(--piarc-space-2);
-  background: var(--piarc-surface-hover);
+  padding: var(--piarc-space-1) var(--piarc-session-pad-md);
+  background: var(--piarc-session-fill);
   color: var(--piarc-text-secondary);
   user-select: none;
 }
 
 .diff-gutter {
   width: 1%;
-  padding: 0 var(--piarc-space-1);
-  color: var(--piarc-text-secondary);
-  text-align: right;
+  min-width: 3ch;
   white-space: nowrap;
+  padding: 0 1ch 0 calc(1ch + 5px);
+  color: var(--piarc-text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  vertical-align: top;
   user-select: none;
 }
 
 .diff-text {
-  padding: 0 var(--piarc-space-2);
+  width: 100%;
+  padding-inline: 0 1ch;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .diff-sign {
   display: inline-block;
-  width: 1.2em;
+  width: 2ch;
   user-select: none;
 }
 
 .diff-line.is-added {
   background: var(--piarc-diff-added-background);
+}
+
+.diff-line.is-added .diff-sign,
+.diff-line.is-added .diff-gutter {
   color: var(--piarc-diff-added-text);
 }
 
 .diff-line.is-removed {
   background: var(--piarc-diff-removed-background);
+}
+
+.diff-line.is-removed .diff-sign,
+.diff-line.is-removed .diff-gutter {
   color: var(--piarc-diff-removed-text);
+}
+
+.diff-more {
+  display: block;
+  width: 100%;
+  height: var(--piarc-session-row);
+  border: 0;
+  border-top: 1px solid var(--piarc-session-line);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+}
+
+.diff-more:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+
+@media (forced-colors: active) {
+  .diff-line.is-added .diff-sign,
+  .diff-line.is-removed .diff-sign {
+    forced-color-adjust: none;
+    color: CanvasText;
+  }
 }
 
 /* compaction */
@@ -1875,22 +1960,15 @@
 
 /* web search (T38) */
 
-.row-web-search > .bash-head {
-  margin-left: 0;
-}
-
 .web-search-query {
-  overflow: hidden;
-  max-width: 60ch;
   color: var(--piarc-text-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .web-search-sources {
-  margin: var(--piarc-space-1) 0 0;
-  padding-left: var(--piarc-space-5);
-  font-size: var(--piarc-font-size-small);
+  margin: 0;
+  padding-inline-start: calc(var(--piarc-session-text-inset) + 1.5em);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
 }
 
 .web-search-source {
@@ -1903,11 +1981,7 @@
   color: var(--piarc-text-secondary);
 }
 
-.row-web-search.is-failed .bash-head {
-  color: var(--piarc-text-danger);
-}
-
 /* T47: a `Memory` call links to its note on the settings window's memory page. */
 .tool-call-link {
-  margin-inline-start: var(--piarc-space-5);
+  margin-inline-start: var(--piarc-space-1);
 }
