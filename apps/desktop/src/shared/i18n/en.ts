@@ -1058,7 +1058,7 @@ export const en = {
 
   'composer.label': 'Message',
   'composer.placeholder': 'Type / for commands, @ to mention files',
-  'composer.placeholder.running': 'Enter to steer, {queue} to queue for later',
+  'composer.placeholder.running': 'Enter to steer, {queue} to queue',
   'composer.hint.idle': 'Enter to send · Shift+Enter for a new line',
   'composer.hint.running': 'Enter to steer · {queue} to queue · Esc to stop',
   'composer.send': 'Send',
@@ -1337,7 +1337,7 @@ export const en = {
   'subagent.background': 'Background',
   'subagent.model': 'Model {model}',
   'subagent.toolCalls': '{count, plural, one {# tool call} other {# tool calls}}',
-  'subagent.tokens': '{input} tokens in · {output} out',
+  'subagent.tokens': '{input, number} tokens in · {output, number} out',
   'subagent.showTranscript': 'Show its transcript',
   'subagent.hideTranscript': 'Hide its transcript',
   'subagent.stop': 'Stop',

@@ -803,7 +803,7 @@ describe('subagent card (T31-A13)', () => {
     expect(byTestId(root, 'subagent-type').textContent).toBe('Explore');
     expect(byTestId(root, 'subagent-model').textContent).toBe('Model mock-child/fast-model');
     expect(byTestId(root, 'subagent-tools').textContent).toBe('2 tool calls');
-    expect(byTestId(root, 'subagent-tokens').textContent).toBe('1000 tokens in · 120 out');
+    expect(byTestId(root, 'subagent-tokens').textContent).toBe('1,000 tokens in · 120 out');
     expect(byTestId(root, 'subagent-activity').textContent).toBe('Grep parser');
     expect(byTestId(root, 'subagent-warnings').textContent).toContain('The model alias fast');
     act(() => {

@@ -362,6 +362,10 @@
 .environment-bar .choice-button[data-mode='bypassPermissions'] {
   color: var(--piarc-text-warning);
 }
+.environment-bar .choice-button[data-top-tier] {
+  color: var(--piarc-text-accent);
+  font-weight: var(--piarc-font-weight-medium);
+}
 .environment-bar .composer-spacer {
   flex: 1 1 0;
 }

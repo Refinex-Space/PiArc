@@ -329,8 +329,16 @@ function QuestionSummary({ item }: { readonly item: ToolItem }) {
           <div key={String(i)} data-outcome={a.outcome}>
             <dt>{a.question}</dt>
             <dd>
-              {a.answer || '—'}{' '}
-              <span className="harness-status">{t(`question.outcome.${a.outcome}`)}</span>
+              {a.answer || '—'}
+              {/* An answer speaks for itself; a default or no answer says so after a dot. */}
+              {a.outcome === 'answered' && a.answer !== '' ? null : (
+                <>
+                  <span className="step-dot" aria-hidden="true">
+                    {' · '}
+                  </span>
+                  <span className="harness-status">{t(`question.outcome.${a.outcome}`)}</span>
+                </>
+              )}
             </dd>
           </div>
         ))}

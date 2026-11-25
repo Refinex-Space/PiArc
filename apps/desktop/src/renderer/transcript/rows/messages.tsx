@@ -36,8 +36,11 @@ type AgentMessageItem = Extract<Item, { type: 'agentMessage' }>;
 type ReasoningItem = Extract<Item, { type: 'reasoning' }>;
 type UserMessageItem = Extract<Item, { type: 'userMessage' }>;
 
-/** A user message taller than this folds (CSS px). */
-const FOLD_ABOVE_PX = 300;
+/**
+ * A user message longer than this many lines folds (to the lines `transcript.css` shows): counted
+ * in lines, so the same paste folds alike in every language and density.
+ */
+const FOLD_ABOVE_LINES = 12;
 
 /** A user message from Core; the first of a turn can be rewound to and branched from (T28). */
 export function UserMessageRow({
@@ -169,7 +172,9 @@ function UserBubble({
     const element = body.current;
     if (element === null) return;
     const measure = () => {
-      setTall(element.scrollHeight > FOLD_ABOVE_PX);
+      const view = element.ownerDocument.defaultView ?? window;
+      const line = Number.parseFloat(view.getComputedStyle(element).lineHeight) || 20;
+      setTall(element.scrollHeight > FOLD_ABOVE_LINES * line + 1);
     };
     const Observer = (element.ownerDocument.defaultView ?? window).ResizeObserver;
     // Read after layout, with every other row's reads, instead of forcing a layout per row.
@@ -212,7 +217,11 @@ function UserBubble({
         ) : null}
       </div>
       {children}
-      <div className="row-actions reveal-actions" data-testid="user-actions">
+      <div
+        className="row-actions reveal-actions"
+        data-testid="user-actions"
+        data-tooltip-side="below"
+      >
         {at === undefined ? null : <MessageTime at={at} />}
         <CopyIconButton label={t('transcript.copyText')} text={() => input.text} />
         <IconButton
@@ -278,7 +287,11 @@ export function AgentMessageRow({
     >
       {body}
       {complete && parsed?.final === true && endsTurn ? (
-        <div className="row-actions reveal-actions" data-testid="message-actions">
+        <div
+          className="row-actions reveal-actions"
+          data-testid="message-actions"
+          data-tooltip-side="below"
+        >
           <CopyIconButton label={t('transcript.copyMarkdown')} text={() => item.text} />
           <CopyIconButton
             label={t('transcript.copyText')}

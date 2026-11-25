@@ -1104,6 +1104,8 @@ textarea.input {
   border-radius: var(--piarc-radius-md);
   background: var(--piarc-surface-raised);
   box-shadow: var(--piarc-shadow-overlay);
+  /* Its own ink: a menu opened from the environment bar does not take the bar's grey. */
+  color: var(--piarc-text-primary);
   outline: none;
 }
 
@@ -1120,9 +1122,14 @@ textarea.input {
   color: var(--piarc-text-danger);
 }
 
+/* A choice that cannot be made steps down; its hint (why) stays readable. */
 .menu-item.is-disabled {
-  color: var(--piarc-text-secondary);
+  color: var(--piarc-text-disabled);
   cursor: default;
+}
+
+.menu-item.is-disabled .menu-item-hint {
+  color: var(--piarc-text-secondary);
 }
 
 .menu-item-hint {

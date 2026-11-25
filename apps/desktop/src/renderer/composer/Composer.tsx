@@ -803,7 +803,10 @@ export function Composer({
               >
                 <FileCodeCornerIcon />
                 <span className="mention-label">{candidate.label}</span>
-                <span className="mention-path">{candidate.path}</span>
+                {/* A file at the root has no folder to add to its name. */}
+                {candidate.path === candidate.label ? null : (
+                  <span className="mention-path">{candidate.path}</span>
+                )}
               </li>
             ))
           )}

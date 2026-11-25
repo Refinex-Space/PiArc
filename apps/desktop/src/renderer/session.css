@@ -262,6 +262,12 @@ button.step-line:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* A trail or outcome that rendered nothing (no line counts) takes no gap before the caret. */
+.step-trail:empty,
+.step-outcome:empty {
+  display: none;
+}
+
 .step-caret {
   display: inline-grid;
   flex: none;

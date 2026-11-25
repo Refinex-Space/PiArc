@@ -1,6 +1,7 @@
 // One tooltip per document. Any element with `data-tooltip` shows its text after a short hover
 // or when it takes keyboard focus; `data-tooltip-keys` (a `Mod+Enter`-style binding) adds the
-// shortcut's keycaps. The element keeps its own accessible name, so the bubble is hidden from
+// shortcut's keycaps; `data-tooltip-side="below"` on it or an ancestor opens it below (controls
+// under text they would otherwise cover). The element keeps its own accessible name, so the bubble is hidden from
 // assistive technology. Moving between tooltipped controls within the warm window shows the next
 // one at once.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -22,6 +23,7 @@ interface Tip {
   readonly text: string;
   readonly keys: string | undefined;
   readonly anchor: DOMRect;
+  readonly below: boolean;
 }
 
 /** The tooltipped element at the target, checked against the realm of the document it is in. */
@@ -53,7 +55,12 @@ export function TooltipLayer() {
     const show = (element: HTMLElement) => {
       const text = element.dataset.tooltip ?? '';
       if (text === '' || !element.isConnected) return;
-      setTip({ text, keys: element.dataset.tooltipKeys, anchor: element.getBoundingClientRect() });
+      setTip({
+        text,
+        keys: element.dataset.tooltipKeys,
+        anchor: element.getBoundingClientRect(),
+        below: element.closest<HTMLElement>('[data-tooltip-side]')?.dataset.tooltipSide === 'below',
+      });
     };
     const arm = (element: HTMLElement, immediate: boolean) => {
       if (element === current) return;
@@ -102,7 +109,8 @@ export function TooltipLayer() {
       view.removeEventListener('blur', leave);
     };
   }, [doc]);
-  // Above the anchor, centred; below it when there is no room; kept inside the viewport.
+  // Above the anchor (below when asked), centred; on the other side when there is no room; kept
+  // inside the viewport.
   useLayoutEffect(() => {
     const node = bubble.current;
     if (tip === undefined || node === null) {
@@ -111,10 +119,14 @@ export function TooltipLayer() {
     }
     const { width, height } = node.getBoundingClientRect();
     const { anchor } = tip;
+    const view = documentWindow(doc);
     const above = anchor.top - OFFSET - height;
-    const top = above >= EDGE ? above : anchor.bottom + OFFSET;
+    const below = anchor.bottom + OFFSET;
+    const fitsAbove = above >= EDGE;
+    const fitsBelow = below + height <= view.innerHeight - EDGE;
+    const top = tip.below ? (fitsBelow || !fitsAbove ? below : above) : fitsAbove ? above : below;
     const centred = anchor.left + anchor.width / 2 - width / 2;
-    const left = Math.min(Math.max(EDGE, centred), documentWindow(doc).innerWidth - EDGE - width);
+    const left = Math.min(Math.max(EDGE, centred), view.innerWidth - EDGE - width);
     setPlace({ left, top });
   }, [tip, doc]);
   if (tip === undefined) return null;

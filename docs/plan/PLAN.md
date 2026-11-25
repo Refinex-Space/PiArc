@@ -315,7 +315,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 计划卡：计划用 Markdown 渲染，去掉工具名与"0 条评论"，说明改为信息图标提示（UI-7）。
 - [x] 审批卡与命令行：命令不在连字符处断行（UI-8）；文件改动卡不重复"附加目录"（UI-6）。
 - [x] TodoWrite：只有最新一次显示整张任务卡，较早的更新收成一行变化记录（UI-14）。
-- [ ] 其余 P2/P3：模式菜单禁用项与层级（UI-10）、工具行等宽命令（UI-15）、箭头间距（UI-16）、环境栏当前值与"中等"（UI-17）、已回答的问题（UI-18）、数字格式（UI-19）、按行数折叠（UI-20）与 UI-21 的零散项。
+- [x] 其余 P2/P3：模式菜单禁用项与层级（UI-10）、工具行等宽命令（UI-15）、箭头间距（UI-16）、环境栏最高档强度着色与"中等"（UI-17，按参考源码只给最高档着色）、已回答的问题（UI-18）、数字格式（UI-19）、按行数折叠（UI-20）与 UI-21 的零散项（`@` 面板根目录重名、窄列占位符、消息操作的提示放下方、展开后的文件路径、任务复选框、行间公式）；上下文卡片的"记忆"已翻译，未送达原因的英文登记为 I236。
 - [ ] 验收：受影响的 Vitest、L4、画廊截图与 ui-critic 复查，verify。
 
 ### Files 精修与 Markdown（桌面已验收，整仓待 I230）
@@ -571,6 +571,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I233 | 会话主块对标 | 会话的模型目录（`useModelCatalog` → `sessionModels`）在 Core 已把会话标为 `open`、Agent Host 尚未打开该会话时发出，答 `sessionNotFound: no open session <id>`，输入框上方一直显示"无法更新模型选择"，环境栏只剩"模型""推理强度"占位；之后不重试 | 属会话层状态同步：Core 的 `open` 与 Agent Host 的会话打开对齐后再查，或在 `sessionNotFound` 时随会话状态变化重取；需改 Core/Agent Host 语义时先写 ADR；**已落地（会话主块遗留）**：会话 actor 的请求先等 `sessions/session/presence.rs` 的 `InHost`（创建、恢复、接管 fork 完成时置位，会话关闭即取消等待）再取 Agent Host，快照与 AHP 不变；回归用例 `crates/piarc-testkit/tests/sessions/models.rs` 的 `model_list_during_resume_waits_for_the_session`（修复前稳定复现 `no open session`） |
 | I234 | 会话主块对标 | MCP 工具、截图等工具结果里的图片字节只交给模型，条目只带输出文字，界面无法显示（Read 读取的图片按路径显示，已做） | 在工具条目增加图片引用（会话 blob 路径与哈希，ADR-0009 第 8 条），Core 经短期预览地址交给渲染进程；涉及 AHP 与 Core，按补充型处理并写 ADR |
 | I235 | 会话主块对标 | `bench:t19` 回退的定位与修复在用户同时使用本机时完成，两次基线复测就相差 74.9 / 40.4 fps，最终数值不可作验收：对照实验（同一时段只切换渲染层产物）确认 `:has()` 规则是主因（去掉后滚动 36→65 fps、冷加载约 160→80 ms、切换约 95→35 ms、流式 p99 约 11→6.6 ms），已修；长消息折叠的逐行强制布局、格式器重建与 O(n) 查找一并修掉 | 在空闲桌面上前台运行 `npm run bench:t19` 与开工值对比（流式 p99 6.32 ms、滚动 59.6 fps、冷加载 61–94 ms、缓存切换 17–25 ms）；仍有差距时继续按提交二分 |
+| I236 | 会话主块遗留 | 渲染进程把 `window.piarc` 调用失败的 `Error.message`（Core 的英文错误）原样显示：未送达行"未送达：the app is offline"、模型菜单、设置页等都经 `shell/errors.ts` 的 `reason()` 拼接，中文界面夹英文 | 按 `ErrorObject.kind` 建本地化映射（主进程把 kind 随错误传给页面，`reason()` 先查目录，未知 kind 才显示原文），一次覆盖所有调用处；涉及 IPC 错误形状，按补充型处理 |
+| I237 | 会话主块遗留 | `t23-permissions` 第一个用例点击"Show full request"时带 `.catch`，命令不长时按钮不存在，白等 30 s 默认超时；整组连跑时该用例曾在后续点击超时一次（单独与再次连跑都通过） | 改为按卡片是否显示该按钮再点（`count()` 或 `isVisible()`），不等超时 |
 
 ## 技术债
 

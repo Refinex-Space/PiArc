@@ -40,6 +40,12 @@ export function ModelMenus({
   const current = catalog?.models.find((m) => catalog.model && keyOf(m) === keyOf(catalog.model));
   const modelLabel = current?.name ?? catalog?.model?.id ?? t('models.label');
   const effortLabel = catalog?.effort ? t(`models.effort.${catalog.effort}`) : t('models.effort');
+  // The model's highest level stands out, like the reference's top tier (the rest stay grey).
+  const topEffort =
+    catalog?.effort !== undefined &&
+    current !== undefined &&
+    current.efforts.length > 1 &&
+    current.efforts.at(-1) === catalog.effort;
   const close = () => {
     nextRequest.current++;
     setChosen(undefined);
@@ -120,6 +126,7 @@ export function ModelMenus({
         ref={effortButton}
         disabled={running || busy || !current?.efforts.length}
         data-testid="session-effort"
+        data-top-tier={topEffort ? '' : undefined}
         aria-label={choiceName(effortLabel, t('models.effort'))}
         aria-haspopup="menu"
         aria-expanded={Boolean(menu.open)}

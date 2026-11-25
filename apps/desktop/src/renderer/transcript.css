@@ -380,8 +380,9 @@
   unicode-bidi: plaintext;
 }
 
+/* Eight lines show of a folded message (it folds above twelve, `messages.tsx`). */
 .row-user-text[data-folded='true'] {
-  max-height: 200px;
+  max-height: 8lh;
   overflow: hidden;
   mask-image: linear-gradient(#000 calc(100% - 48px), transparent);
 }
@@ -776,10 +777,33 @@
   padding-inline-start: 0;
 }
 
+/* A reply's task box is read-only: drawn here, so a checked one reads done, not disabled. */
 .row-agent .md .md-task > input {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  box-sizing: border-box;
+  width: 0.95em;
+  height: 0.95em;
   margin: 0 0.5em 0 -1.375em;
-  accent-color: var(--piarc-accent-solid);
-  translate: 0 0.1em;
+  border: 1.5px solid var(--piarc-border-strong);
+  border-radius: 3px;
+  background: transparent;
+  translate: 0 0.12em;
+}
+
+.row-agent .md .md-task > input:checked {
+  border-color: var(--piarc-accent-solid);
+  background: var(--piarc-accent-solid);
+}
+
+.row-agent .md .md-task > input:checked::before {
+  width: 0.5em;
+  height: 0.26em;
+  border: solid var(--piarc-text-on-accent);
+  border-width: 0 0 1.5px 1.5px;
+  content: '';
+  transform: translateY(-0.06em) rotate(-45deg);
 }
 
 .row-agent .md :is(.md-list, .md-table-wrap, .md-code, blockquote, hr) + * {
@@ -1121,6 +1145,11 @@
   overflow-y: hidden;
 }
 
+/* Math fonts run small beside the text (Cambria Math on Windows): a display formula steps up. */
+.row-agent .md .markdown-display-math math {
+  font-size: 1.2em;
+}
+
 /* Scrollbars inside tables and code: thin pills that do not crowd the text. */
 .row-agent .md :is(.md-table-wrap, .md-code pre)::-webkit-scrollbar {
   height: 8px;
@@ -1213,9 +1242,10 @@
   color: var(--piarc-text-primary);
 }
 
+/* A command in a step line: mono runs wide and dark, so one step smaller than the line's text. */
 .step-code {
   font-family: var(--piarc-font-mono);
-  font-size: 0.9em;
+  font-size: var(--piarc-session-caption);
 }
 
 /* Several calls open into a card: a hairline ring, rows divided, no fill. */
@@ -1457,8 +1487,11 @@
   min-width: 0;
 }
 
-.file-change-path {
+/* Over the element resets (`:root[data-app] button`) and the files panel's `.file-path-action`:
+   the path is a quiet footnote, not the body's ink and size. */
+:root[data-app] .file-change-path {
   min-width: 0;
+  min-block-size: 0;
   max-width: 100%;
   padding: 0;
   overflow: hidden;
@@ -1473,7 +1506,7 @@
   white-space: nowrap;
 }
 
-button.file-change-path:hover {
+:root[data-app] button.file-change-path:hover {
   color: var(--piarc-text-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
