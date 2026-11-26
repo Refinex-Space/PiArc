@@ -441,7 +441,7 @@ threats:
   - id: THR-13
     title: 恶意链接与导航
     countermeasures:
-      - arch: 窗口禁止导航到应用自身协议以外的地址
+      - arch: 应用窗口禁止导航到应用自身协议以外的地址
         measure: 导航与重定向只允许应用自身的 origin
         type: automated
         tests:

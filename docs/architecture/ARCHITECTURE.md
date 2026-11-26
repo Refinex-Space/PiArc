@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.73（2026-11-25） |
+| 版本 | 2.74（2026-11-26） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -292,6 +292,12 @@ PiArc/
 | [0084](../adr/0084-git-panel-scopes.md) | 右上角的 Changes 工具改为 Git 工具：仓库内以 Git 为准（全部改动 vs 基础分支、未提交、单个提交），保留"本会话"范围并作为非仓库时的退回；按 hunk 丢弃只在"本会话"，Git 范围的回滚先存快照并原生确认 | 用户要看的是仓库的真实状态，会话快照看不到 Bash 与用户自己的改动 |
 | [0085](../adr/0085-git-command-boundaries.md) | Git 命令只在 Core 运行：只读查询以命令行覆盖关掉仓库可配置的程序，写操作只在受信任的项目、按会话空闲与仓库写锁执行；丢失工作的操作经主进程原生确认并核对 Core 读到的事实；强推只用带期望提交的 lease，受保护分支只在 Core 判断 | 打开面板即读仓库，恶意仓库的 Git 配置不能借此运行程序；破坏性操作不能由渲染进程单独发起 |
 | [0086](../adr/0086-commit-message-generation.md) | 提交信息经会话级 AHP 请求 `session/commitMessage` 由辅助模型生成，语言由主进程按界面语言填入，暂存内容按预算与敏感规则裁剪并脱敏 | 只在用户点击时发送已暂存的内容；语言与指令可控 |
+| [0088](../adr/0088-browser-guests-in-the-security-baseline.md) | 内置浏览器的页面是主进程持有的 guest（`WebContentsView`）：独立分区、创建时按分区识别并走 guest 守卫、不计入工作台的真实输入、网络经 Core 的浏览器代理做地址检查；"应用窗口"的导航与网络条款不变 | 预览需要加载任意网页，应用界面的基线不能因此放松；Electron 45 的本地网络访问保护未生效 |
+| [0089](../adr/0089-agent-browser-execution-boundary.md) | 智能体经 `Browser` 工具写 JS 驱动浏览器：脚本在一次性的沙箱渲染进程运行；Core 经 `BrowserClient` 把运行交给主进程；请求闸门按主机与本机端口裁决，站点卡复用网络卡；CDP 允许名单；上传下载经 Core | 代码模式省往返；脚本只能做浏览器操作，审批落在用户能判断的主机、端口与文件上 |
+| [0090](../adr/0090-chrome-cookie-import.md) | 浏览器分区的 cookie 不进保险箱（ADR-0021 例外）；从 Chrome 按站点导入登录，导入站点每会话审批 | 复用用户登录是用户的明确要求；范围与访问保持可见、可撤销 |
+| [0091](../adr/0091-browser-sdk-from-ego-browser.md) | 浏览器 SDK 移植 ego-browser（MIT），保留布局便于对照上游，严格类型不加豁免 | 复用已验证的页面操作语义 |
+| [0092](../adr/0092-launch-configs-and-dev-servers.md) | 启动配置 `.piarc/launch.json`（另读 `.claude/launch.json`）、开发服务器是 `TaskKind::DevServer`、按进程树发现监听端口 | 面板与智能体共用服务与端口事实 |
+| [0093](../adr/0093-tool-result-images-in-transcript.md) | 工具结果图片写入会话 blob，transcript 显示缩略图 | 用户与模型看到同一张截图 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -375,7 +381,7 @@ agent-host/
 - `ModelRuntime.create({ credentials })` 注入 PiArc 的 `CredentialStore`：读取来自 Core（凭据保险箱，第 9.1 节），写入经 AHP 交给 Core 持久化。Agent Host 启动时向 Core 一次性取回凭据放在内存中，写操作先更新内存、再异步回写 Core。
 - T08 落地（S5，ADR-0021）：Pi 1.5.2 的这个注入点是 pi-ai 的异步 `CredentialStore`（`read`、`list`、`modify`、`delete`），同步的 `AuthStorageBackend.withLock` 只属于 coding-agent 的 `auth.json` 后端，PiArc 不使用，风险 R11 在此不出现。适配层 `agent-host/src/runtime/credentials.ts`：启动时 `secrets/getAll`，读从内存返回；`modify`、`delete` 按 provider 串行，在 Core 的键锁（`secrets/lock`，锁 `provider/<id>` 与 `oauth/<id>`）内运行，先改内存再 `secrets/set`/`secrets/delete`，Core 存好后才完成；写回或取回失败时拒绝，pi-ai 让该次模型请求失败，会话以 `turn/completed` 的 `failed` 报出，不回退到明文或环境变量。其他 Agent Host 的写入经 `secrets/changed` 推送，按 `revision` 丢弃过期通知。pi-ai 在 `modify` 内刷新 OAuth（剩余不到 5 分钟），两个 Agent Host 同时刷新时第二个在锁内看到新 token，不再刷新。
 - 凭据只经 AHP 传递，不放进环境变量（Agent Host 启动的子进程会继承环境变量）。
-- OAuth 与设备码登录调用 `ModelRuntime.login(provider, type, interaction)`，`interaction` 的回调（授权 URL、设备码、输入提示）转成 AHP 请求，由客户端呈现：授权页在系统浏览器中打开，回调经本地回环端口或 `piarc://` 深链接返回，不在应用窗口内加载第三方登录页。
+- OAuth 与设备码登录调用 `ModelRuntime.login(provider, type, interaction)`，`interaction` 的回调（授权 URL、设备码、输入提示）转成 AHP 请求，由客户端呈现：授权页在系统浏览器中打开，回调经本地回环端口或 `piarc://` 深链接返回，不在应用窗口内加载第三方登录页（内置浏览器的 guest 不是应用窗口，见 ADR-0088；登录流程仍走系统浏览器）。
 - **Anthropic 的订阅 OAuth 登录方式在 Agent Host 中被屏蔽**（ADR-0006）；CI 中有测试断言可用登录方式列表不包含它。
 - T29 落地（ADR-0045）：登录在 Core 为该操作启动的设置 Host 上运行（`models/login/start` 结束时才应答，上限 15 分钟；`models/login/cancel`、`models/logout`）。`AuthInteraction` 的授权 URL、设备码、进度、说明与提问经 `ui/loginInteraction` 交给 Core，Core 一次只运行一个登录，把每一步发到事件路由 `core/login`，客户端答复经 `answerLogin(loginId, value)`（空值即取消）；新的提问顶替屏幕上的提问，进度与说明不顶替。授权页经主进程外链确认交给系统浏览器，回调由服务商流程在 Agent Host 内的回环端口接收；本任务不注册 `piarc://`（T35）。Pi 的 OAuth 流程经 `registerLazyOAuthFlows` 打进 bundle。可登录服务商在 `models/list` 的 `loginProviders` 中列出（不含 Anthropic）。凭据经适配层只进保险箱：`tests/sessions/login.rs` 用 `piarc-testkit` 的 mock 授权服务器跑授权码、设备码、拒绝、过期与取消，并扫描数据目录确认无明文。
 - 账号、测试与启停（ADR-0083）：同一服务商可登录多个账号，同一时刻一个在用。在用账号的凭据在 `oauth/<服务商>`，其余在只给 Core 的 `account/<服务商>/<账号 id>`，账号的公开信息在用户设置 `modelProviders.accounts`；再次登录前 Core 把在用凭据移开，登录失败放回，切换时互换，运行中的 Agent Host 经 `secrets/changed` 换用新账号。账号显示名由 Agent Host 从凭据推导（JWT 的 email 等；GitHub Copilot 在登录完成时查一次 `/user`），只交出名字。`models/test` 向该服务商的一个模型发一次很短的请求；`models/discover` 请求端点的模型列表，已存的密钥只发给它绑定的地址与协议。`modelProviders.disabled` 列出停用的服务商，随 `ModelPreferences.disabledProviders` 下发，凭据适配层对它们视而不见，自定义端点另从 `pi/models.json` 移除；设置 Host 不受影响。
@@ -1370,7 +1376,7 @@ Core 事件批次 ──► 主进程（只转发）──MessagePort──► �
 | 动效 | 弹簧参数集中定义；遵循 `prefers-reduced-motion` 并提供应用内开关 |
 | 重试 | 自动重试显示次数（n / max），用尽后转为手动重试按钮 |
 | 快捷键 | Mod+N 新会话、Mod+W 关闭、Ctrl+Tab 切换、Mod+K 命令面板、Mod+/ 快捷键列表、Mod+Shift+D Changes、Ctrl+\` 终端、Mod+Shift+M 权限模式、Mod+Shift+I 模型、Mod+Shift+E effort；全部可在设置中修改。终端获得焦点时，除少数全局快捷键外按键都交给终端 |
-| 外部链接 | 模型输出与仓库内容中的链接点击后先显示目标地址，确认后用系统浏览器打开；应用窗口内不导航到外部页面 |
+| 外部链接 | 模型输出与仓库内容中的链接点击后先显示目标地址，确认后用系统浏览器打开；应用窗口内不导航到外部页面（内置浏览器的 guest 在独立分区，见 ADR-0088 与[设计增补](addenda/browser.md)） |
 
 T18 落地（ADR-0029）：快捷键注册表在 `src/shared/keybindings.ts`（命令 id、`Mod` 记法的默认键、标签消息 id）。渲染进程按 `KeyboardEvent.code` 匹配用户覆盖后的有效绑定，执行命令并阻止默认行为；输入法合成中不匹配。主进程菜单显示同一份绑定作为加速键，菜单点击经应用事件送到窗口。冲突按平台换算后的物理按键判断，只允许 Mod、Ctrl、Alt 组合或功能键。T18 注册了 Mod+N、Mod+W、Ctrl+Tab、Mod+/，以及设置窗口的 Mod+,；其余快捷键由所属任务在 `COMMANDS` 中追加。
 
@@ -1534,7 +1540,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）；Core 以最小环境启动内置 node（不传 `DYLD_*`）；内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`，同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
 | 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关；发布构建拒绝 Chromium 的远程调试开关（T45） |
-| 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 窗口禁止导航到应用自身协议以外的地址；仅允许绑定工作台的一次性工具窗口，其余新窗口拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
+| 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 应用窗口禁止导航到应用自身协议以外的地址；仅允许绑定工作台的一次性工具窗口，其余新窗口拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
 | 恶意仓库的 Git 配置 | 克隆的仓库在 `.git/config` 或 `.gitattributes` 里设置 `core.fsmonitor`、`core.hooksPath`、filter、外部 diff、textconv 与 pager，Git 面板一打开就读取状态与 diff | Git 面板的只读查询用命令行覆盖关闭 fsmonitor、hooks、外部 diff、textconv 与 pager，清空仓库配置的全部 filter，只带最小环境、不继承 `GIT_*` 变量（ADR-0085）；暂存、提交、检出、推送等写操作照常运行仓库的 hooks 与 filter，只在受信任的项目里执行；网络操作不弹终端或图形凭据提示，不继承带凭据的环境变量，远程地址里的用户信息在日志中脱敏；丢失工作的操作（回滚、强制检出、强制推送、删除未合并分支）经主进程原生确认并展示 Core 读到的事实，强制推送只用带期望提交的 `--force-with-lease`，受保护分支不强推 |
 
 ### 10.2 项目信任
@@ -1563,7 +1569,7 @@ macOS 通过 Electron 的原生缓冲区回调交付 `app:` 资源，Windows 继
 
 - 所有窗口开启 `sandbox` 与 `contextIsolation`，关闭 `nodeIntegration`；不使用 `<webview>`；不开启实验特性与 `enableBlinkFeatures`；不关闭 `webSecurity`。
 - 界面通过自定义协议（`app://` 一类，具体名称随应用标识确定；当前为 `app://piarc`，以 `standard`、`secure` 注册）从 app.asar 提供，不使用 `file://`，并关闭 `GrantFileProtocolExtraPrivileges` fuse。
-- CSP 由主进程以响应头下发：`default-src 'self'`，`script-src 'self'`（不允许内联脚本与 `eval`），`connect-src` 只允许应用自身协议，工作台图片只允许应用自身协议、`data:` 与 ADR-0076 的短期本地文档地址；媒体和预览子框架仅接受专用 `piarc-document:` 来源。子文档没有业务 preload、应用 IPC 或网络请求权限。渲染进程不直接访问网络，模型请求都在 Agent Host 中发出。
+- CSP 由主进程以响应头下发：`default-src 'self'`，`script-src 'self'`（不允许内联脚本与 `eval`），`connect-src` 只允许应用自身协议，工作台图片只允许应用自身协议、`data:` 与 ADR-0076 的短期本地文档地址；媒体和预览子框架仅接受专用 `piarc-document:` 来源。子文档没有业务 preload、应用 IPC 或网络请求权限。渲染进程不直接访问网络，模型请求都在 Agent Host 中发出。内置浏览器的 guest 不是应用的渲染进程：它在独立分区里加载网页，网络经 Core 的浏览器代理（ADR-0088）。
 - 模型输出与仓库内容一律当作不可信数据：Markdown 渲染不使用 `innerHTML` / `dangerouslySetInnerHTML`，原始 HTML 当文本显示；代码高亮与公式渲染只输出受控的元素和样式。
 - 导航与新窗口：`will-navigate` 中用 `new URL()` 比较 origin，只允许应用自身协议；`setWindowOpenHandler` 默认返回 `deny`；只为主进程已授权的一次性本地工具窗放行（ADR-0075，子窗口禁止创建后继窗口），外部链接由主进程在用户确认后用 `shell.openExternal` 打开，并只放行 `https:`、`http:`、`mailto:`。
 - 权限请求：`setPermissionRequestHandler` 与 `setPermissionCheckHandler` 默认拒绝，设备权限一律拒绝；只放行剪贴板写入等明确需要的权限，放行清单集中定义并逐条写理由（当前只有 `clipboard-sanitized-write`，供复制按钮使用，T09）。
@@ -1913,6 +1919,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.71 | 2026-11-25 | 第 5.5 节：Agent Host 的网络代理，用户设置或系统代理经启动环境生效（ADR-0082）。 |
 | 2.72 | 2026-11-26 | 第 5.4 节：同一服务商多个账号、连接测试、服务商启停与端点模型列表；保险箱新增只给 Core 的 `account/` 键（ADR-0083）。 |
 | 2.73 | 2026-11-25 | Git 工具（ADR-0084、ADR-0085、ADR-0086）：第 4 章新增三条 ADR，ADR-0044 第 8 条被 ADR-0084 取代；6.9 节说明 Changes 面板成为 Git 工具的"本会话"范围；7.6 节 `gitRequest`、`cancelGit` 与事件 `core/git`；7.7 节 Git diff 的来源、上限与按 hunk 暂存；8.2 节 Git 工具、提交视图、分支弹窗与设置页；10.1 节新增威胁"恶意仓库的 Git 配置"（THR-15）。 |
+| 2.74 | 2026-11-26 | 内置浏览器（ADR-0088–0093，[设计增补](addenda/browser.md)）：第 4 章新增六条 ADR；5.4、8.5、10.3 写明浏览器 guest 不属于应用窗口；10.1 THR-13 第一条改为"应用窗口"；ADR-0013 增加浏览器平台集成、ADR-0021 增加浏览器分区 cookie 的例外。THR-16、THR-17 与第 7.1、8.1 节的模块表随实现落地补入。 |
 | 2.70 | 2026-11-25 | 第 16 章：M3 的内存退出标准在 Windows 上按 ADR-0063 的口径复测达标（W3 收尾）。 |
 | 2.69 | 2026-11-25 | 第 8.2 节：会话状态徽标改用参考的安静小标记，等待为带细环的圆点以保留形状区分（ADR-0081）。 |
 | 2.68 | 2026-11-25 | 第 7.4、8.2 节：历史条目的可选时间 `at`，回复里的 Mermaid、图片与消息时间，输入框的命令芯片（ADR-0080）。 |
