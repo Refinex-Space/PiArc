@@ -136,9 +136,6 @@
   border-radius: var(--piarc-radius-md);
   background: var(--piarc-surface-input);
 }
-.browser-address:focus-within {
-  border-color: var(--piarc-border-focus);
-}
 .browser-site {
   display: inline-flex;
   flex: none;
@@ -171,6 +168,7 @@
 }
 
 .browser-prompt,
+.browser-agent,
 .browser-find,
 .browser-device {
   display: flex;
@@ -184,6 +182,13 @@
 }
 .browser-prompt {
   background: var(--piarc-surface-raised);
+}
+/* The agent's control bar (B2.5): accent while it works, warning while it waits for the user. */
+.browser-agent {
+  background: var(--piarc-accent-subtle);
+}
+.browser-agent.is-user {
+  background: var(--piarc-state-warning-subtle);
 }
 .browser-cert {
   background: var(--piarc-state-warning-subtle);

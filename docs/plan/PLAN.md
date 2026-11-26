@@ -365,8 +365,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 1. 设计增补、ADR-0088–0093（用户 2026-11-26 确认三份变更型）、架构 2.74（第 4 章、5.4、8.5、10.1 THR-13 措辞、10.3）、参考登记；spike 结论记在设计增补附录第 35 条。THR-16、THR-17 的行与映射随第一批测试补入（`check-threats` 要求每条威胁至少一个测试）。
 - [x] 2. B1 底座：分区识别与 guest 守卫、浏览器代理（`piarc-sandbox` 浏览器策略 + Core `BrowserProxies` + NAPI `browserProxy`）、`BrowserService`、视图宿主与停车窗口、`browser-ipc`、测试钩子 `browser(sessionId)`（`60961714`、`a08613e7`、`1faca479`）。spike 结论：附加 CDP 后 JS 对话框仍由 Electron 弹原生框、`prompt()` 不可用，用户标签用原生对话框（B1.3.3 偏差，收尾时写进设计增补）。L4 `browser-basic` 4 项与 `workbench-tiles` 3 项通过；修了退出时新建停车窗口打断退出、对未加载页面调设备模拟导致崩溃两处。
 - [ ] 3. B1 面板：标签与 Space 分组、导航与地址栏、提示条、DevTools、设备、console、查找、缩放、PDF、工作区协议、恢复、键位、设置基础项、a11y 与 i18n；L4 `browser-basic`、`browser-view-host`、`browser-files`。
-- [ ] 4. B2 Core 与协议：`browser/run`、`BrowserClient`、站点卡、端口所有权、`Browser` 规则、审计、L1 样本、L2 假客户端与 `browser-` 场景。
-- [ ] 5. B2 SDK 与宿主：SDK 移植与测试、宿主页面与绑定、CDP 代理、快照、请求闸门、控制权、截图、上传下载、transcript 图片（ADR-0093）；L4 `browser-agent`、`browser-nav-gate`、`t45-egress` 新用例；THR-16。
+- [ ] 4. B2 Core 与协议：`browser/run`、`BrowserClient`、站点卡、端口所有权、`Browser` 规则、审计、L1 样本、L2 假客户端与 `browser-` 场景。进度：`browser/run`、`attachBrowserClient`/`answerBrowserRun`、能力开关 `browser.agentEnabled`、审计、L1 样本、站点卡（`browserSite`，规则 `Browser(domain:…)`、模式、卡片三档与超时，`policy::tests::browser_site` 6 项）、截图存会话 blob 与 transcript 条目 `browser`（ADR-0093）已完成；端口所有权随 B4，L2 假客户端待补。
+- [ ] 5. B2 SDK 与宿主：SDK 移植与测试、宿主页面与绑定、CDP 代理、快照、请求闸门、控制权、截图、上传下载、transcript 图片（ADR-0093）；L4 `browser-agent`、`browser-nav-gate`、`t45-egress` 新用例；THR-16。进度：SDK 移植（534 项 Vitest）、快照（16 项）、宿主与分区、绑定、CDP 代理与允许名单、请求闸门（站点卡、用户打开过的端口、被拦主机进结果）、控制条（接管、交还、停止）与遮罩、智能体光标、transcript 截图已完成；L4 `browser-agent` 覆盖快照/填写/点击/截图、闸门、控制、THR-05、超时、CDP 拒绝与 mock 模型端到端。上传下载经 Core（B2.6.6）、脚本痕迹提示（B2.5.4）、Space 变化提醒（B2.7.3）待补。
 - [ ] 6. B3：拾取、元素上下文与源码定位、标注、截图菜单、输入框桥接；L4 `browser-picker`、`browser-annotate`、`browser-screenshot`、`t45-xss`。
 - [ ] 7. B4：启动配置、`TaskKind::DevServer`、端口发现、起始页与失败卡、`autoVerify`；L2 `devserver-`、L4 `browser-devserver`。
 - [ ] 8. B5：`piarc-browser-import`、导入流程与记录、设置页补全、性能探针、Windows 交叉检查；THR-17。

@@ -9,6 +9,7 @@ import { Notification, webContents } from 'electron';
 import type { LaunchTarget } from '../../shared/ipc.js';
 import type {
   BrowserObservation,
+  PiarcTestHooks,
   AttentionObservation,
   ForwardObservation,
   NotificationProbeEvent,
@@ -43,6 +44,7 @@ export function installTestHooks(options: {
   readonly quit: () => void;
   readonly mainWindows: () => number[];
   readonly browser: (sessionId: string) => Promise<BrowserObservation>;
+  readonly browserScript: PiarcTestHooks['browserScript'];
 }): void {
   const { router } = options;
   let histogram: ELDHistogram | undefined;
@@ -50,6 +52,7 @@ export function installTestHooks(options: {
   globalThis.__piarcTestHooks = {
     modulePath: options.modulePath,
     browser: options.browser,
+    browserScript: options.browserScript,
     core: options.core,
     routerStats: () => router.stats(),
     routesOf: (id) => router.routesOf(id),

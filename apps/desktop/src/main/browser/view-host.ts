@@ -80,6 +80,12 @@ export class ViewHost {
     this.#parents.set(view, window);
   }
 
+  /** Puts `view` in `window` above every other view there (re-adding moves it to the top). */
+  raise(view: WebContentsView, window: BrowserWindow): void {
+    this.attach(view, window);
+    window.contentView.addChildView(view);
+  }
+
   /** Keeps `view` running in the hidden parking window at `size`. */
   park(view: WebContentsView, size?: { width: number; height: number }): void {
     const parking = this.parking();

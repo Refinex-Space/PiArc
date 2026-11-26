@@ -163,6 +163,16 @@ export function parseBrowserRequest(value: unknown): BrowserRequest {
       return { op: 'media', tab: tab(), media: media(fields.media) };
     case 'answer':
       return parseAnswer(fields);
+    case 'control': {
+      const action = fields.action;
+      if (action !== 'takeOver' && action !== 'handBack' && action !== 'stop') {
+        throw new TypeError('Invalid control');
+      }
+      if (typeof fields.space !== 'string' || !/^agent-\d{1,9}$/.test(fields.space)) {
+        throw new TypeError('Invalid space');
+      }
+      return { op: 'control', space: fields.space, action };
+    }
     case 'download':
       if (typeof fields.download !== 'string' || !/^[0-9a-f-]{36}$/.test(fields.download)) {
         throw new TypeError('Invalid download');

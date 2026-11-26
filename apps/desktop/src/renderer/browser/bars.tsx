@@ -11,6 +11,8 @@ import {
   type BrowserFind,
   type BrowserMedia,
   type BrowserPrompt,
+  type BrowserControl,
+  type BrowserSpaceState,
   type DevicePresetId,
 } from '../../shared/browser.js';
 import type { MessageId } from '../../shared/i18n/index.js';
@@ -487,5 +489,91 @@ export function Downloads({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The agent's control bar (B2.5): while the agent works in the shown Space the user can take
+ * it over or stop the call; after a hand-off the user hands it back when done.
+ */
+export function AgentBar({
+  space,
+  tainted,
+  onControl,
+  onReload,
+}: {
+  readonly space: BrowserSpaceState;
+  /** The shown page ran the agent's script (B2.5.4). */
+  readonly tainted: boolean;
+  readonly onControl: (action: BrowserControl) => void;
+  readonly onReload: () => void;
+}) {
+  const t = useT();
+  // An agent Space between calls needs no bar; one the user holds always shows it.
+  if (space.kind !== 'agent' || space.ownership === 'user') return null;
+  if (space.ownership === 'agent' && !space.running) return null;
+  if (space.ownership === 'agentDelegatedToUser') {
+    return (
+      <div className="browser-agent is-user" role="status" data-testid="browser-agent-bar">
+        <span className="browser-prompt-text">
+          {space.handOff === undefined
+            ? t('browser.agent.inControl')
+            : t('browser.agent.asks', { reason: revealBidi(space.handOff) })}
+          <span className="browser-prompt-detail">
+            {t('browser.agent.space', { name: revealBidi(space.name) })}
+          </span>
+          {tainted && (
+            <span className="browser-prompt-detail" data-testid="browser-tainted">
+              {t('browser.agent.tainted')}
+            </span>
+          )}
+        </span>
+        {tainted && (
+          <Button size="small" variant="ghost" onClick={onReload}>
+            {t('browser.agent.reload')}
+          </Button>
+        )}
+        <Button
+          size="small"
+          variant="primary"
+          data-testid="browser-hand-back"
+          onClick={() => {
+            onControl('handBack');
+          }}
+        >
+          {space.handOff === undefined ? t('browser.agent.handBack') : t('browser.agent.done')}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="browser-agent" role="status" data-testid="browser-agent-bar">
+      <span className="browser-prompt-text">
+        {space.action === undefined
+          ? t('browser.agent.running')
+          : t('browser.agent.runningAction', { action: revealBidi(space.action) })}
+        <span className="browser-prompt-detail">{t('browser.agent.locked')}</span>
+      </span>
+      <Button
+        size="small"
+        variant="ghost"
+        data-testid="browser-stop"
+        disabled={!space.running}
+        onClick={() => {
+          onControl('stop');
+        }}
+      >
+        {t('browser.agent.stop')}
+      </Button>
+      <Button
+        size="small"
+        data-testid="browser-takeover"
+        onClick={() => {
+          onControl('takeOver');
+        }}
+      >
+        {t('browser.agent.takeOver')}
+      </Button>
+    </div>
   );
 }

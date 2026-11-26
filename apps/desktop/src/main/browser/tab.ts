@@ -75,6 +75,8 @@ export class BrowserTab {
   devtools: BrowserTabState['devtools'] = 'closed';
   failure: BrowserTabState['failure'];
   crashed = false;
+  /** The agent ran script in the current document (B2.5.4); a new document clears it. */
+  tainted = false;
   /** When the tab was last on screen (for discarding hidden tabs). */
   lastShown = Date.now();
   view: WebContentsView | undefined;
@@ -123,7 +125,9 @@ export class BrowserTab {
     this.crashed = false;
     this.#emulationApplied = undefined;
     this.wire(view.webContents);
-    if (this.url !== '' && this.url !== 'about:blank') {
+    // `about:blank` loads too: a page that never navigated has no document, and scripts the
+    // agent runs in it would wait forever (an agent Space starts on a blank page).
+    if (this.url !== '') {
       this.load(this.url);
     }
     return view;
@@ -213,6 +217,7 @@ export class BrowserTab {
       devtools: this.devtools,
       ...(this.failure === undefined ? {} : { failure: this.failure }),
       crashed: this.crashed,
+      ...(this.tainted ? { tainted: true } : {}),
     };
   }
 
@@ -236,6 +241,7 @@ export class BrowserTab {
     });
     contents.on('did-navigate', (_event, url) => {
       this.url = url;
+      this.tainted = false;
       this.failure = undefined;
       this.favicon = undefined;
       this.#history(contents);

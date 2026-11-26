@@ -33,7 +33,7 @@ export interface GuestSessionHooks {
   granted(contents: WebContents | null, origin: string, permission: string): boolean;
   download(contents: WebContents | undefined, item: DownloadItem): void;
   /** The agent's request gate (B2); the request rules have already passed. */
-  gate?(details: Electron.OnBeforeRequestListenerDetails): Promise<RequestVerdict>;
+  gate?(details: Electron.OnBeforeRequestListenerDetails): RequestVerdict | Promise<RequestVerdict>;
   /** PiArc's own loopback ports now. */
   deniedPorts(): ReadonlySet<number>;
 }
@@ -100,9 +100,14 @@ export async function setUpGuestSession(
       callback({ cancel: !verdict.allow });
       return;
     }
-    hooks.gate(details).then(
-      (gated) => {
-        callback({ cancel: !gated.allow });
+    const gated = hooks.gate(details);
+    if (!(gated instanceof Promise)) {
+      callback({ cancel: !gated.allow });
+      return;
+    }
+    gated.then(
+      (answer) => {
+        callback({ cancel: !answer.allow });
       },
       () => {
         callback({ cancel: true });

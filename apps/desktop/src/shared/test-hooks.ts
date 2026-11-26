@@ -165,6 +165,21 @@ export interface BrowserObservation {
     readonly occluded: boolean;
   } | null;
   readonly tabs: readonly BrowserTabObservation[];
+  /** The shield is over the shown page: the agent drives it (B2.5.1). */
+  readonly shielded: boolean;
+}
+
+/** What a script run straight through the script host answered (B2 L4). */
+export interface BrowserScriptObservation {
+  readonly output: string;
+  /** Attached screenshots: their media type and size. */
+  readonly images: readonly {
+    readonly mediaType: string;
+    readonly width: number;
+    readonly height: number;
+  }[];
+  readonly error?: { readonly name: string; readonly message: string; readonly code?: string };
+  readonly blockedHosts?: readonly string[];
 }
 
 export interface PiarcTestHooks {
@@ -172,6 +187,15 @@ export interface PiarcTestHooks {
   readonly modulePath: string;
   /** The built-in browser of a session (B1–B5 L4). */
   browser(sessionId: string): Promise<BrowserObservation>;
+  /**
+   * Runs a `Browser` script in the script host for `sessionId` without Core or a model
+   * (B2 L4): the same host, bindings, CDP proxy and snapshot an agent's call uses.
+   */
+  browserScript(
+    sessionId: string,
+    script: string,
+    timeoutMs?: number,
+  ): Promise<BrowserScriptObservation | null>;
   readonly core: TestCoreApi;
   routerStats(): RouterStats;
   /** Routes the window with this `webContents.id` receives. */

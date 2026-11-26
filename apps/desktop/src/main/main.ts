@@ -18,6 +18,7 @@ import {
 import { DOCUMENT_SCHEME, ProjectPreviews } from './core/project-preview.js';
 import { registerProjectWatch } from './core/project-file-watch.js';
 import { registerMarkdownImageHandlers } from './core/markdown-images.js';
+import { registerSessionImageHandlers } from './core/session-images.js';
 import { registerProjectFileHandlers } from './core/project-files-ipc.js';
 import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
@@ -34,7 +35,7 @@ import { startupFailure } from './core/startup-error.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
-import { createIpcRegistrar } from './ipc/register.js';
+import { createIpcRegistrar, registerHostHandler } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
 import { registerMcpHandlers } from './core/mcp-ipc.js';
 import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
@@ -47,6 +48,7 @@ import { applyAppIdentity } from './platform/index.js';
 import { confirmQuit } from './platform/quit.js';
 import { TrayIcon, parseActivity, trayIconDirectory } from './platform/tray.js';
 import { WindowStateFile } from './platform/window-state.js';
+import { BROWSER_HOST_CHANNEL } from '../shared/browser-host.js';
 import type { LaunchTarget } from '../shared/ipc.js';
 import { resolveLocale, Translator } from '../shared/i18n/index.js';
 import { runVelopackStartup } from './platform/velopack.js';
@@ -56,8 +58,12 @@ import { applyPermissionPolicy } from './security/permissions.js';
 import { refuseRemoteDebugging } from './security/runtime-switches.js';
 import { ToolWindows } from './tool-windows.js';
 import { createMainWindow, createParkingWindow } from './window.js';
+import { BROWSER_ROUTE } from './browser/agent-bridge.js';
+import { startAgentRuntime, type AgentRuntime } from './browser/agent-runtime.js';
 import { registerBrowserHandlers } from './browser/browser-ipc.js';
-import { refuseClientCertificates } from './browser/guest-session.js';
+import { chromeUserAgent, refuseClientCertificates } from './browser/guest-session.js';
+import { HOST_PAGE } from './browser/host-session.js';
+import { HOST_SCHEME } from './browser/script-host.js';
 import { BrowserService } from './browser/service.js';
 import { BROWSE_SCHEME, WorkspaceFiles } from './browser/workspace-files.js';
 import { electronExternalLinkPort } from './external-link-port.js';
@@ -85,6 +91,10 @@ let shell: AppShell | undefined;
 let tray: TrayIcon | undefined;
 /** The built-in browser (ADR-0088); exists once Core runs. */
 let browser: BrowserService | undefined;
+/** The agent's side of the browser (ADR-0089); exists once Core runs. */
+let browserAgent: AgentRuntime | undefined;
+/** Runs started by the development test hook `browserScript`. */
+let testRuns = 0;
 const eventRouter = new EventRouter();
 /** Launch targets that arrived before the shell existed (macOS sends them before `ready`). */
 const early: LaunchTarget[] = [];
@@ -158,6 +168,37 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
       if (browser === undefined) return Promise.reject(new Error('The browser has not started'));
       return browser.observe(sessionId);
     },
+    browserScript: async (sessionId, script, timeoutMs) => {
+      if (browserAgent === undefined) throw new Error('The browser agent has not started');
+      const answer = await browserAgent.hosts.run({
+        runId: `test-${String(++testRuns)}`,
+        sessionId,
+        // No Core call: site cards are refused, so pages reach only allowed hosts.
+        callSessionId: sessionId,
+        toolCallId: `test-${String(testRuns)}`,
+        script,
+        timeoutMs: timeoutMs ?? 30_000,
+      });
+      if (answer === undefined) return null;
+      return {
+        output: answer.output,
+        images: (answer.images ?? []).map(({ mediaType, width, height }) => ({
+          mediaType,
+          width,
+          height,
+        })),
+        ...(answer.error == null
+          ? {}
+          : {
+              error: {
+                name: answer.error.name,
+                message: answer.error.message,
+                ...(answer.error.code == null ? {} : { code: answer.error.code }),
+              },
+            }),
+        ...(answer.blockedHosts == null ? {} : { blockedHosts: answer.blockedHosts }),
+      };
+    },
     attention: () => app.attention.observed(),
     notificationAction: (index) => app.attention.pressAction(index),
     failNext: (channel, message) => {
@@ -225,6 +266,49 @@ function startBrowser(
     service.dispose();
   });
   return service;
+}
+
+/**
+ * The agent's side of the browser (ADR-0089): script hosts answer `core/browser` runs. Core
+ * offers the `Browser` tool only after `attachBrowserClient`, so it comes last.
+ */
+function startBrowserAgent(core: CoreHost, service: BrowserService): void {
+  const hostDevServer = import.meta.env.DEV ? BROWSER_HOST_VITE_DEV_SERVER_URL : undefined;
+  const agent = startAgentRuntime({
+    service,
+    core: core.runtime,
+    hostFolder: bundlePath('renderer', BROWSER_HOST_VITE_NAME),
+    hostPage: hostDevServer === undefined ? HOST_PAGE : `${hostDevServer}/index.html`,
+    devOrigin: hostDevServer === undefined ? undefined : new URL(hostDevServer).origin,
+    preload: bundlePath('build', 'browser-host.cjs'),
+    devTools: !__PIARC_RELEASE_BUILD__,
+    localNames: () => ['*.test', '*.local'],
+    userAgent: chromeUserAgent(app.userAgentFallback),
+    handedOff: () => {
+      // The panel shows the hand-off from the Space's state (B2.5.3).
+    },
+    handedBack: (sessionId) => {
+      // The agent asked the user to act in the browser; it goes on when the user says so.
+      core.runtime
+        .followUp(sessionId, shell?.t().t('browser.agent.handedBack') ?? '')
+        .catch((error: unknown) => {
+          console.warn('[browser] could not tell the agent the browser is back', error);
+        });
+    },
+  });
+  registerHostHandler(
+    BROWSER_HOST_CHANNEL,
+    (sender) => agent.hosts.isHost(sender),
+    (sender, request) => agent.hosts.call(sender, request),
+  );
+  eventRouter.listen(BROWSER_ROUTE, (batch) => {
+    agent.bridge.deliver(batch);
+  });
+  app.on('will-quit', () => {
+    agent.hosts.dispose();
+  });
+  agent.bridge.attach();
+  browserAgent = agent;
 }
 
 function start(dirs: DataDirs): void {
@@ -383,6 +467,7 @@ function start(dirs: DataDirs): void {
     registerMarkdownImageHandlers(registerHandler, core.runtime, terminalOwners, () =>
       appShell.t(),
     );
+    registerSessionImageHandlers(registerHandler, dirs.data);
     registerProjectFileHandlers(registerHandler, core.runtime, terminalOwners, (child) =>
       toolWindows?.fileOwner(child),
     );
@@ -422,6 +507,7 @@ function start(dirs: DataDirs): void {
     );
     browser = startBrowser(core, appShell, dirs, toolWindows);
     registerBrowserHandlers(registerHandler, browser);
+    startBrowserAgent(core, browser);
     startTestHooks(core, terminalOwners, appShell);
     // The preferences come first: the window's language, theme and menu depend on them.
     void preferences.load().then(() => {
@@ -444,7 +530,13 @@ runVelopackStartup();
 // privileges.
 applyAppIdentity();
 app.enableSandbox();
-protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION, DOCUMENT_SCHEME, BROWSE_SCHEME]);
+protocol.registerSchemesAsPrivileged([
+  APP_SCHEME_REGISTRATION,
+  DOCUMENT_SCHEME,
+  BROWSE_SCHEME,
+  // The agent's script host page (ADR-0089): a standard, secure origin of its own.
+  { scheme: HOST_SCHEME, privileges: { standard: true, secure: true } },
+]);
 // Before `ready` and before the single-instance lock, which lives in `userData`.
 const dataDirs = applyDataDirs(app, process.env, process.platform);
 

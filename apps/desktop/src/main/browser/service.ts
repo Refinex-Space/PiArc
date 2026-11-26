@@ -17,10 +17,12 @@ import {
   type MenuItemConstructorOptions,
   type Session,
   type WebContents,
+  WebContentsView,
 } from 'electron';
 
 import {
   BROWSER_LIMITS,
+  type BrowserControl,
   type BrowserDownload,
   type BrowserFind,
   type BrowserPlacement,
@@ -39,10 +41,13 @@ import {
   BrowserPartitions,
   partitionKey,
   partitionName,
+  SHIELD_PARTITION,
   type BrowserStorage,
 } from './partitions.js';
 import { BrowserTab } from './tab.js';
 import { createDevtoolsView, fitDevice, splitForDevtools, toDips, ViewHost } from './view-host.js';
+import type { GatedPage } from './agent-gate.js';
+import { loopbackHost, portOf, type RequestVerdict } from './request-rules.js';
 import { insideRoot, type WorkspaceFiles } from './workspace-files.js';
 import type { Placement } from './view-host.js';
 
@@ -81,13 +86,16 @@ export interface BrowserPreferences {
   readonly localHostnames: readonly string[];
 }
 
-interface Space {
+/** A Space of a session; agent-spaces.ts changes agent Spaces through `AgentModel`. */
+export interface Space {
   id: string;
   name: string;
   kind: 'user' | 'agent';
   ownership: BrowserSpaceState['ownership'];
   running: boolean;
   action?: string;
+  /** What the agent asked the user to do when it handed the Space over (B2.5.3). */
+  handOff?: string;
 }
 
 interface Prompt {
@@ -122,6 +130,38 @@ interface SessionModel {
   revision: number;
   emitTimer: NodeJS.Timeout | undefined;
   saveTimer: NodeJS.Timeout | undefined;
+  /** Tab events for the agent side (the CDP proxy's target events). */
+  readonly watchers: Set<(event: TabEvent) => void>;
+  /** Loopback ports the user opened in their own tabs: the agent may use them (B2.6.2). */
+  readonly userPorts: Set<number>;
+  /** The empty view over a page while the agent drives it (B2.5.1), made on first use. */
+  shield: Electron.WebContentsView | undefined;
+}
+
+/** A tab came, changed (address, title, loading) or went. */
+export interface TabEvent {
+  readonly kind: 'created' | 'changed' | 'destroyed';
+  readonly tab: BrowserTab;
+}
+
+/** What the agent side (agent-spaces.ts, ADR-0089) uses of one session. */
+export interface AgentModel {
+  readonly sessionId: string;
+  readonly workspace: string;
+  readonly partition: string;
+  /** Live: the agent side adds and changes agent Spaces in place, then calls `changed`. */
+  readonly spaces: Space[];
+  readonly tabs: readonly BrowserTab[];
+  active(): string | undefined;
+  /** Opens a tab in `space`; the panel moves to it only when it shows no user tab. */
+  newTab(space: string, url: string): BrowserTab;
+  closeTab(id: string): void;
+  /** Shows the tab in the panel unless the panel shows a user tab. */
+  select(id: string): void;
+  /** The tab's page, created (and parked when hidden) if needed. */
+  contents(tab: BrowserTab): WebContents;
+  changed(): void;
+  watch(listener: (event: TabEvent) => void): () => void;
 }
 
 const USER_SPACE = 'user';
@@ -138,6 +178,15 @@ export class BrowserService {
   readonly #views: ViewHost;
   #nextTab = 1;
   #quitting = false;
+  /** The user's controls of agent Spaces (B2.5), installed once the agent side starts. */
+  #control:
+    ((sessionId: string, space: string, action: BrowserControl) => Promise<void>) | undefined;
+  /** The agent's request gate (agent-gate.ts), installed once the agent side starts. */
+  #gate:
+    | ((
+        details: Electron.OnBeforeRequestListenerDetails,
+      ) => RequestVerdict | Promise<RequestVerdict>)
+    | undefined;
 
   constructor(private readonly deps: BrowserDeps) {
     this.#views = new ViewHost(() => deps.createParking());
@@ -202,12 +251,117 @@ export class BrowserService {
     }
   }
 
+  /** Installs what the panel's take over, hand back and stop do (B2.5). */
+  setControl(
+    control: (sessionId: string, space: string, action: BrowserControl) => Promise<void>,
+  ): void {
+    this.#control = control;
+  }
+
+  /** Installs the agent's request gate for every guest partition (B2.6.1). */
+  setGate(
+    gate: (
+      details: Electron.OnBeforeRequestListenerDetails,
+    ) => RequestVerdict | Promise<RequestVerdict>,
+  ): void {
+    this.#gate = gate;
+  }
+
+  /** The Space of the tab whose page is `webContentsId`, for the gate. */
+  gatedPage(webContentsId: number): GatedPage | undefined {
+    for (const model of this.#loaded.values()) {
+      const tab = model.tabs.find(
+        (t) =>
+          t.view !== undefined &&
+          !t.view.webContents.isDestroyed() &&
+          t.view.webContents.id === webContentsId,
+      );
+      if (tab === undefined) continue;
+      const space = model.spaces.find((s) => s.id === tab.space);
+      return {
+        sessionId: model.id,
+        space: tab.space,
+        agentControlled: space?.kind === 'agent' && space.ownership === 'agent',
+      };
+    }
+    return undefined;
+  }
+
+  /** Agent pages showing `host` (requests no page can be named for, such as a worker's). */
+  agentPagesOn(host: string): GatedPage[] {
+    const pages: GatedPage[] = [];
+    for (const model of this.#loaded.values()) {
+      for (const tab of model.tabs) {
+        const space = model.spaces.find((s) => s.id === tab.space);
+        if (space?.kind !== 'agent' || hostOf(tab.url) !== host) continue;
+        pages.push({
+          sessionId: model.id,
+          space: tab.space,
+          agentControlled: space.ownership === 'agent',
+        });
+      }
+    }
+    return pages;
+  }
+
+  /** Loopback ports the user opened in the session's own tabs (B2.6.2). */
+  userPorts(sessionId: string): ReadonlySet<number> {
+    return this.#loaded.get(sessionId)?.userPorts ?? new Set();
+  }
+
+  /** One session as the agent side sees it, loading it on first use. */
+  async agentModel(sessionId: string, workspace?: string): Promise<AgentModel> {
+    const model = await this.#model(sessionId, workspace);
+    const userTabShown = () => model.tabs.find((t) => t.id === model.active)?.space === USER_SPACE;
+    return {
+      sessionId: model.id,
+      workspace: model.workspace,
+      partition: model.partition,
+      spaces: model.spaces,
+      tabs: model.tabs,
+      active: () => model.active,
+      newTab: (space, url) => {
+        const tab = this.#newTab(model, url, userTabShown(), 'agent', space);
+        this.#changed(model);
+        return tab;
+      },
+      closeTab: (id) => {
+        this.#closeTab(model, id);
+        this.#changed(model);
+      },
+      select: (id) => {
+        if (userTabShown() || model.active === id) return;
+        this.#select(model, id);
+        this.#changed(model);
+      },
+      contents: (tab) => {
+        const contents = tab.contents(model.partition);
+        this.#layout(model);
+        return contents;
+      },
+      changed: () => {
+        // The agent's work starting or ending shows or lifts the shield.
+        this.#layout(model);
+        this.#changed(model);
+      },
+      watch: (listener) => {
+        model.watchers.add(listener);
+        return () => model.watchers.delete(listener);
+      },
+    };
+  }
+
   /** What L4 checks (development builds' test hooks). */
   async observe(sessionId: string): Promise<BrowserObservation> {
     const model = await this.#model(sessionId);
     const placement = model.placement;
+    const shield = model.shield;
     return {
       partition: model.partition,
+      shielded:
+        shield !== undefined &&
+        placement !== undefined &&
+        this.#views.parentOf(shield) === placement.window,
       active: model.active ?? null,
       placement:
         placement === undefined
@@ -280,31 +434,24 @@ export class BrowserService {
     for (const model of this.#loaded.values()) {
       for (const tab of model.tabs) tab.destroy();
       for (const view of model.devtools.values()) closeView(view);
+      if (model.shield !== undefined) closeView(model.shield);
     }
     this.#views.dispose();
   }
 
-  async #model(sessionId: string): Promise<SessionModel> {
+  async #model(sessionId: string, workspace?: string): Promise<SessionModel> {
     let pending = this.#sessions.get(sessionId);
     if (pending === undefined) {
-      pending = this.#load(sessionId);
+      pending = this.#load(sessionId, workspace);
       this.#sessions.set(sessionId, pending);
       pending.catch(() => this.#sessions.delete(sessionId));
     }
     return pending;
   }
 
-  async #load(sessionId: string): Promise<SessionModel> {
-    const target: unknown = JSON.parse(await this.deps.core.sessionDeletionTarget(sessionId));
-    if (
-      typeof target !== 'object' ||
-      target === null ||
-      !('workspace' in target) ||
-      typeof target.workspace !== 'string'
-    ) {
-      throw new Error('The session has no workspace');
-    }
-    const workspace = target.workspace;
+  /** Loads a session; `known` is its workspace when the caller has it (an agent's run). */
+  async #load(sessionId: string, known?: string): Promise<SessionModel> {
+    const workspace = known ?? (await this.#workspaceOf(sessionId));
     const { storage, localHostnames } = this.deps.preferences();
     const key = partitionKey(workspace, storage);
     const partition = partitionName(key, storage);
@@ -336,10 +483,27 @@ export class BrowserService {
       revision: 0,
       emitTimer: undefined,
       saveTimer: undefined,
+      watchers: new Set(),
+      userPorts: new Set(),
+      shield: undefined,
     };
     await this.#restore(model);
     this.#loaded.set(sessionId, model);
     return model;
+  }
+
+  /** The session's workspace from Core's index. */
+  async #workspaceOf(sessionId: string): Promise<string> {
+    const target: unknown = JSON.parse(await this.deps.core.sessionDeletionTarget(sessionId));
+    if (
+      typeof target !== 'object' ||
+      target === null ||
+      !('workspace' in target) ||
+      typeof target.workspace !== 'string'
+    ) {
+      throw new Error('The session has no workspace');
+    }
+    return target.workspace;
   }
 
   async #ensurePartition(
@@ -369,6 +533,7 @@ export class BrowserService {
     if (typeof port !== 'number') throw new Error('Core did not start the browser proxy');
     this.deps.files.register(session);
     await setUpGuestSession(session, port, {
+      gate: (details) => this.#gate?.(details) ?? { allow: true },
       permission: (contents, origin, permission) =>
         this.#askPermission(contents, origin, permission),
       granted: (contents, origin, permission) => this.#granted(contents, origin, permission),
@@ -453,6 +618,8 @@ export class BrowserService {
       case 'answer':
         this.#answer(model, request);
         return null;
+      case 'control':
+        return this.#control?.(model.id, request.space, request.action) ?? null;
       case 'openExternal': {
         const tab = this.#tab(model, request.tab);
         this.deps.openExternal(windowOf(sender, this.deps.windows()) ?? null, tab.url);
@@ -496,6 +663,7 @@ export class BrowserService {
     model.tabs.splice(at === -1 ? model.tabs.length : at + 1, 0, tab);
     if (!background || model.active === undefined) this.#select(model, tab.id);
     else this.#layout(model);
+    tabEvent(model, { kind: 'created', tab });
     return tab;
   }
 
@@ -532,6 +700,7 @@ export class BrowserService {
     if (tab.view !== undefined) this.#views.detach(tab.view);
     tab.destroy();
     model.tabs.splice(index, 1);
+    tabEvent(model, { kind: 'destroyed', tab });
     if (model.active === id) {
       model.active = (model.tabs[index] ?? model.tabs[index - 1])?.id;
     }
@@ -677,6 +846,7 @@ export class BrowserService {
     const placement = model.placement;
     // A tab without an address has no page: the panel shows its start card instead.
     if (placement === undefined || placement.window.isDestroyed() || active.url === '') {
+      if (model.shield !== undefined) this.#views.detach(model.shield);
       if (active.view !== undefined) this.#views.park(active.view);
       const devtools = model.devtools.get(active.id);
       if (devtools !== undefined) this.#views.detach(devtools);
@@ -700,6 +870,31 @@ export class BrowserService {
     }
     active.applyEmulation(area);
     view.setVisible(!placement.occluded);
+    this.#shieldOver(model, active, placement.window, view.getBounds(), !placement.occluded);
+  }
+
+  /**
+   * While the agent's call drives the shown page, an empty view above it takes the user's
+   * pointer (B2.5.1): the panel's control bar says to take over first. Keys stay with the
+   * focused element, which is the panel's while the user works there.
+   */
+  #shieldOver(
+    model: SessionModel,
+    tab: BrowserTab,
+    window: BrowserWindow,
+    bounds: Electron.Rectangle,
+    visible: boolean,
+  ): void {
+    const space = model.spaces.find((s) => s.id === tab.space);
+    const driven = space?.kind === 'agent' && space.ownership === 'agent' && space.running;
+    if (!driven) {
+      if (model.shield !== undefined) this.#views.detach(model.shield);
+      return;
+    }
+    model.shield ??= createShield(this.partitions);
+    this.#views.raise(model.shield, window);
+    model.shield.setBounds(bounds);
+    model.shield.setVisible(visible);
   }
 
   async #sendStill(model: SessionModel, owner: WebContents): Promise<void> {
@@ -717,8 +912,10 @@ export class BrowserService {
 
   #hooks(model: SessionModel) {
     return {
-      changed: () => {
+      changed: (tab: BrowserTab) => {
         this.#changed(model);
+        tabEvent(model, { kind: 'changed', tab });
+        if (tab.space === USER_SPACE) rememberUserPort(model, tab.url);
       },
       openTab: (from: BrowserTab, url: string, background: boolean) => {
         try {
@@ -1086,6 +1283,7 @@ export class BrowserService {
         ownership: space.ownership,
         running: space.running,
         ...(space.action === undefined ? {} : { action: space.action }),
+        ...(space.handOff === undefined ? {} : { handOff: space.handOff }),
       })),
       tabs: model.tabs.map((tab) => tab.state()),
       ...(model.active === undefined ? {} : { activeTab: model.active }),
@@ -1107,8 +1305,10 @@ export class BrowserService {
     const saved = {
       version: 1,
       active: model.active,
+      // Tabs of a Space the agent controls are its own; they are not reopened as the user's.
       tabs: model.tabs
         .filter((tab) => tab.url !== '' && tab.url !== 'about:blank')
+        .filter((tab) => model.spaces.find((s) => s.id === tab.space)?.ownership === 'user')
         .map((tab) => ({
           space: tab.space,
           url: tab.url,
@@ -1171,6 +1371,29 @@ export class BrowserService {
   }
 }
 
+/** Remembers the port of a loopback address the user opened (B2.6.2). */
+function rememberUserPort(model: SessionModel, url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+  if (!loopbackHost(parsed.hostname.replace(/^\[|\]$/g, ''))) return;
+  model.userPorts.add(portOf(parsed));
+}
+
+function tabEvent(model: SessionModel, event: TabEvent): void {
+  for (const listener of model.watchers) {
+    try {
+      listener(event);
+    } catch (error) {
+      console.warn('[browser] a tab listener failed', error);
+    }
+  }
+}
+
 function send(contents: WebContents, event: AppEvent): void {
   if (!contents.isDestroyed()) contents.send(APP_EVENT_CHANNEL, event);
 }
@@ -1185,6 +1408,25 @@ function hostOf(url: string): string {
   } catch {
     return '';
   }
+}
+
+function createShield(partitions: BrowserPartitions): Electron.WebContentsView {
+  partitions.shield();
+  const shield = new WebContentsView({
+    webPreferences: {
+      partition: SHIELD_PARTITION,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      javascript: false,
+      images: false,
+      webgl: false,
+      plugins: false,
+      spellcheck: false,
+    },
+  });
+  shield.setBackgroundColor('#00000000');
+  return shield;
 }
 
 function closeView(view: Electron.WebContentsView): void {

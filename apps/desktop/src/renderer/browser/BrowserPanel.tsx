@@ -11,7 +11,7 @@ import { GlobeIcon } from '../shell/icons.js';
 import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
 import { ToolHeaderContent } from '../shell/ToolHeaderSlot.js';
 import { useUi } from '../shell/ui.js';
-import { DeviceBar, Downloads, FindBar, PromptBar } from './bars.js';
+import { AgentBar, DeviceBar, Downloads, FindBar, PromptBar } from './bars.js';
 import { NavigationRow, TabStrip, type ChromeActions } from './chrome.js';
 import { browserCall, useBrowserState } from './use-browser.js';
 import { Viewport } from './Viewport.js';
@@ -26,6 +26,8 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
   const [focusAddress, setFocusAddress] = useState(0);
   const [claim, setClaim] = useState(false);
   const tab = state?.tabs.find((candidate) => candidate.id === state.activeTab);
+  // The Space of the shown tab: an agent's shows its control bar (B2.5).
+  const space = state?.spaces.find((candidate) => candidate.id === tab?.space);
 
   const report = useCallback(
     (error: unknown) => {
@@ -246,6 +248,18 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
         deviceOn={deviceOn}
         findOn={findOn}
       />
+      {space !== undefined && (
+        <AgentBar
+          space={space}
+          tainted={tab?.tainted === true}
+          onControl={(action) => {
+            call({ op: 'control', space: space.id, action });
+          }}
+          onReload={() => {
+            if (tab !== undefined) call({ op: 'reload', tab: tab.id, hard: false });
+          }}
+        />
+      )}
       {prompts.map((prompt) => (
         <PromptBar
           key={prompt.id}

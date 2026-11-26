@@ -52,6 +52,8 @@ export interface BrowserTabState {
   readonly failure?: { readonly url: string; readonly code: number; readonly name: string };
   /** The renderer went away (crash, out of memory, killed). */
   readonly crashed: boolean;
+  /** The agent ran script in this document (B2.5.4): reload before typing secrets. */
+  readonly tainted?: boolean;
 }
 
 export interface BrowserSpaceState {
@@ -63,6 +65,8 @@ export interface BrowserSpaceState {
   readonly running: boolean;
   /** The agent's last action label (`page.click(…, { label })`), while running. */
   readonly action?: string;
+  /** What the agent asked the user to do when it handed the Space over (B2.5.3). */
+  readonly handOff?: string;
 }
 
 /** Something the page or Chromium asks the user, shown in the panel's DOM. */
@@ -211,7 +215,15 @@ export type BrowserRequest =
   | { readonly op: 'focus'; readonly tab: string }
   | { readonly op: 'contextMenu'; readonly tab: string }
   | { readonly op: 'download'; readonly download: string; readonly action: 'cancel' | 'show' }
-  | { readonly op: 'clearData' };
+  | { readonly op: 'clearData' }
+  /**
+   * The user and an agent Space (B2.5): take it over (the agent's calls then fail with "user
+   * in control"), hand it back, or stop the agent's current `Browser` call.
+   */
+  | { readonly op: 'control'; readonly space: string; readonly action: BrowserControl };
+
+/** What the user does to an agent Space from the panel (B2.5). */
+export type BrowserControl = 'takeOver' | 'handBack' | 'stop';
 
 /** The suggestions of the address bar. */
 export interface BrowserSuggestion {

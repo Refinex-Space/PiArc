@@ -11,6 +11,8 @@ export type BrowserStorage = 'persist' | 'session';
 
 /** The partition of the agent's script host (B2): in memory, no network. */
 export const HOST_PARTITION = 'piarc-browser-host';
+/** The partition of the shield over a page the agent is driving (B2.5.1): empty, no script. */
+export const SHIELD_PARTITION = 'piarc-browser-shield';
 
 /** The key of a workspace's partition: Core's proxy is named by it. */
 export function partitionKey(workspace: string, storage: BrowserStorage): string {
@@ -48,6 +50,22 @@ export class BrowserPartitions {
     if (!this.#hosts.has(session)) {
       this.#hosts.add(session);
       setup(session);
+    }
+    return session;
+  }
+
+  /** The shield's session: refuses every request and permission. */
+  shield(): Session {
+    const session = sessions.fromPartition(SHIELD_PARTITION);
+    if (!this.#hosts.has(session)) {
+      this.#hosts.add(session);
+      session.webRequest.onBeforeRequest((_details, callback) => {
+        callback({ cancel: true });
+      });
+      session.setPermissionRequestHandler((_contents, _permission, callback) => {
+        callback(false);
+      });
+      session.setPermissionCheckHandler(() => false);
     }
     return session;
   }

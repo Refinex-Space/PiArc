@@ -347,6 +347,25 @@ testkit 的假客户端实现 `BrowserClient`：订阅 `core/browser`，按场�
 8. B5：`piarc-browser-import`、导入流程与记录、设置页补全、性能探针、Windows 交叉 Clippy 与 CI。验证：`cargo test -p piarc-browser-import`、L4 `browser-import`、`node scripts/perf/run.mjs --lane nightly --only browser-*`、Windows 交叉 Clippy。
 9. 收尾：`npm run verify` 全量、`dev-flow:spec-reviewer` 对照本文复核、ego-browser 实际操作（本地环境与测试数据）、交付说明（含 R3、R4、R6 保留风险）。
 
+## 8. 实施中的偏差与补充（2026-11-26）
+
+| 条目 | 设计 | 实际 | 原因 |
+|---|---|---|---|
+| B1.3.3 | 用户标签的 JS 对话框显示在 `#browser-dialog` | 用户标签沿用 Electron 的原生对话框 | spike：附加 CDP 后 `Page.javascriptDialogOpening` 能收到，但 Electron 仍弹原生框；`disableDialogs` 让 `confirm()` 恒为 false、`prompt()` 不可用。智能体的标签由 SDK 经 CDP 应答 |
+| B2.1.5 | 无客户端时答 `browserUnavailable` | `hostUnavailable`，`details.reason` 为 `browserClient` | 沿用已有错误类别，不新增；Agent Host 据此给模型"浏览器不可用"的结果 |
+| B2.1.1、4.6 | `tests/l3-allowlist.yaml` 登记 `Browser` | 不登记 | L3 的 PiArc 侧没有桌面客户端，`Browser` 不出现在请求里；登记一条永不匹配的条目会让 allowlist 检查失败 |
+| B2.1.4 | 超时后 `timeoutMs + 2 s` 内返回 | 主进程在 `timeoutMs` 结束宿主并答复（带已打印的输出，代码 `PIARC_TIMEOUT`）；Core 自己在 `timeoutMs + 2 s` 兜底 | 让模型拿到超时前的输出 |
+| B2.5.1 | 遮罩视图挡住用户输入 | 运行中的智能体 Space 显示在面板时，页面上方有一层透明、不运行脚本、不发请求的视图（独立分区）接住指针；按键仍归焦点所在（用户在面板操作时焦点在面板）；控制条写明"接管后才能自己操作页面" | 点击遮罩的提示改由控制条常显 |
+| B2.5.2 | 停止只取消当前调用 | 一致：主进程结束宿主，Core 收到代码 `PIARC_STOPPED` 的结果，回合继续 | — |
+| B2.6.2 | 本会话进程树正在监听的端口自动放行 | 暂只放行用户本人在面板里打开过的本机端口；其他本机端口走站点卡（本机地址的卡没有"总是允许"） | 端口所有权与启动配置一起在 B4 做 |
+| B2.6.3 | Auto 模式送审 | Auto 模式下站点卡交给用户 | 审查模型只判断工具调用，站点访问属于已允许的调用的一部分 |
+| B2.6.3 | — | 规则 `Browser(domain:…)` 的匹配与 `WebFetch(domain:…)` 相同；裸 `Browser` 的 allow 等于放行所有站点（与 `WebFetch` 一致），deny 关掉工具 | 补充 |
+| B2.7.1、ADR-0093 | 图片经短期预览地址显示 | 截图由 Core 存为会话 blob（SHA-256 命名），transcript 条目 `browser` 带 `images[]`；渲染进程经 `sessionImage` 取得 `piarc-document://session-images/<uuid>`，与 Markdown 图片预览同样的沙箱响应头，渲染进程 CSP 不变 | 补充 |
+| 4.5 | SDK 保留 v1 的驱动 | 只移植 v2 API；v1 驱动与只服务 v1 的函数不移植 | 只有 v1 助手会用到，移植就是死代码（`src/browser-host/AGENTS.md`） |
+| 4.5 | 视口溢出提示 | 由主进程快照打印，SDK 的同名提示去掉 | 避免打印两次；快照的版本不在页面里运行脚本，对话框打开时也能用 |
+
+尚未完成（B2 收尾前补齐）：上传与下载经 Core（B2.6.6）、接管时的脚本痕迹提示（B2.5.4）、Space 变化的提醒（B2.7.3）、L2 假客户端场景（5.2）。
+
 ## 附录：评审裁决（2026-11-26）
 
 | # | 意见 | 来源 | 决定 | 理由 |
