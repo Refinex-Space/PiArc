@@ -947,8 +947,8 @@
   flex: none;
   flex-direction: column;
   gap: var(--piarc-space-1);
+  /* No rule above it: the message area continues the file list. */
   padding: var(--piarc-space-2);
-  border-top: 1px solid var(--piarc-border-subtle);
 }
 
 .git-message-field {

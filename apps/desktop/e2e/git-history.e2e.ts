@@ -330,3 +330,50 @@ test('focused text fields in the Git tool draw one rounded edge', async ({
   await rounded('git-commit-message');
   await screenshots(page, info, 'git-focus-commit-message');
 });
+
+/**
+ * The header's "View options" menu opens right under its button, right edges aligned; in the
+ * Commit view "Amend the last commit" sits above the message, with no rule above them.
+ */
+test('the Git header menu opens under its button, and amend sits above the message', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
+  const { ws } = await openSession(app, page, workspaces, 'git-menu', 'git-start', 'Start.', {
+    'src/.keep': '',
+  });
+  await makeRepository(ws);
+  await idle(page);
+  await openGit(page);
+  for (const view of ['changes', 'commit'] as const) {
+    await page.getByTestId(`git-view-${view}`).click();
+    const button = page.getByTestId('git-menu');
+    await button.click();
+    const popup = page.getByTestId('git-menu-popup');
+    await expect(popup).toBeVisible();
+    const [anchor, menu] = await Promise.all([button.boundingBox(), popup.boundingBox()]);
+    if (anchor === null || menu === null) throw new Error('the button or the menu has no box');
+    expect(
+      Math.abs(menu.x + menu.width - (anchor.x + anchor.width)),
+      `${view}: right edges`,
+    ).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(menu.y - (anchor.y + anchor.height + 4)),
+      `${view}: just below`,
+    ).toBeLessThanOrEqual(2);
+    await page.screenshot({ path: info.outputPath(`git-menu-${view}.png`) });
+    await page.keyboard.press('Escape');
+  }
+  const [amend, message] = await Promise.all([
+    page.getByTestId('git-amend').boundingBox(),
+    page.getByTestId('git-commit-message').boundingBox(),
+  ]);
+  if (amend === null || message === null) throw new Error('amend or the message has no box');
+  expect(amend.y + amend.height).toBeLessThanOrEqual(message.y);
+  expect(Math.abs(amend.x - message.x)).toBeLessThanOrEqual(12);
+  expect(
+    await page.getByTestId('git-message').evaluate((e) => getComputedStyle(e).borderTopStyle),
+  ).toBe('none');
+  await screenshots(page, info, 'git-commit-amend');
+});

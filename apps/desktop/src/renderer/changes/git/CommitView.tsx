@@ -804,6 +804,23 @@ function MessageBox({
   const stale = generatedFor !== undefined && generatedFor !== key && generating === undefined;
   return (
     <div className="git-message" data-testid="git-message">
+      {/* Above the message, at its start: it decides what the message is for. */}
+      {emptyRepo ? null : (
+        <label className="git-amend">
+          <input
+            type="checkbox"
+            checked={amend}
+            data-testid="git-amend"
+            onChange={(event) => {
+              onAmend(event.target.checked);
+            }}
+          />
+          {t('git.commit.amend')}
+          {amend && pushedHead ? (
+            <span className="git-amend-warning">{t('git.commit.amendPushed')}</span>
+          ) : null}
+        </label>
+      )}
       <div className="git-message-field">
         <textarea
           ref={box}
@@ -881,22 +898,6 @@ function MessageBox({
           </span>
         )}
       </div>
-      {emptyRepo ? null : (
-        <label className="git-amend">
-          <input
-            type="checkbox"
-            checked={amend}
-            data-testid="git-amend"
-            onChange={(event) => {
-              onAmend(event.target.checked);
-            }}
-          />
-          {t('git.commit.amend')}
-          {amend && pushedHead ? (
-            <span className="git-amend-warning">{t('git.commit.amendPushed')}</span>
-          ) : null}
-        </label>
-      )}
       {confirmDetached ? (
         <p className="git-banner" role="alert" data-testid="git-detached-warning">
           {t('git.commit.detached')}

@@ -711,8 +711,7 @@ function DisplayMenu({
         aria-expanded={menu.open !== null}
         data-testid="git-menu"
         onClick={(event) => {
-          const box = event.currentTarget.getBoundingClientRect();
-          menu.openAt(box.right - 240, box.bottom + 4, event.currentTarget);
+          menu.openBelowEnd(event.currentTarget);
         }}
       >
         <MoreVerticalIcon />

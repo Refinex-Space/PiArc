@@ -40,6 +40,8 @@ interface MenuPoint {
   readonly x: number;
   readonly y: number;
   readonly above?: boolean;
+  /** `x` is the menu's right edge (a menu opened under a button at the end of a toolbar). */
+  readonly end?: boolean;
   /** The other edge and usable width for a submenu beside its parent. */
   readonly cascade?: {
     readonly leftEdge: number;
@@ -62,6 +64,11 @@ export function useMenu() {
     openAbove: (button: HTMLElement) => {
       const rect = button.getBoundingClientRect();
       setOpen({ x: rect.left, y: rect.top - 4, above: true });
+    },
+    /** Under `button`, the menu's right edge on the button's, whatever the menu's width. */
+    openBelowEnd: (button: HTMLElement) => {
+      const rect = button.getBoundingClientRect();
+      setOpen({ x: rect.right, y: rect.bottom + 4, end: true, anchor: button });
     },
     close,
   };
@@ -209,7 +216,7 @@ export function MenuPopup({
       if (at.anchor?.isConnected && event.type === 'scroll') {
         if (event.target instanceof win.Element && !event.target.contains(at.anchor)) return;
         const rect = at.anchor.getBoundingClientRect();
-        setLeft(rect.left);
+        setLeft(at.end === true ? rect.right : rect.left);
         setTop(rect.bottom);
         return;
       }
@@ -291,7 +298,7 @@ export function MenuPopup({
   };
   // Percentages in translate resolve against the rendered menu, including gaps and wrapped hints.
   const style: CSSProperties = {
-    transform: `translate(clamp(var(--menu-edge), ${String(left)}px, calc(100vw - 100% - var(--menu-edge))), clamp(var(--menu-edge), calc(${String(top)}px - ${at.above === true ? '100%' : '0%'}), calc(100vh - 100% - var(--menu-edge))))`,
+    transform: `translate(clamp(var(--menu-edge), calc(${String(left)}px - ${at.end === true ? '100%' : '0%'}), calc(100vw - 100% - var(--menu-edge))), clamp(var(--menu-edge), calc(${String(top)}px - ${at.above === true ? '100%' : '0%'}), calc(100vh - 100% - var(--menu-edge))))`,
     ...(at.cascade ? { maxWidth: `min(23rem, ${String(at.cascade.maxWidth)}px)` } : {}),
   };
   const ChildMenu = child?.replacesParent ? CompactSubmenu : MenuPopup;
