@@ -19,6 +19,15 @@ export type ProtocolValue =
   | BrowserRunAnswer
   | BrowserSiteRequest
   | BrowserSiteDecision
+  | BrowserFilesRequest
+  | BrowserFilesResult
+  | BrowserStateUpdate
+  | BrowserStateSummary
+  | BrowserStateSpace
+  | BrowserStateController
+  | BrowserStateTab
+  | LaunchView
+  | DevServerStart
   | GitCall
   | GitStatus
   | GitProbe
@@ -931,7 +940,9 @@ export type ReminderType =
   | 'contextRestore'
   | 'mcpChanged'
   | 'skillsChanged'
-  | 'outputStyle';
+  | 'outputStyle'
+  | 'browserVerify'
+  | 'browserState';
 /**
  * Why a review has no answer (T46).
  */
@@ -989,7 +1000,7 @@ export type OutputStream = 'stdout' | 'stderr';
 /**
  * What a task runs.
  */
-export type TaskKind = 'command' | 'subagent' | 'monitor' | 'terminal';
+export type TaskKind = 'command' | 'subagent' | 'monitor' | 'terminal' | 'devServer';
 /**
  * Where a task stands. Every status but `running` is final.
  */
@@ -1352,11 +1363,104 @@ export type BrowserClientEvent =
        */
       runId: string;
       type: 'cancel';
+    }
+  | {
+      /**
+       * Ports the project's launch configurations declare.
+       */
+      declared: number[];
+      /**
+       * Listening ports, by port.
+       */
+      ports: ListeningPort[];
+      /**
+       * The main session.
+       */
+      sessionId: SessionId;
+      type: 'ports';
+      /**
+       * Its workspace (main checkout path).
+       */
+      workspace: string;
+    }
+  | {
+      /**
+       * The servers, in start order.
+       */
+      servers: DevServerState[];
+      /**
+       * The main session.
+       */
+      sessionId: SessionId;
+      type: 'servers';
+      /**
+       * Its workspace (main checkout path).
+       */
+      workspace: string;
     };
+/**
+ * Why a server failed.
+ */
+export type DevServerFailure = 'exited' | 'timeout' | 'spawn';
+/**
+ * Who started a server.
+ */
+export type DevServerStarter = 'user' | 'agent';
+/**
+ * Where a development server stands.
+ */
+export type DevServerStatus = 'starting' | 'ready' | 'failed' | 'stopped';
 /**
  * How long an allowing answer holds.
  */
 export type BrowserSiteScope = 'run' | 'session';
+/**
+ * A file request of the agent's browser (Core API, `browserFiles`, design addendum B2.6.6):
+ * stage files for a page's file input, or save a finished download.
+ */
+export type BrowserFilesRequest =
+  | {
+      op: 'stage';
+      /**
+       * 1 to 20 files.
+       */
+      paths: string[];
+      /**
+       * The session of the running `Browser` call.
+       */
+      sessionId: SessionId;
+      /**
+       * The running `Browser` call.
+       */
+      toolCallId: string;
+    }
+  | {
+      op: 'save';
+      /**
+       * Where to save it (absolute, or relative to the working directory); must not exist.
+       */
+      path: string;
+      /**
+       * The session of the running `Browser` call.
+       */
+      sessionId: SessionId;
+      /**
+       * The download's file.
+       */
+      source: string;
+      /**
+       * The running `Browser` call.
+       */
+      toolCallId: string;
+    };
+/**
+ * Who controls a task space.
+ */
+export type BrowserStateController = 'agent' | 'user';
+/**
+ * The file a configuration comes from.
+ */
+export type LaunchSource = 'piarc' | 'claude';
 /**
  * A request of `gitRequest`.
  */
@@ -7690,7 +7794,9 @@ export interface SessionRemindParams {
    */
   text: string;
   /**
-   * What it tells the model: `backgroundTask`, or `monitorOutput` (T32).
+   * What it tells the model: `backgroundTask`, `monitorOutput` (T32), or `browserVerify`
+   * (ADR-0092; `text` then lists the changed files, one per line, and `source` names the
+   * server).
    */
   type: ReminderType;
   /**
@@ -10813,6 +10919,68 @@ export interface SubagentUsage {
   tokens: UsageTokens;
 }
 /**
+ * A TCP port a process tree of a session listens on.
+ */
+export interface ListeningPort {
+  /**
+   * What the task runs.
+   */
+  kind: TaskKind;
+  /**
+   * The port.
+   */
+  port: number;
+  /**
+   * The background task whose process tree listens on it.
+   */
+  taskId: string;
+  /**
+   * The task's title (the command, the configuration's name).
+   */
+  title: string;
+}
+/**
+ * One server a session started.
+ */
+export interface DevServerState {
+  /**
+   * The exit code, when it exited.
+   */
+  exitCode?: number | null;
+  /**
+   * Why it failed.
+   */
+  failure?: DevServerFailure | null;
+  /**
+   * The last lines of its output when it failed (at most 20).
+   */
+  log?: string[];
+  /**
+   * The configuration's name.
+   */
+  name: string;
+  /**
+   * The port it was started on (after `autoPort`).
+   */
+  port: number;
+  /**
+   * Who started it.
+   */
+  startedBy: DevServerStarter;
+  /**
+   * Where it stands.
+   */
+  status: DevServerStatus;
+  /**
+   * Its background task.
+   */
+  taskId?: string | null;
+  /**
+   * The address to open.
+   */
+  url: string;
+}
+/**
  * How the desktop client answers a run (Core API).
  */
 export interface BrowserRunAnswer {
@@ -10880,6 +11048,206 @@ export interface BrowserSiteDecision {
    * How long an allowing answer holds; absent when refused.
    */
   scope?: BrowserSiteScope | null;
+}
+/**
+ * Core's answer to a [`BrowserFilesRequest`].
+ */
+export interface BrowserFilesResult {
+  /**
+   * Where the download was saved (`save`).
+   */
+  saved?: string | null;
+  /**
+   * The staged copies, in order (`stage`).
+   */
+  staged?: string[];
+}
+/**
+ * The browser of a main session as the agent should know it before its next request (Core
+ * API, `browserState`, design addendum B2.7.3): the desktop client sends it when the user
+ * changed something between the agent's calls; Core keeps the newest as one `browserState`
+ * reminder.
+ */
+export interface BrowserStateUpdate {
+  /**
+   * The main session.
+   */
+  sessionId: SessionId;
+  /**
+   * At most 4.
+   */
+  spaces: BrowserStateSpace[];
+  /**
+   * Tabs of the user's own Space (only counted).
+   */
+  userTabs: number;
+}
+/**
+ * One task space in a [`BrowserStateSummary`].
+ */
+export interface BrowserStateSpace {
+  /**
+   * Who controls it now.
+   */
+  controlledBy: BrowserStateController;
+  /**
+   * The task space's number (`taskSpace(id)`).
+   */
+  id: number;
+  /**
+   * Its name, at most 64 characters.
+   */
+  name: string;
+  /**
+   * How many tabs it has.
+   */
+  tabCount: number;
+  /**
+   * Its tabs while the agent controls it (at most 20, titles cut to 80 characters); empty
+   * while the user does.
+   */
+  tabs?: BrowserStateTab[];
+}
+/**
+ * One tab of a [`BrowserStateSpace`].
+ */
+export interface BrowserStateTab {
+  title: string;
+  url: string;
+}
+/**
+ * The text of a `browserState` reminder (JSON): the session's task spaces and how many tabs
+ * the user has of their own. Titles come from pages and are data.
+ */
+export interface BrowserStateSummary {
+  /**
+   * At most 4.
+   */
+  spaces: BrowserStateSpace[];
+  /**
+   * Tabs of the user's own Space (only counted).
+   */
+  userTabs: number;
+}
+/**
+ * What `launchConfigs` answers for a session.
+ */
+export interface LaunchView {
+  /**
+   * `autoVerify` (default true): the agent is reminded to look at the page after it changes
+   * a running server's front-end files.
+   */
+  autoVerify: boolean;
+  /**
+   * The configurations, `.piarc` ones first, in file order.
+   */
+  configs: LaunchConfigView[];
+  /**
+   * Problems of the launch files.
+   */
+  issues?: LaunchIssue[];
+  /**
+   * The servers the session started.
+   */
+  servers?: DevServerState[];
+  /**
+   * The project is trusted: its configurations may run (ADR-0025).
+   */
+  trusted: boolean;
+}
+/**
+ * One launch configuration as the start page shows it.
+ */
+export interface LaunchConfigView {
+  /**
+   * Another free port is taken when this one is busy.
+   */
+  autoPort?: boolean;
+  /**
+   * The command line, quoted for reading.
+   */
+  command: string;
+  /**
+   * The directory it runs in.
+   */
+  cwd: string;
+  /**
+   * SHA-256 of what it runs (command, arguments, directory, environment, port), lowercase
+   * hex: the agent's start is approved per fingerprint.
+   */
+  fingerprint: string;
+  /**
+   * Its name, unique in the project.
+   */
+  name: string;
+  /**
+   * The port it serves on (`port`, the `url`'s, `env.PORT`, `--port`/`-p`, or 3000).
+   */
+  port: number;
+  /**
+   * The file it comes from.
+   */
+  source: LaunchSource;
+  /**
+   * The address to open once it is ready.
+   */
+  url: string;
+}
+/**
+ * A problem in a launch file.
+ */
+export interface LaunchIssue {
+  /**
+   * 1-based column, when the problem has a place.
+   */
+  column?: number | null;
+  /**
+   * The file, relative to the project with `/`.
+   */
+  file: string;
+  /**
+   * 1-based line, when the problem has a place.
+   */
+  line?: number | null;
+  /**
+   * What is wrong.
+   */
+  message: string;
+}
+/**
+ * `startDevServer`'s request.
+ */
+export interface DevServerStart {
+  /**
+   * Set when the agent's running `Browser` call starts it: the first start of a
+   * configuration's fingerprint in the session asks the user.
+   */
+  agent?: DevServerAgent | null;
+  /**
+   * The configuration.
+   */
+  name: string;
+  /**
+   * The main session whose panel or agent starts it.
+   */
+  sessionId: SessionId;
+  /**
+   * Answer once the server is ready or failed instead of once it started.
+   */
+  wait?: boolean;
+}
+/**
+ * The `Browser` call that starts a server.
+ */
+export interface DevServerAgent {
+  /**
+   * The session of the call (a subagent's own id for a subagent).
+   */
+  sessionId: SessionId;
+  /**
+   * The running `Browser` call; the question goes away with it.
+   */
+  toolCallId: string;
 }
 /**
  * One call of `gitRequest`: an optional operation id (for progress and cancel) and the

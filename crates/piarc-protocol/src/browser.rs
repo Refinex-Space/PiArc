@@ -120,6 +120,33 @@ pub enum BrowserClientEvent {
         /// The run's id.
         run_id: String,
     },
+    /// The TCP ports a session's background tasks, terminals and development servers listen
+    /// on, and the ports its launch configurations declare (ADR-0092 rule 5): the agent's
+    /// pages may reach them (B2.6.2) and the start page lists them (B4.4). A complete
+    /// snapshot, sent when it changes.
+    #[serde(rename_all = "camelCase")]
+    Ports {
+        /// The main session.
+        session_id: SessionId,
+        /// Its workspace (main checkout path).
+        workspace: String,
+        /// Listening ports, by port.
+        ports: Vec<crate::dev_server::ListeningPort>,
+        /// Ports the project's launch configurations declare.
+        #[schemars(with = "Vec<u64>")]
+        declared: Vec<u16>,
+    },
+    /// The development servers a session started and where they stand (ADR-0092). A
+    /// complete snapshot, sent when it changes.
+    #[serde(rename_all = "camelCase")]
+    Servers {
+        /// The main session.
+        session_id: SessionId,
+        /// Its workspace (main checkout path).
+        workspace: String,
+        /// The servers, in start order.
+        servers: Vec<crate::dev_server::DevServerState>,
+    },
 }
 
 /// How the desktop client answers a run (Core API).
@@ -209,4 +236,106 @@ pub struct BrowserSiteDecision {
     /// How long an allowing answer holds; absent when refused.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope: Option<BrowserSiteScope>,
+}
+
+/// A file request of the agent's browser (Core API, `browserFiles`, design addendum B2.6.6):
+/// stage files for a page's file input, or save a finished download.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "op", rename_all = "camelCase")]
+pub enum BrowserFilesRequest {
+    /// Copy `paths` (absolute, or relative to the session's working directory) for an upload.
+    #[serde(rename_all = "camelCase")]
+    Stage {
+        /// The session of the running `Browser` call.
+        session_id: SessionId,
+        /// The running `Browser` call.
+        tool_call_id: String,
+        /// 1 to 20 files.
+        paths: Vec<String>,
+    },
+    /// Save the finished download `source` (in the session's downloads) to `path`.
+    #[serde(rename_all = "camelCase")]
+    Save {
+        /// The session of the running `Browser` call.
+        session_id: SessionId,
+        /// The running `Browser` call.
+        tool_call_id: String,
+        /// The download's file.
+        source: String,
+        /// Where to save it (absolute, or relative to the working directory); must not exist.
+        path: String,
+    },
+}
+
+/// Core's answer to a [`BrowserFilesRequest`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserFilesResult {
+    /// The staged copies, in order (`stage`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub staged: Vec<String>,
+    /// Where the download was saved (`save`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved: Option<String>,
+}
+
+/// The browser of a main session as the agent should know it before its next request (Core
+/// API, `browserState`, design addendum B2.7.3): the desktop client sends it when the user
+/// changed something between the agent's calls; Core keeps the newest as one `browserState`
+/// reminder.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserStateUpdate {
+    /// The main session.
+    pub session_id: SessionId,
+    /// What the reminder says.
+    #[serde(flatten)]
+    pub summary: BrowserStateSummary,
+}
+
+/// The text of a `browserState` reminder (JSON): the session's task spaces and how many tabs
+/// the user has of their own. Titles come from pages and are data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserStateSummary {
+    /// At most 4.
+    pub spaces: Vec<BrowserStateSpace>,
+    /// Tabs of the user's own Space (only counted).
+    pub user_tabs: u64,
+}
+
+/// One task space in a [`BrowserStateSummary`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserStateSpace {
+    /// The task space's number (`taskSpace(id)`).
+    pub id: u64,
+    /// Its name, at most 64 characters.
+    pub name: String,
+    /// Who controls it now.
+    pub controlled_by: BrowserStateController,
+    /// Its tabs while the agent controls it (at most 20, titles cut to 80 characters); empty
+    /// while the user does.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tabs: Vec<BrowserStateTab>,
+    /// How many tabs it has.
+    pub tab_count: u64,
+}
+
+/// Who controls a task space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum BrowserStateController {
+    /// The agent (ego's `agent`).
+    Agent,
+    /// The user took it over or the agent handed it to them (`agentDelegatedToUser`, `user`).
+    User,
+}
+
+/// One tab of a [`BrowserStateSpace`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserStateTab {
+    pub title: String,
+    pub url: String,
 }

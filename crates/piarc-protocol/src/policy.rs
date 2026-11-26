@@ -365,6 +365,12 @@ pub const NETWORK_TOOL: &str = "SandboxNetwork";
 /// script drives does.
 pub const BROWSER_SITE_TOOL: &str = "BrowserSite";
 
+/// The tool name of a development server card (ADR-0092 rule 3): the agent's `Browser` script
+/// starts a launch configuration whose fingerprint the session has not allowed. A `command`
+/// card with the command line, its directory and `sandbox: unsandboxed`; `allowSession`
+/// covers the fingerprint for the rest of the session.
+pub const BROWSER_SERVER_TOOL: &str = "BrowserServer";
+
 /// Where an approved command runs (T39).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

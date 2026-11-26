@@ -41,6 +41,8 @@ pub enum TaskKind {
     Monitor,
     /// A terminal: a shell in a PTY whose screen Core keeps (T33).
     Terminal,
+    /// A development server started from a launch configuration (ADR-0092).
+    DevServer,
 }
 
 /// Who opened a terminal task.

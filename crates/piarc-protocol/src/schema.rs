@@ -60,6 +60,13 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::browser::BrowserRunAnswer>();
     generator.subschema_for::<crate::browser::BrowserSiteRequest>();
     generator.subschema_for::<crate::browser::BrowserSiteDecision>();
+    generator.subschema_for::<crate::browser::BrowserFilesRequest>();
+    generator.subschema_for::<crate::browser::BrowserFilesResult>();
+    generator.subschema_for::<crate::browser::BrowserStateUpdate>();
+    // A `browserState` reminder's text (the Agent Host reads it).
+    generator.subschema_for::<crate::browser::BrowserStateSummary>();
+    generator.subschema_for::<crate::dev_server::LaunchView>();
+    generator.subschema_for::<crate::dev_server::DevServerStart>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

@@ -10,8 +10,9 @@
 //!   file state table are forgotten (hashes stay, so read-before-edit still holds).
 //! - `session/usage` (Agent Host → Core): the context usage after each model response and each
 //!   compaction; `session/getContextUsage` (Core → Agent Host) returns the latest.
-//! - `session/remind` (Core → Agent Host): a `backgroundTask` or `monitorOutput` reminder for
-//!   the model's next request, deduplicated by key, or waking an idle session (T32).
+//! - `session/remind` (Core → Agent Host): a `backgroundTask`, `monitorOutput` or
+//!   `browserVerify` reminder for the model's next request, deduplicated by key, or waking an
+//!   idle session (T32).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -51,6 +52,13 @@ pub enum ReminderType {
     SkillsChanged,
     /// The output style changed during the session (T37, capability `skills`).
     OutputStyle,
+    /// The agent changed front-end files a running development server serves: look at the
+    /// page (ADR-0092 rule 6, `autoVerify`).
+    BrowserVerify,
+    /// The session's browser changed between the agent's calls (design addendum B2.7.3): the
+    /// user took a Space over or handed it back, or pages moved on. Environment state, not
+    /// instructions; `text` is a JSON [`crate::browser::BrowserStateSummary`].
+    BrowserState,
 }
 
 /// One reminder of a reminder message: its type and where it came from.
@@ -160,7 +168,9 @@ pub struct SessionUsageParams {
 pub struct SessionRemindParams {
     /// The session whose model hears it.
     pub session_id: SessionId,
-    /// What it tells the model: `backgroundTask`, or `monitorOutput` (T32).
+    /// What it tells the model: `backgroundTask`, `monitorOutput` (T32), or `browserVerify`
+    /// (ADR-0092; `text` then lists the changed files, one per line, and `source` names the
+    /// server).
     #[serde(rename = "type")]
     pub kind: ReminderType,
     /// Where it came from (the task).
