@@ -396,6 +396,9 @@ testkit 的假客户端实现 `BrowserClient`：订阅 `core/browser`，按场�
 | B2.5.2 | — | `takeOverTaskSpace` 只能取回智能体自己 `handOff()` 的 Space；用户手动接管的 Space 答 `EGO_TASK_SPACE_USER_IN_CONTROL`（`manual_takeover`），等用户交还 | 补充 |
 | B2.6.7 | 长边 ≤ 1,568 px、单张 ≤ 3.75 MB、超出降质 | 主进程用 `nativeImage` 解码附件、按解码后的尺寸缩放（不信脚本报的宽高），按原类型重新编码，超过 3.75 MiB 依次降为 JPEG 85、70、55、40；请求里的 base64 至多 16 MiB，解码不了或降质后仍超限即拒绝 | 脚本能绕过 SDK 直接调用绑定 |
 | B2.7.2、§4.2 | 审计与脚本上限 | 审计行另记被拒的 CDP 方法与本次调用到过的主机（各至多 100 条、每条 256 字符，不进模型的结果）；脚本上限由 Core 按 UTF-8 字节检查（256 KiB），Agent Host 的参数 schema 以 262,144 个字符写明上限 | schema 只能数字符 |
+| B1.3.1 | 本地连接被拒时退避重试 | 回环地址也经浏览器代理（THR-16），目标拒绝连接时代理答 `502` 并带 `x-piarc-proxy-error: connection-refused`；guest 分区的 `onHeadersReceived` 认出主框架的这种答复后取消它，标签把这次失败当作 `ERR_CONNECTION_REFUSED`，沿用同样的重试 | 走代理后 Chromium 不再给出 -102 |
+| B1.4.3 | console 抽屉列出页面输出 | Electron 从自身二进制运行时（开发构建、L4）往页面里打印的 `Electron Security Warning`、`Electron Deprecation Warning` 不进抽屉 | 不是页面的输出；发布构建本来没有 |
+| B2.6.6 | 下载以 CDP 事件报给 SDK | CDP 代理丢掉 Chromium 自己的 `Page.download*`、`Browser.download*` 事件，SDK 只看到主进程用暂存 guid 发的；`saveAs()` 遇到仍在下载的文件时主进程等它结束（至多 2 分钟，仍受本次调用的超时约束） | 两套 guid 会让保存找不到下载 |
 
 ## 附录：评审裁决（2026-11-26）
 

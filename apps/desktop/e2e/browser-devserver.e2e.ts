@@ -144,7 +144,7 @@ test('runs a launch configuration from the start page, opens it, and stop ends i
   // It is a background task of kind devServer (B4.3).
   await page.getByTestId('tool-more').click();
   await page.getByTestId('tool-background-tasks').click();
-  await expect(page.getByText('Development server').first()).toBeVisible();
+  await expect(page.getByText(/Development server|开发服务器/u).first()).toBeVisible();
   await page.keyboard.press('Escape');
 
   await server(page, 'web').getByTestId('browser-server-open').click();
@@ -240,7 +240,10 @@ test('a port a session terminal listens on is announced once, with a dot while t
   await page.keyboard.type(`node server.js --port ${String(port)}`);
   await page.keyboard.press('Enter');
   await expect.poll(() => answers(port), { timeout: 15_000 }).toBe(true);
-  await page.getByTestId('tool-preview').click();
+  // The preview button toggles the tool: open it only when it is not showing.
+  if (!(await page.getByTestId('tile-preview').isVisible())) {
+    await page.getByTestId('tool-preview').click();
+  }
   await page.getByTestId('browser-new-tab').click();
   await expect(
     page.locator(`[data-testid="browser-service"][data-port="${String(port)}"]`),
@@ -397,7 +400,8 @@ test('"Open HTML file…" opens a workspace file, and an outside file only until
   const granted = (await observe(app, id)).tabs[1]?.pageUrl ?? '';
   expect(granted).toMatch(/^piarc-browse:\/\/[0-9a-f]{32}\/index\.html$/);
   // Closing its tab ends the grant: the same address no longer loads the file.
-  await page.getByTestId('browser-tab').nth(1).getByRole('button').click();
+  // The close control is for the pointer (keys close a focused tab with Delete).
+  await page.getByTestId('browser-tab').nth(1).getByTestId('browser-tab-close').click();
   await expect(page.getByTestId('browser-tab')).toHaveCount(1);
   await page.getByTestId('browser-new-tab').click();
   await go(page, granted);

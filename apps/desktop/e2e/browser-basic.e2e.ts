@@ -111,7 +111,13 @@ test('opens local pages in tabs on the panel viewport, follows links and popups'
       return tabs.map((tab) => tab.host);
     })
     .toEqual(['panel', 'parking']);
-  await page.getByTestId('browser-tab').nth(1).getByRole('button').click();
+  // The close control is for the pointer (keys close a focused tab with Delete).
+  await page.getByTestId('browser-tab').nth(1).getByTestId('browser-tab-close').click();
+  await expect(page.getByTestId('browser-tab')).toHaveCount(1);
+  await page.getByTestId('browser-new-tab').click();
+  await expect(page.getByTestId('browser-tab')).toHaveCount(2);
+  await page.getByTestId('browser-tab').nth(1).focus();
+  await page.keyboard.press('Delete');
   await expect(page.getByTestId('browser-tab')).toHaveCount(1);
 });
 

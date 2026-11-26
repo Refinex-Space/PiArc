@@ -493,7 +493,10 @@ test('a Browser call with its screenshot, and the preview console', async ({
   await expect(card.getByTestId('browser-shot')).toHaveAttribute('data-state', 'shown');
   await checkState(page, 'row:browser');
   // B1.1.1, B4.5: the start page with a launch configuration, and a server that failed.
-  await page.getByTestId('tool-preview').click();
+  // The agent's call may have opened the preview already; its button toggles the tool.
+  if (!(await page.getByTestId('tile-preview').isVisible())) {
+    await page.getByTestId('tool-preview').click();
+  }
   await expect(page.getByTestId('browser-start')).toBeVisible();
   const broken = page.locator('[data-testid="browser-server"][data-name="broken"]');
   await expect(broken).toBeVisible();

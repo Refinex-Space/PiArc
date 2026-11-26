@@ -139,7 +139,11 @@ test('THR-17 imports chosen sites after the native confirmation; the page never 
   await openPreviewAt(page, origin);
   await expect(page.getByTestId('browser-tab')).toHaveText(['none']);
   await page.getByTestId('browser-site').click();
-  await page.getByRole('menuitem', { name: 'Import this site’s sign-ins from Chrome…' }).click();
+  await page
+    .getByRole('menuitem', {
+      name: /Import this site’s sign-ins from Chrome…|从 Chrome 导入此站点的登录…/u,
+    })
+    .click();
   const dialog = page.getByTestId('chrome-import-dialog');
   await expect(dialog).toBeVisible();
   await dialog.getByTestId('chrome-import-profile').selectOption('Default');
@@ -175,8 +179,10 @@ test('THR-17 imports chosen sites after the native confirmation; the page never 
   const result = dialog.getByTestId('chrome-import-result');
   await expect(result).toBeVisible({ timeout: 30_000 });
   const site = result.locator('[data-site="127.0.0.1"]');
-  await expect(site).toContainText('1 cookie imported');
-  await expect(site.locator('[data-reason="expired"]')).toContainText('1 skipped: expired');
+  await expect(site).toContainText(/1 cookie imported|已导入 1 条 cookie/u);
+  await expect(site.locator('[data-reason="expired"]')).toContainText(
+    /1 skipped: expired|跳过 1 条：已过期/u,
+  );
   await dialog.getByTestId('chrome-import-close').click();
   await expect(page.getByTestId('browser-import-entry')).toHaveCount(1);
   await expect(page.getByTestId('browser-import-entry')).toContainText('127.0.0.1');
@@ -226,8 +232,11 @@ test('the browser settings page saves user-level settings', async ({ app, page, 
   const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-browser').click();
   await expect(settings.getByTestId('browser-page')).toBeVisible();
-  await settings.getByTestId('browser-agent-enabled').uncheck();
-  await settings.getByTestId('browser-devtools-right').check({ force: true });
+  // The box follows the saved preference, so it changes once the write comes back.
+  await settings.getByTestId('browser-agent-enabled').click();
+  await expect(settings.getByTestId('browser-agent-enabled')).not.toBeChecked();
+  await settings.getByTestId('browser-devtools-right').click({ force: true });
+  await expect(settings.getByTestId('browser-devtools-right')).toBeChecked();
   await settings.getByTestId('browser-search-engine').selectOption('duckduckgo');
   const timeout = settings.getByTestId('browser-approval-timeout');
   await timeout.fill('45');

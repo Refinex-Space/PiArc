@@ -282,8 +282,8 @@ test('B1.4.2, B1.3.2: the agent’s device shows in the panel; its pages get no 
   test.setTimeout(120_000);
   const { id } = await openSession(app, page, workspaces, 'Browser device', 't18-chat', 'Hello');
   await idle(page);
-  await page.getByTestId('tool-preview').click();
-  await expect(page.getByTestId('tile-preview')).toBeVisible();
+  // The user opened the local server first, so its port is the session's (B2.6.2).
+  await userOpens(page, `${origin}/`);
   const emulated = await run(
     app,
     id,
@@ -291,8 +291,9 @@ test('B1.4.2, B1.3.2: the agent’s device shows in the panel; its pages get no 
 const page = task.page("p1");
 await page.goto(${JSON.stringify(`${origin}/`)});
 await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
-await page.waitForFunction(() => innerWidth === 390);
-console.log({ width: await page.evaluate(() => innerWidth), space: task.spaceId });
+// A mobile device without a viewport tag lays out at 980 px; its screen is the device.
+await page.waitForFunction(() => screen.width === 390);
+console.log({ width: await page.evaluate(() => screen.width), space: task.spaceId });
 let wrong = "accepted";
 try {
   await page.cdp("Emulation.setDeviceMetricsOverride", { width: 10, height: 10, deviceScaleFactor: 1, mobile: false });
@@ -311,6 +312,7 @@ console.log(await page.evaluate(() => new Promise((done) => {
   await expect(page.getByTestId('browser-permission')).toBeHidden();
   const space = /space: (\d+)/.exec(emulated.output)?.[1];
   // The panel shows the agent's device with its badge until the user resets it.
+  await page.locator('[data-testid="browser-tab"][data-opened-by="agent"]').click();
   await expect(page.getByTestId('browser-device-agent')).toBeVisible();
   await page.getByTestId('browser-device-reset').click();
   await expect(page.getByTestId('browser-device-agent')).toBeHidden();
@@ -318,7 +320,7 @@ console.log(await page.evaluate(() => new Promise((done) => {
     app,
     id,
     `const task = await taskSpace(${String(space)});
-console.log({ width: await task.page("p1").evaluate(() => innerWidth) });
+console.log({ width: await task.page("p1").evaluate(() => screen.width) });
 await task.finish({ keep: [] });`,
   );
   expect(reset.output).not.toContain('width: 390');

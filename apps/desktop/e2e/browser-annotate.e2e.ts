@@ -62,6 +62,19 @@ test('annotating freezes the page, draws, numbers and goes to the input', async 
     // Frozen: the page's view is hidden while the canvas shows its screenshot.
     await expect.poll(async () => (await observe(app, id)).tabs[0]?.visible).toBe(false);
     const canvas = page.getByTestId('browser-annotate-canvas');
+    // The whole screenshot fits above the comment list: nothing to draw on is out of view.
+    const fits = await canvas.evaluate((element) => {
+      const stage = element.closest('.browser-annotate-stage')?.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      return (
+        stage !== undefined &&
+        box.top >= stage.top - 1 &&
+        box.bottom <= stage.bottom + 1 &&
+        box.left >= stage.left - 1 &&
+        box.right <= stage.right + 1
+      );
+    });
+    expect(fits).toBe(true);
 
     // Rectangle (1) in red, thin.
     await page.getByTestId('browser-annotate-width-2').click();

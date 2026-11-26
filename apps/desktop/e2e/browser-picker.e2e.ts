@@ -133,7 +133,7 @@ test('page scripts cannot pick; Esc ends picking; picks go to the input as one g
     // The page menu's "Add to Conversation" adds the element under the pointer (B1.3.8).
     await recordMenus(app);
     await rightClickInPage(app, server.origin, '#cancel');
-    await runMenuItem(app, 'Add to Conversation');
+    await runMenuItem(app, ['Add to Conversation', '加入对话']);
     await expect(page.getByTestId('browser-pick-card')).toHaveCount(3);
     await expect(page.getByTestId('browser-pick-card').nth(2)).not.toContainText('steal');
     await page.screenshot({ path: info.outputPath('picker-tray.png') });
@@ -147,6 +147,8 @@ test('page scripts cannot pick; Esc ends picking; picks go to the input as one g
     await expect(page.getByTestId('composer-input')).toBeFocused();
     await page.getByTestId('pending-browser-context-toggle').click();
     await expect(page.getByTestId('pending-browser-context-items').locator('li')).toHaveCount(3);
+    // The toggle has the focus now: back to the input to write the message.
+    await page.getByTestId('composer-input').click();
     await page.keyboard.type('Review these');
     await page.keyboard.press('Enter');
     await expect
@@ -263,7 +265,7 @@ test('THR-11 a picked element with markup in its id and text shows it as text', 
         '<!doctype html><title>Picker xss</title>',
         `<button id="${markup.replaceAll('"', '&quot;')}" aria-label="<svg onload=alert(1)>">`,
         '&lt;script&gt;window.__piarcXssSentinel="text"&lt;/script&gt;</button>',
-        // A second button: the selector then has to name the first one by its id.
+        // A second button: the selector has to tell the two apart.
         '<button>Other</button>',
       ].join(''),
     },
@@ -276,10 +278,16 @@ test('THR-11 a picked element with markup in its id and text shows it as text', 
     await clickInPage(app, server.origin, 'button');
     const card = page.getByTestId('browser-pick-card');
     await expect(card).toHaveCount(1);
-    await expect(card.getByTestId('browser-pick-selector')).toContainText('<img');
+    // An id with markup never becomes part of a selector (only plain identifiers do).
+    await expect(card.getByTestId('browser-pick-selector')).toHaveText('button:nth-of-type(1)');
     await page.getByTestId('browser-picks-add').click();
     const composer = page.getByTestId('composer');
     await expect(composer).toBeVisible();
+    // The element's name, markup included, is shown as text in the message's context.
+    await page.getByTestId('pending-browser-context-toggle').click();
+    await expect(page.getByTestId('pending-browser-context-items')).toContainText(
+      '<button> "<svg onload=alert(1)>"',
+    );
     const found = await page.evaluate(() => ({
       sentinel: globalThis.__piarcXssSentinel,
       images: document.querySelectorAll('[data-testid="browser-picks"] img:not([src^="data:"])')

@@ -259,14 +259,28 @@ export async function recordMenus(app: ElectronApplication): Promise<void> {
   });
 }
 
-/** Runs the item labelled `label` of the last recorded menu. */
-export async function runMenuItem(app: ElectronApplication, label: string): Promise<void> {
-  await app.evaluate((_electron, wanted) => {
-    const store = globalThis as { __piarcMenus?: { label?: string; click?: () => void }[][] };
-    const item = store.__piarcMenus?.at(-1)?.find((entry) => entry.label === wanted);
-    if (item?.click === undefined) throw new Error(`No menu item ${wanted}`);
-    item.click();
-  }, label);
+/**
+ * Runs the item of the last recorded menu labelled with one of `labels` (the English and the
+ * Simplified Chinese label: the app follows the system language). The menu is built when the
+ * page's `context-menu` event arrives, so this waits for it.
+ */
+export async function runMenuItem(
+  app: ElectronApplication,
+  labels: readonly string[],
+): Promise<void> {
+  await expect
+    .poll(() =>
+      app.evaluate((_electron, wanted) => {
+        const store = globalThis as { __piarcMenus?: { label?: string; click?: () => void }[][] };
+        const item = store.__piarcMenus
+          ?.at(-1)
+          ?.find((entry) => entry.label !== undefined && wanted.includes(entry.label));
+        if (item?.click === undefined) return false;
+        item.click();
+        return true;
+      }, labels),
+    )
+    .toBe(true);
 }
 
 /** A right click in the guest page at the center of `selector` (opens the page menu). */

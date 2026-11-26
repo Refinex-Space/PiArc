@@ -104,6 +104,9 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - T18 的 L4 依赖窗口真的在前台（标记已读只在前台发生）：测试里用 `e2e/sessions.ts` 的 `focusMain(app)`（`app.focus({ steal: true })`），不要假设 Playwright 启动的窗口有焦点。原生对话框用 `stubFolderDialog`、`stubMessageBox` 替换，Playwright 点不到它们。
 - macOS 上页面截图把半透明的侧栏合成在白底上，看不到 vibrancy：评审截图用 `screencapture -l <窗口号>`（`BrowserWindow.getMediaSourceId()` 的数字部分，见 `e2e/t18-review.e2e.ts`）。运行 L4 的终端要有系统设置中的“屏幕录制”权限，否则 `t18-review` 报 `could not create image from window`。
 - 新建会话时乐观消息用 `flushSync` 立即提交：创建失败可能在下一次渲染之前就返回。
+- `useState` 的初始化函数不要有副作用（例如读完即删 sessionStorage）：页面首次渲染可能挂起，React 丢弃这次渲染后会再调用一次（`settings/browser-import-target.ts` 的 `useImportTarget` 先读、提交后再删）。
+- composer 的附件只有一个货架（`composer-attachments`，网格区域 `shelf`）：再加一个同区域的容器会与它重叠。
+- L4 在无人值守的 Mac 上：被测应用退出后系统可能没有任何前台应用，下一个实例的 `app.focus({ steal: true })` 拿不到焦点，`focusMain` 全部超时；先让一个应用（如 Finder）在前台再跑。
 - `dev` 形态跑的是上次打包生成的 `.vite/`：改了 `src/` 要重新 `package:desktop -- --flavor development`；`electron-forge start` 会清掉 `.vite/renderer`，之后 L4 报 "Production bundle not found"。
 - Node 的 `URL` 不认识 Chromium 注册的标准协议：`new URL('app://piarc/').origin` 是 `'null'`。
 - 导航被取消后 Playwright 定位器会一直等导航完成：拦截之后用 `page.evaluate` 检查，会触发导航的点击用 `page.mouse.click`。

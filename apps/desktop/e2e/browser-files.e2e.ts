@@ -78,7 +78,7 @@ test('B2.6.6 a download the agent saves asks first and lands in the workspace, q
   await expect(card).toBeVisible({ timeout: 60_000 });
   await expect(card).toContainText('save this download');
   await expect(card).toContainText(/saved[\\/]report\.csv/u);
-  await card.getByRole('button', { name: 'Allow once', exact: true }).click();
+  await card.getByRole('button', { name: /^(Allow once|仅本次允许)$/u }).click();
   await idle(page);
   await expect(page.getByTestId('agent-message').getByText('The report is saved.')).toBeVisible();
   await expect(page.getByTestId('browser-card')).toHaveAttribute('data-status', 'completed');
