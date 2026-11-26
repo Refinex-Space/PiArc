@@ -104,6 +104,7 @@ T48 的 fork 场景用 `same_system_as`、`same_tools_as` 核对原始请求字�
 
 - T46：端点的 `strict_tools: true` 在 `models.json` 的 `compat` 写 `supportsStrictTools`（Anthropic）或 `supportsStrictMode`（OpenAI），目录因此把它记为 `verified`，可以当 Auto 模式的审查模型（用户设置 `autoMode.model: "mock-<端点>/mock-model"`）；顶层 `review_timeout_ms` 缩短 Core 的审查时限（`CoreConfig.review_timeout`，超时场景用）；审批应答的 `review` 断言卡片转回人工的原因（`none` 为从未送审）。运行器不应答 `review.state` 为 `reviewing` 的卡（它在之后的快照里以新的 revision 回来），`pendingApprovals` 也只计可作答的卡。`perm-auto-*.yaml` 覆盖各条判定与失败路径；审查请求是新的对话，用户消息里有 JSON，`contains` 匹配的是请求体里转义后的文本。
 
+- 内置浏览器（设计增补 `browser.md` 5.2）：顶层 `browser`（`src/l2/browser_spec.rs`）让 `Env::start_core` 在每个 Core 启动后 `attach_browser_client`；假客户端在 `runner/browser.rs`，由 `wait_until` 每轮调用 `browser_tick` 推进（Core 回调与 `delay_ms` 计时器经 `Events.arrived` 唤醒），`drive` 结束前 `browser_settled` 检查脚本走完与不变量。`expect.audit` 的 `browser` 类经 Core 的 `audit_events` 读取（与其他类相同）。审批应答的 `rules` 核对卡片"总是允许"的规则。
 - T47：顶层 `managed`（`files`：`PiArc/<文件>` 或 `ClaudeCode/<文件>` → 内容，按 `layout`（缺省为本平台）的目录布局放在运行根的 `admin 管理/` 下，经 `FixedPolicy` 交给 Core，轮询 `MANAGED_POLL` 100 ms）；动作 `write_managed`（写或删一个托管文件，等 Core 的配置诊断里托管来源的报告变化后才继续）；`expect.audit`（按 `kind` 取工作区审计，逐条做子集比较）。`managed-*.yaml` 覆盖优先级矩阵、只用托管 hooks、Claude Code 两种布局与运行中变化，`memory-auto-*.yaml` 覆盖写入、关闭、未信任与压缩后恢复。
 
 ## 易错点

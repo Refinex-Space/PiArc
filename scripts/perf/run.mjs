@@ -350,6 +350,8 @@ PROBES.idle = perfScript('probe-idle.mjs', { pr: 0, nightly: 1, long: 0 });
 PROBES.recovery = perfScript('probe-recovery.mjs', { pr: 0, nightly: 3, long: 0 });
 PROBES.size = perfScript('probe-size.mjs', { pr: 0, nightly: 1, long: 0 });
 PROBES['long-run'] = perfScript('long-run.mjs', { pr: 0, nightly: 0, long: 1 });
+// The built-in browser (design addendum B5.6): snapshots, tab switch, occlusion, idle CPU.
+PROBES.browser = perfScript('probe-browser.mjs', { pr: 0, nightly: 1, long: 0 });
 
 /**
  * Runs the probes of `lane` (or the ones measuring `only`) and returns each metric's values.

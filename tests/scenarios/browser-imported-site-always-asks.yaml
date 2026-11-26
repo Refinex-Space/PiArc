@@ -1,0 +1,50 @@
+id: browser-imported-site-always-asks
+description: A host the client marks sensitive (imported sign-ins or a private address) gets a card even in bypassPermissions mode and despite a user allow rule for it, and that card offers no Always allow (design addendum browser.md B2.6.3, B5.4).
+capabilities: [CAP-BROWSER-SITE-001]
+workspace:
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableBypassPermissions":true,"allow":["Browser(domain:bank.example.com)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              {
+                script: 'await (await taskSpace("t").newPage()).goto("https://bank.example.com/");',
+              }
+      - text: 'Signed in.'
+sessions:
+  main: { provider: main, mode: bypassPermissions }
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'https://bank.example.com/'
+            host: bank.example.com
+            sensitive: true
+            decision: { allowed: true, scope: run }
+        - answer: { output: 'account page' }
+actions:
+  - prompt: { text: 'Open my bank.', turn: one }
+approvals:
+  - { tool: BrowserSite, decision: allow, rules: [] }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  request_counts: { main: 2 }
+  audit:
+    - kind: browser
+      count: 1
+      detail:
+        {
+          approval: site,
+          hosts: [bank.example.com],
+          sensitive: true,
+          step: card,
+          decision: allowOnce,
+          conclusion: allow,
+        }

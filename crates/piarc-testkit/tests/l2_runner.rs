@@ -219,6 +219,7 @@ fn declared_approvals_without_approval_requests_fail() {
         via: None,
         notification_allow: None,
         review: None,
+        rules: None,
     }];
     let failures = failures_of(&spec);
     println!("{failures:#?}");

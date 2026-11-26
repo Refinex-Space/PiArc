@@ -46,6 +46,9 @@ pub struct Approval {
     /// card never went to the reviewer.
     #[serde(default)]
     pub review: Option<ReviewSpec>,
+    /// Exactly the rules the card offers to save with "Always allow" (`[]`: no "always").
+    #[serde(default)]
+    pub rules: Option<Vec<String>>,
 }
 
 /// What an approval expects of the Auto mode reviewer (T46).

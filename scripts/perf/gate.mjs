@@ -20,7 +20,7 @@ export const BASELINES = path.join(repoRoot, 'scripts', 'perf', 'baselines');
  * @typedef {import('./metrics.mjs').Metric} Metric
  * @typedef {{
  *   id: string,
- *   row: string,
+ *   row: string | null,
  *   unit: string,
  *   value: number,
  *   runs: number,

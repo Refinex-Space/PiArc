@@ -1293,6 +1293,31 @@ capabilities:
     task: T42
     status: active
 
+  # Built-in browser (off-plan, ADR-0088–0093, design addendum browser.md; accepted in T51)
+  - id: CAP-BROWSER-TOOL-001
+    title: '有桌面客户端且设置开启时模型请求里有 Browser 工具；没有客户端时没有'
+    milestone: M5
+    refs: [ARCH-8.1, ARCH-10.1]
+    task: T51
+    status: active
+  - id: CAP-BROWSER-RUN-001
+    title: 'Browser 调用交给客户端运行：输出在 nonce 边界内、截图附在结果后、超长输出落盘、超时与中断有结果、同一回复的调用依次运行、每次一行审计'
+    milestone: M5
+    refs: [ARCH-8.1, ARCH-10.1]
+    task: T51
+    status: active
+  - id: CAP-BROWSER-SITE-001
+    title: '智能体的页面访问新站点经 Core 站点卡：本次、本会话、总是允许（规则）、plan 只放行本机、Auto 交给用户、导入站点总是询问'
+    milestone: M5
+    refs: [ARCH-10.1]
+    task: T51
+    status: active
+  - id: CAP-BROWSER-FILES-001
+    title: '智能体页面的上传经 Core 读权限裁决并复制到会话暂存区，工作区外询问，同名文件不覆盖已暂存的副本'
+    milestone: M5
+    refs: [ARCH-10.1]
+    task: T51
+    status: active
 client_only:
   - ref: FR-CH-05
     reason: 三档视图只改变客户端的展示

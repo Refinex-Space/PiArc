@@ -1,0 +1,59 @@
+id: browser-run-basic
+description: With a desktop client attached the model gets the Browser tool; a call needs no card, Core hands the script to the client with its session and the default timeout, and the client's output and screenshot reach the model - the output inside the browser-output boundary, the image after it - while one browser audit row records the script's hash and size, never the script (design addendum browser.md B2.1.1, B2.1.2, B2.7.2).
+capabilities: [CAP-BROWSER-TOOL-001, CAP-BROWSER-RUN-001]
+providers:
+  main:
+    wire: anthropic
+    vision: true
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              script: 'const page = await taskSpace("docs").newPage(); await page.goto("https://example.com/"); console.log(await page.title()); await page.screenshot();'
+              description: Read the page title
+      - text: 'The page is called Example Domain.'
+browser:
+  runs:
+    - run:
+        type: run
+        toolCallId: b1
+        timeoutMs: 120000
+        script: 'const page = await taskSpace("docs").newPage(); await page.goto("https://example.com/"); console.log(await page.title()); await page.screenshot();'
+      steps:
+        - answer:
+            output: 'Example Domain'
+            images:
+              - media_type: image/png
+                data: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==
+                width: 1
+                height: 1
+actions:
+  - prompt: { text: 'What is the title of example.com?', turn: one }
+expect:
+  events:
+    - method: item/completed
+      params: { item: { itemId: b1, status: completed } }
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - { index: 0, tools_include: [Browser] }
+    - index: 1
+      tool_results:
+        - id: b1
+          is_error: false
+          contains: "1 screenshot is attached.\n[image image/png]"
+      # Raw body: the output sits between the boundary's tags (a JSON-escaped newline).
+      contains:
+        - '\nExample Domain\n</browser-output-'
+        - iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==
+  request_counts: { main: 2 }
+  audit:
+    - kind: browser
+      count: 1
+      detail:
+        tool: Browser
+        toolCallId: b1
+        outcome: ok
+        images: 1
+        scriptChars: 146
+        scriptSha256: 0a0b07c67ed949421dbfd56c08fc4c52e81db33545ce4326f7fdb453ee1689fd

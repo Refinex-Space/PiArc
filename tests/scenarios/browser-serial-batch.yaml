@@ -1,0 +1,34 @@
+id: browser-serial-batch
+description: Two Browser calls in one response run one after the other - the second run reaches the client only after the first (answered 300 ms late) ended, which the fake client checks for every run of a session (design addendum browser.md B2.1.3).
+capabilities: [CAP-BROWSER-RUN-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input: { script: 'console.log("first run");' }
+          - id: b2
+            name: Browser
+            input: { script: 'console.log("second run");' }
+      - text: 'Both ran.'
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - answer: { output: 'first run', delay_ms: 300 }
+    - run: { toolCallId: b2 }
+      steps:
+        - answer: { output: 'second run' }
+actions:
+  - prompt: { text: 'Run both scripts.', turn: one }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: b1, is_error: false, contains: 'first run' }
+        - { id: b2, is_error: false, contains: 'second run' }
+  request_counts: { main: 2 }

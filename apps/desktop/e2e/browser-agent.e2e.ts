@@ -217,7 +217,8 @@ console.log("not stopped");`,
   await expect(page.getByTestId('browser-agent-bar')).toBeVisible();
   // The page under the agent takes no pointer input from the user meanwhile (B2.5.1).
   await expect.poll(async () => (await observe(app, id)).shielded).toBe(true);
-  await page.getByTestId('browser-stop').click();
+  // The control bar's Stop (the navigation row has its own while the page loads).
+  await page.getByTestId('browser-agent-bar').getByTestId('browser-stop').click();
   const stopped = await waiting;
   expect(stopped.error?.code).toBe('PIARC_STOPPED');
   expect(stopped.output).not.toContain('not stopped');

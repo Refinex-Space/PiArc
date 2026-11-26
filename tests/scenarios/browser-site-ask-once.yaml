@@ -1,0 +1,71 @@
+id: browser-site-ask-once
+description: A page of a Browser run asks for a host the session has not allowed, so Core shows a BrowserSite card offering to always allow it; allow once lets the page through for this run only, so the next run asks again, and a refusal there reaches the client - each card answer writes one browser audit row (design addendum browser.md B2.6.3).
+capabilities: [CAP-BROWSER-SITE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              { script: 'await (await taskSpace("t").newPage()).goto("https://example.com/");' }
+      - tool_calls:
+          - id: b2
+            name: Browser
+            input:
+              {
+                script: 'await (await taskSpace("t").newPage()).goto("https://example.com/again");',
+              }
+      - text: 'The second visit was refused.'
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'https://example.com/'
+            host: example.com
+            decision: { allowed: true, scope: run }
+        - answer: { output: 'opened' }
+    - run: { toolCallId: b2 }
+      steps:
+        - site:
+            url: 'https://example.com/again'
+            host: example.com
+            decision: { allowed: false }
+        - answer:
+            output: ''
+            error:
+              {
+                name: EgoError,
+                message: 'The user did not allow example.com.',
+                code: PIARC_SITE_REFUSED,
+              }
+actions:
+  - prompt: { text: 'Visit example.com twice.', turn: one }
+approvals:
+  - { tool: BrowserSite, decision: allow, rules: ['Browser(domain:example.com)'] }
+  - { tool: BrowserSite, decision: deny }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: b1, is_error: false, contains: "\nopened\n</browser-output-" }
+        - {
+            id: b2,
+            is_error: true,
+            contains: 'The script stopped with EgoError PIARC_SITE_REFUSED: The user did not allow example.com.',
+          }
+  request_counts: { main: 3 }
+  audit:
+    - kind: browser
+      count: 2
+      detail: { approval: site, step: card, hosts: [example.com] }
+    - kind: browser
+      count: 1
+      detail: { approval: site, toolCallId: b1, decision: allowOnce, conclusion: allow }
+    - kind: browser
+      count: 1
+      detail: { approval: site, toolCallId: b2, decision: deny, conclusion: deny }

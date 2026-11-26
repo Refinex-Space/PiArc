@@ -1,0 +1,43 @@
+id: browser-cancel-while-asking
+description: Interrupting the turn while a site card of the running Browser call is up withdraws the card, refuses the page and cancels the run - the client hears cancel and the run is audited as cancelled (design addendum browser.md B2.1.3, B2.6.3).
+capabilities: [CAP-BROWSER-RUN-001, CAP-BROWSER-SITE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              { script: 'await (await taskSpace("t").newPage()).goto("https://example.com/");' }
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'https://example.com/'
+            host: example.com
+            decision: { allowed: false }
+        - wait_cancel: {}
+actions:
+  - prompt: { text: 'Open example.com.', turn: one }
+  - wait: { method: core/sessions, params: { pendingApprovals: 1 } }
+  - abort: {}
+# The card stays unanswered: the interrupt takes it away.
+approvals:
+  - { tool: BrowserSite, decision: wait }
+expect:
+  events:
+    - { method: core/sessions, params: { pendingApprovals: 1 } }
+    # The snapshot without the card may come before or after the turn's end.
+    - any_order:
+        - { method: core/sessions, params: { pendingApprovals: 0, approvals: [] } }
+        - { method: turn/completed, turn: one, params: { status: interrupted } }
+  request_counts: { main: 1 }
+  audit:
+    - kind: browser
+      count: 1
+      detail: { tool: Browser, toolCallId: b1, outcome: cancelled }
+    - kind: browser
+      count: 1
+      detail: { approval: site, toolCallId: b1, step: timeout, conclusion: deny }

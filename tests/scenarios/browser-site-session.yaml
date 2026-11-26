@@ -1,0 +1,69 @@
+id: browser-site-session
+description: A site card lists the run's other waiting hosts; allowing it for the session covers all of them, so a later request of the same run and the next run reach those hosts without another card, and only the card's decision is audited (design addendum browser.md B2.6.3).
+capabilities: [CAP-BROWSER-SITE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              {
+                script: 'await (await taskSpace("t").newPage()).goto("https://docs.example.org/");',
+              }
+      - tool_calls:
+          - id: b2
+            name: Browser
+            input:
+              {
+                script: 'await (await taskSpace("t").newPage()).goto("https://docs.example.org/next");',
+              }
+      - text: 'Both visits went through.'
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'https://docs.example.org/'
+            host: docs.example.org
+            pending: [cdn.example.net]
+            decision: { allowed: true, scope: session }
+        - site:
+            url: 'https://cdn.example.net/app.js'
+            host: cdn.example.net
+            decision: { allowed: true, scope: session }
+        - answer: { output: 'docs open' }
+    - run: { toolCallId: b2 }
+      steps:
+        - site:
+            url: 'https://docs.example.org/next'
+            host: docs.example.org
+            decision: { allowed: true, scope: session }
+        - answer: { output: 'next open' }
+actions:
+  - prompt: { text: 'Read the docs.', turn: one }
+approvals:
+  - tool: BrowserSite
+    decision: session
+    rules: ['Browser(domain:docs.example.org)', 'Browser(domain:cdn.example.net)']
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: b1, is_error: false, contains: 'docs open' }
+        - { id: b2, is_error: false, contains: 'next open' }
+  request_counts: { main: 3 }
+  audit:
+    - kind: browser
+      count: 1
+      detail: { approval: site }
+    - kind: browser
+      detail:
+        approval: site
+        step: card
+        hosts: [docs.example.org, cdn.example.net]
+        decision: allowSession
+        conclusion: allow

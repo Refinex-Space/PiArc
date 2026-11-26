@@ -1,0 +1,50 @@
+id: browser-upload-outside-workspace
+description: A page's file input gets only copies Core staged below the session's browser/uploads - a workspace file without a card, a file outside the workspace after a BrowserUpload card is allowed, and nothing when the card is refused; every decision is audited (design addendum browser.md B2.6.6).
+capabilities: [CAP-BROWSER-FILES-001]
+workspace:
+  files:
+    notes.txt: "inside the workspace\n"
+  run_files:
+    'outside 外部/report.txt': "quarterly numbers\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              {
+                script: 'const p = (await taskSpace("t").pages())[0]; await p.setInputFiles("#file", ["notes.txt", "../outside 外部/report.txt"]);',
+              }
+      - text: 'Uploaded.'
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - stage:
+            paths: [notes.txt]
+            staged: ["inside the workspace\n"]
+        - stage:
+            paths: ['../outside 外部/report.txt']
+            staged: ["quarterly numbers\n"]
+        - stage:
+            paths: ['../outside 外部/report.txt']
+            refused: 'The user did not let the page upload'
+        - answer: { output: 'uploaded' }
+actions:
+  - prompt: { text: 'Upload the files.', turn: one }
+approvals:
+  - { tool: BrowserUpload, decision: allow }
+  - { tool: BrowserUpload, decision: deny }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  request_counts: { main: 2 }
+  audit:
+    - kind: browser
+      count: 3
+      detail: { approval: upload, toolCallId: b1 }
+    - kind: browser
+      count: 1
+      detail: { approval: upload, conclusion: deny }

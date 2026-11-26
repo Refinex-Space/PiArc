@@ -7,7 +7,9 @@
 // - `long`: the long-run memory test (8 hours locally, a shortened run in Nightly).
 //
 // `metrics.test.mjs` checks that every row of chapter 11's table has a metric here or a reason
-// in `EXCLUDED`. Budgets are chapter 11's; a budget that differs by platform is an object.
+// in `EXCLUDED`. A metric whose budget comes from a design addendum rather than a chapter 11
+// row (the built-in browser's, design addendum B5.6: chapter 11 gains no row) has `row: null`
+// and names the addendum section in `source`. Budgets are chapter 11's; a budget that differs by platform is an object.
 // `floor` is the smallest change, in the metric's unit, that counts as a regression: below it
 // the 10% rule would only measure noise on values near zero.
 
@@ -15,7 +17,8 @@
  * @typedef {'pr' | 'nightly' | 'long'} Lane
  * @typedef {{
  *   id: string,
- *   row: string,
+ *   row: string | null,
+ *   source?: string,
  *   probe: string,
  *   unit: string,
  *   better: 'lower' | 'higher',
@@ -339,6 +342,67 @@ export const METRICS = [
     lanes: ['nightly'],
     floor: 100,
     how: 'renderer reload to the transcript visible while the mock turn goes on',
+  },
+  // The built-in browser (design addendum B5.6), Nightly only.
+  {
+    id: 'browser-snapshot-1k',
+    row: null,
+    source: 'browser.md B2.4.3',
+    probe: 'browser',
+    unit: 'ms',
+    better: 'lower',
+    budget: 250,
+    lanes: ['nightly'],
+    floor: 15,
+    how: 'p95 of 20 full-page snapshots of a 1,000-node page, timed in the script host',
+  },
+  {
+    id: 'browser-snapshot-10k',
+    row: null,
+    source: 'browser.md B2.4.3',
+    probe: 'browser',
+    unit: 'ms',
+    better: 'lower',
+    budget: 1500,
+    lanes: ['nightly'],
+    floor: 60,
+    how: 'p95 of 20 full-page snapshots of a 10,000-node page, timed in the script host',
+  },
+  {
+    id: 'browser-tab-switch',
+    row: '会话切换',
+    probe: 'browser',
+    unit: 'ms',
+    better: 'lower',
+    // Held to the cached session switch: switching a tab is switching what the panel shows.
+    budget: 100,
+    lanes: ['nightly'],
+    floor: 10,
+    how: 'p95 of 20 switches between two loaded user tabs: selectTab to the view on the panel (main process, 2 ms polls)',
+  },
+  {
+    id: 'browser-occlusion',
+    row: null,
+    source: 'browser.md B1.5.2',
+    probe: 'browser',
+    unit: 'ms',
+    better: 'lower',
+    // Provisional (the addendum sets no number): a menu must not wait on a visible blank.
+    budget: 100,
+    lanes: ['nightly'],
+    floor: 10,
+    how: 'p95 of 20 openings of the panel menu over the page to the still frame on screen, timed in the renderer',
+  },
+  {
+    id: 'browser-idle-cpu',
+    row: '空闲 CPU',
+    probe: 'browser',
+    unit: '%',
+    better: 'lower',
+    budget: 5,
+    lanes: ['nightly'],
+    floor: 0.2,
+    how: 'window shown, the preview on one user tab, a busy user tab and a finished agent tab hidden; app processes plus the Agent Host over 60 s',
   },
 ];
 
