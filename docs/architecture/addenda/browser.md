@@ -124,7 +124,7 @@
 
 **B2.5 控制权与可见性**
 - B2.5.1 运行期间面板显示控制条 `#browser-agent-bar`："智能体正在操作 · <动作标签>"、`#browser-takeover`、`#browser-stop`；页面上显示智能体光标与动作标签（在隔离 world 里绘制，`pointer-events: none`）；视图上方覆盖透明遮罩视图，用户的点击与按键不进入页面，点击遮罩提示"先接管再操作"。
-- B2.5.2 接管：Space 变为 `agentDelegatedToUser`，遮罩移除，智能体之后的调用得到 `EGO_TASK_SPACE_USER_IN_CONTROL`（reason `manual_takeover`）；控制条变为"你正在控制 · 交还给智能体"。停止：只取消当前 `Browser` 调用（B2.1.3），不中断回合。
+- B2.5.2 接管：Space 变为 `agentDelegatedToUser`，遮罩移除，智能体之后的调用（包括 `takeOverTaskSpace`）得到 `EGO_TASK_SPACE_USER_IN_CONTROL`（reason `manual_takeover`），只有用户在面板上交还才回到智能体；`takeOverTaskSpace` 只能取回智能体自己 `handOff()` 的 Space；控制条变为"你正在控制 · 交还给智能体"。停止：只取消当前 `Browser` 调用（B2.1.3），不中断回合。
 - B2.5.3 智能体 `handOff()`：面板自动显示该 Space 并通知（窗口不在前台时发系统通知），控制条"智能体请你操作：<原因>"；用户点"完成并交还"时 Space 交还，若智能体已空闲则发送一条用户消息"浏览器已交还，请继续"（本地化）。
 - B2.5.4 接管时若该文档执行过智能体的 `evaluate` 或原始 CDP，显示 `#browser-tainted`："这个页面运行过智能体的脚本，输入密码前建议重新加载"，附"重新加载"。
 - B2.5.5 面板关着时智能体照常运行，【预览】工具按钮显示活动点；智能体第一次在会话里使用浏览器时不自动打开面板（设置 `browser.revealOnAgentUse`，默认"首次使用时打开"）。
@@ -389,6 +389,13 @@ testkit 的假客户端实现 `BrowserClient`：订阅 `core/browser`，按场�
 | B5.3 | 清除浏览数据 | 设置页"清除本工作区浏览数据"同时删掉该工作区的导入记录；面板菜单的"清除浏览数据"只清分区，记录保留（导入站点仍按敏感处理，偏安全） | 补充 |
 | B5.4 | 导入站点每会话询问 | 导入之前已在本会话"本会话允许"过的站点，本会话内不再出卡片 | 本会话的授权是用户已经给过的 |
 | B5.6 | 性能探针 | `scripts/perf/probe-browser.mjs` 五个指标；快照与遮挡在第 11 章没有对应行，`metrics.mjs` 的 `row` 可为 `null` 并带 `source`；遮挡的预算暂定 100 ms | 第 11 章评审时并入或调整 |
+| B1.3.2 | 智能体控制的标签拒绝权限并写进工具结果 | 智能体控制（`agent`）的 Space 在两次调用之间同样拒绝，用户此前在该标签允许过的权限对它不再生效；运行中被拒的请求（权限与来源，至多 20 条）接在本次输出末尾的 `[PiArc]` 说明里 | 补充：输出说明不改结果结构 |
+| B1.4.2 | 智能体设置的模拟显示徽标 | 智能体经 `page.cdp()` 发的 `Emulation.setDeviceMetricsOverride`、`clearDeviceMetricsOverride` 不转给页面，而是作为面板的模拟施加（`by: "agent"`，宽高 200–4,000 的整数、DPR 1–3，`deviceScaleFactor: 0` 按 1，其他值答 `PIARC_EMULATION`）；徽标旁有"恢复" | 面板、`browserState().emulation` 与页面只认一份模拟 |
+| B1.6.1 | deny 规则的文件返回 403 | 工作区协议读文件时带 `browser: true`，Core 按会话的 `Read(…)` deny 规则拒绝（`permissionDenied` → 403），对所有标签生效；会话未打开时不查（没有智能体在驱动它的页面） | 协议处理器分不出请求来自哪个页面，且智能体的页面与用户的页面同源 |
+| B2.3.4 | 共享给智能体需审批卡确认 | 标签右键"共享给智能体"把用户的标签移进新的 Space（名为 `Shared: <标题>`，`ownership: user`，`createdBy: user`），智能体 `claimTaskSpace(id)` 后才能操作，闸门随之生效；共享本身就是用户的确认，不另出审批卡；"我的标签"仍不能被认领。标签保持 `openedBy: "user"`，SDK 的 `finish` 不关闭它 | 补充 |
+| B2.5.2 | — | `takeOverTaskSpace` 只能取回智能体自己 `handOff()` 的 Space；用户手动接管的 Space 答 `EGO_TASK_SPACE_USER_IN_CONTROL`（`manual_takeover`），等用户交还 | 补充 |
+| B2.6.7 | 长边 ≤ 1,568 px、单张 ≤ 3.75 MB、超出降质 | 主进程用 `nativeImage` 解码附件、按解码后的尺寸缩放（不信脚本报的宽高），按原类型重新编码，超过 3.75 MiB 依次降为 JPEG 85、70、55、40；请求里的 base64 至多 16 MiB，解码不了或降质后仍超限即拒绝 | 脚本能绕过 SDK 直接调用绑定 |
+| B2.7.2、§4.2 | 审计与脚本上限 | 审计行另记被拒的 CDP 方法与本次调用到过的主机（各至多 100 条、每条 256 字符，不进模型的结果）；脚本上限由 Core 按 UTF-8 字节检查（256 KiB），Agent Host 的参数 schema 以 262,144 个字符写明上限 | schema 只能数字符 |
 
 ## 附录：评审裁决（2026-11-26）
 

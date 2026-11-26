@@ -549,6 +549,7 @@ threats:
           - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::refuses unallowed subresources and records them for the result
           - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::asks Core for a document and keeps a session answer for every waiting host
           - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::refuses a document when Core refuses, and without a run asks nothing
+          - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::THR-16 judges a request without page or referrer by every running agent call
           - rust:crates/piarc-core/src/tool_io/policy/tests/browser_site.rs::without_a_running_call_nothing_is_asked
           - rust:crates/piarc-core/src/tool_io/policy/tests/browser_site.rs::the_card_goes_away_with_the_run_and_on_timeout
           - rust:crates/piarc-core/src/tool_io/policy/tests/browser_site.rs::plan_mode_allows_only_local_addresses
@@ -560,21 +561,30 @@ threats:
           - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::lets local ports the user opened through without a card
           - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::lets the session’s listening and declared ports through and asks for others (B2.6.2)
           - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_refuses_piarc_ports_and_takes_a_new_policy
+          - rust:crates/piarc-core/src/browser/proxies.rs::thr16_own_ports_join_the_requested_ones
+          - l4:apps/desktop/e2e/browser-basic.e2e.ts::THR-16 guests send WebRTC and loopback traffic only through the proxy
       - arch: 全部 guest 的网络经 Core 的浏览器代理，协议与链路本地地址在主进程的请求规则里拒绝（ADR-0088）
-        measure: 浏览器代理按名称放行公网与内网，本机地址只在本机名称后可达；请求规则拒绝链路本地与不支持的协议；工作区协议拒绝越界路径
+        measure: 浏览器代理放行公网名，本机与私网地址只在 IP 字面量、localhost 与本地开发名称后可达（防 DNS 重绑定）；请求规则拒绝链路本地与不支持的协议；工作区协议拒绝越界路径，并经 Core 按会话的 Read deny 规则拒绝文件
         type: automated
         tests:
-          - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_lets_any_public_or_private_name_through_without_asking
+          - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_lets_public_names_through_and_private_ones_only_when_local
           - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_reaches_loopback_only_behind_local_names
+          - rust:crates/piarc-sandbox/src/proxy/browser.rs::thr16_private_addresses_need_a_local_name
           - vitest:apps/desktop/src/main/browser/request-rules.test.ts::THR-16 refuses %s (%s)
           - vitest:apps/desktop/src/main/browser/workspace-files.test.ts::THR-16 refuses %s
+          - vitest:apps/desktop/src/main/browser/workspace-files.test.ts::THR-16 reads through Core as the browser, so the session’s Read deny rules apply
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_files.rs::thr16_the_browser_serves_no_workspace_file_a_read_deny_rule_covers
       - arch: 脚本宿主是不能联网的沙箱页面，SDK 只经主进程的 CDP 代理访问本 Space 的标签，页面命令走允许名单（ADR-0091）
-        measure: 宿主页面的 CSP 不许连接、宿主分区的请求全部取消；CDP 代理只答本 Space 的目标，允许名单外的方法被拒并记入结果
+        measure: 宿主页面的 CSP 不许连接、宿主分区的请求全部取消；CDP 代理只答本 Space 的目标，允许名单外的方法被拒，并与本次调用到过的主机一起记入审计行
         type: automated
         tests:
           - vitest:apps/desktop/src/main/browser/host-session.test.ts::allows scripts only from the host and no connections
           - vitest:apps/desktop/src/main/browser/cdp-policy.test.ts::answers the Space-scoped Target methods and the version only
           - vitest:apps/desktop/src/main/browser/cdp-proxy.test.ts::refuses methods outside the policy and records them
+          - vitest:apps/desktop/src/main/browser/cdp-policy.test.ts::THR-16 refuses dragging local files into a page and page-level Target reach
+          - vitest:apps/desktop/src/main/browser/host-bindings.test.ts::keeps each refused method once, bounded in count and length, for the audit row
+          - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::records the hosts the run reached for the audit row (B2.7.2)
+          - rust:crates/piarc-core/src/tool_io/browser.rs::the_audit_row_lists_refused_methods_and_visited_hosts
           - 'l4:apps/desktop/e2e/browser-agent.e2e.ts::THR-05: the script host reaches nothing on the network'
       - arch: 上传与保存下载经 Core 的读写裁决，工作区外与受保护路径询问，不覆盖已有文件，保存的文件带来自互联网的标记
         measure: 工作区外的上传要卡片、deny 规则拒绝；没有运行中的调用不搬运；保存在手动模式询问、不覆盖、只认本会话的下载；保存与下载的文件带 quarantine 或 Zone.Identifier
@@ -612,6 +622,7 @@ threats:
           - rust:crates/piarc-browser-import/src/crypto.rs::thr17_keys_do_not_print_their_bytes
           - rust:crates/piarc-browser-import/src/crypto.rs::thr17_plaintext_buffers_are_zeroized
           - rust:crates/piarc-browser-import/src/import.rs::thr17_macos_v10_import_with_domain_hash_keeps_values_out_of_debug
+          - vitest:apps/desktop/src/main/browser/cdp-policy.test.ts::THR-17 keeps cookies out of the network events the script sees
       - arch: Windows 上持久分区的 cookie 由 Chromium 以 DPAPI 保护，沙箱外同一用户的进程能解开
         measure: Windows 上浏览器分区的 cookie 对沙箱外的同用户进程不保密
         type: accepted-risk
