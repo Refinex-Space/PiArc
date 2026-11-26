@@ -599,6 +599,15 @@ export function FileSection(props: FileSectionProps) {
           data-highlight={language ?? ''}
         >
           <table className={`git-table${display.split ? ' is-split' : ''}`} data-testid="git-diff">
+            {/* Fixed layout takes its widths from here, not from a full-width first row. */}
+            {display.split ? (
+              <colgroup>
+                <col className="git-col-gutter" />
+                <col className="git-col-text" />
+                <col className="git-col-gutter" />
+                <col className="git-col-text" />
+              </colgroup>
+            ) : null}
             {hunks.map((hunk, index) => (
               <Fragment key={`${String(hunk.newStart)}:${String(index)}`}>
                 {renderGap(index)}

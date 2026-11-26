@@ -431,8 +431,16 @@
   overflow-wrap: anywhere;
 }
 
+.git-col-gutter {
+  width: 7ch;
+}
+
+.git-col-text {
+  width: calc(50% - 7ch);
+}
+
 .git-table.is-split .git-text {
-  width: 50%;
+  overflow: hidden;
 }
 
 .git-line.is-added,

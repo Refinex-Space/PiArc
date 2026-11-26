@@ -1529,6 +1529,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
 | 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关；发布构建拒绝 Chromium 的远程调试开关（T45） |
 | 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 窗口禁止导航到应用自身协议以外的地址；仅允许绑定工作台的一次性工具窗口，其余新窗口拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
+| 恶意仓库的 Git 配置 | 克隆的仓库在 `.git/config` 或 `.gitattributes` 里设置 `core.fsmonitor`、`core.hooksPath`、filter、外部 diff、textconv 与 pager，Git 面板一打开就读取状态与 diff | Git 面板的只读查询用命令行覆盖关闭 fsmonitor、hooks、外部 diff、textconv 与 pager，清空仓库配置的全部 filter，只带最小环境、不继承 `GIT_*` 变量（ADR-0085）；暂存、提交、检出、推送等写操作照常运行仓库的 hooks 与 filter，只在受信任的项目里执行；网络操作不弹终端或图形凭据提示，不继承带凭据的环境变量，远程地址里的用户信息在日志中脱敏；丢失工作的操作（回滚、强制检出、强制推送、删除未合并分支）经主进程原生确认并展示 Core 读到的事实，强制推送只用带期望提交的 `--force-with-lease`，受保护分支不强推 |
 
 ### 10.2 项目信任
 

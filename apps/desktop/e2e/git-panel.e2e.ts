@@ -10,7 +10,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { expect, test } from './sessions.js';
 import { idle, openSession, prefer, requests, screenshots } from './t19.js';
@@ -87,9 +87,10 @@ async function filePaths(page: Page): Promise<string[]> {
   ).sort();
 }
 
-async function openGit(page: Page): Promise<void> {
+async function openGit(page: Page, card?: (card: Locator) => Promise<void>): Promise<void> {
   await page.getByTestId('panel-tab-changes-card').click();
   await expect(page.getByTestId('git-card')).toBeVisible();
+  await card?.(page.getByTestId('git-card'));
   await page.getByTestId('changes-open').click();
   await expect(page.getByTestId('git-panel')).toBeVisible();
 }
@@ -104,10 +105,11 @@ test('the Changes view shows the branch, uncommitted and one commit, with go to 
   });
   await makeRepository(ws);
   await idle(page);
-  await openGit(page);
-  const card = page.getByTestId('git-card');
-  await expect(card).toContainText('feature/login');
-  await expect(card).toContainText('2 uncommitted files');
+  // The rail's card: branch and uncommitted files.
+  await openGit(page, async (card) => {
+    await expect(card).toContainText('feature/login');
+    await expect(card).toContainText('2 uncommitted files');
+  });
 
   // All changes against main: the branch's commit and what is not committed yet.
   await expect
@@ -135,8 +137,12 @@ test('the Changes view shows the branch, uncommitted and one commit, with go to 
   await expect(
     page.locator('[data-testid=git-file-section][data-path="src/login.ts"]'),
   ).toHaveAttribute('data-current', 'true');
+  // Side by side needs room: in a narrow tile it falls back to one column and says so.
   await page.getByTestId('git-menu').click();
+  await expect(page.getByTestId('git-menu-split')).toContainText('Needs a wider panel');
   await page.getByTestId('git-menu-split').click();
+  await expect(page.locator('.git-table.is-split')).toHaveCount(0);
+  await page.getByTestId('tile-maximize-changes').click();
   await expect(page.locator('.git-table.is-split').first()).toBeVisible();
   await screenshots(page, info, 'git-changes-commit-split');
 });
@@ -175,6 +181,10 @@ test('the Commit view stages, writes the message in the interface language, comm
   await readme.click();
   await expect(page.getByTestId('git-stage-staged')).toContainText('with sign-in');
   await expect(page.getByTestId('git-unstage-hunk')).toBeVisible();
+  // A narrow tool shows one column: the diff replaced the list until "Back".
+  if (await page.getByTestId('git-commit-back').isVisible()) {
+    await page.getByTestId('git-commit-back').click();
+  }
 
   // Generate: one auxiliary request with the instructions, in English (the interface language).
   await page.getByTestId('git-generate').click();
@@ -284,13 +294,14 @@ test('the Git settings page saves to the user file and asks before always force 
   await app.evaluate(({ dialog }) => {
     const shown: string[] = [];
     (globalThis as { __gitForceAsked?: string[] }).__gitForceAsked = shown;
-    dialog.showMessageBox = ((...args: unknown[]) => {
+    dialog.showMessageBox = (...args: unknown[]) => {
       const options = args.at(-1) as { message?: string };
       shown.push(options.message ?? '');
       return Promise.resolve({ response: 1, checkboxChecked: false });
-    });
+    };
   });
-  await settings.getByTestId('git-setting-force-push').check({ force: true });
+  // Refused natively, so the box stays clear (`check()` would insist on a change).
+  await settings.getByTestId('git-setting-force-push').click();
   await expect
     .poll(() =>
       app.evaluate(() => (globalThis as { __gitForceAsked?: string[] }).__gitForceAsked ?? []),

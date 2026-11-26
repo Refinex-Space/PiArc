@@ -22,6 +22,7 @@
 | THR-12 | 应用被当作通用运行时滥用 | 3 | 3 | 0 | 0 | 0 | 10 |
 | THR-13 | 恶意链接与导航 | 4 | 4 | 0 | 0 | 0 | 15 |
 | THR-14 | 同一用户的进程向 PiArc 注入代码 | 3 | 2 | 0 | 1 | 0 | 4 |
+| THR-15 | 恶意仓库的 Git 配置 | 4 | 4 | 0 | 0 | 0 | 11 |
 
 ## THR-01 提示注入导致破坏性操作
 
@@ -151,3 +152,12 @@
 | 应用开启 hardened runtime，entitlements 只有两项 | 自动化 | CI `scripts/ci/check-app-layout.mjs`<br>Vitest `scripts/ci/check-app-layout.test.mjs` · reads an ad-hoc signature with the hardened runtime<br>Vitest `scripts/ci/check-app-layout.test.mjs` · THR-14 the app asks for only JIT and disabled library validation |
 | Agent Host 只收到白名单环境变量 | 自动化 | Rust `crates/piarc-host/src/config.rs` · passes_only_named_variables_and_the_fixed_ones |
 | 同一用户的进程调试附加 Agent Host | 已接受风险 | 理由：去掉 get-task-allow 要对 node 重签，违背 ADR-0018 保留官方签名的决定；能调试附加的进程已以用户身份运行<br>依据：ADR-0018、I39 |
+
+## THR-15 恶意仓库的 Git 配置
+
+| 对策 | 类型 | 测试与依据 |
+|---|---|---|
+| 只读查询不运行仓库配置的任何程序；只读环境去掉继承的 GIT_* 变量与凭据 | 自动化 | Rust `crates/piarc-git/tests/panel.rs` · thr15_readonly_git_runs_no_repo_program<br>Rust `crates/piarc-git/src/env.rs` · read_only_takes_config_location_and_drops_git_variables |
+| 未受信任的项目可以读状态，写操作返回 untrusted；受信任后提交照常运行仓库的 hook | 自动化 | Rust `crates/piarc-testkit/tests/sessions/git.rs` · status_reads_and_writes_wait_for_trust_and_idle_sessions<br>Rust `crates/piarc-git/tests/writes.rs` · commits_run_hooks_and_report_identity |
+| 用户模式的环境只加 SSH agent 与代理变量、关闭凭据提示；URL 中的用户信息被脱敏 | 自动化 | Rust `crates/piarc-git/src/env.rs` · user_mode_adds_agents_and_proxies_only<br>Rust `crates/piarc-telemetry/src/redact_tests.rs` · secret_named_fields_and_url_passwords_are_replaced |
+| 只有丢失工作的操作需要原生确认，取消时不发送，确认后带上展示的期望提交；远程动过时推送被拒；受保护分支按整名匹配 | 自动化 | Vitest `apps/desktop/src/main/core/git-ipc.test.ts` · confirms only operations that lose work<br>Vitest `apps/desktop/src/main/core/git-ipc.test.ts` · asks natively, sends nothing on cancel and passes the shown lease on confirm<br>Rust `crates/piarc-git/tests/writes.rs` · pushes_are_rejected_leased_and_pulls_stop_on_conflicts<br>Rust `crates/piarc-core/src/git/mod.rs` · protected_patterns_match_whole_names<br>L4 `apps/desktop/e2e/git-panel.e2e.ts` · rolling back asks natively, keeps the bytes and undoes |
