@@ -35,6 +35,7 @@ mod checkpoints;
 mod context;
 mod exec;
 mod files;
+mod git_files;
 mod git_status;
 mod hooks;
 mod hooks_m4;
@@ -618,6 +619,42 @@ impl ToolIo {
             program,
             env,
         ))
+    }
+
+    /// The Git panel's two runners for `workspace` (ADR-0085): read-only queries and the
+    /// user's write operations, each with its own environment, the git on the commands'
+    /// `PATH` outside the workspace and the process-tree spawner.
+    ///
+    /// # Errors
+    ///
+    /// `notFound` when no git is on that `PATH`.
+    pub(crate) async fn git_panel_runners(
+        &self,
+        workspace: &Path,
+    ) -> Result<(piarc_git::Git, piarc_git::Git), ErrorObject> {
+        let inherited = self.command_environment().await;
+        let login = self.expansion_environment().await;
+        let base = self.git_runner(workspace).await?;
+        let make = |env| {
+            piarc_git::Git::new(
+                Arc::new(piarc_exec::ProcessTreeSpawner),
+                base.program().to_owned(),
+                env,
+            )
+        };
+        Ok((
+            make(piarc_git::env::readonly_env(&inherited, &login)),
+            make(piarc_git::env::user_env(&inherited, &login)),
+        ))
+    }
+
+    /// The workspace of a registered session's settings and trust (T35: a worktree session's
+    /// main workspace).
+    #[must_use]
+    pub(crate) fn session_project(&self, session_id: &str) -> Option<PathBuf> {
+        lock(&self.sessions)
+            .get(session_id)
+            .map(|s| s.project().to_owned())
     }
 
     /// The proxy port of a session whose proxy has started (its first sandboxed command).

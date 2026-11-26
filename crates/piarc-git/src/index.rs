@@ -256,7 +256,12 @@ fn pathspecs(paths: &[String]) -> Vec<u8> {
     out
 }
 
-async fn with_paths(writer: &Writer, args: &[&str], paths: &[String]) -> Result<(), GitError> {
+/// Runs `args` with `paths` given as NUL-separated pathspecs on stdin.
+///
+/// # Errors
+///
+/// The writer's errors.
+pub async fn with_paths(writer: &Writer, args: &[&str], paths: &[String]) -> Result<(), GitError> {
     let mut full: Vec<&str> = args.to_vec();
     full.extend(["--pathspec-from-file=-", "--pathspec-file-nul"]);
     let out = writer

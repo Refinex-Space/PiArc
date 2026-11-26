@@ -107,7 +107,7 @@ PiArc 有意偏离 Claude Desktop 的：保留按 hunk 丢弃（只在"本会话
 - B1.3 勾选文件后 `git diff --cached --name-only` 包含它；取消勾选后不包含；勾选未跟踪文件等于 `git add`；勾选已删除文件等于暂存删除；组复选框作用于全组。空仓库取消暂存用 `git rm --cached`。
 - B1.4 选中文件的 diff 分两段："已暂存"（HEAD ↔ index）与"未暂存"（index ↔ 工作区）。已暂存段每个 hunk 有"取消暂存此块"；未暂存段每个 hunk 有"暂存此块"与"回滚此块"。二进制、只改权限、带 filter 属性（含 LFS）的文件、隐藏空白开启时没有 hunk 按钮。
 - B1.5 hunk 操作的陈旧防护：请求带路径、段、hunk 序号、hunk 内容哈希、工作区文件 SHA-256、index 条目 oid；Core 在仓库写锁内重新生成 patch 并核对，任何一项不符返回 `stale`，`git diff --cached` 与工作区字节都不变，界面提示"文件已变化，已刷新"并刷新。
-- B1.6 行与 hunk 的回滚（含"未提交"范围的回滚）先经主进程原生确认（列出文件数与前 10 个路径，或"回滚 1 个改动块"），执行前把工作区字节与 index 条目存入快照；完成后 toast 提供"撤销"，撤销后文件 SHA-256 与回滚前相同、暂存状态恢复；撤销前文件又被改动的，撤销被拒并说明。
+- B1.6 行与 hunk 的回滚（含"未提交"范围的回滚）先经主进程原生确认（列出文件数与前 10 个路径，或"回滚 1 个改动块"），执行前把工作区字节与 index 条目存入快照；完成后 toast 提供"撤销"，撤销后文件 SHA-256 与回滚前相同、暂存状态恢复；撤销前文件又被改动的，撤销被拒并说明。撤销记录在 Core 内存里，Core 重启后不再可撤销。
 
 **B2 提交信息框**
 - B2.1 多行输入框 `#git-commit-message`，占位"提交信息（Mod+Enter 提交）"；首行超过 72 字符时计数变为警告色。草稿按会话保存在 `localStorage`，提交成功后清空。
@@ -209,11 +209,10 @@ GitPanel ─ window.piarc.git ─▶ 校验 · 近期输入 · 原生确认 ─�
   - `mod.rs`：`GitService`，按会话解析文件根（worktree 会话为 worktree，否则工作区）与项目（`SessionIo.project()`，设置与信任来源）；git 程序经 `git_runner` 解析（登录 shell 的 PATH，排除工作区内的 git）。
   - `ops.rs`：把 `GitRequest` 分派到 piarc-git；只读操作不加锁；写操作先查信任（`piarc_core::trust`，未信任返回 `untrusted`）、再查忙碌（会改动工作区的操作要求同一文件根下所有会话空闲，否则 `sessionBusy`）、再取该 common dir 的 `tokio::Mutex`；`index.lock` 退避两次。
   - `guards.rs`：受保护分支只在这里判断（用户级 `git.protectedBranches`，`*` 通配）；强推必须带期望 oid；`describe` 为原生确认返回事实（分支、远端、旧 / 新 oid、未合并提交数、受影响文件）。
-  - `restore.rs`：回滚前在路径锁内把工作区字节存入 `piarc_checkpoint::ObjectStore`，写 `checkpoint_files` 记录（新操作 `gitRestore`；同批次的 `gitRestoreIndex` 记录指向保存 index 条目 mode、oid 与暂存状态的小对象）；会话没有检查点时补建。`plan` 与 Changes 视图排除这两种操作。撤销经 `piarc_fs::replace` 核对回滚后的哈希写回，再恢复 index 条目（`update-index --cacheinfo`）。完成后从同一文件根下各会话的文件状态表移除这些路径。
+  - `restore.rs`：回滚前把工作区字节存入 `piarc_checkpoint::ObjectStore` 并钉住，连同 index 条目（mode、oid）记在 Core 内存（最近 32 次，ADR-0085 第 7 条）；不写 `checkpoint_files`。撤销时文件仍是回滚后的内容才写回（会话打开时经 `piarc_fs::replace`），再恢复 index 条目（`update-index --cacheinfo`）。完成后从同一文件根下各会话的文件状态表移除这些路径。
   - `commit_message.rs`：组装 `session/commitMessage` 的输入（第 3.2 节 B3.3 的预算、只给路径的规则、`permissions` 的 `Read` deny 规则经 `piarc-policy` 匹配、`redact`），经会话 actor 发给 Agent Host（Agent Host 被回收时由 actor 重新拉起），超时 60 s，用量按 purpose `commitMessage` 记账。
   - 审计：`kind: "git"`。
   - 事件：Core 路由 `core/git`（`progress`、`finished`，带 `opId`）。
-- `piarc-checkpoint`：`Operation` 新增 `GitRestore`、`GitRestoreIndex`；`plan` 排除。
 - `piarc-telemetry::redact`：新增 PEM 私钥块与 `scheme://<token>@host` 形式的 userinfo 规则。
 - 设置：`piarc-config` 的 `PIARC_SETTINGS` 新增 `git` 对象（`branchPrefix`、`protectedBranches`、`pullMode`、`alwaysForcePush`、`commitInstructions`，长度上限同第 3.1 节 A8），`client_settings` 的写入白名单加入 `/git/...`；只读用户级与托管层，项目级忽略并进配置诊断。
 
@@ -253,7 +252,7 @@ GitPanel ─ window.piarc.git ─▶ 校验 · 近期输入 · 原生确认 ─�
 
 ### 4.8 迁移与兼容
 
-- 不改 SQLite DDL：`checkpoint_files.operation` 新增两个取值。
+- 不改 SQLite DDL，不改检查点的记录：Git 回滚的撤销记录只在 Core 内存里。
 - 面板 id、命令 id、用户自定义快捷键、工具布局的 sessionStorage 都不变。
 - 旧的 T42 评论草稿没有 `scope`，按"本会话改动"处理。
 - 现有 L4（`t28-rewind`、`t42-comments` 等）的工作区不是 Git 仓库时自动落到"本会话"范围；是仓库的夹具按新默认范围更新断言。

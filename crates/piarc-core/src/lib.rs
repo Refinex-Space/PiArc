@@ -80,6 +80,7 @@ pub mod demo;
 pub mod dirs;
 mod error;
 pub mod events;
+pub(crate) mod git;
 pub(crate) mod hooks;
 pub mod host_probe;
 pub mod identity;

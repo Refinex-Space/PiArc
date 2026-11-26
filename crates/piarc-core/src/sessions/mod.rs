@@ -34,6 +34,7 @@
 
 mod create;
 mod diagnostics;
+mod git;
 mod hooks;
 mod inbound;
 mod login;
@@ -86,6 +87,7 @@ pub enum ForkPoint {
     BeforeTurn(String),
 }
 pub(crate) use diagnostics::PreparedBundle;
+pub(crate) use git::Place;
 pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
 pub use piarc_store::SessionPrefsChange;
@@ -167,6 +169,8 @@ pub(crate) struct Ctx {
     pub diagnostics: diagnostics::PreparedBundle,
     /// The Agent Hosts' proxy (ADR-0082).
     pub proxy: Arc<crate::network::Proxy>,
+    /// The Git panel's locks and operations (ADR-0085).
+    pub git: Arc<crate::git::GitState>,
 }
 
 /// The entry of the session layer. Cheap to clone.

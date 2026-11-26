@@ -673,6 +673,7 @@ fn open_state(
         worktrees,
         diagnostics: crate::sessions::PreparedBundle::default(),
         proxy: Arc::new(crate::network::Proxy::starting(&data)),
+        git: Arc::default(),
     });
     tasks.set_outlet(sessions.task_outlet());
     sessions.connect_hooks();

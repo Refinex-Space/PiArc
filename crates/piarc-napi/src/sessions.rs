@@ -772,6 +772,26 @@ impl CoreRuntime {
         })
     }
 
+    /// One Git panel request of session `sessionId` (ADR-0084, ADR-0085): `requestJson` is a
+    /// `GitCall`; resolves with `{ result }` or `{ failure }` as JSON text.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn git_request<'env>(
+        &self,
+        env: &'env Env,
+        session_id: String,
+        request_json: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.gitRequest", |core, done| {
+            core.git_request(session_id, request_json, done)
+        })
+    }
+
+    /// Cancels Git panel operation `opId`; whether one was running.
+    #[napi(catch_unwind)]
+    pub fn cancel_git(&self, env: Env, op_id: String) -> napi::Result<bool> {
+        boundary::call(&env, "CoreRuntime.cancelGit", || self.core.cancel_git(&op_id))
+    }
+
     /// Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most
     /// `limit` matches. A newer search with the same `searchId` cancels this one, which then
     /// rejects with kind `cancelled`. Resolves with `{ root, results: [{ path, name,

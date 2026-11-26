@@ -807,6 +807,33 @@ impl CoreRuntime {
         })
     }
 
+    /// Answers one Git panel request of a session (ADR-0084, ADR-0085): `request_json` is a
+    /// `GitCall`; the result is `{ result }` or `{ failure }`.
+    ///
+    /// # Errors
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn git_request(
+        &self,
+        session_id: String,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&session_id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.git(session_id, request_json).await
+        })
+    }
+
+    /// Cancels Git panel operation `op_id`; whether one was running.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`].
+    pub fn cancel_git(&self, op_id: &str) -> Result<bool> {
+        self.ensure_running()?;
+        Ok(self.services()?.sessions.cancel_git(op_id))
+    }
+
     /// Searches the files below `root` for an `@` mention (ADR-0030).
     ///
     /// # Errors

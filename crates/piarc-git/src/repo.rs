@@ -144,6 +144,86 @@ impl Reader {
     }
 }
 
+impl Reader {
+    /// The commit `HEAD` names; `None` before the first commit.
+    ///
+    /// # Errors
+    ///
+    /// The runner's errors.
+    pub async fn repo_head(&self) -> Result<Option<String>, GitError> {
+        let out = self
+            .run(&["rev-parse", "--verify", "--quiet", "HEAD"], ExecOptions::default())
+            .await?;
+        Ok(out
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned()))
+    }
+
+    /// Which of `paths` `HEAD` has.
+    ///
+    /// # Errors
+    ///
+    /// The runner's errors.
+    pub async fn in_head(
+        &self,
+        paths: &[String],
+    ) -> Result<std::collections::HashSet<String>, GitError> {
+        let mut found = std::collections::HashSet::new();
+        if self.repo_head().await?.is_none() {
+            return Ok(found);
+        }
+        for chunk in paths.chunks(200) {
+            let mut args = vec!["ls-tree", "-r", "-z", "--name-only", "HEAD", "--"];
+            args.extend(chunk.iter().map(String::as_str));
+            let out = self.ok(&args).await?;
+            found.extend(
+                String::from_utf8_lossy(&out)
+                    .split('\0')
+                    .filter(|p| !p.is_empty())
+                    .map(str::to_owned),
+            );
+        }
+        Ok(found)
+    }
+
+    /// The commit of remote-tracking branch `remote/branch`, the lease of a force push.
+    ///
+    /// # Errors
+    ///
+    /// The runner's errors.
+    pub async fn tracking_oid(&self, remote: &str, branch: &str) -> Result<Option<String>, GitError> {
+        let reference = format!("refs/remotes/{remote}/{branch}");
+        let out = self
+            .run(
+                &["rev-parse", "--verify", "--quiet", "--end-of-options", &reference],
+                ExecOptions::default(),
+            )
+            .await?;
+        Ok(out
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned()))
+    }
+
+    /// Tracked files whose working tree or index differs from `HEAD`.
+    ///
+    /// # Errors
+    ///
+    /// The runner's errors.
+    pub async fn changed_tracked(&self) -> Result<Vec<String>, GitError> {
+        if self.repo_head().await?.is_none() {
+            return Ok(Vec::new());
+        }
+        let out = self
+            .ok(&["diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv", "HEAD", "--"])
+            .await?;
+        Ok(String::from_utf8_lossy(&out)
+            .split('\0')
+            .filter(|p| !p.is_empty())
+            .map(str::to_owned)
+            .collect())
+    }
+}
+
 /// Runs the user's write operations in one repository (trusted projects only, decided by
 /// Core).
 #[derive(Debug, Clone)]

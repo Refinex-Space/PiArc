@@ -18,7 +18,7 @@ Git 工具要在面板打开、窗口获得焦点、回合结束时自动读取�
 4. **参数由 Core 约束。** 远端只接受 `git remote` 列出的名字；分支名经 `git check-ref-format --branch` 且不以 `-` 开头；修订参数前加 `--end-of-options`；路径必须是文件根内的相对路径，放在 `--` 之后；hunk 操作只收标识（路径、段、序号、内容哈希、工作区 SHA-256、index oid），patch 由 Core 在仓库写锁内用原始字节重新生成，任何一项不符返回 `stale`。
 5. **并发。** 写操作按仓库 common dir 在 Core 内串行，只读操作不加锁。会改动工作区的操作（检出、拉取、回滚、继续、中止、跳过）要求同一文件根下所有会话空闲，否则返回 `sessionBusy`；完成后从这些会话的文件状态表移除受影响路径。遇到 `index.lock` 不删除，退避两次后返回可重试的 `busy`。
 6. **危险操作的确认与审计。** 全部写操作要求窗口近期有真实输入（弹出窗口经 `bindToolInput` 计入）。Git 回滚、强制检出、强推、删除未完全合并的分支、把"始终强制推送"打开，先由 Core 的 `describe` 给出事实（分支、远端、旧 / 新 oid、文件数与路径），主进程以原生确认展示，确认后携带 Core 给出的期望值执行，Core 再核对。强推一律 `--force-with-lease=<ref>:<期望 oid> --force-if-includes`；受保护分支（用户级 `git.protectedBranches`，默认 `main`、`master`，`*` 通配）只在 Core 判断，强推在调用 git 之前拒绝。推送、强推、回滚、强制检出、删除分支各写一行 `kind: "git"` 审计，不含文件内容与提交信息正文。
-7. **回滚可撤销。** Git 回滚前在路径锁内把工作区字节存入 `piarc_checkpoint::ObjectStore`，写 `checkpoint_files` 的新操作 `gitRestore`，index 条目（mode、oid、暂存状态）存为同批次的 `gitRestoreIndex` 记录；两种操作不进回退计划与本会话视图，随会话检查点的保留期清理。撤销经 `piarc_fs::replace` 核对回滚后的哈希写回，再恢复 index 条目。
+7. **回滚可撤销。** Git 回滚前把工作区字节存入检查点的内容寻址对象库并钉住，连同 index 条目（mode、oid）记在 Core 内存里（每个 Core 保留最近 32 次）；不写 `checkpoint_files`，所以不进回退计划与本会话视图。撤销只在同一会话、Core 未重启时可用：文件仍是回滚后的内容时才写回（会话打开时经 `piarc_fs::replace` 在路径锁内核对，否则直接写回），再恢复 index 条目；已被改动的文件列为冲突、不覆盖。Core 重启后钉住解除，对象由检查点回收清理。
 8. **输出脱敏。** git 的 stderr、进度文本与远端 URL 先按结构去掉 userinfo 与 ANSI 转义，再经 `piarc_telemetry::redact`（补充 `scheme://<token>@host` 与 PEM 私钥规则）交给页面与日志；日志不写 stderr 原文。
 9. **`gh`（G5 适用）。** 程序从工作区以外的 PATH 解析；环境设 `GH_PROMPT_DISABLED=1`、`GH_NO_UPDATE_NOTIFIER=1`；子命令白名单为 `pr view/create/list/merge/checks` 与 `repo view`，禁止 `auth`、`config`、`extension`、`alias`、`browse` 与 `--web`；`--repo` 由 Core 从远端解析且主机在已登录主机内；`GH_TOKEN`、`GITHUB_TOKEN`、`GH_HOST`、`GH_CONFIG_DIR` 只在用户登录环境本来就有时传给 gh，不进 git 与模型命令。
 
@@ -31,6 +31,7 @@ Git 工具要在面板打开、窗口获得焦点、回合结束时自动读取�
 | 用户模式使用完整登录环境 | 最接近终端 | 登录环境里的服务商密钥与令牌进入 git 与 hook 进程 | 否决 |
 | PiArc 实现 askpass（原生输入框） | 带口令的密钥、host key 确认能在面板里完成 | 需要回调通道、凭据存储与 Windows 适配 | 推迟；先用"在终端中运行" |
 | 危险操作只在渲染进程确认 | 交互轻 | 注入的页面可绕过 | 否决 |
+| 回滚记录写进 `checkpoint_files`（新操作 `gitRestore`） | 撤销跨重启 | 回退计划、本会话基线、保留与回收都要区分新操作，牵动 ADR-0044 的既有语义；撤销本来只在回滚后立即以 toast 提供 | 否决；记录放内存，字节进对象库 |
 
 ## 后果
 

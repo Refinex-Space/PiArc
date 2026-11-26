@@ -218,7 +218,7 @@ impl Hub {
         // A stored conversation can be browsed before its model provider resumes. Its indexed
         // checkout and cwd come from Core. Reject a checkout which is now a redirect.
         let fallback = if registered.is_none() {
-            Some(self.indexed_file_root(id).await?)
+            Some(self.indexed_place(id).await?.1)
         } else {
             None
         };
@@ -262,7 +262,8 @@ impl Hub {
     }
     /// An imported history's claimed cwd is not authority to browse arbitrary files. Older
     /// records without a PiArc ownership field can use a previously opened enclosing workspace.
-    async fn indexed_file_root(&self, id: &str) -> Result<PathBuf> {
+    /// The workspace and file root of a session from the index (it is not open).
+    pub(super) async fn indexed_place(&self, id: &str) -> Result<(PathBuf, PathBuf)> {
         let key = id.to_owned();
         let (record, workspaces) = self
             .ctx
@@ -288,7 +289,8 @@ impl Hub {
             })
             .max_by_key(|p| p.components().count())
             .ok_or_else(|| invalid("session has no registered project directory"))?;
-        Ok(piarc_git::worktree::containing(&workspace, &cwd).unwrap_or(workspace))
+        let root = piarc_git::worktree::containing(&workspace, &cwd).unwrap_or(workspace.clone());
+        Ok((workspace, root))
     }
 }
 fn invalid(reason: &str) -> Error {

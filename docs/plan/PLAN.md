@@ -339,11 +339,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 2. piarc-git 执行器：只读 / 用户两种模式、输出上限、取消、进度、参数校验（`exec.rs`、`env.rs`、`args.rs`、`repo.rs`；THR-15 恶意配置用例带正向对照）。
 - [x] 3. piarc-git 只读操作：status、diff、log、refs、文件全文、基础分支（`tests/panel.rs` 8 项）。
 - [ ] 4. piarc-protocol `git.rs` 与 AHP `session/commitMessage`、契约样本。
-- [ ] 5. piarc-core `git/` 只读路径、指纹、`core/git`；NAPI `gitRequest`/`cancelGit`。
+- [x] 5. piarc-core `git/` 只读路径、指纹、`core/git`；NAPI `gitRequest`/`cancelGit`（`sessions/git.rs`、`git/mod.rs`）。
 - [ ] 6. 主进程 `git-ipc.ts`、preload。
 - [ ] 7. 渲染进程 G1：改动视图、标题行、范围、文件列、跳转、diff 升级、状态、评论范围、工具改名、右栏卡片。
 - [ ] 8. Git 设置：schema、写入白名单、偏好、设置页。
-- [ ] 9. 写操作：index、hunk、回滚与快照、提交、分支、远端、进行中操作、信任、忙碌、锁、审计。
+- [x] 9. 写操作：index、hunk、回滚与快照、提交、分支、远端、进行中操作、信任、忙碌、锁、审计（`git/write.rs`、`git/restore.rs`；回滚撤销记录改为放在内存，ADR-0085 第 7 条已同步）。
 - [ ] 10. 提交信息生成：Core 组装、AHP、Agent Host harness 与提示词、用量。
 - [ ] 11. 渲染进程 G2：提交视图、生成、同步栏、分支弹窗与对话框、状态条、原生确认。
 - [ ] 12. L4、a11y 登记、i18n、威胁映射、受影响的现有测试。

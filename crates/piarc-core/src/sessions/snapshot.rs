@@ -218,6 +218,17 @@ pub(crate) enum SnapshotMsg {
 pub(crate) struct Snapshots {
     tx: mpsc::UnboundedSender<SnapshotMsg>,
     activity: Arc<std::sync::Mutex<Activity>>,
+    running: Arc<std::sync::Mutex<Vec<RunningSession>>>,
+}
+
+/// A session in a turn, as last listed: the Git panel refuses operations that rewrite the
+/// files such a session works on (ADR-0085 rule 5).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RunningSession {
+    pub id: String,
+    pub title: Option<String>,
+    pub cwd: Option<String>,
+    pub workspace: Option<String>,
 }
 
 /// The activity counts of `core/activity` (T35): what the menu-bar or tray icon shows, taken
@@ -274,11 +285,13 @@ impl Snapshots {
     pub fn spawn(handle: &tokio::runtime::Handle, events: EventSender, storage: Storage) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         let activity = Arc::new(std::sync::Mutex::new(Activity::default()));
+        let running = Arc::new(std::sync::Mutex::new(Vec::new()));
         let task = SnapshotTask {
             rx,
             events,
             storage,
             activity: Arc::clone(&activity),
+            running: Arc::clone(&running),
             resend_activity: true,
             workspaces: BTreeMap::new(),
             live: BTreeMap::new(),
@@ -290,7 +303,11 @@ impl Snapshots {
             session_revision: 0,
         };
         handle.spawn(task.run());
-        let snapshots = Self { tx, activity };
+        let snapshots = Self {
+            tx,
+            activity,
+            running,
+        };
         snapshots.send(SnapshotMsg::Reload);
         snapshots
     }
@@ -298,6 +315,14 @@ impl Snapshots {
     pub fn send(&self, msg: SnapshotMsg) {
         // The task ends only when Core shuts down; nothing is left to tell then.
         let _ = self.tx.send(msg);
+    }
+
+    /// The sessions in a turn, as last listed.
+    pub fn running_sessions(&self) -> Vec<RunningSession> {
+        self.running
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// The activity counts as last sent.
@@ -315,6 +340,8 @@ struct SnapshotTask {
     storage: Storage,
     /// The counts last sent on `core/activity` (shared with [`Snapshots::activity`]).
     activity: Arc<std::sync::Mutex<Activity>>,
+    /// The sessions in a turn (shared with [`Snapshots::running_sessions`]).
+    running: Arc<std::sync::Mutex<Vec<RunningSession>>>,
     /// Send the counts with the next list even when unchanged (a client subscribed anew).
     resend_activity: bool,
     /// Workspaces the actors reported, by path.
@@ -485,6 +512,19 @@ impl SnapshotTask {
             }
         }
         let activity = Activity::of(&list);
+        *self
+            .running
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = list
+            .iter()
+            .filter(|v| !v.archived && v.status == SessionStatus::Running)
+            .map(|v| RunningSession {
+                id: v.id.clone(),
+                title: v.title.clone(),
+                cwd: v.cwd.clone(),
+                workspace: v.workspace.clone(),
+            })
+            .collect();
         let payload = serde_json::json!({
             "revision": self.session_revision,
             "sessions": list,

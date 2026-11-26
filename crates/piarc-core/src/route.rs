@@ -79,6 +79,12 @@ impl RouteKey {
         Self(Arc::from(crate::mcp::MCP_ROUTE))
     }
 
+    /// The route of the Git panel's progress and repository changes (`core/git`, ADR-0085).
+    #[must_use]
+    pub fn git() -> Self {
+        Self(Arc::from(crate::git::GIT_ROUTE))
+    }
+
     /// The route of provider sign-in progress and questions (`core/login`, T29).
     #[must_use]
     pub fn login() -> Self {
