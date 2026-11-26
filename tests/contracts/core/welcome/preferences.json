@@ -11,7 +11,8 @@
       "auxiliary": {
         "provider": "shop",
         "id": "small"
-      }
+      },
+      "disabledProviders": ["deepseek"]
     }
   }
 }

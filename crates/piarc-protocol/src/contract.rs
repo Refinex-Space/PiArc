@@ -35,9 +35,9 @@ use crate::mcp::{
 use crate::memory::{FsMemory, MemoryApply, MemoryStatus};
 use crate::method::{Method, NotificationMessage, RequestMessage, ResultMessage};
 use crate::models::{
-    ModelsCredential, ModelsCredentialStatus, ModelsList, ModelsLoginCancel, ModelsLoginStart,
-    ModelsLogout, ModelsReload, SessionPreviewModelSwitch, SessionSetEffort, SessionSetModel,
-    UiLoginInteraction,
+    ModelsCredential, ModelsCredentialStatus, ModelsDiscover, ModelsList, ModelsLoginCancel,
+    ModelsLoginStart, ModelsLogout, ModelsReload, ModelsTest, SessionPreviewModelSwitch,
+    SessionSetEffort, SessionSetModel, UiLoginInteraction,
 };
 use crate::plugins::PluginsExtensionsMethod;
 use crate::policy::{
@@ -342,6 +342,10 @@ pub static CONTRACTS: &[Contract] = &[
     response::<WebSearchBackend>("web/searchBackend/result"),
     request::<ModelsLoginStart>(ModelsLoginStart::NAME),
     response::<ModelsLoginStart>("models/login/start/result"),
+    request::<ModelsTest>(ModelsTest::NAME),
+    response::<ModelsTest>("models/test/result"),
+    request::<ModelsDiscover>(ModelsDiscover::NAME),
+    response::<ModelsDiscover>("models/discover/result"),
     request::<ModelsLoginCancel>(ModelsLoginCancel::NAME),
     response::<ModelsLoginCancel>("models/login/cancel/result"),
     request::<ModelsLogout>(ModelsLogout::NAME),

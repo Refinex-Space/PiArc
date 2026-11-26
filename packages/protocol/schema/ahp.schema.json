@@ -6334,6 +6334,10 @@
     "LoginProvider": {
       "description": "A provider that offers sign-in (OAuth or device code) in the settings window (T29).\nAnthropic's subscription sign-in is never listed (ADR-0006).",
       "properties": {
+        "account": {
+          "description": "Who is signed in, as far as the credential tells (ADR-0083): an email or a user name.",
+          "type": ["string", "null"]
+        },
         "id": {
           "description": "Pi provider id.",
           "type": "string"
@@ -6371,6 +6375,16 @@
         }
       },
       "required": ["loginId", "provider"],
+      "type": "object"
+    },
+    "LoginStartResult": {
+      "description": "Result of `models/login/start`: the signed-in account's name, when the credential tells it\n(ADR-0083).",
+      "properties": {
+        "account": {
+          "description": "An email or a user name.",
+          "type": ["string", "null"]
+        }
+      },
       "type": "object"
     },
     "LogoutParams": {
@@ -7613,6 +7627,13 @@
           ],
           "description": "The auxiliary model as an alias (T31), instead of `auxiliary`; Core resolves it with the\nuser's alias table before the Agent Host gets the preferences."
         },
+        "disabledProviders": {
+          "description": "Providers the user turned off (ADR-0083): the Agent Host treats them as unconfigured.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "models": {
           "additionalProperties": {
             "$ref": "#/$defs/ModelOverride"
@@ -7873,6 +7894,80 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "ModelsDiscoverParams": {
+      "description": "Parameters of `models/discover` (Core → settings Agent Host, ADR-0083): the model list of an\nOpenAI- or Anthropic-compatible endpoint.",
+      "properties": {
+        "api": {
+          "description": "Wire protocol: `openai-completions`, `openai-responses` or `anthropic-messages`.",
+          "type": "string"
+        },
+        "baseUrl": {
+          "description": "The endpoint's base URL.",
+          "type": "string"
+        },
+        "key": {
+          "description": "The key to send, typed in the form.",
+          "type": ["string", "null"]
+        },
+        "storedKeyOf": {
+          "description": "Send the key stored for this provider instead (Core checked that the endpoint is the one\nit was saved for).",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["api", "baseUrl"],
+      "type": "object"
+    },
+    "ModelsDiscoverRequest": {
+      "description": "Request for `models/discover`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/discover",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ModelsDiscoverParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsDiscoverResponse": {
+      "description": "Successful response to `models/discover`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsDiscoverResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsDiscoverResult": {
+      "description": "Result of `models/discover`.",
+      "properties": {
+        "models": {
+          "description": "Model ids, sorted and unique.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["models"],
+      "type": "object"
+    },
     "ModelsListParams": {
       "description": "Lists available models, optionally for a session.",
       "properties": {
@@ -8045,7 +8140,7 @@
           "$ref": "#/$defs/JsonRpcVersion"
         },
         "result": {
-          "$ref": "#/$defs/ModelsUpdated"
+          "$ref": "#/$defs/LoginStartResult"
         }
       },
       "required": ["jsonrpc", "id", "result"],
@@ -8145,6 +8240,87 @@
         }
       },
       "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsTestParams": {
+      "description": "Parameters of `models/test` (Core → settings Agent Host, ADR-0083): one short request to a\nmodel of the provider.",
+      "properties": {
+        "model": {
+          "description": "The model to ask; absent: the provider's first available model.",
+          "type": ["string", "null"]
+        },
+        "provider": {
+          "description": "Provider id.",
+          "type": "string"
+        }
+      },
+      "required": ["provider"],
+      "type": "object"
+    },
+    "ModelsTestRequest": {
+      "description": "Request for `models/test`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "models/test",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/ModelsTestParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "ModelsTestResponse": {
+      "description": "Successful response to `models/test`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/ModelsTestResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "ModelsTestResult": {
+      "description": "Result of `models/test`.",
+      "properties": {
+        "latencyMs": {
+          "description": "How long the request took, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "message": {
+          "description": "Why it failed.",
+          "type": ["string", "null"]
+        },
+        "model": {
+          "description": "The model asked (`<model id>`), when there was one.",
+          "type": ["string", "null"]
+        },
+        "network": {
+          "description": "The provider could not be reached (ADR-0082).",
+          "type": "boolean"
+        },
+        "ok": {
+          "description": "Whether the model answered.",
+          "type": "boolean"
+        }
+      },
+      "required": ["ok"],
       "type": "object"
     },
     "ModelsUpdated": {
@@ -16797,6 +16973,18 @@
     },
     {
       "$ref": "#/$defs/ModelsLoginStartResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsTestRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsTestResponse"
+    },
+    {
+      "$ref": "#/$defs/ModelsDiscoverRequest"
+    },
+    {
+      "$ref": "#/$defs/ModelsDiscoverResponse"
     },
     {
       "$ref": "#/$defs/ModelsLoginCancelRequest"
