@@ -33,7 +33,21 @@ export function Viewport({
   const [windowVisible, setWindowVisible] = useState(isWindowVisible());
   const [occluded, setOccluded] = useState(false);
   const [still, setStill] = useState<string | undefined>(undefined);
+  // The document the viewport lives in: popping the tool out moves it to another window.
+  const [host, setHost] = useState<Document | null>(null);
   const shown = active && toolVisible && windowVisible;
+
+  useEffect(() => {
+    const check = () => {
+      const doc = ref.current?.ownerDocument ?? null;
+      setHost((current) => (current === doc ? current : doc));
+    };
+    check();
+    const timer = window.setInterval(check, 500);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(
     () =>
@@ -55,7 +69,7 @@ export function Viewport({
     const element = ref.current;
     if (element === null || !shown) return;
     return watchCover(element, setOccluded);
-  }, [shown]);
+  }, [shown, host]);
 
   useEffect(() => {
     if (!occluded) setStill(undefined);
@@ -105,7 +119,7 @@ export function Viewport({
       view?.removeEventListener('resize', settle);
       if (frame !== 0) view?.cancelAnimationFrame(frame);
     };
-  }, [sessionId, shown, occluded, claim]);
+  }, [sessionId, shown, occluded, claim, host]);
 
   useEffect(
     () => () => {

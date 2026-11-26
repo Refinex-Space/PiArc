@@ -159,3 +159,30 @@ test('closing the tool parks the page and reopening shows it again', async ({
   await expect(page.getByTestId('browser-tab')).toHaveText(['Fixture home']);
   await expect.poll(async () => (await observe(app, id)).tabs[0]?.host).toBe('panel');
 });
+
+test('workspace files open through the workspace scheme with their relative resources', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  const { id } = await openSession(app, page, workspaces, 'Browser files', 't18-chat', 'Hello', {
+    'site/index.html':
+      '<!doctype html><title>Workspace page</title><link rel="stylesheet" href="style.css">' +
+      '<p id="p">styled</p><script>addEventListener("load", () => { document.title = ' +
+      '"Workspace page " + getComputedStyle(document.getElementById("p")).color; });</script>',
+    'site/style.css': '#p { color: rgb(1, 2, 3); }',
+  });
+  await idle(page);
+  await openPreview(page);
+  await go(page, './site/index.html');
+  await expect(page.getByTestId('browser-tab')).toHaveText(['Workspace page rgb(1, 2, 3)']);
+  const seen = await observe(app, id);
+  expect(seen.tabs[0]?.pageUrl).toMatch(/^piarc-browse:\/\/[0-9a-f]{16}\/site\/index\.html$/);
+  await expect(page.getByTestId('browser-site')).toHaveAttribute('data-security', 'file');
+  // A path outside the workspace is refused before anything loads.
+  await go(page, '/etc/hosts');
+  await expect(
+    page.getByText('Only files inside this session’s workspace open in the browser.'),
+  ).toBeVisible();
+});

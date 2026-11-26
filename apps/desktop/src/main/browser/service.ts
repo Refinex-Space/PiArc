@@ -43,6 +43,7 @@ import {
 } from './partitions.js';
 import { BrowserTab } from './tab.js';
 import { createDevtoolsView, fitDevice, splitForDevtools, toDips, ViewHost } from './view-host.js';
+import { insideRoot, type WorkspaceFiles } from './workspace-files.js';
 import type { Placement } from './view-host.js';
 
 /** What the service needs from the rest of the main process. */
@@ -66,6 +67,12 @@ export interface BrowserDeps {
   createParking(): BrowserWindow;
   /** The user's choices (B5.5). */
   preferences(): BrowserPreferences;
+  /** Workspace files in guests (B1.6). */
+  readonly files: WorkspaceFiles;
+  /** The tool window `owner` popped the preview out to (ticket `token`). */
+  toolWindow(token: string, owner: WebContents): BrowserWindow | undefined;
+  /** The user's home directory, for `~/` addresses. */
+  readonly home: string;
 }
 
 export interface BrowserPreferences {
@@ -160,7 +167,11 @@ export class BrowserService {
       this.#changed(model);
       return;
     }
-    const window = windowOf(sender, this.deps.windows());
+    // A popped-out panel measures in its tool window; the page goes there (B1.5.3).
+    const window =
+      placement.toolWindow === undefined
+        ? windowOf(sender, this.deps.windows())
+        : this.deps.toolWindow(placement.toolWindow, sender);
     if (window === undefined) return;
     if (current !== undefined && current.owner !== sender && !current.owner.isDestroyed()) {
       if (placement.claim !== true) {
@@ -172,7 +183,7 @@ export class BrowserService {
     model.placement = {
       window,
       owner: sender,
-      bounds: toDips(placement.bounds, sender.getZoomFactor()),
+      bounds: toDips(placement.bounds, window.webContents.getZoomFactor()),
       occluded: placement.occluded,
     };
     if (placement.occluded && !wasOccluded) await this.#sendStill(model, sender);
@@ -356,6 +367,7 @@ export class BrowserService {
     const port =
       typeof answer === 'object' && answer !== null && 'port' in answer ? answer.port : undefined;
     if (typeof port !== 'number') throw new Error('Core did not start the browser proxy');
+    this.deps.files.register(session);
     await setUpGuestSession(session, port, {
       permission: (contents, origin, permission) =>
         this.#askPermission(contents, origin, permission),
@@ -536,9 +548,14 @@ export class BrowserService {
       case 'search':
         url = searchUrl(this.deps.preferences().searchEngine, parsed.query);
         break;
-      case 'file':
-        // Workspace files open through the workspace scheme (B1.6, step 3 of the design).
-        throw new Error('[piarc:browserFile] Workspace files open through the workspace scheme');
+      case 'file': {
+        const relative = insideRoot(parsed.path, model.workspace, this.deps.home);
+        if (relative === undefined) {
+          throw new Error('[piarc:browserFile] Only files inside the workspace open here');
+        }
+        url = this.deps.files.url(model.id, relative);
+        break;
+      }
       case 'refused':
         throw new Error(`[piarc:browserAddress] ${parsed.reason}`);
     }

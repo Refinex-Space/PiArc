@@ -363,7 +363,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ### 内置浏览器 B1–B5（计划外，ADR-0088–0093，设计增补 `docs/architecture/addenda/browser.md`，分支 `macos/preview`）
 
 - [x] 1. 设计增补、ADR-0088–0093（用户 2026-11-26 确认三份变更型）、架构 2.74（第 4 章、5.4、8.5、10.1 THR-13 措辞、10.3）、参考登记；spike 结论记在设计增补附录第 35 条。THR-16、THR-17 的行与映射随第一批测试补入（`check-threats` 要求每条威胁至少一个测试）。
-- [ ] 2. B1 底座：分区识别与 guest 守卫、浏览器代理、`BrowserService`、视图宿主与停车窗口、`browser-ipc`、测试钩子；`t45-browser-isolation`。
+- [x] 2. B1 底座：分区识别与 guest 守卫、浏览器代理（`piarc-sandbox` 浏览器策略 + Core `BrowserProxies` + NAPI `browserProxy`）、`BrowserService`、视图宿主与停车窗口、`browser-ipc`、测试钩子 `browser(sessionId)`（`60961714`、`a08613e7`、`1faca479`）。spike 结论：附加 CDP 后 JS 对话框仍由 Electron 弹原生框、`prompt()` 不可用，用户标签用原生对话框（B1.3.3 偏差，收尾时写进设计增补）。L4 `browser-basic` 4 项与 `workbench-tiles` 3 项通过；修了退出时新建停车窗口打断退出、对未加载页面调设备模拟导致崩溃两处。
 - [ ] 3. B1 面板：标签与 Space 分组、导航与地址栏、提示条、DevTools、设备、console、查找、缩放、PDF、工作区协议、恢复、键位、设置基础项、a11y 与 i18n；L4 `browser-basic`、`browser-view-host`、`browser-files`。
 - [ ] 4. B2 Core 与协议：`browser/run`、`BrowserClient`、站点卡、端口所有权、`Browser` 规则、审计、L1 样本、L2 假客户端与 `browser-` 场景。
 - [ ] 5. B2 SDK 与宿主：SDK 移植与测试、宿主页面与绑定、CDP 代理、快照、请求闸门、控制权、截图、上传下载、transcript 图片（ADR-0093）；L4 `browser-agent`、`browser-nav-gate`、`t45-egress` 新用例；THR-16。

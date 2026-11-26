@@ -59,6 +59,7 @@ import { createMainWindow, createParkingWindow } from './window.js';
 import { registerBrowserHandlers } from './browser/browser-ipc.js';
 import { refuseClientCertificates } from './browser/guest-session.js';
 import { BrowserService } from './browser/service.js';
+import { BROWSE_SCHEME, WorkspaceFiles } from './browser/workspace-files.js';
 import { electronExternalLinkPort } from './external-link-port.js';
 import { LinkConfirmations } from './external-links.js';
 
@@ -183,7 +184,12 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
 }
 
 /** The built-in browser: its service, the idle-page sweep and the cleanup at quit. */
-function startBrowser(core: CoreHost, appShell: AppShell, dirs: DataDirs): BrowserService {
+function startBrowser(
+  core: CoreHost,
+  appShell: AppShell,
+  dirs: DataDirs,
+  toolWindows: ToolWindows,
+): BrowserService {
   const links = new LinkConfirmations();
   const devPort = devServer === undefined ? undefined : Number(new URL(devServer.origin).port);
   const denied = new Set<number>(devPort === undefined || devPort === 0 ? [] : [devPort]);
@@ -198,6 +204,9 @@ function startBrowser(core: CoreHost, appShell: AppShell, dirs: DataDirs): Brows
     platform: process.platform,
     deniedPorts: () => denied,
     createParking: createParkingWindow,
+    files: new WorkspaceFiles(core.runtime),
+    home: app.getPath('home'),
+    toolWindow: (token, owner) => toolWindows.previewWindow(token, owner),
     preferences: () => ({
       storage: 'persist',
       searchEngine: 'google',
@@ -411,7 +420,7 @@ function start(dirs: DataDirs): void {
       terminalOwners,
       () => preferences.locale(),
     );
-    browser = startBrowser(core, appShell, dirs);
+    browser = startBrowser(core, appShell, dirs, toolWindows);
     registerBrowserHandlers(registerHandler, browser);
     startTestHooks(core, terminalOwners, appShell);
     // The preferences come first: the window's language, theme and menu depend on them.
@@ -435,7 +444,7 @@ runVelopackStartup();
 // privileges.
 applyAppIdentity();
 app.enableSandbox();
-protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION, DOCUMENT_SCHEME]);
+protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION, DOCUMENT_SCHEME, BROWSE_SCHEME]);
 // Before `ready` and before the single-instance lock, which lives in `userData`.
 const dataDirs = applyDataDirs(app, process.env, process.platform);
 
