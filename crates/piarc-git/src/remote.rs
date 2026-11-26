@@ -91,7 +91,10 @@ pub async fn fetch(
     cancel: Cancel,
 ) -> Result<RemoteOutcome, GitError> {
     let out = writer
-        .network(&["fetch", "--all", "--prune", "--progress"], network(progress, cancel))
+        .network(
+            &["fetch", "--all", "--prune", "--progress"],
+            network(progress, cancel),
+        )
         .await?;
     Ok(if out.success() {
         RemoteOutcome::Done(words(&out))
@@ -164,7 +167,10 @@ pub fn push_args(spec: &PushSpec) -> Vec<String> {
         args.push("--set-upstream".into());
     }
     if let Some(lease) = &spec.lease {
-        args.push(format!("--force-with-lease=refs/heads/{}:{lease}", spec.branch));
+        args.push(format!(
+            "--force-with-lease=refs/heads/{}:{lease}",
+            spec.branch
+        ));
         args.push("--force-if-includes".into());
     }
     args.push("--".into());
@@ -197,7 +203,10 @@ pub fn classify_push(out: &ExecOutput) -> RemoteOutcome {
         return RemoteOutcome::Done(all);
     }
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let rejected = stdout.lines().find(|l| l.starts_with('!')).unwrap_or_default();
+    let rejected = stdout
+        .lines()
+        .find(|l| l.starts_with('!'))
+        .unwrap_or_default();
     if rejected.contains("stale info") {
         RemoteOutcome::StaleLease(all)
     } else if rejected.contains("non-fast-forward") || rejected.contains("fetch first") {
@@ -266,7 +275,9 @@ pub async fn sequence(
     };
     let mut full = vec!["-c", "core.editor=true"];
     full.extend(&args);
-    let out = writer.run(&full, ExecOptions::timeout(WRITE_TIMEOUT)).await?;
+    let out = writer
+        .run(&full, ExecOptions::timeout(WRITE_TIMEOUT))
+        .await?;
     if out.success() {
         return Ok(RemoteOutcome::Done(words(&out)));
     }
@@ -327,11 +338,17 @@ mod tests {
             stderr: stderr.into(),
         };
         assert!(matches!(
-            classify_push(&out("To r\n!\tHEAD:refs/heads/x\t[rejected] (non-fast-forward)\nDone", "")),
+            classify_push(&out(
+                "To r\n!\tHEAD:refs/heads/x\t[rejected] (non-fast-forward)\nDone",
+                ""
+            )),
             RemoteOutcome::Rejected(_)
         ));
         assert!(matches!(
-            classify_push(&out("To r\n!\tHEAD:refs/heads/x\t[rejected] (stale info)\nDone", "")),
+            classify_push(&out(
+                "To r\n!\tHEAD:refs/heads/x\t[rejected] (stale info)\nDone",
+                ""
+            )),
             RemoteOutcome::StaleLease(_)
         ));
         assert!(matches!(

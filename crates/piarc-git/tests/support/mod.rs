@@ -2,7 +2,10 @@
 //! `piarc-exec`), throwaway repositories whose paths contain spaces and Chinese, a temporary
 //! home for the user's global configuration, and the panel's read and write runners.
 
-#![allow(dead_code, reason = "each test file uses a different part of the fixtures")]
+#![allow(
+    dead_code,
+    reason = "each test file uses a different part of the fixtures"
+)]
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};

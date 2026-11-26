@@ -159,7 +159,10 @@ mod tests {
         ]);
         let env = user_env(&inherited, &login);
         assert_eq!(get(&env, "SSH_AUTH_SOCK"), Some(OsStr::new("/tmp/agent")));
-        assert_eq!(get(&env, "https_proxy"), Some(OsStr::new("http://proxy:8080")));
+        assert_eq!(
+            get(&env, "https_proxy"),
+            Some(OsStr::new("http://proxy:8080"))
+        );
         assert_eq!(get(&env, "GITHUB_TOKEN"), None);
         assert_eq!(get(&env, "GIT_SSH_COMMAND"), None);
         assert_eq!(get(&env, "GIT_EDITOR"), Some(OsStr::new("true")));

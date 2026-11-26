@@ -90,7 +90,9 @@ pub fn parse_patch(out: &[u8]) -> Vec<ParsedFile> {
         let git_line = lines[i];
         push_line(&mut file.header, git_line);
         i += 1;
-        while i < lines.len() && !lines[i].starts_with(b"@@ ") && !lines[i].starts_with(b"diff --git ")
+        while i < lines.len()
+            && !lines[i].starts_with(b"@@ ")
+            && !lines[i].starts_with(b"diff --git ")
         {
             header_line(&mut file, lines[i]);
             push_line(&mut file.header, lines[i]);
@@ -145,14 +147,23 @@ fn push_line(buf: &mut Vec<u8>, line: &[u8]) {
 }
 
 fn header_line(file: &mut ParsedFile, line: &[u8]) {
-    let text = |prefix: &[u8]| line.strip_prefix(prefix).map(|rest| lossy(rest).into_owned());
+    let text = |prefix: &[u8]| {
+        line.strip_prefix(prefix)
+            .map(|rest| lossy(rest).into_owned())
+    };
     if let Some(mode) = text(b"old mode ").or_else(|| text(b"deleted file mode ")) {
         file.old_mode = Some(mode);
     } else if let Some(mode) = text(b"new mode ").or_else(|| text(b"new file mode ")) {
         file.new_mode = Some(mode);
-    } else if let Some(rest) = line.strip_prefix(b"rename from ").or(line.strip_prefix(b"copy from ")) {
+    } else if let Some(rest) = line
+        .strip_prefix(b"rename from ")
+        .or(line.strip_prefix(b"copy from "))
+    {
         file.old_path = Some(unquote(rest));
-    } else if let Some(rest) = line.strip_prefix(b"rename to ").or(line.strip_prefix(b"copy to ")) {
+    } else if let Some(rest) = line
+        .strip_prefix(b"rename to ")
+        .or(line.strip_prefix(b"copy to "))
+    {
         file.new_path = Some(unquote(rest));
     } else if let Some(rest) = line.strip_prefix(b"--- ") {
         file.old_path = side_path(rest, b"a/");
@@ -528,7 +539,10 @@ pub async fn resolve_range(
     session_base: Option<&str>,
 ) -> Result<Range, GitError> {
     let head = reader
-        .run(&["rev-parse", "--verify", "--quiet", "HEAD"], ExecOptions::default())
+        .run(
+            &["rev-parse", "--verify", "--quiet", "HEAD"],
+            ExecOptions::default(),
+        )
         .await?;
     let has_head = head.success();
     let empty = || async { crate::status::empty_tree(reader).await };
@@ -536,12 +550,24 @@ pub async fn resolve_range(
         GitScope::Commit { sha } => {
             let commit = format!("{sha}^{{commit}}");
             reader
-                .ok(&["rev-parse", "--verify", "--quiet", "--end-of-options", &commit])
+                .ok(&[
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    "--end-of-options",
+                    &commit,
+                ])
                 .await?;
             let parent = format!("{sha}^1");
             let has_parent = reader
                 .run(
-                    &["rev-parse", "--verify", "--quiet", "--end-of-options", &parent],
+                    &[
+                        "rev-parse",
+                        "--verify",
+                        "--quiet",
+                        "--end-of-options",
+                        &parent,
+                    ],
                     ExecOptions::default(),
                 )
                 .await?
@@ -622,7 +648,8 @@ pub async fn changes(
     let raw = reader.ok(&range_args(&range, &["--raw", "-z"])).await?;
     let mut numstat_flags = vec!["--numstat", "-z"];
     numstat_flags.extend_from_slice(ws);
-    let counts = crate::status::parse_numstat(&reader.ok(&range_args(&range, &numstat_flags)).await?);
+    let counts =
+        crate::status::parse_numstat(&reader.ok(&range_args(&range, &numstat_flags)).await?);
     let mut entries = parse_raw(&raw);
     if range.to.is_none() {
         let others = reader
@@ -732,8 +759,16 @@ fn change_of(
         diff: (!binary && !submodule).then(|| FileDiff {
             path: entry.path.clone(),
             created: (entry.status == GitFileStatus::Added).then_some(true),
-            added: if ignore_whitespace { 0 } else { pair.map_or(0, |p| p.0) },
-            removed: if ignore_whitespace { 0 } else { pair.map_or(0, |p| p.1) },
+            added: if ignore_whitespace {
+                0
+            } else {
+                pair.map_or(0, |p| p.0)
+            },
+            removed: if ignore_whitespace {
+                0
+            } else {
+                pair.map_or(0, |p| p.1)
+            },
             unified: String::new(),
             hunks: Vec::new(),
             degraded: None,

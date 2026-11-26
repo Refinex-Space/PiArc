@@ -65,7 +65,10 @@ pub fn worktree_hash(root: &Path, path: &str) -> String {
 /// # Errors
 ///
 /// The reader's errors.
-pub async fn index_entry(reader: &Reader, path: &str) -> Result<Option<(String, String)>, GitError> {
+pub async fn index_entry(
+    reader: &Reader,
+    path: &str,
+) -> Result<Option<(String, String)>, GitError> {
     let out = reader.ok(&["ls-files", "-s", "-z", "--", path]).await?;
     let text = String::from_utf8_lossy(&out);
     for record in text.split('\0').filter(|r| !r.is_empty()) {
@@ -108,7 +111,9 @@ fn section(out: &[u8], path: &str) -> Option<ParsedFile> {
 }
 
 async fn filtered(reader: &Reader, path: &str) -> Result<bool, GitError> {
-    let out = reader.ok(&["check-attr", "-z", "filter", "--", path]).await?;
+    let out = reader
+        .ok(&["check-attr", "-z", "filter", "--", path])
+        .await?;
     let fields: Vec<String> = String::from_utf8_lossy(&out)
         .split('\0')
         .map(str::to_owned)
@@ -296,7 +301,12 @@ pub async fn stage(writer: &Writer, paths: &[String]) -> Result<(), GitError> {
 /// The writer's errors.
 pub async fn unstage(writer: &Writer, paths: &[String], unborn: bool) -> Result<(), GitError> {
     if unborn {
-        with_paths(writer, &["rm", "--cached", "-r", "--quiet", "--ignore-unmatch"], paths).await
+        with_paths(
+            writer,
+            &["rm", "--cached", "-r", "--quiet", "--ignore-unmatch"],
+            paths,
+        )
+        .await
     } else {
         with_paths(writer, &["restore", "--staged"], paths).await
     }
@@ -325,7 +335,10 @@ pub async fn set_index_entry(
         Some((mode, oid)) => {
             let info = format!("{mode},{oid},{path}");
             writer
-                .run(&["update-index", "--add", "--cacheinfo", &info], ExecOptions::default())
+                .run(
+                    &["update-index", "--add", "--cacheinfo", &info],
+                    ExecOptions::default(),
+                )
                 .await?
         }
         None => {

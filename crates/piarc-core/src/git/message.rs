@@ -9,7 +9,9 @@ use std::path::PathBuf;
 use piarc_git::diff::{self, ParsedFile};
 use piarc_git::{ExecOptions, GitError, Reader, commit, status};
 use piarc_protocol::git::{GitCommitMessage, GitFailure, GitFailureKind, GitLanguage};
-use piarc_protocol::session::{CommitMessageAnswer, CommitMessageFile, CommitMessageParams, SessionId};
+use piarc_protocol::session::{
+    CommitMessageAnswer, CommitMessageFile, CommitMessageParams, SessionId,
+};
 use serde_json::Value;
 
 use crate::Result;
@@ -96,7 +98,10 @@ async fn assemble(
     let reader = &context.reader;
     let head = reader.repo_head().await?;
     if amend && head.is_none() {
-        return Ok(Err(GitFailure::new(GitFailureKind::Invalid, "nothing to amend")));
+        return Ok(Err(GitFailure::new(
+            GitFailureKind::Invalid,
+            "nothing to amend",
+        )));
     }
     if !amend && !commit::has_staged(reader).await? {
         return Ok(Err(GitFailure::of(GitFailureKind::NothingToCommit)));
@@ -106,7 +111,16 @@ async fn assemble(
     let counts = status::parse_numstat(&reader.ok(&cached(&base, &["--numstat", "-z"])).await?);
     let patch = reader
         .run(
-            &cached(&base, &["--no-color", "--no-textconv", "-U3", "--src-prefix=a/", "--dst-prefix=b/"]),
+            &cached(
+                &base,
+                &[
+                    "--no-color",
+                    "--no-textconv",
+                    "-U3",
+                    "--src-prefix=a/",
+                    "--dst-prefix=b/",
+                ],
+            ),
             ExecOptions {
                 stdout_limit: Some(4 * 1024 * 1024),
                 ..ExecOptions::default()
@@ -118,12 +132,18 @@ async fn assemble(
         .filter_map(|f| f.path().map(str::to_owned).map(|p| (p, f)))
         .collect();
     let entries = diff::parse_raw(&raw);
-    let paths: Vec<PathBuf> = entries.iter().map(|e| reader.repo.root.join(&e.path)).collect();
+    let paths: Vec<PathBuf> = entries
+        .iter()
+        .map(|e| reader.repo.root.join(&e.path))
+        .collect();
     let denied = context.hub.read_denied(context.session, &paths).await;
     let (files, text, withheld) = describe(&entries, &counts, &sections, &denied);
     let subjects = if head.is_some() {
         let out = reader
-            .run(&["log", "-10", "--no-show-signature", "--format=%s"], ExecOptions::default())
+            .run(
+                &["log", "-10", "--no-show-signature", "--format=%s"],
+                ExecOptions::default(),
+            )
             .await?;
         String::from_utf8_lossy(&out.stdout)
             .lines()
@@ -154,10 +174,17 @@ async fn assemble(
 
 /// What the message describes changes from: `HEAD` (its parent when amending), or the empty
 /// tree.
-async fn base_of(reader: &Reader, head: Option<&str>, amend: bool) -> std::result::Result<String, GitError> {
+async fn base_of(
+    reader: &Reader,
+    head: Option<&str>,
+    amend: bool,
+) -> std::result::Result<String, GitError> {
     if amend {
         let parent = reader
-            .run(&["rev-parse", "--verify", "--quiet", "HEAD^1"], ExecOptions::default())
+            .run(
+                &["rev-parse", "--verify", "--quiet", "HEAD^1"],
+                ExecOptions::default(),
+            )
             .await?;
         if parent.success() {
             return Ok(String::from_utf8_lossy(&parent.stdout).trim().to_owned());
@@ -297,7 +324,13 @@ mod tests {
 
     #[test]
     fn sensitive_names() {
-        for path in [".env", "config/.env.local", "certs/server.pem", "id_ed25519", "a/.npmrc"] {
+        for path in [
+            ".env",
+            "config/.env.local",
+            "certs/server.pem",
+            "id_ed25519",
+            "a/.npmrc",
+        ] {
             assert!(is_sensitive(path), "{path}");
         }
         for path in ["src/env.ts", "keys.md", "README.md"] {
@@ -313,7 +346,9 @@ mod tests {
 
     #[test]
     fn private_keys_are_found_in_diffs() {
-        assert!(holds_private_key("+-----BEGIN OPENSSH PRIVATE KEY-----\n+abc"));
+        assert!(holds_private_key(
+            "+-----BEGIN OPENSSH PRIVATE KEY-----\n+abc"
+        ));
         assert!(!holds_private_key("+-----BEGIN CERTIFICATE-----"));
     }
 }

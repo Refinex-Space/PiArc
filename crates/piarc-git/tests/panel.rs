@@ -13,7 +13,9 @@ use support::{git, home, reader, repository, temp_dir};
 
 async fn changes(home: &Path, repo: &Path, scope: GitScope) -> piarc_protocol::git::GitChanges {
     let reader = reader(home, repo).await;
-    let range = diff::resolve_range(&reader, &scope, None).await.expect("range");
+    let range = diff::resolve_range(&reader, &scope, None)
+        .await
+        .expect("range");
     diff::changes(&reader, range, false).await.expect("changes")
 }
 
@@ -23,7 +25,11 @@ async fn uncommitted_scope_lists_every_kind_of_change() {
     let home = home(&root);
     let repo = repository(&root, "repo 仓库");
     std::fs::write(repo.join("gone.txt"), "bye\n").expect("gone");
-    std::fs::write(repo.join("old name.rs"), "fn a() {}\nfn b() {}\nfn c() {}\n").expect("old");
+    std::fs::write(
+        repo.join("old name.rs"),
+        "fn a() {}\nfn b() {}\nfn c() {}\n",
+    )
+    .expect("old");
     std::fs::write(repo.join("img.bin"), [0_u8, 1, 2, 3]).expect("bin");
     std::fs::write(repo.join("run.sh"), "echo hi\n").expect("run");
     git(&repo, &["add", "."]);
@@ -90,7 +96,11 @@ async fn crlf_files_with_autocrlf_show_only_real_changes() {
     git(&repo, &["commit", "-q", "-m", "crlf"]);
     std::fs::write(repo.join("win.txt"), "l1\r\nL2\r\nl3\r\n").expect("edit");
     let view = changes(&home, &repo, GitScope::Uncommitted).await;
-    let file = view.files.iter().find(|f| f.path == "win.txt").expect("win");
+    let file = view
+        .files
+        .iter()
+        .find(|f| f.path == "win.txt")
+        .expect("win");
     assert_eq!((file.added, file.removed), (Some(1), Some(1)));
     let lines = &file.diff.as_ref().expect("diff").hunks[0].lines;
     assert!(lines.iter().all(|l| !l.text.ends_with('\r')));
@@ -101,9 +111,15 @@ async fn branch_scope_compares_with_the_inferred_base() {
     let root = temp_dir("base");
     let home = home(&root);
     let remote = root.join("remote.git");
-    git(&root, &["init", "-q", "--bare", remote.to_str().expect("utf8")]);
+    git(
+        &root,
+        &["init", "-q", "--bare", remote.to_str().expect("utf8")],
+    );
     let repo = repository(&root, "clone 克隆");
-    git(&repo, &["remote", "add", "origin", remote.to_str().expect("utf8")]);
+    git(
+        &repo,
+        &["remote", "add", "origin", remote.to_str().expect("utf8")],
+    );
     git(&repo, &["push", "-q", "origin", "main"]);
     git(&repo, &["remote", "set-head", "origin", "main"]);
     git(&repo, &["switch", "-q", "-c", "feature/登录"]);
@@ -120,7 +136,9 @@ async fn branch_scope_compares_with_the_inferred_base() {
     assert_eq!(paths, ["b.txt", "c.txt"]);
 
     let reader = reader(&home, &repo).await;
-    let listed = log::commits(&reader, Some(base.clone())).await.expect("commits");
+    let listed = log::commits(&reader, Some(base.clone()))
+        .await
+        .expect("commits");
     assert_eq!(listed.total, 1);
     assert_eq!(listed.commits[0].subject, "feat: b");
 
@@ -132,7 +150,14 @@ async fn branch_scope_compares_with_the_inferred_base() {
     // An explicit base wins; one without common history answers as uncommitted.
     git(&repo, &["switch", "-q", "--orphan", "lonely"]);
     git(&repo, &["commit", "-q", "--allow-empty", "-m", "root"]);
-    let lonely = changes(&home, &repo, GitScope::Branch { base: Some("main".into()) }).await;
+    let lonely = changes(
+        &home,
+        &repo,
+        GitScope::Branch {
+            base: Some("main".into()),
+        },
+    )
+    .await;
     assert_eq!(lonely.scope, GitScope::Uncommitted);
 }
 
@@ -141,9 +166,15 @@ async fn status_reports_branch_upstream_counts_and_merge_state() {
     let root = temp_dir("status");
     let home = home(&root);
     let remote = root.join("remote.git");
-    git(&root, &["init", "-q", "--bare", remote.to_str().expect("utf8")]);
+    git(
+        &root,
+        &["init", "-q", "--bare", remote.to_str().expect("utf8")],
+    );
     let repo = repository(&root, "repo 仓库");
-    git(&repo, &["remote", "add", "origin", remote.to_str().expect("utf8")]);
+    git(
+        &repo,
+        &["remote", "add", "origin", remote.to_str().expect("utf8")],
+    );
     git(&repo, &["push", "-q", "-u", "origin", "main"]);
     std::fs::write(repo.join("a.txt"), "one\n").expect("a");
     git(&repo, &["commit", "-q", "-am", "local"]);
@@ -157,7 +188,11 @@ async fn status_reports_branch_upstream_counts_and_merge_state() {
     assert_eq!((repository.ahead, repository.behind), (1, 0));
     assert_eq!(repository.remotes, ["origin"]);
     assert_eq!(repository.state, GitRepoState::Clean);
-    let new = answer.files.iter().find(|f| f.path == "new.txt").expect("new");
+    let new = answer
+        .files
+        .iter()
+        .find(|f| f.path == "new.txt")
+        .expect("new");
     assert_eq!(new.added, Some(2));
 
     // A conflicted merge lists the file first and reports the state.
@@ -165,7 +200,14 @@ async fn status_reports_branch_upstream_counts_and_merge_state() {
     std::fs::write(repo.join("a.txt"), "other\n").expect("other");
     git(&repo, &["commit", "-q", "-am", "other"]);
     let merge = std::process::Command::new("git")
-        .args(["-c", "user.name=T", "-c", "user.email=t@e.invalid", "merge", "main"])
+        .args([
+            "-c",
+            "user.name=T",
+            "-c",
+            "user.email=t@e.invalid",
+            "merge",
+            "main",
+        ])
         .current_dir(&repo)
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .output()
@@ -231,8 +273,14 @@ async fn branches_texts_and_recent_checkouts() {
     };
     let head = text(GitTextSource::Commit { rev: "HEAD".into() }).await;
     assert_eq!(head.as_deref(), Some("one\ntwo\nthree\n"));
-    assert_eq!(text(GitTextSource::Index).await.as_deref(), Some("changed\n"));
-    assert_eq!(text(GitTextSource::Worktree).await.as_deref(), Some("changed again\n"));
+    assert_eq!(
+        text(GitTextSource::Index).await.as_deref(),
+        Some("changed\n")
+    );
+    assert_eq!(
+        text(GitTextSource::Worktree).await.as_deref(),
+        Some("changed again\n")
+    );
 }
 
 /// A repository whose configuration (local, included and global) names a marker-writing script
@@ -264,7 +312,13 @@ committer T <t@e.invalid> 1700000000 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----
     std::fs::write(&raw, object).expect("commit");
     let signed = git(
         &repo,
-        &["hash-object", "-t", "commit", "-w", raw.to_str().expect("utf8")],
+        &[
+            "hash-object",
+            "-t",
+            "commit",
+            "-w",
+            raw.to_str().expect("utf8"),
+        ],
     );
     git(&repo, &["update-ref", "HEAD", &signed]);
 
@@ -282,7 +336,12 @@ committer T <t@e.invalid> 1700000000 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let hooks = bin.join("hooks");
     std::fs::create_dir_all(&hooks).expect("hooks");
-    for hook in ["post-index-change", "pre-commit", "post-checkout", "reference-transaction"] {
+    for hook in [
+        "post-index-change",
+        "pre-commit",
+        "post-checkout",
+        "reference-transaction",
+    ] {
         std::fs::copy(&script, hooks.join(hook)).expect("hook");
     }
     let s = script.display().to_string();
@@ -324,11 +383,19 @@ async fn thr15_readonly_git_runs_no_repo_program() {
     for scope in [
         GitScope::Uncommitted,
         GitScope::Branch { base: None },
-        GitScope::Commit { sha: signed.clone() },
+        GitScope::Commit {
+            sha: signed.clone(),
+        },
     ] {
-        let range = diff::resolve_range(&reader, &scope, None).await.expect("range");
-        diff::changes(&reader, range.clone(), false).await.expect("changes");
-        diff::single(&reader, &range, "a.txt", None, true).await.expect("single");
+        let range = diff::resolve_range(&reader, &scope, None)
+            .await
+            .expect("range");
+        diff::changes(&reader, range.clone(), false)
+            .await
+            .expect("changes");
+        diff::single(&reader, &range, "a.txt", None, true)
+            .await
+            .expect("single");
     }
     let base = answer.repository.and_then(|r| r.base);
     log::commits(&reader, base).await.expect("commits");
@@ -338,7 +405,9 @@ async fn thr15_readonly_git_runs_no_repo_program() {
         GitTextSource::Index,
         GitTextSource::Worktree,
     ] {
-        log::file_text(&reader, &source, "a.txt").await.expect("text");
+        log::file_text(&reader, &source, "a.txt")
+            .await
+            .expect("text");
     }
     let ran = std::fs::read_to_string(&marker).unwrap_or_default();
     assert!(ran.is_empty(), "a read-only query ran a program:\n{ran}");
@@ -364,7 +433,11 @@ async fn exec_cuts_output_and_cancels() {
     let slow = root.join("slow-git.sh");
     std::fs::write(&slow, "#!/bin/sh\nhead -c 4096 /dev/zero\nsleep 30\n").expect("slow");
     std::fs::set_permissions(&slow, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-    let git = Git::new(Arc::new(support::TokioSpawner), slow, support::inherited(&root));
+    let git = Git::new(
+        Arc::new(support::TokioSpawner),
+        slow,
+        support::inherited(&root),
+    );
 
     let cancel = Cancel::new();
     let later = cancel.clone();
@@ -384,13 +457,20 @@ async fn exec_cuts_output_and_cancels() {
             },
         )
         .await;
-    assert!(matches!(result, Err(GitError::Cancelled { .. })), "{result:?}");
+    assert!(
+        matches!(result, Err(GitError::Cancelled { .. })),
+        "{result:?}"
+    );
     assert!(started.elapsed() < std::time::Duration::from_secs(10));
 
     let quick = root.join("quick-git.sh");
     std::fs::write(&quick, "#!/bin/sh\nhead -c 4096 /dev/zero\n").expect("quick");
     std::fs::set_permissions(&quick, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-    let git = Git::new(Arc::new(support::TokioSpawner), quick, support::inherited(&root));
+    let git = Git::new(
+        Arc::new(support::TokioSpawner),
+        quick,
+        support::inherited(&root),
+    );
     let out = git
         .exec(
             &root,

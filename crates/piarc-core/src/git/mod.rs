@@ -19,7 +19,6 @@ mod message;
 pub(crate) mod restore;
 pub(crate) mod write;
 
-
 /// The route of `core/git` events.
 pub const GIT_ROUTE: &str = "core/git";
 
@@ -161,14 +160,18 @@ pub(crate) fn settings_of(settings: &piarc_config::Settings) -> GitSettings {
 /// Whether `branch` matches one of `patterns` (`*` matches any run of characters).
 #[must_use]
 pub(crate) fn is_protected(branch: &str, patterns: &[String]) -> bool {
-    patterns.iter().any(|p| glob(p.as_bytes(), branch.as_bytes()))
+    patterns
+        .iter()
+        .any(|p| glob(p.as_bytes(), branch.as_bytes()))
 }
 
 fn glob(pattern: &[u8], text: &[u8]) -> bool {
     match pattern.split_first() {
         None => text.is_empty(),
         Some((b'*', rest)) => (0..=text.len()).any(|i| glob(rest, &text[i..])),
-        Some((&c, rest)) => text.split_first().is_some_and(|(&t, tail)| t == c && glob(rest, tail)),
+        Some((&c, rest)) => text
+            .split_first()
+            .is_some_and(|(&t, tail)| t == c && glob(rest, tail)),
     }
 }
 

@@ -42,7 +42,10 @@ enum Target {
 
 async fn exists(reader: &Reader, reference: &str) -> Result<bool, GitError> {
     Ok(reader
-        .run(&["show-ref", "--verify", "--quiet", reference], ExecOptions::default())
+        .run(
+            &["show-ref", "--verify", "--quiet", reference],
+            ExecOptions::default(),
+        )
         .await?
         .success())
 }
@@ -61,7 +64,13 @@ async fn resolve(reader: &Reader, target: &str) -> Result<Target, GitError> {
     }
     let commit = format!("{target}^{{commit}}");
     reader
-        .ok(&["rev-parse", "--verify", "--quiet", "--end-of-options", &commit])
+        .ok(&[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            "--end-of-options",
+            &commit,
+        ])
         .await?;
     Ok(Target::Detached(target.to_owned()))
 }
@@ -108,7 +117,8 @@ fn outcome_of(out: &ExecOutput) -> Option<CheckoutOutcome> {
             "would be overwritten by checkout:",
         )));
     }
-    if stderr.contains("is already checked out at") || stderr.contains("is already used by worktree")
+    if stderr.contains("is already checked out at")
+        || stderr.contains("is already used by worktree")
     {
         let path = stderr
             .split('\'')
@@ -144,7 +154,10 @@ pub async fn checkout(
 
 async fn stash_top(reader: &Reader) -> Result<Option<String>, GitError> {
     let out = reader
-        .run(&["rev-parse", "--verify", "--quiet", "refs/stash"], ExecOptions::default())
+        .run(
+            &["rev-parse", "--verify", "--quiet", "refs/stash"],
+            ExecOptions::default(),
+        )
         .await?;
     Ok(out
         .success()
@@ -161,18 +174,26 @@ async fn smart(
     let message = format!("{STASH_PREFIX} {from} → {shown}");
     let before = stash_top(reader).await?;
     let push = writer
-        .run(&["stash", "push", "-m", &message], ExecOptions::timeout(WRITE_TIMEOUT))
+        .run(
+            &["stash", "push", "-m", &message],
+            ExecOptions::timeout(WRITE_TIMEOUT),
+        )
         .await?;
     if !push.success() {
         return Err(failed(&["stash"], &push));
     }
     let stashed = stash_top(reader).await? != before;
     let args = switch_args(target, false);
-    let out = writer.run(&args, ExecOptions::timeout(WRITE_TIMEOUT)).await?;
+    let out = writer
+        .run(&args, ExecOptions::timeout(WRITE_TIMEOUT))
+        .await?;
     if !out.success() {
         if stashed {
             let _ = writer
-                .run(&["stash", "pop", "--index"], ExecOptions::timeout(WRITE_TIMEOUT))
+                .run(
+                    &["stash", "pop", "--index"],
+                    ExecOptions::timeout(WRITE_TIMEOUT),
+                )
                 .await;
         }
         return outcome_of(&out).ok_or_else(|| failed(&args, &out));
@@ -200,7 +221,13 @@ async fn smart(
 /// The reader's errors.
 pub async fn conflicted(reader: &Reader) -> Result<Vec<String>, GitError> {
     let out = reader
-        .ok(&["diff", "--name-only", "-z", "--diff-filter=U", "--no-ext-diff"])
+        .ok(&[
+            "diff",
+            "--name-only",
+            "-z",
+            "--diff-filter=U",
+            "--no-ext-diff",
+        ])
         .await?;
     Ok(String::from_utf8_lossy(&out)
         .split('\0')
@@ -210,7 +237,9 @@ pub async fn conflicted(reader: &Reader) -> Result<Vec<String>, GitError> {
 }
 
 async fn run_ok(writer: &Writer, args: &[&str]) -> Result<(), GitError> {
-    let out = writer.run(args, ExecOptions::timeout(WRITE_TIMEOUT)).await?;
+    let out = writer
+        .run(args, ExecOptions::timeout(WRITE_TIMEOUT))
+        .await?;
     if out.success() {
         Ok(())
     } else {
@@ -274,7 +303,10 @@ pub async fn delete(
     let upstream = upstream_of(reader, name).await?;
     let flag = if force { "-D" } else { "-d" };
     let out = writer
-        .run(&["branch", flag, "--end-of-options", name], ExecOptions::default())
+        .run(
+            &["branch", flag, "--end-of-options", name],
+            ExecOptions::default(),
+        )
         .await?;
     if !out.success() {
         if out.stderr.contains("not fully merged") {
@@ -299,7 +331,14 @@ pub async fn upstream_of(reader: &Reader, name: &str) -> Result<Option<String>, 
     let spec = format!("{name}@{{upstream}}");
     let out = reader
         .run(
-            &["rev-parse", "--abbrev-ref", "--verify", "--quiet", "--end-of-options", &spec],
+            &[
+                "rev-parse",
+                "--abbrev-ref",
+                "--verify",
+                "--quiet",
+                "--end-of-options",
+                &spec,
+            ],
             ExecOptions::default(),
         )
         .await?;
@@ -363,7 +402,13 @@ pub async fn set_upstream(
             let flag = format!("--set-upstream-to={up}");
             run_ok(writer, &["branch", &flag, "--end-of-options", branch]).await
         }
-        None => run_ok(writer, &["branch", "--unset-upstream", "--end-of-options", branch]).await,
+        None => {
+            run_ok(
+                writer,
+                &["branch", "--unset-upstream", "--end-of-options", branch],
+            )
+            .await
+        }
     }
 }
 

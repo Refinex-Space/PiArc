@@ -9,8 +9,7 @@ use std::path::{Path, PathBuf};
 
 use piarc_git::{Git, Reader, args, commit, diff, index, log, refs, status};
 use piarc_protocol::git::{
-    GitCall, GitEvent, GitFailure, GitFailureKind, GitProbe, GitRequest, GitScope,
-    GitTextSource,
+    GitCall, GitEvent, GitFailure, GitFailureKind, GitProbe, GitRequest, GitScope, GitTextSource,
 };
 use serde_json::Value;
 
@@ -96,8 +95,7 @@ impl Hub {
         tokio::task::spawn_blocking(move || {
             let workspace = piarc_git::canonical(&project).unwrap_or(project);
             let table = storage.dirs().layers(&workspace);
-            let settings =
-                piarc_config::Settings::load(table, piarc_config::TrustState::Untrusted);
+            let settings = piarc_config::Settings::load(table, piarc_config::TrustState::Untrusted);
             panel::settings_of(&settings)
         })
         .await

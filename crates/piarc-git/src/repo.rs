@@ -52,12 +52,24 @@ impl Repo {
     #[must_use]
     pub fn fingerprint(&self) -> String {
         let mut out = String::new();
-        let local = ["HEAD", "index", "ORIG_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD"];
+        let local = [
+            "HEAD",
+            "index",
+            "ORIG_HEAD",
+            "MERGE_HEAD",
+            "CHERRY_PICK_HEAD",
+        ];
         let local_more = ["REVERT_HEAD", "logs/HEAD", "rebase-merge", "rebase-apply"];
         for name in local.iter().chain(local_more.iter()) {
             stamp(&mut out, &self.git_dir.join(name));
         }
-        for name in ["packed-refs", "FETCH_HEAD", "refs/heads", "refs/remotes", "refs/tags"] {
+        for name in [
+            "packed-refs",
+            "FETCH_HEAD",
+            "refs/heads",
+            "refs/remotes",
+            "refs/tags",
+        ] {
             stamp(&mut out, &self.common_dir.join(name));
         }
         out
@@ -152,7 +164,10 @@ impl Reader {
     /// The runner's errors.
     pub async fn repo_head(&self) -> Result<Option<String>, GitError> {
         let out = self
-            .run(&["rev-parse", "--verify", "--quiet", "HEAD"], ExecOptions::default())
+            .run(
+                &["rev-parse", "--verify", "--quiet", "HEAD"],
+                ExecOptions::default(),
+            )
             .await?;
         Ok(out
             .success()
@@ -191,11 +206,21 @@ impl Reader {
     /// # Errors
     ///
     /// The runner's errors.
-    pub async fn tracking_oid(&self, remote: &str, branch: &str) -> Result<Option<String>, GitError> {
+    pub async fn tracking_oid(
+        &self,
+        remote: &str,
+        branch: &str,
+    ) -> Result<Option<String>, GitError> {
         let reference = format!("refs/remotes/{remote}/{branch}");
         let out = self
             .run(
-                &["rev-parse", "--verify", "--quiet", "--end-of-options", &reference],
+                &[
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    "--end-of-options",
+                    &reference,
+                ],
                 ExecOptions::default(),
             )
             .await?;
@@ -214,7 +239,15 @@ impl Reader {
             return Ok(Vec::new());
         }
         let out = self
-            .ok(&["diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv", "HEAD", "--"])
+            .ok(&[
+                "diff",
+                "--name-only",
+                "-z",
+                "--no-ext-diff",
+                "--no-textconv",
+                "HEAD",
+                "--",
+            ])
             .await?;
         Ok(String::from_utf8_lossy(&out)
             .split('\0')
@@ -298,7 +331,9 @@ async fn discover(git: &Git, cwd: &Path, fixed: &[OsString]) -> Result<Option<Re
         ]
         .map(OsString::from),
     );
-    let output = git.exec(cwd, &args, ExecOptions::timeout(READ_TIMEOUT)).await?;
+    let output = git
+        .exec(cwd, &args, ExecOptions::timeout(READ_TIMEOUT))
+        .await?;
     if !output.success() {
         let stderr = output.stderr.to_ascii_lowercase();
         if stderr.contains("not a git repository") || stderr.contains("must be run in a work tree")
@@ -345,7 +380,9 @@ async fn filter_overrides(
         ]
         .map(OsString::from),
     );
-    let output = git.exec(root, &args, ExecOptions::timeout(READ_TIMEOUT)).await?;
+    let output = git
+        .exec(root, &args, ExecOptions::timeout(READ_TIMEOUT))
+        .await?;
     match output.code {
         Some(0) => {}
         Some(1) => return Ok(Vec::new()),
