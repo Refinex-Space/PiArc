@@ -411,6 +411,9 @@ const api: PiarcApi = {
       .then((value: unknown) => expectString(value)),
   cancelGit: (opId) =>
     ipcRenderer.invoke(IPC_CHANNELS.gitCancel, opId).then((value: unknown) => value === true),
+  browser: (id, request) => ipcRenderer.invoke(IPC_CHANNELS.browserRequest, id, request),
+  placeBrowser: (id, placement) =>
+    ipcRenderer.invoke(IPC_CHANNELS.browserPlace, id, placement).then(() => undefined),
   switchBranch: (id, entryId) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionSwitchBranch, id, entryId)

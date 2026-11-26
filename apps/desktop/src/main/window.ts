@@ -35,6 +35,23 @@ export function createMainWindow(
   return window;
 }
 
+/**
+ * The built-in browser's hidden window (B1.5.3): pages no panel shows are attached to it so
+ * they keep running, painting and answering the agent. It never loads anything itself.
+ */
+export function createParkingWindow(): BrowserWindow {
+  return new BrowserWindow({
+    show: false,
+    width: 1280,
+    height: 800,
+    paintWhenInitiallyHidden: true,
+    skipTaskbar: true,
+    // i18n-exempt: never shown.
+    title: 'PiArc browser pages',
+    webPreferences: secureWebPreferences(''),
+  });
+}
+
 /** A renderer that went away more often than this within a minute is not reloaded again. */
 export const CRASH_RELOADS_PER_MINUTE = 3;
 

@@ -55,7 +55,12 @@ import { guardWebContents } from './security/navigation.js';
 import { applyPermissionPolicy } from './security/permissions.js';
 import { refuseRemoteDebugging } from './security/runtime-switches.js';
 import { ToolWindows } from './tool-windows.js';
-import { createMainWindow } from './window.js';
+import { createMainWindow, createParkingWindow } from './window.js';
+import { registerBrowserHandlers } from './browser/browser-ipc.js';
+import { refuseClientCertificates } from './browser/guest-session.js';
+import { BrowserService } from './browser/service.js';
+import { electronExternalLinkPort } from './external-link-port.js';
+import { LinkConfirmations } from './external-links.js';
 
 // Release builds refuse Chromium's remote debugging before anything else runs (T45, I10): the
 // switches are removed, so the DevTools server never starts, and the app exits.
@@ -77,6 +82,8 @@ const trustedOrigins: readonly string[] =
 
 let shell: AppShell | undefined;
 let tray: TrayIcon | undefined;
+/** The built-in browser (ADR-0088); exists once Core runs. */
+let browser: BrowserService | undefined;
 const eventRouter = new EventRouter();
 /** Launch targets that arrived before the shell existed (macOS sends them before `ready`). */
 const early: LaunchTarget[] = [];
@@ -171,6 +178,39 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
   });
 }
 
+/** The built-in browser: its service, the idle-page sweep and the cleanup at quit. */
+function startBrowser(core: CoreHost, appShell: AppShell, dirs: DataDirs): BrowserService {
+  const links = new LinkConfirmations();
+  const devPort = devServer === undefined ? undefined : Number(new URL(devServer.origin).port);
+  const denied = new Set<number>(devPort === undefined || devPort === 0 ? [] : [devPort]);
+  const service = new BrowserService({
+    core: core.runtime,
+    windows: () => appShell.mainWindows(),
+    translator: () => appShell.t(),
+    openExternal: (window, url) => {
+      void links.open(window?.id ?? 0, url, electronExternalLinkPort(window, appShell.t()));
+    },
+    dataDir: path.join(dirs.data, 'browser'),
+    platform: process.platform,
+    deniedPorts: () => denied,
+    createParking: createParkingWindow,
+    preferences: () => ({
+      storage: 'persist',
+      searchEngine: 'google',
+      localHostnames: ['*.test', '*.local'],
+    }),
+  });
+  const sweep = setInterval(() => {
+    service.discardIdle();
+  }, 60_000);
+  sweep.unref();
+  app.on('will-quit', () => {
+    clearInterval(sweep);
+    service.dispose();
+  });
+  return service;
+}
+
 function start(dirs: DataDirs): void {
   let toolWindows: ToolWindows | undefined;
   let previews: ProjectPreviews | undefined;
@@ -185,7 +225,15 @@ function start(dirs: DataDirs): void {
   app.on('session-created', (created) => {
     applyPermissionPolicy(created, trustedOrigins);
   });
+  // Browser guests and the agent's script host are recognized by their partition when they
+  // are created (ADR-0088 rule 2): they get the browser's guards, never the app's.
+  refuseClientCertificates((contents) => browser?.isBrowserContents(contents) ?? false);
   app.on('web-contents-created', (_event, contents) => {
+    if (browser?.isBrowserContents(contents) === true) return;
+    contents.on('destroyed', () => browser?.released(contents));
+    contents.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) browser?.released(contents);
+    });
     guardWebContents(
       contents,
       trustedOrigins,
@@ -339,7 +387,9 @@ function start(dirs: DataDirs): void {
     toolWindows.register(registerHandler);
     // Every page is watched from its creation: terminal input needs the page's recent real
     // input (I51), so the first keystroke must already be seen.
+    // A guest's input (including CDP's synthetic input) is never the workbench's real input.
     app.on('web-contents-created', (_event, contents) => {
+      if (browser?.isBrowserContents(contents) === true) return;
       terminalOwners.watch(contents);
     });
     registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
@@ -354,6 +404,8 @@ function start(dirs: DataDirs): void {
       terminalOwners,
       () => preferences.locale(),
     );
+    browser = startBrowser(core, appShell, dirs);
+    registerBrowserHandlers(registerHandler, browser);
     startTestHooks(core, terminalOwners, appShell);
     // The preferences come first: the window's language, theme and menu depend on them.
     void preferences.load().then(() => {

@@ -13,6 +13,7 @@ import type {
 
 import type { ImageInput, ImageSettingsRequest } from './markdown-images.js';
 import type { ProjectRequest } from './project-files.js';
+import type { BrowserPlacement, BrowserRequest, BrowserSessionState } from './browser.js';
 import type { CommandId } from './keybindings.js';
 import type { Locale } from './i18n/index.js';
 import type { PreferenceChange, Preferences } from './preferences.js';
@@ -70,6 +71,8 @@ export const IPC_CHANNELS = {
   sessionChanges: 'piarc:session.changes',
   sessionDiscardChange: 'piarc:session.discardChange',
   gitRequest: 'piarc:git.request',
+  browserRequest: 'piarc:browser.request',
+  browserPlace: 'piarc:browser.place',
   gitCancel: 'piarc:git.cancel',
   sessionSwitchBranch: 'piarc:session.switchBranch',
   sessionFork: 'piarc:session.fork',
@@ -297,7 +300,18 @@ export type AppEvent =
    * An answer given in a system notification was not applied (T42): the request was answered
    * elsewhere first or is no longer current.
    */
-  | { readonly type: 'approvalNotice'; readonly sessionId: string; readonly status: string };
+  | { readonly type: 'approvalNotice'; readonly sessionId: string; readonly status: string }
+  /** The built-in browser's state of a session changed (ADR-0088). */
+  | { readonly type: 'browser'; readonly sessionId: string; readonly state: BrowserSessionState }
+  /** A still frame of the session's page, shown while something covers the page (B1.5.2). */
+  | { readonly type: 'browserStill'; readonly sessionId: string; readonly image: string }
+  /** A preview key pressed while the page had focus (`main/browser/keymap.ts`). */
+  | {
+      readonly type: 'browserKey';
+      readonly sessionId: string;
+      readonly tab: string;
+      readonly key: string;
+    };
 
 /**
  * The approval a waiting session's notification is about (T42): the card's identity as Core
@@ -821,6 +835,13 @@ export interface PiarcApi {
   git(id: string, request: Record<string, unknown>, opId?: string): Promise<string>;
   /** Cancels Git operation `opId`; whether one was running. */
   cancelGit(opId: string): Promise<boolean>;
+  /**
+   * One request to the built-in browser of session `id` (ADR-0088): `state` answers the
+   * session's state, `newTab` and `navigate` the tab id, the rest `null`.
+   */
+  browser(id: string, request: BrowserRequest): Promise<unknown>;
+  /** Where the session's preview panel wants its page; `null` when the panel is gone. */
+  placeBrowser(id: string, placement: BrowserPlacement): Promise<void>;
   /** Continues the session on another branch (`SessionRewound` JSON, T28). */
   switchBranch(id: string, entryId: string): Promise<string>;
   /**
