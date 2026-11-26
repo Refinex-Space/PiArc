@@ -351,6 +351,17 @@ GitPanel ─ window.piarc.git ─▶ 校验 · 近期输入 · 原生确认 ─�
 | 12 | L4 E1–E12、a11y 登记、i18n、威胁映射、受影响的现有测试 | `npm run package:desktop -- --flavor development`；第 5.4 节命令；`node scripts/ci/check-i18n.mjs`；`node scripts/ci/check-threats.mjs` |
 | 13 | 文档同步（架构、AGENTS.md）、全量 verify、对照本增补复核 | `npm run verify` |
 
+## 8. 实施偏差与未覆盖项（2026-11-25，G1+G2 实施后）
+
+| 条目 | 设计 | 实际 | 原因或后续 |
+|---|---|---|---|
+| A5.4 词级高亮 | 在 worker 中计算 | 渲染进程按行配对同步计算（`model.ts` 的 `changedWords`），单行 1,000 字符或两行词数乘积超过 60,000 时跳过 | 有上限的 LCS 在一个 hunk 内耗时可忽略，省掉一个 worker 与消息往返；大 diff 先折叠 |
+| B2.5 / B4.6 在终端中运行 | 在会话终端中填入命令、不执行 | 打开会话终端并把命令复制到剪贴板，由用户粘贴运行 | 向终端写入要求窗口近期真实输入且走同一写线程（ADR-0051），由页面代填会绕过它 |
+| B1.1 窄宽度 | 左列换成 diff，顶部有"返回" | 同设计；改动视图宽度不足 560 px 时并排自动退回统一，菜单项写明"面板加宽后可用" | — |
+| 协议字段 | camelCase | 内部标签枚举的结构体变体字段原为 snake_case，`undoRollback` 解析失败、`ignoreWhitespace` 被忽略、进度事件字段名不对；已加 `rename_all_fields` 与回归测试（`git::tests`） | 已修复 |
+| L4 覆盖 | 第 5.4 节 E1–E12 | `git-panel.e2e.ts` 覆盖 E1 的范围、提交列表、跳转与并排，E3 的勾选、按 hunk 显示、生成（英文界面）与提交，E4 的检出与带前缀新建，回滚的原生确认与撤销，E10 的保存与始终强推的确认；`t43-a11y.e2e.ts` 覆盖 E11 的 axe（改动视图、提交视图、分支弹窗、分支名对话框、设置页） | E2、E5–E9、E12 与 E1 的评论发送、F7、E3 的推送、E4 的重命名与删除恢复尚无 L4；对应的 Core 行为由 `tests/writes.rs`（推送被拒与 lease、拉取冲突、智能与强制检出、删除与恢复分支）、`sessions git::`（信任与运行中会话）与 `git-ipc.test.ts`（没有真实输入、取消确认）覆盖。G3 开工时补齐 |
+| 打包 | `npm run package:desktop -- --flavor development` | 本机缺 Xcode（只有 Command Line Tools），App Intents 的 `xcodebuild` 失败；Core、Agent Host bundle 与 `.vite/` 已在失败之前生成，L4 以 `dev` 形态运行 | 打包产物形态的 L4 需要装有 Xcode 的机器或 CI |
+
 ## 附录：评审裁决
 
 | # | 意见 | 来源 | 决定 | 理由 |

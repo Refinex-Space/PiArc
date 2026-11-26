@@ -2050,7 +2050,6 @@ export const en = {
   'git.goto.label': 'Go to a changed file',
   'git.goto.placeholder': 'File name',
   'git.goto.none': 'No matching files',
-  'git.scope.label': 'Compare: {scope}',
   'git.scope.menu': 'Compare',
   'git.scope.all': 'All changes',
   'git.scope.vs': 'Against {base}',

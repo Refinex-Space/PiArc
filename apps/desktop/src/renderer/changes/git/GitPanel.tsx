@@ -516,7 +516,6 @@ function ScopeButton({
         data-testid="git-scope"
         aria-haspopup="menu"
         aria-expanded={menu.open !== null}
-        aria-label={t('git.scope.label', { scope: shown })}
         disabled={disabled}
         onClick={(event) => {
           void session.loadBranches();
@@ -524,6 +523,7 @@ function ScopeButton({
           menu.openAt(box.left, box.bottom + 4, event.currentTarget);
         }}
       >
+        <span className="visually-hidden">{t('git.scope.menu')}: </span>
         {scope.kind === 'branch' && label !== undefined ? (
           <>
             <span className="git-scope-text">{revealBidi(label)}</span>

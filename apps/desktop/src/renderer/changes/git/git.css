@@ -813,8 +813,8 @@
   display: flex;
   align-items: center;
   gap: var(--piarc-space-1);
-  min-height: 26px;
-  padding: 0 var(--piarc-space-2);
+  min-height: 28px;
+  padding: 0 var(--piarc-space-2) 0 var(--piarc-space-1);
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-font-size-caption);
   font-weight: var(--piarc-font-weight-medium);
@@ -824,23 +824,39 @@
   display: flex;
   align-items: center;
   gap: var(--piarc-space-1);
-  min-height: 26px;
-  padding: 0 var(--piarc-space-2);
-  font-size: var(--piarc-font-size-small);
-  cursor: pointer;
+  min-height: 28px;
+  padding: 0 var(--piarc-space-2) 0 var(--piarc-space-1);
 }
 
 .git-cfile:hover {
   background: var(--piarc-surface-hover);
 }
 
-.git-cfile[aria-selected='true'] {
+.git-cfile[data-selected] {
   background: var(--piarc-surface-selected);
 }
 
-.git-cfile:focus-visible {
+:root[data-app] .git-cfile-select {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+  text-align: start;
+  cursor: pointer;
+}
+
+:root[data-app] .git-cfile-select:focus-visible {
   outline: 2px solid var(--piarc-border-focus);
   outline-offset: -2px;
+  border-radius: var(--piarc-radius-sm);
 }
 
 .git-cfile-name {
@@ -856,25 +872,36 @@
   flex: none;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.git-check-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 16px;
   height: 16px;
-  padding: 0;
   border: 1px solid var(--piarc-border-strong);
   border-radius: var(--piarc-radius-sm);
   background: var(--piarc-surface-input);
   color: var(--piarc-text-on-accent);
-  cursor: pointer;
 }
 
-:root[data-app] .git-check[aria-checked='true'],
-:root[data-app] .git-check[aria-checked='mixed'] {
+:root[data-app] .git-check[aria-checked='true'] .git-check-box,
+:root[data-app] .git-check[aria-checked='mixed'] .git-check-box {
   border-color: var(--piarc-accent-solid);
   background: var(--piarc-accent-solid);
 }
 
 :root[data-app] .git-check:focus-visible {
   outline: 2px solid var(--piarc-border-focus);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 :root[data-app] .git-check:disabled {
@@ -884,7 +911,7 @@
 
 .git-check-spacer {
   flex: none;
-  width: 16px;
+  width: 24px;
 }
 
 .git-letter {
@@ -1205,8 +1232,8 @@
     outline: 1px solid CanvasText;
   }
 
-  :root[data-app] .git-check[aria-checked='true'],
-  :root[data-app] .git-check[aria-checked='mixed'] {
+  :root[data-app] .git-check[aria-checked='true'] .git-check-box,
+  :root[data-app] .git-check[aria-checked='mixed'] .git-check-box {
     background: Highlight;
     color: HighlightText;
   }

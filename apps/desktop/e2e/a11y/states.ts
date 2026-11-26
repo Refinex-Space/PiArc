@@ -175,6 +175,17 @@ export const A11Y_STATES = [
     note: 'Changes panel with a comment being written and saved ones',
   },
   { id: 'panel:terminal', area: 'panel', panel: 'terminal', note: 'terminal panel' },
+  {
+    id: 'state:git-changes',
+    area: 'state',
+    note: 'Git tool in a repository: all changes against the base branch, files and commits',
+  },
+  {
+    id: 'state:git-commit',
+    area: 'state',
+    note: 'Git tool: the Commit view with a staged file and the message box',
+  },
+  { id: 'state:git-branches', area: 'state', note: 'Git tool: the branch popup' },
   { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
   {
     id: 'state:md-read',

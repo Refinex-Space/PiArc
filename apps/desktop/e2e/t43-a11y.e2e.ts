@@ -16,6 +16,7 @@ import { IPC_CHANNELS } from '../src/shared/ipc.js';
 import { expectTestHooks } from './core.js';
 import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from './oauth.js';
 import { idle, killAgentHost, openSession, prefer, send } from './t19.js';
+import { makeRepository } from './git.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -590,6 +591,33 @@ test('MCP asks for a form and an external URL', async ({ app, page, workspaces }
   await exerciseElicitation(app, page, workspaces, async (state) => {
     await checkState(page, state);
   });
+});
+
+test('the Git tool in a repository: changes, commit view, branches and a branch name', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  const { ws } = await openSession(app, page, workspaces, 'git 仓库', 'git-start', 'Start.');
+  await makeRepository(ws);
+  await idle(page);
+  await railTab(page, 'changes-card');
+  await page.getByTestId('changes-open').click();
+  await expect(page.getByTestId('git-file').first()).toBeVisible();
+  await checkState(page, 'state:git-changes');
+  await page.getByTestId('git-view-commit').click();
+  const readme = page.locator('[data-testid=git-commit-file][data-path="README.md"]');
+  await readme.getByTestId('git-file-check').click();
+  await expect(readme.getByTestId('git-file-check')).toHaveAttribute('aria-checked', 'true');
+  await checkState(page, 'state:git-commit');
+  await page.getByTestId('git-branch-button').click();
+  await expect(page.getByTestId('git-branch-row').first()).toBeVisible();
+  await checkState(page, 'state:git-branches');
+  await page.locator('[data-testid=git-branch-row][data-branch="new"]').click();
+  await expect(page.getByTestId('git-branch-name-dialog')).toBeVisible();
+  await checkState(page, 'dialog:git-prompt');
+  await page.keyboard.press('Escape');
 });
 
 test('every listed state was checked in this run', async () => {

@@ -178,11 +178,14 @@ function CheckBox({
         onToggle();
       }}
     >
-      {checked === true ? (
-        <CheckIcon size={12} />
-      ) : checked === 'mixed' ? (
-        <MinusIcon size={12} />
-      ) : null}
+      {/* A 16 px box in a 24 px target (WCAG 2.5.8). */}
+      <span className="git-check-box" aria-hidden="true">
+        {checked === true ? (
+          <CheckIcon size={12} />
+        ) : checked === 'mixed' ? (
+          <MinusIcon size={12} />
+        ) : null}
+      </span>
     </button>
   );
 }
@@ -586,7 +589,7 @@ function CommitFiles({
     <div
       className="git-commit-files"
       ref={list}
-      role="tree"
+      role="group"
       aria-label={t('git.commit.files')}
       onKeyDown={onKeyDown}
     >
@@ -626,20 +629,9 @@ function CommitFiles({
                 <div
                   key={file.path}
                   className="git-cfile"
-                  role="treeitem"
-                  aria-selected={selected === file.path}
-                  tabIndex={
-                    selected === file.path || (selected === undefined && file === files[0]) ? 0 : -1
-                  }
-                  data-row
                   data-path={file.path}
+                  data-selected={selected === file.path || undefined}
                   data-testid="git-commit-file"
-                  onClick={() => {
-                    onSelect(file.path);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') onSelect(file.path);
-                  }}
                   onContextMenu={(event) => {
                     event.preventDefault();
                     setMenuFile(file);
@@ -659,25 +651,42 @@ function CommitFiles({
                       }}
                     />
                   )}
-                  <span
-                    className={`git-letter is-${group === 'conflicts' ? 'conflicted' : (file.unstaged ?? file.staged ?? 'modified')}`}
-                    aria-hidden="true"
+                  {/* The row's own button selects the file; the checkbox beside it stages. */}
+                  <button
+                    type="button"
+                    className="git-cfile-select"
+                    aria-current={selected === file.path ? 'true' : undefined}
+                    tabIndex={
+                      selected === file.path || (selected === undefined && file === files[0])
+                        ? 0
+                        : -1
+                    }
+                    data-row
+                    data-path={file.path}
+                    onClick={() => {
+                      onSelect(file.path);
+                    }}
                   >
-                    {letter}
-                  </span>
-                  <TreeTypeIcon name={name} directory={false} open={false} />
-                  <span className="git-cfile-name" data-tooltip={revealBidi(file.path)}>
-                    <span className="git-file-base">{revealBidi(name)}</span>
-                    {folder === '' ? null : (
-                      <span className="git-file-folder">{revealBidi(folder)}</span>
-                    )}
-                  </span>
-                  {file.added === undefined ? null : (
-                    <span className="git-counts">
-                      <span className="diff-added">+{file.added}</span>{' '}
-                      <span className="diff-removed">−{file.removed ?? 0}</span>
+                    <span
+                      className={`git-letter is-${group === 'conflicts' ? 'conflicted' : (file.unstaged ?? file.staged ?? 'modified')}`}
+                      aria-hidden="true"
+                    >
+                      {letter}
                     </span>
-                  )}
+                    <TreeTypeIcon name={name} directory={false} open={false} />
+                    <span className="git-cfile-name" data-tooltip={revealBidi(file.path)}>
+                      <span className="git-file-base">{revealBidi(name)}</span>
+                      {folder === '' ? null : (
+                        <span className="git-file-folder">{revealBidi(folder)}</span>
+                      )}
+                    </span>
+                    {file.added === undefined ? null : (
+                      <span className="git-counts">
+                        <span className="diff-added">+{file.added}</span>{' '}
+                        <span className="diff-removed">−{file.removed ?? 0}</span>
+                      </span>
+                    )}
+                  </button>
                 </div>
               );
             })}

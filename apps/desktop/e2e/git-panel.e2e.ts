@@ -5,63 +5,16 @@
 // popup (check out, new branch with the prefix), and rollback through the native confirmation
 // with undo. Every write is checked with git itself. Screenshots go to tmp/evidence/git/ with
 // PIARC_EVIDENCE_TASK=git.
-import { execFile } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { promisify } from 'node:util';
 
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
+import { git, makeRepository } from './git.js';
 import { expect, test } from './sessions.js';
 import { idle, openSession, prefer, requests, screenshots } from './t19.js';
 
-const run = promisify(execFile);
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
-
-/** Git without the machine's configuration. */
-async function git(cwd: string, ...args: string[]): Promise<string> {
-  const { stdout } = await run('git', args, {
-    cwd,
-    env: {
-      ...process.env,
-      GIT_CONFIG_NOSYSTEM: '1',
-      GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
-    },
-  });
-  return stdout.trim();
-}
-
-const APP =
-  Array.from(
-    { length: 30 },
-    (_, i) => `export const line${String(i + 1)} = ${String(i + 1)};`,
-  ).join('\n') + '\n';
-
-/** main: README and src/app.ts; feature/login: one more commit; then uncommitted changes. */
-async function makeRepository(ws: string): Promise<void> {
-  await git(ws, 'init', '-q', '-b', 'main');
-  for (const [key, value] of [
-    ['user.name', 'PiArc Test'],
-    ['user.email', 'test@example.invalid'],
-    ['commit.gpgsign', 'false'],
-  ] as const) {
-    await git(ws, 'config', key, value);
-  }
-  await writeFile(path.join(ws, 'src', 'app.ts'), APP);
-  await writeFile(path.join(ws, 'README.md'), '# Demo\n\nA demo project.\n');
-  await git(ws, 'add', '-A');
-  await git(ws, 'commit', '-q', '-m', 'chore: initial commit');
-  await git(ws, 'checkout', '-q', '-b', 'feature/login');
-  await writeFile(path.join(ws, 'src', 'app.ts'), APP.replace('line3 = 3', "line3 = 'three'"));
-  await writeFile(
-    path.join(ws, 'src', 'login.ts'),
-    'export function login(): boolean {\n  return true;\n}\n',
-  );
-  await git(ws, 'add', '-A');
-  await git(ws, 'commit', '-q', '-m', 'feat: add login');
-  await writeFile(path.join(ws, 'README.md'), '# Demo\n\nA demo project with sign-in.\n');
-  await writeFile(path.join(ws, 'notes.txt'), 'remember the tests\n');
-}
 
 async function answerNext(app: ElectronApplication, answer: boolean): Promise<void> {
   await app.evaluate((_electron, value) => {

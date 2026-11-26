@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.72（2026-11-26） |
+| 版本 | 2.73（2026-11-25） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -289,6 +289,9 @@ PiArc/
 | [0075](../adr/0075-session-tool-tiles.md) | 会话工具右侧分块与受控独立窗口 | 详情随主会话，工具可独立调整位置、大小和回停靠 |
 | [0076](../adr/0076-project-files.md) | 会话项目文件的浏览、保存与隔离预览 | 工作树、系统窗口和对话草稿各有明确归属 |
 | [0077](../adr/0077-markdown-file-authoring.md) | 文件面板内的 Markdown 编辑、文档隔离渲染和本地图片授权 | 编辑器与阅读共享草稿、保存版本和工作树 |
+| [0084](../adr/0084-git-panel-scopes.md) | 右上角的 Changes 工具改为 Git 工具：仓库内以 Git 为准（全部改动 vs 基础分支、未提交、单个提交），保留"本会话"范围并作为非仓库时的退回；按 hunk 丢弃只在"本会话"，Git 范围的回滚先存快照并原生确认 | 用户要看的是仓库的真实状态，会话快照看不到 Bash 与用户自己的改动 |
+| [0085](../adr/0085-git-command-boundaries.md) | Git 命令只在 Core 运行：只读查询以命令行覆盖关掉仓库可配置的程序，写操作只在受信任的项目、按会话空闲与仓库写锁执行；丢失工作的操作经主进程原生确认并核对 Core 读到的事实；强推只用带期望提交的 lease，受保护分支只在 Core 判断 | 打开面板即读仓库，恶意仓库的 Git 配置不能借此运行程序；破坏性操作不能由渲染进程单独发起 |
+| [0086](../adr/0086-commit-message-generation.md) | 提交信息经会话级 AHP 请求 `session/commitMessage` 由辅助模型生成，语言由主进程按界面语言填入，暂存内容按预算与敏感规则裁剪并脱敏 | 只在用户点击时发送已暂存的内容；语言与指令可控 |
 | [0026](../adr/0026-turns-queue-and-interrupted-transcript.md) | 一个输入一个回合：steer 交给 Pi，follow-up 由 Agent Host 在回合后启动；排队表带 id；中断后补写"已中断"结果与中断标记；重试只在 Pi 的 agent 循环；seq 缺口用回放缓冲补齐 | Pi 1.5.2 的 follow-up 不分回合、队列没有 id、中断后留下相邻 user 消息 |
 | [0025](../adr/0025-core-state-and-project-trust.md) | `ready` 前固定 `userData` 与 `sessionData`；SQLite 只经编号迁移演进；信任按主 checkout 存、撤销即删除并重启 Agent Host；Pi 的项目信任经资源加载器的 `resolveProjectTrust` 钩子由 Core 回答 | 数据库与信任的语义发布后难改；钩子是 Pi SDK 路径唯一的信任挂点 |
 | [0014](../adr/0014-core-binding-napi-rs.md) | Rust Core 以 NAPI-RS 原生模块加载在主进程 | Node-API ABI 稳定；粗粒度接口与合并事件流 |
@@ -299,7 +302,7 @@ PiArc/
 | [0017](../adr/0017-terminal-libghostty-vt.md) | 终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | agent 读屏与用户所见一致；IPC 流量与输出量无关 |
 | [0023](../adr/0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort | 按键之后 MessagePort 消息被推迟到下一帧之后处理；改为回复后回显额外延迟 p95 从 16.2 ms 降到 0.77 ms |
 
-已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订；ADR-0014 第 4 条（大块数据转移）被 ADR-0019 修订；ADR-0017 第 3 条中帧的送达方式（经 MessagePort）被 ADR-0023 修订。
+已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订；ADR-0014 第 4 条（大块数据转移）被 ADR-0019 修订；ADR-0017 第 3 条中帧的送达方式（经 MessagePort）被 ADR-0023 修订；ADR-0044 第 8 条（Changes 面板）被 ADR-0084 取代。
 
 ---
 
@@ -844,7 +847,7 @@ T36 落地（ADR-0053）：
 - **Rewind 选项**：恢复代码与对话 / 只恢复对话 / 只恢复代码 / 从此处摘要。对话恢复使用 Pi 会话树：在目标用户消息处分支（原分支保留，可在历史中切换回去）。
 - 代码恢复前检查目标文件当前内容与快照记录的"之后"状态是否一致；不一致（被外部或 Bash 修改过）时列出冲突让用户选择。
 - 限制与 Claude Code 一致：只被 Bash 改动的文件不在快照内；UI 明确说明，并在会话面板提示配合 git 使用。
-- Changes 面板支持按文件、按 hunk 丢弃改动（基于快照的确定性回退，而不是让 agent "请撤销"）。
+- Changes 面板支持按文件、按 hunk 丢弃改动（基于快照的确定性回退，而不是让 agent "请撤销"）。ADR-0084 起这是 Git 工具的"本会话"范围，也是非 Git 仓库时的视图；Git 范围的改动以仓库为准（第 8.2 节）。
 - **T28 落地（ADR-0044）**：
   - 检查点：键为会话加 PiArc 回合 id（`piarc.input` 记录的 `turn-<uuid>`），Core 在交付 `turn/started` 时建立；`fs/write` 带可选的 `turnId`。`piarc-fs` 在写入的路径锁内、原子替换之前把旧字节存入 `piarc_checkpoint::ObjectStore`，替换成功后 Core 写 `checkpoint_files`（操作 `create`/`modify`/`restore`/`undo`/`discard`）。设置 `fileCheckpointingEnabled: false`（Claude Code 同名键）时不建检查点、不存快照。
   - 代码恢复按时间：取检查点 id 不小于目标回合的全部记录，每个路径恢复为第一条记录的"之前"内容（不存在则删除），当前内容既不是目标也不是会话最后写下的内容时列为冲突，由用户逐个选择覆盖或保留，取消不改任何文件。执行时逐个文件在路径锁内核对预览时的哈希，第一个失败即停止并报告逐文件结果；恢复按批次记录，撤销把仍是恢复后内容的文件写回。写回直接用快照字节，编码、BOM 与换行不变，并从会话文件状态表移除该路径。
@@ -1241,6 +1244,7 @@ impl Session {
 - 状态导出（T13）：`CoreRuntime.create` 的选项增加 `dataDir` 与 `cacheDir`（同时给或都不给；不给时没有数据库、设置、信任与日志文件，只用于事件通道的测试）；`rebuildSessionIndex()`、`projectTrust(path)`、`decideProjectTrust(path, trusted, version)`、`revokeProjectTrust(path)` 都返回 JSON 文本的 Promise（`piarc_core::storage::report_json`、`piarc_core::trust::TrustView`）。设置变化以事件发到 `core/settings`（`{ workspace, changed, issues }`）。
 - Promise 由 Core 自己的运行时经 NAPI-RS 的 `JsDeferred` 结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - 会话导出（T14）：`CoreRuntime.create` 的选项增加 `agentHost`（打包产物的 `resourcesPath`，或开发时的 `node` 与 `bundle`）与 `idleTimeoutMs`；`openWorkspace`（Agent Host 就绪后才解析）、`closeWorkspace`、`createSession`、`resumeSession`、`forkSession`、`closeSession`、`prompt`、`steer`、`followUp`、`abort`、`editQueueItem`、`deleteQueueItem`、`reorderQueue`、`markSessionRead`、`transcriptWindow(id, start, limit)` 返回 JSON 文本的 Promise，`resendSnapshots` 只入队。事件路由：`core/workspaces`、`core/sessions`（实体快照，各自的 `revision` 严格递增，由同一个任务按顺序发出）与 `session/<id>`（会话通知 `{ method, params }`，按 Agent Host 的 `seq` 连续交付；Core 自己的 `session/resync`（缺口无法补齐，需重新加载 transcript）与 `session/uncertain`（Agent Host 重启时在途的调用））。开发构建另有 `createForTests`（保险箱主密钥放在内存，测试不碰钥匙串）。
+- Git 导出（ADR-0084、ADR-0085）：`gitRequest(id, json)` 以会话的文件根定位仓库，请求为 `GitCall`（可选 `opId` 加按 `op` 区分的 `GitRequest`：读取 `probe`、`status`、`changes`、`fileDiff`、`fileText`、`commits`、`branches`、`fileStages`、`lastCommit`，写入 `stage`、`unstage`、`stageHunk`、`unstageHunk`、`rollbackHunk`、`rollback`、`undoRollback`、`commit`、`checkout`、`createBranch`、`renameBranch`、`deleteBranch`、`restoreBranch`、`setUpstream`、`fetch`、`pull`、`push`、`continue`、`abort`、`skip`、`markResolved`，以及 `commitMessage` 与原生确认用的 `describe`），结果为 `{ result }` 或 `{ failure: GitFailure }` 的 JSON 文本；`cancelGit(opId)` 取消运行中的操作。事件路由 `core/git`：`progress`（发起操作的会话、`opId`、git 报告的阶段与百分比）与 `changed`（仓库根，同一仓库的会话刷新）。写入要求项目受信任、该仓库没有运行中的会话（`sessionBusy`）并取仓库写锁；原生确认在主进程，确认后带上 Core 给出的期望值再执行（第 10.1 节 THR-15）。
 - 检查点导出（T28，ADR-0044）：`rewindPreview(id, turnId)`、`rewind(id, request)`（`turnId`、`scope` 为 `codeAndConversation`/`conversation`/`code`/`summarize`、冲突的逐个选择）、`undoRewind(id, restoreId)`、`sessionChanges(id, path?)`、`discardChange(id, { path, version, hunk? })`、`switchBranch(id, entryId)`，`forkSession` 增加可选的 `beforeTurn`；结果为 JSON 文本（`RewindPreview`、`RewindReport`、`ChangesView`），事件 `session/branchChanged`。
 - 会话元数据与客户端偏好（T18，ADR-0029）：`renameSession(id, title|null)`、`setSessionPinned`、`setSessionArchived`（归档时先关闭会话并清理临时输出，T19 起保留附件）、`deleteSession`（先关闭，再删除 Pi 的 JSONL、临时目录与索引行；原生确认的标题与工作区来自 Core 的 `sessionDeletionTarget(id)`，同时显示该 ID）对打开与未打开的会话都可用；`core/sessions` 的条目增加 `pinned`、`archived`，标题取用户标题 > 会话名 > 首条消息；新会话在 Pi 写出文件（第一条回复）之前以 Core 发出的第一条消息作标题。`userSettings()` 返回用户级 `settings.json`，`writeClientSetting(pointer, valueJson|null)` 只写 `/language`、`/appearance`、`/keybindings`、`/notifications`。`decideProjectTrust` 与 `revokeProjectTrust` 在同一主 checkout 的打开工作区都进入重启状态之后才应答，之后的请求等新进程就绪。启动时的索引同步结束后重新发出会话快照。
 - Composer 导出（T19，ADR-0030）包括 `composerInfo()`（内置命令、附件与搜索上限）、`searchFiles(searchId, root, query, limit)`、`cancelFileSearch(searchId)`、`storeAttachment(id, name, mimeType, bytes)` 和 `compact(id)`。NAPI 的文本方法 `prompt`、`steer`、`followUp` 保持 T14 语义，结构化输入经对应的 `promptInput`、`steerInput`、`followUpInput` 传入。
@@ -1259,6 +1263,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 ### 7.7 diff 与预处理
 
 - **diff**：similar 计算行级与词级 diff，输出 hunk 结构；Changes 面板、审批卡、快照回退用同一份结构。超过阈值（例如 5,000 行或 300 个文件）时降级为折叠与纯文本。T16 落地行级部分：`piarc_diff::file_diff` 给出 `FileDiff`（unified 文本、3 行上下文的 hunk、增删行数，行文本不含换行符，末行无换行时标记 `noNewline`）；增删超过 5,000 行或文本超过 512 KiB 时不给 hunk、文本截断（`degraded`）；similar 的搜索限时 2 秒，超时后给出较粗的 diff。T28 的 Changes 面板沿用行级 `FileDiff`（基线为会话最早一条快照，当前内容从磁盘读），面板超过 300 个文件或合计 5,000 行增删时整体降级为折叠与纯文本（`piarc_diff::MAX_PANEL_FILES`、`MAX_PANEL_LINES`）；按 hunk 丢弃由 `piarc_diff::revert_hunks` 对当前文本反向应用。词级 diff 与 UTF-16 偏移仍未实现：T42 的 diff 行内评论按行号范围与行文本摘录定位，不需要它们（ADR-0060）。
+- **Git diff（ADR-0084）**：Git 工具的 diff 由 `piarc-git` 读 `git diff`（`--no-ext-diff --no-textconv --find-renames`，可选忽略空白）的 raw 与 patch 输出解析成同一份 `FileDiff`；范围为 merge-base 到工作区（含未跟踪文件）、HEAD 到工作区或单个提交。一个范围至多列 10,000 个文件；超过 300 个文件、合计 20,000 行或 1 MiB 时只给文件列表，展开单个文件再取（单文件 5 MiB 以上只给计数，增删超过 5,000 行时同第 7.7 节降级为纯文本）；按 hunk 暂存、取消暂存与回滚由 Core 重新生成 patch 并核对 hunk 哈希、工作区字节哈希与 index 条目后经 `git apply --cached` 应用。词级高亮在渲染进程按行配对计算，单行 1,000 字符以上不算。
 - **文件预览分类**：二进制、图片、超大文件在 Core 中识别，渲染进程按类型选择展示方式，不读原始字节。
 - **偏移**：Core 对外给出的文本偏移统一为 UTF-16 码元，与 JavaScript 字符串索引一致。
 - **为什么 Markdown 与高亮不放在 Core**：原生方案中 Core 做 Markdown 块解析和高亮，是为了给 AppKit 直接提供 span。改用 Web 界面后，渲染进程的生态（Markdown、shiki、公式、Mermaid）更完整；放在 Core 只会多一层序列化和一套重复实现。重活放在 Web Worker 里，不占用界面线程。
@@ -1318,6 +1323,7 @@ T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新�
 - T34（ADR-0051）：停靠区的终端面板（Ctrl+\` 切换，打开时会话没有终端就新建一个）列出会话的终端任务为标签，工具条有共享开关、附加到消息、查找与以文本查看屏幕；面板只是查看会话终端，关闭面板或重载窗口不影响 shell。composer 新增片段胶囊：显示来源与行数，发送时以带来源的围栏代码块拼入消息。
 - T37（ADR-0054）：composer 的 `/` 面板列出 Core 的合并命令（`listCommands`），按来源分组（内置、项目 `.piarc`/`.claude`/Pi、用户三类）、用共享的模糊匹配（`src/shared/fuzzy.ts`）排序，显示描述、参数提示与 skill 标记；选中内置命令即执行，选中命令文件或 skill 则在输入框填入 `/名称 ` 等用户输入参数。`/output-style` 不带名称时打开风格列表。设置窗口新增"Skills 与插件"页：按工作区列出 skills 的来源、谁可调用、免审批的工具、`paths`、覆盖关系、警告与无效文件，并设置用户级默认输出风格。
 - T42（ADR-0060）：Changes 面板的行号是按钮，点击（Shift+点击扩成范围）在旧侧或新侧的行上写评论，可编辑、删除、跨文件；Mod+Enter 或"发送评论"把全部评论按文件分组拼成一条消息发出（运行中作为排队消息）。评论是渲染进程按会话存在 `localStorage` 的草稿，diff 更新后按摘录重新定位，找不到的标"已失效"并保留文本。
+- Git 工具（ADR-0084、ADR-0085、ADR-0086）：右上角的 Changes 工具改名为 Git（id 与快捷键 Mod+Shift+D 不变），标题行是"改动 / 提交"视图切换、文件列表开关、范围按钮、跳转到文件（Mod+P）与显示菜单。改动视图有四种范围：全部改动 vs 基础分支（默认，可换比较分支）、未提交、单个提交（提交列表或范围菜单）与本会话（即原 Changes 面板，也是非仓库与没有 Git 时的视图）；文件列可按目录树或平铺、按源代码 / 测试 / 构建 / 生成文件分组、拖宽或收起；diff 有统一与并排（宽度不足 560 px 时退回统一）、换行、词级高亮、忽略空白、展开未改动行，F7 / Shift+F7 在改动之间跳转；行内评论按范围保存。提交视图有同步栏（分支按钮与领先落后、获取、拉取、推送，进度可取消）、合并或变基中的状态条（继续、跳过、中止）、按冲突 / 改动 / 未跟踪分组的三态复选框、选中文件的已暂存与未暂存 hunk（暂存、取消暂存、回滚此块）和提交信息框（按会话草稿、按界面语言生成、修正、提交与提交并推送，Mod+Enter 提交）；分支弹窗可搜索、新建（预填前缀）、检出分支或修订版本、重命名、删除（可从提示恢复）、跟踪远程分支。失败以面板内提示或对话框呈现（检出冲突的智能检出与丢弃、推送被拒的先拉后推与安全强推、首次推送的目标、拉取方式、认证失败、提交者未设置或 hook 失败时打开会话终端并复制命令，由用户运行）；回滚与删除分支可从提示撤销。右栏卡片显示分支、领先落后与未提交文件。设置的"Git"页写用户级 `git` 对象：分支前缀、受保护分支、拉取方式、始终强制推送（打开时原生确认）与提交指令；项目文件的 `git` 键不生效并进配置诊断。
 - T19 的会话主区使用第 8.4 节的行组件与 ProseMirror 输入。提及胶囊显示文件名，发送时按相对路径展开。附件经主进程存入 Core 的会话附件目录，模型收到图像块或 PDF 提取文本。内置命令由 Core 提供，运行中的 steer、follow-up 与队列编辑都经会话 API 执行。
 
 ### 8.3 状态与数据流
@@ -1906,6 +1912,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
 | 2.71 | 2026-11-25 | 第 5.5 节：Agent Host 的网络代理，用户设置或系统代理经启动环境生效（ADR-0082）。 |
 | 2.72 | 2026-11-26 | 第 5.4 节：同一服务商多个账号、连接测试、服务商启停与端点模型列表；保险箱新增只给 Core 的 `account/` 键（ADR-0083）。 |
+| 2.73 | 2026-11-25 | Git 工具（ADR-0084、ADR-0085、ADR-0086）：第 4 章新增三条 ADR，ADR-0044 第 8 条被 ADR-0084 取代；6.9 节说明 Changes 面板成为 Git 工具的"本会话"范围；7.6 节 `gitRequest`、`cancelGit` 与事件 `core/git`；7.7 节 Git diff 的来源、上限与按 hunk 暂存；8.2 节 Git 工具、提交视图、分支弹窗与设置页；10.1 节新增威胁"恶意仓库的 Git 配置"（THR-15）。 |
 | 2.70 | 2026-11-25 | 第 16 章：M3 的内存退出标准在 Windows 上按 ADR-0063 的口径复测达标（W3 收尾）。 |
 | 2.69 | 2026-11-25 | 第 8.2 节：会话状态徽标改用参考的安静小标记，等待为带细环的圆点以保留形状区分（ADR-0081）。 |
 | 2.68 | 2026-11-25 | 第 7.4、8.2 节：历史条目的可选时间 `at`，回复里的 Mermaid、图片与消息时间，输入框的命令芯片（ADR-0080）。 |

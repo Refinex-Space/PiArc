@@ -341,12 +341,12 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 4. piarc-protocol `git.rs` 与 AHP `session/commitMessage`、契约样本（能力 `commitMessage`）。
 - [x] 5. piarc-core `git/` 只读路径、指纹、`core/git`；NAPI `gitRequest`/`cancelGit`（`sessions/git.rs`、`git/mod.rs`）。
 - [x] 6. 主进程 `git-ipc.ts`、preload（单测 6 项；S10 报告与 preload 键快照已更新）。
-- [ ] 7. 渲染进程 G1：改动视图、标题行、范围、文件列、跳转、diff 升级、状态、评论范围、工具改名、右栏卡片。
-- [ ] 8. Git 设置：schema、写入白名单、偏好、设置页。
+- [x] 7. 渲染进程 G1：改动视图、标题行、范围、文件列、跳转、diff 升级、状态、评论范围、工具改名、右栏卡片（`changes/git/`；协议字段大小写缺陷已修复并加回归测试）。
+- [x] 8. Git 设置：schema（项目层移除并报 `projectGit`）、写入白名单、偏好、设置页、始终强推的原生确认。
 - [x] 9. 写操作：index、hunk、回滚与快照、提交、分支、远端、进行中操作、信任、忙碌、锁、审计（`git/write.rs`、`git/restore.rs`；回滚撤销记录改为放在内存，ADR-0085 第 7 条已同步）。
 - [x] 10. 提交信息生成：Core 组装、AHP、Agent Host harness 与提示词、用量（`cargo test -p piarc-testkit --test sessions git::` 2 项；原创性检查 0 命中）。
-- [ ] 11. 渲染进程 G2：提交视图、生成、同步栏、分支弹窗与对话框、状态条、原生确认。
-- [ ] 12. L4、a11y 登记、i18n、威胁映射、受影响的现有测试。
+- [x] 11. 渲染进程 G2：提交视图、生成、同步栏、分支弹窗与对话框、状态条、原生确认。
+- [x] 12. L4（`git-panel.e2e.ts` 4 项通过）、a11y 登记与 T43 旅程、i18n、THR-15 映射；未覆盖的 L4 流程见设计增补第 8 节。
 - [ ] 13. 文档同步、全量 verify、对照设计增补复核。
 
 ## 登记事项

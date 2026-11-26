@@ -1980,7 +1980,6 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'git.goto.label': '跳转到改动的文件',
   'git.goto.placeholder': '文件名',
   'git.goto.none': '没有匹配的文件',
-  'git.scope.label': '比较范围：{scope}',
   'git.scope.menu': '比较范围',
   'git.scope.all': '全部改动',
   'git.scope.vs': '相对 {base}',
