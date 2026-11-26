@@ -27,8 +27,9 @@ use crate::format;
 use crate::master_key::MasterKey;
 
 /// Key prefixes the vault accepts: provider API keys, OAuth tokens, MCP tokens, search
-/// services' API keys (T38; Core keeps those from the Agent Hosts).
-pub const KEY_PREFIXES: [&str; 4] = ["provider/", "oauth/", "mcp/", "websearch/"];
+/// services' API keys (T38) and the signed-in accounts not in use (ADR-0083); Core keeps the
+/// last two from the Agent Hosts.
+pub const KEY_PREFIXES: [&str; 5] = ["provider/", "oauth/", "mcp/", "websearch/", "account/"];
 /// Longest accepted credential key, in bytes.
 pub const MAX_KEY_BYTES: usize = 256;
 /// Largest accepted credential value (its JSON text), in bytes.

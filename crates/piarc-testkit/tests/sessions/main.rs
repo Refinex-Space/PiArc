@@ -2,6 +2,7 @@
 //! bundle on Node, the strict mock provider, and Core's actors in between. Provider scripts
 //! are in `scenarios/`.
 
+mod accounts;
 mod input;
 mod lifecycle;
 mod login;

@@ -104,6 +104,28 @@ export declare class CoreRuntime {
   deleteProvider(id: string): Promise<string>;
   /** Changes the user's catalog refresh preference. */
   setCatalogRefresh(enabled: boolean): Promise<string>;
+  /** Turns a provider on or off (ADR-0083); answers the provider settings. */
+  setProviderEnabled(id: string, enabled: boolean): Promise<string>;
+  /**
+   * Sends one short request to a model of the provider (ADR-0083); answers
+   * `{ ok, model?, latencyMs?, message?, network? }`.
+   */
+  testProvider(id: string): Promise<string>;
+  /**
+   * Lists an endpoint's models (ADR-0083): `{ api, baseUrl, provider? }` and the key typed in
+   * the form as `{ key }`; answers `{ models }`.
+   */
+  discoverModels(requestJson: string, secretJson?: string | null): Promise<string>;
+  /**
+   * Makes a signed-in account of the provider the one in use (ADR-0083); answers the
+   * provider settings.
+   */
+  useProviderAccount(provider: string, account: string): Promise<string>;
+  /**
+   * Removes a signed-in account not in use, with its stored sign-in (ADR-0083); answers the
+   * provider settings.
+   */
+  removeProviderAccount(provider: string, account: string): Promise<string>;
   /**
    * Saves the per-model settings and the auxiliary model (T29); the JSON is
    * `{ models: { "<provider>/<model>": {...} }, auxiliary?: { provider, id } }`.
