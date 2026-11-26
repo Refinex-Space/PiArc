@@ -474,16 +474,14 @@ export function FileViewer({
                 <PencilIcon />
               </IconButton>
             )}
-            {file.kind !== 'missing' && (
-              <IconButton
-                label={t('files.viewer.attachFile')}
-                onClick={() => {
-                  onAttach(path);
-                }}
-              >
-                {markdown ? <MarkdownActionIcon name="attach" /> : <PaperclipIcon />}
-              </IconButton>
-            )}
+            <IconButton
+              label={t('files.viewer.attachFile')}
+              onClick={() => {
+                onAttach(path);
+              }}
+            >
+              {markdown ? <MarkdownActionIcon name="attach" /> : <PaperclipIcon />}
+            </IconButton>
           </div>
         )}
       </div>
@@ -555,9 +553,10 @@ export function FileViewer({
           close={closeTool}
           editable={editable}
           onReplace={(replacement, all) => {
-            if (!editable || (all ? !count : !match)) return;
+            const target = all ? (count ? 'all' : undefined) : match;
+            if (!editable || target === undefined) return;
             const wasLast = !all && current === count - 1;
-            const next = replaceMatches(draft, query, replacement, options, all ? 'all' : match);
+            const next = replaceMatches(draft, query, replacement, options, target);
             if (next === undefined || next === draft) return;
             doc.setDraft(next);
             if (wasLast) setIndex(0);

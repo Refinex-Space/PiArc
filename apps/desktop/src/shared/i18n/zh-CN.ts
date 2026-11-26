@@ -460,6 +460,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'nav.searchSelect': '选择',
   'nav.searchOpen': '打开',
   'nav.searchClose': '关闭',
+  'nav.searchCloseKey': 'esc',
   'nav.showArchived': '显示已归档会话',
   'nav.hideArchived': '隐藏已归档会话',
   'nav.moveUp': '上移项目',

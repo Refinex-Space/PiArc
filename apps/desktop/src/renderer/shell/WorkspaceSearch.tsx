@@ -295,7 +295,7 @@ export function WorkspaceSearch({
           </span>
           <span className="workspace-search-hint">
             {t('nav.searchClose')}
-            <kbd>esc</kbd>
+            <kbd>{t('nav.searchCloseKey')}</kbd>
           </span>
         </footer>
       </div>

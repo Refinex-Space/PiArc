@@ -470,6 +470,7 @@ export const en = {
   'nav.searchSelect': 'Select',
   'nav.searchOpen': 'Open',
   'nav.searchClose': 'Close',
+  'nav.searchCloseKey': 'esc',
   'nav.showArchived': 'Show archived sessions',
   'nav.hideArchived': 'Hide archived sessions',
   'nav.moveUp': 'Move project up',
