@@ -32,6 +32,7 @@
 //! index is synced incrementally and the row updated. After a restart the session list comes
 //! from the index and `resume` reopens a session from its file.
 
+mod browser;
 mod create;
 mod diagnostics;
 mod git;
@@ -171,6 +172,8 @@ pub(crate) struct Ctx {
     pub proxy: Arc<crate::network::Proxy>,
     /// The Git panel's locks and operations (ADR-0085).
     pub git: Arc<crate::git::GitState>,
+    /// The built-in browser's partition proxies (ADR-0088).
+    pub browser: Arc<crate::browser::BrowserProxies>,
 }
 
 /// The entry of the session layer. Cheap to clone.

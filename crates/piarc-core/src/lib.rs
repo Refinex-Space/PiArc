@@ -71,6 +71,7 @@
 
 pub mod agent_host;
 pub mod auto_memory;
+pub mod browser;
 pub mod checkpoints;
 pub mod client_settings;
 pub mod clock;

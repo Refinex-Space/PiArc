@@ -342,6 +342,35 @@ impl CoreRuntime {
         })
     }
 
+    /// The port of a browser partition's proxy (ADR-0088): JSON `{ partition, localNames,
+    /// deniedPorts }`; answers `{ port }`.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn browser_proxy(
+        &self,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.browser_proxy(request_json).await
+        })
+    }
+
+    /// Stops a browser partition's proxy (its data was cleared); answers `{ stopped }`.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn stop_browser_proxy(
+        &self,
+        partition: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.stop_browser_proxy(partition).await
+        })
+    }
+
     /// Writes the user's sandbox values (T39); answers the new view of `workspace`.
     ///
     /// # Errors

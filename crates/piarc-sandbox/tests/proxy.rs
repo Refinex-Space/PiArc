@@ -16,7 +16,8 @@ use hyper::body::Bytes;
 use hyper_util::rt::TokioIo;
 use piarc_ports::BoxFuture;
 use piarc_sandbox::proxy::{
-    Allowlist, DENIED_HEADER, DenyReason, Network, NetworkProxy, ProxyHooks, ProxyLimits, Refused,
+    Allowlist, BrowserPolicy, DENIED_HEADER, DenyReason, Network, NetworkProxy, ProxyHooks,
+    ProxyLimits, Refused,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -507,4 +508,78 @@ async fn a_slow_request_head_is_cut_off() {
     .await
     .expect("the proxy closes before the safety net")
     .expect("reads");
+}
+
+/// A browser partition's proxy (ADR-0088): names resolve as listed, loopback and private
+/// addresses are served by the local HTTP upstream.
+async fn browser_proxy(denied_ports: Vec<u16>) -> NetworkProxy {
+    let http = http_upstream().await;
+    let loopback = IpAddr::from([127, 0, 0, 1]);
+    let private = IpAddr::from([10, 0, 0, 5]);
+    let names = HashMap::from([
+        ("docs.example", IpAddr::from(HTTP_IP)),
+        ("wiki.corp", private),
+        ("app.test", loopback),
+        ("web.localhost", loopback),
+        ("rebind.example", loopback),
+        ("metadata.example", IpAddr::from([169, 254, 169, 254])),
+    ]);
+    let routes = HashMap::from([
+        (IpAddr::from(HTTP_IP), http),
+        (loopback, http),
+        (private, http),
+    ]);
+    let policy = BrowserPolicy {
+        local_names: Allowlist::new(["*.test"]).expect("valid"),
+        denied_ports,
+    };
+    NetworkProxy::start_browser(
+        policy,
+        Arc::new(TestNetwork { names, routes }),
+        Arc::new(Recorder::default()),
+        ProxyLimits::default(),
+    )
+    .await
+    .expect("proxy starts")
+}
+
+#[tokio::test]
+async fn thr16_a_browser_proxy_lets_any_public_or_private_name_through_without_asking() {
+    let proxy = browser_proxy(Vec::new()).await;
+    for host in ["docs.example", "wiki.corp", "203.0.113.10"] {
+        let reply = http_get(&proxy, &format!("http://{host}/page"), host).await;
+        assert_eq!(reply.status, 200, "{host}");
+    }
+}
+
+#[tokio::test]
+async fn thr16_a_browser_proxy_reaches_loopback_only_behind_local_names() {
+    let proxy = browser_proxy(Vec::new()).await;
+    for host in ["app.test", "web.localhost", "localhost", "127.0.0.1"] {
+        let target = if host == "localhost" {
+            "127.0.0.1"
+        } else {
+            host
+        };
+        let reply = http_get(&proxy, &format!("http://{target}/"), host).await;
+        assert_eq!(reply.status, 200, "{host}");
+    }
+    let reply = http_get(&proxy, "http://rebind.example/", "rebind.example").await;
+    assert_eq!(reply.status, 403);
+    assert_eq!(reply.header(DENIED_HEADER), Some("blocked-address"));
+    assert!(reply.body.contains("not local"), "{}", reply.body);
+    let reply = connect(&proxy, "metadata.example:443").await;
+    assert_eq!(reply.status, 403);
+    assert_eq!(reply.header(DENIED_HEADER), Some("blocked-address"));
+}
+
+#[tokio::test]
+async fn thr16_a_browser_proxy_refuses_piarc_ports_and_takes_a_new_policy() {
+    let proxy = browser_proxy(vec![4100]).await;
+    let reply = connect(&proxy, "app.test:4100").await;
+    assert_eq!(reply.status, 403);
+    assert!(reply.body.contains("PiArc itself"), "{}", reply.body);
+    proxy.set_browser_policy(BrowserPolicy::default());
+    let reply = http_get(&proxy, "http://app.test/", "app.test").await;
+    assert_eq!(reply.status, 403, "*.test is no longer a local name");
 }

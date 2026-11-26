@@ -674,6 +674,9 @@ fn open_state(
         diagnostics: crate::sessions::PreparedBundle::default(),
         proxy: Arc::new(crate::network::Proxy::starting(&data)),
         git: Arc::default(),
+        browser: Arc::new(crate::browser::BrowserProxies::new(
+            config.sandbox.network.clone(),
+        )),
     });
     tasks.set_outlet(sessions.task_outlet());
     sessions.connect_hooks();

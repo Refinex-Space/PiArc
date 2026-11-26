@@ -3,6 +3,13 @@
 /** PiArc Core, loaded once in the Electron main process (ADR-0014). */
 export declare class CoreRuntime {
   /**
+   * The port on `127.0.0.1` of a browser partition's proxy, started on first use; JSON
+   * `{ partition, localNames, deniedPorts }`. Answers `{ port }`.
+   */
+  browserProxy(requestJson: string): Promise<string>;
+  /** Stops a browser partition's proxy. Answers `{ stopped }`. */
+  stopBrowserProxy(partition: string): Promise<string>;
+  /**
    * Assembles the diagnostic bundle in memory and answers its manifest as JSON text:
    * `{id, files: [{name, bytes}], redactions: {<kind>: n}, excluded}`. `appJson` holds the
    * client's versions; `workspace` whose configuration diagnostics to add (the most recent

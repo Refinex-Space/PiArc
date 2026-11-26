@@ -26,11 +26,16 @@
 //!   an allowed name resolves to them: internal mirrors and registries live there. The
 //!   allowlist should only name hosts the user trusts (architecture section 6.10).
 //!
+//! - A browser proxy ([`NetworkProxy::start_browser`], ADR-0088) lets every host through and
+//!   checks the resolved addresses with a [`BrowserPolicy`] instead: loopback only behind a
+//!   local name, never PiArc's own ports.
+//!
 //! Name resolution and outgoing connections go through [`Network`], so tests can point
 //! public-looking addresses at a local upstream server.
 
 mod address;
 mod allowlist;
+mod browser;
 
 use std::convert::Infallible;
 use std::io;
@@ -55,6 +60,7 @@ use tokio_util::sync::CancellationToken;
 
 pub use address::blocked_reason;
 pub use allowlist::{Allowlist, InvalidEntry};
+pub use browser::BrowserPolicy;
 
 /// The header that carries the reason of a refusal.
 pub const DENIED_HEADER: &str = "x-piarc-proxy-denied";
@@ -225,6 +231,7 @@ pub struct NetworkProxy {
     port: u16,
     stop: CancellationToken,
     allowlist: Arc<RwLock<Allowlist>>,
+    browser: Option<Arc<RwLock<BrowserPolicy>>>,
 }
 
 impl std::fmt::Debug for NetworkProxy {
@@ -264,12 +271,39 @@ impl NetworkProxy {
         hooks: Arc<dyn ProxyHooks>,
         limits: ProxyLimits,
     ) -> io::Result<Self> {
+        Self::spawn(allowlist, None, network, hooks, limits).await
+    }
+
+    /// Starts a browser partition's proxy (ADR-0088): every host passes, the resolved
+    /// addresses are checked with `policy`. Must be called inside a tokio runtime.
+    ///
+    /// # Errors
+    ///
+    /// The listening socket cannot be opened.
+    pub async fn start_browser(
+        policy: BrowserPolicy,
+        network: Arc<dyn Network>,
+        hooks: Arc<dyn ProxyHooks>,
+        limits: ProxyLimits,
+    ) -> io::Result<Self> {
+        let browser = Arc::new(RwLock::new(policy));
+        Self::spawn(Allowlist::default(), Some(browser), network, hooks, limits).await
+    }
+
+    async fn spawn(
+        allowlist: Allowlist,
+        browser: Option<Arc<RwLock<BrowserPolicy>>>,
+        network: Arc<dyn Network>,
+        hooks: Arc<dyn ProxyHooks>,
+        limits: ProxyLimits,
+    ) -> io::Result<Self> {
         let listener = TcpListener::bind((IpAddr::from([127, 0, 0, 1]), 0)).await?;
         let port = listener.local_addr()?.port();
         let stop = CancellationToken::new();
         let allowlist = Arc::new(RwLock::new(allowlist));
         let shared = Arc::new(Shared {
             allowlist: Arc::clone(&allowlist),
+            browser: browser.clone(),
             network,
             hooks,
             limits,
@@ -279,6 +313,7 @@ impl NetworkProxy {
             port,
             stop,
             allowlist,
+            browser,
         })
     }
 
@@ -295,6 +330,13 @@ impl NetworkProxy {
             .write()
             .unwrap_or_else(PoisonError::into_inner) = allowlist;
     }
+
+    /// Replaces a browser proxy's policy; does nothing on a sandbox proxy.
+    pub fn set_browser_policy(&self, policy: BrowserPolicy) {
+        if let Some(browser) = &self.browser {
+            *browser.write().unwrap_or_else(PoisonError::into_inner) = policy;
+        }
+    }
 }
 
 impl Drop for NetworkProxy {
@@ -305,6 +347,7 @@ impl Drop for NetworkProxy {
 
 struct Shared {
     allowlist: Arc<RwLock<Allowlist>>,
+    browser: Option<Arc<RwLock<BrowserPolicy>>>,
     network: Arc<dyn Network>,
     hooks: Arc<dyn ProxyHooks>,
     limits: ProxyLimits,
@@ -316,6 +359,15 @@ impl Shared {
             .read()
             .unwrap_or_else(PoisonError::into_inner)
             .allows(host)
+    }
+
+    fn browser_policy(&self) -> Option<BrowserPolicy> {
+        self.browser.as_ref().map(|policy| {
+            policy
+                .read()
+                .unwrap_or_else(PoisonError::into_inner)
+                .clone()
+        })
     }
 }
 
@@ -427,7 +479,8 @@ async fn check(shared: &Shared, host: &str, port: u16) -> Result<Vec<SocketAddr>
         });
         Refusal::denied(reason.as_str(), message)
     };
-    if !shared.allows(host) && !shared.hooks.unlisted(host, port).await {
+    let browser = shared.browser_policy();
+    if browser.is_none() && !shared.allows(host) && !shared.hooks.unlisted(host, port).await {
         return Err(refuse(
             DenyReason::NotAllowed,
             format!("{host} is not in the sandbox network allowlist"),
@@ -442,10 +495,13 @@ async fn check(shared: &Shared, host: &str, port: u16) -> Result<Vec<SocketAddr>
             )));
         }
     };
-    if let Some((addr, reason)) = addrs
-        .iter()
-        .find_map(|addr| blocked_reason(addr.ip()).map(|reason| (addr, reason)))
-    {
+    if let Some((addr, reason)) = addrs.iter().find_map(|addr| {
+        match &browser {
+            Some(policy) => policy.blocked_reason(host, *addr),
+            None => blocked_reason(addr.ip()),
+        }
+        .map(|reason| (addr, reason))
+    }) {
         return Err(refuse(
             DenyReason::BlockedAddress,
             format!("{host} resolves to {}, a {reason}", addr.ip()),

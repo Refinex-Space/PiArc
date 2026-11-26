@@ -38,6 +38,17 @@ pub fn blocked_reason(ip: IpAddr) -> Option<&'static str> {
     }
 }
 
+/// Whether `ip` is a loopback address, IPv4-mapped forms included.
+#[must_use]
+pub(super) fn is_loopback(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V6(v6) => v6
+            .to_ipv4_mapped()
+            .map_or_else(|| v6.is_loopback(), |v4| v4.is_loopback()),
+        IpAddr::V4(v4) => v4.is_loopback(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
