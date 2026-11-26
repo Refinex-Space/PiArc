@@ -215,6 +215,22 @@
       "usedBy": "Mermaid document diagram engine",
       "addedBy": "Markdown file editing",
       "notes": "The npm tarball ships the complete MIT licence but omits the SPDX field. Match both the reviewed tarball integrity and the installed licence text before using this declaration."
+    },
+    {
+      "id": "ego-browser-sdk",
+      "name": "ego-browser SDK (ego-lite, typed port)",
+      "version": "0.1.0 (main@56589ea)",
+      "license": "MIT",
+      "licenseFile": "apps/desktop/src/browser-host/sdk/LICENSE",
+      "copyright": "Copyright (c) 2026 CitroLabs",
+      "source": {
+        "repository": "https://github.com/citrolabs/ego-lite",
+        "path": "package/ego-browser/src",
+        "commit": "56589ea8b98fd3b17a5d2316bfd8ff7b803d3293"
+      },
+      "usedBy": "apps/desktop/src/browser-host/sdk/ (modified; every file names its upstream path, and apps/desktop/src/browser-host/AGENTS.md lists the changes): the browser SDK the Browser tool script runs against in the script host (ADR-0089, ADR-0091)",
+      "addedBy": "Built-in browser (B2)",
+      "notes": "Ported file by file to strict TypeScript; the CLI, the frozen v1 helpers, learning/, update-notice, skill-migration, http, clipboard and env are not ported, and Node APIs are replaced by the script host bindings."
     }
   ]
 }
