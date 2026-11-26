@@ -28,7 +28,7 @@ test('the gear opens a modal in place, finds a setting and restores focus', asyn
   await singleEdge('1px');
   await search.press('Tab');
   await page.keyboard.press('Shift+Tab');
-  await singleEdge('2px');
+  await singleEdge('1px');
   await search.fill('density');
   await search.press('Enter');
   await expect(panel.getByTestId('settings-page-appearance')).toBeVisible();

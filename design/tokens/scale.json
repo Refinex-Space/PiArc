@@ -42,7 +42,8 @@
     "titlebarHeight": "44px",
     "sidebarMin": "200px",
     "sidebarMax": "420px",
-    "badge": "8px"
+    "badge": "8px",
+    "focusRing": "1px"
   },
   "workbench": {
     "readingWidth": "768px",

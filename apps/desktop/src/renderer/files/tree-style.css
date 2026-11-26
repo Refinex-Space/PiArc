@@ -130,8 +130,8 @@
   background-color: var(--piarc-surface-hover);
 }
 .project-tree-list:focus-visible .project-tree-row[data-focused] {
-  outline: 2px solid var(--piarc-c-focus-ring);
-  outline-offset: -2px;
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
 }
 .project-tree-row[aria-disabled='true'],
 .project-tree-note,

@@ -43,7 +43,8 @@
     "size": "size.badge"
   },
   "focus": {
-    "ring": "border.focus"
+    "ring": "border.focus",
+    "width": "size.focusRing"
   },
   "terminal": {
     "background": "code.background",

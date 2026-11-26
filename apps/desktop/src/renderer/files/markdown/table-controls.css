@@ -78,8 +78,8 @@
   background: transparent;
 }
 .cm-editor .md-table-cell textarea:focus-visible {
-  outline: 2px solid var(--piarc-c-focus-ring);
-  outline-offset: -2px;
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
 }
 .cm-editor .md-table-cell:not(:focus-within) textarea {
   opacity: 0;
@@ -293,8 +293,8 @@
 }
 .md-table-menu-item:focus-visible,
 .md-table-menu-tabs button:focus-visible {
-  outline: 2px solid var(--piarc-c-focus-ring);
-  outline-offset: -2px;
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
 }
 .md-table-menu-item[data-danger='true'] {
   color: var(--piarc-text-danger);

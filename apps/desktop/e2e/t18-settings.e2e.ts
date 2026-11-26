@@ -205,7 +205,7 @@ test('appearance segments keep the reference geometry and one moving selected su
     await expect(thumb).toHaveCSS('box-shadow', 'none');
     await expect(settings.getByTestId('theme-light').locator('..')).toHaveCSS(
       'outline-width',
-      '2px',
+      '1px',
     );
   }
   const motion = settings.getByTestId('setting-reduceMotion').getByRole('combobox');

@@ -76,13 +76,13 @@
   overflow: hidden;
   touch-action: none;
   cursor: grab;
-  outline-offset: -2px;
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
 }
 .md-media-canvas[data-dragging='true'] {
   cursor: grabbing;
 }
 .md-media-canvas:focus-visible {
-  outline: 2px solid var(--piarc-c-focus-ring);
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
 }
 .md-media-canvas [role='alert'] {
   position: absolute;

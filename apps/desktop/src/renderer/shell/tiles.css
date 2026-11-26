@@ -156,7 +156,7 @@ body[data-tool-window] > #tool-root {
   background: var(--piarc-border-focus);
 }
 .tile-divider:focus-visible {
-  outline: 2px solid var(--piarc-c-focus-ring);
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
   outline-offset: 0;
 }
 .tile-drop-zone {

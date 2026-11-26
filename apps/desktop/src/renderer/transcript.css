@@ -2565,7 +2565,7 @@
 }
 
 .approval-card:focus-within .plan-preview:focus-visible {
-  outline: 2px solid var(--piarc-c-focus-ring);
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
   outline-offset: 1px;
 }
 
@@ -2588,7 +2588,7 @@
 }
 
 .approval-hint:focus-visible {
-  outline: 2px solid var(--piarc-c-focus-ring);
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
   outline-offset: 1px;
 }
 
@@ -2788,8 +2788,8 @@
 .transcript-sizer > .transcript-row[data-located] {
   border-radius: var(--piarc-radius-md);
   background: var(--piarc-accent-subtle);
-  outline: 2px solid var(--piarc-c-focus-ring);
-  outline-offset: -2px;
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
 }
 
 /* web search (T38) */

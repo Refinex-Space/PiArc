@@ -35,6 +35,7 @@
   --piarc-size-sidebar-min: 200px;
   --piarc-size-sidebar-max: 420px;
   --piarc-size-badge: 8px;
+  --piarc-size-focus-ring: 1px;
   --piarc-workbench-reading-width: 768px;
   --piarc-workbench-environment-width: 320px;
   --piarc-workbench-composer-height: 44px;
@@ -144,6 +145,7 @@
   --piarc-c-badge-unread: var(--piarc-agent-status-unread);
   --piarc-c-badge-size: var(--piarc-size-badge);
   --piarc-c-focus-ring: var(--piarc-border-focus);
+  --piarc-c-focus-width: var(--piarc-size-focus-ring);
   --piarc-c-terminal-background: var(--piarc-code-background);
   --piarc-c-terminal-foreground: var(--piarc-code-text);
   --piarc-c-terminal-cursor: var(--piarc-accent-solid);

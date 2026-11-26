@@ -498,7 +498,7 @@
   color: var(--piarc-text-primary);
 }
 .proxy-settings .proxy-info:focus-visible {
-  outline: 2px solid var(--piarc-c-focus-ring);
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
   outline-offset: 1px;
 }
 .proxy-settings .proxy-value {

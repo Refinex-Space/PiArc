@@ -110,6 +110,7 @@ export type ScaleToken =
   | 'size.sidebarMin'
   | 'size.sidebarMax'
   | 'size.badge'
+  | 'size.focusRing'
   | 'workbench.readingWidth'
   | 'workbench.environmentWidth'
   | 'workbench.composerHeight'
@@ -222,6 +223,7 @@ export type ComponentToken =
   | 'badge.unread'
   | 'badge.size'
   | 'focus.ring'
+  | 'focus.width'
   | 'terminal.background'
   | 'terminal.foreground'
   | 'terminal.cursor'
@@ -608,6 +610,7 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'size.sidebarMin': '--piarc-size-sidebar-min',
   'size.sidebarMax': '--piarc-size-sidebar-max',
   'size.badge': '--piarc-size-badge',
+  'size.focusRing': '--piarc-size-focus-ring',
   'workbench.readingWidth': '--piarc-workbench-reading-width',
   'workbench.environmentWidth': '--piarc-workbench-environment-width',
   'workbench.composerHeight': '--piarc-workbench-composer-height',
@@ -717,6 +720,7 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'badge.unread': '--piarc-c-badge-unread',
   'badge.size': '--piarc-c-badge-size',
   'focus.ring': '--piarc-c-focus-ring',
+  'focus.width': '--piarc-c-focus-width',
   'terminal.background': '--piarc-c-terminal-background',
   'terminal.foreground': '--piarc-c-terminal-foreground',
   'terminal.cursor': '--piarc-c-terminal-cursor',

@@ -60,19 +60,20 @@ body,
   transition-duration: 0s !important;
 }
 
-/* Paint one edge, including on controls whose actual focus target is invisible. Keeping it
-   inside the bounds also protects the indicator in clipped menus, panels and virtual lists. */
+/* Paint one fine edge (the light focus style), including on controls whose actual focus target
+   is invisible. Keeping it inside the bounds also protects the indicator in clipped panels and
+   virtual lists. */
 :root[data-app] :focus-visible:not(:where([data-focus-proxy])),
 :root[data-app] .settings-search:has(input:focus-visible),
 .segment:has(> input:focus-visible),
 .composer-attach:has(> input:focus-visible),
-:root[data-app] .terminal-surface:has(textarea:focus-visible),
-:root[data-app] .menu:focus-visible > .menu-item.is-active {
-  outline: 2px solid var(--piarc-c-focus-ring);
-  outline-offset: -2px;
+:root[data-app] .terminal-surface:has(textarea:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
 }
 
-/* The menu and editor each delegate their indicator to the visible target above. */
+/* A focused menu shows its active item by the item's fill alone; the editor delegates its
+   indicator to the composer card. */
 :root[data-app] .menu:focus-visible:has(> .menu-item.is-active),
 :root[data-app] .composer-editor:focus-visible {
   outline: none;
@@ -96,8 +97,8 @@ body,
 :root[data-app][data-pointer-focus]
   :is(input:read-write, input[readonly], textarea, select):focus:not(:where([data-focus-proxy])),
 :root[data-app][data-pointer-focus] .settings-search:has(input:focus) {
-  outline: 1px solid var(--piarc-c-focus-ring);
-  outline-offset: -1px;
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
   transition: outline-color var(--piarc-motion-fast) var(--piarc-motion-easing);
 }
 

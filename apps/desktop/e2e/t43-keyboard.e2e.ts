@@ -320,7 +320,7 @@ test('pointer editing and keyboard navigation give exactly one visible focus ind
     await expect(box).not.toHaveCSS('box-shadow', restShadow);
     await page.keyboard.press('Shift+Tab');
     await expect(attach).toBeFocused();
-    await expect(attach).toHaveCSS('outline-width', '2px');
+    await expect(attach).toHaveCSS('outline-width', '1px');
     await expect(box).toHaveCSS('outline-style', 'none');
     await page.keyboard.press('Tab');
     await expect(editor).toBeFocused();
@@ -334,13 +334,15 @@ test('pointer editing and keyboard navigation give exactly one visible focus ind
   await page.keyboard.press('ArrowDown');
   await expect(menu).toBeFocused();
   await expect(menu).toHaveCSS('outline-style', 'none');
-  await expect(menu.locator('.is-active')).toHaveCSS('outline-width', '2px');
+  // The active item carries the focus by its fill alone (the light style).
+  await expect(menu.locator('.is-active')).toHaveCSS('outline-style', 'none');
+  await expect(menu.locator('.is-active')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await page.keyboard.press('Escape');
 
   await page.keyboard.press('Control+Backquote');
   const surface = page.getByTestId('terminal-surface');
   await expect(page.getByTestId('terminal-input')).toBeFocused();
-  await expect(surface).toHaveCSS('outline-width', '2px');
+  await expect(surface).toHaveCSS('outline-width', '1px');
   await page.getByTestId('terminal-canvas').click();
   await expect(page.getByTestId('terminal-input')).toBeFocused();
   await expect(surface).toHaveCSS('outline-style', 'none');
@@ -354,6 +356,6 @@ test('pointer editing and keyboard navigation give exactly one visible focus ind
   await settings.keyboard.press('ArrowRight');
   const dark = settings.locator('label').filter({ has: settings.getByTestId('theme-dark') });
   await expect(settings.getByTestId('theme-dark')).toBeFocused();
-  await expect(dark).toHaveCSS('outline-width', '2px');
+  await expect(dark).toHaveCSS('outline-width', '1px');
   await expect(dark).toHaveCSS('box-shadow', 'none');
 });
