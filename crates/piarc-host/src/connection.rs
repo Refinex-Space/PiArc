@@ -140,6 +140,16 @@ pub(crate) struct Link {
     pub accepted: Arc<AtomicBool>,
 }
 
+impl Link {
+    /// Records which optional methods the handshake enabled on this connection.
+    fn enable(&mut self, enabled: &[piarc_protocol::Capability]) {
+        let on = |name: &str| enabled.iter().any(|c| c.as_str() == name);
+        self.side_chat_enabled = on("sideChat");
+        self.commit_message_enabled = on("commitMessage");
+        self.models_enabled = on("models");
+    }
+}
+
 /// A connection that completed its handshake.
 pub(crate) struct Connection {
     pub link: Link,
@@ -224,12 +234,7 @@ pub(crate) async fn start(
     };
     match accept_hello(config, epoch, &hello) {
         Ok((params, welcome)) => {
-            link.side_chat_enabled = welcome.enabled.iter().any(|c| c.as_str() == "sideChat");
-            link.commit_message_enabled = welcome
-                .enabled
-                .iter()
-                .any(|c| c.as_str() == "commitMessage");
-            link.models_enabled = welcome.enabled.iter().any(|c| c.as_str() == "models");
+            link.enable(&welcome.enabled);
             let frame = encode(&ResultMessage::<HostHello>::new(
                 hello.id.clone(),
                 welcome.clone(),
