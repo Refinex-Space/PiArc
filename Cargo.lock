@@ -2076,6 +2076,7 @@ dependencies = [
 name = "piarc-git"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "piarc-ports",
  "piarc-protocol",
  "sha2",

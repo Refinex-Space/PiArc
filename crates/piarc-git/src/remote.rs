@@ -195,6 +195,51 @@ pub async fn push(
     Ok(classify_push(&out))
 }
 
+/// Deletes `branch` on `remote` (both checked by the caller). With `expect`, only while the
+/// remote branch still names that commit (a lease, so a branch someone pushed to since the
+/// last fetch is not lost).
+///
+/// # Errors
+///
+/// The writer's errors.
+pub async fn delete_branch(
+    writer: &Writer,
+    remote: &str,
+    branch: &str,
+    expect: Option<&str>,
+    cancel: Cancel,
+) -> Result<RemoteOutcome, GitError> {
+    let mut args = vec!["push".to_owned(), "--porcelain".into()];
+    if let Some(oid) = expect {
+        args.push(format!("--force-with-lease=refs/heads/{branch}:{oid}"));
+    }
+    args.extend([
+        "--".into(),
+        remote.to_owned(),
+        format!(":refs/heads/{branch}"),
+    ]);
+    let out = writer.network(&args, network(None, cancel)).await?;
+    Ok(classify_push(&out))
+}
+
+/// Pushes `oid` as `branch` on `remote` without forcing: recreates a deleted remote branch.
+///
+/// # Errors
+///
+/// The writer's errors.
+pub async fn restore_branch(
+    writer: &Writer,
+    remote: &str,
+    branch: &str,
+    oid: &str,
+    cancel: Cancel,
+) -> Result<RemoteOutcome, GitError> {
+    let refspec = format!("{oid}:refs/heads/{branch}");
+    let args = ["push", "--porcelain", "--", remote, &refspec];
+    let out = writer.network(&args, network(None, cancel)).await?;
+    Ok(classify_push(&out))
+}
+
 /// The outcome of `push --porcelain`.
 #[must_use]
 pub fn classify_push(out: &ExecOutput) -> RemoteOutcome {

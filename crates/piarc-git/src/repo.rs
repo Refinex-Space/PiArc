@@ -291,6 +291,16 @@ impl Writer {
         self.git.exec(&self.repo.root, &full, options).await
     }
 
+    /// The same writer with pathspec magic allowed, for commands that pass no path of the
+    /// page's and use magic themselves (`stash push -u` cleans with `:/`).
+    #[must_use]
+    pub fn with_pathspec_magic(&self) -> Self {
+        Self {
+            git: self.git.clone().with_env("GIT_LITERAL_PATHSPECS", "0"),
+            repo: self.repo.clone(),
+        }
+    }
+
     /// Like [`Writer::run`] for commands that reach a remote: the `ext::` transport (which
     /// runs a command) is refused whatever the configuration says.
     ///

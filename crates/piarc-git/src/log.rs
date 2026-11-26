@@ -1,7 +1,7 @@
 //! The commits of the branch scope (`base..HEAD`) and a file's complete text at one revision,
 //! for the Git panel.
 
-use piarc_protocol::git::{GitBase, GitCommitRow, GitCommits, GitText, GitTextSource};
+use piarc_protocol::git::{GitBase, GitBlob, GitCommitRow, GitCommits, GitText, GitTextSource};
 
 use crate::diff::MAX_FILE_BYTES;
 use crate::exec::ExecOptions;
@@ -129,6 +129,90 @@ pub async fn file_text(
         binary: None,
         too_large: None,
     })
+}
+
+/// The most bytes [`file_blob`] returns.
+pub const MAX_BLOB_BYTES: usize = 8 * 1024 * 1024;
+
+/// A file's bytes from a commit, the index or the working tree, base64, for an image diff.
+/// `rev` and `path` are checked by the caller; a link in the working tree is not followed.
+///
+/// # Errors
+///
+/// The reader's errors.
+pub async fn file_blob(
+    reader: &Reader,
+    source: &GitTextSource,
+    path: &str,
+) -> Result<GitBlob, GitError> {
+    use base64::Engine as _;
+    let too_large = |size: u64| GitBlob {
+        data: None,
+        size,
+        too_large: Some(true),
+    };
+    let missing = GitBlob {
+        data: None,
+        size: 0,
+        too_large: None,
+    };
+    let bytes = match source {
+        GitTextSource::Worktree => {
+            let full = reader.repo.root.join(path);
+            match std::fs::symlink_metadata(&full) {
+                Ok(meta) if meta.is_file() && meta.len() > MAX_BLOB_BYTES as u64 => {
+                    return Ok(too_large(meta.len()));
+                }
+                Ok(meta) if meta.is_file() => std::fs::read(&full).ok().map(Ok),
+                _ => None,
+            }
+        }
+        GitTextSource::Commit { rev } => {
+            sized_blob(reader, &format!("{rev}:{path}"), MAX_BLOB_BYTES).await?
+        }
+        GitTextSource::Index => sized_blob(reader, &format!(":{path}"), MAX_BLOB_BYTES).await?,
+    };
+    Ok(match bytes {
+        None => missing,
+        Some(Err(size)) => too_large(size),
+        Some(Ok(bytes)) if bytes.len() > MAX_BLOB_BYTES => too_large(bytes.len() as u64),
+        Some(Ok(bytes)) => GitBlob {
+            size: bytes.len() as u64,
+            data: Some(base64::engine::general_purpose::STANDARD.encode(&bytes)),
+            too_large: None,
+        },
+    })
+}
+
+/// The bytes of `object`; `Some(Err(size))` past `limit`, `None` when missing.
+async fn sized_blob(
+    reader: &Reader,
+    object: &str,
+    limit: usize,
+) -> Result<Option<Result<Vec<u8>, u64>>, GitError> {
+    let size = reader
+        .run(&["cat-file", "-s", object], ExecOptions::default())
+        .await?;
+    if !size.success() {
+        return Ok(None);
+    }
+    let bytes: u64 = String::from_utf8_lossy(&size.stdout)
+        .trim()
+        .parse()
+        .unwrap_or(u64::MAX);
+    if bytes > limit as u64 {
+        return Ok(Some(Err(bytes)));
+    }
+    let out = reader
+        .run(
+            &["cat-file", "blob", object],
+            ExecOptions {
+                stdout_limit: Some(limit),
+                ..ExecOptions::default()
+            },
+        )
+        .await?;
+    Ok(out.success().then_some(Ok(out.stdout)))
 }
 
 fn too_large() -> GitText {

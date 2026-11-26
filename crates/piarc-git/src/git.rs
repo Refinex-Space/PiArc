@@ -109,6 +109,15 @@ impl Git {
         self
     }
 
+    /// The same runner with `name` set to `value` (replacing an inherited value), e.g.
+    /// `GCM_INTERACTIVE=never` for an automatic fetch nobody is watching.
+    #[must_use]
+    pub fn with_env(mut self, name: &str, value: &str) -> Self {
+        self.env.retain(|(n, _)| n != name);
+        self.env.push((name.into(), value.into()));
+        self
+    }
+
     /// Runs `git <args>` in `cwd` and returns what it printed, whatever its exit code.
     ///
     /// # Errors

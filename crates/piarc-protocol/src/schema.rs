@@ -55,21 +55,7 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::plugins::PackageInstallRequest>();
     generator.subschema_for::<crate::plugins::PackageInstallResult>();
     generator.subschema_for::<crate::usage::UsageReport>();
-    generator.subschema_for::<crate::git::GitCall>();
-    generator.subschema_for::<crate::git::GitStatus>();
-    generator.subschema_for::<crate::git::GitProbe>();
-    generator.subschema_for::<crate::git::GitChanges>();
-    generator.subschema_for::<crate::git::GitFileChange>();
-    generator.subschema_for::<crate::git::GitText>();
-    generator.subschema_for::<crate::git::GitCommits>();
-    generator.subschema_for::<crate::git::GitBranches>();
-    generator.subschema_for::<crate::git::GitFileStages>();
-    generator.subschema_for::<crate::git::GitLastCommit>();
-    generator.subschema_for::<crate::git::GitCommitMessage>();
-    generator.subschema_for::<crate::git::GitOpResult>();
-    generator.subschema_for::<crate::git::GitDescription>();
-    generator.subschema_for::<crate::git::GitFailure>();
-    generator.subschema_for::<crate::git::GitEvent>();
+    git_types(&mut generator);
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()
@@ -123,6 +109,29 @@ fn sort_keys(value: Value) -> Value {
         Value::Array(items) => Value::Array(items.into_iter().map(sort_keys).collect()),
         other => other,
     }
+}
+
+/// The Git panel types the desktop client reads (ADR-0084).
+fn git_types(generator: &mut schemars::SchemaGenerator) {
+    generator.subschema_for::<crate::git::GitCall>();
+    generator.subschema_for::<crate::git::GitStatus>();
+    generator.subschema_for::<crate::git::GitProbe>();
+    generator.subschema_for::<crate::git::GitChanges>();
+    generator.subschema_for::<crate::git::GitFileChange>();
+    generator.subschema_for::<crate::git::GitText>();
+    generator.subschema_for::<crate::git::GitCommits>();
+    generator.subschema_for::<crate::git::GitBranches>();
+    generator.subschema_for::<crate::git::GitFileStages>();
+    generator.subschema_for::<crate::git::GitLastCommit>();
+    generator.subschema_for::<crate::git::GitCommitMessage>();
+    generator.subschema_for::<crate::git::GitOpResult>();
+    generator.subschema_for::<crate::git::GitDescription>();
+    generator.subschema_for::<crate::git::GitFailure>();
+    generator.subschema_for::<crate::git::GitEvent>();
+    generator.subschema_for::<crate::git::GitLog>();
+    generator.subschema_for::<crate::git::GitCommitDetail>();
+    generator.subschema_for::<crate::git::GitStashes>();
+    generator.subschema_for::<crate::git::GitBlob>();
 }
 
 #[cfg(test)]

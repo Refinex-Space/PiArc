@@ -4456,6 +4456,27 @@
       "required": ["name", "reference"],
       "type": "object"
     },
+    "GitBlob": {
+      "description": "`fileBlob`.",
+      "properties": {
+        "data": {
+          "description": "The bytes, base64; absent when missing or too large.",
+          "type": ["string", "null"]
+        },
+        "size": {
+          "description": "The size in bytes (0 when missing).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tooLarge": {
+          "description": "Larger than the limit.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "required": ["size"],
+      "type": "object"
+    },
     "GitBranches": {
       "description": "`branches`.",
       "properties": {
@@ -4575,6 +4596,84 @@
         }
       ]
     },
+    "GitCommitDetail": {
+      "description": "`commitDetail`.",
+      "properties": {
+        "author": {
+          "description": "The author's name.",
+          "type": "string"
+        },
+        "authorEmail": {
+          "description": "The author's address.",
+          "type": "string"
+        },
+        "authorTime": {
+          "description": "Author time, Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "commitTime": {
+          "description": "Commit time, Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "committer": {
+          "description": "The committer's name.",
+          "type": "string"
+        },
+        "committerEmail": {
+          "description": "The committer's address.",
+          "type": "string"
+        },
+        "inHead": {
+          "description": "`HEAD` contains it.",
+          "type": "boolean"
+        },
+        "message": {
+          "description": "The whole message.",
+          "type": "string"
+        },
+        "parents": {
+          "description": "The parents' full ids.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pushed": {
+          "description": "The current branch's upstream contains it.",
+          "type": "boolean"
+        },
+        "refs": {
+          "description": "The references on it.",
+          "items": {
+            "$ref": "#/$defs/GitRefLabel"
+          },
+          "type": "array"
+        },
+        "sha": {
+          "description": "The full id.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha",
+        "parents",
+        "author",
+        "authorEmail",
+        "authorTime",
+        "committer",
+        "committerEmail",
+        "commitTime",
+        "message",
+        "refs",
+        "inHead",
+        "pushed"
+      ],
+      "type": "object"
+    },
     "GitCommitMessage": {
       "description": "`commitMessage`.",
       "properties": {
@@ -4680,6 +4779,25 @@
       "required": ["name", "oid"],
       "type": "object"
     },
+    "GitDeletedRemoteBranch": {
+      "description": "A deleted remote branch, for \"Restore\".",
+      "properties": {
+        "branch": {
+          "description": "The branch.",
+          "type": "string"
+        },
+        "oid": {
+          "description": "The commit it named.",
+          "type": "string"
+        },
+        "remote": {
+          "description": "The remote.",
+          "type": "string"
+        }
+      },
+      "required": ["remote", "branch", "oid"],
+      "type": "object"
+    },
     "GitDescribe": {
       "description": "What a native confirmation describes before a destructive operation (ADR-0085 rule 6).",
       "oneOf": [
@@ -4767,6 +4885,65 @@
           },
           "required": ["kind", "target"],
           "type": "object"
+        },
+        {
+          "description": "Resetting the current branch (a hard reset is confirmed natively).",
+          "properties": {
+            "kind": {
+              "const": "reset",
+              "type": "string"
+            },
+            "mode": {
+              "$ref": "#/$defs/GitResetMode",
+              "description": "How."
+            },
+            "sha": {
+              "description": "The commit the branch moves to.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "sha", "mode"],
+          "type": "object"
+        },
+        {
+          "description": "Dropping a stash.",
+          "properties": {
+            "index": {
+              "description": "Its position in `stash list`.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "stashDrop",
+              "type": "string"
+            },
+            "oid": {
+              "description": "The stash commit shown.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "index", "oid"],
+          "type": "object"
+        },
+        {
+          "description": "Deleting a branch on a remote.",
+          "properties": {
+            "branch": {
+              "description": "The branch on it.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "deleteRemoteBranch",
+              "type": "string"
+            },
+            "remote": {
+              "description": "The remote.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "remote", "branch"],
+          "type": "object"
         }
       ]
     },
@@ -4777,8 +4954,18 @@
           "description": "The branch concerned.",
           "type": ["string", "null"]
         },
+        "leaving": {
+          "description": "Commits a reset takes off the branch.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
         "localOid": {
           "description": "The local commit pushed.",
+          "type": ["string", "null"]
+        },
+        "message": {
+          "description": "A stash's message.",
           "type": ["string", "null"]
         },
         "paths": {
@@ -4787,6 +4974,12 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "pushed": {
+          "description": "Of those, commits the upstream already has.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
         },
         "refused": {
           "anyOf": [
@@ -5306,6 +5499,109 @@
       "required": ["name", "oid", "time"],
       "type": "object"
     },
+    "GitLog": {
+      "description": "`log`: one page, in topological order.",
+      "properties": {
+        "commits": {
+          "description": "The commits.",
+          "items": {
+            "$ref": "#/$defs/GitLogCommit"
+          },
+          "type": "array"
+        },
+        "more": {
+          "description": "More commits follow.",
+          "type": "boolean"
+        }
+      },
+      "required": ["commits", "more"],
+      "type": "object"
+    },
+    "GitLogCommit": {
+      "description": "One commit of a log page.",
+      "properties": {
+        "author": {
+          "description": "The author's name.",
+          "type": "string"
+        },
+        "email": {
+          "description": "The author's address.",
+          "type": "string"
+        },
+        "parents": {
+          "description": "The parents' full ids, first parent first.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "refs": {
+          "description": "The references on it.",
+          "items": {
+            "$ref": "#/$defs/GitRefLabel"
+          },
+          "type": "array"
+        },
+        "sha": {
+          "description": "The full id.",
+          "type": "string"
+        },
+        "subject": {
+          "description": "The first line of the message.",
+          "type": "string"
+        },
+        "time": {
+          "description": "Author time, Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sha", "parents", "subject", "author", "email", "time", "refs"],
+      "type": "object"
+    },
+    "GitLogRevs": {
+      "description": "Which commits a log lists.",
+      "oneOf": [
+        {
+          "description": "The commits `HEAD` reaches.",
+          "properties": {
+            "kind": {
+              "const": "head",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "Every branch, remote-tracking branch and tag, and `HEAD`.",
+          "properties": {
+            "kind": {
+              "const": "all",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "The commits one branch, tag or commit reaches.",
+          "properties": {
+            "kind": {
+              "const": "ref",
+              "type": "string"
+            },
+            "name": {
+              "description": "The branch (`main`, `origin/main`), tag or commit.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "name"],
+          "type": "object"
+        }
+      ]
+    },
     "GitOpResult": {
       "description": "What a write operation did.",
       "properties": {
@@ -5327,6 +5623,17 @@
           ],
           "description": "The deleted branch."
         },
+        "deletedRemote": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitDeletedRemoteBranch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The deleted remote branch."
+        },
         "head": {
           "description": "`HEAD` afterwards.",
           "type": ["string", "null"]
@@ -5342,6 +5649,14 @@
         "restoreId": {
           "description": "The rollback to undo with `undoRollback`.",
           "type": ["string", "null"]
+        },
+        "skipped": {
+          "description": "An automatic fetch did nothing because another operation held the repository.",
+          "type": ["boolean", "null"]
+        },
+        "stashKept": {
+          "description": "A stash git kept because applying it stopped with conflicts.",
+          "type": ["boolean", "null"]
         },
         "subject": {
           "description": "The new commit's subject.",
@@ -5399,6 +5714,50 @@
         }
       },
       "required": ["remote", "branch"],
+      "type": "object"
+    },
+    "GitRefKind": {
+      "description": "What a reference on a commit is.",
+      "oneOf": [
+        {
+          "const": "head",
+          "description": "`HEAD` (detached, or pointing at the local branch listed with it).",
+          "type": "string"
+        },
+        {
+          "const": "local",
+          "description": "A local branch.",
+          "type": "string"
+        },
+        {
+          "const": "remote",
+          "description": "A remote-tracking branch (`origin/main`).",
+          "type": "string"
+        },
+        {
+          "const": "tag",
+          "description": "A tag.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitRefLabel": {
+      "description": "A reference shown on a commit.",
+      "properties": {
+        "current": {
+          "description": "`HEAD` points at this local branch.",
+          "type": ["boolean", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/GitRefKind",
+          "description": "What it is."
+        },
+        "name": {
+          "description": "Its short name (`main`, `origin/main`, `v1.0`, `HEAD`).",
+          "type": "string"
+        }
+      },
+      "required": ["kind", "name"],
       "type": "object"
     },
     "GitRemote": {
@@ -6058,6 +6417,10 @@
         {
           "description": "Fetch every remote, pruning.",
           "properties": {
+            "background": {
+              "description": "An automatic fetch (H5): no credential prompt of any kind, skipped when another\noperation holds the repository.",
+              "type": ["boolean", "null"]
+            },
             "op": {
               "const": "fetch",
               "type": "string"
@@ -6183,6 +6546,338 @@
           },
           "required": ["op", "action"],
           "type": "object"
+        },
+        {
+          "description": "A page of history ([`GitLog`]).",
+          "properties": {
+            "author": {
+              "description": "Commits whose author name or address contains this text.",
+              "type": ["string", "null"]
+            },
+            "limit": {
+              "description": "The most commits; 200 when absent and at most 200.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            },
+            "op": {
+              "const": "log",
+              "type": "string"
+            },
+            "revs": {
+              "$ref": "#/$defs/GitLogRevs",
+              "description": "Which commits."
+            },
+            "skip": {
+              "description": "Commits to skip (the rows already shown).",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            },
+            "text": {
+              "description": "Commits whose message contains this text (any case), or whose id starts with it.",
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["op", "revs"],
+          "type": "object"
+        },
+        {
+          "description": "One commit in full ([`GitCommitDetail`]).",
+          "properties": {
+            "op": {
+              "const": "commitDetail",
+              "type": "string"
+            },
+            "sha": {
+              "description": "The full commit id.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "sha"],
+          "type": "object"
+        },
+        {
+          "description": "The stashes ([`GitStashes`]).",
+          "properties": {
+            "op": {
+              "const": "stashes",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "One file's bytes, for an image diff ([`GitBlob`]).",
+          "properties": {
+            "op": {
+              "const": "fileBlob",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file.",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/GitTextSource",
+              "description": "Which content."
+            }
+          },
+          "required": ["op", "source", "path"],
+          "type": "object"
+        },
+        {
+          "description": "Tag a commit.",
+          "properties": {
+            "message": {
+              "description": "An annotation; a lightweight tag when absent.",
+              "type": ["string", "null"]
+            },
+            "name": {
+              "description": "The tag's name.",
+              "type": "string"
+            },
+            "op": {
+              "const": "createTag",
+              "type": "string"
+            },
+            "sha": {
+              "description": "The full commit id.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "name", "sha"],
+          "type": "object"
+        },
+        {
+          "description": "Apply a commit on top of `HEAD`.",
+          "properties": {
+            "op": {
+              "const": "cherryPick",
+              "type": "string"
+            },
+            "sha": {
+              "description": "The full commit id.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "sha"],
+          "type": "object"
+        },
+        {
+          "description": "Commit the inverse of a commit.",
+          "properties": {
+            "op": {
+              "const": "revert",
+              "type": "string"
+            },
+            "sha": {
+              "description": "The full commit id.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "sha"],
+          "type": "object"
+        },
+        {
+          "description": "Move the current branch to a commit (a hard reset is confirmed natively).",
+          "properties": {
+            "expect": {
+              "description": "`HEAD` when the dialog read it: refused as stale when it moved.",
+              "type": "string"
+            },
+            "mode": {
+              "$ref": "#/$defs/GitResetMode",
+              "description": "How."
+            },
+            "op": {
+              "const": "reset",
+              "type": "string"
+            },
+            "sha": {
+              "description": "The full commit id.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "sha", "mode", "expect"],
+          "type": "object"
+        },
+        {
+          "description": "Undo the last commit, keeping its changes staged.",
+          "properties": {
+            "expect": {
+              "description": "`HEAD` when the menu read it.",
+              "type": "string"
+            },
+            "op": {
+              "const": "undoCommit",
+              "type": "string"
+            }
+          },
+          "required": ["op", "expect"],
+          "type": "object"
+        },
+        {
+          "description": "Stash the local changes.",
+          "properties": {
+            "includeUntracked": {
+              "description": "Stash untracked files too.",
+              "type": ["boolean", "null"]
+            },
+            "message": {
+              "description": "The stash's message.",
+              "type": ["string", "null"]
+            },
+            "op": {
+              "const": "stashPush",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Apply a stash, dropping it afterwards with `pop`.",
+          "properties": {
+            "index": {
+              "description": "Its position in `stash list`.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "oid": {
+              "description": "The stash commit shown: refused as stale when the position names another.",
+              "type": "string"
+            },
+            "op": {
+              "const": "stashApply",
+              "type": "string"
+            },
+            "pop": {
+              "description": "Drop it once applied.",
+              "type": ["boolean", "null"]
+            }
+          },
+          "required": ["op", "index", "oid"],
+          "type": "object"
+        },
+        {
+          "description": "Drop a stash (confirmed natively).",
+          "properties": {
+            "index": {
+              "description": "Its position.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "oid": {
+              "description": "The stash commit shown.",
+              "type": "string"
+            },
+            "op": {
+              "const": "stashDrop",
+              "type": "string"
+            }
+          },
+          "required": ["op", "index", "oid"],
+          "type": "object"
+        },
+        {
+          "description": "Create a branch from a stash's base, apply the stash there and drop it.",
+          "properties": {
+            "index": {
+              "description": "Its position.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "name": {
+              "description": "The new branch.",
+              "type": "string"
+            },
+            "oid": {
+              "description": "The stash commit shown.",
+              "type": "string"
+            },
+            "op": {
+              "const": "stashBranch",
+              "type": "string"
+            }
+          },
+          "required": ["op", "index", "oid", "name"],
+          "type": "object"
+        },
+        {
+          "description": "Delete a branch on a remote (confirmed natively).",
+          "properties": {
+            "branch": {
+              "description": "The branch on it.",
+              "type": "string"
+            },
+            "expect": {
+              "description": "The commit the confirmation showed.",
+              "type": ["string", "null"]
+            },
+            "op": {
+              "const": "deleteRemoteBranch",
+              "type": "string"
+            },
+            "remote": {
+              "description": "The remote.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "remote", "branch"],
+          "type": "object"
+        },
+        {
+          "description": "Push a deleted remote branch back.",
+          "properties": {
+            "branch": {
+              "description": "The branch on it.",
+              "type": "string"
+            },
+            "oid": {
+              "description": "The commit it named.",
+              "type": "string"
+            },
+            "op": {
+              "const": "restoreRemoteBranch",
+              "type": "string"
+            },
+            "remote": {
+              "description": "The remote.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "remote", "branch", "oid"],
+          "type": "object"
+        }
+      ]
+    },
+    "GitResetMode": {
+      "description": "How a reset moves the current branch.",
+      "oneOf": [
+        {
+          "const": "soft",
+          "description": "Only the branch: the changes stay staged.",
+          "type": "string"
+        },
+        {
+          "const": "mixed",
+          "description": "The branch and the index: the changes stay in the working tree.",
+          "type": "string"
+        },
+        {
+          "const": "hard",
+          "description": "The branch, the index and the working tree: local changes are lost.",
+          "type": "string"
+        },
+        {
+          "const": "keep",
+          "description": "Like hard, but refuses when a local change would be lost.",
+          "type": "string"
         }
       ]
     },
@@ -6246,6 +6941,51 @@
           "type": "string"
         }
       ]
+    },
+    "GitStashEntry": {
+      "description": "One stash.",
+      "properties": {
+        "branch": {
+          "description": "The branch it was made on.",
+          "type": ["string", "null"]
+        },
+        "index": {
+          "description": "Its position (`stash@{index}`).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message": {
+          "description": "Its message.",
+          "type": "string"
+        },
+        "oid": {
+          "description": "The stash commit.",
+          "type": "string"
+        },
+        "time": {
+          "description": "When, Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["index", "oid", "message", "time"],
+      "type": "object"
+    },
+    "GitStashes": {
+      "description": "`stashes`.",
+      "properties": {
+        "entries": {
+          "description": "Newest first.",
+          "items": {
+            "$ref": "#/$defs/GitStashEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["entries"],
+      "type": "object"
     },
     "GitStatus": {
       "description": "`status`: the repository and its uncommitted files.",

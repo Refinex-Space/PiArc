@@ -29,7 +29,11 @@ export type ProtocolValue =
   | GitOpResult
   | GitDescription
   | GitFailure
-  | GitEvent;
+  | GitEvent
+  | GitLog
+  | GitCommitDetail
+  | GitStashes
+  | GitBlob;
 /**
  * Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.
  */
@@ -1477,6 +1481,11 @@ export type GitRequest =
       upstream?: string | null;
     }
   | {
+      /**
+       * An automatic fetch (H5): no credential prompt of any kind, skipped when another
+       * operation holds the repository.
+       */
+      background?: boolean | null;
       op: 'fetch';
     }
   | {
@@ -1523,6 +1532,183 @@ export type GitRequest =
        */
       action: GitDescribe;
       op: 'describe';
+    }
+  | {
+      /**
+       * Commits whose author name or address contains this text.
+       */
+      author?: string | null;
+      /**
+       * The most commits; 200 when absent and at most 200.
+       */
+      limit?: number | null;
+      op: 'log';
+      /**
+       * Which commits.
+       */
+      revs: GitLogRevs;
+      /**
+       * Commits to skip (the rows already shown).
+       */
+      skip?: number | null;
+      /**
+       * Commits whose message contains this text (any case), or whose id starts with it.
+       */
+      text?: string | null;
+    }
+  | {
+      op: 'commitDetail';
+      /**
+       * The full commit id.
+       */
+      sha: string;
+    }
+  | {
+      op: 'stashes';
+    }
+  | {
+      op: 'fileBlob';
+      /**
+       * The file.
+       */
+      path: string;
+      /**
+       * Which content.
+       */
+      source: GitTextSource;
+    }
+  | {
+      /**
+       * An annotation; a lightweight tag when absent.
+       */
+      message?: string | null;
+      /**
+       * The tag's name.
+       */
+      name: string;
+      op: 'createTag';
+      /**
+       * The full commit id.
+       */
+      sha: string;
+    }
+  | {
+      op: 'cherryPick';
+      /**
+       * The full commit id.
+       */
+      sha: string;
+    }
+  | {
+      op: 'revert';
+      /**
+       * The full commit id.
+       */
+      sha: string;
+    }
+  | {
+      /**
+       * `HEAD` when the dialog read it: refused as stale when it moved.
+       */
+      expect: string;
+      /**
+       * How.
+       */
+      mode: GitResetMode;
+      op: 'reset';
+      /**
+       * The full commit id.
+       */
+      sha: string;
+    }
+  | {
+      /**
+       * `HEAD` when the menu read it.
+       */
+      expect: string;
+      op: 'undoCommit';
+    }
+  | {
+      /**
+       * Stash untracked files too.
+       */
+      includeUntracked?: boolean | null;
+      /**
+       * The stash's message.
+       */
+      message?: string | null;
+      op: 'stashPush';
+    }
+  | {
+      /**
+       * Its position in `stash list`.
+       */
+      index: number;
+      /**
+       * The stash commit shown: refused as stale when the position names another.
+       */
+      oid: string;
+      op: 'stashApply';
+      /**
+       * Drop it once applied.
+       */
+      pop?: boolean | null;
+    }
+  | {
+      /**
+       * Its position.
+       */
+      index: number;
+      /**
+       * The stash commit shown.
+       */
+      oid: string;
+      op: 'stashDrop';
+    }
+  | {
+      /**
+       * Its position.
+       */
+      index: number;
+      /**
+       * The new branch.
+       */
+      name: string;
+      /**
+       * The stash commit shown.
+       */
+      oid: string;
+      op: 'stashBranch';
+    }
+  | {
+      /**
+       * The branch on it.
+       */
+      branch: string;
+      /**
+       * The commit the confirmation showed.
+       */
+      expect?: string | null;
+      op: 'deleteRemoteBranch';
+      /**
+       * The remote.
+       */
+      remote: string;
+    }
+  | {
+      /**
+       * The branch on it.
+       */
+      branch: string;
+      /**
+       * The commit it named.
+       */
+      oid: string;
+      op: 'restoreRemoteBranch';
+      /**
+       * The remote.
+       */
+      remote: string;
     };
 /**
  * A range of changes the panel shows (ADR-0084 rule 1). The session scope is not a Git
@@ -1613,6 +1799,60 @@ export type GitDescribe =
        * The branch or revision.
        */
       target: string;
+    }
+  | {
+      kind: 'reset';
+      /**
+       * How.
+       */
+      mode: GitResetMode;
+      /**
+       * The commit the branch moves to.
+       */
+      sha: string;
+    }
+  | {
+      /**
+       * Its position in `stash list`.
+       */
+      index: number;
+      kind: 'stashDrop';
+      /**
+       * The stash commit shown.
+       */
+      oid: string;
+    }
+  | {
+      /**
+       * The branch on it.
+       */
+      branch: string;
+      kind: 'deleteRemoteBranch';
+      /**
+       * The remote.
+       */
+      remote: string;
+    };
+/**
+ * How a reset moves the current branch.
+ */
+export type GitResetMode = 'soft' | 'mixed' | 'hard' | 'keep';
+/**
+ * Which commits a log lists.
+ */
+export type GitLogRevs =
+  | {
+      kind: 'head';
+    }
+  | {
+      kind: 'all';
+    }
+  | {
+      kind: 'ref';
+      /**
+       * The branch (`main`, `origin/main`), tag or commit.
+       */
+      name: string;
     };
 /**
  * The status of a file in a diff or on one side of `git status`.
@@ -1732,6 +1972,10 @@ export type GitEvent =
       root: string;
       type: 'changed';
     };
+/**
+ * What a reference on a commit is.
+ */
+export type GitRefKind = 'head' | 'local' | 'remote' | 'tag';
 
 /**
  * A request whose method is not interpreted.
@@ -10825,6 +11069,10 @@ export interface GitOpResult {
    */
   deleted?: GitDeletedBranch | null;
   /**
+   * The deleted remote branch.
+   */
+  deletedRemote?: GitDeletedRemoteBranch | null;
+  /**
    * `HEAD` afterwards.
    */
   head?: string | null;
@@ -10840,6 +11088,14 @@ export interface GitOpResult {
    * The rollback to undo with `undoRollback`.
    */
   restoreId?: string | null;
+  /**
+   * An automatic fetch did nothing because another operation held the repository.
+   */
+  skipped?: boolean | null;
+  /**
+   * A stash git kept because applying it stopped with conflicts.
+   */
+  stashKept?: boolean | null;
   /**
    * The new commit's subject.
    */
@@ -10863,6 +11119,23 @@ export interface GitDeletedBranch {
   upstream?: string | null;
 }
 /**
+ * A deleted remote branch, for "Restore".
+ */
+export interface GitDeletedRemoteBranch {
+  /**
+   * The branch.
+   */
+  branch: string;
+  /**
+   * The commit it named.
+   */
+  oid: string;
+  /**
+   * The remote.
+   */
+  remote: string;
+}
+/**
  * `describe`: the facts a native confirmation shows, read by Core.
  */
 export interface GitDescription {
@@ -10871,13 +11144,25 @@ export interface GitDescription {
    */
   branch?: string | null;
   /**
+   * Commits a reset takes off the branch.
+   */
+  leaving?: number | null;
+  /**
    * The local commit pushed.
    */
   localOid?: string | null;
   /**
+   * A stash's message.
+   */
+  message?: string | null;
+  /**
    * The files affected.
    */
   paths?: string[];
+  /**
+   * Of those, commits the upstream already has.
+   */
+  pushed?: number | null;
   /**
    * Refused before asking (a protected branch, nothing to do).
    */
@@ -10919,4 +11204,171 @@ export interface GitFailure {
    * Titles of the sessions that are busy.
    */
   sessions?: string[];
+}
+/**
+ * `log`: one page, in topological order.
+ */
+export interface GitLog {
+  /**
+   * The commits.
+   */
+  commits: GitLogCommit[];
+  /**
+   * More commits follow.
+   */
+  more: boolean;
+}
+/**
+ * One commit of a log page.
+ */
+export interface GitLogCommit {
+  /**
+   * The author's name.
+   */
+  author: string;
+  /**
+   * The author's address.
+   */
+  email: string;
+  /**
+   * The parents' full ids, first parent first.
+   */
+  parents: string[];
+  /**
+   * The references on it.
+   */
+  refs: GitRefLabel[];
+  /**
+   * The full id.
+   */
+  sha: string;
+  /**
+   * The first line of the message.
+   */
+  subject: string;
+  /**
+   * Author time, Unix seconds.
+   */
+  time: number;
+}
+/**
+ * A reference shown on a commit.
+ */
+export interface GitRefLabel {
+  /**
+   * `HEAD` points at this local branch.
+   */
+  current?: boolean | null;
+  /**
+   * What it is.
+   */
+  kind: GitRefKind;
+  /**
+   * Its short name (`main`, `origin/main`, `v1.0`, `HEAD`).
+   */
+  name: string;
+}
+/**
+ * `commitDetail`.
+ */
+export interface GitCommitDetail {
+  /**
+   * The author's name.
+   */
+  author: string;
+  /**
+   * The author's address.
+   */
+  authorEmail: string;
+  /**
+   * Author time, Unix seconds.
+   */
+  authorTime: number;
+  /**
+   * Commit time, Unix seconds.
+   */
+  commitTime: number;
+  /**
+   * The committer's name.
+   */
+  committer: string;
+  /**
+   * The committer's address.
+   */
+  committerEmail: string;
+  /**
+   * `HEAD` contains it.
+   */
+  inHead: boolean;
+  /**
+   * The whole message.
+   */
+  message: string;
+  /**
+   * The parents' full ids.
+   */
+  parents: string[];
+  /**
+   * The current branch's upstream contains it.
+   */
+  pushed: boolean;
+  /**
+   * The references on it.
+   */
+  refs: GitRefLabel[];
+  /**
+   * The full id.
+   */
+  sha: string;
+}
+/**
+ * `stashes`.
+ */
+export interface GitStashes {
+  /**
+   * Newest first.
+   */
+  entries: GitStashEntry[];
+}
+/**
+ * One stash.
+ */
+export interface GitStashEntry {
+  /**
+   * The branch it was made on.
+   */
+  branch?: string | null;
+  /**
+   * Its position (`stash@{index}`).
+   */
+  index: number;
+  /**
+   * Its message.
+   */
+  message: string;
+  /**
+   * The stash commit.
+   */
+  oid: string;
+  /**
+   * When, Unix seconds.
+   */
+  time: number;
+}
+/**
+ * `fileBlob`.
+ */
+export interface GitBlob {
+  /**
+   * The bytes, base64; absent when missing or too large.
+   */
+  data?: string | null;
+  /**
+   * The size in bytes (0 when missing).
+   */
+  size: number;
+  /**
+   * Larger than the limit.
+   */
+  tooLarge?: boolean | null;
 }

@@ -178,6 +178,60 @@ pub enum GitDescribe {
         /// The branch or revision.
         target: String,
     },
+    /// Resetting the current branch (a hard reset is confirmed natively).
+    Reset {
+        /// The commit the branch moves to.
+        sha: String,
+        /// How.
+        mode: GitResetMode,
+    },
+    /// Dropping a stash.
+    StashDrop {
+        /// Its position in `stash list`.
+        index: u64,
+        /// The stash commit shown.
+        oid: String,
+    },
+    /// Deleting a branch on a remote.
+    DeleteRemoteBranch {
+        /// The remote.
+        remote: String,
+        /// The branch on it.
+        branch: String,
+    },
+}
+
+/// Which commits a log lists.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum GitLogRevs {
+    /// The commits `HEAD` reaches.
+    Head,
+    /// Every branch, remote-tracking branch and tag, and `HEAD`.
+    All,
+    /// The commits one branch, tag or commit reaches.
+    Ref {
+        /// The branch (`main`, `origin/main`), tag or commit.
+        name: String,
+    },
+}
+
+/// How a reset moves the current branch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitResetMode {
+    /// Only the branch: the changes stay staged.
+    Soft,
+    /// The branch and the index: the changes stay in the working tree.
+    Mixed,
+    /// The branch, the index and the working tree: local changes are lost.
+    Hard,
+    /// Like hard, but refuses when a local change would be lost.
+    Keep,
 }
 
 /// A request of `gitRequest`.
@@ -341,7 +395,12 @@ pub enum GitRequest {
         upstream: Option<String>,
     },
     /// Fetch every remote, pruning.
-    Fetch,
+    Fetch {
+        /// An automatic fetch (H5): no credential prompt of any kind, skipped when another
+        /// operation holds the repository.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        background: Option<bool>,
+    },
     /// Pull into the current branch.
     Pull {
         /// How to integrate; the user setting when absent.
@@ -375,6 +434,125 @@ pub enum GitRequest {
     Describe {
         /// The operation.
         action: GitDescribe,
+    },
+    /// A page of history ([`GitLog`]).
+    Log {
+        /// Which commits.
+        revs: GitLogRevs,
+        /// Commits to skip (the rows already shown).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        skip: Option<u64>,
+        /// The most commits; 200 when absent and at most 200.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        limit: Option<u64>,
+        /// Commits whose message contains this text (any case), or whose id starts with it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+        /// Commits whose author name or address contains this text.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        author: Option<String>,
+    },
+    /// One commit in full ([`GitCommitDetail`]).
+    CommitDetail {
+        /// The full commit id.
+        sha: String,
+    },
+    /// The stashes ([`GitStashes`]).
+    Stashes,
+    /// One file's bytes, for an image diff ([`GitBlob`]).
+    FileBlob {
+        /// Which content.
+        source: GitTextSource,
+        /// The file.
+        path: String,
+    },
+    /// Tag a commit.
+    CreateTag {
+        /// The tag's name.
+        name: String,
+        /// The full commit id.
+        sha: String,
+        /// An annotation; a lightweight tag when absent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
+    /// Apply a commit on top of `HEAD`.
+    CherryPick {
+        /// The full commit id.
+        sha: String,
+    },
+    /// Commit the inverse of a commit.
+    Revert {
+        /// The full commit id.
+        sha: String,
+    },
+    /// Move the current branch to a commit (a hard reset is confirmed natively).
+    Reset {
+        /// The full commit id.
+        sha: String,
+        /// How.
+        mode: GitResetMode,
+        /// `HEAD` when the dialog read it: refused as stale when it moved.
+        expect: String,
+    },
+    /// Undo the last commit, keeping its changes staged.
+    UndoCommit {
+        /// `HEAD` when the menu read it.
+        expect: String,
+    },
+    /// Stash the local changes.
+    StashPush {
+        /// The stash's message.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+        /// Stash untracked files too.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        include_untracked: Option<bool>,
+    },
+    /// Apply a stash, dropping it afterwards with `pop`.
+    StashApply {
+        /// Its position in `stash list`.
+        index: u64,
+        /// The stash commit shown: refused as stale when the position names another.
+        oid: String,
+        /// Drop it once applied.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pop: Option<bool>,
+    },
+    /// Drop a stash (confirmed natively).
+    StashDrop {
+        /// Its position.
+        index: u64,
+        /// The stash commit shown.
+        oid: String,
+    },
+    /// Create a branch from a stash's base, apply the stash there and drop it.
+    StashBranch {
+        /// Its position.
+        index: u64,
+        /// The stash commit shown.
+        oid: String,
+        /// The new branch.
+        name: String,
+    },
+    /// Delete a branch on a remote (confirmed natively).
+    DeleteRemoteBranch {
+        /// The remote.
+        remote: String,
+        /// The branch on it.
+        branch: String,
+        /// The commit the confirmation showed.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expect: Option<String>,
+    },
+    /// Push a deleted remote branch back.
+    RestoreRemoteBranch {
+        /// The remote.
+        remote: String,
+        /// The branch on it.
+        branch: String,
+        /// The commit it named.
+        oid: String,
     },
 }
 
@@ -777,6 +955,144 @@ pub struct GitDeletedBranch {
     pub upstream: Option<String>,
 }
 
+/// What a reference on a commit is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitRefKind {
+    /// `HEAD` (detached, or pointing at the local branch listed with it).
+    Head,
+    /// A local branch.
+    Local,
+    /// A remote-tracking branch (`origin/main`).
+    Remote,
+    /// A tag.
+    Tag,
+}
+
+/// A reference shown on a commit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRefLabel {
+    /// What it is.
+    pub kind: GitRefKind,
+    /// Its short name (`main`, `origin/main`, `v1.0`, `HEAD`).
+    pub name: String,
+    /// `HEAD` points at this local branch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current: Option<bool>,
+}
+
+/// One commit of a log page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitLogCommit {
+    /// The full id.
+    pub sha: String,
+    /// The parents' full ids, first parent first.
+    pub parents: Vec<String>,
+    /// The first line of the message.
+    pub subject: String,
+    /// The author's name.
+    pub author: String,
+    /// The author's address.
+    pub email: String,
+    /// Author time, Unix seconds.
+    pub time: u64,
+    /// The references on it.
+    pub refs: Vec<GitRefLabel>,
+}
+
+/// `log`: one page, in topological order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitLog {
+    /// The commits.
+    pub commits: Vec<GitLogCommit>,
+    /// More commits follow.
+    pub more: bool,
+}
+
+/// `commitDetail`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitDetail {
+    /// The full id.
+    pub sha: String,
+    /// The parents' full ids.
+    pub parents: Vec<String>,
+    /// The author's name.
+    pub author: String,
+    /// The author's address.
+    pub author_email: String,
+    /// Author time, Unix seconds.
+    pub author_time: u64,
+    /// The committer's name.
+    pub committer: String,
+    /// The committer's address.
+    pub committer_email: String,
+    /// Commit time, Unix seconds.
+    pub commit_time: u64,
+    /// The whole message.
+    pub message: String,
+    /// The references on it.
+    pub refs: Vec<GitRefLabel>,
+    /// `HEAD` contains it.
+    pub in_head: bool,
+    /// The current branch's upstream contains it.
+    pub pushed: bool,
+}
+
+/// One stash.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStashEntry {
+    /// Its position (`stash@{index}`).
+    pub index: u64,
+    /// The stash commit.
+    pub oid: String,
+    /// Its message.
+    pub message: String,
+    /// The branch it was made on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// When, Unix seconds.
+    pub time: u64,
+}
+
+/// `stashes`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStashes {
+    /// Newest first.
+    pub entries: Vec<GitStashEntry>,
+}
+
+/// `fileBlob`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBlob {
+    /// The bytes, base64; absent when missing or too large.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
+    /// The size in bytes (0 when missing).
+    pub size: u64,
+    /// Larger than the limit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub too_large: Option<bool>,
+}
+
+/// A deleted remote branch, for "Restore".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDeletedRemoteBranch {
+    /// The remote.
+    pub remote: String,
+    /// The branch.
+    pub branch: String,
+    /// The commit it named.
+    pub oid: String,
+}
+
 /// What a write operation did.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -793,6 +1109,15 @@ pub struct GitOpResult {
     /// The deleted branch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deleted: Option<GitDeletedBranch>,
+    /// The deleted remote branch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deleted_remote: Option<GitDeletedRemoteBranch>,
+    /// A stash git kept because applying it stopped with conflicts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stash_kept: Option<bool>,
+    /// An automatic fetch did nothing because another operation held the repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skipped: Option<bool>,
     /// A smart checkout's stash kept after conflicts (`stash@{0}` and its message).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kept_stash: Option<String>,
@@ -823,6 +1148,15 @@ pub struct GitDescription {
     /// Commits a deleted branch has that its upstream or `HEAD` lacks.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unmerged: Option<u64>,
+    /// Commits a reset takes off the branch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leaving: Option<u64>,
+    /// Of those, commits the upstream already has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pushed: Option<u64>,
+    /// A stash's message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
     /// The files affected.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub paths: Vec<String>,
@@ -996,6 +1330,49 @@ mod tests {
                 ignore_whitespace: Some(true),
             }
         );
+    }
+
+    #[test]
+    fn history_requests_on_the_wire() {
+        let fetch: GitRequest =
+            serde_json::from_value(json!({ "op": "fetch" })).expect("plain fetch");
+        assert_eq!(fetch, GitRequest::Fetch { background: None });
+        let log: GitRequest = serde_json::from_value(json!({
+            "op": "log",
+            "revs": { "kind": "ref", "name": "origin/main" },
+            "skip": 200,
+        }))
+        .expect("log");
+        assert_eq!(
+            log,
+            GitRequest::Log {
+                revs: GitLogRevs::Ref {
+                    name: "origin/main".into()
+                },
+                skip: Some(200),
+                limit: None,
+                text: None,
+                author: None,
+            }
+        );
+        let push: GitRequest = serde_json::from_value(json!({
+            "op": "stashPush",
+            "includeUntracked": true,
+        }))
+        .expect("stashPush");
+        assert_eq!(
+            push,
+            GitRequest::StashPush {
+                message: None,
+                include_untracked: Some(true),
+            }
+        );
+        let reset = serde_json::to_value(GitDescribe::Reset {
+            sha: "a".repeat(40),
+            mode: GitResetMode::Hard,
+        })
+        .expect("describe");
+        assert_eq!(reset["mode"], "hard");
     }
 
     #[test]

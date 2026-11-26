@@ -173,6 +173,10 @@ async function buildFiles() {
       'GitDescription',
       'GitFailure',
       'GitEvent',
+      'GitLog',
+      'GitCommitDetail',
+      'GitStashes',
+      'GitBlob',
     ].map((name) => ({
       $ref: `#/$defs/${name}`,
     })),
