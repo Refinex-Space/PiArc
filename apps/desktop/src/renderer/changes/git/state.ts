@@ -60,7 +60,7 @@ export function newOpId(): string {
   return `git-${Date.now().toString(36)}-${opCounter.toString(36)}`;
 }
 
-/** The repository's change key: what a reload of the diff depends on. */
+/** What the commits and branches depend on (the diff also depends on file contents). */
 function changeKey(status: Status | undefined): string {
   if (status === undefined) return '';
   const r = status.repository;
@@ -129,7 +129,10 @@ export class GitSession {
       const changed = key !== this.#key;
       this.#key = key;
       this.#set({ status: { value: reply.value, loading: false, stale: false } });
-      if (changed) this.#markStale();
+      // An edit can keep a file's line counts (a changed line changed again), so the diff is
+      // read again after every status read; commits and branches only when HEAD or a file's
+      // state moved.
+      this.#markStale(changed);
     } else {
       this.#set({ status: { failure: reply.failure, loading: false, stale: false } });
     }
@@ -142,14 +145,18 @@ export class GitSession {
     if (reply.ok && reply.value !== this.#fingerprint) await this.refreshStatus();
   }
 
-  #markStale(): void {
+  #markStale(all: boolean): void {
     const changes = new Map<string, Load<Changes>>();
     for (const [key, load] of this.#snapshot.changes) changes.set(key, { ...load, stale: true });
-    this.#set({
-      changes,
-      commits: { ...this.#snapshot.commits, stale: true },
-      branches: { ...this.#snapshot.branches, stale: true },
-    });
+    this.#set(
+      all
+        ? {
+            changes,
+            commits: { ...this.#snapshot.commits, stale: true },
+            branches: { ...this.#snapshot.branches, stale: true },
+          }
+        : { changes },
+    );
   }
 
   changes(choice: ScopeChoice, ignoreWhitespace: boolean): Load<Changes> {
@@ -207,7 +214,7 @@ export class GitSession {
   /** The repository changed (an operation here or in another window). */
   changed(): void {
     void this.refreshStatus();
-    this.#markStale();
+    this.#markStale(true);
   }
 
   setProgress(opId: string, progress: Progress | undefined): void {

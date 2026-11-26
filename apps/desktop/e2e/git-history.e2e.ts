@@ -257,3 +257,76 @@ test('an image diff and an automatic fetch', async ({ app, page, workspaces }, i
   await prefer(page, { key: 'git.autoFetch', value: 5 });
   await expect.poll(() => git(ws, 'rev-parse', 'origin/main'), { timeout: 20_000 }).toBe(pushed);
 });
+
+/**
+ * A focused text field shows one rounded edge: no square-cornered frame inside a rounded box.
+ * The Log filter is a borderless input in a rounded field, so the field's border takes the
+ * focus color and the input draws no outline; inputs with their own rounded border keep the
+ * light outline, which follows that radius.
+ */
+test('focused text fields in the Git tool draw one rounded edge', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
+  const { ws } = await openSession(app, page, workspaces, 'git-focus', 'git-start', 'Start.', {
+    'src/.keep': '',
+  });
+  await makeRepository(ws);
+  await idle(page);
+  await openGit(page);
+  const looks = (locator: ReturnType<Page['getByTestId']>) =>
+    locator.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const field = element.closest('.git-log-search');
+      return {
+        outline: style.outlineStyle,
+        radius: parseFloat(style.borderTopLeftRadius),
+        border: style.borderTopStyle,
+        field: field === null ? '' : getComputedStyle(field).borderTopColor,
+      };
+    });
+
+  await page.getByTestId('git-view-log').click();
+  const filter = page.getByTestId('git-log-filter');
+  await expect(filter).toBeVisible();
+  const resting = (await looks(filter)).field;
+  for (const how of ['pointer', 'keyboard'] as const) {
+    if (how === 'pointer') {
+      await filter.click();
+    } else {
+      await page.getByTestId('git-log-revs').focus();
+      await page.keyboard.press('Shift+Tab');
+    }
+    await expect(filter).toBeFocused();
+    const focused = await looks(filter);
+    expect(focused.outline, `${how} focus draws no frame inside the field`).toBe('none');
+    expect(focused.field, `${how} focus colors the field's edge`).not.toBe(resting);
+  }
+  await screenshots(page, info, 'git-focus-log-filter');
+
+  const rounded = async (testId: string) => {
+    const field = page.getByTestId(testId);
+    await expect(field).toBeFocused();
+    const style = await looks(field);
+    // An outline is drawn only on a field with its own rounded border, and follows its radius.
+    if (style.outline !== 'none') {
+      expect(style.border, `${testId} has its own border`).toBe('solid');
+      expect(style.radius, `${testId} is rounded`).toBeGreaterThan(0);
+    }
+  };
+  await page.getByTestId('git-view-changes').click();
+  await page.getByTestId('git-goto').click();
+  await rounded('git-goto-input');
+  await screenshots(page, info, 'git-focus-goto');
+  await page.keyboard.press('Escape');
+
+  await page.getByTestId('git-view-commit').click();
+  await page.getByTestId('git-branch-button').click();
+  await page.getByTestId('git-branch-search').click();
+  await rounded('git-branch-search');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('git-commit-message').click();
+  await rounded('git-commit-message');
+  await screenshots(page, info, 'git-focus-commit-message');
+});

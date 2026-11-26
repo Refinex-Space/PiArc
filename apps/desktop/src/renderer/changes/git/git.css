@@ -741,7 +741,10 @@
   border-inline-end: 0;
 }
 
-.git-commit-body > .git-files-divider {
+/* Between the Commit view's two columns. The `:root[data-app]` prefix outweighs the file
+   column's absolute divider above; without it the handle sat at the body's right edge, past
+   the tool. */
+:root[data-app] .git-commit-body > .git-files-divider {
   position: relative;
   inset: auto;
   flex: none;

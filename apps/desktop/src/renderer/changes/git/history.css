@@ -59,6 +59,18 @@
   font-size: var(--piarc-font-size-small);
 }
 
+/* The rounded field shows focus with its own border. The inner input draws nothing: the global
+   inset outline would be a square-cornered frame inside the rounded box. The attribute selector
+   outweighs the global text-field rule, which `app.css` declares after this file. */
+:root[data-app] .git-log-search input[type='search']:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .git-log-search input[type='search']:focus {
+  outline: none;
+}
+
+.git-log-search:has(input:focus) {
+  border-color: var(--piarc-c-focus-ring);
+}
+
 :root[data-app] .git-log-revs {
   display: inline-flex;
   align-items: center;
