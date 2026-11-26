@@ -43,6 +43,8 @@ struct Pending {
 }
 
 mod assess;
+mod browser_files;
+pub(super) mod dev_server;
 mod edit;
 mod elicitation;
 mod grants;

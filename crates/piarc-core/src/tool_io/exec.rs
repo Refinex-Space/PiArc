@@ -486,6 +486,9 @@ impl Exec {
         match log {
             Ok(log) => {
                 place.tasks.register(&reserved, new_task, log, token);
+                place
+                    .tasks
+                    .set_tree(&reserved.task_id, crate::tasks::command_tree(running.pid));
                 background::watch_to_end(
                     place.tasks.clone(),
                     reserved.task_id.clone(),
@@ -601,7 +604,10 @@ impl Exec {
         ));
         let forward = tokio::spawn(display.forward(peer, request_id.to_owned(), token.clone()));
         let runner = self.runner.clone();
-        let mut run = tokio::spawn(async move { runner.run(spec, tx, token).await });
+        let started = Arc::new(std::sync::OnceLock::new());
+        let pid = Arc::clone(&started);
+        let mut run =
+            tokio::spawn(async move { runner.run_reporting(spec, tx, token, Some(started)).await });
         tokio::select! {
             joined = &mut run => {
                 let exit = joined.unwrap_or_else(|e| {
@@ -620,7 +626,7 @@ impl Exec {
                     ),
                 }
             }
-            () = deadline => Executed::TimedOut(Running { run, consumer, forward, switch, spilled }),
+            () = deadline => Executed::TimedOut(Running { run, consumer, forward, switch, spilled, pid }),
         }
     }
 }
@@ -640,6 +646,8 @@ struct Running {
     forward: tokio::task::JoinHandle<()>,
     switch: oneshot::Sender<background::Switch>,
     spilled: Arc<Mutex<Option<PathBuf>>>,
+    /// The command's process id once it started: the task's process tree (ADR-0092).
+    pid: Arc<std::sync::OnceLock<u32>>,
 }
 
 /// Where a session's commands become tasks: the task manager, the session, its main session

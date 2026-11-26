@@ -23,6 +23,8 @@ piarc-core.workspace = true
 piarc-protocol.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# The Chrome import answer is handed to V8 from a zeroizing buffer (ADR-0090).
+zeroize.workspace = true
 
 [build-dependencies]
 napi-build.workspace = true

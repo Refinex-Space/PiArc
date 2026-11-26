@@ -46,9 +46,13 @@
 //! - T39: [`Error`], with `kind()` and `retryable()`, for the file and process functions
 //!   ([`TaskLog`], [`task_log::read_chunk`], [`terminal_tree::TerminalTree::attach`], [`CwdProbe`]).
 //!
-//! The Windows `job` module (a safe wrapper over the Job Object calls) and the macOS
-//! `tty_processes` module (one `proc_listpids` call) are the crate's only unsafe code (coding
-//! standards section 2.8).
+//! - ADR-0092: [`listeners`] (the TCP ports a process tree listens on: `lsof` on macOS,
+//!   `GetExtendedTcpTable` and parent links on Windows).
+//!
+//! The Windows `job` module (a safe wrapper over the Job Object calls and the process
+//! snapshot), the Windows `tcp_table` module (one `GetExtendedTcpTable` call per address
+//! family) and the macOS `tty_processes` module (one `proc_listpids` call) are the crate's only
+//! unsafe code (coding standards section 2.8).
 
 pub mod capture;
 mod command;
@@ -62,10 +66,17 @@ mod error;
 )]
 mod job;
 pub mod limits;
+pub mod listeners;
 pub mod semantic;
 pub mod shells;
 mod spawner;
 pub mod task_log;
+#[cfg(windows)]
+#[allow(
+    unsafe_code,
+    reason = "safe wrapper over GetExtendedTcpTable (coding standards section 2.8)"
+)]
+mod tcp_table;
 pub mod terminal_tree;
 #[cfg(test)]
 mod termination_tests;

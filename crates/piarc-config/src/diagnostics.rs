@@ -67,6 +67,8 @@ pub enum SourceKind {
     Plugin,
     /// Enterprise settings (T47).
     Enterprise,
+    /// A launch file (`.piarc/launch.json`, `.claude/launch.json`, ADR-0092).
+    Launch,
 }
 
 /// One key that takes part in the merge.
@@ -111,6 +113,8 @@ pub enum IgnoreReason {
     ProjectAutoMode,
     /// The Git panel's settings apply from the user's own file only (ADR-0085).
     ProjectGit,
+    /// The built-in browser's settings apply from the user's own file only (B5.5).
+    ProjectBrowser,
     /// The setting has no effect on this platform (the sandbox on Windows, requirement D7).
     Platform,
     /// PiArc does not support it (an MCP transport, a plugin component, a field).
@@ -323,6 +327,8 @@ impl Settings {
             let memory = self.ignored_memory.contains(&spec.id) && pointer == "/autoMemoryEnabled";
             let project_git = self.ignored_git.contains(&spec.id)
                 && (pointer == "/git" || pointer.starts_with("/git/"));
+            let project_browser = self.ignored_browser.contains(&spec.id)
+                && (pointer == "/browser" || pointer.starts_with("/browser/"));
             let reason = if managed_only {
                 IgnoreReason::ManagedOnly
             } else if memory {
@@ -335,6 +341,8 @@ impl Settings {
                 IgnoreReason::ProjectAutoMode
             } else if project_git {
                 IgnoreReason::ProjectGit
+            } else if project_browser {
+                IgnoreReason::ProjectBrowser
             } else {
                 untrusted = true;
                 IgnoreReason::Untrusted

@@ -65,6 +65,11 @@
 - `claude_state_servers(home, workspace)` 读 `~/.claude.json` 的顶层与 `projects[<工作区>]` 段（键与工作区规范化后比较），`local_pointer` 给出后者的 JSON Pointer；`pool_settings(merged)` 读 `mcp.idleTimeoutSeconds`（默认 600）与 `mcp.deferThreshold`（默认 30）。
 - 可执行项：`executables::enumerate` 经 `mcp_items()` 列出 `.mcp.json`、`.piarc/settings*.json` 的 `mcpServers` 与项目级子 agent 定义的内联 server，条目名由 `trust_item_name` 给出（名称加程序或地址，再加 `type`、`args`、`env`、`cwd`、`headers`、`oauth`），改了运行什么就是新增项。`.pi/mcp.json` 不再枚举（Pi 的 MCP 扩展不再加载）。
 
+## 启动配置（`src/launch.rs`，ADR-0092）
+
+- `load(root)` 读 `.piarc/launch.json` 与只读的 `.claude/launch.json`（JSONC：`strip_jsonc` 把注释与尾逗号换成空格，位置不变，问题带行列），同名时 `.piarc` 优先（被遮住的在 `hidden`），`autoVerify` 先取 `.piarc` 的、缺省为真。`LaunchConfig::{command, cwd, env, url}` 替换 `${workspaceFolder}`；`port()` 的顺序 `port` → `url` → `env.PORT` → `--port`/`-p` → 3000，`on_port` 改写参数、`PORT` 与 `url`；`fingerprint()` 是命令、参数、目录、环境与端口的 SHA-256。
+- 可执行项：`executables::enumerate` 每个配置一项（`Category::LaunchConfig`，名称含命令与指纹前 12 位），改了运行什么就是新增项；配置诊断的来源是 `SourceKind::Launch`（Core 的 `config_diagnostics/sources.rs`）。
+
 ## Claude Code 配置（T24，ADR-0038）
 
 - **键映射表**在 `src/claude.rs` 的 `SETTINGS_KEYS`（`settings.json` 的键）与 `STATE_KEYS`（`~/.claude.json`）：每行是键（嵌套键用点）、状态（`Active` 以同一 JSON Pointer 并入、`Planned(任务)`、`Ignored`）与对应的 PiArc 设置或忽略原因。它是唯一判断：合并只保留 `Active` 的键（`claude::project`，读文件时投影），诊断用 `claude::classify` 分类，表外的键为"未知"。某个键的功能落地时：把这一行改为 `active("…", "/…")`，把键加进 `schema::PIARC_SETTINGS`（测试检查生效的键都是 PiArc 已知的设置），需要信任的值加进 `layers::CLAUDE_EXECUTABLE`。不要在别处另写"这个键算不算"的判断。行的来源是官方 settings 索引，Claude Code 增删键时同步。

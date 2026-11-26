@@ -23,8 +23,67 @@ export declare class CoreRuntime {
    * `{ allowed, scope? }` once Core decided, which may wait for the user.
    */
   browserSite(requestJson: string): Promise<string>;
+  /**
+   * A file request of the agent's browser (B2.6.6): JSON `{ op: "stage", sessionId,
+   * toolCallId, paths }` or `{ op: "save", sessionId, toolCallId, source, path }`. Answers
+   * `{ staged?, saved? }` once Core decided, which may wait for the user.
+   */
+  browserFiles(requestJson: string): Promise<string>;
+  /**
+   * What the user changed in a session's browser since the agent's last call (B2.7.3): JSON
+   * `{ sessionId, spaces: [{ id, name, controlledBy, tabs, tabCount }], userTabs }`, kept
+   * as the session's next `browserState` reminder.
+   */
+  browserState(requestJson: string): void;
+  /** The directory the downloads of session `sessionId`'s agent tabs go to. */
+  browserDownloadsDir(sessionId: string): string;
   /** Stops a browser partition's proxy. Answers `{ stopped }`. */
   stopBrowserProxy(partition: string): Promise<string>;
+  /**
+   * Chrome's profiles: `{ chrome, profiles: [{ id, name }] }` (`chrome` is false when
+   * Chrome's folder is not there).
+   */
+  chromeProfiles(): Promise<string>;
+  /**
+   * The sites of a Chrome profile with their cookie counts, no value:
+   * `{ sites: [{ site, count }] }`.
+   */
+  chromeSites(profile: string): Promise<string>;
+  /**
+   * Imports sites the user confirmed: JSON `{ workspace, profile, sites }`. Reads the key
+   * once (the macOS keychain prompt), records the sites and audits them. Answers
+   * `{ cookies: [{ site, url, name, value, domain?, path, secure, httpOnly,
+   * expirationDate?, sameSite }], sites: [{ site, imported, skipped: [{ reason, count }] }] }`;
+   * the values are for the browser partition only.
+   */
+  chromeImport(requestJson: string): Promise<string>;
+  /**
+   * The sites of a workspace with imported sign-ins:
+   * `{ imports: [{ site, count, profile, importedAt }] }`.
+   */
+  browserImports(workspace: string): Promise<string>;
+  /**
+   * Forgets an imported site of a workspace after the main process removed its cookies
+   * from the partition: `{ forgot }`.
+   */
+  forgetBrowserImport(workspace: string, site: string): Promise<string>;
+  /**
+   * The launch configurations of open session `sessionId`'s project, their problems,
+   * whether the project may run them and the servers the session started: JSON
+   * `LaunchView`.
+   */
+  launchConfigs(sessionId: string): Promise<string>;
+  /**
+   * Starts a launch configuration: JSON `{ sessionId, name, agent?: { sessionId,
+   * toolCallId }, wait? }`. Answers its `DevServerState`; with `wait`, once it is ready or
+   * failed. An agent's first start of a configuration in the session asks the user.
+   */
+  startDevServer(requestJson: string): Promise<string>;
+  /**
+   * Stops session `sessionId`'s development server `name` with its whole process tree.
+   * Answers its `DevServerState`.
+   */
+  stopDevServer(sessionId: string, name: string): Promise<string>;
   /**
    * Assembles the diagnostic bundle in memory and answers its manifest as JSON text:
    * `{id, files: [{name, bytes}], redactions: {<kind>: n}, excluded}`. `appJson` holds the

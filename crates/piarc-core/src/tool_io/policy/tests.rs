@@ -653,7 +653,11 @@ async fn completion_only_retires_memory_for_its_own_turn() {
 }
 
 mod browser;
+mod browser_files;
+mod browser_import;
 mod browser_site;
+mod browser_state;
+mod dev_servers;
 mod t23;
 mod t26;
 mod t27;

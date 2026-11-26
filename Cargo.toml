@@ -20,6 +20,7 @@ members = [
     "crates/piarc-secrets",
     "crates/piarc-telemetry",
     "crates/piarc-web",
+    "crates/piarc-browser-import",
     "crates/piarc-napi",
     "crates/piarc-testkit",
     "crates/piarc-devcli",
@@ -55,6 +56,7 @@ piarc-git         = { path = "crates/piarc-git" }
 piarc-secrets     = { path = "crates/piarc-secrets" }
 piarc-telemetry   = { path = "crates/piarc-telemetry" }
 piarc-web         = { path = "crates/piarc-web" }
+piarc-browser-import = { path = "crates/piarc-browser-import" }
 piarc-napi        = { path = "crates/piarc-napi" }
 piarc-testkit     = { path = "crates/piarc-testkit" }
 
@@ -65,6 +67,10 @@ quick-xml = "=0.42.0"
 aes-gcm     = { version = "=0.11.1", default-features = false, features = ["aes", "zeroize"] }
 apple-native-keyring-store = { version = "=1.0.2", default-features = false, features = ["keychain"] }
 getrandom   = { version = "=0.4.3", default-features = false }
+# Chrome sign-in import (ADR-0090): AES-128-CBC and PBKDF2-HMAC-SHA1 of macOS Chrome cookies.
+cbc         = { version = "=0.2.1", default-features = false, features = ["block-padding"] }
+pbkdf2      = { version = "=0.13.0", default-features = false, features = ["hmac"] }
+sha1        = { version = "=0.11.0", default-features = false }
 cap-std = "=4.0.3"
 cap-fs-ext = "=4.0.3"
 chardetng   = "=1.0.0"
@@ -121,7 +127,7 @@ zeroize     = { version = "=1.9.1", features = ["serde", "std"] }
 [workspace.lints.rust]
 # `unsafe` is allowed only in -sys crates, at the NAPI boundary and in safe
 # wrapper modules over system interfaces (piarc-term's `vt`, piarc-exec's `job` and
-# `tty_processes`);
+# `tty_processes`, piarc-browser-import's `dpapi`);
 # the crates opt out at the crate root, the wrappers on their module declaration,
 # each with a reason.
 unsafe_code = "deny"

@@ -11,7 +11,8 @@
 //! and `.claude/agents/`, and the `allowed-tools` and `hooks` of skills and command files in
 //! the project's `.piarc/`, `.claude/` and Pi directories (T37). An MCP server's item names its program or endpoint
 //! ([`crate::mcp::trust_item_name`]), so changing what runs is a new item. Pi's `.pi/mcp.json`
-//! is not read: PiArc's MCP extension replaces Pi's (T36).
+//! is not read: PiArc's MCP extension replaces Pi's (T36). The launch configurations of
+//! `.piarc/launch.json` and `.claude/launch.json` (ADR-0092) are items too.
 
 use std::collections::BTreeSet;
 use std::io;
@@ -38,6 +39,9 @@ pub enum Category {
     Plugin,
     /// A Pi extension or package.
     PiExtension,
+    /// A launch configuration: a development server the panel or the agent may start
+    /// (ADR-0092).
+    LaunchConfig,
 }
 
 /// One executable item.
@@ -157,6 +161,7 @@ pub fn enumerate(root: &Path) -> Inventory {
     }
     agent_hook_items(root, &mut items, &mut unreadable);
     skill_items(root, &mut items);
+    launch_items(root, &mut items);
     match extension_entries(&root.join(".pi").join("extensions")) {
         Ok(names) => {
             for name in names {
@@ -171,6 +176,27 @@ pub fn enumerate(root: &Path) -> Inventory {
     Inventory {
         items: items.into_iter().collect(),
         unreadable,
+    }
+}
+
+/// The launch configurations (ADR-0092): one item per configuration, named by what it runs
+/// and its fingerprint, so a changed command, directory, environment or port is a new item.
+/// A file with problems still lists the configurations it holds; one that cannot be parsed
+/// lists none (nothing in it can run).
+fn launch_items(root: &Path, items: &mut BTreeSet<Item>) {
+    let launch = crate::launch::load(root);
+    for config in &launch.configs {
+        let name = format!(
+            "{}: {} [{}]",
+            config.name,
+            config.display(Path::new("${workspaceFolder}")),
+            config.fingerprint().get(..12).unwrap_or_default()
+        );
+        items.insert(item(
+            Category::LaunchConfig,
+            crate::launch::file_of(config.source),
+            &name,
+        ));
     }
 }
 

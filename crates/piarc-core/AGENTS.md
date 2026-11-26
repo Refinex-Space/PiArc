@@ -22,6 +22,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-core --lib provider_accounts` 与 `cargo test -p piarc-testkit --test sessions accounts::` | 同一服务商多个账号（ADR-0083）：再次登录、切换、移除、登录失败放回、同名账号去重，`account/` 只给 Core；端到端另有连接测试与停用后工作区看不到模型 |
 | `cargo test -p piarc-core --lib network` 与 `cargo test -p piarc-testkit --test sessions network::` | 代理（ADR-0082）：地址校验、设置读取与生效值、环境变量；真实 Agent Host 在系统代理变化后空闲重启并带上代理变量、本机 mock 直连、相同代理不重启、回合进行中不重启 |
 | `cargo test -p piarc-core --lib mcp::` | MCP 配置（T36）：未信任项目的 server 等待信任、各来源与同名取舍、用户启停与 `disabledMcpjsonServers`、子 agent 的内联 server、配置诊断不展开变量；`--lib host_probe` 含探针的 `mcp/servers` |
+| `cargo test -p piarc-core --lib tool_io::policy::tests::dev_servers` 与 `--lib ports` | 开发服务器与端口发现（ADR-0092）：未信任不启动、真实 node 服务就绪后停止结束进程树、失败带最后 20 行、就绪超时、`autoPort`、智能体按指纹询问一次、`autoVerify` 每回合一次、后台命令的监听端口进 `ports` 事件（要 PATH 上有 node） |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |
 
 ## 运行时与关闭顺序
@@ -83,6 +84,18 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 输出文件 `<数据目录>/sessions/<主会话 id>/tasks/<任务 id>.log`（`tasks::task_file`），子 agent 的任务也在主会话目录下。归档清理 `tasks/`，删除会话一并删 `background_tasks` 行。
 - 通知：`Notice` 挂在管理器里直到 `delivered`（会话 actor 看到 `reminder` 条目，或 `session/remind` 答 `delivered`）；`sessions/session/notices.rs` 负责发送（任务结束、会话打开或恢复、每个 prompt/steer/follow-up 之前）。Monitor 的批次与限速在 `tasks/feed.rs`、节奏在 `tasks/monitor.rs`；全部限值在 `tasks/limits.rs` 的 `TaskLimits`（`CoreConfig.tasks`），计时用 `TasksConfig.clock`（前台超时、Monitor 超时与唤醒都用它，测试与 L2 注入 `ManualClock`）。
 - 有序关闭：`Hub::shutdown` 先 `TaskManager::shutdown`（并发停止全部、等结束、把最终行写进数据库），再关工作区与数据库。
+
+## 从 Chrome 导入登录（`browser::import`，ADR-0090）
+
+- `ChromeImports`（Hub 的 `Ctx.chrome`，`CoreConfig.chrome`：Chrome 的目录与密钥来源，缺省为 `CoreConfig.home` 下的平台位置与系统钥匙串或 DPAPI；`createForTests` 一律用固定测试密钥，`PIARC_TEST_CHROME_ROOT` 指向夹具目录）：`profiles`、`sites` 只读名称与条数；`import` 在主进程原生确认之后由 NAPI `chromeImport` 调用：读一次密钥、解密、把每个值登记给 `piarc_telemetry::remember_secret`、先写 `browser_imports` 记录再答复（主进程随后写分区，所以有导入 cookie 的站点一定有记录）、写一行 `kind: "browserImport"` 审计（只有站点与条数），答复是 `Zeroizing` 的 JSON 文本，NAPI 交给 V8 后清零。`forget` 删记录并审计。记录按 `workspace_key`（规范化后的路径）存。
+- 站点卡（`tool_io/policy/site.rs`）不信客户端的 `sensitive`：主机是导入站点或其子域名时 Core 自己标为敏感（读不到记录也按敏感），所以规则与 bypass 不放行、没有"总是允许"。
+- 测试：`cargo test -p piarc-core --lib browser::import` 与 `--lib tool_io::policy::tests::browser_import`。
+
+## 开发服务器与端口发现（ADR-0092，设计增补 `browser.md` B4）
+
+- 启动配置只经 `piarc_config::launch` 读（项目取 `SessionIo.project()`，`${workspaceFolder}` 与 `cwd` 取文件根）；服务是 `TaskKind::DevServer` 的后台任务（`tool_io/dev_servers.rs`：沙箱外、会话的命令环境、`start_task`），状态与审批指纹在 `DevServers`（ToolIo 一份），每次变化在 `core/browser` 发 `servers`。项目不受信任时拒绝启动（`ToolIo::project_trusted`，同一份权限设置）；智能体的启动经 `tool_io/policy/dev_server.rs` 的卡片（绑定正在运行的 `Browser` 调用）。
+- 进程树：`start_task` 与转后台的命令经 `CommandRunner::run_reporting` 记下 pid，`TaskManager::set_tree` 登记（`tasks/trees.rs`）；终端由 `terminal/bound.rs` 登记 `TerminalTree::listen_tree`。`ports.rs` 在桌面客户端登记后每 `SCAN_INTERVAL`（1.5 s）经 `piarc_exec::listeners` 扫描全部运行中任务的树，按主会话发变化了的 `ports`（含启动配置声明的端口）。
+- `autoVerify`：`fs/write` 成功后 `dev_file_written` 判断是否是运行中服务目录下的前端文件，经 `TaskManager::remind_once_per_turn` 留一条 `browserVerify` 通知（`turn_started` 清除每回合标记），文案在 Agent Host 的 `harness/prompts/browser-notices.ts`。
 
 ## MCP（`mcp`，T36，ADR-0053）
 

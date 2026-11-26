@@ -25,6 +25,7 @@
 //! Tasks are spawned under a supervisor. A panic is not swallowed: it is printed to stderr
 //! and reported as a structured error event on [`ERROR_ROUTE`](crate::route::ERROR_ROUTE).
 
+mod browser_import;
 mod diagnostics;
 mod mcp;
 mod plugins;
@@ -119,6 +120,9 @@ pub struct CoreConfig {
     /// Where managed (enterprise) settings are read and how often (T47). None by default;
     /// the app passes the system's places, tests a directory of their own.
     pub managed: crate::managed::ManagedConfig,
+    /// Chrome's folder and key source for the sign-in import (ADR-0090); the platform's
+    /// places by default, development builds' L4 a fixture folder and a fixed key.
+    pub chrome: crate::browser::import::ChromeConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -158,6 +162,7 @@ impl Default for CoreConfig {
             sandbox: crate::tool_io::SandboxConfig::default(),
             review_timeout: piarc_policy::review::REVIEW_TIMEOUT,
             managed: crate::managed::ManagedConfig::default(),
+            chrome: crate::browser::import::ChromeConfig::default(),
         }
     }
 }
@@ -642,17 +647,8 @@ fn open_state(
         .with_tasks(tasks.clone())
         .with_terminals(terminals.clone())
         .with_secrets(secrets.clone());
-    let worktrees = crate::worktrees::Worktrees::new(
-        storage.clone(),
-        tool_io.clone(),
-        config.worktrees.clone(),
-    );
-    {
-        let snapshots = snapshots.clone();
-        worktrees.spawn_sweeper(handle, cancel.child_token(), move || {
-            snapshots.send(crate::sessions::SnapshotMsg::Reload);
-        });
-    }
+    let worktrees = state_worktrees(config, handle, cancel, &storage, &tool_io, &snapshots);
+    let ports_io = tool_io.clone();
     let sessions = Hub::new(crate::sessions::Ctx {
         handle: handle.clone(),
         events: events.clone(),
@@ -677,6 +673,11 @@ fn open_state(
         browser: Arc::new(crate::browser::BrowserProxies::new(
             config.sandbox.network.clone(),
         )),
+        chrome: crate::browser::import::ChromeImports::new(
+            storage.clone(),
+            &config.chrome,
+            config.home.as_deref(),
+        ),
     });
     tasks.set_outlet(sessions.task_outlet());
     sessions.connect_hooks();
@@ -685,6 +686,7 @@ fn open_state(
     {
         let _entered = handle.enter();
         tasks.start(storage.clone(), events.clone(), cancel.child_token());
+        crate::ports::spawn(ports_io, events.clone(), cancel.child_token());
     }
     tracing::info!(target: "piarc_core", data = %storage.dirs().data().display(), "Core state opened");
     Ok(StateServices {
@@ -692,6 +694,27 @@ fn open_state(
         trust,
         sessions,
     })
+}
+
+/// The worktrees of Core's state, with their sweeper running (T35).
+fn state_worktrees(
+    config: &CoreConfig,
+    handle: &Handle,
+    cancel: &CancellationToken,
+    storage: &Storage,
+    tool_io: &ToolIo,
+    snapshots: &crate::sessions::Snapshots,
+) -> crate::worktrees::Worktrees {
+    let worktrees = crate::worktrees::Worktrees::new(
+        storage.clone(),
+        tool_io.clone(),
+        config.worktrees.clone(),
+    );
+    let snapshots = snapshots.clone();
+    worktrees.spawn_sweeper(handle, cancel.child_token(), move || {
+        snapshots.send(crate::sessions::SnapshotMsg::Reload);
+    });
+    worktrees
 }
 
 /// Reads the managed settings and opens the database. The managed settings come first: the

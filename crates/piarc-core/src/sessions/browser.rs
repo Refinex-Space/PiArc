@@ -52,6 +52,47 @@ impl Hub {
         })
     }
 
+    /// A file request of the agent's browser (stage an upload, save a download, B2.6.6).
+    pub async fn browser_files(&self, request_json: String) -> Result<serde_json::Value> {
+        let request: piarc_protocol::browser::BrowserFilesRequest =
+            serde_json::from_str(&request_json).map_err(|_| Error::InvalidArgument {
+                field: "request",
+                reason: "must be { op: stage|save, sessionId, toolCallId, … }".into(),
+            })?;
+        let result = self
+            .ctx
+            .tool_io
+            .browser_files(&request)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        serde_json::to_value(result).map_err(|e| Error::Internal {
+            reason: e.to_string(),
+        })
+    }
+
+    /// What the user changed in a session's browser since the agent's last call (B2.7.3): kept
+    /// as the session's `browserState` reminder.
+    pub fn browser_state(&self, request_json: &str) -> Result<()> {
+        let update: piarc_protocol::browser::BrowserStateUpdate =
+            serde_json::from_str(request_json).map_err(|_| Error::InvalidArgument {
+                field: "request",
+                reason: "must be { sessionId, spaces, userTabs }".into(),
+            })?;
+        self.ctx
+            .tool_io
+            .browser_state(&update)
+            .map_err(|e| Error::feature(&e))
+    }
+
+    /// Where the downloads of a session's agent tabs go.
+    pub fn browser_downloads_dir(&self, session_id: &str) -> Result<String> {
+        self.ctx
+            .tool_io
+            .browser_downloads_dir(session_id)
+            .map(|path| piarc_fs::display(&path))
+            .map_err(|e| Error::feature(&e))
+    }
+
     /// Stops a browser partition's proxy; `{ stopped }`.
     pub async fn stop_browser_proxy(&self, partition: String) -> Result<serde_json::Value> {
         let stopped = self.ctx.browser.stop(&partition).await;

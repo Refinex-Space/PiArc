@@ -33,7 +33,9 @@
 //! from the index and `resume` reopens a session from its file.
 
 mod browser;
+mod browser_import;
 mod create;
+mod dev_servers;
 mod diagnostics;
 mod git;
 mod hooks;
@@ -174,6 +176,8 @@ pub(crate) struct Ctx {
     pub git: Arc<crate::git::GitState>,
     /// The built-in browser's partition proxies (ADR-0088).
     pub browser: Arc<crate::browser::BrowserProxies>,
+    /// Chrome sign-in import (ADR-0090).
+    pub chrome: crate::browser::import::ChromeImports,
 }
 
 /// The entry of the session layer. Cheap to clone.

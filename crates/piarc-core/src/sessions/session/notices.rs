@@ -52,6 +52,8 @@ impl SessionActor {
             let kind = match reminder.get("type").and_then(Value::as_str) {
                 Some("backgroundTask") => ReminderType::BackgroundTask,
                 Some("monitorOutput") => ReminderType::MonitorOutput,
+                Some("browserState") => ReminderType::BrowserState,
+                Some("browserVerify") => ReminderType::BrowserVerify,
                 _ => continue,
             };
             if let Some(source) = reminder.get("source").and_then(Value::as_str) {

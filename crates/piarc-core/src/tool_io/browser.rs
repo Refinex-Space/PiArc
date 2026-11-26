@@ -53,6 +53,8 @@ pub const MAX_IMAGE_BASE64: usize = 5 * 1024 * 1024;
 pub(crate) struct BrowserRuns {
     attached: AtomicBool,
     next: AtomicU64,
+    /// Numbers the `browserState` reminders (browser_state.rs), so each has its own source.
+    pub(super) states: AtomicU64,
     pending: Mutex<HashMap<String, oneshot::Sender<BrowserRunAnswer>>>,
 }
 
@@ -237,8 +239,8 @@ impl ToolIo {
 
 /// How long a site card waits for the user by default (B2.6.3), and the range of the user's
 /// `browser.approvalTimeout` (seconds).
-const SITE_TIMEOUT: Duration = Duration::from_secs(120);
-const SITE_TIMEOUT_SECONDS: (u64, u64) = (10, 600);
+pub(super) const SITE_TIMEOUT: Duration = Duration::from_secs(120);
+pub(super) const SITE_TIMEOUT_SECONDS: (u64, u64) = (10, 600);
 
 impl ToolIo {
     /// `browserSite` (Core API): whether a page of the running `Browser` call may reach a
@@ -250,17 +252,58 @@ impl ToolIo {
         &self,
         request: &piarc_protocol::browser::BrowserSiteRequest,
     ) -> Result<piarc_protocol::browser::BrowserSiteDecision, ErrorObject> {
-        let timeout = user_setting(&self.config.data_dir, "/browser/approvalTimeout")
+        self.decide_site(request, self.site_timeout()).await
+    }
+
+    /// `browserFiles` (Core API, B2.6.6): stage files for an upload or save a download of the
+    /// running `Browser` call; may ask the user (`policy/browser_files.rs`).
+    ///
+    /// # Errors
+    /// `permissionDenied` when refused or the call ended, `invalidParams` for bad paths.
+    pub async fn browser_files(
+        &self,
+        request: &piarc_protocol::browser::BrowserFilesRequest,
+    ) -> Result<piarc_protocol::browser::BrowserFilesResult, ErrorObject> {
+        use piarc_protocol::browser::{BrowserFilesRequest, BrowserFilesResult};
+        let timeout = self.site_timeout();
+        match request {
+            BrowserFilesRequest::Stage {
+                session_id,
+                tool_call_id,
+                paths,
+            } => Ok(BrowserFilesResult {
+                staged: self
+                    .stage_browser_upload(&session_id.0, tool_call_id, paths, timeout)
+                    .await?,
+                saved: None,
+            }),
+            BrowserFilesRequest::Save {
+                session_id,
+                tool_call_id,
+                source,
+                path,
+            } => Ok(BrowserFilesResult {
+                staged: Vec::new(),
+                saved: Some(
+                    self.save_browser_download(&session_id.0, tool_call_id, source, path, timeout)
+                        .await?,
+                ),
+            }),
+        }
+    }
+
+    /// How long a browser card waits for the user (`browser.approvalTimeout`).
+    fn site_timeout(&self) -> Duration {
+        user_setting(&self.config.data_dir, "/browser/approvalTimeout")
             .and_then(|v| v.as_u64())
             .map_or(SITE_TIMEOUT, |seconds| {
                 Duration::from_secs(seconds.clamp(SITE_TIMEOUT_SECONDS.0, SITE_TIMEOUT_SECONDS.1))
-            });
-        self.decide_site(request, timeout).await
+            })
     }
 }
 
 /// A value of the user's settings file.
-fn user_setting(data_dir: &std::path::Path, pointer: &str) -> Option<Value> {
+pub(super) fn user_setting(data_dir: &std::path::Path, pointer: &str) -> Option<Value> {
     std::fs::read_to_string(data_dir.join("settings.json"))
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())

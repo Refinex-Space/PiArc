@@ -19,9 +19,10 @@ fn tables(path: &std::path::Path) -> Vec<String> {
         .expect("names")
 }
 
-const EXPECTED_TABLES: [&str; 23] = [
+const EXPECTED_TABLES: [&str; 24] = [
     "audit_events",
     "background_tasks",
+    "browser_imports",
     "checkpoint_files",
     "checkpoint_sessions",
     "checkpoints",
@@ -65,6 +66,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
         (11, "usage".to_owned()),
         (12, "hook_worktrees".to_owned()),
         (13, "ephemeral_usage".to_owned()),
+        (14, "browser_imports".to_owned()),
     ];
     assert_eq!(first.migrations().expect("ledger"), ledger);
     drop(first);
@@ -75,7 +77,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     // Opening an already migrated database applies nothing and keeps the ledger as it was.
     for _ in 0..2 {
         let again = Store::open(&path, 2000).expect("migrated database opens");
-        assert_eq!(again.schema_version().expect("version"), 13);
+        assert_eq!(again.schema_version().expect("version"), 14);
         assert_eq!(again.migrations().expect("ledger"), ledger);
         drop(again);
         assert_eq!(tables(&path), schema_after_first);
@@ -95,7 +97,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     let mut conn = Connection::open(&other).expect("open");
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 5).expect("first"),
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     );
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 6).expect("second"),
@@ -178,20 +180,21 @@ fn a_database_from_a_newer_build_is_refused() {
         MIGRATIONS[10],
         MIGRATIONS[11],
         MIGRATIONS[12],
+        MIGRATIONS[13],
         Migration {
-            version: 14,
+            version: 15,
             name: "future",
             sql: "CREATE TABLE future (x INTEGER) STRICT;",
         },
     ];
     Store::open_with(&path, &newer, 1).expect("newer build migrates");
-    let error = Store::open(&path, 2).expect_err("this build does not know version 14");
+    let error = Store::open(&path, 2).expect_err("this build does not know version 15");
     assert!(
         matches!(
             error,
             Error::SchemaTooNew {
-                found: 14,
-                known: 13
+                found: 15,
+                known: 14
             }
         ),
         "{error:?}"

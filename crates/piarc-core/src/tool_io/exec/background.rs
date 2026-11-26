@@ -219,7 +219,13 @@ pub(in crate::tool_io) fn start_task(
     };
     let consumer = tokio::spawn(consume(rx, None, Sink::Background(feed)));
     let runner = runner.clone();
-    let run = tokio::spawn(async move { runner.run(spec, tx, token).await });
+    let started = Arc::new(std::sync::OnceLock::new());
+    tasks.set_tree(
+        &reserved.task_id,
+        crate::tasks::command_tree(Arc::clone(&started)),
+    );
+    let run =
+        tokio::spawn(async move { runner.run_reporting(spec, tx, token, Some(started)).await });
     watch_to_end(tasks, reserved.task_id.clone(), run, consumer, judge);
     Ok(reserved)
 }

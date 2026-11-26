@@ -13,6 +13,7 @@ getrandom.workspace = true
 http.workspace = true
 jsonschema.workspace = true
 minisign-verify.workspace = true
+piarc-browser-import.workspace = true
 piarc-checkpoint.workspace = true
 piarc-config.workspace = true
 piarc-diff.workspace = true
@@ -39,6 +40,7 @@ tokio-util.workspace = true
 tracing.workspace = true
 
 unicode-normalization.workspace = true
+zeroize.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Managed preferences (T47): the property list files of /Library/Managed Preferences, and the

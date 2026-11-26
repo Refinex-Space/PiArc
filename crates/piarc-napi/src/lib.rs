@@ -52,6 +52,8 @@
 
 mod boundary;
 pub mod browser;
+pub mod browser_import;
+pub mod dev_servers;
 pub mod diagnostics;
 pub mod mcp;
 pub mod plugins;

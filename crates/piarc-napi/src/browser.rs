@@ -58,6 +58,38 @@ impl CoreRuntime {
         })
     }
 
+    /// A file request of the agent's browser (B2.6.6): JSON `{ op: "stage", sessionId,
+    /// toolCallId, paths }` or `{ op: "save", sessionId, toolCallId, source, path }`. Answers
+    /// `{ staged?, saved? }` once Core decided, which may wait for the user.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn browser_files<'env>(
+        &self,
+        env: &'env Env,
+        request_json: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.browserFiles", |core, done| {
+            core.browser_files(request_json, done)
+        })
+    }
+
+    /// What the user changed in a session's browser since the agent's last call (B2.7.3): JSON
+    /// `{ sessionId, spaces: [{ id, name, controlledBy, tabs, tabCount }], userTabs }`, kept
+    /// as the session's next `browserState` reminder.
+    #[napi(catch_unwind)]
+    pub fn browser_state(&self, env: Env, request_json: String) -> napi::Result<()> {
+        crate::boundary::call(&env, "CoreRuntime.browserState", || {
+            self.core.browser_state(&request_json)
+        })
+    }
+
+    /// The directory the downloads of session `sessionId`'s agent tabs go to.
+    #[napi(catch_unwind)]
+    pub fn browser_downloads_dir(&self, env: Env, session_id: String) -> napi::Result<String> {
+        crate::boundary::call(&env, "CoreRuntime.browserDownloadsDir", || {
+            self.core.browser_downloads_dir(&session_id)
+        })
+    }
+
     /// Stops a browser partition's proxy. Answers `{ stopped }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn stop_browser_proxy<'env>(

@@ -19,7 +19,8 @@
 //!
 //! The feature crates `piarc-host`, `piarc-policy`, `piarc-hooks`, `piarc-config`, `piarc-fs`,
 //! `piarc-checkpoint`, `piarc-exec`, `piarc-term`, `piarc-sandbox`, `piarc-store`, `piarc-diff`,
-//! `piarc-git`, `piarc-secrets`, `piarc-telemetry`, and the foundation crates `piarc-protocol` and
+//! `piarc-git`, `piarc-secrets`, `piarc-telemetry`, `piarc-web`, `piarc-browser-import`, and the
+//! foundation crates `piarc-protocol` and
 //! `piarc-ports`.
 //!
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
@@ -91,6 +92,7 @@ mod markdown_images;
 pub mod mcp;
 pub mod network;
 pub mod plugins;
+pub(crate) mod ports;
 pub(crate) mod provider_accounts;
 pub mod providers;
 pub mod release;

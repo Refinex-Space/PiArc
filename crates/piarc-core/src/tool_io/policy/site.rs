@@ -124,6 +124,16 @@ impl ToolIo {
             }
         }
         let services = self.services()?;
+        let marked;
+        let request = if !request.sensitive && imported_host(services, &s, &hosts, request).await {
+            marked = BrowserSiteRequest {
+                sensitive: true,
+                ..request.clone()
+            };
+            &marked
+        } else {
+            request
+        };
         let settings = session_settings(services, &s).await?;
         let rules = rules_of(&s, &settings);
         let said = rules_say(&rules, &hosts, request.local);
@@ -211,6 +221,26 @@ impl ToolIo {
             .record("browser", &request.session_id.0, s.project(), &detail)
             .await?;
         Ok(decision)
+    }
+}
+
+/// Whether one of `hosts` has sign-ins imported from Chrome into the session's workspace
+/// (ADR-0090, B5.4): Core marks it sensitive whatever the client said. When the records cannot
+/// be read the host counts as imported.
+async fn imported_host(
+    services: &Services,
+    s: &SessionIo,
+    hosts: &[String],
+    request: &BrowserSiteRequest,
+) -> bool {
+    match crate::browser::import::imported_sites(&services.storage, s.project()).await {
+        Ok(sites) => hosts
+            .iter()
+            .any(|h| crate::browser::import::is_imported(h, request.local, &sites)),
+        Err(error) => {
+            tracing::warn!(target: "piarc_core::browser", "cannot read the imported sites: {error}");
+            true
+        }
     }
 }
 

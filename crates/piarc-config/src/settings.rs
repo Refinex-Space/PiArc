@@ -120,6 +120,8 @@ pub struct Settings {
     pub(crate) ignored_memory: Vec<&'static str>,
     /// Project layers whose `git` object was removed (ADR-0085: user and managed only).
     pub(crate) ignored_git: Vec<&'static str>,
+    /// Project layers whose `browser` object was removed (B5.5: user-level only).
+    pub(crate) ignored_browser: Vec<&'static str>,
     /// The extension packages in effect (T40), set by Core after the load
     /// ([`Settings::set_packages`]): the settings name them, Core's records say where they are.
     pub(crate) packages: crate::plugins::Packages,
@@ -149,6 +151,7 @@ impl Settings {
             ignored_managed_only: Vec::new(),
             ignored_memory: Vec::new(),
             ignored_git: Vec::new(),
+            ignored_browser: Vec::new(),
             packages: crate::plugins::Packages::default(),
         };
         settings.reload();
@@ -245,6 +248,7 @@ impl Settings {
         let mut ignored_managed_only = Vec::new();
         let mut ignored_memory = Vec::new();
         let mut ignored_git = Vec::new();
+        let mut ignored_browser = Vec::new();
         let managed = self.loaded(crate::layers::ids::ENTERPRISE);
         let effective: Vec<Option<Value>> = self
             .table
@@ -295,6 +299,9 @@ impl Settings {
                     if stripped.git {
                         ignored_git.push(spec.id);
                     }
+                    if stripped.browser {
+                        ignored_browser.push(spec.id);
+                    }
                 }
                 Some(value)
             })
@@ -310,6 +317,7 @@ impl Settings {
         self.ignored_managed_only = ignored_managed_only;
         self.ignored_memory = ignored_memory;
         self.ignored_git = ignored_git;
+        self.ignored_browser = ignored_browser;
         changed
     }
 
@@ -622,11 +630,13 @@ fn issue(
 
 /// Removes the value at `pointer` (`/a/b`, unescaped tokens only).
 /// What a project file set and may not: values that loosen the sandbox (T39), Auto mode's
-/// user-only keys (T46) and the Git panel's settings (ADR-0085).
+/// user-only keys (T46), the Git panel's settings (ADR-0085) and the built-in browser's
+/// settings (B5.5).
 struct Stripped {
     sandbox: Vec<String>,
     auto: Vec<String>,
     git: bool,
+    browser: bool,
 }
 
 /// Removes from a project layer's `value` what only the user's own files may set.
@@ -645,7 +655,14 @@ fn strip_project(value: &mut Value) -> Stripped {
     }
     let git = value.pointer("/git").is_some();
     remove_pointer(value, "/git");
-    Stripped { sandbox, auto, git }
+    let browser = value.pointer("/browser").is_some();
+    remove_pointer(value, "/browser");
+    Stripped {
+        sandbox,
+        auto,
+        git,
+        browser,
+    }
 }
 
 fn remove_pointer(value: &mut Value, pointer: &str) {

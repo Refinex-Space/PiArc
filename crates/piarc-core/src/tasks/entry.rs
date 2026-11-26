@@ -23,6 +23,7 @@ impl Entry {
             done,
             feed: None,
             stop_by: None,
+            tree: None,
         }
     }
 
@@ -35,6 +36,7 @@ impl Entry {
             done,
             feed: None,
             stop_by: None,
+            tree: None,
         }
     }
 

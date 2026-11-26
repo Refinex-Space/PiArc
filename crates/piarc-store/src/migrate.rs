@@ -90,6 +90,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "ephemeral_usage",
         sql: include_str!("sql/0013_ephemeral_usage.sql"),
     },
+    Migration {
+        version: 14,
+        name: "browser_imports",
+        sql: include_str!("sql/0014_browser_imports.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

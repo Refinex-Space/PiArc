@@ -30,6 +30,9 @@ pub struct TerminalTree {
     device: Option<u64>,
     #[cfg(windows)]
     job: crate::job::Job,
+    /// The shell (Windows: its descendants are found by parent links).
+    #[cfg(windows)]
+    shell: u32,
 }
 
 impl TerminalTree {
@@ -63,7 +66,7 @@ impl TerminalTree {
             let _ = tty;
             let job = crate::job::Job::new().map_err(process)?;
             job.assign_pid(pid).map_err(process)?;
-            Ok(Self { job })
+            Ok(Self { job, shell: pid })
         }
     }
 
@@ -83,6 +86,26 @@ impl TerminalTree {
         pids.into_iter()
             .filter_map(|pid| u32::try_from(pid).ok())
             .collect()
+    }
+
+    /// The tree as [`crate::listeners::listening`] asks about it: the shell, and on macOS
+    /// every process attached to the terminal now.
+    #[must_use]
+    pub fn listen_tree(&self) -> crate::listeners::Tree {
+        #[cfg(unix)]
+        {
+            crate::listeners::Tree {
+                root: u32::try_from(self.leader.as_raw()).unwrap_or(0),
+                members: self.members(),
+            }
+        }
+        #[cfg(windows)]
+        {
+            crate::listeners::Tree {
+                root: self.shell,
+                members: Vec::new(),
+            }
+        }
     }
 
     /// Ends the tree: `hangup` closes the terminal (its PTY master), then every process of the

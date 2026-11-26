@@ -59,6 +59,7 @@ pub(super) fn kind_text(kind: TaskKind) -> &'static str {
         TaskKind::Subagent => "subagent",
         TaskKind::Monitor => "monitor",
         TaskKind::Terminal => "terminal",
+        TaskKind::DevServer => "devServer",
     }
 }
 
@@ -78,6 +79,7 @@ fn kind_of(text: &str) -> Option<TaskKind> {
         "subagent" => TaskKind::Subagent,
         "monitor" => TaskKind::Monitor,
         "terminal" => TaskKind::Terminal,
+        "devServer" => TaskKind::DevServer,
         _ => return None,
     })
 }

@@ -27,6 +27,7 @@
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
 mod background_tasks;
+mod browser_imports;
 mod checkpoints;
 mod error;
 pub mod index;
@@ -44,6 +45,7 @@ mod usage;
 pub mod worktrees;
 
 pub use background_tasks::TaskRow;
+pub use browser_imports::BrowserImport;
 pub use checkpoints::{CheckpointFileRow, CheckpointRow, NewCheckpointFile};
 pub use error::{Error, Result};
 pub use index::{

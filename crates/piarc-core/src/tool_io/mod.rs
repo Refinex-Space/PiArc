@@ -32,8 +32,10 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 mod auto_memory;
 mod browser;
+mod browser_state;
 mod checkpoints;
 mod context;
+mod dev_servers;
 mod exec;
 mod files;
 mod git_files;
@@ -55,6 +57,7 @@ mod web_search;
 mod worktree_hooks;
 pub(crate) use web_search::chosen_backend as chosen_search_backend;
 
+pub use dev_servers::DevServerLimits;
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
 pub use piarc_config::sandbox::Enterprise as SandboxEnterprise;
 use piarc_exec::ExecLimits;
@@ -259,6 +262,8 @@ pub struct ToolIo {
     notices: Option<EventSender>,
     /// `Browser` runs waiting for the desktop client (ADR-0089).
     browser: Arc<browser::BrowserRuns>,
+    /// Development servers of the sessions (ADR-0092).
+    dev_servers: Arc<dev_servers::DevServers>,
     /// Whether the sandbox failed to start in this Core (T39, R10).
     sandbox_health: Arc<sandbox::Health>,
 }
@@ -300,6 +305,7 @@ impl ToolIo {
             secrets: None,
             notices,
             browser: Arc::default(),
+            dev_servers: Arc::default(),
             sandbox_health: Arc::default(),
         }
     }
@@ -810,7 +816,14 @@ impl ToolIo {
                 let p: FsWriteParams = parse(method, params)?;
                 let (s, locks) = (self.session(&p.session_id.0)?, Arc::clone(&self.locks));
                 let checkpoints = self.checkpoints_for(&s).await;
-                answer(move || files::write(permit, &s, &locks, checkpoints.as_ref(), p)).await
+                let (written, session) = ((p.session_id.0.clone(), p.path.clone()), Arc::clone(&s));
+                let result =
+                    answer(move || files::write(permit, &s, &locks, checkpoints.as_ref(), p)).await;
+                if result.is_ok() {
+                    // ADR-0092 rule 6: the agent changed a running server's front end.
+                    self.dev_file_written(&written.0, &session, &written.1);
+                }
+                result
             }
             "fs/spill" => {
                 let p: FsSpillParams = parse(method, params)?;
