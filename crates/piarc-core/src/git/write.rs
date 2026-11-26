@@ -481,6 +481,7 @@ impl Context<'_> {
     ) -> std::result::Result<Answer, GitError> {
         let outcome = remote::sequence(&self.reader, writer, action).await?;
         self.hub.forget_root(&self.reader.repo.root);
+        self.tidy_rebase();
         Ok(remote_answer(outcome, ""))
     }
 
@@ -723,6 +724,7 @@ fn rewrites_files(request: &GitRequest) -> bool {
                 ..
             }
     ) || super::history::rewrites_files(request)
+        || super::merging::rewrites_files(request)
 }
 
 /// A push's target and expected remote object.

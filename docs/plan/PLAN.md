@@ -354,7 +354,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 14. 设计增补第 9 节、ADR-0087、索引与 PLAN。
 - [x] 15. G3 的 piarc-git、协议、Core、主进程（`tests/history.rs` 7 项、`sessions git::history_operations_guard_stale_state_and_protected_branches`、`git-ipc.test.ts` 10 项）。
 - [x] 16. G3 的渲染进程：日志视图、提交图、详情与操作、stash、远程分支删除、自动获取、图片 diff、设置（`graph.test.ts` 5 项；L4 `git-history` 3 项与 `git-panel` 4 项通过；T43 新登记 `state:git-log`、`state:git-stashes`、`dialog:git-history`，全套 16 项通过）。
-- [ ] 17. G4 的 piarc-git、协议、Core、主进程。
+- [x] 17. G4 的 piarc-git、协议、Core、主进程（`tests/merging.rs` 4 项、`sessions git::a_merge_conflict_is_saved_only_over_what_the_merge_view_read` 与 `interactive_rebases_follow_the_plan_they_were_given`、`git-ipc.test.ts` 11 项；单次请求上限调到 12 MiB 以容纳 5 MiB 的合并结果）。
 - [ ] 18. G4 的渲染进程：合并与变基入口、冲突对话框、三方合并视图、交互式变基、状态条补齐。
 - [ ] 19. G5：`gh`、ADR-0087 的 AHP 与 Agent Host、Core、主进程。
 - [ ] 20. G5 的渲染进程：PR 条与对话框、审查两种呈现、设置。

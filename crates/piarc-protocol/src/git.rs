@@ -220,6 +220,58 @@ pub enum GitLogRevs {
     },
 }
 
+/// How a merge joins a branch into the current one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitMergeMode {
+    /// Fast-forward when possible, else a merge commit.
+    Ff,
+    /// Always a merge commit (`--no-ff`).
+    NoFf,
+    /// Stage the branch's changes as one change, without committing (`--squash`).
+    Squash,
+}
+
+/// A side of a conflict as the user sees it: their own change, or the incoming one. During a
+/// rebase these are git's "theirs" and "ours" (Core swaps them).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitSide {
+    /// The change on the user's side.
+    Yours,
+    /// The incoming change.
+    Theirs,
+}
+
+/// What an interactive rebase does with one commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitRebaseAction {
+    /// Keep it.
+    Pick,
+    /// Keep it with a new message.
+    Reword,
+    /// Fold it into the previous kept commit, joining the messages.
+    Squash,
+    /// Fold it into the previous kept commit, keeping that commit's message.
+    Fixup,
+    /// Leave it out.
+    Drop,
+}
+
+/// One line of an interactive rebase, in the new order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRebaseStep {
+    /// The full commit id.
+    pub sha: String,
+    /// What to do.
+    pub action: GitRebaseAction,
+    /// The new message, for `reword`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
 /// How a reset moves the current branch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -544,6 +596,54 @@ pub enum GitRequest {
         /// The commit the confirmation showed.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         expect: Option<String>,
+    },
+    /// Merge a branch into the current one.
+    Merge {
+        /// The branch (local or `origin/x`).
+        branch: String,
+        /// How.
+        mode: GitMergeMode,
+    },
+    /// Rebase the current branch onto another.
+    Rebase {
+        /// The branch to rebase onto.
+        onto: String,
+    },
+    /// The three sides of a conflicted file ([`GitConflictSides`]).
+    ConflictSides {
+        /// The file.
+        path: String,
+    },
+    /// Resolve a conflicted file by taking one side whole.
+    ResolveConflict {
+        /// The file.
+        path: String,
+        /// Which side.
+        take: GitSide,
+    },
+    /// Write a merged file and mark it resolved.
+    SaveResolution {
+        /// The file.
+        path: String,
+        /// Its new content.
+        content: String,
+        /// [`GitConflictSides::result_hash`] when the merge view read it.
+        expect: String,
+    },
+    /// The commits an interactive rebase from a commit would list ([`GitRebasePlan`]).
+    RebasePlan {
+        /// The oldest commit to rewrite (full id).
+        from: String,
+    },
+    /// Rewrite the current branch's commits after `base` as `steps` say.
+    RebaseInteractive {
+        /// The commit the rewritten ones go onto; the root when absent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        base: Option<String>,
+        /// `HEAD` when the plan was read.
+        head: String,
+        /// Every commit of `base..HEAD`, in the new order.
+        steps: Vec<GitRebaseStep>,
     },
     /// Push a deleted remote branch back.
     RestoreRemoteBranch {
@@ -1079,6 +1179,69 @@ pub struct GitBlob {
     /// Larger than the limit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub too_large: Option<bool>,
+}
+
+/// `conflictSides`: the base and both sides of a conflicted file, as the user sees them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitConflictSides {
+    /// The file.
+    pub path: String,
+    /// The common ancestor's text; absent when both sides added the file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<String>,
+    /// The user's side; absent when that side deleted the file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub yours: Option<String>,
+    /// The incoming side; absent when that side deleted the file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theirs: Option<String>,
+    /// The file on disk now (with conflict markers); absent when it is not there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
+    /// SHA-256 of the file on disk (`absent` when there is none), for `saveResolution`.
+    pub result_hash: String,
+    /// What the user's side is (`main`, a commit's subject).
+    pub yours_label: String,
+    /// What the incoming side is.
+    pub theirs_label: String,
+    /// A side is binary: only taking a side whole is possible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binary: Option<bool>,
+    /// A side is larger than the limit: only taking a side whole is possible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub too_large: Option<bool>,
+}
+
+/// One commit of a rebase plan, oldest first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRebaseCommit {
+    /// The full id.
+    pub sha: String,
+    /// The first line of the message.
+    pub subject: String,
+    /// The whole message.
+    pub message: String,
+    /// A merge commit: the plan cannot rewrite it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge: Option<bool>,
+    /// The upstream has it: rewriting needs a force push.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pushed: Option<bool>,
+}
+
+/// `rebasePlan`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRebasePlan {
+    /// The commit the rewritten ones go onto; absent when the plan starts at the root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<String>,
+    /// `HEAD`.
+    pub head: String,
+    /// The commits, oldest first.
+    pub commits: Vec<GitRebaseCommit>,
 }
 
 /// A deleted remote branch, for "Restore".

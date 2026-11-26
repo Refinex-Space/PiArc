@@ -220,6 +220,46 @@ describe('Git panel IPC', () => {
     expect(text.detail).toContain('• a.txt');
   });
 
+  it('checks merges, conflict resolutions and interactive rebases', async () => {
+    expect(gitRequest({ op: 'merge', branch: 'topic', mode: 'noFf', strategy: 'ours' })).toEqual({
+      op: 'merge',
+      branch: 'topic',
+      mode: 'noFf',
+    });
+    expect(() => gitRequest({ op: 'merge', branch: '--strategy=ours', mode: 'ff' })).toThrow();
+    expect(() => gitRequest({ op: 'resolveConflict', path: 'a', take: 'both' })).toThrow();
+    expect(
+      gitRequest({ op: 'saveResolution', path: 'a.ts', content: 'x\n\ty', expect: 'absent' }),
+    ).toEqual({ op: 'saveResolution', path: 'a.ts', content: 'x\n\ty', expect: 'absent' });
+    expect(() =>
+      gitRequest({
+        op: 'saveResolution',
+        path: 'a.ts',
+        content: 'x'.repeat(5 * 1024 * 1024 + 1),
+        expect: 'absent',
+      }),
+    ).toThrow();
+    const steps = [{ sha: 'a'.repeat(40), action: 'reword', message: 'm', extra: 1 }];
+    expect(gitRequest({ op: 'rebaseInteractive', head: 'b'.repeat(40), steps })).toEqual({
+      op: 'rebaseInteractive',
+      head: 'b'.repeat(40),
+      steps: [{ sha: 'a'.repeat(40), action: 'reword', message: 'm' }],
+    });
+    expect(() =>
+      gitRequest({ op: 'rebaseInteractive', head: 'b', steps: [{ sha: 'a', action: 'exec' }] }),
+    ).toThrow();
+    expect(() => gitRequest({ op: 'rebaseInteractive', head: 'b', steps: [] })).toThrow();
+    // Reading the sides needs no click; writing the result does.
+    const { call, sent } = harness({ result: {} }, false);
+    await call(['s1', { op: 'conflictSides', path: 'a.ts' }]);
+    expect(sent).toHaveLength(1);
+    await expect(
+      Promise.resolve().then(() =>
+        call(['s1', { op: 'resolveConflict', path: 'a.ts', take: 'yours' }]),
+      ),
+    ).rejects.toThrow('no recent input');
+  });
+
   it('lets an automatic fetch run without a click, and nothing else', async () => {
     const { call, sent } = harness({ result: {} }, false);
     await call(['s1', { op: 'fetch', background: true }]);

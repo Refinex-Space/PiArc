@@ -177,6 +177,8 @@ async function buildFiles() {
       'GitCommitDetail',
       'GitStashes',
       'GitBlob',
+      'GitConflictSides',
+      'GitRebasePlan',
     ].map((name) => ({
       $ref: `#/$defs/${name}`,
     })),

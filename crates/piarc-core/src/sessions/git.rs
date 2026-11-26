@@ -17,8 +17,9 @@ use super::Hub;
 use crate::git::{self as panel, reply, reply_failure};
 use crate::{Error, Result};
 
-/// The most bytes of one `gitRequest` call (a commit message and instructions fit).
-const MAX_CALL: usize = 256 * 1024;
+/// The most bytes of one `gitRequest` call: a merge view's result (5 MiB) and its JSON escaping
+/// fit.
+const MAX_CALL: usize = 12 * 1024 * 1024;
 
 /// Where a session's git runs.
 #[derive(Debug, Clone)]
@@ -262,6 +263,11 @@ impl Hub {
         });
     }
 
+    /// Where interactive rebases keep their todo and messages: `<data>/tmp/git`.
+    pub(crate) fn git_temp_dir(&self) -> PathBuf {
+        self.ctx.storage.dirs().data().join("tmp").join("git")
+    }
+
     /// The checkpoint object store (rollback snapshots).
     pub(crate) fn snapshot_store(&self) -> Option<piarc_checkpoint::ObjectStore> {
         self.ctx.tool_io.snapshot_store()
@@ -355,6 +361,18 @@ async fn answer_history(
         GitRequest::FileBlob { source, path } => {
             reply(&log::file_blob(reader, &source, &path).await?)
         }
+        GitRequest::ConflictSides { path } => {
+            reply(&crate::git::merging::conflict_sides(reader, &path).await?)
+        }
+        GitRequest::RebasePlan { from } => {
+            match piarc_git::merge::rebase_plan(reader, &from).await? {
+                Some(plan) => reply(&plan),
+                None => reply_failure(GitFailure::new(
+                    GitFailureKind::Invalid,
+                    "the commit is not on the current branch, or the range is too long",
+                )),
+            }
+        }
         _ => reply_failure(GitFailure::of(GitFailureKind::Invalid)),
     })
 }
@@ -401,7 +419,10 @@ fn check_read(request: &GitRequest) -> std::result::Result<(), GitFailure> {
             check_filter(text.as_deref())?;
             check_filter(author.as_deref())
         }
-        GitRequest::CommitDetail { sha } => check_scope(&GitScope::Commit { sha: sha.clone() }),
+        GitRequest::CommitDetail { sha } | GitRequest::RebasePlan { from: sha } => {
+            check_scope(&GitScope::Commit { sha: sha.clone() })
+        }
+        GitRequest::ConflictSides { path } => args::check_path(path).map_err(bad),
         GitRequest::FileBlob { source, path } => {
             args::check_path(path).map_err(bad)?;
             match source {
@@ -459,6 +480,8 @@ impl ReadOnly for GitRequest {
                 | Self::CommitDetail { .. }
                 | Self::Stashes
                 | Self::FileBlob { .. }
+                | Self::ConflictSides { .. }
+                | Self::RebasePlan { .. }
         )
     }
 }

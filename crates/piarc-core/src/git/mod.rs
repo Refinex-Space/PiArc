@@ -16,6 +16,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 mod history;
+pub(crate) mod merging;
 mod message;
 pub(crate) mod restore;
 pub(crate) mod write;

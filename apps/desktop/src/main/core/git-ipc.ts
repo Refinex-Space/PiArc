@@ -48,7 +48,14 @@ const READ_ONLY = new Set([
   'commitDetail',
   'stashes',
   'fileBlob',
+  'conflictSides',
+  'rebasePlan',
 ]);
+
+/** The most characters of a merge view's result (Core counts 5 MiB of bytes). */
+const MAX_RESULT = 5 * 1024 * 1024;
+/** The most steps of an interactive rebase. */
+const MAX_STEPS = 200;
 
 /** The most characters of a log filter. */
 const MAX_FILTER = 200;
@@ -359,6 +366,66 @@ function historyRequest(op: string, raw: Json): Json {
         branch: name(raw.branch, 'branch'),
         oid: name(raw.oid, 'oid'),
       };
+    default:
+      return mergeRequest(op, raw);
+  }
+}
+
+function steps(value: unknown): Json[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_STEPS) {
+    throw new TypeError('steps must be a non-empty list');
+  }
+  return value.map((step: unknown) => {
+    if (!isRecord(step)) throw new TypeError('a step must be an object');
+    return compact({
+      sha: name(step.sha, 'step.sha'),
+      action: oneOf(step.action, 'step.action', [
+        'pick',
+        'reword',
+        'squash',
+        'fixup',
+        'drop',
+      ] as const),
+      message: optionalText(step.message, 'step.message', MAX_MESSAGE, true),
+    });
+  });
+}
+
+/** The G4 requests (merge, rebase, conflicts, interactive rebase). */
+function mergeRequest(op: string, raw: Json): Json {
+  switch (op) {
+    case 'merge':
+      return {
+        op,
+        branch: name(raw.branch, 'branch'),
+        mode: oneOf(raw.mode, 'mode', ['ff', 'noFf', 'squash'] as const),
+      };
+    case 'rebase':
+      return { op, onto: name(raw.onto, 'onto') };
+    case 'conflictSides':
+      return { op, path: filePath(raw.path) };
+    case 'resolveConflict':
+      return {
+        op,
+        path: filePath(raw.path),
+        take: oneOf(raw.take, 'take', ['yours', 'theirs'] as const),
+      };
+    case 'saveResolution':
+      return {
+        op,
+        path: filePath(raw.path),
+        content: text(raw.content, 'content', MAX_RESULT, true),
+        expect: name(raw.expect, 'expect'),
+      };
+    case 'rebasePlan':
+      return { op, from: name(raw.from, 'from') };
+    case 'rebaseInteractive':
+      return compact({
+        op,
+        base: optionalName(raw.base, 'base'),
+        head: name(raw.head, 'head'),
+        steps: steps(raw.steps),
+      });
     default:
       throw new TypeError(`unknown Git operation ${op}`);
   }

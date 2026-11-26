@@ -4760,6 +4760,53 @@
       "required": ["commits", "total"],
       "type": "object"
     },
+    "GitConflictSides": {
+      "description": "`conflictSides`: the base and both sides of a conflicted file, as the user sees them.",
+      "properties": {
+        "base": {
+          "description": "The common ancestor's text; absent when both sides added the file.",
+          "type": ["string", "null"]
+        },
+        "binary": {
+          "description": "A side is binary: only taking a side whole is possible.",
+          "type": ["boolean", "null"]
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "result": {
+          "description": "The file on disk now (with conflict markers); absent when it is not there.",
+          "type": ["string", "null"]
+        },
+        "resultHash": {
+          "description": "SHA-256 of the file on disk (`absent` when there is none), for `saveResolution`.",
+          "type": "string"
+        },
+        "theirs": {
+          "description": "The incoming side; absent when that side deleted the file.",
+          "type": ["string", "null"]
+        },
+        "theirsLabel": {
+          "description": "What the incoming side is.",
+          "type": "string"
+        },
+        "tooLarge": {
+          "description": "A side is larger than the limit: only taking a side whole is possible.",
+          "type": ["boolean", "null"]
+        },
+        "yours": {
+          "description": "The user's side; absent when that side deleted the file.",
+          "type": ["string", "null"]
+        },
+        "yoursLabel": {
+          "description": "What the user's side is (`main`, a commit's subject).",
+          "type": "string"
+        }
+      },
+      "required": ["path", "resultHash", "yoursLabel", "theirsLabel"],
+      "type": "object"
+    },
     "GitDeletedBranch": {
       "description": "A deleted branch, for \"Restore\".",
       "properties": {
@@ -5602,6 +5649,26 @@
         }
       ]
     },
+    "GitMergeMode": {
+      "description": "How a merge joins a branch into the current one.",
+      "oneOf": [
+        {
+          "const": "ff",
+          "description": "Fast-forward when possible, else a merge commit.",
+          "type": "string"
+        },
+        {
+          "const": "noFf",
+          "description": "Always a merge commit (`--no-ff`).",
+          "type": "string"
+        },
+        {
+          "const": "squash",
+          "description": "Stage the branch's changes as one change, without committing (`--squash`).",
+          "type": "string"
+        }
+      ]
+    },
     "GitOpResult": {
       "description": "What a write operation did.",
       "properties": {
@@ -5714,6 +5781,104 @@
         }
       },
       "required": ["remote", "branch"],
+      "type": "object"
+    },
+    "GitRebaseAction": {
+      "description": "What an interactive rebase does with one commit.",
+      "oneOf": [
+        {
+          "const": "pick",
+          "description": "Keep it.",
+          "type": "string"
+        },
+        {
+          "const": "reword",
+          "description": "Keep it with a new message.",
+          "type": "string"
+        },
+        {
+          "const": "squash",
+          "description": "Fold it into the previous kept commit, joining the messages.",
+          "type": "string"
+        },
+        {
+          "const": "fixup",
+          "description": "Fold it into the previous kept commit, keeping that commit's message.",
+          "type": "string"
+        },
+        {
+          "const": "drop",
+          "description": "Leave it out.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitRebaseCommit": {
+      "description": "One commit of a rebase plan, oldest first.",
+      "properties": {
+        "merge": {
+          "description": "A merge commit: the plan cannot rewrite it.",
+          "type": ["boolean", "null"]
+        },
+        "message": {
+          "description": "The whole message.",
+          "type": "string"
+        },
+        "pushed": {
+          "description": "The upstream has it: rewriting needs a force push.",
+          "type": ["boolean", "null"]
+        },
+        "sha": {
+          "description": "The full id.",
+          "type": "string"
+        },
+        "subject": {
+          "description": "The first line of the message.",
+          "type": "string"
+        }
+      },
+      "required": ["sha", "subject", "message"],
+      "type": "object"
+    },
+    "GitRebasePlan": {
+      "description": "`rebasePlan`.",
+      "properties": {
+        "base": {
+          "description": "The commit the rewritten ones go onto; absent when the plan starts at the root.",
+          "type": ["string", "null"]
+        },
+        "commits": {
+          "description": "The commits, oldest first.",
+          "items": {
+            "$ref": "#/$defs/GitRebaseCommit"
+          },
+          "type": "array"
+        },
+        "head": {
+          "description": "`HEAD`.",
+          "type": "string"
+        }
+      },
+      "required": ["head", "commits"],
+      "type": "object"
+    },
+    "GitRebaseStep": {
+      "description": "One line of an interactive rebase, in the new order.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/GitRebaseAction",
+          "description": "What to do."
+        },
+        "message": {
+          "description": "The new message, for `reword`.",
+          "type": ["string", "null"]
+        },
+        "sha": {
+          "description": "The full commit id.",
+          "type": "string"
+        }
+      },
+      "required": ["sha", "action"],
       "type": "object"
     },
     "GitRefKind": {
@@ -6832,6 +6997,138 @@
           "type": "object"
         },
         {
+          "description": "Merge a branch into the current one.",
+          "properties": {
+            "branch": {
+              "description": "The branch (local or `origin/x`).",
+              "type": "string"
+            },
+            "mode": {
+              "$ref": "#/$defs/GitMergeMode",
+              "description": "How."
+            },
+            "op": {
+              "const": "merge",
+              "type": "string"
+            }
+          },
+          "required": ["op", "branch", "mode"],
+          "type": "object"
+        },
+        {
+          "description": "Rebase the current branch onto another.",
+          "properties": {
+            "onto": {
+              "description": "The branch to rebase onto.",
+              "type": "string"
+            },
+            "op": {
+              "const": "rebase",
+              "type": "string"
+            }
+          },
+          "required": ["op", "onto"],
+          "type": "object"
+        },
+        {
+          "description": "The three sides of a conflicted file ([`GitConflictSides`]).",
+          "properties": {
+            "op": {
+              "const": "conflictSides",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "path"],
+          "type": "object"
+        },
+        {
+          "description": "Resolve a conflicted file by taking one side whole.",
+          "properties": {
+            "op": {
+              "const": "resolveConflict",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file.",
+              "type": "string"
+            },
+            "take": {
+              "$ref": "#/$defs/GitSide",
+              "description": "Which side."
+            }
+          },
+          "required": ["op", "path", "take"],
+          "type": "object"
+        },
+        {
+          "description": "Write a merged file and mark it resolved.",
+          "properties": {
+            "content": {
+              "description": "Its new content.",
+              "type": "string"
+            },
+            "expect": {
+              "description": "[`GitConflictSides::result_hash`] when the merge view read it.",
+              "type": "string"
+            },
+            "op": {
+              "const": "saveResolution",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "path", "content", "expect"],
+          "type": "object"
+        },
+        {
+          "description": "The commits an interactive rebase from a commit would list ([`GitRebasePlan`]).",
+          "properties": {
+            "from": {
+              "description": "The oldest commit to rewrite (full id).",
+              "type": "string"
+            },
+            "op": {
+              "const": "rebasePlan",
+              "type": "string"
+            }
+          },
+          "required": ["op", "from"],
+          "type": "object"
+        },
+        {
+          "description": "Rewrite the current branch's commits after `base` as `steps` say.",
+          "properties": {
+            "base": {
+              "description": "The commit the rewritten ones go onto; the root when absent.",
+              "type": ["string", "null"]
+            },
+            "head": {
+              "description": "`HEAD` when the plan was read.",
+              "type": "string"
+            },
+            "op": {
+              "const": "rebaseInteractive",
+              "type": "string"
+            },
+            "steps": {
+              "description": "Every commit of `base..HEAD`, in the new order.",
+              "items": {
+                "$ref": "#/$defs/GitRebaseStep"
+              },
+              "type": "array"
+            }
+          },
+          "required": ["op", "head", "steps"],
+          "type": "object"
+        },
+        {
           "description": "Push a deleted remote branch back.",
           "properties": {
             "branch": {
@@ -6924,6 +7221,21 @@
           },
           "required": ["kind", "sha"],
           "type": "object"
+        }
+      ]
+    },
+    "GitSide": {
+      "description": "A side of a conflict as the user sees it: their own change, or the incoming one. During a\nrebase these are git's \"theirs\" and \"ours\" (Core swaps them).",
+      "oneOf": [
+        {
+          "const": "yours",
+          "description": "The change on the user's side.",
+          "type": "string"
+        },
+        {
+          "const": "theirs",
+          "description": "The incoming change.",
+          "type": "string"
         }
       ]
     },

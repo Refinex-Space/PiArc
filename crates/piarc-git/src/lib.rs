@@ -14,7 +14,8 @@
 //!   ([`status`]), scope diffs ([`diff`]), commits and file texts ([`log`]), branches
 //!   ([`refs`]); the index and hunks ([`index`]), commits ([`commit`]), branch operations
 //!   ([`branches`]), fetch, pull, push and the operation in progress ([`remote`]). G3: history
-//!   pages, commit details and commit operations ([`history`]), stashes ([`stash`]).
+//!   pages, commit details and commit operations ([`history`]), stashes ([`stash`]). G4: merges,
+//!   rebases, conflict sides and interactive rebases ([`merge`]).
 //!
 //! # Not responsible for
 //!
@@ -41,6 +42,7 @@ pub mod git;
 pub mod history;
 pub mod index;
 pub mod log;
+pub mod merge;
 pub mod package;
 pub mod refs;
 pub mod remote;

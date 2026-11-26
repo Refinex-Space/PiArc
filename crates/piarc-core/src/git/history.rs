@@ -95,7 +95,7 @@ impl Context<'_> {
                 let command = format!("git push {remote} {oid}:refs/heads/{branch}");
                 Ok(remote_answer(outcome, &command))
             }
-            _ => Ok(Err(GitFailure::of(GitFailureKind::Invalid))),
+            other => self.merging(writer, other).await,
         }
     }
 
@@ -360,7 +360,7 @@ pub(super) fn check(request: &GitRequest) -> std::result::Result<(), GitFailure>
             branch(b)?;
             full_id(oid)
         }
-        _ => Ok(()),
+        other => super::merging::check(other),
     }
 }
 

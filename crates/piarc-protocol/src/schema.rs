@@ -132,6 +132,8 @@ fn git_types(generator: &mut schemars::SchemaGenerator) {
     generator.subschema_for::<crate::git::GitCommitDetail>();
     generator.subschema_for::<crate::git::GitStashes>();
     generator.subschema_for::<crate::git::GitBlob>();
+    generator.subschema_for::<crate::git::GitConflictSides>();
+    generator.subschema_for::<crate::git::GitRebasePlan>();
 }
 
 #[cfg(test)]

@@ -312,6 +312,43 @@ async fn protected_pushes_stay_plain_git_paths_are_refused_and_undo_is_whole() {
     shutdown(core).await;
 }
 
+/// `main` is protected: refused before any confirmation; `topic` is deleted and restored.
+async fn remote_branch_round_trip(
+    core: &CoreRuntime,
+    id: &str,
+    env: &Env,
+    bare: &Path,
+    head: &str,
+) {
+    let protected = git(
+        core,
+        id,
+        json!({ "op": "describe", "action": { "kind": "deleteRemoteBranch", "remote": "origin", "branch": "main" } }),
+    )
+    .await;
+    assert_eq!(
+        protected["result"]["refused"]["kind"], "protected",
+        "{protected}"
+    );
+    let deleted = git(
+        core,
+        id,
+        json!({ "op": "deleteRemoteBranch", "remote": "origin", "branch": "topic" }),
+    )
+    .await;
+    let gone = &deleted["result"]["deletedRemote"];
+    assert_eq!(gone["oid"], head, "{deleted}");
+    assert!(!has_branch(bare, "topic"));
+    let restored = git(
+        core,
+        id,
+        json!({ "op": "restoreRemoteBranch", "remote": "origin", "branch": "topic", "oid": head }),
+    )
+    .await;
+    assert!(restored.get("result").is_some(), "{restored}");
+    assert_eq!(head_of(bare, &env.root, "refs/heads/topic"), head);
+}
+
 fn rev(dir: &Path, root: &Path, rev: &str) -> String {
     head_of(dir, root, rev)
 }
@@ -407,36 +444,145 @@ async fn history_operations_guard_stale_state_and_protected_branches() {
     assert!(popped.get("result").is_some(), "{popped}");
     assert!(env.ws.join("notes 笔记.md").exists());
 
-    // `main` is protected: refused before any confirmation; `topic` is deleted and restored.
-    let protected = git(
-        &core,
-        &id,
-        json!({ "op": "describe", "action": { "kind": "deleteRemoteBranch", "remote": "origin", "branch": "main" } }),
-    )
-    .await;
-    assert_eq!(
-        protected["result"]["refused"]["kind"], "protected",
-        "{protected}"
-    );
-    let deleted = git(
-        &core,
-        &id,
-        json!({ "op": "deleteRemoteBranch", "remote": "origin", "branch": "topic" }),
-    )
-    .await;
-    let gone = &deleted["result"]["deletedRemote"];
-    assert_eq!(gone["oid"], head.as_str(), "{deleted}");
-    assert!(!has_branch(&bare, "topic"));
-    let restored = git(
-        &core,
-        &id,
-        json!({ "op": "restoreRemoteBranch", "remote": "origin", "branch": "topic", "oid": head }),
-    )
-    .await;
-    assert!(restored.get("result").is_some(), "{restored}");
-    assert_eq!(head_of(&bare, &env.root, "refs/heads/topic"), head);
+    remote_branch_round_trip(&core, &id, &env, &bare, &head).await;
 
     let fetched = git(&core, &id, json!({ "op": "fetch", "background": true })).await;
     assert!(fetched.get("result").is_some(), "{fetched}");
+    shutdown(core).await;
+}
+
+/// A conflict on `login.ts` between main and `topic`, with the workspace trusted.
+async fn conflicted(name: &str) -> (Env, CoreRuntime, String) {
+    let env = Env::new(name).await;
+    repository(&env);
+    run_git(&env.ws, &env.root, &["commit", "-qm", "feat: two"]);
+    run_git(&env.ws, &env.root, &["switch", "-q", "-c", "topic"]);
+    std::fs::write(env.ws.join("login.ts"), "export const a = 'topic';\n").expect("topic");
+    run_git(&env.ws, &env.root, &["commit", "-qam", "topic: a"]);
+    run_git(&env.ws, &env.root, &["switch", "-q", "main"]);
+    std::fs::write(env.ws.join("login.ts"), "export const a = 'main';\n").expect("main");
+    run_git(&env.ws, &env.root, &["commit", "-qam", "main: a"]);
+    let (core, _events) = env.start(env.config(&[]));
+    let id = open(&core, &env).await;
+    trust(&core, &env.ws).await;
+    (env, core, id)
+}
+
+/// G4 through Core (design addendum 9.2): a merge stops with a conflict whose sides are
+/// labelled; the merge view's result is written only over the file it read, then resolved.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_merge_conflict_is_saved_only_over_what_the_merge_view_read() {
+    let (env, core, id) = conflicted("git-merge").await;
+    let merged = git(
+        &core,
+        &id,
+        json!({ "op": "merge", "branch": "topic", "mode": "ff" }),
+    )
+    .await;
+    assert_eq!(merged["result"]["conflicts"][0], "login.ts", "{merged}");
+    let sides = git(
+        &core,
+        &id,
+        json!({ "op": "conflictSides", "path": "login.ts" }),
+    )
+    .await;
+    let sides = &sides["result"];
+    assert_eq!(sides["yours"], "export const a = 'main';\n", "{sides}");
+    assert_eq!(sides["theirs"], "export const a = 'topic';\n", "{sides}");
+    assert_eq!(sides["yoursLabel"], "main");
+    assert_eq!(sides["theirsLabel"], "topic");
+    let expect = sides["resultHash"].as_str().expect("hash").to_owned();
+
+    // Someone edits the file after the merge view read it: the save is refused.
+    let edited = std::fs::read_to_string(env.ws.join("login.ts")).expect("read") + "// edit\n";
+    std::fs::write(env.ws.join("login.ts"), &edited).expect("edit");
+    let content = "export const a = 'both';\n";
+    let save =
+        json!({ "op": "saveResolution", "path": "login.ts", "content": content, "expect": expect });
+    let stale = git(&core, &id, save.clone()).await;
+    assert_eq!(stale["failure"]["kind"], "stale", "{stale}");
+    assert_eq!(
+        std::fs::read_to_string(env.ws.join("login.ts")).expect("read"),
+        edited
+    );
+
+    let sides = git(
+        &core,
+        &id,
+        json!({ "op": "conflictSides", "path": "login.ts" }),
+    )
+    .await;
+    let expect = sides["result"]["resultHash"].clone();
+    let saved = git(
+        &core,
+        &id,
+        json!({ "op": "saveResolution", "path": "login.ts", "content": content, "expect": expect }),
+    )
+    .await;
+    assert!(saved.get("result").is_some(), "{saved}");
+    assert_eq!(
+        std::fs::read_to_string(env.ws.join("login.ts")).expect("read"),
+        content
+    );
+    let continued = git(&core, &id, json!({ "op": "continue" })).await;
+    assert!(continued.get("result").is_some(), "{continued}");
+    assert_eq!(
+        head_of(&env.ws, &env.root, "HEAD^2"),
+        head_of(&env.ws, &env.root, "topic")
+    );
+    shutdown(core).await;
+}
+
+/// An interactive rebase runs only on the HEAD and commits its plan listed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn interactive_rebases_follow_the_plan_they_were_given() {
+    let (env, core, id) = conflicted("git-rebase-i").await;
+    let first = head_of(&env.ws, &env.root, "HEAD~1");
+    let plan = git(&core, &id, json!({ "op": "rebasePlan", "from": first })).await;
+    let plan = &plan["result"];
+    let commits = plan["commits"].as_array().expect("commits");
+    assert_eq!(commits.len(), 2, "{plan}");
+    let head = plan["head"].as_str().expect("head").to_owned();
+    let base = plan["base"].clone();
+    let steps = |reworded: &str| {
+        json!([
+            { "sha": commits[0]["sha"], "action": "reword", "message": reworded },
+            { "sha": commits[1]["sha"], "action": "fixup" },
+        ])
+    };
+    let stale = git(
+        &core,
+        &id,
+        json!({ "op": "rebaseInteractive", "base": base, "head": first, "steps": steps("x") }),
+    )
+    .await;
+    assert_eq!(stale["failure"]["kind"], "stale", "{stale}");
+    let missing = git(
+        &core,
+        &id,
+        json!({ "op": "rebaseInteractive", "base": base, "head": head, "steps": [steps("x")[0]] }),
+    )
+    .await;
+    assert_eq!(missing["failure"]["kind"], "stale", "{missing}");
+    let done = git(
+        &core,
+        &id,
+        json!({ "op": "rebaseInteractive", "base": base, "head": head, "steps": steps("feat: 合并后的提交") }),
+    )
+    .await;
+    assert!(done.get("result").is_some(), "{done}");
+    assert_eq!(
+        head_of(&env.ws, &env.root, "HEAD~1"),
+        base.as_str().expect("base")
+    );
+    let subject = std::process::Command::new("git")
+        .current_dir(&env.ws)
+        .args(["log", "-1", "--format=%s"])
+        .output()
+        .expect("git");
+    assert_eq!(
+        String::from_utf8_lossy(&subject.stdout).trim(),
+        "feat: 合并后的提交"
+    );
     shutdown(core).await;
 }

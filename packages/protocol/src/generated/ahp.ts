@@ -33,7 +33,9 @@ export type ProtocolValue =
   | GitLog
   | GitCommitDetail
   | GitStashes
-  | GitBlob;
+  | GitBlob
+  | GitConflictSides
+  | GitRebasePlan;
 /**
  * Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.
  */
@@ -1697,6 +1699,79 @@ export type GitRequest =
     }
   | {
       /**
+       * The branch (local or `origin/x`).
+       */
+      branch: string;
+      /**
+       * How.
+       */
+      mode: GitMergeMode;
+      op: 'merge';
+    }
+  | {
+      /**
+       * The branch to rebase onto.
+       */
+      onto: string;
+      op: 'rebase';
+    }
+  | {
+      op: 'conflictSides';
+      /**
+       * The file.
+       */
+      path: string;
+    }
+  | {
+      op: 'resolveConflict';
+      /**
+       * The file.
+       */
+      path: string;
+      /**
+       * Which side.
+       */
+      take: GitSide;
+    }
+  | {
+      /**
+       * Its new content.
+       */
+      content: string;
+      /**
+       * [`GitConflictSides::result_hash`] when the merge view read it.
+       */
+      expect: string;
+      op: 'saveResolution';
+      /**
+       * The file.
+       */
+      path: string;
+    }
+  | {
+      /**
+       * The oldest commit to rewrite (full id).
+       */
+      from: string;
+      op: 'rebasePlan';
+    }
+  | {
+      /**
+       * The commit the rewritten ones go onto; the root when absent.
+       */
+      base?: string | null;
+      /**
+       * `HEAD` when the plan was read.
+       */
+      head: string;
+      op: 'rebaseInteractive';
+      /**
+       * Every commit of `base..HEAD`, in the new order.
+       */
+      steps: GitRebaseStep[];
+    }
+  | {
+      /**
        * The branch on it.
        */
       branch: string;
@@ -1854,6 +1929,19 @@ export type GitLogRevs =
        */
       name: string;
     };
+/**
+ * How a merge joins a branch into the current one.
+ */
+export type GitMergeMode = 'ff' | 'noFf' | 'squash';
+/**
+ * A side of a conflict as the user sees it: their own change, or the incoming one. During a
+ * rebase these are git's "theirs" and "ours" (Core swaps them).
+ */
+export type GitSide = 'yours' | 'theirs';
+/**
+ * What an interactive rebase does with one commit.
+ */
+export type GitRebaseAction = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop';
 /**
  * The status of a file in a diff or on one side of `git status`.
  */
@@ -10615,6 +10703,23 @@ export interface GitPushTarget {
   remote: string;
 }
 /**
+ * One line of an interactive rebase, in the new order.
+ */
+export interface GitRebaseStep {
+  /**
+   * What to do.
+   */
+  action: GitRebaseAction;
+  /**
+   * The new message, for `reword`.
+   */
+  message?: string | null;
+  /**
+   * The full commit id.
+   */
+  sha: string;
+}
+/**
  * `status`: the repository and its uncommitted files.
  */
 export interface GitStatus {
@@ -11371,4 +11476,91 @@ export interface GitBlob {
    * Larger than the limit.
    */
   tooLarge?: boolean | null;
+}
+/**
+ * `conflictSides`: the base and both sides of a conflicted file, as the user sees them.
+ */
+export interface GitConflictSides {
+  /**
+   * The common ancestor's text; absent when both sides added the file.
+   */
+  base?: string | null;
+  /**
+   * A side is binary: only taking a side whole is possible.
+   */
+  binary?: boolean | null;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * The file on disk now (with conflict markers); absent when it is not there.
+   */
+  result?: string | null;
+  /**
+   * SHA-256 of the file on disk (`absent` when there is none), for `saveResolution`.
+   */
+  resultHash: string;
+  /**
+   * The incoming side; absent when that side deleted the file.
+   */
+  theirs?: string | null;
+  /**
+   * What the incoming side is.
+   */
+  theirsLabel: string;
+  /**
+   * A side is larger than the limit: only taking a side whole is possible.
+   */
+  tooLarge?: boolean | null;
+  /**
+   * The user's side; absent when that side deleted the file.
+   */
+  yours?: string | null;
+  /**
+   * What the user's side is (`main`, a commit's subject).
+   */
+  yoursLabel: string;
+}
+/**
+ * `rebasePlan`.
+ */
+export interface GitRebasePlan {
+  /**
+   * The commit the rewritten ones go onto; absent when the plan starts at the root.
+   */
+  base?: string | null;
+  /**
+   * The commits, oldest first.
+   */
+  commits: GitRebaseCommit[];
+  /**
+   * `HEAD`.
+   */
+  head: string;
+}
+/**
+ * One commit of a rebase plan, oldest first.
+ */
+export interface GitRebaseCommit {
+  /**
+   * A merge commit: the plan cannot rewrite it.
+   */
+  merge?: boolean | null;
+  /**
+   * The whole message.
+   */
+  message: string;
+  /**
+   * The upstream has it: rewriting needs a force push.
+   */
+  pushed?: boolean | null;
+  /**
+   * The full id.
+   */
+  sha: string;
+  /**
+   * The first line of the message.
+   */
+  subject: string;
 }

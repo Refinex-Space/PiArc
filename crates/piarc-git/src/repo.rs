@@ -316,6 +316,16 @@ impl Writer {
         self.git.exec(&self.repo.root, &full, options).await
     }
 
+    /// The same writer with `name` set to `value` (the sequence editor of an interactive
+    /// rebase).
+    #[must_use]
+    pub fn with_env(&self, name: &str, value: &str) -> Self {
+        Self {
+            git: self.git.clone().with_env(name, value),
+            repo: self.repo.clone(),
+        }
+    }
+
     /// The same writer with pathspec magic allowed, for commands that pass no path of the
     /// page's and use magic themselves (`stash push -u` cleans with `:/`).
     #[must_use]
