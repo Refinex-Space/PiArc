@@ -296,27 +296,36 @@ test('pointer editing and keyboard navigation give exactly one visible focus ind
   for (const theme of ['light', 'dark'] as const) {
     await prefer(page, { key: 'appearance.theme', value: theme });
     await expect(page.locator('html')).toHaveAttribute('data-color-mode', theme);
+    // Text-entry surfaces use the light style (accessibility.md, "焦点"): the workspace search
+    // field draws no outline on either kind of focus and relies on its caret.
     await page.getByTestId('open-search').click();
     await filter.click();
-    await expect(filter).toHaveCSS('outline-width', '1px');
+    await expect(filter).toBeFocused();
+    await expect(filter).toHaveCSS('outline-style', 'none');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
     await expect(filter).toBeFocused();
-    await expect(filter).toHaveCSS('outline-width', '2px');
+    await expect(filter).toHaveCSS('outline-style', 'none');
     await page.keyboard.press('Escape');
 
+    // The composer card shows focus only by its deeper shadow, never an outline.
+    const restShadow = await box.evaluate(async (el) => {
+      await Promise.all(el.getAnimations().map((animation) => animation.finished));
+      return getComputedStyle(el).boxShadow;
+    });
     await editor.click();
     await page.keyboard.type('x');
     await expect(editor).toHaveCSS('outline-style', 'none');
-    await expect(box).toHaveCSS('outline-width', '1px');
+    await expect(box).toHaveCSS('outline-style', 'none');
+    await expect(box).not.toHaveCSS('box-shadow', restShadow);
     await page.keyboard.press('Shift+Tab');
     await expect(attach).toBeFocused();
     await expect(attach).toHaveCSS('outline-width', '2px');
     await expect(box).toHaveCSS('outline-style', 'none');
     await page.keyboard.press('Tab');
     await expect(editor).toBeFocused();
-    await expect(box).toHaveCSS('outline-width', '2px');
-    await expect(box).toHaveCSS('outline-offset', '-2px');
+    await expect(box).toHaveCSS('outline-style', 'none');
+    await expect(box).not.toHaveCSS('box-shadow', restShadow);
   }
 
   await page.getByTestId('permission-mode').focus();

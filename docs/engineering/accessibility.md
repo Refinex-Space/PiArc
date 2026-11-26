@@ -21,7 +21,7 @@ PiArc 的界面要能只用键盘完成全部功能，在 VoiceOver、Narrator�
 **焦点**
 
 - 键盘导航用 `:focus-visible` 显示 2 px 的单层轮廓。一般控件把轮廓画在边框内，行内链接、实心主按钮、分隔条与原生勾选控件在外侧留出间距。焦点色取 `border.focus`，在普通与高对比度的明暗主题中与相邻表面均须达到 3:1。强制颜色沿用系统色。
-- 由可见元素代画焦点时，用 `:has(具体目标:focus-visible)` 限定归属。编辑消息时标记编辑框，Tab 到附件时只标记附件标签。分段单选由原生 radio 接收焦点；选中面是装饰层，键盘聚焦选中项时隐藏它的边缘阴影，在对应标签上画单层轮廓；弹出菜单标记当前活动菜单项。`:focus-within` 适合让整行的操作按钮保持可见。
+- 由可见元素代画焦点时，用 `:has(具体目标:focus-visible)` 限定归属。Tab 到附件时只标记附件标签，编辑消息时的输入卡片见下文的轻样式。分段单选由原生 radio 接收焦点；选中面是装饰层，键盘聚焦选中项时隐藏它的边缘阴影，在对应标签上画单层轮廓；弹出菜单标记当前活动菜单项。`:focus-within` 适合让整行的操作按钮保持可见。
 - 浏览器也会让鼠标点入的文本输入匹配 `:focus-visible`。应用窗口记录本次聚焦的输入方式。指针聚焦用 `:focus` 在输入框边缘显示 1 px 的轮廓，继续打字时保持；鼠标点入终端时由终端光标反馈。下一次键盘移动焦点时恢复 2 px 指示器。
 - 对话框（`shell/Dialog.tsx`）打开时焦点进入、Tab 不出框、Esc 关闭、关闭后焦点回到打开它的元素；内容原地换掉时传 `focusKey`，否则原来的焦点元素被移除，焦点落到 `<body>`。
 - 审批卡出现时焦点移到卡片容器（`approvals/use-approval-focus.ts`），卡片名称写明类型与对象（`approvals/approval-label.ts`）；输入法合成期间等合成结束；出现后 400 ms 内卡片里的 Enter、Space 不生效。审批快捷键不拦截卡片与 composer 之外的文本框（`typedElsewhere`）。
@@ -34,6 +34,13 @@ PiArc 的界面要能只用键盘完成全部功能，在 VoiceOver、Narrator�
 - 软填充、内缘和阴影由装饰层绘制。悬停和按压按参考使用 60 ms 表面过渡，键盘操作继续使用 `:focus-visible` 单轮廓。等待时原标签保留在布局和无障碍树中，按钮暴露 `aria-busy`，阻止再次激活。强制颜色使用系统按钮色，减少动效时进度标记静止。
 
 设置搜索框把焦点画在带图标的外框上。内部输入使用 `data-focus-proxy`，排除通用文本框的指针和键盘轮廓。点击时外框为 1 px，Tab 进入时为 2 px，输入本身的边框、轮廓和阴影均为零。
+
+输入类表面用无框或轻样式（用户 2026-11-26 定的 UI 规范：粗焦点框不友好），指针与键盘聚焦表现相同，不适用上面的 1 px、2 px 轮廓：
+
+- 会话输入卡片（composer）不画轮廓，聚焦时只加深阴影（`composer/workbench.css` 的 `.composer-box:focus-within`）。
+- 工作区搜索框（`shell/WorkspaceSearch.tsx`）、菜单筛选、文件与 Markdown 查找、文件树筛选、终端查找不画轮廓，只靠插入点。
+
+这些表面的键盘焦点只有阴影或插入点，达不到 WCAG 2.4.7 要求的明显可见，是保留的风险。按钮、菜单项、分段选项、附件、终端面板与设置控件仍按上面的轮廓规则。`t43-keyboard` 断言两类表现：输入类表面没有轮廓、composer 聚焦时阴影变化，其余控件有轮廓。
 
 快捷键设置与快捷键列表共用 `Keycaps`。组合键按平台展开为独立键帽，辅助技术读取完整键名。快捷键录制沿用注册表的冲突判断；Esc 取消，Tab 退出，冲突提示与发起录制的按钮关联。
 
@@ -68,7 +75,7 @@ PiArc 的界面要能只用键盘完成全部功能，在 VoiceOver、Narrator�
 | 状态清单覆盖 | `apps/desktop/e2e/a11y/states.test.ts`（Vitest，verify 第 5 步） | 渲染进程注册的设置页（`registerSettingsPage`）、面板（`registerPanel`）、渲染 `<Dialog>` 的文件、transcript 行 kind（`ROW_KINDS`）有没登记的 |
 | i18n | `scripts/ci/check-i18n.mjs`（verify 第 16 步） | 两种语言键集合不同；ICU 无效；两种语言占位符不同；用了语言没有的复数类别；`t('…')` 引用不存在的键；渲染进程或主进程有硬编码的用户可见文字；不带 locale 的 `toLocaleString()` |
 | 行名称、live region 节流、审批卡焦点 | `row-label.test.tsx`、`LiveRegion.test.tsx`、`live-announcer.test.ts`、`e2e/t43-approval-focus.e2e.ts` | 任何一种行没有名称，或中英文名称不对；流式期间更新频率超过节流间隔；卡片不取焦点或 400 ms 内键盘能激活 |
-| 键盘与系统偏好 | `e2e/t43-keyboard.e2e.ts` | 只用键盘走不完流程；Tab 跨区域顺序不对；有焦点停靠点没有可见焦点环；减少动效、高对比度、强制颜色不生效 |
+| 键盘与系统偏好 | `e2e/t43-keyboard.e2e.ts` | 只用键盘走不完流程；Tab 跨区域顺序不对；有焦点停靠点没有可见焦点环（输入类表面按上文的轻样式）；减少动效、高对比度、强制颜色不生效 |
 | 中英文截断与溢出 | `e2e/t43-locales.e2e.ts`，截图在 `tmp/evidence/<任务>/locales/` | 按钮、标签页、导航项、表头、徽标的文字超出自身的框 |
 
 **状态清单的维护**：清单在 `apps/desktop/e2e/a11y/states.ts`，每条一个页面或组件状态（`id` 按区域：`window:`、`settings:`、`row:`、`approval:`、`panel:`、`dialog:`、`state:`）。新增页面、面板、对话框或行类型时：
