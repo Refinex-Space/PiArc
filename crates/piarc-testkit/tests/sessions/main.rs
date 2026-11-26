@@ -3,6 +3,7 @@
 //! are in `scenarios/`.
 
 mod accounts;
+mod git;
 mod input;
 mod lifecycle;
 mod login;

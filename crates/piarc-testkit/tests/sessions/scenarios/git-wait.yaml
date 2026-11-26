@@ -1,0 +1,14 @@
+# ADR-0085 rule 5: a turn that waits on a file, so Git operations that rewrite files see a
+# running session in the same file root.
+id: git-wait
+steps:
+  - text: 'Waiting.'
+    tool_calls:
+      [
+        {
+          id: toolu_git_wait,
+          name: Bash,
+          input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' },
+        },
+      ]
+  - text: 'Done.'

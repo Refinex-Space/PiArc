@@ -25,6 +25,8 @@ import {
   type AgentSession,
 } from '@earendil-works/pi-coding-agent';
 import type {
+  CommitMessageAnswer,
+  CommitMessageParams,
   HistoryWindow,
   HooksPromptResult,
   PolicyReviewParams,
@@ -48,6 +50,7 @@ import type {
 } from '@piarc/protocol';
 
 import { reviewCall } from '../harness/auto-review.js';
+import { generateCommitMessage } from '../harness/commit-message.js';
 import { judgeHook, type JudgeRequest } from '../harness/hook-judge.js';
 import { expiredApprovals } from '../harness/policy.js';
 import { fetchCatalog } from '../harness/subagents/definitions.js';
@@ -745,6 +748,24 @@ export class SessionRegistry {
       },
       { auxiliary, runtime: workspace.modelRuntime, preferences: workspace.preferences },
     );
+  }
+
+  /** `session/commitMessage` (ADR-0086): a commit message from session `sessionId`'s channel. */
+  async commitMessage(
+    sessionId: string,
+    params: CommitMessageParams,
+  ): Promise<CommitMessageAnswer> {
+    const auxiliary = this.#get(sessionId).harness.auxiliary;
+    if (auxiliary === undefined) {
+      throw new AhpError(
+        'invalidParams',
+        `session/commitMessage: session ${sessionId} has no model channel`,
+      );
+    }
+    return generateCommitMessage(params, {
+      auxiliary,
+      preferences: this.#options.workspace.preferences,
+    });
   }
 
   /** `hooks/prompt` (T38): one judgement for a `prompt` hook of main session `sessionId`. */

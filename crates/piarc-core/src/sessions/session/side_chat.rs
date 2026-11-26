@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use piarc_host::HostSupervisor;
 use piarc_protocol::session::{
-    SideChatAsk, SideChatAskParams, SideChatControl, SideChatControlParams,
+    CommitMessageParams, SessionCommitMessage, SideChatAsk, SideChatAskParams, SideChatControl,
+    SideChatControlParams,
 };
 use serde_json::{Value, json};
 
@@ -78,6 +79,23 @@ impl Request {
             return Err(Error::Internal { reason: message });
         }
         Ok(json!({"text": answer.text, "stopped": answer.stopped}))
+    }
+
+    /// `session/commitMessage` (ADR-0086): one auxiliary request outside the turn; the usage
+    /// lands in the session's file like any auxiliary call.
+    pub(super) async fn commit_message(
+        &self,
+        host: &HostSupervisor,
+        mut params: CommitMessageParams,
+    ) -> Result<Value> {
+        params.session_id = self.id.clone();
+        let answer = host
+            .session_call_within::<SessionCommitMessage>(&self.id, params, Duration::from_secs(70))
+            .await
+            .map_err(host_error)?;
+        serde_json::to_value(answer).map_err(|e| Error::Internal {
+            reason: format!("cannot encode the commit message: {e}"),
+        })
     }
 
     pub(super) async fn control_side_chat(

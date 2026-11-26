@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "method": "session/commitMessage",
+  "params": {
+    "sessionId": "main",
+    "language": "fr",
+    "instructions": "",
+    "recentSubjects": [],
+    "files": [],
+    "diff": ""
+  }
+}

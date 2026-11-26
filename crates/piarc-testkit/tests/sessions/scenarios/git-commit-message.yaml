@@ -1,0 +1,5 @@
+# ADR-0086: the one auxiliary request that writes a commit message. The scenario marker sits in
+# the user's commit instructions, which open the request's only user message.
+id: git-commit-message
+steps:
+  - text: 'feat(login): 校验登录表单'

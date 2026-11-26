@@ -1625,6 +1625,101 @@
       "required": ["commands", "outputStyles", "outputStyle"],
       "type": "object"
     },
+    "CommitMessageAnswer": {
+      "description": "The generated message (`session/commitMessage`).",
+      "properties": {
+        "fallback": {
+          "description": "The chosen auxiliary model was unavailable and the session's model answered.",
+          "type": ["boolean", "null"]
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "The model that wrote it."
+        },
+        "text": {
+          "description": "The message, without code fences or control characters (at most 4 KiB).",
+          "type": "string"
+        }
+      },
+      "required": ["text", "model"],
+      "type": "object"
+    },
+    "CommitMessageFile": {
+      "description": "One staged file described to the commit message model (ADR-0086).",
+      "properties": {
+        "added": {
+          "description": "Lines added; absent for binary files.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "removed": {
+          "description": "Lines removed.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "status": {
+          "description": "`added`, `modified`, `deleted`, `renamed`…",
+          "type": "string"
+        },
+        "withheld": {
+          "description": "Why its content is left out of `diff` (`binary`, `sensitive`, `denied`, `lockfile`,\n`privateKey`, `budget`).",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["path", "status"],
+      "type": "object"
+    },
+    "CommitMessageParams": {
+      "description": "Parameters of `session/commitMessage` (Core → Agent Host, ADR-0086).",
+      "properties": {
+        "amend": {
+          "description": "The message of the commit being amended.",
+          "type": ["string", "null"]
+        },
+        "branch": {
+          "description": "The current branch.",
+          "type": ["string", "null"]
+        },
+        "diff": {
+          "description": "The staged diff, cut and redacted by Core (at most 32 KiB).",
+          "type": "string"
+        },
+        "files": {
+          "description": "The staged files.",
+          "items": {
+            "$ref": "#/$defs/CommitMessageFile"
+          },
+          "type": "array"
+        },
+        "instructions": {
+          "description": "The user's commit instructions (at most 8 KiB).",
+          "type": "string"
+        },
+        "language": {
+          "$ref": "#/$defs/GitLanguage",
+          "description": "The interface language the description is written in."
+        },
+        "recentSubjects": {
+          "description": "The newest commit subjects, for style (at most 10).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose model channel answers."
+        }
+      },
+      "required": ["sessionId", "language", "instructions", "recentSubjects", "files", "diff"],
+      "type": "object"
+    },
     "CompactionReason": {
       "description": "Why a compaction ran.",
       "oneOf": [
@@ -13539,6 +13634,43 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionCommitMessageRequest": {
+      "description": "Request for `session/commitMessage`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/commitMessage",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/CommitMessageParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionCommitMessageResponse": {
+      "description": "Successful response to `session/commitMessage`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/CommitMessageAnswer"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionCompactParams": {
       "description": "Parameters of `session/compact`.",
       "properties": {
@@ -18564,6 +18696,12 @@
     },
     {
       "$ref": "#/$defs/SideChatControlResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionCommitMessageRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionCommitMessageResponse"
     },
     {
       "$ref": "#/$defs/SessionCompactRequest"

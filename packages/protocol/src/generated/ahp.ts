@@ -84,6 +84,8 @@ export type AhpMessage =
   | SideChatAskResponse
   | SideChatControlRequest
   | SideChatControlResponse
+  | SessionCommitMessageRequest
+  | SessionCommitMessageResponse
   | SessionCompactRequest
   | SessionCompactResponse
   | SessionForkRequest
@@ -392,6 +394,10 @@ export type SetPermissionModeResult = Record<string, never>;
  * The requested panel has been stopped or closed.
  */
 export type SideChatControlled = Record<string, never>;
+/**
+ * The language of a generated commit message (the client's interface language).
+ */
+export type GitLanguage = 'en' | 'zh-CN';
 /**
  * Result of `session/steer` and `session/followUp`.
  */
@@ -1561,10 +1567,6 @@ export type GitTextSource =
  * Which side of a file's uncommitted change a hunk belongs to.
  */
 export type GitStage = 'staged' | 'unstaged';
-/**
- * The language of a generated commit message (the client's interface language).
- */
-export type GitLanguage = 'en' | 'zh-CN';
 /**
  * How a checkout treats local changes it would overwrite.
  */
@@ -3285,6 +3287,104 @@ export interface SideChatControlResponse {
   id: RequestId;
   jsonrpc: JsonRpcVersion;
   result: SideChatControlled;
+}
+/**
+ * Request for `session/commitMessage`.
+ */
+export interface SessionCommitMessageRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/commitMessage';
+  params: CommitMessageParams;
+}
+/**
+ * Parameters of `session/commitMessage` (Core → Agent Host, ADR-0086).
+ */
+export interface CommitMessageParams {
+  /**
+   * The message of the commit being amended.
+   */
+  amend?: string | null;
+  /**
+   * The current branch.
+   */
+  branch?: string | null;
+  /**
+   * The staged diff, cut and redacted by Core (at most 32 KiB).
+   */
+  diff: string;
+  /**
+   * The staged files.
+   */
+  files: CommitMessageFile[];
+  /**
+   * The user's commit instructions (at most 8 KiB).
+   */
+  instructions: string;
+  /**
+   * The interface language the description is written in.
+   */
+  language: GitLanguage;
+  /**
+   * The newest commit subjects, for style (at most 10).
+   */
+  recentSubjects: string[];
+  /**
+   * The session whose model channel answers.
+   */
+  sessionId: SessionId;
+}
+/**
+ * One staged file described to the commit message model (ADR-0086).
+ */
+export interface CommitMessageFile {
+  /**
+   * Lines added; absent for binary files.
+   */
+  added?: number | null;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * Lines removed.
+   */
+  removed?: number | null;
+  /**
+   * `added`, `modified`, `deleted`, `renamed`…
+   */
+  status: string;
+  /**
+   * Why its content is left out of `diff` (`binary`, `sensitive`, `denied`, `lockfile`,
+   * `privateKey`, `budget`).
+   */
+  withheld?: string | null;
+}
+/**
+ * Successful response to `session/commitMessage`.
+ */
+export interface SessionCommitMessageResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: CommitMessageAnswer;
+}
+/**
+ * The generated message (`session/commitMessage`).
+ */
+export interface CommitMessageAnswer {
+  /**
+   * The chosen auxiliary model was unavailable and the session's model answered.
+   */
+  fallback?: boolean | null;
+  /**
+   * The model that wrote it.
+   */
+  model: ModelRef;
+  /**
+   * The message, without code fences or control characters (at most 4 KiB).
+   */
+  text: string;
 }
 /**
  * Request for `session/compact`.

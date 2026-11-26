@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "text": "feat(login): 校验登录表单",
+    "model": { "provider": "mock-main", "id": "mock-model" }
+  }
+}

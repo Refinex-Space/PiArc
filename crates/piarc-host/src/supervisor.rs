@@ -468,6 +468,16 @@ impl Tracking {
 
 impl Link {
     fn check_method(&self, method: &str) -> Result<()> {
+        if !self.commit_message_enabled && method == "session/commitMessage" {
+            return Err(Error::Remote {
+                method: method.to_owned(),
+                error: piarc_protocol::ErrorObject::new(
+                    ErrorKind::MethodNotFound,
+                    "the connected Agent Host does not generate commit messages",
+                    false,
+                ),
+            });
+        }
         if !self.side_chat_enabled
             && matches!(method, "session/sideChatAsk" | "session/sideChatControl")
         {

@@ -123,6 +123,7 @@ impl HostConfig {
                 Capability::new("plugins"),
                 Capability::new("autoMemory"),
                 Capability::new("sideChat"),
+                Capability::new("commitMessage"),
             ],
             allow_model_network: None,
             model_preferences: None,

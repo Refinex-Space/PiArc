@@ -1,6 +1,7 @@
 // Checks for request params and results arriving over AHP (a system boundary): values are
 // `unknown` until one of these functions has narrowed them.
 import type {
+  CommitMessageParams,
   CoreWelcome,
   InputAttachment,
   InputMention,
@@ -283,5 +284,50 @@ export function reviewParams(params: unknown): PolicyReviewParams {
       id: stringField(method, model, 'id'),
     },
     timeoutMs,
+  };
+}
+
+/** `session/commitMessage`'s params (ADR-0086), bounded as Core sends them. */
+export function commitMessageParams(params: unknown): CommitMessageParams {
+  const method = 'session/commitMessage';
+  const fields = paramsObject(method, params);
+  const fail = (member: string, what: string): never => {
+    throw new AhpError('invalidParams', `${method}: ${member} ${what}`, { details: { member } });
+  };
+  const language = fields.language;
+  if (language !== 'en' && language !== 'zh-CN') fail('language', "must be 'en' or 'zh-CN'");
+  const instructions = typeof fields.instructions === 'string' ? fields.instructions : '';
+  if (instructions.length > 8192) fail('instructions', 'is too long');
+  const diff = typeof fields.diff === 'string' ? fields.diff : fail('diff', 'must be a string');
+  if (diff.length > 64 * 1024) fail('diff', 'is too long');
+  const recentSubjects = stringList(method, fields, 'recentSubjects').slice(0, 10);
+  const rawFiles = Array.isArray(fields.files) ? fields.files : fail('files', 'must be a list');
+  const files = rawFiles.slice(0, 2000).map((file) => {
+    if (!isFields(file) || typeof file.path !== 'string' || typeof file.status !== 'string') {
+      return fail('files', 'must hold { path, status } objects');
+    }
+    const count = (value: unknown) =>
+      typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+    const added = count(file.added);
+    const removed = count(file.removed);
+    return {
+      path: file.path,
+      status: file.status,
+      ...(added === undefined ? {} : { added }),
+      ...(removed === undefined ? {} : { removed }),
+      ...(typeof file.withheld === 'string' ? { withheld: file.withheld } : {}),
+    };
+  });
+  const branch = optionalString(method, fields, 'branch');
+  const amend = optionalString(method, fields, 'amend');
+  return {
+    sessionId: stringField(method, fields, 'sessionId'),
+    language: language === 'zh-CN' ? 'zh-CN' : 'en',
+    instructions,
+    recentSubjects,
+    files,
+    diff,
+    ...(branch === undefined ? {} : { branch }),
+    ...(amend === undefined ? {} : { amend }),
   };
 }

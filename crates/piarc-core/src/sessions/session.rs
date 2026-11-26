@@ -77,6 +77,8 @@ pub enum Op {
         /// Discard history too.
         close: bool,
     },
+    /// Generates a commit message on the session's auxiliary model channel (ADR-0086).
+    CommitMessage(Box<piarc_protocol::session::CommitMessageParams>),
     /// The session's context usage (`session/getContextUsage`, T27).
     ContextUsage,
     /// Switches the session permission mode and records a transcript entry.
@@ -989,6 +991,7 @@ impl Request {
             Op::SideChatControl { panel_id, close } => {
                 self.control_side_chat(&supervisor, panel_id, close).await
             }
+            Op::CommitMessage(params) => self.commit_message(&supervisor, *params).await,
             Op::ContextUsage => {
                 let params = SessionTarget {
                     session_id: self.id.clone(),

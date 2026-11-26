@@ -303,6 +303,18 @@
     },
     {
       "kind": "request",
+      "method": "session/commitMessage",
+      "name": "session/commitMessage",
+      "schema": "SessionCommitMessageRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/commitMessage",
+      "name": "session/commitMessage/result",
+      "schema": "SessionCommitMessageResponse"
+    },
+    {
+      "kind": "request",
       "method": "session/compact",
       "name": "session/compact",
       "schema": "SessionCompactRequest"

@@ -297,6 +297,11 @@ impl Hub {
         )
     }
 
+    /// Which of `paths` session `session`'s `Read(…)` deny rules cover.
+    pub(crate) async fn read_denied(&self, session: &str, paths: &[PathBuf]) -> Vec<bool> {
+        self.ctx.tool_io.read_denied(session, paths).await
+    }
+
     /// One `kind: "git"` audit row (no file contents, no commit message bodies).
     pub(crate) async fn audit_git(&self, session: &str, project: &Path, detail: Value) {
         let workspace = piarc_fs::display(project);

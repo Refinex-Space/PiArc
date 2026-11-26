@@ -39,6 +39,20 @@ impl ToolIo {
         }
     }
 
+    /// Which of `paths` the session's `Read(…)` deny rules cover (ADR-0086: their content is
+    /// not sent to a model). A session that is not open denies none; rules that cannot be read
+    /// deny all.
+    pub(crate) async fn read_denied(&self, session_id: &str, paths: &[PathBuf]) -> Vec<bool> {
+        let Ok(session) = self.session(session_id) else {
+            return vec![false; paths.len()];
+        };
+        match self.read_deny(&session).await {
+            Ok(Some(deny)) => paths.iter().map(|p| deny.denies(p)).collect(),
+            Ok(None) => vec![false; paths.len()],
+            Err(_) => vec![true; paths.len()],
+        }
+    }
+
     /// Puts `content` (or removes the file, for `None`) at `path` of session `session_id`
     /// when the file still has the content whose SHA-256 is `expected` (`None`: no file);
     /// the replaced bytes go to the snapshot store first.

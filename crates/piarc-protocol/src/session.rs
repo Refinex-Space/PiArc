@@ -359,6 +359,69 @@ request!(
     SideChatControl, "session/sideChatControl", SideChatControlParams, SideChatControlled
 );
 
+/// One staged file described to the commit message model (ADR-0086).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitMessageFile {
+    /// The file.
+    pub path: String,
+    /// `added`, `modified`, `deleted`, `renamed`…
+    pub status: String,
+    /// Lines added; absent for binary files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added: Option<u64>,
+    /// Lines removed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removed: Option<u64>,
+    /// Why its content is left out of `diff` (`binary`, `sensitive`, `denied`, `lockfile`,
+    /// `privateKey`, `budget`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withheld: Option<String>,
+}
+
+/// Parameters of `session/commitMessage` (Core → Agent Host, ADR-0086).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitMessageParams {
+    /// The session whose model channel answers.
+    pub session_id: SessionId,
+    /// The interface language the description is written in.
+    pub language: crate::git::GitLanguage,
+    /// The user's commit instructions (at most 8 KiB).
+    pub instructions: String,
+    /// The current branch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// The newest commit subjects, for style (at most 10).
+    pub recent_subjects: Vec<String>,
+    /// The staged files.
+    pub files: Vec<CommitMessageFile>,
+    /// The staged diff, cut and redacted by Core (at most 32 KiB).
+    pub diff: String,
+    /// The message of the commit being amended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amend: Option<String>,
+}
+
+/// The generated message (`session/commitMessage`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitMessageAnswer {
+    /// The message, without code fences or control characters (at most 4 KiB).
+    pub text: String,
+    /// The model that wrote it.
+    pub model: ModelRef,
+    /// The chosen auxiliary model was unavailable and the session's model answered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<bool>,
+}
+
+request!(
+    /// Generate a commit message from staged changes on the session's auxiliary model
+    /// channel (Core → Agent Host).
+    SessionCommitMessage, "session/commitMessage", CommitMessageParams, CommitMessageAnswer
+);
+
 /// Parameters of `session/compact`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

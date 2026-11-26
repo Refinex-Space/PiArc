@@ -33,6 +33,7 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 | 2026-11-22 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 8056 | 10 | 0 |
 | 2026-11-22 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 8533 | 10 | 0 |
 | 2026-11-23 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 8594 | 10 | 0 |
+| 2026-11-25 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 8600 | 10 | 0 |
 
 ## T46 审查提示词的逐段自查
 
@@ -49,3 +50,7 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 | 工具描述与参数描述 | `record_review` 的描述与 `verdict`、`reason`、`category` 的参数说明 | 自写；随参数描述一起比对，0 命中 |
 | B 段标题 | "The developer's additions" 与四个列表的标题、空列表写 "(none)" | `harness/auto-review.ts` 的 `policySection`，字面量扫描比对，0 命中 |
 | 拒绝说明 | Core 给模型的拒绝理由开头、`DENIAL_NOTE`、`PAUSE_NOTE` | `piarc-policy` 与 Core 的 `review.rs`，字面量扫描比对，0 命中 |
+
+## Git 面板的提交信息提示词（ADR-0086）
+
+提示词在 `agent-host/src/harness/prompts/commit-message.ts`（system 段、两种语言要求、修正时的说明），user 消息的块标签与文件行在 `harness/commit-message.ts`。按 ADR-0086 第 3 条自写，写作时没有打开参考仓库的提示词；2026-11-25 用上面的脚本做 10 词窗口比对，0 个匹配窗口。
