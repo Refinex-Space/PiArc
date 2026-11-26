@@ -17,7 +17,7 @@ import type { Side } from './comments.js';
 import { CommentEditorRow, CommentRow, useDiffComments } from './DiffComments.js';
 
 /** The highlighted lines of `code`, once the worker answered (`null`: plain). */
-function useHighlighted(
+export function useHighlighted(
   highlight: HighlightClient,
   language: string | null,
   code: string,
@@ -42,7 +42,7 @@ function useHighlighted(
 }
 
 /** A line number; a button that starts a comment when the panel takes comments. */
-function Gutter({
+export function Gutter({
   file,
   side,
   line,

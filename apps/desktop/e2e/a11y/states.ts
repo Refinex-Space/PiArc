@@ -59,6 +59,12 @@ export const A11Y_STATES = [
   { id: 'settings:permissions', area: 'settings', page: 'permissions', note: 'Permissions' },
   { id: 'settings:sandbox', area: 'settings', page: 'sandbox', note: 'Sandbox' },
   { id: 'settings:proxy', area: 'settings', page: 'proxy', note: 'Proxy (detected system proxy)' },
+  {
+    id: 'settings:git',
+    area: 'settings',
+    page: 'git',
+    note: 'Git (branches, push and pull, commits)',
+  },
   { id: 'settings:agents', area: 'settings', page: 'agents', note: 'Subagents' },
   {
     id: 'settings:skills',
@@ -268,6 +274,12 @@ export const A11Y_STATES = [
     area: 'dialog',
     source: 'settings/SignInSection.tsx',
     note: 'sign in with a code',
+  },
+  {
+    id: 'dialog:git-prompt',
+    area: 'dialog',
+    source: 'changes/git/GitPrompts.tsx',
+    note: 'Git: a new branch name',
   },
   {
     id: 'dialog:terminal-text',

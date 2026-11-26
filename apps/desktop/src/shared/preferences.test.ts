@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_PREFERENCES, pointerOf, preferencesFrom, proxyUrlProblem } from './preferences.js';
+import {
+  DEFAULT_PREFERENCES,
+  isBranchPrefix,
+  pointerOf,
+  preferencesFrom,
+  proxyUrlProblem,
+} from './preferences.js';
 
 describe('preferences', () => {
   it('reads valid values and falls back to defaults', () => {
@@ -161,5 +167,102 @@ describe('the proxy preference (ADR-0082)', () => {
       pointerOf({ key: 'proxy', value: { mode: 'manual', url: 'http://u:p@h:1' } }),
     ).toBeUndefined();
     expect(pointerOf({ key: 'proxy', value: { mode: 'system' } })).toBeUndefined();
+  });
+});
+
+describe('the Git preferences (ADR-0085)', () => {
+  it('reads the defaults and the values Git accepts', () => {
+    expect(preferencesFrom({}).git).toEqual({
+      branchPrefix: '',
+      protectedBranches: ['main', 'master'],
+      pullMode: 'config',
+      alwaysForcePush: false,
+      commitInstructions: '',
+    });
+    const git = preferencesFrom({
+      git: {
+        branchPrefix: 'feature/',
+        protectedBranches: ['main', ' release/* ', 'has space', 3],
+        pullMode: 'rebase',
+        alwaysForcePush: true,
+        commitInstructions: 'Be brief.',
+      },
+    }).git;
+    expect(git).toEqual({
+      branchPrefix: 'feature/',
+      protectedBranches: ['main', 'release/*'],
+      pullMode: 'rebase',
+      alwaysForcePush: true,
+      commitInstructions: 'Be brief.',
+    });
+    // An empty list is a choice: nothing is protected.
+    expect(preferencesFrom({ git: { protectedBranches: [] } }).git.protectedBranches).toEqual([]);
+    expect(preferencesFrom({ git: { branchPrefix: 'a b', pullMode: 'squash' } }).git).toMatchObject(
+      {
+        branchPrefix: '',
+        pullMode: 'config',
+      },
+    );
+  });
+
+  it('accepts branch prefixes Git can start a name with', () => {
+    for (const ok of ['', 'feature/', 'me-', 'team/me/']) expect(isBranchPrefix(ok)).toBe(true);
+    for (const bad of ['-x', '/x', 'a..b', 'a//b', 'a b', 'a~', 'a:b', 'a\\b', 'x'.repeat(65)]) {
+      expect(isBranchPrefix(bad)).toBe(false);
+    }
+  });
+
+  it('writes Git settings to their pointers and removes defaults', () => {
+    expect(pointerOf({ key: 'git.branchPrefix', value: 'feature/' })).toEqual({
+      pointer: '/git/branchPrefix',
+      value: 'feature/',
+    });
+    expect(pointerOf({ key: 'git.branchPrefix', value: '' })).toEqual({
+      pointer: '/git/branchPrefix',
+      value: null,
+    });
+    expect(pointerOf({ key: 'git.branchPrefix', value: '-bad' })).toBeUndefined();
+    expect(pointerOf({ key: 'git.protectedBranches', value: ['main', ' main ', 'rel/*'] })).toEqual(
+      {
+        pointer: '/git/protectedBranches',
+        value: ['main', 'rel/*'],
+      },
+    );
+    expect(pointerOf({ key: 'git.protectedBranches', value: null })).toEqual({
+      pointer: '/git/protectedBranches',
+      value: null,
+    });
+    expect(pointerOf({ key: 'git.protectedBranches', value: ['a b'] })).toBeUndefined();
+    expect(
+      pointerOf({
+        key: 'git.protectedBranches',
+        value: Array.from({ length: 33 }, (_, i) => `b${String(i)}`),
+      }),
+    ).toBeUndefined();
+    expect(pointerOf({ key: 'git.pullMode', value: 'ffOnly' })).toEqual({
+      pointer: '/git/pullMode',
+      value: 'ffOnly',
+    });
+    expect(pointerOf({ key: 'git.pullMode', value: 'config' })).toEqual({
+      pointer: '/git/pullMode',
+      value: null,
+    });
+    expect(pointerOf({ key: 'git.pullMode', value: 'squash' })).toBeUndefined();
+    expect(pointerOf({ key: 'git.alwaysForcePush', value: true })).toEqual({
+      pointer: '/git/alwaysForcePush',
+      value: true,
+    });
+    expect(pointerOf({ key: 'git.alwaysForcePush', value: false })).toEqual({
+      pointer: '/git/alwaysForcePush',
+      value: null,
+    });
+    expect(pointerOf({ key: 'git.alwaysForcePush', value: 'yes' })).toBeUndefined();
+    expect(pointerOf({ key: 'git.commitInstructions', value: '  ' })).toEqual({
+      pointer: '/git/commitInstructions',
+      value: null,
+    });
+    expect(
+      pointerOf({ key: 'git.commitInstructions', value: 'x'.repeat(8 * 1024 + 1) }),
+    ).toBeUndefined();
   });
 });

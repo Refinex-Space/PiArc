@@ -132,6 +132,23 @@ describe('i18n', () => {
             number: 1,
             position: 2,
             detail: 'the Agent Host stopped',
+            // The Git tool (ADR-0084, ADR-0085).
+            remote: 'origin',
+            remoteOid: 'abc1234',
+            localOid: 'def5678',
+            ahead: 2,
+            behind: 1,
+            base: 'main',
+            upstream: 'origin/main',
+            onto: 'main',
+            step: 1,
+            scope: 'All changes',
+            short: 'abc1234',
+            subject: 'feat: add login',
+            stash: 'stash@{0}',
+            group: 'Changes',
+            pattern: 'release/*',
+            language: 'English',
           }),
         ).not.toThrow();
       }

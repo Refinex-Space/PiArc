@@ -14,6 +14,7 @@ import {
   loadComments,
   reanchor,
   saveComments,
+  scopeOfComment,
   sideLines,
   type DiffComment,
   type Side,
@@ -65,6 +66,7 @@ function withDraft(
   comments: readonly DiffComment[],
   draft: CommentDraft,
   file: ChangesFile | undefined,
+  scope: string,
 ): DiffComment[] {
   const body = draft.body;
   if (draft.id !== undefined) {
@@ -85,6 +87,7 @@ function withDraft(
       end: draft.end,
       excerpt,
       body,
+      ...(scope === 'session' ? {} : { scope }),
     },
   ];
 }
@@ -95,24 +98,30 @@ function newId(): string {
   return `${Date.now().toString(36)}-${counter.toString(36)}`;
 }
 
-/** The comments of session `sessionId`, placed on `files`. */
+/**
+ * The comments of session `sessionId` written on `scope` (ADR-0084: `session`, or a Git range),
+ * placed on `files`; `heading` opens the message that sends them.
+ */
 export function useDiffCommentsState(
   sessionId: string,
   files: readonly ChangesFile[] | undefined,
+  scope = 'session',
+  heading?: string,
 ): DiffCommentsState {
   const turn = useTurnInfo(sessionId);
-  const [comments, setComments] = useState<DiffComment[]>(() => loadComments(sessionId));
+  const [all, setComments] = useState<DiffComment[]>(() => loadComments(sessionId));
+  const comments = useMemo(() => all.filter((c) => scopeOfComment(c) === scope), [all, scope]);
   const [draft, setDraft] = useState<CommentDraft | undefined>(undefined);
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<string | undefined>(undefined);
   // A new diff: place every comment again.
   useEffect(() => {
     if (files === undefined) return;
-    setComments((current) => reanchor(current, files));
-  }, [files]);
+    setComments((current) => reanchor(current, files, scope));
+  }, [files, scope]);
   useEffect(() => {
-    saveComments(sessionId, comments);
-  }, [sessionId, comments]);
+    saveComments(sessionId, all);
+  }, [sessionId, all]);
   const start = useCallback((file: ChangesFile, side: Side, line: number, extend: boolean) => {
     setDraft((current) => {
       if (
@@ -143,28 +152,26 @@ export function useDiffCommentsState(
   const save = useCallback(
     (file: ChangesFile | undefined) => {
       if (draft === undefined || draft.body.trim() === '') return;
-      setComments((current) => withDraft(current, draft, file));
+      setComments((current) => withDraft(current, draft, file, scope));
       setDraft(undefined);
     },
-    [draft],
+    [draft, scope],
   );
   const send = useCallback(
     async (file?: ChangesFile) => {
       // Mod+Enter in the editor keeps the comment being written and sends it with the others.
-      const all =
-        draft !== undefined && draft.body.trim() !== ''
-          ? withDraft(comments, draft, file)
-          : comments;
-      if (all !== comments) {
-        setComments(all);
+      const next =
+        draft !== undefined && draft.body.trim() !== '' ? withDraft(all, draft, file, scope) : all;
+      if (next !== all) {
+        setComments(next);
         setDraft(undefined);
       }
-      const live = all.filter((c) => c.stale !== true);
+      const live = next.filter((c) => c.stale !== true && scopeOfComment(c) === scope);
       if (live.length === 0 || sending) return;
       setSending(true);
       setFailure(undefined);
       try {
-        const text = formatComments(live);
+        const text = formatComments(live, heading);
         // While the agent works, the message waits in the queue (the composer's Mod+Enter).
         await (turn.running
           ? window.piarc.followUp(sessionId, text)
@@ -177,7 +184,7 @@ export function useDiffCommentsState(
         setSending(false);
       }
     },
-    [comments, draft, sending, sessionId, turn.running],
+    [all, draft, sending, sessionId, turn.running, scope, heading],
   );
   return useMemo(
     () => ({
@@ -204,7 +211,14 @@ export function useDiffCommentsState(
 }
 
 /** The editor of the open draft, inside a hunk's table. */
-export function CommentEditorRow({ file }: { readonly file: ChangesFile }) {
+export function CommentEditorRow({
+  file,
+  span = 3,
+}: {
+  readonly file: ChangesFile;
+  /** Columns of the table it sits in. */
+  readonly span?: number;
+}) {
   const { t, keyPlatform } = useApp();
   const state = useDiffComments();
   const draft = state?.draft;
@@ -215,7 +229,7 @@ export function CommentEditorRow({ file }: { readonly file: ChangesFile }) {
       : t('changes.comment.lines', { start: draft.start, end: draft.end });
   return (
     <tr className="diff-comment-editor" data-testid="changes-comment-editor">
-      <td colSpan={3}>
+      <td colSpan={span}>
         <form
           className="diff-comment-form"
           onSubmit={(event) => {
@@ -275,13 +289,20 @@ export function CommentEditorRow({ file }: { readonly file: ChangesFile }) {
 }
 
 /** A saved comment under its last line. */
-export function CommentRow({ comment }: { readonly comment: DiffComment }) {
+export function CommentRow({
+  comment,
+  span = 3,
+}: {
+  readonly comment: DiffComment;
+  /** Columns of the table it sits in. */
+  readonly span?: number;
+}) {
   const t = useT();
   const state = useDiffComments();
   if (state === undefined) return null;
   return (
     <tr className="diff-comment" data-testid="changes-comment" data-comment={comment.id}>
-      <td colSpan={3}>
+      <td colSpan={span}>
         <div className="diff-comment-body">
           <span className="muted small">
             {comment.start === comment.end

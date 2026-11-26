@@ -1,7 +1,10 @@
-// T28's panels: the changes card in the session rail (every session, after the context card)
-// and the Changes panel in the dock while it is open (the card's button, Mod+Shift+D).
+// The Git tool (ADR-0084, formerly T28's Changes panel) and its rail card: the card in the
+// session rail (every session, after the context card) and the tool in the dock while it is
+// open (the card's button, Mod+Shift+D). Outside a Git repository both show the session's own
+// changes as before.
 import { registerPanel } from '../shell/registry.js';
-import { ChangesCard, ChangesPanel } from './ChangesPanel.js';
+import { GitCard } from './git/GitCard.js';
+import { GitPanel } from './git/GitPanel.js';
 
 registerPanel({
   id: 'changes-card',
@@ -10,7 +13,7 @@ registerPanel({
   order: 60,
   when: (context) => context.sessionId !== undefined,
   render: (context) =>
-    context.sessionId === undefined ? null : <ChangesCard sessionId={context.sessionId} />,
+    context.sessionId === undefined ? null : <GitCard sessionId={context.sessionId} />,
 });
 
 registerPanel({
@@ -20,5 +23,5 @@ registerPanel({
   order: 30,
   when: (context) => context.sessionId !== undefined,
   render: (context) =>
-    context.sessionId === undefined ? null : <ChangesPanel sessionId={context.sessionId} />,
+    context.sessionId === undefined ? null : <GitPanel sessionId={context.sessionId} />,
 });

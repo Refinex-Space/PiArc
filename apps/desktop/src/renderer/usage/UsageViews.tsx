@@ -13,6 +13,7 @@ const PURPOSES: Readonly<Record<string, MessageId>> = {
   webSearch: 'usage.purpose.webSearch',
   hookPrompt: 'usage.purpose.hookPrompt',
   autoReview: 'usage.purpose.autoReview',
+  commitMessage: 'usage.purpose.commitMessage',
   sideChat: 'sideChat.title',
   cache_warm: 'usage.purpose.cacheWarm',
 };

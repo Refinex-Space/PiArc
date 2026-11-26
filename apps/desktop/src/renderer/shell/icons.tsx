@@ -61,6 +61,20 @@ import {
   WandSparkles,
   WrapText,
   X,
+  ArrowDownToLine,
+  ArrowRight,
+  ArrowUpFromLine,
+  CircleAlert,
+  EllipsisVertical,
+  GitBranch,
+  GitCommitHorizontal,
+  GitMerge,
+  List,
+  Minus,
+  RefreshCw,
+  Sparkles,
+  Tag,
+  Undo2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -127,6 +141,24 @@ export const RestoreIcon = glyph(Minimize2);
 export const MaximizeIcon = glyph(Maximize);
 export const MinimizeIcon = glyph(Minimize);
 export const PopoutIcon = glyph(AppWindow);
+
+// ---- Git panel (ADR-0084) ----
+
+export const GitBranchIcon = glyph(GitBranch);
+export const GitCommitIcon = glyph(GitCommitHorizontal);
+export const GitMergeIcon = glyph(GitMerge);
+export const ArrowRightIcon = glyph(ArrowRight);
+/** The changed files list toggle. */
+export const FileListIcon = glyph(List);
+export const MoreVerticalIcon = glyph(EllipsisVertical);
+export const FetchIcon = glyph(RefreshCw);
+export const PullIcon = glyph(ArrowDownToLine);
+export const PushIcon = glyph(ArrowUpFromLine);
+export const GenerateIcon = glyph(Sparkles);
+export const RollbackIcon = glyph(Undo2);
+export const MinusIcon = glyph(Minus);
+export const TagIcon = glyph(Tag);
+export const AlertIcon = glyph(CircleAlert);
 
 // ---- Filled marks Lucide lacks ----
 

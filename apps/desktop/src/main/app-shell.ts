@@ -278,6 +278,12 @@ export class AppShell {
           return this.options.preferences.get();
         }
       }
+      if (
+        enablesAlwaysForcePush(change) &&
+        !(await this.confirmAlwaysForcePush(BrowserWindow.fromWebContents(event.sender)))
+      ) {
+        return this.options.preferences.get();
+      }
       return this.options.preferences.set(change);
     });
     registerHandler(IPC_CHANNELS.settingsOpen, (event, [page]) => {
@@ -324,6 +330,25 @@ export class AppShell {
         model: this.options.preferences.get().autoMode.model,
       }),
       buttons: [t.t('permissions.auto.enable'), t.t('dialog.cancel')],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+    };
+    const result =
+      window === null
+        ? await dialog.showMessageBox(options)
+        : await dialog.showMessageBox(window, options);
+    return result.response === 0;
+  }
+
+  /** ADR-0085: the native confirmation before every push from the Git panel forces. */
+  private async confirmAlwaysForcePush(window: BrowserWindow | null): Promise<boolean> {
+    const t = this.translator;
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      message: t.t('git.confirm.alwaysForcePush'),
+      detail: t.t('git.confirm.alwaysForcePushDetail'),
+      buttons: [t.t('git.confirm.alwaysForcePushButton'), t.t('dialog.cancel')],
       defaultId: 1,
       cancelId: 1,
       noLink: true,
@@ -428,6 +453,18 @@ export function isNotificationApproval(value: unknown): value is NotificationApp
     typeof a.summary === 'string' &&
     a.summary.length <= 4096 &&
     typeof a.allow === 'boolean'
+  );
+}
+
+/** Whether a preference change turns "always force push" on (ADR-0085). */
+function enablesAlwaysForcePush(change: unknown): boolean {
+  return (
+    typeof change === 'object' &&
+    change !== null &&
+    'key' in change &&
+    change.key === 'git.alwaysForcePush' &&
+    'value' in change &&
+    change.value === true
   );
 }
 

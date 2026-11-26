@@ -36,6 +36,7 @@ const REASONS = [
   'projectMode',
   'projectSandbox',
   'projectAutoMode',
+  'projectGit',
   'platform',
   'unsupported',
   'disabled',

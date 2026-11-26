@@ -15,6 +15,7 @@ import { useApp, useT } from '../app/app-context.js';
 import { requestTerminalFocus } from '../terminal/panel-state.js';
 import {
   ChangesIcon,
+  GitBranchIcon,
   FolderIcon,
   MoreIcon,
   PreviewIcon,
@@ -232,7 +233,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
   const bindings = effectiveBindings(preferences.keybindings);
   const controls = [
     ['terminal', 'panel.terminal', <TerminalIcon />, bindings['terminal.toggle']],
-    ['changes', 'panel.changes', <ChangesIcon />, bindings['changes.toggle']],
+    ['changes', 'panel.changes', <GitBranchIcon />, bindings['changes.toggle']],
     ['preview', 'tiles.preview', <PreviewIcon />, ''],
     ['files', 'tiles.files', <FolderIcon />, bindings['files.toggle']],
   ] as const;

@@ -8,6 +8,7 @@
 @import './files/files-panel.css';
 @import './files/viewer-styles.css';
 @import './files/tree-style.css';
+@import './changes/git/git.css';
 
 /* PiArc's window styles. Colors, fonts and sizes come only from the design tokens
    (theme/tokens.generated.css, generated from design/tokens/): a change of visual direction

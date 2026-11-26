@@ -35,6 +35,7 @@ import '../changes/panels.js';
 import '../terminal/panels.js';
 import { requestFilesControl } from '../files/file-controls.js';
 import { toggleChangesPanel } from '../changes/panel-state.js';
+import { claimPanelCommand } from '../changes/git/focus.js';
 import { showPanel, togglePanel } from './registry.js';
 import { ShortcutsDialog } from './ShortcutsDialog.js';
 import { CommandPalette } from './CommandPalette.js';
@@ -416,6 +417,8 @@ export function Shell() {
       case 'files.quick':
       case 'files.tree':
         if (selected) {
+          // The Git panel takes them while it has focus (ADR-0084).
+          if (claimPanelCommand(command)) break;
           showPanel('files');
           requestFilesControl(selected, command === 'files.quick' ? 'search' : 'tree');
         }

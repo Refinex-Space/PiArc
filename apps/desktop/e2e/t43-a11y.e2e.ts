@@ -236,6 +236,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     'permissions',
     'sandbox',
     'proxy',
+    'git',
     'agents',
     'skills',
     'memory',

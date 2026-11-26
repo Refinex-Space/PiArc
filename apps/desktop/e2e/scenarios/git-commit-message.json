@@ -1,0 +1,4 @@
+{
+  "id": "git-commit-message",
+  "steps": [{ "text": "docs: describe the sign-in flow" }]
+}

@@ -2,7 +2,7 @@
 // session wrote through its file tools, each against its content before the session first
 // wrote it. The Changes panel and the rail's changes card read it; it is fetched when shown,
 // after each turn and after a discard, a rewind or a branch change.
-import type { ChangesFile, ChangesView, DiffHunk, DiffLine } from '@piarc/protocol';
+import type { ChangesFile, ChangesView, DiffHunk, DiffLine, FileDiff } from '@piarc/protocol';
 import { reason } from '../shell/errors.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -48,8 +48,7 @@ function fileOf(value: unknown): ChangesFile | undefined {
   ) {
     return undefined;
   }
-  const diff = isRecord(value.diff) ? value.diff : undefined;
-  const hunks = Array.isArray(diff?.hunks) ? diff.hunks.map(hunkOf) : [];
+  const diff = fileDiffOf(value.diff, value.label);
   return {
     path: value.path,
     label: value.label,
@@ -58,19 +57,23 @@ function fileOf(value: unknown): ChangesFile | undefined {
     added: count(value.added),
     removed: count(value.removed),
     ...(value.binary === true ? { binary: true } : {}),
-    ...(diff === undefined || hunks.some((hunk) => hunk === undefined)
-      ? {}
-      : {
-          diff: {
-            path: typeof diff.path === 'string' ? diff.path : value.label,
-            added: count(diff.added),
-            removed: count(diff.removed),
-            unified: typeof diff.unified === 'string' ? diff.unified : '',
-            hunks: hunks.filter((hunk): hunk is DiffHunk => hunk !== undefined),
-            ...(diff.created === true ? { created: true } : {}),
-            ...(diff.degraded === true ? { degraded: true } : {}),
-          },
-        }),
+    ...(diff === undefined ? {} : { diff }),
+  };
+}
+
+/** A `FileDiff` from Core, or undefined when it is not one (`path` names it when absent). */
+export function fileDiffOf(value: unknown, path: string): FileDiff | undefined {
+  if (!isRecord(value)) return undefined;
+  const hunks = Array.isArray(value.hunks) ? value.hunks.map(hunkOf) : [];
+  if (hunks.some((hunk) => hunk === undefined)) return undefined;
+  return {
+    path: typeof value.path === 'string' ? value.path : path,
+    added: count(value.added),
+    removed: count(value.removed),
+    unified: typeof value.unified === 'string' ? value.unified : '',
+    hunks: hunks.filter((hunk): hunk is DiffHunk => hunk !== undefined),
+    ...(value.created === true ? { created: true } : {}),
+    ...(value.degraded === true ? { degraded: true } : {}),
   };
 }
 

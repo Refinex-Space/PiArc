@@ -28,6 +28,13 @@ export interface DiffComment {
   readonly body: string;
   /** Its lines are no longer in the diff. */
   readonly stale?: boolean;
+  /** The range of changes it was written on (ADR-0084): `session` when absent. */
+  readonly scope?: string;
+}
+
+/** The scope a comment belongs to. */
+export function scopeOfComment(comment: DiffComment): string {
+  return comment.scope ?? 'session';
 }
 
 /** The numbered lines of one side of a file's diff. */
@@ -64,15 +71,18 @@ function placed(comment: DiffComment): DiffComment {
     end: comment.end,
     excerpt: comment.excerpt,
     body: comment.body,
+    ...(comment.scope === undefined ? {} : { scope: comment.scope }),
   };
 }
 
-/** `comments` placed on `files` as they are now. */
+/** `comments` of `scope` placed on `files` as they are now; other scopes' stay as they are. */
 export function reanchor(
   comments: readonly DiffComment[],
   files: readonly ChangesFile[],
+  scope = 'session',
 ): DiffComment[] {
   return comments.map((comment) => {
+    if (scopeOfComment(comment) !== scope) return comment;
     const file = files.find((f) => f.label === comment.path);
     if (file === undefined || comment.excerpt.length === 0) return { ...comment, stale: true };
     const lines = sideLines(file, comment.side);
@@ -84,12 +94,18 @@ export function reanchor(
   });
 }
 
-/** The message that sends `comments` (the ones still placed) to the agent. */
-export function formatComments(comments: readonly DiffComment[]): string {
+/**
+ * The message that sends `comments` (the ones still placed) to the agent; `heading` names the
+ * range of changes they were written on (ADR-0084).
+ */
+export function formatComments(
+  comments: readonly DiffComment[],
+  heading = 'Review comments on the changes:',
+): string {
   const live = comments.filter((c) => c.stale !== true);
   const byFile = new Map<string, DiffComment[]>();
   for (const c of live) byFile.set(c.path, [...(byFile.get(c.path) ?? []), c]);
-  const parts = ['Review comments on the changes:'];
+  const parts = [heading];
   for (const [path, list] of byFile) {
     parts.push('', `## ${path}`);
     for (const c of [...list].sort((a, b) => a.start - b.start)) {
@@ -140,7 +156,8 @@ function isComment(value: unknown): value is DiffComment {
     line(c.end) &&
     Array.isArray(c.excerpt) &&
     c.excerpt.every((l) => typeof l === 'string') &&
-    typeof c.body === 'string'
+    typeof c.body === 'string' &&
+    (c.scope === undefined || typeof c.scope === 'string')
   );
 }
 

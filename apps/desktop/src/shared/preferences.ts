@@ -46,6 +46,56 @@ export interface Preferences {
   readonly outputStyle: string;
   /** ADR-0082: the Agent Hosts' proxy: the system's (`auto`, the default) or `url`. */
   readonly proxy: { readonly mode: ProxyMode; readonly url: string };
+  /** ADR-0085: the Git panel's settings (the user's file; Core reads the same keys). */
+  readonly git: GitPreferences;
+}
+
+/** How a pull integrates the upstream (`config` follows `pull.rebase` and `pull.ff`). */
+export const PULL_MODES = ['config', 'merge', 'rebase', 'ffOnly'] as const;
+export type PullMode = (typeof PULL_MODES)[number];
+
+export interface GitPreferences {
+  /** Prefilled when a branch is created; `''` when unset. */
+  readonly branchPrefix: string;
+  /** Branch name patterns (`*` matches any run) that are never force-pushed. */
+  readonly protectedBranches: readonly string[];
+  readonly pullMode: PullMode;
+  readonly alwaysForcePush: boolean;
+  /** `''`: the interface language's default instructions. */
+  readonly commitInstructions: string;
+}
+
+/** Bounds of the Git settings (Core cuts the same values at its own limits). */
+export const GIT_LIMITS = {
+  prefix: 64,
+  patterns: 32,
+  pattern: 255,
+  instructions: 8 * 1024,
+} as const;
+
+export const DEFAULT_PROTECTED_BRANCHES: readonly string[] = ['main', 'master'];
+
+/** Whether `text` can start a branch name: no spaces, controls or characters Git refuses. */
+export function isBranchPrefix(text: string): boolean {
+  return (
+    text.length <= GIT_LIMITS.prefix &&
+    !text.startsWith('-') &&
+    !text.startsWith('/') &&
+    !text.includes('..') &&
+    !text.includes('//') &&
+    // eslint-disable-next-line no-control-regex -- control characters are what it refuses
+    !/[\s~^:?*[\\\x00-\x1f\x7f]/u.test(text)
+  );
+}
+
+/** Whether `text` is a protected-branch pattern. */
+export function isBranchPattern(text: string): boolean {
+  return (
+    text.length > 0 &&
+    text.length <= GIT_LIMITS.pattern &&
+    // eslint-disable-next-line no-control-regex -- control characters are what it refuses
+    !/[\s\x00-\x1f\x7f]/u.test(text)
+  );
 }
 
 /** How the Agent Hosts find their proxy (ADR-0082). */
@@ -108,6 +158,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   },
   outputStyle: '',
   proxy: { mode: 'auto', url: '' },
+  git: {
+    branchPrefix: '',
+    protectedBranches: DEFAULT_PROTECTED_BRANCHES,
+    pullMode: 'config',
+    alwaysForcePush: false,
+    commitInstructions: '',
+  },
 };
 
 /** A `provider/model` reference as the reviewer setting takes it (no alias). */
@@ -182,6 +239,30 @@ export function preferencesFrom(settings: unknown): Preferences {
       mode: oneOf(PROXY_MODES, isRecord(file.proxy) ? file.proxy.mode : undefined, 'auto'),
       url: isRecord(file.proxy) && typeof file.proxy.url === 'string' ? file.proxy.url : '',
     },
+    git: gitFrom(file.git),
+  };
+}
+
+function gitFrom(value: unknown): GitPreferences {
+  const git = isRecord(value) ? value : {};
+  const defaults = DEFAULT_PREFERENCES.git;
+  return {
+    branchPrefix:
+      typeof git.branchPrefix === 'string' && isBranchPrefix(git.branchPrefix)
+        ? git.branchPrefix
+        : defaults.branchPrefix,
+    protectedBranches: Array.isArray(git.protectedBranches)
+      ? git.protectedBranches
+          .filter((p): p is string => typeof p === 'string' && isBranchPattern(p.trim()))
+          .map((p) => p.trim())
+          .slice(0, GIT_LIMITS.patterns)
+      : defaults.protectedBranches,
+    pullMode: oneOf(PULL_MODES, git.pullMode, defaults.pullMode),
+    alwaysForcePush: git.alwaysForcePush === true,
+    commitInstructions:
+      typeof git.commitInstructions === 'string'
+        ? git.commitInstructions
+        : defaults.commitInstructions,
   };
 }
 
@@ -226,7 +307,16 @@ export type PreferenceChange =
   /** `value` `null` restores the default key. */
   | { readonly key: 'keybinding'; readonly command: string; readonly value: string | null }
   /** ADR-0082: `manual` with an address, or back to the system's proxy. */
-  | { readonly key: 'proxy'; readonly value: { readonly mode: ProxyMode; readonly url?: string } };
+  | { readonly key: 'proxy'; readonly value: { readonly mode: ProxyMode; readonly url?: string } }
+  /** ADR-0085: `''` removes the prefix. */
+  | { readonly key: 'git.branchPrefix'; readonly value: string }
+  /** `null` restores the default patterns. */
+  | { readonly key: 'git.protectedBranches'; readonly value: readonly string[] | null }
+  | { readonly key: 'git.pullMode'; readonly value: PullMode }
+  /** Turning it on needs the main process's native confirmation. */
+  | { readonly key: 'git.alwaysForcePush'; readonly value: boolean }
+  /** `null` (or the default text) restores the default instructions. */
+  | { readonly key: 'git.commitInstructions'; readonly value: string | null };
 
 /**
  * Validates a change received over IPC and returns the settings-file pointer and value to
@@ -304,6 +394,30 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
         ? { pointer: '/proxy', value: { mode: 'manual', url } }
         : undefined;
     }
+    case 'git.branchPrefix':
+      if (typeof value !== 'string' || !isBranchPrefix(value)) return undefined;
+      return { pointer: '/git/branchPrefix', value: value === '' ? null : value };
+    case 'git.protectedBranches': {
+      if (value === null) return { pointer: '/git/protectedBranches', value: null };
+      if (!Array.isArray(value) || value.length > GIT_LIMITS.patterns) return undefined;
+      const patterns = value.map((p: unknown) => (typeof p === 'string' ? p.trim() : ''));
+      return patterns.every(isBranchPattern)
+        ? { pointer: '/git/protectedBranches', value: [...new Set(patterns)] }
+        : undefined;
+    }
+    case 'git.pullMode':
+      return oneOf(PULL_MODES, value, 'config') === value
+        ? { pointer: '/git/pullMode', value: value === 'config' ? null : value }
+        : undefined;
+    case 'git.alwaysForcePush':
+      return typeof value === 'boolean'
+        ? { pointer: '/git/alwaysForcePush', value: value ? true : null }
+        : undefined;
+    case 'git.commitInstructions':
+      if (value === null) return { pointer: '/git/commitInstructions', value: null };
+      return typeof value === 'string' && value.length <= GIT_LIMITS.instructions
+        ? { pointer: '/git/commitInstructions', value: value.trim() === '' ? null : value }
+        : undefined;
     default:
       return undefined;
   }

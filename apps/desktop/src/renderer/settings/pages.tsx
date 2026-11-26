@@ -29,6 +29,7 @@ import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { SandboxPage } from './SandboxPage.js';
 import { ProxyPage } from './ProxyPage.js';
+import { GitPage } from './GitPage.js';
 import { ProvidersPage } from './ProvidersPage.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { registerSettingsPage } from './registry.js';
@@ -552,6 +553,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.proxy',
     order: 37,
     component: ProxyPage,
+  });
+  registerSettingsPage({
+    id: 'git',
+    title: 'settings.git',
+    order: 38,
+    component: GitPage,
   });
   registerSettingsPage({
     id: 'agents',

@@ -46,7 +46,8 @@ function useIconScheme(): IconScheme {
   return scheme;
 }
 
-function TreeTypeIcon({
+/** A file or folder's type icon from the bundled Material icon theme. */
+export function TreeTypeIcon({
   name,
   directory,
   open,
