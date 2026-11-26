@@ -17,6 +17,21 @@ impl Hub {
         Ok(serde_json::json!({ "port": port }))
     }
 
+    /// The desktop client runs `Browser` scripts from now on (ADR-0089).
+    pub fn attach_browser_client(&self) {
+        self.ctx.tool_io.attach_browser_client();
+    }
+
+    /// The client's answer to a run; whether a run was waiting for it.
+    pub fn answer_browser_run(&self, run_id: &str, answer_json: &str) -> Result<bool> {
+        let answer: piarc_protocol::browser::BrowserRunAnswer =
+            serde_json::from_str(answer_json).map_err(|_| Error::InvalidArgument {
+                field: "answer",
+                reason: "must be { output, images?, error?, blockedHosts? }".into(),
+            })?;
+        Ok(self.ctx.tool_io.answer_browser_run(run_id, answer))
+    }
+
     /// Stops a browser partition's proxy; `{ stopped }`.
     pub async fn stop_browser_proxy(&self, partition: String) -> Result<serde_json::Value> {
         let stopped = self.ctx.browser.stop(&partition).await;

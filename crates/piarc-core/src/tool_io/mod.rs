@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 mod auto_memory;
+mod browser;
 mod checkpoints;
 mod context;
 mod exec;
@@ -251,8 +252,10 @@ pub struct ToolIo {
     terminals: Option<crate::terminal::Terminals>,
     /// The vault, for search services' API keys (T38); none without Core's state.
     secrets: Option<crate::secrets::SecretsService>,
-    /// Notices for the user (`core/notices`).
+    /// Notices for the user (`core/notices`) and the browser's runs (`core/browser`).
     notices: Option<EventSender>,
+    /// `Browser` runs waiting for the desktop client (ADR-0089).
+    browser: Arc<browser::BrowserRuns>,
     /// Whether the sandbox failed to start in this Core (T39, R10).
     sandbox_health: Arc<sandbox::Health>,
 }
@@ -293,6 +296,7 @@ impl ToolIo {
             terminals: None,
             secrets: None,
             notices,
+            browser: Arc::default(),
             sandbox_health: Arc::default(),
         }
     }
@@ -336,6 +340,7 @@ impl ToolIo {
                     | "mcp/cancelElicitation"
                     | "context/settings"
                     | "web/fetch"
+                    | "browser/run"
                     | "web/search"
                     | "web/searchBackend"
             )
@@ -744,6 +749,7 @@ impl ToolIo {
             "mcp/elicit" => return self.elicit(parse(method, params)?, peer).await,
             "ui/ask" => return self.ask(parse(method, params)?, peer).await,
             "web/fetch" => return self.web_fetch(parse(method, params)?, peer).await,
+            "browser/run" => return self.browser_run(parse(method, params)?, peer).await,
             "web/search" => return self.web_search(parse(method, params)?, peer).await,
             "web/searchBackend" => return to_value(&self.search_backend().await),
             "context/settings" => return self.context_settings(&parse(method, params)?).await,

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "output": "",
+    "images": [
+      {
+        "mediaType": "image/png",
+        "data": "iVBORw0KGgo="
+      }
+    ]
+  }
+}

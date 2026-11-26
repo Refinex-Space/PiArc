@@ -479,6 +479,13 @@ impl WorkspaceActor {
                     // ADR-0082: providers and sign-in through the user's or the system's proxy.
                     let data = self.ctx.storage.dirs().data();
                     config.extra_env.extend(self.ctx.proxy.env(data));
+                    // ADR-0089: the `Browser` tool exists only with a desktop client and while
+                    // the user leaves it on.
+                    if self.ctx.tool_io.browser_offered() {
+                        config
+                            .capabilities
+                            .push(piarc_protocol::Capability::new("browser"));
+                    }
                     if let Some(tune) = &tune {
                         tune(config);
                     }

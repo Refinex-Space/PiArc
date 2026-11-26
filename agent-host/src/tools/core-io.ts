@@ -9,6 +9,9 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  BrowserImage,
+  BrowserRunResult,
+  BrowserScriptError,
   MemoryApplyParams,
   MemoryApplyResult,
   MemoryStatusResult,
@@ -581,6 +584,21 @@ export class CoreIo {
     }
   }
 
+  /**
+   * Runs an approved `Browser` call's script in the desktop app's browser (`browser/run`,
+   * ADR-0089). Core bounds the run (`timeoutMs`, cancel on interrupt); the request waits for it.
+   * Core's message for a refused run is written for the model.
+   */
+  async browserRun(
+    script: string,
+    timeoutMs: number | undefined,
+    origin: Origin,
+    signal?: AbortSignal,
+  ): Promise<BrowserRunResult> {
+    const params = { script, origin, ...(timeoutMs === undefined ? {} : { timeoutMs }) };
+    return this.#request('browser/run', params, parseBrowserRun, signal, null);
+  }
+
   /** What auto memory offers this session (`memory/status`, T47). */
   async memoryStatus(signal?: AbortSignal): Promise<MemoryStatusResult> {
     return this.#request('memory/status', {}, parseMemoryStatus, signal);
@@ -1066,6 +1084,64 @@ export function parseSearchBackend(v: unknown): WebSearchBackendResult | undefin
       ? { backend: { id: backend.id, name: backend.name } }
       : {}),
     ...(unavailable === 'notConfigured' || unavailable === 'noKey' ? { unavailable } : {}),
+  };
+}
+
+function parseBrowserImage(v: unknown): BrowserImage | undefined {
+  if (
+    !isRecord(v) ||
+    (v.mediaType !== 'image/png' && v.mediaType !== 'image/jpeg') ||
+    typeof v.data !== 'string' ||
+    typeof v.width !== 'number' ||
+    typeof v.height !== 'number'
+  ) {
+    return undefined;
+  }
+  return { mediaType: v.mediaType, data: v.data, width: v.width, height: v.height };
+}
+
+function parseScriptError(v: unknown): BrowserScriptError | undefined {
+  if (!isRecord(v) || typeof v.name !== 'string' || typeof v.message !== 'string') {
+    return undefined;
+  }
+  if (v.code != null && typeof v.code !== 'string') return undefined;
+  return {
+    name: v.name,
+    message: v.message,
+    ...(typeof v.code === 'string' ? { code: v.code } : {}),
+  };
+}
+
+/** A `browser/run` result, or undefined when it is malformed. */
+export function parseBrowserRun(v: unknown): BrowserRunResult | undefined {
+  if (!isRecord(v) || typeof v.output !== 'string') return undefined;
+  const images: BrowserImage[] = [];
+  if (v.images != null) {
+    if (!Array.isArray(v.images)) return undefined;
+    for (const item of v.images as unknown[]) {
+      const image = parseBrowserImage(item);
+      if (image === undefined) return undefined;
+      images.push(image);
+    }
+  }
+  const error = v.error == null ? undefined : parseScriptError(v.error);
+  if (v.error != null && error === undefined) return undefined;
+  const hosts: string[] = [];
+  if (v.blockedHosts != null) {
+    if (!Array.isArray(v.blockedHosts)) return undefined;
+    for (const host of v.blockedHosts as unknown[]) {
+      if (typeof host !== 'string') return undefined;
+      hosts.push(host);
+    }
+  }
+  if (v.spill != null && typeof v.spill !== 'string') return undefined;
+  return {
+    output: v.output,
+    ...(v.truncated === true ? { truncated: true } : {}),
+    ...(typeof v.spill === 'string' ? { spill: v.spill } : {}),
+    ...(images.length > 0 ? { images } : {}),
+    ...(error === undefined ? {} : { error }),
+    ...(hosts.length > 0 ? { blockedHosts: hosts } : {}),
   };
 }
 

@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "output": "{ taskSpaceId: 3, page: 'p1' }\n- heading \"Home\" [ref=1]",
+    "images": [
+      {
+        "mediaType": "image/png",
+        "data": "iVBORw0KGgo=",
+        "width": 1280,
+        "height": 800
+      }
+    ],
+    "blockedHosts": ["fonts.example.net"]
+  }
+}

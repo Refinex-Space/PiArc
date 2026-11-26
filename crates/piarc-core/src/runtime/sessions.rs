@@ -357,6 +357,27 @@ impl CoreRuntime {
         })
     }
 
+    /// The desktop client runs `Browser` scripts from now on (ADR-0089).
+    ///
+    /// # Errors
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`].
+    pub fn attach_browser_client(&self) -> Result<()> {
+        self.ensure_running()?;
+        self.services()?.sessions.attach_browser_client();
+        Ok(())
+    }
+
+    /// The desktop client's answer to a `Browser` run; whether a run was waiting for it.
+    ///
+    /// # Errors
+    /// [`Error::InvalidArgument`] for a malformed answer; as [`Self::attach_browser_client`].
+    pub fn answer_browser_run(&self, run_id: &str, answer_json: &str) -> Result<bool> {
+        self.ensure_running()?;
+        self.services()?
+            .sessions
+            .answer_browser_run(run_id, answer_json)
+    }
+
     /// Stops a browser partition's proxy (its data was cleared); answers `{ stopped }`.
     ///
     /// # Errors

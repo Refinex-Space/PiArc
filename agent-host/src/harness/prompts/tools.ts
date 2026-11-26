@@ -2,6 +2,7 @@
 // supply its own snippet and guidelines for the same canonical operation.
 import type { CanonicalTool, ToolPresentation } from '../../tools/profile.js';
 import { MEMORY_GUIDANCE } from './auto-memory.js';
+import { BROWSER_GUIDANCE } from './browser.js';
 
 export const TOOL_GUIDANCE = {
   Read: {
@@ -64,6 +65,7 @@ export const TOOL_GUIDANCE = {
       'Search for what may be newer than your knowledge; cite the result addresses you used.',
     ],
   },
+  Browser: BROWSER_GUIDANCE,
   KillShell: {
     snippet: 'KillShell: stop a background task of this session',
     guidelines: [

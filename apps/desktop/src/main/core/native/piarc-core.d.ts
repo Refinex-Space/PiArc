@@ -7,6 +7,16 @@ export declare class CoreRuntime {
    * `{ partition, localNames, deniedPorts }`. Answers `{ port }`.
    */
   browserProxy(requestJson: string): Promise<string>;
+  /**
+   * The app's main process runs `Browser` scripts from now on (ADR-0089): workspaces
+   * started afterwards offer the tool; runs arrive on `core/browser`.
+   */
+  attachBrowserClient(): void;
+  /**
+   * Answers run `runId` with JSON `{ output, images?, error?, blockedHosts? }`; false when
+   * the run already ended.
+   */
+  answerBrowserRun(runId: string, answerJson: string): boolean;
   /** Stops a browser partition's proxy. Answers `{ stopped }`. */
   stopBrowserProxy(partition: string): Promise<string>;
   /**

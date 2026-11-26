@@ -9,6 +9,7 @@
 // (Pi's tool implementations behind Core's I/O), not Claude Code's.
 
 import { MEMORY_DESCRIPTION } from '../harness/prompts/auto-memory.js';
+import { BROWSER_DESCRIPTION } from '../harness/prompts/browser.js';
 import { SKILL_DESCRIPTION } from '../harness/prompts/skills.js';
 import { AGENT_DESCRIPTION } from '../harness/prompts/subagents.js';
 import { TOOL_GUIDANCE } from '../harness/prompts/tools.js';
@@ -40,6 +41,9 @@ export const HOST_TOOLS = [
  * provider's own search or `web/search`). */
 export const WEB_TOOLS = ['WebFetch', 'WebSearch'] as const;
 
+/** The built-in browser (ADR-0089, `harness/browser.ts`): the desktop app runs the script. */
+export const BROWSER_TOOLS = ['Browser'] as const;
+
 /** The subagent tool (T31, `harness/subagents/agent-tool.ts`), after the host tools. */
 export const AGENT_TOOLS = ['Agent'] as const;
 
@@ -56,6 +60,7 @@ export const TASK_TOOLS = ['KillShell', 'Monitor'] as const;
 export const CANONICAL_TOOLS = [
   ...CORE_TOOLS,
   ...WEB_TOOLS,
+  ...BROWSER_TOOLS,
   ...TASK_TOOLS,
   ...HOST_TOOLS,
   ...AGENT_TOOLS,
@@ -223,6 +228,11 @@ export const DEFAULT_PROFILE: ToolProfile = {
       'not the pages: read a page with WebFetch when the excerpt is not enough. Name the ' +
       'addresses you relied on in your answer.',
     ...TOOL_GUIDANCE.WebSearch,
+  },
+  Browser: {
+    name: 'Browser',
+    description: BROWSER_DESCRIPTION,
+    ...TOOL_GUIDANCE.Browser,
   },
   KillShell: {
     name: 'KillShell',

@@ -158,6 +158,8 @@ async function buildFiles() {
       'PackageInstallRequest',
       'PackageInstallResult',
       'UsageReport',
+      'BrowserClientEvent',
+      'BrowserRunAnswer',
       'GitCall',
       'GitStatus',
       'GitProbe',

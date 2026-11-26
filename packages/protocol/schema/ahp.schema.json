@@ -1116,6 +1116,268 @@
       "required": ["options"],
       "type": "object"
     },
+    "BrowserClientEvent": {
+      "description": "What Core tells the desktop client on `core/browser` (Core API).",
+      "oneOf": [
+        {
+          "description": "Run a script in the session's browser and answer with `answerBrowserRun`.",
+          "properties": {
+            "agentType": {
+              "description": "The subagent's type when a subagent made the call.",
+              "type": ["string", "null"]
+            },
+            "mainSessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The main session: its Spaces show the run (a subagent's runs show under it)."
+            },
+            "runId": {
+              "description": "The run's id, to answer with.",
+              "type": "string"
+            },
+            "script": {
+              "description": "The script.",
+              "type": "string"
+            },
+            "sessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The session of the call (a subagent's own id for a subagent)."
+            },
+            "timeoutMs": {
+              "description": "How long it may run, in milliseconds.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "toolCallId": {
+              "description": "The `Browser` call.",
+              "type": "string"
+            },
+            "type": {
+              "const": "run",
+              "type": "string"
+            },
+            "workspace": {
+              "description": "The workspace (main checkout path); it picks the browser partition.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "runId",
+            "sessionId",
+            "mainSessionId",
+            "workspace",
+            "toolCallId",
+            "script",
+            "timeoutMs"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Stop a run (the turn was interrupted, the session closed or the run timed out).",
+          "properties": {
+            "runId": {
+              "description": "The run's id.",
+              "type": "string"
+            },
+            "type": {
+              "const": "cancel",
+              "type": "string"
+            }
+          },
+          "required": ["type", "runId"],
+          "type": "object"
+        }
+      ]
+    },
+    "BrowserImage": {
+      "description": "An image the script attached (`page.screenshot()`).",
+      "properties": {
+        "data": {
+          "description": "Base64 of the image bytes.",
+          "type": "string"
+        },
+        "height": {
+          "description": "Height in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mediaType": {
+          "description": "`image/png` or `image/jpeg`.",
+          "type": "string"
+        },
+        "width": {
+          "description": "Width in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["mediaType", "data", "width", "height"],
+      "type": "object"
+    },
+    "BrowserRunAnswer": {
+      "description": "How the desktop client answers a run (Core API).",
+      "properties": {
+        "blockedHosts": {
+          "description": "Hosts the browser kept the page from reaching during the run.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserScriptError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The error the script ended with."
+        },
+        "images": {
+          "description": "Images the script attached.",
+          "items": {
+            "$ref": "#/$defs/BrowserImage"
+          },
+          "type": ["array", "null"]
+        },
+        "output": {
+          "description": "What the script printed, whole.",
+          "type": "string"
+        }
+      },
+      "required": ["output"],
+      "type": "object"
+    },
+    "BrowserRunParams": {
+      "description": "Parameters of `browser/run`.",
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/ToolOrigin",
+          "description": "The approved `Browser` call; its input's `script` must equal `script`."
+        },
+        "script": {
+          "description": "The JavaScript to run with the browser SDK's helpers in scope.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session of the call."
+        },
+        "timeoutMs": {
+          "description": "How long the script may run, in milliseconds (default 120,000, at most 600,000).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["sessionId", "origin", "script"],
+      "type": "object"
+    },
+    "BrowserRunRequest": {
+      "description": "Request for `browser/run`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "browser/run",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/BrowserRunParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "BrowserRunResponse": {
+      "description": "Successful response to `browser/run`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/BrowserRunResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "BrowserRunResult": {
+      "description": "Result of `browser/run`.",
+      "properties": {
+        "blockedHosts": {
+          "description": "Hosts the page tried to reach that the agent may not (the user can allow them).",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserScriptError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The error the script ended with, when it did not finish."
+        },
+        "images": {
+          "description": "Images attached by the script, in order.",
+          "items": {
+            "$ref": "#/$defs/BrowserImage"
+          },
+          "type": ["array", "null"]
+        },
+        "output": {
+          "description": "What the script printed, cut to the inline budget.",
+          "type": "string"
+        },
+        "spill": {
+          "description": "The file with the whole output (home-relative paths start with `~`).",
+          "type": ["string", "null"]
+        },
+        "truncated": {
+          "description": "The output was longer than the budget; the whole text is in `spill`.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "required": ["output"],
+      "type": "object"
+    },
+    "BrowserScriptError": {
+      "description": "The error the script ended with.",
+      "properties": {
+        "code": {
+          "description": "The SDK's stable code (`EGO_TASK_SPACE_USER_IN_CONTROL`, `PIARC_SITE_REFUSED`).",
+          "type": ["string", "null"]
+        },
+        "message": {
+          "description": "Its message.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The error's name (`TypeError`, `SyntaxError`, `EgoError`).",
+          "type": "string"
+        }
+      },
+      "required": ["name", "message"],
+      "type": "object"
+    },
     "Capability": {
       "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
       "type": "string"
@@ -19778,6 +20040,12 @@
     },
     {
       "$ref": "#/$defs/WebFetchResponse"
+    },
+    {
+      "$ref": "#/$defs/BrowserRunRequest"
+    },
+    {
+      "$ref": "#/$defs/BrowserRunResponse"
     },
     {
       "$ref": "#/$defs/WebSearchRequest"

@@ -48,6 +48,7 @@ import { createTodoWriteTool, currentTodos, todosOf, todoWatch } from './todos.j
 import type { AuxiliaryModel } from './auxiliary.js';
 import { createAgentTool, type AgentToolHost } from './subagents/agent-tool.js';
 import { createKillShellTool, createMonitorTool } from './task-tools.js';
+import { createBrowserTool } from './browser.js';
 import { createWebFetchTool } from './web-fetch.js';
 import { createWebSearchTool } from './web-search.js';
 import type { SessionSkills } from './skills/session-skills.js';
@@ -68,6 +69,8 @@ export interface HostToolCapabilities {
   readonly webFetch?: boolean;
   /** `webSearch` (T38): Core answers `web/searchBackend` and `web/search`. */
   readonly webSearch?: boolean;
+  /** `browser` (ADR-0089): a desktop app runs `Browser` scripts (`browser/run`). */
+  readonly browser?: boolean;
   /** `subagents` (T31): the `Agent` tool and child sessions Core registers. */
   readonly subagents?: boolean;
   /** `backgroundTasks` (T32): background commands, `KillShell` and `Monitor`. */
@@ -294,6 +297,9 @@ export class SessionHarness {
       createSuggestNextStepsTool(profile.SuggestNextSteps),
       ...(core?.webFetch === true && this.#o.io !== undefined && this.#o.auxiliary !== undefined
         ? [createWebFetchTool(profile.WebFetch, this.#o.io, this.#o.auxiliary)]
+        : []),
+      ...(core?.browser === true && this.#o.io !== undefined
+        ? [createBrowserTool(profile.Browser, this.#o.io)]
         : []),
       ...(this.webSearchOffered && this.#o.io !== undefined && this.#o.auxiliary !== undefined
         ? [

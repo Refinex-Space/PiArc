@@ -69,8 +69,8 @@ pub(super) use waits::{post_local_card, withdraw_local_card};
 pub(crate) mod settings_view;
 use grants::Grant;
 pub(super) use grants::{
-    FilePermit, claim_command, claim_fetch, claim_memory, claim_monitor, claim_search, claim_skill,
-    file_permit,
+    FilePermit, claim_browser, claim_command, claim_fetch, claim_memory, claim_monitor,
+    claim_search, claim_skill, file_permit,
 };
 
 /// `path` without `.` and `..` components (no file system access).

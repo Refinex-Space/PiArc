@@ -15,6 +15,8 @@ export type ProtocolValue =
   | PackageInstallRequest
   | PackageInstallResult
   | UsageReport
+  | BrowserClientEvent
+  | BrowserRunAnswer
   | GitCall
   | GitStatus
   | GitProbe
@@ -202,6 +204,8 @@ export type AhpMessage =
   | FsForgetReadsResponse
   | WebFetchRequest
   | WebFetchResponse
+  | BrowserRunRequest
+  | BrowserRunResponse
   | WebSearchRequest
   | WebSearchResponse
   | WebSearchBackendRequest
@@ -1256,6 +1260,52 @@ export type PackageSourceKind = 'directory' | 'git' | 'npm';
  * Where a model's price comes from.
  */
 export type PriceSource = 'catalog' | 'user' | 'unknown';
+/**
+ * What Core tells the desktop client on `core/browser` (Core API).
+ */
+export type BrowserClientEvent =
+  | {
+      /**
+       * The subagent's type when a subagent made the call.
+       */
+      agentType?: string | null;
+      /**
+       * The main session: its Spaces show the run (a subagent's runs show under it).
+       */
+      mainSessionId: SessionId;
+      /**
+       * The run's id, to answer with.
+       */
+      runId: string;
+      /**
+       * The script.
+       */
+      script: string;
+      /**
+       * The session of the call (a subagent's own id for a subagent).
+       */
+      sessionId: SessionId;
+      /**
+       * How long it may run, in milliseconds.
+       */
+      timeoutMs: number;
+      /**
+       * The `Browser` call.
+       */
+      toolCallId: string;
+      type: 'run';
+      /**
+       * The workspace (main checkout path); it picks the browser partition.
+       */
+      workspace: string;
+    }
+  | {
+      /**
+       * The run's id.
+       */
+      runId: string;
+      type: 'cancel';
+    };
 /**
  * A request of `gitRequest`.
  */
@@ -7802,6 +7852,112 @@ export interface WebRedirect {
   url: string;
 }
 /**
+ * Request for `browser/run`.
+ */
+export interface BrowserRunRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'browser/run';
+  params: BrowserRunParams;
+}
+/**
+ * Parameters of `browser/run`.
+ */
+export interface BrowserRunParams {
+  /**
+   * The approved `Browser` call; its input's `script` must equal `script`.
+   */
+  origin: ToolOrigin;
+  /**
+   * The JavaScript to run with the browser SDK's helpers in scope.
+   */
+  script: string;
+  /**
+   * The session of the call.
+   */
+  sessionId: SessionId;
+  /**
+   * How long the script may run, in milliseconds (default 120,000, at most 600,000).
+   */
+  timeoutMs?: number | null;
+}
+/**
+ * Successful response to `browser/run`.
+ */
+export interface BrowserRunResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: BrowserRunResult;
+}
+/**
+ * Result of `browser/run`.
+ */
+export interface BrowserRunResult {
+  /**
+   * Hosts the page tried to reach that the agent may not (the user can allow them).
+   */
+  blockedHosts?: string[] | null;
+  /**
+   * The error the script ended with, when it did not finish.
+   */
+  error?: BrowserScriptError | null;
+  /**
+   * Images attached by the script, in order.
+   */
+  images?: BrowserImage[] | null;
+  /**
+   * What the script printed, cut to the inline budget.
+   */
+  output: string;
+  /**
+   * The file with the whole output (home-relative paths start with `~`).
+   */
+  spill?: string | null;
+  /**
+   * The output was longer than the budget; the whole text is in `spill`.
+   */
+  truncated?: boolean | null;
+}
+/**
+ * The error the script ended with.
+ */
+export interface BrowserScriptError {
+  /**
+   * The SDK's stable code (`EGO_TASK_SPACE_USER_IN_CONTROL`, `PIARC_SITE_REFUSED`).
+   */
+  code?: string | null;
+  /**
+   * Its message.
+   */
+  message: string;
+  /**
+   * The error's name (`TypeError`, `SyntaxError`, `EgoError`).
+   */
+  name: string;
+}
+/**
+ * An image the script attached (`page.screenshot()`).
+ */
+export interface BrowserImage {
+  /**
+   * Base64 of the image bytes.
+   */
+  data: string;
+  /**
+   * Height in pixels.
+   */
+  height: number;
+  /**
+   * `image/png` or `image/jpeg`.
+   */
+  mediaType: string;
+  /**
+   * Width in pixels.
+   */
+  width: number;
+}
+/**
  * Request for `web/search`.
  */
 export interface WebSearchRequest {
@@ -10556,6 +10712,27 @@ export interface SubagentUsage {
    * The tokens.
    */
   tokens: UsageTokens;
+}
+/**
+ * How the desktop client answers a run (Core API).
+ */
+export interface BrowserRunAnswer {
+  /**
+   * Hosts the browser kept the page from reaching during the run.
+   */
+  blockedHosts?: string[] | null;
+  /**
+   * The error the script ended with.
+   */
+  error?: BrowserScriptError | null;
+  /**
+   * Images the script attached.
+   */
+  images?: BrowserImage[] | null;
+  /**
+   * What the script printed, whole.
+   */
+  output: string;
 }
 /**
  * One call of `gitRequest`: an optional operation id (for progress and cancel) and the

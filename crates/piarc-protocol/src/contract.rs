@@ -15,6 +15,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
+use crate::browser::BrowserRun;
 use crate::checkpoint::{SessionBranches, SessionRewind, SessionSwitchBranch};
 use crate::context::{
     ContextSettingsGet, FsChanges, FsForgetReads, SessionGetContextUsage, SessionRemind,
@@ -338,6 +339,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<FsForgetReads>("fs/forgetReads/result"),
     request::<WebFetch>(WebFetch::NAME),
     response::<WebFetch>("web/fetch/result"),
+    request::<BrowserRun>(BrowserRun::NAME),
+    response::<BrowserRun>("browser/run/result"),
     request::<WebSearch>(WebSearch::NAME),
     response::<WebSearch>("web/search/result"),
     request::<WebSearchBackend>(WebSearchBackend::NAME),

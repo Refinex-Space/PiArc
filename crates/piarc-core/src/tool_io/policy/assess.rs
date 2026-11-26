@@ -434,9 +434,11 @@ pub(super) fn other_call(
         // `ToolSearch` (T36) only loads tool definitions into the conversation, `Skill` (T37)
         // a skill's instructions; `Skill(<name>)` deny and ask rules still apply. `Memory`
         // (T47) writes only the repository's auto memory in PiArc's data directory, through
-        // Core, audited; `Memory` deny and ask rules still apply.
+        // Core, audited; `Memory` deny and ask rules still apply. `Browser` (ADR-0089) runs a
+        // script that can only drive the browser: the hosts, ports and files it reaches are
+        // decided while it runs; `Browser` deny and ask rules still apply.
         "TodoWrite" | "EnterPlanMode" | "SuggestNextSteps" | "AskUserQuestion" | "Agent"
-        | "KillShell" | "ToolSearch" | "Skill" | "Memory" => {
+        | "KillShell" | "ToolSearch" | "Skill" | "Memory" | "Browser" => {
             ladder.read_only = true;
             return Assessment::new(ladder, Vec::new());
         }

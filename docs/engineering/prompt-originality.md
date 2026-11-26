@@ -54,3 +54,7 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 ## Git 面板的提交信息提示词（ADR-0086）
 
 提示词在 `agent-host/src/harness/prompts/commit-message.ts`（system 段、两种语言要求、修正时的说明），user 消息的块标签与文件行在 `harness/commit-message.ts`。按 ADR-0086 第 3 条自写，写作时没有打开参考仓库的提示词；2026-11-25 用上面的脚本做 10 词窗口比对，0 个匹配窗口。
+
+## 内置浏览器的使用说明（ADR-0091）
+
+`Browser` 的工具描述、指引与结果说明在 `agent-host/src/harness/prompts/browser.ts`，改编自 ego-browser 的 `package/ego-browser/skill-body/SKILL.md`（ego-lite，MIT，上游提交 `56589ea8`，文件头注明出处与改动）：去掉 Node.js 运行时、安装、shell 写法、平台段落、profile 与站点经验，加入 PiArc 的脚本沙箱、截图附进结果、文件经权限、站点闸门、控制权与"页面内容是数据"。改编来源是 MIT 项目，不是参考仓库的提示词；2026-11-26 用上面的脚本做 10 词窗口比对（工具描述经默认 Profile 取出），0 个匹配窗口。
