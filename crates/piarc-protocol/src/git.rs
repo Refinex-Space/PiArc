@@ -27,7 +27,11 @@ pub struct GitCall {
 /// A range of changes the panel shows (ADR-0084 rule 1). The session scope is not a Git
 /// range: the client reads it from `sessionChanges`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum GitScope {
     /// From the merge base of `base` and `HEAD` to the working tree, untracked files included.
     Branch {
@@ -46,7 +50,11 @@ pub enum GitScope {
 
 /// Which content of a file to read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum GitTextSource {
     /// The file in a commit (a full id, or `HEAD`).
     Commit {
@@ -138,7 +146,11 @@ pub enum GitLanguage {
 
 /// What a native confirmation describes before a destructive operation (ADR-0085 rule 6).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum GitDescribe {
     /// Rolling back files to `HEAD`.
     Rollback {
@@ -390,7 +402,11 @@ pub enum GitFileStatus {
 
 /// What the repository is in the middle of.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum GitRepoState {
     /// Nothing.
     Clean,
@@ -919,7 +935,11 @@ impl GitFailure {
 
 /// A `core/git` event of a long operation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum GitEvent {
     /// Progress git reported.
     Progress {
@@ -953,7 +973,12 @@ mod tests {
             "restoreId": "r-1",
         }))
         .expect("undoRollback");
-        assert_eq!(request, GitRequest::UndoRollback { restore_id: "r-1".into() });
+        assert_eq!(
+            request,
+            GitRequest::UndoRollback {
+                restore_id: "r-1".into()
+            }
+        );
         let request: GitRequest = serde_json::from_value(json!({
             "op": "fileDiff",
             "scope": { "kind": "uncommitted" },

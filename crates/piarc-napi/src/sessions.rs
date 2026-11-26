@@ -789,7 +789,9 @@ impl CoreRuntime {
     /// Cancels Git panel operation `opId`; whether one was running.
     #[napi(catch_unwind)]
     pub fn cancel_git(&self, env: Env, op_id: String) -> napi::Result<bool> {
-        boundary::call(&env, "CoreRuntime.cancelGit", || self.core.cancel_git(&op_id))
+        boundary::call(&env, "CoreRuntime.cancelGit", || {
+            self.core.cancel_git(&op_id)
+        })
     }
 
     /// Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most

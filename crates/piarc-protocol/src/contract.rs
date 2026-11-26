@@ -49,9 +49,9 @@ use crate::secrets::{
     SecretsSet, SecretsUnlock,
 };
 use crate::session::{
-    PolicyRecover, SessionAbort, SessionClose, SessionCompact, SessionCreate,
+    PolicyRecover, SessionAbort, SessionClose, SessionCommitMessage, SessionCompact, SessionCreate,
     SessionEventNotification, SessionFollowUp, SessionFork, SessionPrompt, SessionResume,
-    SessionCommitMessage, SessionSetPermissionMode, SessionSteer, SideChatAsk, SideChatControl,
+    SessionSetPermissionMode, SessionSteer, SideChatAsk, SideChatControl,
 };
 use crate::skills::{
     ResourcesListCommands, ResourcesListSkills, ResourcesReload, SkillsInvoke, SkillsListMethod,

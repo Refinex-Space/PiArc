@@ -7,8 +7,7 @@ use std::path::{Path, PathBuf};
 use piarc_config::schema::Severity;
 use piarc_config::{
     IgnoreReason, LayerSpec, LayerStatus, LayerTable, Scope, Settings, Source, TrustState, ids,
-    precedence,
-    write_value,
+    precedence, write_value,
 };
 use serde_json::json;
 
@@ -571,9 +570,15 @@ fn git_settings_apply_from_the_user_file_only() {
     );
     let settings = Settings::load(f.table(), TrustState::Trusted);
     assert!(settings.issues().is_empty(), "{:?}", settings.issues());
-    assert_eq!(settings.user_value("/git/alwaysForcePush"), Some(&json!(false)));
+    assert_eq!(
+        settings.user_value("/git/alwaysForcePush"),
+        Some(&json!(false))
+    );
     assert_eq!(settings.get("/git/alwaysForcePush"), Some(&json!(false)));
-    assert_eq!(settings.get("/git/protectedBranches"), Some(&json!(["main"])));
+    assert_eq!(
+        settings.get("/git/protectedBranches"),
+        Some(&json!(["main"]))
+    );
     let report = settings.diagnostics();
     let project = report
         .iter()

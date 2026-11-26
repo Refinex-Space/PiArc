@@ -38,7 +38,11 @@ fn run_git(dir: &Path, root: &Path, args: &[&str]) {
         .args(args)
         .output()
         .expect("git");
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 /// A repository in the workspace: one commit, then a staged change, a staged `.env` and an
@@ -55,7 +59,11 @@ fn repository(env: &Env) {
     std::fs::write(env.ws.join("login.ts"), "export const a = 1;\n").expect("file");
     run_git(&env.ws, &env.root, &["add", "login.ts"]);
     run_git(&env.ws, &env.root, &["commit", "-qm", "feat: start"]);
-    std::fs::write(env.ws.join("login.ts"), "export const a = 2;\nexport const b = 3;\n").expect("edit");
+    std::fs::write(
+        env.ws.join("login.ts"),
+        "export const a = 2;\nexport const b = 3;\n",
+    )
+    .expect("edit");
     std::fs::write(env.ws.join(".env"), "API_TOKEN=do-not-send-this-value\n").expect("env");
     run_git(&env.ws, &env.root, &["add", "login.ts", ".env"]);
     std::fs::write(env.ws.join("notes 笔记.md"), "draft\n").expect("untracked");
@@ -75,7 +83,13 @@ async fn open(core: &CoreRuntime, env: &Env) -> String {
 }
 
 async fn trust(core: &CoreRuntime, ws: &Path) {
-    let version = core.trust().expect("trust").view(ws).await.expect("view").version;
+    let version = core
+        .trust()
+        .expect("trust")
+        .view(ws)
+        .await
+        .expect("view")
+        .version;
     let (tx, rx) = tokio::sync::oneshot::channel();
     core.trust_view(ws.to_path_buf(), Some((true, version)), move |result| {
         let _ = tx.send(result.map(|view| view.trusted));
@@ -101,13 +115,26 @@ async fn status_reads_and_writes_wait_for_trust_and_idle_sessions() {
         .iter()
         .filter_map(|f| f["path"].as_str())
         .collect();
-    assert!(paths.contains(&"login.ts") && paths.contains(&"notes 笔记.md"), "{paths:?}");
+    assert!(
+        paths.contains(&"login.ts") && paths.contains(&"notes 笔记.md"),
+        "{paths:?}"
+    );
 
-    let refused = git(&core, &id, json!({ "op": "stage", "paths": ["notes 笔记.md"] })).await;
+    let refused = git(
+        &core,
+        &id,
+        json!({ "op": "stage", "paths": ["notes 笔记.md"] }),
+    )
+    .await;
     assert_eq!(refused["failure"]["kind"], "untrusted", "{refused}");
 
     trust(&core, &env.ws).await;
-    let staged = git(&core, &id, json!({ "op": "stage", "paths": ["notes 笔记.md"] })).await;
+    let staged = git(
+        &core,
+        &id,
+        json!({ "op": "stage", "paths": ["notes 笔记.md"] }),
+    )
+    .await;
     assert!(staged.get("result").is_some(), "{staged}");
 
     // A running turn in the same root blocks operations that rewrite files, not staging.
@@ -119,10 +146,18 @@ async fn status_reads_and_writes_wait_for_trust_and_idle_sessions() {
         .await;
     let busy = git(&core, &id, json!({ "op": "checkout", "target": "main" })).await;
     assert_eq!(busy["failure"]["kind"], "sessionBusy", "{busy}");
-    let unstaged = git(&core, &id, json!({ "op": "unstage", "paths": ["notes 笔记.md"] })).await;
+    let unstaged = git(
+        &core,
+        &id,
+        json!({ "op": "unstage", "paths": ["notes 笔记.md"] }),
+    )
+    .await;
     assert!(unstaged.get("result").is_some(), "{unstaged}");
     std::fs::write(env.ws.join("go"), "").expect("go");
-    assert_eq!(events.turn_completed(&id, &turn).await["status"], "completed");
+    assert_eq!(
+        events.turn_completed(&id, &turn).await["status"],
+        "completed"
+    );
     shutdown(core).await;
 }
 
@@ -156,8 +191,14 @@ async fn commit_messages_follow_the_language_and_leave_secrets_out() {
     assert!(body.contains("Use Conventional Commits."), "{body}");
     assert!(body.contains("export const b = 3;"), "{body}");
     assert!(body.contains("[content withheld: sensitive]"), "{body}");
-    assert!(!body.contains("do-not-send-this-value"), "the .env content reached the model");
-    assert!(!body.contains("notes 笔记.md"), "an unstaged file reached the model");
+    assert!(
+        !body.contains("do-not-send-this-value"),
+        "the .env content reached the model"
+    );
+    assert!(
+        !body.contains("notes 笔记.md"),
+        "an unstaged file reached the model"
+    );
     shutdown(core).await;
 }
 
@@ -165,7 +206,11 @@ async fn commit_messages_follow_the_language_and_leave_secrets_out() {
 fn remote(env: &Env) -> std::path::PathBuf {
     let bare = env.root.join("remote 远端.git");
     let path = bare.to_str().expect("utf-8");
-    run_git(&env.root, &env.root, &["init", "-q", "--bare", "-b", "main", path]);
+    run_git(
+        &env.root,
+        &env.root,
+        &["init", "-q", "--bare", "-b", "main", path],
+    );
     run_git(&env.ws, &env.root, &["remote", "add", "origin", path]);
     run_git(&env.ws, &env.root, &["push", "-q", "-u", "origin", "main"]);
     bare
@@ -206,23 +251,44 @@ async fn protected_pushes_stay_plain_git_paths_are_refused_and_undo_is_whole() {
     // `main` is protected by default: the push goes out without a lease instead of failing.
     let pushed = git(&core, &id, json!({ "op": "push" })).await;
     assert!(pushed.get("result").is_some(), "{pushed}");
-    assert_eq!(head_of(&bare, &env.root, "main"), head_of(&env.ws, &env.root, "HEAD"));
+    assert_eq!(
+        head_of(&bare, &env.root, "main"),
+        head_of(&env.ws, &env.root, "HEAD")
+    );
     // An explicit force push of a protected branch is still refused.
     let forced = git(&core, &id, json!({ "op": "push", "force": true })).await;
     assert_eq!(forced["failure"]["kind"], "protected", "{forced}");
 
     let config = env.ws.join(".git").join("config");
-    let refused = git(&core, &id, json!({ "op": "rollback", "paths": [".git/config"] })).await;
+    let refused = git(
+        &core,
+        &id,
+        json!({ "op": "rollback", "paths": [".git/config"] }),
+    )
+    .await;
     assert_eq!(refused["failure"]["kind"], "invalid", "{refused}");
     assert!(config.exists(), "the rollback deleted .git/config");
 
     std::fs::write(env.ws.join("login.ts"), "changed before rollback\n").expect("login");
     std::fs::write(env.ws.join(".env"), "API_TOKEN=changed\n").expect("env");
-    let rolled = git(&core, &id, json!({ "op": "rollback", "paths": ["login.ts", ".env"] })).await;
-    let restore = rolled["result"]["restoreId"].as_str().expect("restore id").to_owned();
+    let rolled = git(
+        &core,
+        &id,
+        json!({ "op": "rollback", "paths": ["login.ts", ".env"] }),
+    )
+    .await;
+    let restore = rolled["result"]["restoreId"]
+        .as_str()
+        .expect("restore id")
+        .to_owned();
     let at_head = std::fs::read_to_string(env.ws.join("login.ts")).expect("read");
     std::fs::write(env.ws.join(".env"), "edited after the rollback\n").expect("edit");
-    let undo = git(&core, &id, json!({ "op": "undoRollback", "restoreId": restore })).await;
+    let undo = git(
+        &core,
+        &id,
+        json!({ "op": "undoRollback", "restoreId": restore }),
+    )
+    .await;
     assert_eq!(undo["failure"]["kind"], "stale", "{undo}");
     assert_eq!(undo["failure"]["paths"], json!([".env"]), "{undo}");
     assert_eq!(
@@ -232,7 +298,12 @@ async fn protected_pushes_stay_plain_git_paths_are_refused_and_undo_is_whole() {
     );
     // Put the file back as the rollback left it: the same undo works now.
     run_git(&env.ws, &env.root, &["checkout", "--", ".env"]);
-    let undone = git(&core, &id, json!({ "op": "undoRollback", "restoreId": restore })).await;
+    let undone = git(
+        &core,
+        &id,
+        json!({ "op": "undoRollback", "restoreId": restore }),
+    )
+    .await;
     assert!(undone.get("result").is_some(), "{undone}");
     assert_eq!(
         std::fs::read_to_string(env.ws.join("login.ts")).expect("read"),

@@ -2330,7 +2330,8 @@ export const en = {
   'gitSettings.language.zh': 'Simplified Chinese',
   'gitSettings.protectedPlaceholder': 'e.g. release/*',
   'git.scope.head': 'HEAD',
-  'git.commit.fallbackModel': "The auxiliary model was unavailable, so the session's model {model} wrote this.",
+  'git.commit.fallbackModel':
+    "The auxiliary model was unavailable, so the session's model {model} wrote this.",
 } as const;
 
 export type MessageId = keyof typeof en;

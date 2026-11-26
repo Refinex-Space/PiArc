@@ -225,8 +225,10 @@ pub(crate) async fn start(
     match accept_hello(config, epoch, &hello) {
         Ok((params, welcome)) => {
             link.side_chat_enabled = welcome.enabled.iter().any(|c| c.as_str() == "sideChat");
-            link.commit_message_enabled =
-                welcome.enabled.iter().any(|c| c.as_str() == "commitMessage");
+            link.commit_message_enabled = welcome
+                .enabled
+                .iter()
+                .any(|c| c.as_str() == "commitMessage");
             link.models_enabled = welcome.enabled.iter().any(|c| c.as_str() == "models");
             let frame = encode(&ResultMessage::<HostHello>::new(
                 hello.id.clone(),
