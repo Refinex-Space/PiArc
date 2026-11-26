@@ -16,7 +16,7 @@
 | `agent-runtime.ts` | 装配智能体侧：Space、闸门、绑定、脚本宿主、Core 桥；`main.ts` 注册宿主 IPC 与 `core/browser` 路由 |
 | `agent-bridge.ts` | 启动时 `attachBrowserClient`；`core/browser` 的 `run` 交给脚本宿主、答复经 `answerBrowserRun`，`cancel` 结束宿主 |
 | `script-host.ts`、`host-session.ts` | 每次调用一个新的沙箱宿主（预热一个），超时与崩溃结束运行并带回已打印的输出，用户可停止；宿主分区只服务自己的页面，其余请求全部取消 |
-| `host-bindings.ts` | 宿主每个绑定请求的校验与分派（脚本能直接调用 `window.piarcBrowserHost`，按不可信输入处理）；截图附件的数量与大小上限 |
+| `host-bindings.ts` | 宿主每个绑定请求的校验与分派（脚本能直接调用 `window.piarcBrowserHost`，按不可信输入处理）；截图附件经 `nativeImage` 解码后按真实尺寸缩到长边 1,568 px，超过 3.75 MiB 降质为 JPEG（`fitImage`，B2.6.7）；被拒的 CDP 方法与页面被拒的权限记进本次调用（审计行、工具结果） |
 | `agent-spaces.ts` | ego 语义的 Space：数字 id、`agent` / `agentDelegatedToUser` / `user`、每会话至多 4 个、用户自己的标签只报数量；用户接管、交还；页面账本（按会话与 id，与 Space 的存续无关） |
 | `cdp-proxy.ts`、`cdp-policy.ts` | 给 SDK 的浏览器级 CDP：只答本 Space 的 `Target.*` 与 `Browser.getVersion`，页面命令经允许名单（B2.6.5）后转给标签的 debugger，OOPIF 子会话映射为虚拟 id |
 | `agent-gate.ts` | 请求闸门（B2.6.1–B2.6.4）：智能体控制的 Space 里每个请求按会话与本次调用的授权、本会话的本机端口（用户打开过的、会话进程树监听的、启动配置声明的）判断，文档与框架问 Core（站点卡），其余拦截并记入本次调用的结果 |

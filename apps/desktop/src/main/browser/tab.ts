@@ -133,6 +133,9 @@ export class BrowserTab {
       },
     });
     view.setBackgroundColor('#00000000');
+    // WebRTC only through the proxy: no UDP around Core's proxy and the request gate
+    // (ADR-0088 rule 5, B1.7.3).
+    view.webContents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
     this.view = view;
     this.crashed = false;
     this.#emulationApplied = undefined;

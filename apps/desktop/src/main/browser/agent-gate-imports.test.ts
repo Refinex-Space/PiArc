@@ -14,10 +14,12 @@ function gate(imported: (sessionId: string, host: string) => Promise<boolean>) {
     toolCallId: 'call-1',
     allowedHosts: new Set(),
     blockedHosts: new Set(),
+    visitedHosts: new Set(),
   };
   const deps: GateDeps = {
     pageOf: (id) => (id === 1 ? AGENT : undefined),
     agentPagesOn: () => [],
+    agentPages: () => [],
     runFor: () => run,
     allowedPorts: () => new Set(),
     askCore: (json) => {

@@ -1,13 +1,15 @@
 // Workspace files in the built-in browser (B1.6): `piarc-browse://<token>/<path>`, where the
 // token names one session and the path is relative to its files root. Bytes come from Core's
 // project files (handle reads, ADR-0036); `file://` never loads in a guest. Paths with `..` or
-// a segment starting with a dot (`.env`, `.git`, `.ssh`) are refused: a page, or the agent
-// driving one, never reads them through the browser.
+// a segment starting with a dot (`.env`, `.git`, `.ssh`) are refused, and Core refuses what the
+// session's `Read(…)` deny rules cover (THR-16): a page, or the agent driving one, never reads
+// them through the browser.
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 
 import type { CustomScheme, Session } from 'electron';
 
+import { coreErrorKind } from '../../shared/ipc-error.js';
 import { projectChunk } from '../core/project-file-stream.js';
 import type { CoreRuntime } from '../core/native/piarc-core.js';
 import { WORKSPACE_SCHEME } from './request-rules.js';
@@ -172,7 +174,7 @@ export class WorkspaceFiles {
       return new Response('Not available in the browser', { status: 403 });
     }
     try {
-      const first = await projectChunk(this.core, sessionId, relative, 0, CHUNK);
+      const first = await projectChunk(this.core, sessionId, relative, 0, CHUNK, undefined, true);
       if (first.size > MAX_FILE_BYTES) return new Response('File too large', { status: 413 });
       const parts = [first.bytes];
       for (let offset = first.bytes.length; offset < first.size; offset += CHUNK) {
@@ -183,6 +185,7 @@ export class WorkspaceFiles {
           offset,
           Math.min(CHUNK, first.size - offset),
           first.revision,
+          true,
         );
         parts.push(next.bytes);
       }
@@ -197,8 +200,11 @@ export class WorkspaceFiles {
           'x-content-type-options': 'nosniff',
         },
       });
-    } catch {
-      return new Response('Not found', { status: 404 });
+    } catch (error) {
+      // A `Read(…)` deny rule (THR-16) is a refusal, anything else a missing file.
+      return coreErrorKind(error) === 'permissionDenied'
+        ? new Response('Not available in the browser', { status: 403 })
+        : new Response('Not found', { status: 404 });
     }
   }
 }

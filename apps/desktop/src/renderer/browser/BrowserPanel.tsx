@@ -350,7 +350,8 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
           }}
         />
       )}
-      {deviceOn && tab !== undefined && (
+      {/* The agent's emulation shows the bar with its badge and Reset (B1.4.2). */}
+      {tab !== undefined && (deviceOn || tab.emulation?.by === 'agent') && (
         <DeviceBar
           emulation={tab.emulation}
           media={tab.media}

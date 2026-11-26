@@ -38,6 +38,7 @@ function fixture() {
   const watchers = new Set<(change: TabChange) => void>();
   const refused: string[] = [];
   const tainted: string[] = [];
+  const emulated: [string, unknown][] = [];
   const out: Record<string, unknown>[] = [];
   const space: ProxySpace = {
     tabs: () => tabs,
@@ -67,6 +68,7 @@ function fixture() {
     stagedFile: () => false,
     refused: (method) => refused.push(method),
     tainted: (targetId) => tainted.push(targetId),
+    emulated: (targetId, emulation) => emulated.push([targetId, emulation]),
     cancelDownload: (guid) => guid === 'known',
   };
   const proxy = new CdpProxy(space, (m) => out.push(JSON.parse(m) as Record<string, unknown>), {
@@ -77,7 +79,7 @@ function fixture() {
     await proxy.handle(JSON.stringify(message));
     return out.at(-1);
   };
-  return { proxy, out, call, refused, tainted, debuggers, tabs };
+  return { proxy, out, call, refused, tainted, emulated, debuggers, tabs };
 }
 
 describe('CdpProxy', () => {
@@ -123,6 +125,36 @@ describe('CdpProxy', () => {
     const browser = await f.call({ id: 3, method: 'Browser.setDownloadBehavior', params: {} });
     expect(browser).toMatchObject({ id: 3, error: { code: -32000 } });
     expect(f.refused).toEqual(['Network.getAllCookies', 'Browser.setDownloadBehavior']);
+    expect(f.debuggers.get('T1')?.sent).toEqual([]);
+  });
+
+  it('shows the agent’s device emulation in the panel instead of forwarding it (B1.4.2)', async () => {
+    const f = fixture();
+    const attach = await f.call({
+      id: 1,
+      method: 'Target.attachToTarget',
+      params: { targetId: 'T1' },
+    });
+    const sessionId = (attach?.result as { sessionId: string }).sessionId;
+    const set = await f.call({
+      id: 2,
+      method: 'Emulation.setDeviceMetricsOverride',
+      params: { width: 390, height: 844, deviceScaleFactor: 3, mobile: true },
+      sessionId,
+    });
+    expect(set).toMatchObject({ id: 2, result: {}, sessionId });
+    const wrong = await f.call({
+      id: 3,
+      method: 'Emulation.setDeviceMetricsOverride',
+      params: { width: 50, height: 844, deviceScaleFactor: 1, mobile: false },
+      sessionId,
+    });
+    expect(wrong).toMatchObject({ id: 3, error: { code: -32000 } });
+    await f.call({ id: 4, method: 'Emulation.clearDeviceMetricsOverride', sessionId });
+    expect(f.emulated).toEqual([
+      ['T1', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }],
+      ['T1', null],
+    ]);
     expect(f.debuggers.get('T1')?.sent).toEqual([]);
   });
 

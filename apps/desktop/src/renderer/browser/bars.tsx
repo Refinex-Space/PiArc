@@ -398,9 +398,21 @@ export function DeviceBar({
             {t('browser.device.touch')}
           </label>
           {emulation.by === 'agent' && (
-            <span className="browser-badge" data-testid="browser-device-agent">
-              {t('browser.device.byAgent')}
-            </span>
+            <>
+              <span className="browser-badge" data-testid="browser-device-agent">
+                {t('browser.device.byAgent')}
+              </span>
+              <Button
+                size="small"
+                variant="ghost"
+                data-testid="browser-device-reset"
+                onClick={() => {
+                  onEmulate(null);
+                }}
+              >
+                {t('browser.device.reset')}
+              </Button>
+            </>
           )}
         </>
       )}

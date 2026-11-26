@@ -60,6 +60,14 @@ export interface AgentSpacesDeps {
   handedOff(sessionId: string, space: string, reason: string): void;
 }
 
+/**
+ * Whether the agent controls `space` now, running or between its calls (B1.3.2): its pages get
+ * no permission prompts and no earlier grants.
+ */
+export function agentHolds(space: Pick<Space, 'kind' | 'ownership'> | undefined): boolean {
+  return space?.kind === 'agent' && space.ownership === 'agent';
+}
+
 function clip(text: string, chars: number): string {
   return text.length > chars ? `${text.slice(0, chars - 1)}…` : text;
 }
@@ -123,6 +131,46 @@ export class AgentSpaces {
     return this.#info(model, space);
   }
 
+  /**
+   * The user shared one of their own tabs (B2.3.4): it moves into a new Space the user owns,
+   * which the agent lists with its titles and claims before working in it. The tab stays
+   * `openedBy: "user"`, so the SDK's `finish` keeps it. Answers the Space's numeric id, or
+   * undefined when `tabId` is not one of the user's own tabs.
+   */
+  async share(sessionId: string, tabId: string): Promise<number | undefined> {
+    const model = await this.deps.model(sessionId);
+    const tab = model.tabs.find((t) => t.id === tabId && t.space === USER_SPACE);
+    if (tab === undefined) return undefined;
+    if (model.spaces.filter((s) => s.kind === 'agent').length >= MAX_AGENT_SPACES) {
+      throw new SpaceError(
+        'PIARC_LIMIT',
+        `This session already has ${String(MAX_AGENT_SPACES)} task spaces`,
+      );
+    }
+    const title = clip(`Shared: ${tab.title === '' ? tab.url : tab.title}`, NAME_CHARS);
+    const taken = (name: string) => model.spaces.some((s) => s.kind === 'agent' && s.name === name);
+    let name = title;
+    for (let n = 2; taken(name); n += 1) name = clip(`${title} (${String(n)})`, NAME_CHARS);
+    const numeric = this.#next++;
+    const space: Space = {
+      id: `agent-${String(numeric)}`,
+      name,
+      kind: 'agent',
+      ownership: 'user',
+      running: false,
+    };
+    model.spaces.push(space);
+    this.#numeric.set(numeric, { sessionId: model.sessionId, space: space.id });
+    this.#data.set(this.#key(model, space.id), {
+      numeric,
+      createdBy: 'user',
+      activeTab: tab.id,
+    });
+    tab.space = space.id;
+    model.changed();
+    return numeric;
+  }
+
   async claim(caller: SpaceCaller, id: number, name?: string): Promise<TaskSpaceInfo> {
     const { model, space } = await this.#find(caller, id);
     if (space.id === USER_SPACE) {
@@ -184,6 +232,15 @@ export class AgentSpaces {
       throw new SpaceError(
         'EGO_TASK_SPACE_INACTIVE',
         `Task space ${String(id)} was finished; claim it with claimTaskSpace(${String(id)})`,
+      );
+    }
+    // Only a hand-off the agent asked for may be resumed by the agent; a Space the user took
+    // over stays theirs until they hand it back in the panel (B2.5.2).
+    if (space.ownership === 'agentDelegatedToUser' && space.handOff === undefined) {
+      throw new SpaceError(
+        'EGO_TASK_SPACE_USER_IN_CONTROL',
+        `The user took control of task space ${String(id)}; it comes back when they hand it back. Do not retry.`,
+        'manual_takeover',
       );
     }
     space.ownership = 'agent';
@@ -388,6 +445,18 @@ export class AgentSpaces {
           tab.tainted = true;
           model.changed();
         }
+      },
+      emulated: (targetId, emulation) => {
+        const tab = model.tabs.find(
+          (t) => t.space === space.id && tracked.get(t.id)?.targetId === targetId,
+        );
+        if (tab === undefined) return;
+        // Shown with the panel's badge until the user resets it (B1.4.2).
+        tab.emulation =
+          emulation === null
+            ? null
+            : { ...emulation, touch: tab.emulation?.touch ?? false, by: 'agent' };
+        model.changed();
       },
     };
   }

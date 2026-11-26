@@ -19,6 +19,7 @@ function fixture(answers: Record<string, unknown> = {}, ports: readonly number[]
     toolCallId: 'call-1',
     allowedHosts: new Set(),
     blockedHosts: new Set(),
+    visitedHosts: new Set(),
   };
   const pages = new Map<number, GatedPage>([
     [1, AGENT],
@@ -28,6 +29,7 @@ function fixture(answers: Record<string, unknown> = {}, ports: readonly number[]
   const deps: GateDeps = {
     pageOf: (id) => pages.get(id),
     agentPagesOn: (host) => (host === 'app.example.com' ? [AGENT] : []),
+    agentPages: () => [AGENT],
     runFor: () => current,
     allowedPorts: () => new Set([5173, ...ports]),
     askCore: (json) => {
@@ -105,6 +107,17 @@ describe('AgentGate (B2.6)', () => {
     expect(asked).toEqual([]);
   });
 
+  it('records the hosts the run reached for the audit row (B2.7.2)', async () => {
+    const { gate, run } = fixture({ 'docs.example.org': { allowed: true, scope: 'run' } });
+    await gate.check(request('http://localhost:5173/'));
+    await gate.check(request('http://localhost:5173/src/main.ts', 'script'));
+    await gate.check(request('https://docs.example.org/guide'));
+    await gate.check(request('https://docs.example.org/app.css', 'stylesheet'));
+    await gate.check(request('https://cdn.example.net/app.js', 'script'));
+    expect([...run.visitedHosts]).toEqual(['localhost:5173', 'docs.example.org']);
+    expect([...run.blockedHosts]).toEqual(['cdn.example.net']);
+  });
+
   it('refuses unallowed subresources and records them for the result', () => {
     const { gate, run, asked } = fixture();
     expect(gate.check(request('https://cdn.example.net/app.js', 'script'))).toEqual({
@@ -176,6 +189,19 @@ describe('AgentGate (B2.6)', () => {
     };
     expect(gate.check(sw)).toMatchObject({ allow: false });
     expect(gate.check({ ...sw, referrer: 'https://unrelated.example/' })).toEqual({ allow: true });
+  });
+
+  it('THR-16 judges a request without page or referrer by every running agent call', () => {
+    const { gate, run, endRun } = fixture();
+    const hidden = { url: 'https://exfil.example/x', resourceType: 'xhr', referrer: '' };
+    // A service worker that dropped its referrer while the agent's call runs.
+    expect(gate.check(hidden)).toMatchObject({ allow: false });
+    expect([...run.blockedHosts]).toContain('exfil.example');
+    run.allowedHosts.add('exfil.example');
+    expect(gate.check(hidden)).toEqual({ allow: true });
+    // Without a running call the request is the user's.
+    endRun();
+    expect(gate.check({ ...hidden, url: 'https://other.example/' })).toEqual({ allow: true });
   });
 
   it('requestAccess asks one card for the listed hosts', async () => {

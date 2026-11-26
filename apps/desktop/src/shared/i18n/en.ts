@@ -2662,6 +2662,7 @@ export const en = {
   'browser.menu.reload': 'Reload',
   'browser.menu.inspect': 'Inspect',
   'browser.menu.openExternal': 'Open in Default Browser',
+  'browser.menu.shareWithAgent': 'Share with Agent',
   'browser.menu.closeOthers': 'Close Other Tabs',
   'browser.menu.closeTab': 'Close Tab',
   'browser.menu.addToConversation': 'Add to Conversation',

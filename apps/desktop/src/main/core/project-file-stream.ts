@@ -9,11 +9,20 @@ export async function projectChunk(
   offset: number,
   length: number,
   revision?: string,
+  /** The built-in browser reads (B1.6): Core applies the session's Read deny rules. */
+  browser = false,
 ) {
   const raw: unknown = JSON.parse(
     await core.projectFiles(
       session,
-      JSON.stringify({ op: 'chunk', path, offset, length, revision }),
+      JSON.stringify({
+        op: 'chunk',
+        path,
+        offset,
+        length,
+        revision,
+        ...(browser ? { browser } : {}),
+      }),
     ),
   );
   if (

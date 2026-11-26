@@ -38,6 +38,8 @@ export interface GateRun {
   readonly allowedHosts: Set<string>;
   /** Hosts the run was kept from reaching. */
   readonly blockedHosts: Set<string>;
+  /** Hosts the run's pages reached (the audit row, B2.7.2), at most `VISITED_LIMIT`. */
+  readonly visitedHosts: Set<string>;
 }
 
 export interface GateDeps {
@@ -45,6 +47,8 @@ export interface GateDeps {
   pageOf(webContentsId: number): GatedPage | undefined;
   /** Pages of agent-controlled Spaces showing `host`, for requests no page can be named for. */
   agentPagesOn(host: string): readonly GatedPage[];
+  /** Every page of an agent-controlled Space, for requests that name neither page nor site. */
+  agentPages(): readonly GatedPage[];
   runFor(sessionId: string, space: string): GateRun | undefined;
   /**
    * Loopback ports of the session (B2.6.2): opened by the user in their own tabs, listened on
@@ -73,6 +77,15 @@ export interface GateRequest {
 const ALLOW: RequestVerdict = { allow: true };
 /** A refused request (the partition rules' reasons do not apply; `invalid` is closest). */
 const REFUSE: RequestVerdict = { allow: false, reason: 'invalid' };
+
+/** Hosts a run records as visited; the audit row needs the sites, not every request. */
+const VISITED_LIMIT = 200;
+
+function visited(run: GateRun | undefined, key: string): RequestVerdict {
+  if (run !== undefined && run.visitedHosts.size < VISITED_LIMIT) run.visitedHosts.add(key);
+  return ALLOW;
+}
+
 const NAVIGATIONS = new Set(['mainFrame', 'subFrame']);
 const GATED_SCHEMES = new Set(['http:', 'https:', 'ws:', 'wss:']);
 
@@ -131,12 +144,14 @@ export class AgentGate {
     if (!page.agentControlled) return ALLOW;
     const { key, local } = hostKey(url, this.deps.localNames());
     const run = this.deps.runFor(page.sessionId, page.space);
-    if (this.#allowed(page.sessionId, run, key, local, url)) return ALLOW;
+    if (this.#allowed(page.sessionId, run, key, local, url)) return visited(run, key);
     if (run === undefined || !NAVIGATIONS.has(request.resourceType)) {
       run?.blockedHosts.add(key);
       return REFUSE;
     }
-    return this.#ask(page.sessionId, run, url, key, local).then((ok) => (ok ? ALLOW : REFUSE));
+    return this.#ask(page.sessionId, run, url, key, local).then((ok) =>
+      ok ? visited(run, key) : REFUSE,
+    );
   }
 
   /**
@@ -175,25 +190,35 @@ export class AgentGate {
     return local && this.deps.allowedPorts(sessionId).has(portOf(url));
   }
 
-  /** A request without a page (a service worker's): judged as the agent's when an agent
-   * page shows the site it belongs to, without a card. */
+  /**
+   * A request without a page (a service worker's): judged as the agent's when an agent page
+   * shows the site it belongs to, without a card. One that names no site either (the worker
+   * dropped its referrer) is judged by every running agent call: it passes only when each of
+   * them may reach the host, and it is the user's when no agent call runs.
+   */
   #unattributed(request: GateRequest, url: URL): RequestVerdict {
-    let site: string;
+    let site: string | undefined;
     try {
       site = new URL(request.referrer).hostname.toLowerCase();
     } catch {
-      return ALLOW;
+      site = undefined;
     }
-    const pages = this.deps.agentPagesOn(site).filter((page) => page.agentControlled);
+    const pages = (site === undefined ? this.deps.agentPages() : this.deps.agentPagesOn(site))
+      .filter((page) => page.agentControlled)
+      .filter((page) => site !== undefined || this.deps.runFor(page.sessionId, page.space));
     if (pages.length === 0) return ALLOW;
     const { key, local } = hostKey(url, this.deps.localNames());
-    for (const page of pages) {
-      const run = this.deps.runFor(page.sessionId, page.space);
+    const runs = pages.map((page) => ({
+      page,
+      run: this.deps.runFor(page.sessionId, page.space),
+    }));
+    for (const { page, run } of runs) {
       if (!this.#allowed(page.sessionId, run, key, local, url)) {
         run?.blockedHosts.add(key);
         return REFUSE;
       }
     }
+    for (const { run } of runs) visited(run, key);
     return ALLOW;
   }
 

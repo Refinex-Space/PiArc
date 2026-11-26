@@ -50,6 +50,7 @@ import {
   type BrowserStorage,
 } from './partitions.js';
 import { freePath, spaceNumber } from './agent-downloads.js';
+import { agentHolds, MAX_AGENT_SPACES } from './agent-spaces.js';
 import type { StateSummary } from './state-reminders.js';
 import { LiveReload } from './live-reload.js';
 import { quarantine } from './quarantine.js';
@@ -209,6 +210,11 @@ export class BrowserService {
   #disposed = false;
   /** Downloads of agent pages while a call runs (B2.6.6), installed with the agent side. */
   #agentDownload: ((contents: WebContents, item: DownloadItem) => boolean) | undefined;
+  /** Shares a user tab with the agent (B2.3.4), installed with the agent side. */
+  #share: ((sessionId: string, tabId: string) => Promise<unknown>) | undefined;
+  /** Permission requests refused on agent pages (B1.3.2), installed with the agent side. */
+  #permissionRefused:
+    ((sessionId: string, space: string, permission: string, origin: string) => void) | undefined;
   /** The user's controls of agent Spaces (B2.5), installed once the agent side starts. */
   #control:
     ((sessionId: string, space: string, action: BrowserControl) => Promise<void>) | undefined;
@@ -390,6 +396,18 @@ export class BrowserService {
     this.#agentDownload = take;
   }
 
+  /** Installs what the tab menu's "Share with agent" does (B2.3.4). */
+  setShare(share: (sessionId: string, tabId: string) => Promise<unknown>): void {
+    this.#share = share;
+  }
+
+  /** Installs what hears permission requests refused on agent pages (B1.3.2). */
+  setPermissionRefusals(
+    refused: (sessionId: string, space: string, permission: string, origin: string) => void,
+  ): void {
+    this.#permissionRefused = refused;
+  }
+
   /** Installs what the panel's take over, hand back and stop do (B2.5). */
   setControl(
     control: (sessionId: string, space: string, action: BrowserControl) => Promise<void>,
@@ -427,12 +445,12 @@ export class BrowserService {
   }
 
   /** Agent pages showing `host` (requests no page can be named for, such as a worker's). */
-  agentPagesOn(host: string): GatedPage[] {
+  agentPagesOn(host: string | undefined): GatedPage[] {
     const pages: GatedPage[] = [];
     for (const model of this.#loaded.values()) {
       for (const tab of model.tabs) {
         const space = model.spaces.find((s) => s.id === tab.space);
-        if (space?.kind !== 'agent' || hostOf(tab.url) !== host) continue;
+        if (space?.kind !== 'agent' || (host !== undefined && hostOf(tab.url) !== host)) continue;
         pages.push({
           sessionId: model.id,
           space: tab.space,
@@ -1304,7 +1322,11 @@ export class BrowserService {
     if (found === undefined) return false;
     const { model, tab } = found;
     const space = model.spaces.find((s) => s.id === tab.space);
-    if (space?.ownership === 'agent' && space.running) return false;
+    // The agent's pages get no prompt, running or between its calls (B1.3.2).
+    if (space !== undefined && agentHolds(space)) {
+      this.#permissionRefused?.(model.id, space.id, permission, origin);
+      return false;
+    }
     return new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {
         for (const [id, prompt] of model.prompts) {
@@ -1335,6 +1357,8 @@ export class BrowserService {
     if (contents === null) return false;
     const found = this.#tabOf(contents);
     if (found === undefined) return false;
+    // What the user allowed while they controlled the Space does not pass to the agent.
+    if (agentHolds(found.model.spaces.find((s) => s.id === found.tab.space))) return false;
     return found.model.grants.get(found.tab.id)?.has(`${origin} ${permission}`) === true;
   }
 
@@ -1564,6 +1588,7 @@ export class BrowserService {
           this.deps.openExternal(windowOf(sender, this.deps.windows()) ?? null, tab.url);
         },
       },
+      ...this.#shareItem(model, tab),
       { type: 'separator' },
       {
         label: t.t('browser.menu.closeOthers'),
@@ -1584,6 +1609,23 @@ export class BrowserService {
     ];
     const window = windowOf(sender, this.deps.windows());
     Menu.buildFromTemplate(items).popup(window === undefined ? {} : { window });
+  }
+
+  /** "Share with agent" for the user's own tabs (B2.3.4). */
+  #shareItem(model: SessionModel, tab: BrowserTab): MenuItemConstructorOptions[] {
+    const share = this.#share;
+    if (share === undefined || tab.space !== USER_SPACE) return [];
+    return [
+      {
+        label: this.deps.translator().t('browser.menu.shareWithAgent'),
+        enabled: model.spaces.filter((s) => s.kind === 'agent').length < MAX_AGENT_SPACES,
+        click: () => {
+          share(model.id, tab.id).catch((error: unknown) => {
+            console.warn('[browser] the tab could not be shared', error);
+          });
+        },
+      },
+    ];
   }
 
   #changed(model: SessionModel): void {

@@ -196,6 +196,8 @@ export interface PiarcTestHooks {
     script: string,
     timeoutMs?: number,
   ): Promise<BrowserScriptObservation | null>;
+  /** The tab menu's "Share with agent" (B2.3.4); the new Space's numeric id. */
+  browserShare(sessionId: string, tabId: string): Promise<number | null>;
   readonly core: TestCoreApi;
   routerStats(): RouterStats;
   /** Routes the window with this `webContents.id` receives. */

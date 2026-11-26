@@ -10,7 +10,13 @@
 // (src/vs/platform/browserView/common/cdp/proxy.ts, MIT License, Copyright (c) Microsoft
 // Corporation); the code is PiArc's.
 
-import { browserCommand, pageCommand } from './cdp-policy.js';
+import {
+  agentEmulation,
+  browserCommand,
+  pageCommand,
+  pageEvent,
+  type AgentEmulation,
+} from './cdp-policy.js';
 
 /** One page's debugger, as Electron's `webContents.debugger` offers it. */
 export interface PageDebugger {
@@ -50,6 +56,8 @@ export interface ProxySpace {
   refused(method: string): void;
   /** The agent ran script in the page of `targetId` (B2.5.4). */
   tainted(targetId: string): void;
+  /** The agent set (or cleared, null) the device of the page of `targetId` (B1.4.2). */
+  emulated(targetId: string, emulation: AgentEmulation | null): void;
   /** Cancels a download of the run (`Browser.cancelDownload`); whether there was one. */
   cancelDownload(guid: string): boolean;
 }
@@ -73,6 +81,11 @@ interface Message {
 }
 
 const CONTEXT_ID = 'piarc-space';
+/** Device emulation of a page, which the panel applies itself (B1.4.2). */
+const EMULATION_METHODS: ReadonlySet<string> = new Set([
+  'Emulation.setDeviceMetricsOverride',
+  'Emulation.clearDeviceMetricsOverride',
+]);
 /** Methods that run the agent's code in the page (B2.5.4). */
 const RUNS_SCRIPT: ReadonlySet<string> = new Set([
   'Runtime.evaluate',
@@ -285,9 +298,24 @@ export class CdpProxy {
       // Frames attach flattened, and never wait for a debugger the SDK may not resume.
       params = { ...params, flatten: true, waitForDebuggerOnStart: false };
     }
+    if (attached.child === undefined && EMULATION_METHODS.has(message.method)) {
+      return this.#emulate(attached.targetId, message);
+    }
     const debug = await this.space.debuggerOf(attached.targetId);
     if (RUNS_SCRIPT.has(message.method)) this.space.tainted(attached.targetId);
     return debug.sendCommand(message.method, params, attached.child);
+  }
+
+  /** The page's device goes through the panel's emulation, marked as the agent's (B1.4.2). */
+  #emulate(targetId: string, message: Message): Record<string, never> {
+    if (message.method === 'Emulation.clearDeviceMetricsOverride') {
+      this.space.emulated(targetId, null);
+      return {};
+    }
+    const emulation = agentEmulation(message.params);
+    if (typeof emulation === 'string') throw new CdpFailure(`PIARC_EMULATION: ${emulation}`);
+    this.space.emulated(targetId, emulation);
+    return {};
   }
 
   async #attach(targetId: string, auto: boolean): Promise<string> {
@@ -337,7 +365,10 @@ export class CdpProxy {
   /** A page event: to every virtual session of that page (or of that frame). */
   #forward(targetId: string, method: string, params: unknown, child: string): void {
     const from = child === '' ? undefined : child;
-    let payload = params;
+    // Cookie values never reach the script (THR-17): such events are dropped or stripped.
+    const visible = pageEvent(method, params);
+    if (visible === undefined) return;
+    let payload = visible;
     if (method === 'Target.attachedToTarget' && isRecord(params)) {
       const frame = typeof params.sessionId === 'string' ? params.sessionId : undefined;
       if (frame !== undefined) {

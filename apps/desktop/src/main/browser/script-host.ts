@@ -10,7 +10,7 @@ import type { BrowserRunAnswer } from '@piarc/protocol';
 
 import { BROWSER_HOST_RUN_CHANNEL, type BrowserHostRun } from '../../shared/browser-host.js';
 import type { AgentSpaces } from './agent-spaces.js';
-import type { HostBindings, HostRun } from './host-bindings.js';
+import { permissionNote, type HostBindings, type HostRun } from './host-bindings.js';
 import { HOST_PARTITION, type BrowserPartitions } from './partitions.js';
 
 /** The host page's scheme (registered as privileged in main.ts). */
@@ -109,6 +109,8 @@ export class ScriptHosts {
         images: [],
         refusedMethods: new Set(),
         blockedHosts: new Set(),
+        visitedHosts: new Set(),
+        refusedPermissions: new Set(),
         allowedHosts: new Set(),
         proxies: new Map(),
         staged: new Set(),
@@ -140,8 +142,14 @@ export class ScriptHosts {
         }
         resolve({
           ...outcome,
+          output: outcome.output + permissionNote(active.refusedPermissions),
           ...(active.images.length === 0 ? {} : { images: active.images }),
           ...(active.blockedHosts.size === 0 ? {} : { blockedHosts: [...active.blockedHosts] }),
+          // For the audit row only: Core keeps both out of the model's result.
+          ...(active.visitedHosts.size === 0 ? {} : { visitedHosts: [...active.visitedHosts] }),
+          ...(active.refusedMethods.size === 0
+            ? {}
+            : { refusedMethods: [...active.refusedMethods] }),
         });
       };
       this.#active.set(host.id, active);

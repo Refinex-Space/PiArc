@@ -2,7 +2,7 @@
 // their ports, the script hosts and the bridge to Core. main.ts registers the host's IPC
 // channel and the `core/browser` route with what this returns.
 
-import type { WebContents } from 'electron';
+import { nativeImage, type WebContents } from 'electron';
 
 import type { SnapshotOptions, SnapshotResult } from '../../shared/browser-host.js';
 import { AgentBridge, type BridgeCore } from './agent-bridge.js';
@@ -13,7 +13,7 @@ import { StateReminders } from './state-reminders.js';
 import { AgentSpaces, SpaceError } from './agent-spaces.js';
 import { showCursor } from './cursor.js';
 import { FrameTracker } from './frames.js';
-import { HostBindings, type BindingPorts } from './host-bindings.js';
+import { HostBindings, notePermission, type BindingPorts } from './host-bindings.js';
 import { setUpHostSession } from './host-session.js';
 import { ScriptHosts } from './script-host.js';
 import type { BrowserService } from './service.js';
@@ -123,6 +123,7 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
   const gate = new AgentGate({
     pageOf: (id) => deps.service.gatedPage(id),
     agentPagesOn: (host) => deps.service.agentPagesOn(host),
+    agentPages: () => deps.service.agentPagesOn(undefined),
     runFor: (sessionId, space) => late.hosts?.runFor(sessionId, space),
     allowedPorts: (sessionId) =>
       new Set([
@@ -202,6 +203,10 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
     highlight: (contents, x, y, label) => {
       showCursor(contents, x, y, label);
     },
+    decodeImage: (bytes) => {
+      const image = nativeImage.createFromBuffer(bytes);
+      return image.isEmpty() ? undefined : image;
+    },
     browserVersion: {
       protocolVersion: '1.3',
       product: `Chrome/${process.versions.chrome}`,
@@ -229,6 +234,11 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
     targetIdOf: (contents) => spaces.targetIdOf(contents),
   });
   deps.service.setAgentDownloads((contents, item) => downloads.take(contents, item));
+  deps.service.setShare((sessionId, tabId) => spaces.share(sessionId, tabId));
+  deps.service.setPermissionRefusals((sessionId, space, permission, origin) => {
+    const run = hosts.runFor(sessionId, space);
+    if (run !== undefined) notePermission(run.refusedPermissions, permission, origin);
+  });
   deps.service.setControl(async (sessionId, space, action) => {
     const run = hosts.runFor(sessionId, space);
     switch (action) {

@@ -201,6 +201,10 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
         ...(answer.blockedHosts == null ? {} : { blockedHosts: answer.blockedHosts }),
       };
     },
+    browserShare: async (sessionId, tabId) => {
+      if (browserAgent === undefined) throw new Error('The browser agent has not started');
+      return (await browserAgent.spaces.share(sessionId, tabId)) ?? null;
+    },
     attention: () => app.attention.observed(),
     notificationAction: (index) => app.attention.pressAction(index),
     failNext: (channel, message) => {

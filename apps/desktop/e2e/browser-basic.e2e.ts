@@ -126,6 +126,31 @@ test('THR-11 guests reach neither the preload nor Node', async ({ app, page, wor
   expect(seen.tabs[0]?.pageUrl).toBe(`${origin}/probe`);
 });
 
+// ADR-0088 rule 5, B1.7.3: a guest's WebRTC never leaves around Core's proxy, and its loopback
+// traffic goes through the proxy too.
+test('THR-16 guests send WebRTC and loopback traffic only through the proxy', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(90_000);
+  await openSession(app, page, workspaces, 'Browser WebRTC', 't18-chat', 'Hello');
+  await idle(page);
+  await openPreview(page);
+  await go(page, origin);
+  await expect(page.getByTestId('browser-tab')).toHaveText(['Fixture home']);
+  const guest = await app.evaluate(async ({ webContents }, url) => {
+    const contents = webContents.getAllWebContents().find((c) => c.getURL().startsWith(url));
+    if (contents === undefined) throw new Error('no guest');
+    return {
+      webrtc: contents.getWebRTCIPHandlingPolicy(),
+      proxy: await contents.session.resolveProxy(url),
+    };
+  }, origin);
+  expect(guest.webrtc).toBe('disable_non_proxied_udp');
+  expect(guest.proxy).toMatch(/^PROXY 127\.0\.0\.1:\d+$/u);
+});
+
 test('a menu over the page hides it behind a still frame', async ({ app, page, workspaces }) => {
   test.setTimeout(120_000);
   const { id } = await openSession(app, page, workspaces, 'Browser occlusion', 't18-chat', 'Hello');

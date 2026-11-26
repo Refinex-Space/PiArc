@@ -248,6 +248,18 @@ console.log("never taken over");`,
     'EGO_TASK_SPACE_USER_IN_CONTROL',
   );
   await expect(page.getByTestId('browser-hand-back')).toBeVisible();
+  // The agent cannot take the space back itself: only the user hands it back (B2.5.2).
+  const reclaim = await run(
+    app,
+    id,
+    `await takeOverTaskSpace(${String(space)});
+console.log("reclaimed");`,
+  );
+  expect(reclaim.output).not.toContain('reclaimed');
+  expect(`${reclaim.error?.code ?? ''} ${reclaim.error?.message ?? ''}`).toContain(
+    'EGO_TASK_SPACE_USER_IN_CONTROL',
+  );
+  await expect(page.getByTestId('browser-hand-back')).toBeVisible();
   // The agent's calls ran script in the page: the user is told before typing secrets.
   await expect(page.getByTestId('browser-tainted')).toBeVisible();
   await page.getByTestId('browser-hand-back').click();
@@ -260,6 +272,98 @@ console.log(await task.page("p1").url());
 await task.finish({ keep: [] });`,
   );
   expect(back.error).toBeUndefined();
+});
+
+test('B1.4.2, B1.3.2: the agent’s device shows in the panel; its pages get no permissions', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  const { id } = await openSession(app, page, workspaces, 'Browser device', 't18-chat', 'Hello');
+  await idle(page);
+  await page.getByTestId('tool-preview').click();
+  await expect(page.getByTestId('tile-preview')).toBeVisible();
+  const emulated = await run(
+    app,
+    id,
+    `const task = await taskSpace("device check");
+const page = task.page("p1");
+await page.goto(${JSON.stringify(`${origin}/`)});
+await page.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
+await page.waitForFunction(() => innerWidth === 390);
+console.log({ width: await page.evaluate(() => innerWidth), space: task.spaceId });
+let wrong = "accepted";
+try {
+  await page.cdp("Emulation.setDeviceMetricsOverride", { width: 10, height: 10, deviceScaleFactor: 1, mobile: false });
+} catch (error) { wrong = String(error.message); }
+console.log(wrong);
+console.log(await page.evaluate(() => new Promise((done) => {
+  navigator.geolocation.getCurrentPosition(() => done("position"), (error) => done("geolocation " + error.code));
+})));`,
+  );
+  expect(emulated.error).toBeUndefined();
+  expect(emulated.output).toContain('width: 390');
+  expect(emulated.output).toContain('PIARC_EMULATION');
+  // The permission was refused without a prompt and the result says so.
+  expect(emulated.output).toContain('geolocation 1');
+  expect(emulated.output).toMatch(/\[PiArc\] Pages in your task space asked for geolocation/);
+  await expect(page.getByTestId('browser-permission')).toBeHidden();
+  const space = /space: (\d+)/.exec(emulated.output)?.[1];
+  // The panel shows the agent's device with its badge until the user resets it.
+  await expect(page.getByTestId('browser-device-agent')).toBeVisible();
+  await page.getByTestId('browser-device-reset').click();
+  await expect(page.getByTestId('browser-device-agent')).toBeHidden();
+  const reset = await run(
+    app,
+    id,
+    `const task = await taskSpace(${String(space)});
+console.log({ width: await task.page("p1").evaluate(() => innerWidth) });
+await task.finish({ keep: [] });`,
+  );
+  expect(reset.output).not.toContain('width: 390');
+});
+
+test('B2.3.4: a tab the user shares is claimed by the agent and stays the user’s', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  const { id } = await openSession(app, page, workspaces, 'Browser share', 't18-chat', 'Hello');
+  await idle(page);
+  await userOpens(page, `${origin}/`);
+  // "My tabs" cannot be claimed.
+  const before = await run(app, id, `console.log(JSON.stringify(await listTaskSpaces()));`);
+  expect(before.output).toContain('My tabs (1)');
+  expect(before.output).not.toContain('Agent fixture');
+  const own = (await observe(app, id)).tabs.find((t) => t.space === 'user');
+  expect(own).toBeDefined();
+  // The tab menu's "Share with agent" (a native menu; the hook does what it does).
+  const shared = await app.evaluate(
+    async (_electron, args) => {
+      const hooks = globalThis.__piarcTestHooks;
+      if (hooks === undefined) throw new Error('No test hooks: build the development flavor');
+      return hooks.browserShare(args.sessionId, args.tabId);
+    },
+    { sessionId: id, tabId: own?.id ?? '' },
+  );
+  expect(shared).not.toBeNull();
+  const claimed = await run(
+    app,
+    id,
+    `const task = await claimTaskSpace(${String(shared)});
+const tabs = await task.tabs();
+const page = await task.adopt(tabs[0].page);
+console.log({ title: await page.title(), openedBy: tabs[0].openedBy });
+await task.finish({ keep: [] });`,
+  );
+  expect(claimed.error).toBeUndefined();
+  expect(claimed.output).toContain('Agent fixture');
+  expect(claimed.output).toContain('user');
+  // finish() leaves the user's page open.
+  const tabs = (await observe(app, id)).tabs;
+  expect(tabs.some((t) => t.id === own?.id && t.openedBy === 'user')).toBe(true);
 });
 
 test('B2.1.2: a model Browser call runs end to end and shows its screenshot', async ({

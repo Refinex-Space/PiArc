@@ -45,6 +45,7 @@ export function installTestHooks(options: {
   readonly mainWindows: () => number[];
   readonly browser: (sessionId: string) => Promise<BrowserObservation>;
   readonly browserScript: PiarcTestHooks['browserScript'];
+  readonly browserShare: PiarcTestHooks['browserShare'];
 }): void {
   const { router } = options;
   let histogram: ELDHistogram | undefined;
@@ -53,6 +54,7 @@ export function installTestHooks(options: {
     modulePath: options.modulePath,
     browser: options.browser,
     browserScript: options.browserScript,
+    browserShare: options.browserShare,
     core: options.core,
     routerStats: () => router.stats(),
     routesOf: (id) => router.routesOf(id),

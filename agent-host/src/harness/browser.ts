@@ -28,9 +28,16 @@ import {
 /** The run time a call may ask for, in milliseconds (Core clamps to the same range). */
 export const BROWSER_TIMEOUT = { min: 1_000, default: 120_000, max: 600_000 } as const;
 
-const browserSchema = Type.Object({
+/**
+ * The longest script, in characters: Core refuses one over 256 KiB of UTF-8, so a call that
+ * passes here can still be refused there (design addendum §4.2).
+ */
+export const BROWSER_SCRIPT_MAX_CHARS = 256 * 1024;
+
+export const browserSchema = Type.Object({
   script: Type.String({
     minLength: 1,
+    maxLength: BROWSER_SCRIPT_MAX_CHARS,
     description: 'The JavaScript to run (an async function body with the browser helpers).',
   }),
   description: Type.Optional(

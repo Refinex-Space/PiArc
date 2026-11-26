@@ -52,8 +52,12 @@ export async function setUpGuestSession(
   proxyPort: number,
   hooks: GuestSessionHooks,
 ): Promise<void> {
-  // Loopback goes direct (Chromium's implicit bypass); everything else through Core.
-  await session.setProxy({ proxyRules: `127.0.0.1:${String(proxyPort)}` });
+  // Everything goes through Core, loopback included (`<-loopback>` removes Chromium's implicit
+  // bypass): the proxy refuses PiArc's own ports and DNS rebinding (ADR-0088 rule 5).
+  await session.setProxy({
+    proxyRules: `127.0.0.1:${String(proxyPort)}`,
+    proxyBypassRules: '<-loopback>',
+  });
   session.setUserAgent(chromeUserAgent(app.userAgentFallback));
   session.setPermissionRequestHandler((contents, permission, callback, details) => {
     const origin = originOf(details.requestingUrl);

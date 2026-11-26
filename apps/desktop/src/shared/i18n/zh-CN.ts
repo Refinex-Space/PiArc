@@ -2572,6 +2572,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'browser.menu.reload': '重新加载',
   'browser.menu.inspect': '检查',
   'browser.menu.openExternal': '在默认浏览器中打开',
+  'browser.menu.shareWithAgent': '共享给智能体',
   'browser.menu.closeOthers': '关闭其他标签页',
   'browser.menu.closeTab': '关闭标签页',
   'browser.menu.addToConversation': '加入对话',
