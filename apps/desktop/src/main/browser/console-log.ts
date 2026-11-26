@@ -20,6 +20,14 @@ export interface ConsoleSummary {
   readonly warnings: number;
 }
 
+/**
+ * Whether a console message is one Electron itself prints in a page when it runs from its own
+ * binary (development builds and L4): not the page's output, so the drawer leaves it out.
+ */
+export function electronNotice(text: string): boolean {
+  return /^(%c)?Electron (Security|Deprecation) Warning\b/.test(text);
+}
+
 export class ConsoleLog {
   #entries: BrowserConsoleEntry[] = [];
   #seq = 0;

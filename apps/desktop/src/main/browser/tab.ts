@@ -13,7 +13,7 @@ import type {
 import { originForLog } from '../security/navigation.js';
 import { local, LOCAL_RETRY, localRetryDelay } from './address.js';
 import { navigable, WORKSPACE_SCHEME } from './request-rules.js';
-import { ConsoleLog } from './console-log.js';
+import { ConsoleLog, electronNotice } from './console-log.js';
 import { nextZoom } from './site-zoom.js';
 import { fitDevice } from './view-host.js';
 
@@ -63,6 +63,8 @@ export interface TabInit {
 }
 
 const FAVICON_BYTES = 32 * 1024;
+/** Chromium's refused connection, which a local server that is not up yet gives (B1.3.1). */
+const CONNECTION_REFUSED = { code: -102, name: 'ERR_CONNECTION_REFUSED' } as const;
 
 export class BrowserTab {
   readonly id: string;
@@ -94,6 +96,8 @@ export class BrowserTab {
   /** Refused loads of a local server in a row, and the pending retry (B1.3.1). */
   #refused = 0;
   #retryTimer: NodeJS.Timeout | undefined;
+  /** The load the browser proxy reported refused (its marked 502), until it fails. */
+  #proxyRefused: string | undefined;
 
   constructor(
     init: TabInit,
@@ -206,6 +210,11 @@ export class BrowserTab {
     this.#emulationApplied = key;
   }
 
+  /** The guest session saw the proxy's refused-connection answer for `url` (B1.3.1). */
+  refusedLoad(url: string): void {
+    this.#proxyRefused = url;
+  }
+
   stepZoom(step: 'in' | 'out' | 'reset'): void {
     this.setZoom(nextZoom(this.zoom, step));
     this.hooks.zoomed(this, this.zoom);
@@ -286,14 +295,18 @@ export class BrowserTab {
     contents.on('page-favicon-updated', (_event, favicons) => {
       void this.#fetchFavicon(contents, favicons[0]);
     });
-    contents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
+    contents.on('did-fail-load', (_event, failed, failedName, url, isMainFrame) => {
       // -3 is an aborted load: a new navigation replaced it.
-      if (!isMainFrame || code === -3) return;
+      if (!isMainFrame || failed === -3) return;
+      // The proxy's marked 502, cancelled by the guest session, is a refused connection.
+      const refused = this.#proxyRefused === url;
+      this.#proxyRefused = undefined;
+      const code = refused ? CONNECTION_REFUSED.code : failed;
       const delay = localRetryDelay(url, code, this.#refused);
       this.failure = {
         url,
         code,
-        name: description,
+        name: refused ? CONNECTION_REFUSED.name : failedName,
         ...(delay === undefined
           ? {}
           : { retry: { attempt: this.#refused + 1, max: LOCAL_RETRY.attempts } }),
@@ -330,6 +343,7 @@ export class BrowserTab {
     });
     // Uncaught exceptions arrive here too, as errors (`Uncaught TypeError: …`).
     contents.on('console-message', (details) => {
+      if (electronNotice(details.message)) return;
       this.console.add(details.level, details.message, details.sourceId, details.lineNumber);
       this.hooks.logged(this);
     });

@@ -146,6 +146,17 @@ describe('THR-16 and THR-17 tightening (B2.6.5)', () => {
     const other = { frameId: 'f' };
     expect(pageEvent('Page.frameNavigated', other)).toBe(other);
   });
+
+  it('B2.6.6 drops Chromium’s own download events: PiArc reports downloads with its guid', () => {
+    for (const method of [
+      'Page.downloadWillBegin',
+      'Page.downloadProgress',
+      'Browser.downloadWillBegin',
+      'Browser.downloadProgress',
+    ]) {
+      expect(pageEvent(method, { guid: 'chromium-guid' }), method).toBeUndefined();
+    }
+  });
 });
 
 describe('agentEmulation (B1.4.2)', () => {

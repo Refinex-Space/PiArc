@@ -17,7 +17,7 @@ use hyper_util::rt::TokioIo;
 use piarc_ports::BoxFuture;
 use piarc_sandbox::proxy::{
     Allowlist, BrowserPolicy, DENIED_HEADER, DenyReason, Network, NetworkProxy, ProxyHooks,
-    ProxyLimits, Refused,
+    ProxyLimits, Refused, UPSTREAM_HEADER,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -522,6 +522,7 @@ async fn browser_proxy(denied_ports: Vec<u16>) -> NetworkProxy {
         ("nas.test", private),
         ("app.test", loopback),
         ("web.localhost", loopback),
+        ("down.test", IpAddr::from([127, 0, 0, 2])),
         ("rebind.example", loopback),
         ("metadata.example", IpAddr::from([169, 254, 169, 254])),
     ]);
@@ -586,4 +587,20 @@ async fn thr16_a_browser_proxy_refuses_piarc_ports_and_takes_a_new_policy() {
     proxy.set_browser_policy(BrowserPolicy::default());
     let reply = http_get(&proxy, "http://app.test/", "app.test").await;
     assert_eq!(reply.status, 403, "*.test is no longer a local name");
+}
+
+/// B1.3.1: a local server that is not up yet is told apart from other failures, so the
+/// browser can wait for it as it does without a proxy (`ERR_CONNECTION_REFUSED`).
+#[tokio::test]
+async fn a_browser_proxy_marks_a_refused_connection() {
+    let proxy = browser_proxy(Vec::new()).await;
+    let reply = http_get(&proxy, "http://down.test/", "down.test").await;
+    assert_eq!(reply.status, 502);
+    assert_eq!(reply.header(UPSTREAM_HEADER), Some("connection-refused"));
+    let reply = connect(&proxy, "down.test:443").await;
+    assert_eq!(reply.status, 502);
+    assert_eq!(reply.header(UPSTREAM_HEADER), Some("connection-refused"));
+    let reply = http_get(&proxy, "http://app.test/", "app.test").await;
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.header(UPSTREAM_HEADER), None);
 }

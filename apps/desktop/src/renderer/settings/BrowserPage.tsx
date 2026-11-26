@@ -20,7 +20,7 @@ import { reason } from '../shell/errors.js';
 import { parseWorkspaces } from './AgentsPage.js';
 import { ChromeImportDialog } from './ChromeImportDialog.js';
 import { WorkspaceOptions } from './WorkspaceOptions.js';
-import { takeImportTarget } from './browser-import-target.js';
+import { useImportTarget } from './browser-import-target.js';
 import {
   agentSites,
   browserDomain,
@@ -167,10 +167,13 @@ function LocalNames({
   const { t } = useApp();
   const id = useId();
   const hintId = useId();
-  const [draft, setDraft] = useState(names.join(', '));
+  const saved = names.join(', ');
+  const [draft, setDraft] = useState(saved);
+  // Follows the saved value only when it changes: every preferences update brings a new array,
+  // and resetting on that would wipe what the user is typing.
   useEffect(() => {
-    setDraft(names.join(', '));
-  }, [names]);
+    setDraft(saved);
+  }, [saved]);
   return (
     <form
       className="setting"
@@ -269,7 +272,7 @@ export function BrowserPage() {
   const storageLabel = useId();
   const engineId = useId();
   const dockLabel = useId();
-  const [target] = useState(takeImportTarget);
+  const target = useImportTarget();
   const [workspaces, setWorkspaces] = useState<string[]>([]);
   const [workspace, setWorkspace] = useState<string | null>(null);
   const [imports, setImports] = useState<ImportedSite[]>([]);

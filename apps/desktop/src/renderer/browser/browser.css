@@ -10,10 +10,17 @@
   container-type: inline-size;
 }
 
+.browser-tabbar {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+}
 .browser-tabs {
   display: flex;
   align-items: center;
   gap: var(--piarc-space-1);
+  flex: 0 1 auto;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -809,6 +816,8 @@
   height: 5px;
 }
 .browser-annotate-stage {
+  /* A size container: the canvas fits its box with `cq` units (B3.3). */
+  container-type: size;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -827,8 +836,10 @@
   max-height: 100%;
 }
 .browser-annotate-canvas {
-  max-width: 100%;
-  max-height: 100%;
+  /* The frame is sized by the canvas, so percentages of it would not bound the canvas: the
+     stage's box does, on both axes (a replaced element keeps its aspect ratio). */
+  max-width: 100cqw;
+  max-height: 100cqh;
   width: auto;
   height: auto;
   cursor: crosshair;

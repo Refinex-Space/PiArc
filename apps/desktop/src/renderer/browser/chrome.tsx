@@ -89,104 +89,113 @@ export function TabStrip({
   const dragged = useRef<string | null>(null);
   const grouped = state.spaces.length > 1;
   return (
-    <div
-      className="browser-tabs"
-      role="tablist"
-      aria-label={t('browser.tabs')}
-      data-testid="browser-tabs"
-    >
-      {state.spaces.map((space) => {
-        const tabs = state.tabs.filter((tab) => tab.space === space.id);
-        if (tabs.length === 0 && grouped) return null;
-        return (
-          <div key={space.id} className="browser-space" data-space-kind={space.kind}>
-            {grouped && (
-              <span
-                className="browser-space-label"
-                data-running={space.running}
-                data-ownership={space.ownership}
-              >
-                {spaceLabel(space, t)}
-              </span>
-            )}
-            {tabs.map((tab) => {
-              const index = state.tabs.indexOf(tab);
-              const selected = tab.id === state.activeTab;
-              const title = tabTitle(tab, t);
-              return (
-                <div
-                  key={tab.id}
-                  className="browser-tab"
-                  role="tab"
-                  aria-selected={selected}
-                  tabIndex={selected ? 0 : -1}
-                  data-testid="browser-tab"
-                  data-tab={tab.id}
-                  data-opened-by={tab.openedBy}
-                  draggable
-                  data-tooltip={tab.url}
-                  onClick={() => {
-                    actions.select(tab.id);
-                  }}
-                  onAuxClick={(event) => {
-                    if (event.button === 1) actions.close(tab.id);
-                  }}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    actions.tabMenu(tab.id);
-                  }}
-                  onKeyDown={(event) => {
-                    if (isImeComposing(event.nativeEvent)) return;
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      actions.select(tab.id);
-                    }
-                  }}
-                  onDragStart={(event) => {
-                    dragged.current = tab.id;
-                    event.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onDragOver={(event) => {
-                    if (dragged.current !== null) event.preventDefault();
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const from = dragged.current;
-                    dragged.current = null;
-                    if (from !== null && from !== tab.id) actions.move(from, index);
-                  }}
+    // The new-tab button sits beside the tablist: a tablist owns only tabs.
+    <div className="browser-tabbar">
+      <div
+        className="browser-tabs"
+        role="tablist"
+        aria-label={t('browser.tabs')}
+        data-testid="browser-tabs"
+      >
+        {state.spaces.map((space) => {
+          const tabs = state.tabs.filter((tab) => tab.space === space.id);
+          if (tabs.length === 0 && grouped) return null;
+          return (
+            <div key={space.id} className="browser-space" data-space-kind={space.kind}>
+              {grouped && (
+                <span
+                  className="browser-space-label"
+                  data-running={space.running}
+                  data-ownership={space.ownership}
                 >
-                  <span className="browser-tab-icon" aria-hidden="true">
-                    {tab.loading ? (
-                      <span className="browser-spinner" />
-                    ) : tab.favicon === undefined ? (
-                      <GlobeIcon size={12} />
-                    ) : (
-                      <img src={tab.favicon} alt="" width={12} height={12} />
-                    )}
-                  </span>
-                  <span className="browser-tab-title">{title}</span>
-                  {tab.openedBy === 'agent' && (
-                    <span className="browser-tab-agent" aria-label={t('browser.agentTab')} />
-                  )}
-                  <IconButton
-                    size="xs"
-                    className="browser-tab-close"
-                    label={t('browser.closeTab')}
-                    tabIndex={-1}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      actions.close(tab.id);
+                  {spaceLabel(space, t)}
+                </span>
+              )}
+              {tabs.map((tab) => {
+                const index = state.tabs.indexOf(tab);
+                const selected = tab.id === state.activeTab;
+                const title = tabTitle(tab, t);
+                return (
+                  <div
+                    key={tab.id}
+                    className="browser-tab"
+                    role="tab"
+                    aria-selected={selected}
+                    tabIndex={selected ? 0 : -1}
+                    data-testid="browser-tab"
+                    aria-keyshortcuts="Delete"
+                    data-tab={tab.id}
+                    data-opened-by={tab.openedBy}
+                    draggable
+                    data-tooltip={tab.url}
+                    onClick={() => {
+                      actions.select(tab.id);
+                    }}
+                    onAuxClick={(event) => {
+                      if (event.button === 1) actions.close(tab.id);
+                    }}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      actions.tabMenu(tab.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (isImeComposing(event.nativeEvent)) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        actions.select(tab.id);
+                      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+                        event.preventDefault();
+                        actions.close(tab.id);
+                      }
+                    }}
+                    onDragStart={(event) => {
+                      dragged.current = tab.id;
+                      event.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(event) => {
+                      if (dragged.current !== null) event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const from = dragged.current;
+                      dragged.current = null;
+                      if (from !== null && from !== tab.id) actions.move(from, index);
                     }}
                   >
-                    <CloseIcon size={12} />
-                  </IconButton>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                    <span className="browser-tab-icon" aria-hidden="true">
+                      {tab.loading ? (
+                        <span className="browser-spinner" />
+                      ) : tab.favicon === undefined ? (
+                        <GlobeIcon size={12} />
+                      ) : (
+                        <img src={tab.favicon} alt="" width={12} height={12} />
+                      )}
+                    </span>
+                    <span className="browser-tab-title">{title}</span>
+                    {tab.openedBy === 'agent' && (
+                      <span className="browser-tab-agent" aria-label={t('browser.agentTab')} />
+                    )}
+                    {/* A tab's content is presentational, so the close control is for the
+                        pointer only; on a focused tab Delete closes it (aria-keyshortcuts). */}
+                    <span
+                      className="icon-button workbench-icon is-xs browser-tab-close"
+                      aria-hidden="true"
+                      data-tooltip={t('browser.closeTab')}
+                      data-testid="browser-tab-close"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        actions.close(tab.id);
+                      }}
+                    >
+                      <CloseIcon size={12} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
       <IconButton
         size="xs"
         label={t('browser.newTab')}

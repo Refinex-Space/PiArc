@@ -50,3 +50,6 @@
 - `electron-forge start` 会清掉 `.vite/renderer`，之后 `dev` 形态的 L4 报 "Production bundle not found"：重新打开发构建。
 - 宿主页面的 `print` 是临时输出：一行输出在静默一段时间后立即同步发出（脚本之后可能死循环、到不了微任务），连续输出按微任务合并；`finish` 的输出是权威结果。
 - 附加 CDP 之后 JS 对话框仍由 Electron 弹原生框，`prompt()` 不可用（B1.3.3 的偏差，见设计增补）。
+- guest 的回环流量也经 Core 的浏览器代理（`<-loopback>`）：本地服务没起来时 Chromium 看到的是代理带 `x-piarc-proxy-error: connection-refused` 的 `502`，不是 -102；`guest-session.ts` 的 `onHeadersReceived` 把它变回连接被拒（`tab.ts` 的 `refusedLoad`）。一个分区的 `webRequest` 每种事件只能有一个监听器，新的判断加在已有的监听器里。
+- Chromium 在页面会话里也会发自己的 `Page.downloadWillBegin`/`downloadProgress`：`cdp-policy.ts` 的 `pageEvent` 丢掉它们，SDK 只认 `agent-downloads.ts` 发的（guid 与暂存一致）。
+- 智能体经 CDP 设的设备模拟由面板施加（`cdp-proxy.ts` 的 `#emulate`）：不在屏上的标签同样施加，`mobile: true` 且页面没有 viewport 标签时布局宽度是 980，断言用 `screen.width`。

@@ -21,6 +21,25 @@ export interface AgentDownload {
   /** Where the browser writes it. */
   readonly file: string;
   state: 'inProgress' | 'completed' | 'canceled';
+  /** Settles with the final state once the browser is done with it. */
+  readonly done: Promise<'completed' | 'canceled'>;
+}
+
+/**
+ * Whether `download` completed, waiting up to `waitMs` for one in progress: the SDK's
+ * `saveAs()` may come right after the download event, before the last bytes (B2.6.6).
+ */
+export async function finishedDownload(download: AgentDownload, waitMs: number): Promise<boolean> {
+  if (download.state !== 'inProgress') return download.state === 'completed';
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<'late'>((resolve) => {
+    timer = setTimeout(() => {
+      resolve('late');
+    }, waitMs);
+  });
+  const state = await Promise.race([download.done, late]);
+  clearTimeout(timer);
+  return state === 'completed';
 }
 
 export interface DownloadDeps {
@@ -78,7 +97,11 @@ export class AgentDownloads {
     const name = safeName(item.getFilename());
     const file = path.join(this.deps.directory(run.callSessionId), `${guid}-${name}`);
     item.setSavePath(file);
-    const download: AgentDownload = { item, file, state: 'inProgress' };
+    let settle: (state: 'completed' | 'canceled') => void = () => undefined;
+    const done = new Promise<'completed' | 'canceled'>((resolve) => {
+      settle = resolve;
+    });
+    const download: AgentDownload = { item, file, state: 'inProgress', done };
     run.downloads.set(guid, download);
     const space = spaceNumber(page.space);
     const emit = (method: string, params: Record<string, unknown>) => {
@@ -115,6 +138,7 @@ export class AgentDownloads {
     });
     item.once('done', (_event, state) => {
       download.state = state === 'completed' ? 'completed' : 'canceled';
+      settle(download.state);
       emit('Page.downloadProgress', {
         guid,
         totalBytes: item.getTotalBytes(),

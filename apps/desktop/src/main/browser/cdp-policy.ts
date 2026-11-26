@@ -80,6 +80,17 @@ const COOKIE_EVENTS: ReadonlySet<string> = new Set([
   'Network.responseReceivedEarlyHints',
 ]);
 
+/**
+ * Chromium's own download events: PiArc reports the downloads of a run itself, with the guid
+ * its staging uses (`agent-downloads.ts`, B2.6.6), so these would name downloads it cannot save.
+ */
+const NATIVE_DOWNLOAD_EVENTS: ReadonlySet<string> = new Set([
+  'Page.downloadWillBegin',
+  'Page.downloadProgress',
+  'Browser.downloadWillBegin',
+  'Browser.downloadProgress',
+]);
+
 /** Header names that carry cookies. */
 const COOKIE_HEADERS: ReadonlySet<string> = new Set(['cookie', 'set-cookie', 'set-cookie2']);
 
@@ -159,12 +170,12 @@ export function browserCommand(method: string): CdpVerdict {
 }
 
 /**
- * A page event as the agent's script may see it (THR-17): the events that list cookies are
- * dropped (undefined), cookie headers are removed from requests and responses, everything
- * else passes unchanged.
+ * A page event as the agent's script may see it (THR-17): the events that list cookies and
+ * Chromium's own download events are dropped (undefined), cookie headers are removed from
+ * requests and responses, everything else passes unchanged.
  */
 export function pageEvent(method: string, params: unknown): unknown {
-  if (COOKIE_EVENTS.has(method)) return undefined;
+  if (COOKIE_EVENTS.has(method) || NATIVE_DOWNLOAD_EVENTS.has(method)) return undefined;
   if (method !== 'Network.requestWillBeSent' && method !== 'Network.responseReceived') {
     return params;
   }

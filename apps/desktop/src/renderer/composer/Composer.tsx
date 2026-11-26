@@ -939,8 +939,10 @@ export function Composer({
         </div>
       )}
       <div className={`composer-box${disabled ? ' is-disabled' : ''}`}>
-        {contexts.length === 0 ? null : (
-          <div className="composer-attachments" data-testid="composer-browser-contexts">
+        {contexts.length === 0 && pending.length === 0 ? null : (
+          // One shelf for both kinds: two containers would share the grid's shelf area and
+          // draw over each other.
+          <div className="composer-attachments" data-testid="composer-attachments">
             {contexts.map((context) => (
               <BrowserContextChip
                 key={context.id}
@@ -954,10 +956,6 @@ export function Composer({
                 }}
               />
             ))}
-          </div>
-        )}
-        {pending.length === 0 ? null : (
-          <div className="composer-attachments" data-testid="composer-attachments">
             {pending.map((attachment) => (
               <span
                 key={attachment.id}

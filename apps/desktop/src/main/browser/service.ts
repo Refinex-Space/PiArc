@@ -714,6 +714,17 @@ export class BrowserService {
         this.#download(contents, item);
       },
       deniedPorts: () => this.deps.deniedPorts(),
+      refusedLoad: (webContentsId, url) => {
+        for (const model of this.#loaded.values()) {
+          const tab = model.tabs.find(
+            (t) =>
+              t.view !== undefined &&
+              !t.view.webContents.isDestroyed() &&
+              t.view.webContents.id === webContentsId,
+          );
+          tab?.refusedLoad(url);
+        }
+      },
     });
   }
 
@@ -1139,7 +1150,17 @@ export class BrowserService {
     if (this.#quitting) return;
     const active = model.tabs.find((t) => t.id === model.active);
     for (const tab of model.tabs) {
-      if (tab !== active && tab.view !== undefined) this.#views.park(tab.view);
+      if (tab !== active && tab.view !== undefined) {
+        this.#views.park(tab.view);
+        // A hidden page keeps its device (B1.4.2): the agent may emulate a tab not on screen.
+        const { emulation } = tab;
+        tab.applyEmulation({
+          x: 0,
+          y: 0,
+          width: emulation?.width ?? 1,
+          height: emulation?.height ?? 1,
+        });
+      }
     }
     for (const [tabId, view] of model.devtools) {
       if (tabId !== model.active) this.#views.detach(view);

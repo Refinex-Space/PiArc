@@ -550,6 +550,11 @@ export function AnnotateSurface({
             role="img"
             aria-label={t('browser.annotate.canvas')}
             onPointerDown={onDown}
+            // The text field opens on pointerdown and takes the focus; the mousedown that
+            // follows would move the focus to the page and close the empty field at once.
+            onMouseDown={(event) => {
+              if (mode === 'annotate' && tool === 'text') event.preventDefault();
+            }}
             onPointerMove={onMove}
             onPointerUp={onUp}
             onPointerCancel={() => {

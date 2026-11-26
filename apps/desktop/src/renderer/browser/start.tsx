@@ -94,7 +94,7 @@ export function StartPage({ sessionId, services, call, open, report }: StartPage
       </Button>
       {local.length > 0 && (
         <section className="browser-start-section" data-testid="browser-start-services">
-          <h3 className="browser-start-heading">{t('browser.start.services')}</h3>
+          <h2 className="browser-start-heading">{t('browser.start.services')}</h2>
           <ul className="browser-start-list">
             {local.map((service) => (
               <li key={service.port}>
@@ -117,7 +117,7 @@ export function StartPage({ sessionId, services, call, open, report }: StartPage
       )}
       {(rows.length > 0 || issues.length > 0) && (
         <section className="browser-start-section" data-testid="browser-start-servers">
-          <h3 className="browser-start-heading">{t('browser.start.servers')}</h3>
+          <h2 className="browser-start-heading">{t('browser.start.servers')}</h2>
           {page.launch?.trusted === false && (
             <p className="browser-start-note" data-testid="browser-start-untrusted">
               {t('browser.start.untrusted')}
@@ -151,7 +151,7 @@ export function StartPage({ sessionId, services, call, open, report }: StartPage
       )}
       {page.recents.length > 0 && (
         <section className="browser-start-section" data-testid="browser-start-recents">
-          <h3 className="browser-start-heading">{t('browser.start.recent')}</h3>
+          <h2 className="browser-start-heading">{t('browser.start.recent')}</h2>
           <ul className="browser-start-list" aria-label={t('browser.start.recentLabel')}>
             {page.recents.map((recent) => (
               <li key={recent.url}>

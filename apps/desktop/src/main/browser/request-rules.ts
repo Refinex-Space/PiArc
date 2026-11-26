@@ -8,6 +8,22 @@ const SCHEMES = new Set(['http:', 'https:', 'ws:', 'wss:', 'data:', 'blob:', 'ab
 /** The workspace file scheme (B1.6). */
 export const WORKSPACE_SCHEME = 'piarc-browse';
 
+/**
+ * Whether a response is the browser proxy's `502` for a target that refused the connection
+ * (Core's `x-piarc-proxy-error: connection-refused`): a local server that is not up yet, which
+ * the tab waits for as Chromium's `ERR_CONNECTION_REFUSED` without a proxy (B1.3.1).
+ */
+export function proxyRefused(
+  statusCode: number,
+  headers: Record<string, string[]> | undefined,
+): boolean {
+  if (statusCode !== 502 || headers === undefined) return false;
+  return Object.entries(headers).some(
+    ([name, values]) =>
+      name.toLowerCase() === 'x-piarc-proxy-error' && values.includes('connection-refused'),
+  );
+}
+
 /** Cloud metadata literals outside link-local: they go through the proxy, which refuses them. */
 const LINK_LOCAL_V4 = /^169\.254\.\d{1,3}\.\d{1,3}$/;
 

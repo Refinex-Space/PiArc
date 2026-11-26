@@ -16,7 +16,7 @@
 //! - A refusal is `403 Forbidden` with the reason in the `x-piarc-proxy-denied` header
 //!   (`not-allowed` or `blocked-address`) and in the text body, and is reported to
 //!   [`ProxyHooks::refused`] (Core writes it to the audit); a failed lookup or connection is
-//!   `502 Bad Gateway`.
+//!   `502 Bad Gateway`, marked in [`UPSTREAM_HEADER`] when the target refused the connection.
 //! - Limits ([`ProxyLimits`], R1 I54): at most a number of client connections at once (the
 //!   accept loop waits for a free slot instead of exhausting file descriptors), a deadline for a
 //!   request's head, for connecting upstream and for a tunnel without traffic; a failed accept
@@ -64,6 +64,10 @@ pub use browser::BrowserPolicy;
 
 /// The header that carries the reason of a refusal.
 pub const DENIED_HEADER: &str = "x-piarc-proxy-denied";
+
+/// The header of a `502` whose target refused the connection (`connection-refused`): a local
+/// server that is not up yet, which the built-in browser waits for (design addendum B1.3.1).
+pub const UPSTREAM_HEADER: &str = "x-piarc-proxy-error";
 
 /// Name resolution and outgoing TCP connections.
 pub trait Network: Send + Sync {
@@ -542,7 +546,7 @@ async fn tunnel(
     };
     let mut upstream = match connect(shared, &addrs).await {
         Ok(stream) => stream,
-        Err(error) => return bad_gateway(&format!("cannot connect to {host}:{port}: {error}")),
+        Err(error) => return unreachable(&host, port, &error),
     };
     let idle = shared.limits.idle_timeout;
     tokio::spawn(async move {
@@ -692,7 +696,7 @@ async fn forward(request: Request<Incoming>, shared: &Shared) -> Response<ProxyB
     };
     let stream = match connect(shared, &addrs).await {
         Ok(stream) => stream,
-        Err(error) => return bad_gateway(&format!("cannot connect to {host}:{port}: {error}")),
+        Err(error) => return unreachable(&host, port, &error),
     };
     let (mut sender, connection) =
         match hyper::client::conn::http1::handshake(TokioIo::new(stream)).await {
@@ -752,4 +756,16 @@ fn refusal(status: StatusCode, reason: Option<&'static str>, message: &str) -> R
 
 fn bad_gateway(message: &str) -> Response<ProxyBody> {
     refusal(StatusCode::BAD_GATEWAY, None, message)
+}
+
+/// The `502` for a target the proxy could not connect to; a refusal is marked as such.
+fn unreachable(host: &str, port: u16, error: &io::Error) -> Response<ProxyBody> {
+    let mut response = bad_gateway(&format!("cannot connect to {host}:{port}: {error}"));
+    if error.kind() == io::ErrorKind::ConnectionRefused {
+        response.headers_mut().insert(
+            UPSTREAM_HEADER,
+            HeaderValue::from_static("connection-refused"),
+        );
+    }
+    response
 }

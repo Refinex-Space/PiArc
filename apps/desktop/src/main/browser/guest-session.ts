@@ -3,7 +3,7 @@
 // downloads hook. The agent's request gate (B2) plugs into `gate`.
 import { app, type DownloadItem, type Session, type WebContents } from 'electron';
 
-import { requestVerdict, type RequestVerdict } from './request-rules.js';
+import { proxyRefused, requestVerdict, type RequestVerdict } from './request-rules.js';
 
 /** Permissions a user may allow for one page of a tab they control (B1.3.2). */
 export const PROMPTABLE = new Set([
@@ -36,6 +36,8 @@ export interface GuestSessionHooks {
   gate?(details: Electron.OnBeforeRequestListenerDetails): RequestVerdict | Promise<RequestVerdict>;
   /** PiArc's own loopback ports now. */
   deniedPorts(): ReadonlySet<number>;
+  /** A page's load whose server refused the connection behind the proxy (B1.3.1). */
+  refusedLoad(webContentsId: number, url: string): void;
 }
 
 /** Chrome's user agent without Electron's and PiArc's tokens, so sites treat it as Chrome. */
@@ -117,6 +119,20 @@ export async function setUpGuestSession(
         callback({ cancel: true });
       },
     );
+  });
+  // Behind the proxy a local server that is not up yet answers the proxy's marked 502; the
+  // load fails instead, and the tab treats it as `ERR_CONNECTION_REFUSED` (B1.3.1).
+  session.webRequest.onHeadersReceived((details, callback) => {
+    if (
+      details.resourceType === 'mainFrame' &&
+      details.webContentsId !== undefined &&
+      proxyRefused(details.statusCode, details.responseHeaders)
+    ) {
+      hooks.refusedLoad(details.webContentsId, details.url);
+      callback({ cancel: true });
+      return;
+    }
+    callback({});
   });
   session.on('will-download', (_event, item, contents) => {
     hooks.download(contents, item);

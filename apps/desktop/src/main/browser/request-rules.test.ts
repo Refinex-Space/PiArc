@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { loopbackHost, navigable, requestVerdict } from './request-rules.js';
+import { loopbackHost, navigable, proxyRefused, requestVerdict } from './request-rules.js';
 
 const denied = new Set([4100]);
 
@@ -64,5 +64,16 @@ describe('navigable', () => {
     for (const url of ['file:///x', 'javascript:alert(1)', 'data:text/html,x', 'app://piarc/']) {
       expect(navigable(url), url).toBe(false);
     }
+  });
+});
+
+describe('proxyRefused (B1.3.1)', () => {
+  it('recognizes the proxy’s 502 for a target that refused the connection', () => {
+    expect(proxyRefused(502, { 'X-PiArc-Proxy-Error': ['connection-refused'] })).toBe(true);
+    expect(proxyRefused(502, { 'x-piarc-proxy-error': ['connection-refused'] })).toBe(true);
+    expect(proxyRefused(502, {})).toBe(false);
+    expect(proxyRefused(502, undefined)).toBe(false);
+    expect(proxyRefused(200, { 'x-piarc-proxy-error': ['connection-refused'] })).toBe(false);
+    expect(proxyRefused(502, { 'x-piarc-proxy-error': ['other'] })).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CONSOLE_LIMITS, ConsoleLog } from './console-log.js';
+import { CONSOLE_LIMITS, ConsoleLog, electronNotice } from './console-log.js';
 
 describe('console log (B1.4.3)', () => {
   it('numbers entries and answers those after a sequence number', () => {
@@ -48,5 +48,20 @@ describe('console log (B1.4.3)', () => {
     const log = new ConsoleLog(() => 0);
     log.add('info', 'a\ud800b', '', 0);
     expect(log.after(0)[0]?.text).toBe('a�b');
+  });
+});
+
+describe('electronNotice', () => {
+  it('recognizes the warnings Electron itself prints in a development run, not page output', () => {
+    expect(
+      electronNotice(
+        '%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security Policy set',
+      ),
+    ).toBe(true);
+    expect(
+      electronNotice('Electron Security Warning (Insecure Content-Security-Policy) This renderer'),
+    ).toBe(true);
+    expect(electronNotice('slow request: Electron Security Warning')).toBe(false);
+    expect(electronNotice('Security warning from the page')).toBe(false);
   });
 });

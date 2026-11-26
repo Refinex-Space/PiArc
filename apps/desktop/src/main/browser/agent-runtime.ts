@@ -6,7 +6,7 @@ import { nativeImage, type WebContents } from 'electron';
 
 import type { SnapshotOptions, SnapshotResult } from '../../shared/browser-host.js';
 import { AgentBridge, type BridgeCore } from './agent-bridge.js';
-import { AgentDownloads } from './agent-downloads.js';
+import { AgentDownloads, finishedDownload } from './agent-downloads.js';
 import { AgentGate } from './agent-gate.js';
 import { quarantine } from './quarantine.js';
 import { StateReminders } from './state-reminders.js';
@@ -20,6 +20,9 @@ import type { BrowserService } from './service.js';
 import { SnapshotError, takeSnapshot } from './snapshot.js';
 import { parseLaunchView } from './dev-servers.js';
 import { serverAnswer, serverInfo, serversResult, type StartPageCore } from './start-page.js';
+
+/** How long a save waits for a download still in progress (B2.6.6). */
+const DOWNLOAD_WAIT_MS = 120_000;
 
 export interface AgentRuntimeDeps {
   readonly service: BrowserService;
@@ -156,7 +159,9 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
     },
     saveFile: async (run, source, path) => {
       const download = run.downloads.get(source);
-      if (download?.state !== 'completed') {
+      // saveAs() may come before the last bytes: wait for the download (the run's own timeout
+      // still ends the call).
+      if (download === undefined || !(await finishedDownload(download, DOWNLOAD_WAIT_MS))) {
         throw new SpaceError(
           'PIARC_FILE_REFUSED',
           'Only a finished download of this call can be saved',

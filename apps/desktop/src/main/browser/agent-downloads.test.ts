@@ -7,7 +7,7 @@ import type { HostRun as Run } from './host-bindings.js';
 
 vi.mock('electron', () => ({}));
 
-const { AgentDownloads, DOWNLOAD_LIMITS, freePath, safeName, spaceNumber } =
+const { AgentDownloads, DOWNLOAD_LIMITS, finishedDownload, freePath, safeName, spaceNumber } =
   await import('./agent-downloads.js');
 
 class FakeItem extends EventEmitter {
@@ -110,5 +110,32 @@ describe('agent downloads (B2.6.6)', () => {
     const extra = new FakeItem();
     expect(f.downloads.take(contents, extra as never)).toBe(true);
     expect(extra.cancelled).toBe(true);
+  });
+});
+
+describe('finishedDownload (B2.6.6)', () => {
+  it('waits for a download in progress, so saveAs right after the event works', async () => {
+    const f = fixture();
+    const item = new FakeItem();
+    f.downloads.take(contents, item as unknown as Electron.DownloadItem);
+    const download = [...f.run.downloads.values()][0];
+    if (download === undefined) throw new Error('no download');
+    const waiting = finishedDownload(download, 1000);
+    item.emit('done', {}, 'completed');
+    expect(await waiting).toBe(true);
+    expect(await finishedDownload(download, 1000)).toBe(true);
+  });
+
+  it('answers false for a canceled download and one that does not finish in time', async () => {
+    const f = fixture();
+    const canceled = new FakeItem();
+    const slow = new FakeItem();
+    f.downloads.take(contents, canceled as unknown as Electron.DownloadItem);
+    f.downloads.take(contents, slow as unknown as Electron.DownloadItem);
+    const [first, second] = [...f.run.downloads.values()];
+    if (first === undefined || second === undefined) throw new Error('no downloads');
+    canceled.emit('done', {}, 'cancelled');
+    expect(await finishedDownload(first, 1000)).toBe(false);
+    expect(await finishedDownload(second, 10)).toBe(false);
   });
 });
