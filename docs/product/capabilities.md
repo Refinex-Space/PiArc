@@ -12,7 +12,7 @@
 | M2 | 46 | 46 | 0 | 0 |
 | M3 | 47 | 47 | 0 | 0 |
 | M4 | 31 | 31 | 0 | 0 |
-| M5 | 25 | 25 | 0 | 0 |
+| M5 | 29 | 29 | 0 | 0 |
 
 ## M1
 
@@ -224,6 +224,10 @@
 | ID | 能力 | 需求与架构 | 任务 | 覆盖场景 | 状态 |
 |---|---|---|---|---|---|
 | CAP-AGENT-FORK-001 | fork 子 agent 继承分支历史及父会话的 system 与工具前缀，审批和检查点归主会话 | FR-HN-04、ARCH-6.4、ARCH-6.15 | T48 | `subagent-fork` | 已实现 |
+| CAP-BROWSER-FILES-001 | 智能体页面的上传经 Core 读权限裁决并复制到会话暂存区，工作区外询问，同名文件不覆盖已暂存的副本 | ARCH-10.1 | T51 | `browser-upload-outside-workspace`<br>`browser-upload-same-name` | 已实现 |
+| CAP-BROWSER-RUN-001 | Browser 调用交给客户端运行：输出在 nonce 边界内、截图附在结果后、超长输出落盘、超时与中断有结果、同一回复的调用依次运行、每次一行审计 | ARCH-8.1、ARCH-10.1 | T51 | `browser-cancel-while-asking`<br>`browser-client-hang`<br>`browser-output-spill`<br>`browser-run-basic`<br>`browser-serial-batch` | 已实现 |
+| CAP-BROWSER-SITE-001 | 智能体的页面访问新站点经 Core 站点卡：本次、本会话、总是允许（规则）、plan 只放行本机、Auto 交给用户、导入站点总是询问 | ARCH-10.1 | T51 | `browser-auto-review`<br>`browser-bypass`<br>`browser-cancel-while-asking`<br>`browser-imported-site-always-asks`<br>`browser-plan-local-only`<br>`browser-site-always-rule`<br>`browser-site-ask-once`<br>`browser-site-session` | 已实现 |
+| CAP-BROWSER-TOOL-001 | 有桌面客户端且设置开启时模型请求里有 Browser 工具；没有客户端时没有 | ARCH-8.1、ARCH-10.1 | T51 | `browser-client-absent`<br>`browser-run-basic` | 已实现 |
 | CAP-CHAT-SIDE-001 | 侧边对话基于当前上下文提问，不写入主对话 | FR-CH-08 | T49 | `side-chat-isolation` | 已实现 |
 | CAP-CONFIG-MANAGED-001 | 企业托管配置是最高层：托管 deny 在裁决第 1 步生效，列表与其他层合并，标量覆盖其他层 | ARCH-6.14、ARCH-6.2.3 | T47 | `managed-precedence` | 已实现 |
 | CAP-CONFIG-MANAGED-CHANGE-001 | 托管配置变化在下一次检查内生效，ConfigChange hook 不能阻断，运行中变坏的文件沿用上次内容 | ARCH-6.14、ARCH-6.3.2 | T47 | `managed-change` | 已实现 |

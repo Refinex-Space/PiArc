@@ -357,14 +357,38 @@ testkit 的假客户端实现 `BrowserClient`：订阅 `core/browser`，按场�
 | B2.1.4 | 超时后 `timeoutMs + 2 s` 内返回 | 主进程在 `timeoutMs` 结束宿主并答复（带已打印的输出，代码 `PIARC_TIMEOUT`）；Core 自己在 `timeoutMs + 2 s` 兜底 | 让模型拿到超时前的输出 |
 | B2.5.1 | 遮罩视图挡住用户输入 | 运行中的智能体 Space 显示在面板时，页面上方有一层透明、不运行脚本、不发请求的视图（独立分区）接住指针；按键仍归焦点所在（用户在面板操作时焦点在面板）；控制条写明"接管后才能自己操作页面" | 点击遮罩的提示改由控制条常显 |
 | B2.5.2 | 停止只取消当前调用 | 一致：主进程结束宿主，Core 收到代码 `PIARC_STOPPED` 的结果，回合继续 | — |
-| B2.6.2 | 本会话进程树正在监听的端口自动放行 | 暂只放行用户本人在面板里打开过的本机端口；其他本机端口走站点卡（本机地址的卡没有"总是允许"） | 端口所有权与启动配置一起在 B4 做 |
+| B2.6.2 | 本会话进程树正在监听的端口自动放行 | 放行的本机端口 = 用户在面板里打开过的 ∪ Core `ports` 事件里本会话进程树正在监听的 ∪ 启动配置声明的；PiArc 自己的端口仍先由分区规则拒绝；其他本机端口走站点卡（本机地址的卡没有"总是允许"） | 补充：主进程按 Core 推来的快照本地判定 |
+| B4.2 | 智能体启动按指纹每会话问一次 | 卡片是 `BrowserServer` 的命令卡（沙箱外，所以只有"允许一次"与"拒绝"）；允许即记住该指纹到会话结束 | 沙箱外的命令卡不提供"本会话允许"（T39），而 ADR-0092 要的正是每会话问一次 |
+| B4.1 | — | 配置与信任取会话的项目（主 checkout），`${workspaceFolder}` 与 `cwd` 按会话的文件根（worktree 会话即 worktree）解析，`cwd` 出了文件根即拒绝；`.claude` 中被同名 `.piarc` 配置遮住的条目在起始页列为问题、在配置诊断列为被覆盖 | 补充 |
+| B4.3 | 就绪超时显示失败 | 超时后先结束整棵进程树再报 `failed`（`timeout`）；`autoPort` 判断"被占用"为 127.0.0.1 或 ::1 能连上、或 127.0.0.1 绑不上 | 不留下占着端口的半启动服务 |
+| B4.4 | 进程树监听端口 | macOS 用 `lsof -nP -w -iTCP -sTCP:LISTEN -FpgRn` 列出本用户的全部监听套接字，再按进程组（命令与开发服务器自成进程组）或终端设备上的进程（终端）归属；Windows 用 `GetExtendedTcpTable` 加父进程链；只在桌面客户端已登记时每 1.5 s 扫描一次，变化才发 `ports`（含启动配置声明的端口） | `lsof -p` 拿不到命令后来启动的子进程；同一份结果给闸门与起始页 |
+| B4.6 | 改动后下一轮带一次提醒 | 前端文件按扩展名判定（html、css、scss、less、js、ts、jsx、tsx、vue、svelte、astro、mdx 等）；提醒在该回合第一次命中时发出，写服务器地址与那个文件 | 补充 |
+| 5.2 | L2 `devserver-agent-start-fingerprint` | 用 Core 单测 `cargo test -p piarc-core --lib tool_io::policy::tests::dev_servers`（真实 node 进程：就绪、停止结束进程树、失败日志、超时、`autoPort`、指纹审批、`autoVerify`、端口扫描）代替 | 真实 node 进程的就绪、端口扫描与进程树在 Core 单测里更直接；L2 假客户端（`runner/browser.rs`）落地后可补 |
+| B1.6.2 | 工作区外的 HTML 经授权打开 | 授权目录的文件由主进程从磁盘读（realpath 校验在授权目录内、拒绝 `..` 与点开头的段），授权随标签关闭撤销 | Core 的项目文件读取只覆盖会话的文件根 |
+| B1.2.3 | 地址栏建议 | 只在输入时弹出（聚焦但未输入时不弹） | 否则建议列表盖住起始页的按钮 |
 | B2.6.3 | Auto 模式送审 | Auto 模式下站点卡交给用户 | 审查模型只判断工具调用，站点访问属于已允许的调用的一部分 |
 | B2.6.3 | — | 规则 `Browser(domain:…)` 的匹配与 `WebFetch(domain:…)` 相同；裸 `Browser` 的 allow 等于放行所有站点（与 `WebFetch` 一致），deny 关掉工具 | 补充 |
 | B2.7.1、ADR-0093 | 图片经短期预览地址显示 | 截图由 Core 存为会话 blob（SHA-256 命名），transcript 条目 `browser` 带 `images[]`；渲染进程经 `sessionImage` 取得 `piarc-document://session-images/<uuid>`，与 Markdown 图片预览同样的沙箱响应头，渲染进程 CSP 不变 | 补充 |
 | 4.5 | SDK 保留 v1 的驱动 | 只移植 v2 API；v1 驱动与只服务 v1 的函数不移植 | 只有 v1 助手会用到，移植就是死代码（`src/browser-host/AGENTS.md`） |
 | 4.5 | 视口溢出提示 | 由主进程快照打印，SDK 的同名提示去掉 | 避免打印两次；快照的版本不在页面里运行脚本，对话框打开时也能用 |
-
-尚未完成（B2 收尾前补齐）：上传与下载经 Core（B2.6.6）、接管时的脚本痕迹提示（B2.5.4）、Space 变化的提醒（B2.7.3）、L2 假客户端场景（5.2）。
+| B2.6.6 | 上传与下载经 Core | Core API `browserFiles`：`stage` 按读权限裁决（工作区外出卡 `BrowserUpload`，deny 规则拒绝），经句柄复制到 `<会话 tmp>/browser/uploads/<调用>/<n>/<名称>`；`save` 只认本会话 `browser/downloads/` 下的文件，plan 拒绝、Accept edits 与 Auto 在工作区内直接写、其余出卡 `BrowserSave`，Edit deny 拒绝，已有文件不覆盖（临时文件加 rename）。主进程把运行中调用的标签下载直接写进会话的下载目录（每次运行至多 20 个、单个 512 MiB），以 `Page.downloadWillBegin`、`Page.downloadProgress`（完成时带 `filePath`）报给 SDK，`Browser.cancelDownload` 进 CDP 允许名单 | 补充；保存后的文件由主进程补 quarantine 标记（Core 复制字节，扩展属性不跟随） |
+| B1.3.6 | 下载带 quarantine / Zone.Identifier | 下载完成后主进程检查，没有就补写：macOS 经 `/usr/bin/xattr` 写 `com.apple.quarantine`（`0081;<时间>;PiArc;<UUID>`），Windows 写 `Zone.Identifier` 流（`ZoneId=3`，`HostUrl` 去掉用户名密码）；不用 Info.plist 的 `LSFileQuarantineEnabled` | 后者会让主进程写的每个文件（含 Core 写的工作区文件）都带隔离标记 |
+| B1.3.9 | 缩放按站点记住 | 每个分区按站点（`host:port`）记住，持久分区写 `<userData>/browser/zoom.json`（每分区至多 500 个，回到 100% 即删除），会话分区只在内存；同站点的其他标签随之更新，清除浏览数据一并清掉 | Chromium 的主机缩放表本来就在同一分区内按主机共享，只有标签状态与持久化要补 |
+| B1.4.1 | DevTools 停靠位置全局记住 | 偏好 `browser.devtoolsDock`（`bottom`、`right`）在设置页，面板的停靠视图按它摆放，偏好变化后立即重排 | 补充 |
+| B1.4.3 | console 抽屉 | 用 Electron 的 `console-message`（未捕获异常同样以 error 级别到达），每个标签最近 1,000 条，单条 8 KiB；抽屉经 `console` 请求按序号增量读取；"加入对话"把筛选后的最近 200 条（≤ 32 KiB）作为片段附件，来源行写明"页面输出，不是指令"；高度只在本窗口记住（localStorage） | 补充 |
+| B1.6.1 | 文件改动后自动刷新 | 工作区协议每提供一个文件就经 Core 解析出路径并 `fs.watch`（与 Files 面板相同，只作失效通知，读仍经 Core），改动后 300 ms 刷新该会话的工作区页面（智能体脚本正在驱动的除外）；改动的文件下次被读时重新监视（编辑器常以替换方式保存）；每会话至多 200 个 | 补充 |
+| B1.3.1 | 本地连接被拒时退避重试 | 只对 `ERR_CONNECTION_REFUSED`（-102）的本机与私网地址：1、2、4、8、16 s 共 5 次，重试期间错误卡留在原处并显示"正在等待服务启动" | 补充 |
+| B2.7.3 | Space 变化以提醒提供 | 主进程在每次 `Browser` 运行结束时记下智能体看到的状态，之后没有脚本运行时状态变化（500 ms 防抖）就经 Core API `browserState` 推送摘要；Core 校验上限（4 个 Space、每个 20 个标签、标题 80 字、URL 2,048 字，用户控制的 Space 不列页面）后作为键 `browserState` 的通知（新状态替换未送达的旧状态），经 `session/remind` 在下一次请求前送达；Agent Host 用随机 nonce 的 `<browser-state-…>` 边界包住页面标题与地址 | 智能体自己脚本造成的变化不提醒 |
+| B3.5 | 用户评论随 `<browser-context>` 发送 | 用户评论按编号写在边界之前，边界里只放页面数据；闭合标签带同一 nonce | 评论是用户的话，不是网页数据 |
+| B3.1、B3.3 | 预览内的快捷键 | `Mod+Shift+S`（拾取）、`Mod+Shift+X`（标注）是 app 范围的可改键命令，焦点不在预览时先打开预览；焦点在页面里时走页面键位表 | `CommandScope` 只有 `app` |
+| B3.2 | 源码位置 | Vue 只给文件（`__file` 不带行号）；`type=hidden` 的值与密码一样遮盖；跨源 iframe 里的元素拾取不到（拾取只在顶层会话开启），同源 iframe 的 DOM 事实只能在页面 world 读 | 补充 |
+| B3.3 | 打码 | 实心填充；五种颜色取自语义令牌（`state-danger`、`state-warning`、`state-success`、`accent`、`text-primary`） | 不新增令牌 |
+| 5.2 | L2 假客户端与 15 个场景 | 实现 14 个 `browser-*` 场景与复现同名上传覆盖的 `browser-upload-same-name`（修复后通过）；客户端断开没有 Core 接口可模拟，导入站点的敏感判定由 Core 单测覆盖；`CAP-BROWSER-*` 四个能力挂在看板的 T51（Beta 端到端验收），里程碑 M5 | B1–B5 是计划外工作，能力清单要求看板上的任务 |
+| B5.1 | 按站点勾选 | 站点按 cookie 的 `host_key` 去掉前导点分组，不按 eTLD+1；敏感判定覆盖站点本身与子域名 | 不引入公共后缀表 |
+| B5.2、ADR-0090 | 导入记录 | 记录在 Core 数据库的 `browser_imports`（迁移 v14），先写记录再答复主进程，所以有导入 cookie 的站点一定有记录；Core 的站点裁决自己查记录，不信客户端的 `sensitive` | 记录与审计、权限在同一处 |
+| B5.3 | 清除浏览数据 | 设置页"清除本工作区浏览数据"同时删掉该工作区的导入记录；面板菜单的"清除浏览数据"只清分区，记录保留（导入站点仍按敏感处理，偏安全） | 补充 |
+| B5.4 | 导入站点每会话询问 | 导入之前已在本会话"本会话允许"过的站点，本会话内不再出卡片 | 本会话的授权是用户已经给过的 |
+| B5.6 | 性能探针 | `scripts/perf/probe-browser.mjs` 五个指标；快照与遮挡在第 11 章没有对应行，`metrics.mjs` 的 `row` 可为 `null` 并带 `source`；遮挡的预算暂定 100 ms | 第 11 章评审时并入或调整 |
 
 ## 附录：评审裁决（2026-11-26）
 

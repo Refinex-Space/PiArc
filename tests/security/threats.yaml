@@ -76,6 +76,14 @@ threats:
   - id: THR-02
     title: 恶意项目配置
     countermeasures:
+      - measure: 内置浏览器里来自网页的文字（Browser 工具的输出、加入对话的元素上下文、浏览器状态提醒）放在随机 nonce 的边界里并写明是网页数据，网页文字关不掉边界；用户的评论写在边界外
+        type: automated
+        tests:
+          - vitest:agent-host/src/harness/browser.test.ts::wraps the output in a boundary page text cannot close
+          - vitest:agent-host/src/harness/browser.test.ts::lists the spaces inside a nonce boundary the titles cannot close
+          - vitest:apps/desktop/src/renderer/composer/browser-context.test.ts::opens with the data notice inside a nonce boundary and numbers the items
+          - vitest:apps/desktop/src/renderer/composer/browser-context.test.ts::escapes page text so it cannot close the boundary
+          - vitest:apps/desktop/src/renderer/composer/browser-context.test.ts::puts the user’s comments above the boundary, by number
       - arch: 项目信任闸门（10.2）：信任前不执行任何项目级可执行配置
         measure: 信任前不运行项目 hooks、不连项目 MCP、不应用项目 allow 规则、不加载项目插件与 Pi 扩展
         type: automated
@@ -220,6 +228,11 @@ threats:
         type: automated
         tests:
           - cap:CAP-SANDBOX-PATHS-001
+      - measure: 内置浏览器的脚本宿主（智能体的 Browser 脚本）是不能联网的沙箱页面，宿主分区的请求全部取消（ADR-0091）
+        type: automated
+        tests:
+          - 'l4:apps/desktop/e2e/browser-agent.e2e.ts::THR-05: the script host reaches nothing on the network'
+          - vitest:apps/desktop/src/main/browser/host-session.test.ts::allows scripts only from the host and no connections
       - measure: Windows 上没有命令沙箱
         type: accepted-risk
         reason: Windows 到 Beta 没有 OS 级沙箱（需求 D7），经批准的命令可以写工作区外与外传数据；沙箱开关在 Windows 上不可用且说明原因
@@ -366,6 +379,7 @@ threats:
           - vitest:apps/desktop/src/main/web-preferences.test.ts::fixes the security-relevant preferences
           - l4:apps/desktop/e2e/preload.e2e.ts::require, process, module and Buffer are not defined in the page
           - l4:apps/desktop/e2e/preload.e2e.ts::the window renderer runs in the OS-level sandbox
+          - l4:apps/desktop/e2e/browser-basic.e2e.ts::THR-11 guests reach neither the preload nor Node
       - arch: 严格 CSP
         measure: 主进程下发的 CSP 不允许内联脚本、eval 与外部资源
         type: automated
@@ -389,6 +403,8 @@ threats:
           - l4:apps/desktop/e2e/preload.e2e.ts::IPC from another origin is rejected
           - l4:apps/desktop/e2e/preload.e2e.ts::IPC from an origin that only starts with the app origin is rejected
           - vitest:apps/desktop/src/main/ipc/sender.test.ts::rejects origins that only start with the app origin
+          - vitest:apps/desktop/src/main/browser/browser-ipc.test.ts::THR-11 rejects %j
+          - l4:apps/desktop/e2e/browser-picker.e2e.ts::THR-11 a picked element with markup in its id and text shows it as text
           - l4:apps/desktop/e2e/t45-ipc-hardening.e2e.ts::THR-11 every window.piarc command answers malformed arguments with a structured error and the main process lives
       - arch: 有副作用的命令仍经 Core 的权限裁决
         measure: 终端写入要求真实输入；"总是允许"与 allow 规则经主进程原生确认
@@ -523,3 +539,83 @@ threats:
           - rust:crates/piarc-git/tests/writes.rs::pushes_are_rejected_leased_and_pulls_stop_on_conflicts
           - rust:crates/piarc-core/src/git/mod.rs::protected_patterns_match_whole_names
           - l4:apps/desktop/e2e/git-panel.e2e.ts::rolling back asks natively, keeps the bytes and undoes
+  - id: THR-16
+    title: 浏览器外传与本机服务访问
+    countermeasures:
+      - arch: 智能体控制的 Space 里每个请求经请求闸门：文档与框架的新主机经 Core 的站点卡并绑定正在运行的那次调用，未获准的子资源被拦截并写进本次结果（ADR-0089）
+        measure: 没有运行中的调用时不询问；新主机的文档问一次 Core，本会话的答复覆盖同时等待的主机；未获准的子资源被拦截并进结果；卡片随运行结束撤下
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::refuses unallowed subresources and records them for the result
+          - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::asks Core for a document and keeps a session answer for every waiting host
+          - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::refuses a document when Core refuses, and without a run asks nothing
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_site.rs::without_a_running_call_nothing_is_asked
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_site.rs::the_card_goes_away_with_the_run_and_on_timeout
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_site.rs::plan_mode_allows_only_local_addresses
+          - 'l4:apps/desktop/e2e/browser-agent.e2e.ts::B2.6: the gate blocks what the user did not allow and reports it'
+      - arch: 本机端口只放行用户打开过的、本会话进程树监听的与启动配置声明的，PiArc 自己的端口一律拒绝
+        measure: 用户打开过的本机端口与会话进程树监听、启动配置声明的端口免卡片，其他本机端口要卡片；浏览器代理拒绝 PiArc 自己的端口
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::lets local ports the user opened through without a card
+          - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::lets the session’s listening and declared ports through and asks for others (B2.6.2)
+          - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_refuses_piarc_ports_and_takes_a_new_policy
+      - arch: 全部 guest 的网络经 Core 的浏览器代理，协议与链路本地地址在主进程的请求规则里拒绝（ADR-0088）
+        measure: 浏览器代理按名称放行公网与内网，本机地址只在本机名称后可达；请求规则拒绝链路本地与不支持的协议；工作区协议拒绝越界路径
+        type: automated
+        tests:
+          - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_lets_any_public_or_private_name_through_without_asking
+          - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_reaches_loopback_only_behind_local_names
+          - vitest:apps/desktop/src/main/browser/request-rules.test.ts::THR-16 refuses %s (%s)
+          - vitest:apps/desktop/src/main/browser/workspace-files.test.ts::THR-16 refuses %s
+      - arch: 脚本宿主是不能联网的沙箱页面，SDK 只经主进程的 CDP 代理访问本 Space 的标签，页面命令走允许名单（ADR-0091）
+        measure: 宿主页面的 CSP 不许连接、宿主分区的请求全部取消；CDP 代理只答本 Space 的目标，允许名单外的方法被拒并记入结果
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/browser/host-session.test.ts::allows scripts only from the host and no connections
+          - vitest:apps/desktop/src/main/browser/cdp-policy.test.ts::answers the Space-scoped Target methods and the version only
+          - vitest:apps/desktop/src/main/browser/cdp-proxy.test.ts::refuses methods outside the policy and records them
+          - 'l4:apps/desktop/e2e/browser-agent.e2e.ts::THR-05: the script host reaches nothing on the network'
+      - arch: 上传与保存下载经 Core 的读写裁决，工作区外与受保护路径询问，不覆盖已有文件，保存的文件带来自互联网的标记
+        measure: 工作区外的上传要卡片、deny 规则拒绝；没有运行中的调用不搬运；保存在手动模式询问、不覆盖、只认本会话的下载；保存与下载的文件带 quarantine 或 Zone.Identifier
+        type: automated
+        tests:
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_files.rs::a_file_outside_the_workspace_asks_and_a_deny_rule_refuses
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_files.rs::nothing_moves_without_a_running_call
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_files.rs::saving_asks_in_manual_mode_and_never_replaces_a_file
+          - vitest:apps/desktop/src/main/browser/quarantine.test.ts::adds the macOS attribute when the download has none
+          - vitest:apps/desktop/src/main/browser/quarantine.test.ts::writes the Windows zone stream without credentials or line breaks
+          - l4:apps/desktop/e2e/browser-files.e2e.ts::B2.6.6 a download the agent saves asks first and lands in the workspace, quarantined
+  - id: THR-17
+    title: 浏览器凭据
+    countermeasures:
+      - arch: 每个工作区一个浏览器分区，与应用窗口和其他工作区的会话数据分开（ADR-0088）
+        measure: 标签加载在工作区自己的分区里，没有 preload、拿不到应用的 IPC
+        type: automated
+        tests:
+          - l4:apps/desktop/e2e/browser-basic.e2e.ts::THR-11 guests reach neither the preload nor Node
+      - arch: 从 Chrome 导入只在用户逐站勾选并经主进程原生确认后进行，导入的站点在智能体访问时每个会话都经站点卡询问，规则与跳过权限都不放行（ADR-0090）
+        measure: 默认不勾任何站点、没有"全部"；取消原生确认不导入；导入的站点及其子域名对智能体是敏感站点，allow 规则与跳过权限都不放行，读不到记录时也按敏感处理
+        type: automated
+        tests:
+          - l4:apps/desktop/e2e/browser-import.e2e.ts::THR-17 imports chosen sites after the native confirmation; the page never sees a value
+          - vitest:apps/desktop/src/main/browser/agent-gate-imports.test.ts::THR-17 marks the imported site and its subdomains sensitive, not other sites
+          - vitest:apps/desktop/src/main/browser/agent-gate-imports.test.ts::THR-17 counts a host as imported when the records cannot be read
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_import.rs::thr17_an_allow_rule_does_not_cover_an_imported_site
+          - rust:crates/piarc-core/src/tool_io/policy/tests/browser_import.rs::thr17_bypass_permissions_asks_for_an_imported_site
+      - arch: 解密后的 cookie 只经 Core 交给主进程写进分区，不进渲染进程与日志，用后清零
+        measure: 页面只拿到每站点的条数；值登记到日志脱敏、审计只记站点与条数；密钥不打印字节，明文缓冲用后清零
+        type: automated
+        tests:
+          - 'vitest:apps/desktop/src/main/browser/chrome-import.test.ts::THR-17 the page gets counts only: confirms natively, imports through Core, writes the cookies'
+          - rust:crates/piarc-core/src/browser/import.rs::thr17_import_redacts_values_and_audits_sites_and_counts_only
+          - rust:crates/piarc-browser-import/src/crypto.rs::thr17_keys_do_not_print_their_bytes
+          - rust:crates/piarc-browser-import/src/crypto.rs::thr17_plaintext_buffers_are_zeroized
+          - rust:crates/piarc-browser-import/src/import.rs::thr17_macos_v10_import_with_domain_hash_keeps_values_out_of_debug
+      - arch: Windows 上持久分区的 cookie 由 Chromium 以 DPAPI 保护，沙箱外同一用户的进程能解开
+        measure: Windows 上浏览器分区的 cookie 对沙箱外的同用户进程不保密
+        type: accepted-risk
+        reason: Windows 到 Beta 没有 OS 级沙箱（D7），经批准的命令与同用户进程可以用 DPAPI 解开分区里的 cookie；用户在听过风险后坚持保留导入功能，设置页可按站点移除导入、清除工作区浏览数据或改为退出即清空
+        refs: [ADR-0090, ADR-0057]
+        tests:
+          - 'vitest:apps/desktop/src/main/browser/chrome-import.test.ts::removes a site: its cookies first, then the record'

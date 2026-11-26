@@ -39,4 +39,17 @@
 | IPC 的其他注册方式（I52） | ESLint 拒绝 `webContents.ipc`、`ipcMain` 的别名与 `electron.ipcMain` | 见第 17 项；临时违规文件触发 5 条错误（T45 实测） |
 | 双向控制字符 | 审批卡、diff、代码与文件路径把 U+202E 等显示成可见的 `[U+XXXX]`，界面上的文字就是要运行的文字 | `vitest:apps/desktop/src/renderer/transcript/reveal.test.ts::THR-01 shows every bidirectional control as a visible marker, in place`、`l4:apps/desktop/e2e/t45-xss.e2e.ts::THR-11 approval cards, the Changes diff and its comments show the payloads as text` |
 
+## 3. 内置浏览器的 guest（ADR-0088，2026-11-26）
+
+预览面板的标签是加载远程内容的 `WebContentsView`，不是应用窗口。第 1 节的各项对它们的落实方式如下；应用窗口的做法不变。
+
+| 清单项 | guest 的做法 | 测试 ID |
+|---|---|---|
+| 1、2、3、4、6、8、9 | 每个标签 `sandbox`、`contextIsolation`、`webSecurity` 开，`nodeIntegration*`、`allowRunningInsecureContent`、`experimentalFeatures` 关，不带 preload；只有 `plugins` 打开（内置 PDF 查看器）；每个工作区一个分区，与应用窗口的会话分开 | `l4:apps/desktop/e2e/browser-basic.e2e.ts::THR-11 guests reach neither the preload nor Node` |
+| 5 | guest 分区的权限请求只在用户控制的标签上显示面板提示（允许本次、拒绝，30 s 无响应即拒绝），设备选择与客户端证书一律拒绝；智能体控制的标签一律拒绝 | `l4:apps/desktop/e2e/browser-basic.e2e.ts::opens local pages in tabs on the panel viewport, follows links and popups` |
+| 13、14 | 导航只放行 `http(s)`、`data:`（子框架）、`about:` 与工作区协议；`window.open` 与 `target=_blank` 在同一 Space 新建标签，`mailto:` 经第 15 项的外链确认，其他协议拒绝；`will-attach-webview` 取消 | `vitest:apps/desktop/src/main/browser/request-rules.test.ts::lets the main frame load web pages and workspace files only`、`vitest:apps/desktop/src/main/browser/request-rules.test.ts::THR-16 refuses %s (%s)` |
+| 18 | 工作区文件经 `piarc-browse://<会话令牌>/` 提供，路径解析后必须在会话文件根内，点开头的段与越界路径拒绝；`file://` 不在 guest 中加载 | `vitest:apps/desktop/src/main/browser/workspace-files.test.ts::THR-16 refuses %s` |
+| 20 | guest 没有任何 preload；智能体脚本的宿主页面只有 `window.piarcBrowserHost` 一个窄接口，只应答正在运行的那次调用，宿主分区不能联网 | `vitest:apps/desktop/src/main/browser/host-session.test.ts::allows scripts only from the host and no connections`、`l4:apps/desktop/e2e/browser-agent.e2e.ts::THR-05: the script host reaches nothing on the network` |
+| 远程调试 | CDP 只经进程内的 `webContents.debugger`，只挂在 guest 上；智能体的 SDK 经主进程的代理与允许名单使用它，发布构建仍不开调试端口 | `vitest:apps/desktop/src/main/browser/cdp-proxy.test.ts::refuses methods outside the policy and records them` |
+
 清单原文没有提到、PiArc 仍按需要落实的：`setPermissionCheckHandler`（第 5 项一并安装）、拼写检查词典的下载（Windows 与 Linux 才有，列入[外连清单](egress.md)）。

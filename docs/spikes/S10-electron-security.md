@@ -59,6 +59,8 @@
 
 内置浏览器（ADR-0088、ADR-0089、ADR-0093）：工作台 preload 增加 `sessionImage`，页面交出会话 id 与 64 位十六进制的 blob 名，主进程读 Core 数据目录里该会话 `blobs/` 下的文件（≤ 8 MiB），按内容签名只认 PNG 与 JPEG，给出归发送页面所有的短期 `piarc-document://session-images/<uuid>` 地址（每页至多 128 个、64 MiB，页面销毁、崩溃或整页导航即失效），响应带 `sandbox` CSP 与 `nosniff`；渲染进程的 CSP 不变。智能体的脚本宿主是另一个 preload（`src/preload/browser-host.ts`），只暴露 `window.piarcBrowserHost`：一个 invoke 通道 `piarc:browserHost` 由 `registerHostHandler` 注册，只应答正在运行的那次调用的宿主 webContents（工作台页面与运行结束后的宿主都被拒），每个请求按 `host-bindings.ts` 的形状与大小校验；宿主在自己的内存分区里，除自身协议外的请求全部取消，CSP 不允许连接（L4 `browser-agent.e2e.ts` 的 THR-05 用例）。
 
+从 Chrome 导入登录（ADR-0090，设计增补 B5）给同一 preload 白名单增加 `chromeProfiles`、`chromeSites`、`chromeImport`、`browserImports`、`forgetBrowserImport`、`clearBrowserData`。主进程校验配置文件名（1–128 个字符，不含路径分隔符、冒号与控制字符）、站点名（小写主机名或 IP 字面量，1–50 个、去重）与绝对路径的工作区；导入先由主进程弹原生确认（列出配置文件、每个站点、智能体会以用户身份访问、导入的是副本，macOS 上建议钥匙串选"允许"），页面无法绕过，"退出即清空"模式下直接答 `unavailable`。Core 解密后把明文经 NAPI 交给主进程写入工作区的持久分区，页面只收到每站点的条数与跳过原因，永远拿不到 cookie 值；移除站点先删分区里的 cookie 再删 Core 的记录。开发构建的 `createForTests` 读 `PIARC_TEST_CHROME_ROOT` 并固定使用测试密钥，发布构建没有这条路径。
+
 T49 给同一 preload 白名单增加 `askSideChat` 和 `controlSideChat`。主进程验证会话、面板、问题和控制参数，按发送窗口分配 Host 侧的面板编号。窗口销毁、渲染进程退出或整页导航会触发释放。Host 用内存会话生成回答，模型的工具请求只能得到本地拒绝结果。外部草稿的导航约束见 ADR-0069。
 
 Git 面板（ADR-0084、0085）给同一 preload 白名单增加 `git` 和 `cancelGit`。一个通道承载全部 Git 请求：主进程按操作逐个校验成员（会话 id 按 Core 规则；路径 1–4,096 字符、不含 NUL；分支、修订、远端与 hunk 标识 ≤ 255 字符、不以 `-` 开头、无控制字符；提交信息 ≤ 64 KiB，提交指令 ≤ 8 KiB），只保留已知成员；写操作要求窗口或该会话的 Git 弹出窗口 5 秒内有真实输入（`input-event`）；回滚、丢弃改动的检出、强制推送、删除未完全合并的分支先请 Core 给出事实（文件、分支、远端、新旧 oid、未合并提交数），由主进程原生确认，双向控制字符显示为转义，取消时 Core 不执行；强推带上确认框里的远端 oid 作为租约。Core 再按 ADR-0085 校验参数、只接受已配置的远端名、在受信任项目里才写、同一文件根有会话运行时拒绝改写文件的操作。提交信息的语言由主进程按界面语言填入，页面给的值被覆盖。

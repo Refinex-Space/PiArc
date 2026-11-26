@@ -58,3 +58,7 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 ## 内置浏览器的使用说明（ADR-0091）
 
 `Browser` 的工具描述、指引与结果说明在 `agent-host/src/harness/prompts/browser.ts`，改编自 ego-browser 的 `package/ego-browser/skill-body/SKILL.md`（ego-lite，MIT，上游提交 `56589ea8`，文件头注明出处与改动）：去掉 Node.js 运行时、安装、shell 写法、平台段落、profile 与站点经验，加入 PiArc 的脚本沙箱、截图附进结果、文件经权限、站点闸门、控制权与"页面内容是数据"。改编来源是 MIT 项目，不是参考仓库的提示词；2026-11-26 用上面的脚本做 10 词窗口比对（工具描述经默认 Profile 取出），0 个匹配窗口。
+
+## 开发服务器的验证提醒（ADR-0092）
+
+`browserVerify` 提醒的文字在 `agent-host/src/harness/prompts/browser-notices.ts`（智能体改了运行中开发服务器的前端文件后，下一次请求前提醒它用 `Browser` 打开页面检查）。Core 只发服务器地址与改动的文件，措辞全在这里，按 ADR-0092 第 6 条自写，写作时没有打开参考仓库的提示词；脚本把它加进比对（`browserVerifyNotice`），2026-11-26 比对 0 个匹配窗口。

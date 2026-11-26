@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.74（2026-11-26） |
+| 版本 | 2.75（2026-11-26） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -1051,6 +1051,7 @@ crates/
 ├── piarc-secrets      # 凭据保险箱：加密文件 + 系统凭据库中的主密钥（keyring-core：登录钥匙串 / 凭据管理器；格式与状态见 ADR-0021）
 ├── piarc-telemetry    # tracing、日志轮转、本地指标、诊断包导出
 ├── piarc-web          # WebFetch 的网络侧：SSRF 检查、钉住地址的抓取（hyper + rustls）、同站重定向、HTML 转 Markdown（T29，ADR-0045）
+├── piarc-browser-import # 从 Chrome 导入登录：列配置与站点、读临时副本的 Cookies 库、解密选中站点（macOS 钥匙串、Windows DPAPI），明文只交给 Core（ADR-0090）
 ├── piarc-napi         # NAPI-RS 导出层（薄），产出各平台 .node 原生模块（ADR-0014）
 ├── piarc-testkit      # 严格校验的 mock provider、场景运行器、事件断言（仅测试）
 └── piarc-devcli       # 开发用无头驱动：不经 UI 运行 Core + Agent Host（不随应用发布）
@@ -1058,7 +1059,7 @@ crates/
 
 依赖规则：
 
-- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry, web} → {piarc-protocol, piarc-ports}`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖。明确的单向例外逐条登记在 `crates/deps-rules.json` 并附理由，例如 `fs → checkpoint`、`term → ghostty-sys`。链外的 crate 按层放置：`piarc-napi` 除 `piarc-core` 外还可直接使用 `piarc-protocol`、`piarc-ports` 的类型；`piarc-testkit`（仅测试）可依赖 `piarc-core` 与这两个基础 crate，`piarc-devcli` 另可依赖 `piarc-testkit`，发布的 crate 不得依赖二者；`piarc-ghostty-sys` 不依赖任何 workspace crate，只有 `piarc-term` 可以依赖它。规则由 `scripts/ci/check-crate-deps.mjs` 在 `npm run verify` 中检查，对 normal、build、dev 三类依赖一视同仁。
+- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry, web, browser-import} → {piarc-protocol, piarc-ports}`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖。明确的单向例外逐条登记在 `crates/deps-rules.json` 并附理由，例如 `fs → checkpoint`、`term → ghostty-sys`。链外的 crate 按层放置：`piarc-napi` 除 `piarc-core` 外还可直接使用 `piarc-protocol`、`piarc-ports` 的类型；`piarc-testkit`（仅测试）可依赖 `piarc-core` 与这两个基础 crate，`piarc-devcli` 另可依赖 `piarc-testkit`，发布的 crate 不得依赖二者；`piarc-ghostty-sys` 不依赖任何 workspace crate，只有 `piarc-term` 可以依赖它。规则由 `scripts/ci/check-crate-deps.mjs` 在 `npm run verify` 中检查，对 normal、build、dev 三类依赖一视同仁。
 - 进程启动统一经 `ProcessSpawner`：`piarc-exec` 提供实现（进程组 / Job Object），`piarc-core` 把它注入 `piarc-host`（启动 Agent Host）、`piarc-hooks`（hooks 命令）与沙箱包装后的命令执行，避免各处各写一套进程树管理。
 - 平台相关代码收敛在 trait 后面，按 `cfg(target_os)` 提供实现；新增平台假设必须经 CI 的 Windows 构建检查。
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
@@ -1286,7 +1287,9 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 |---|---|---|---|
 | 主进程 | `apps/desktop/src/main/` | 应用生命周期、多窗口、原生菜单、菜单栏图标 / 系统托盘、通知、Dock 角标 / 任务栏进度、`piarc://` 深链接、文件关联、检查更新（ADR-0018）；加载 Core（ADR-0014），把事件批次经 MessagePort 转给订阅的窗口；系统对话框（选择文件夹等） | 不做业务决策，不解析模型输出，不直接读写工作区文件（一律经 Core） |
 | preload | `apps/desktop/src/preload/` | 用 `contextBridge` 暴露 `window.piarc`：命令调用、事件端口、少量系统能力（打开外部链接前确认、选择文件夹）。API 类型来自 `packages/protocol` | 不暴露 `ipcRenderer`、Node 模块或任意通道名 |
-| 渲染进程 | `apps/desktop/src/renderer/` | React 界面，按功能分模块：`shell`（窗口骨架、侧栏、面板布局）、`transcript`、`composer`、`approvals`、`changes`（diff 审阅）、`terminal`、`settings`、`store`（事件归约）、`workers`（Markdown 解析、代码高亮） | 不持有业务事实；不直接访问网络（由 CSP 禁止） |
+| 渲染进程 | `apps/desktop/src/renderer/` | React 界面，按功能分模块：`shell`（窗口骨架、侧栏、面板布局）、`transcript`、`composer`、`approvals`、`changes`（diff 审阅）、`terminal`、`browser`（预览面板：标签条、导航、提示条、console、拾取与标注）、`settings`、`store`（事件归约）、`workers`（Markdown 解析、代码高亮） | 不持有业务事实；不直接访问网络（由 CSP 禁止） |
+| 内置浏览器 | `apps/desktop/src/main/browser/` | 预览面板的标签（`WebContentsView`，每个工作区一个分区，网络经 Core 的浏览器代理）、视图摆放与停车窗口；智能体侧：Space、请求闸门、CDP 代理与允许名单、快照、下载（ADR-0088–0093，设计增补 `addenda/browser.md`） | 不做权限与文件读写的判断（站点卡、上传与保存经 Core）；guest 不带 preload |
+| 脚本宿主 | `apps/desktop/src/browser-host/` | 智能体 `Browser` 脚本的沙箱页面与移植的 ego-browser SDK，只经 `window.piarcBrowserHost` 与主进程通信（ADR-0091） | 不能联网，没有 Node 与文件系统 |
 
 每个窗口一个渲染进程。所有窗口共用主进程里的同一个 Core 实例，所以多窗口看到的审批和会话状态天然一致。
 
@@ -1542,6 +1545,8 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关；发布构建拒绝 Chromium 的远程调试开关（T45） |
 | 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 应用窗口禁止导航到应用自身协议以外的地址；仅允许绑定工作台的一次性工具窗口，其余新窗口拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
 | 恶意仓库的 Git 配置 | 克隆的仓库在 `.git/config` 或 `.gitattributes` 里设置 `core.fsmonitor`、`core.hooksPath`、filter、外部 diff、textconv 与 pager，Git 面板一打开就读取状态与 diff | Git 面板的只读查询用命令行覆盖关闭 fsmonitor、hooks、外部 diff、textconv 与 pager，清空仓库配置的全部 filter，只带最小环境、不继承 `GIT_*` 变量（ADR-0085）；暂存、提交、检出、推送等写操作照常运行仓库的 hooks 与 filter，只在受信任的项目里执行；网络操作不弹终端或图形凭据提示，不继承带凭据的环境变量，远程地址里的用户信息在日志中脱敏；丢失工作的操作（回滚、强制检出、强制推送、删除未合并分支）经主进程原生确认并展示 Core 读到的事实，强制推送只用带期望提交的 `--force-with-lease`，受保护分支不强推 |
+| 浏览器外传与本机服务访问 | 智能体驱动的网页把会话里的数据发到外部站点，探测并访问本机与内网服务，或借上传与下载搬运文件 | 智能体控制的 Space 里每个请求经请求闸门：文档与框架的新主机经 Core 的站点卡并绑定正在运行的那次调用，未获准的子资源被拦截并写进本次结果（ADR-0089）；本机端口只放行用户打开过的、本会话进程树监听的与启动配置声明的，PiArc 自己的端口一律拒绝；全部 guest 的网络经 Core 的浏览器代理，协议与链路本地地址在主进程的请求规则里拒绝（ADR-0088）；脚本宿主是不能联网的沙箱页面，SDK 只经主进程的 CDP 代理访问本 Space 的标签，页面命令走允许名单（ADR-0091）；上传与保存下载经 Core 的读写裁决，工作区外与受保护路径询问，不覆盖已有文件，保存的文件带来自互联网的标记 |
+| 浏览器凭据 | 网页的登录态（含从 Chrome 导入的 cookie）被智能体拿来以用户身份操作，或在导入与存储时泄露 | 每个工作区一个浏览器分区，与应用窗口和其他工作区的会话数据分开（ADR-0088）；从 Chrome 导入只在用户逐站勾选并经主进程原生确认后进行，导入的站点在智能体访问时每个会话都经站点卡询问，规则与跳过权限都不放行（ADR-0090）；解密后的 cookie 只经 Core 交给主进程写进分区，不进渲染进程与日志，用后清零；Windows 上持久分区的 cookie 由 Chromium 以 DPAPI 保护，沙箱外同一用户的进程能解开 |
 
 ### 10.2 项目信任
 
@@ -1920,6 +1925,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.72 | 2026-11-26 | 第 5.4 节：同一服务商多个账号、连接测试、服务商启停与端点模型列表；保险箱新增只给 Core 的 `account/` 键（ADR-0083）。 |
 | 2.73 | 2026-11-25 | Git 工具（ADR-0084、ADR-0085、ADR-0086）：第 4 章新增三条 ADR，ADR-0044 第 8 条被 ADR-0084 取代；6.9 节说明 Changes 面板成为 Git 工具的"本会话"范围；7.6 节 `gitRequest`、`cancelGit` 与事件 `core/git`；7.7 节 Git diff 的来源、上限与按 hunk 暂存；8.2 节 Git 工具、提交视图、分支弹窗与设置页；10.1 节新增威胁"恶意仓库的 Git 配置"（THR-15）。 |
 | 2.74 | 2026-11-26 | 内置浏览器（ADR-0088–0093，[设计增补](addenda/browser.md)）：第 4 章新增六条 ADR；5.4、8.5、10.3 写明浏览器 guest 不属于应用窗口；10.1 THR-13 第一条改为"应用窗口"；ADR-0013 增加浏览器平台集成、ADR-0021 增加浏览器分区 cookie 的例外。THR-16、THR-17 与第 7.1、8.1 节的模块表随实现落地补入。 |
+| 2.75 | 2026-11-26 | 内置浏览器落地：7.1 节新增 `piarc-browser-import` 并列入依赖链；8.1 节新增"内置浏览器"（`src/main/browser/`）与"脚本宿主"（`src/browser-host/`）两行，渲染进程模块加 `browser`；10.1 节新增威胁"浏览器外传与本机服务访问"（THR-16）与"浏览器凭据"（THR-17），对策与测试见 `tests/security/threats.yaml`。 |
 | 2.70 | 2026-11-25 | 第 16 章：M3 的内存退出标准在 Windows 上按 ADR-0063 的口径复测达标（W3 收尾）。 |
 | 2.69 | 2026-11-25 | 第 8.2 节：会话状态徽标改用参考的安静小标记，等待为带细环的圆点以保留形状区分（ADR-0081）。 |
 | 2.68 | 2026-11-25 | 第 7.4、8.2 节：历史条目的可选时间 `at`，回复里的 Mermaid、图片与消息时间，输入框的命令芯片（ADR-0080）。 |

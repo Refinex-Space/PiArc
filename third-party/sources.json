@@ -231,6 +231,22 @@
       "usedBy": "apps/desktop/src/browser-host/sdk/ (modified; every file names its upstream path, and apps/desktop/src/browser-host/AGENTS.md lists the changes): the browser SDK the Browser tool script runs against in the script host (ADR-0089, ADR-0091)",
       "addedBy": "Built-in browser (B2)",
       "notes": "Ported file by file to strict TypeScript; the CLI, the frozen v1 helpers, learning/, update-notice, skill-migration, http, clipboard and env are not ported, and Node APIs are replaced by the script host bindings."
+    },
+    {
+      "id": "bippy-source-locations",
+      "name": "bippy stack parsing and source map lookup (adapted)",
+      "version": "main@fbafc40",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/bippy.LICENSE",
+      "copyright": "Copyright 2024-present Aiden Bai",
+      "source": {
+        "repository": "https://github.com/aidenybai/bippy",
+        "path": "packages/bippy/src/source/parse-stack.ts, parse-debug-stack.ts, constants.ts, symbolication.ts",
+        "commit": "fbafc407ca31ad82f391404c6c6539008f9e0d79"
+      },
+      "usedBy": "apps/desktop/src/main/browser/source-map.ts (adapted; the file header names the upstream files): the element picker's React 19 source locations (design addendum B3.2)",
+      "addedBy": "Built-in browser (B3)",
+      "notes": "Only the V8 frame parsing, the React bottom-frame rule and the mapping segment lookup are adapted; the VLQ decoder is PiArc's own (no @jridgewell/sourcemap-codec), and nothing runs in the page."
     }
   ]
 }

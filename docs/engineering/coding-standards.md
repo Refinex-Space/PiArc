@@ -103,7 +103,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 ### 2.8 unsafe
 
-- `unsafe` 只允许出现在 `-sys` crate（`piarc-ghostty-sys`）、NAPI 边界（`piarc-napi`）与系统接口的 safe 封装模块（`piarc-term` 的 `vt` 模块，T10，与 Windows 专用的 `console` 模块，W0；`piarc-exec` 的 `job` 模块，Windows Job Object，T11；`piarc-exec` 的 `tty_processes` 模块，macOS 上按终端设备列进程的一次 `proc_listpids`，T33）。workspace lints 对 `unsafe_code` 设为 deny；前两个 crate 在 crate 根写 `#![allow(unsafe_code, reason = "...")]` 放开，safe 封装只在模块声明上放开（`#[allow(unsafe_code, reason = "...")] mod vt;`），crate 的其余部分仍然禁止。
+- `unsafe` 只允许出现在 `-sys` crate（`piarc-ghostty-sys`）、NAPI 边界（`piarc-napi`）与系统接口的 safe 封装模块（`piarc-term` 的 `vt` 模块，T10，与 Windows 专用的 `console` 模块，W0；`piarc-exec` 的 `job` 模块，Windows Job Object，T11；`piarc-exec` 的 `tty_processes` 模块，macOS 上按终端设备列进程的一次 `proc_listpids`，T33；`piarc-exec` 的 `tcp_table` 模块，Windows 上列出监听套接字与所属进程的 `GetExtendedTcpTable`，ADR-0092；`piarc-browser-import` 的 `dpapi` 模块，Windows 上解开 Chrome 密钥的 `CryptUnprotectData`，ADR-0090）。workspace lints 对 `unsafe_code` 设为 deny；前两个 crate 在 crate 根写 `#![allow(unsafe_code, reason = "...")]` 放开，safe 封装只在模块声明上放开（`#[allow(unsafe_code, reason = "...")] mod vt;`），crate 的其余部分仍然禁止。
 - 按输出类型读值的 FFI 辅助函数（传入数据键与输出指针）写成 `unsafe fn`，在 `# Safety` 中写明"类型必须与数据键对应"，调用处的 `// SAFETY:` 写出具体的对应关系。
 - 每个 `unsafe` 块前写 `// SAFETY:` 注释，说明满足了哪些前置条件（clippy `undocumented_unsafe_blocks`，verify 第 7 步）。
 - `unsafe fn` 内部的不安全操作也要包在 `unsafe {}` 块中（edition 2024 默认的 `unsafe_op_in_unsafe_fn`）。
