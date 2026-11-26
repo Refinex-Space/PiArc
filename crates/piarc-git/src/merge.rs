@@ -30,7 +30,14 @@ pub async fn merge(
     branch: &str,
     mode: GitMergeMode,
 ) -> Result<RemoteOutcome, GitError> {
-    let mut args = vec!["-c", "core.editor=true", "merge", "--no-edit"];
+    // Local changes are stashed around the merge and put back afterwards, as IDEA does.
+    let mut args = vec![
+        "-c",
+        "core.editor=true",
+        "merge",
+        "--no-edit",
+        "--autostash",
+    ];
     match mode {
         GitMergeMode::Ff => {}
         GitMergeMode::NoFf => args.push("--no-ff"),
@@ -50,7 +57,14 @@ pub async fn rebase(
     writer: &Writer,
     onto: &str,
 ) -> Result<RemoteOutcome, GitError> {
-    let args = ["-c", "core.editor=true", "rebase", "--end-of-options", onto];
+    let args = [
+        "-c",
+        "core.editor=true",
+        "rebase",
+        "--autostash",
+        "--end-of-options",
+        onto,
+    ];
     finish(reader, writer, &args).await
 }
 
@@ -330,6 +344,7 @@ pub async fn rebase_interactive(
         "rebase.autoSquash=false",
         "rebase",
         "-i",
+        "--autostash",
     ];
     match base {
         Some(base) => args.extend(["--end-of-options", base]),

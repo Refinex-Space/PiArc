@@ -37,6 +37,7 @@ import {
   StopGlyph,
 } from '../../shell/icons.js';
 import { StashButtonDialog } from './LogView.js';
+import { markResolved, StateBar } from './conflicts.js';
 import { useAutoFetchFailure } from './auto-fetch.js';
 import { revealBidi } from '../../transcript/reveal.js';
 import { isImeComposing } from '../../composer/ime-guard.js';
@@ -227,6 +228,7 @@ export function CommitView({
     <div className="git-commit-column" style={oneColumn ? undefined : { width: column }}>
       <StateBar sessionId={sessionId} repo={repo} files={files} actions={actions} />
       <CommitFiles
+        sessionId={sessionId}
         files={files}
         truncated={status.truncated}
         writable={repo.writable}
@@ -441,89 +443,9 @@ function SyncBar({
   );
 }
 
-/** A merge, rebase, cherry-pick or revert in progress: what it is and how to go on. */
-function StateBar({
-  sessionId,
-  repo,
-  files,
-  actions,
-}: {
-  readonly sessionId: string;
-  readonly repo: Repository;
-  readonly files: readonly StatusFile[];
-  readonly actions: GitActions;
-}) {
-  const t = useT();
-  const board = useGitBoard(sessionId);
-  const state = repo.state;
-  if (state === undefined || state.kind === 'clean') return null;
-  const conflicts = files.filter((f) => groupOf(f) === 'conflicts').length;
-  const text = (() => {
-    switch (state.kind) {
-      case 'merging':
-        return t('git.state.merging', { source: state.source ?? '' });
-      case 'rebasing':
-        return state.step !== undefined && state.total !== undefined
-          ? t('git.state.rebasingStep', {
-              onto: state.onto ?? '',
-              step: state.step,
-              total: state.total,
-            })
-          : t('git.state.rebasing', { onto: state.onto ?? '' });
-      case 'cherryPicking':
-        return t('git.state.cherryPicking', { commit: (state.commit ?? '').slice(0, 7) });
-      case 'reverting':
-        return t('git.state.reverting', { commit: (state.commit ?? '').slice(0, 7) });
-    }
-  })();
-  const busy = board.running.size > 0 || !repo.writable;
-  return (
-    <div className="git-state" role="status" data-testid="git-state" data-state={state.kind}>
-      <p className="git-state-text">
-        {revealBidi(text)}
-        {conflicts > 0 ? (
-          <span className="git-state-conflicts">
-            {t('git.state.conflicts', { count: conflicts })}
-          </span>
-        ) : null}
-      </p>
-      <div className="git-state-actions">
-        <button
-          type="button"
-          className="button button-small"
-          disabled={busy || conflicts > 0}
-          data-testid="git-continue"
-          onClick={() => void actions.sequence('continue')}
-        >
-          {t('git.state.continue')}
-        </button>
-        {state.kind !== 'rebasing' ? null : (
-          <button
-            type="button"
-            className="button button-small"
-            disabled={busy}
-            data-testid="git-skip"
-            onClick={() => void actions.sequence('skip')}
-          >
-            {t('git.state.skip')}
-          </button>
-        )}
-        <button
-          type="button"
-          className="button button-small"
-          disabled={busy}
-          data-testid="git-abort"
-          onClick={() => void actions.sequence('abort')}
-        >
-          {t('git.state.abort')}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /** The changed files by group, each with a tri-state staging checkbox. */
 function CommitFiles({
+  sessionId,
   files,
   truncated,
   writable,
@@ -531,6 +453,7 @@ function CommitFiles({
   onSelect,
   actions,
 }: {
+  readonly sessionId: string;
   readonly files: readonly StatusFile[];
   readonly truncated: boolean;
   readonly writable: boolean;
@@ -573,7 +496,7 @@ function CommitFiles({
               id: 'resolved',
               label: t('git.commit.markResolved'),
               testId: 'git-mark-resolved',
-              run: () => void actions.markResolved([file.path]),
+              run: () => void markResolved(sessionId, actions, [file.path]),
             },
           ]
         : []),

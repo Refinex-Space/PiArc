@@ -192,6 +192,11 @@ export const A11Y_STATES = [
     note: 'Git tool: the Log view with the commit graph and the details of a commit',
   },
   { id: 'state:git-stashes', area: 'state', note: 'Git tool: a stash and its details' },
+  {
+    id: 'state:git-merge-view',
+    area: 'state',
+    note: 'Git tool: the three-way merge view of a conflicted file',
+  },
   { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
   {
     id: 'state:md-read',
@@ -303,6 +308,24 @@ export const A11Y_STATES = [
     area: 'dialog',
     source: 'changes/git/HistoryPrompts.tsx',
     note: 'Git: reset the branch to a commit',
+  },
+  {
+    id: 'dialog:git-conflicts',
+    area: 'dialog',
+    source: 'changes/git/conflicts.tsx',
+    note: 'Git: the conflicted files',
+  },
+  {
+    id: 'dialog:git-merge-unresolved',
+    area: 'dialog',
+    source: 'changes/git/MergeView.tsx',
+    note: 'Git: apply a merge result with conflicts left',
+  },
+  {
+    id: 'dialog:git-rebase',
+    area: 'dialog',
+    source: 'changes/git/RebaseDialog.tsx',
+    note: 'Git: an interactive rebase',
   },
   {
     id: 'dialog:terminal-text',

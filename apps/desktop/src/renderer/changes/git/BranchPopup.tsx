@@ -72,6 +72,34 @@ export function BranchPopup({
   const [place, setPlace] = useState<{ left: number; top: number; maxHeight: number }>();
   const menu = useMenu();
   const history = useHistoryActions(sessionId, actions);
+  const locked = repo.writable ? {} : { disabled: true, hint: t('git.log.untrusted') };
+  const integrate = (name: string): MenuItem[] => {
+    const current = revealBidi(repo.branch ?? 'HEAD');
+    return [
+      {
+        id: 'merge',
+        label: t('git.branch.mergeInto', { current }),
+        testId: 'git-branch-merge',
+        ...locked,
+        run: () => {
+          onClose();
+          setPrompt(sessionId, { kind: 'merge', branch: name });
+        },
+      },
+      {
+        id: 'rebase',
+        label: t('git.branch.rebaseOnto', { current }),
+        testId: 'git-branch-rebase',
+        ...(repo.detached ? { disabled: true } : locked),
+        run: () => {
+          onClose();
+          // A branch with an upstream has pushed commits: rewriting them needs a force push.
+          if (repo.upstream === undefined) void actions.rebase(name);
+          else setPrompt(sessionId, { kind: 'rebase', onto: name });
+        },
+      },
+    ];
+  };
   const [menuRow, setMenuRow] = useState<Row | undefined>(undefined);
   const branches = git.branches.value;
   useEffect(() => {
@@ -172,6 +200,7 @@ export function BranchPopup({
             newBranch(b.name);
           },
         },
+        ...(current ? [] : integrate(b.name)),
         {
           id: 'rename',
           label: t('git.branch.rename'),
@@ -262,6 +291,7 @@ export function BranchPopup({
             newBranch(full);
           },
         },
+        ...integrate(full),
         {
           id: 'deleteRemote',
           label: t('git.branch.deleteRemote', { remote: row.branch.remote }),

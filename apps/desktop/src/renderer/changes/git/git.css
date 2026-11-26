@@ -1007,6 +1007,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--piarc-space-1);
+  /* The small native checkbox keeps 24 px around its center clear of other targets. */
+  min-height: 24px;
+  padding-block: var(--piarc-space-1);
   font-size: var(--piarc-font-size-small);
 }
 

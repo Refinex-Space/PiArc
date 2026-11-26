@@ -16,7 +16,7 @@ import { IPC_CHANNELS } from '../src/shared/ipc.js';
 import { expectTestHooks } from './core.js';
 import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from './oauth.js';
 import { idle, killAgentHost, openSession, prefer, send } from './t19.js';
-import { git, makeRepository } from './git.js';
+import { conflictOnMain, git, makeRepository } from './git.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -641,6 +641,46 @@ test('the Git tool in a repository: changes, commit view, branches and a branch 
   await page.getByTestId('git-stash-row').click();
   await expect(page.getByTestId('git-stash-detail')).toBeVisible();
   await checkState(page, 'state:git-stashes');
+});
+
+test('the Git tool resolving a conflict and rebasing interactively', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  const { ws } = await openSession(app, page, workspaces, 'git 冲突', 'git-start', 'Start.');
+  await makeRepository(ws);
+  await conflictOnMain(ws);
+  await idle(page);
+  await railTab(page, 'changes-card');
+  await page.getByTestId('changes-open').click();
+  await page.getByTestId('git-view-commit').click();
+  await page.getByTestId('git-branch-button').click();
+  await page.getByTestId('git-branch-search').fill('main');
+  await page.locator('[data-testid=git-branch-row][data-branch="main"]').click();
+  await page.getByTestId('git-branch-merge').click();
+  await page.getByTestId('git-merge-submit').click();
+  await expect(page.getByTestId('git-conflict-row')).toBeVisible();
+  await checkState(page, 'dialog:git-conflicts');
+  await page.getByTestId('git-conflict-merge').click();
+  await expect(page.getByTestId('git-merge-conflict')).toBeVisible();
+  await checkState(page, 'state:git-merge-view');
+  await page.getByTestId('git-merge-apply').click();
+  await expect(page.getByTestId('git-merge-unresolved-dialog')).toBeVisible();
+  await checkState(page, 'dialog:git-merge-unresolved');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('git-merge-cancel').click();
+  await git(ws, 'merge', '--abort');
+  await page.getByTestId('git-view-log').click();
+  await page
+    .getByTestId('git-log-row')
+    .filter({ hasText: 'feat: add login' })
+    .click({ button: 'right' });
+  await page.getByTestId('git-log-rebase').click();
+  await expect(page.getByTestId('git-rebase-row').first()).toBeVisible();
+  await checkState(page, 'dialog:git-rebase');
+  await page.keyboard.press('Escape');
 });
 
 test('every listed state was checked in this run', async () => {

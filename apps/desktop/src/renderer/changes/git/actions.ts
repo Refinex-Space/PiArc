@@ -62,13 +62,25 @@ export type GitPrompt =
       readonly mode: 'create' | 'rename';
       readonly from?: string | undefined;
       readonly start?: string | undefined;
-    };
+    }
+  /** G4: the conflicted files and how to resolve them. */
+  | { readonly kind: 'conflicts' }
+  /** G4: files still holding conflict markers, marked resolved anyway? */
+  | { readonly kind: 'markResolved'; readonly paths: readonly string[] }
+  /** G4: abort the operation in progress? */
+  | { readonly kind: 'abort' }
+  /** G4: merge a branch into the current one, choosing how. */
+  | { readonly kind: 'merge'; readonly branch: string }
+  /** G4: rebase the current branch (which has an upstream) onto another? */
+  | { readonly kind: 'rebase'; readonly onto: string };
 
 interface Board {
   readonly notices: readonly GitNotice[];
   readonly prompt: GitPrompt | undefined;
   /** Running operations by id, with the label shown while they run. */
   readonly running: ReadonlyMap<string, string>;
+  /** The conflicted file open in the merge view (G4). */
+  readonly mergeView?: string | undefined;
 }
 
 const EMPTY_BOARD: Board = { notices: [], prompt: undefined, running: new Map() };
@@ -107,6 +119,11 @@ export function dismissNotice(sessionId: string, id: string): void {
 
 export function setPrompt(sessionId: string, prompt: GitPrompt | undefined): void {
   setBoard(sessionId, { prompt });
+}
+
+/** Opens (or with `undefined` closes) the merge view of a conflicted file. */
+export function openMergeView(sessionId: string, path: string | undefined): void {
+  setBoard(sessionId, { mergeView: path, prompt: undefined });
 }
 
 /** The session's notices, prompt and running operations. */
@@ -361,10 +378,36 @@ export function useGitActions(sessionId: string) {
       return reply;
     };
 
+    const conflictsAfter = (reply: Reply<OpResult>, done: string) => {
+      if (reply.ok && reply.value.conflicts.length > 0) {
+        pushNotice(sessionId, {
+          tone: 'error',
+          text: t('git.notice.conflicts', { count: reply.value.conflicts.length }),
+          actions: [],
+        });
+        setPrompt(sessionId, { kind: 'conflicts' });
+      } else if (reply.ok) {
+        pushNotice(sessionId, { tone: 'info', text: done, actions: [] });
+      }
+      return reply;
+    };
+    const merge = async (branch: string, mode: 'ff' | 'noFf' | 'squash') =>
+      conflictsAfter(
+        await run({ op: 'merge', branch, mode }, { label: t('git.progress.merge', { branch }) }),
+        t('git.notice.merged', { branch }),
+      );
+    const rebase = async (onto: string) =>
+      conflictsAfter(
+        await run({ op: 'rebase', onto }, { label: t('git.progress.rebase', { onto }) }),
+        t('git.notice.rebased', { onto }),
+      );
+
     return {
       run,
       report,
       rollback,
+      merge,
+      rebase,
       checkout,
       deleteBranch,
       push,

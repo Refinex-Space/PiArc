@@ -2,7 +2,7 @@
 // with one more commit, then a modified README and an untracked file. Git runs without the
 // machine's configuration.
 import { execFile } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -52,4 +52,15 @@ export async function makeRepository(ws: string): Promise<void> {
   await git(ws, 'commit', '-q', '-m', 'feat: add login');
   await writeFile(path.join(ws, 'README.md'), '# Demo\n\nA demo project with sign-in.\n');
   await writeFile(path.join(ws, 'notes.txt'), 'remember the tests\n');
+}
+
+/** main changes line 3 of src/app.ts differently from feature/login (still checked out). */
+export async function conflictOnMain(ws: string): Promise<void> {
+  await git(ws, 'stash', '-q', '-u');
+  await git(ws, 'checkout', '-q', 'main');
+  const file = path.join(ws, 'src', 'app.ts');
+  await writeFile(file, (await readFile(file, 'utf8')).replace('line3 = 3', "line3 = 'tres'"));
+  await git(ws, 'commit', '-q', '-am', 'fix: line 3 on main');
+  await git(ws, 'checkout', '-q', 'feature/login');
+  await git(ws, 'stash', 'pop', '-q');
 }

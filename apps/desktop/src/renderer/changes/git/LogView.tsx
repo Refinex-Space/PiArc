@@ -24,6 +24,7 @@ import { CommitDetailPane, StashDetailPane } from './CommitDetail.js';
 import { graphRows, type GraphRow } from './graph.js';
 import { useHistoryActions, shortId } from './history-actions.js';
 import { HistoryPrompt, type HistoryDialog } from './HistoryPrompts.js';
+import { RebaseDialog } from './RebaseDialog.js';
 import type { DiffDisplay } from './GitDiff.js';
 import {
   gitCall,
@@ -204,6 +205,7 @@ export function LogView({
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [detailOpen, setDetailOpen] = useState(false);
   const [dialog, setDialog] = useState<HistoryDialog | undefined>(undefined);
+  const [rebaseFrom, setRebaseFrom] = useState<string | undefined>(undefined);
   const [stashes, setStashes] = useState<readonly StashEntry[] | undefined>(undefined);
   const menu = useMenu();
   const revsMenu = useMenu();
@@ -327,6 +329,15 @@ export function LogView({
             head: repo.head,
             branch: repo.branch ?? 'HEAD',
           });
+        },
+      },
+      {
+        id: 'rebase',
+        label: t('git.log.rebaseFrom'),
+        testId: 'git-log-rebase',
+        ...(merge ? { disabled: true, hint: t('git.log.mergeCommit') } : locked),
+        run: () => {
+          setRebaseFrom(commit.sha);
         },
       },
       ...(isHead && commit.parents.length > 0
@@ -675,6 +686,16 @@ export function LogView({
           label={t('git.log.revsLabel')}
           filterLabel={t('git.log.revsFilter')}
           testId="git-log-revs-menu"
+        />
+      )}
+      {rebaseFrom === undefined ? null : (
+        <RebaseDialog
+          sessionId={sessionId}
+          sha={rebaseFrom}
+          actions={actions}
+          onClose={() => {
+            setRebaseFrom(undefined);
+          }}
         />
       )}
       {dialog === undefined ? null : (

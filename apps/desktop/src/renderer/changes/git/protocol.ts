@@ -670,6 +670,72 @@ export function blobOf(value: unknown): Blob | undefined {
   });
 }
 
+export interface ConflictSides {
+  readonly path: string;
+  readonly base?: string | undefined;
+  readonly yours?: string | undefined;
+  readonly theirs?: string | undefined;
+  readonly result?: string | undefined;
+  readonly resultHash: string;
+  readonly yoursLabel: string;
+  readonly theirsLabel: string;
+  readonly binary?: boolean | undefined;
+  readonly tooLarge?: boolean | undefined;
+}
+
+export function conflictSidesOf(value: unknown): ConflictSides | undefined {
+  if (!isRecord(value)) return undefined;
+  const path = str(value.path);
+  const resultHash = str(value.resultHash);
+  if (path === undefined || resultHash === undefined) return undefined;
+  return defined({
+    path,
+    base: str(value.base),
+    yours: str(value.yours),
+    theirs: str(value.theirs),
+    result: str(value.result),
+    resultHash,
+    yoursLabel: str(value.yoursLabel) ?? '',
+    theirsLabel: str(value.theirsLabel) ?? '',
+    binary: value.binary === true ? true : undefined,
+    tooLarge: value.tooLarge === true ? true : undefined,
+  });
+}
+
+export interface RebaseCommit {
+  readonly sha: string;
+  readonly subject: string;
+  readonly message: string;
+  readonly merge: boolean;
+  readonly pushed: boolean;
+}
+
+export interface RebasePlan {
+  readonly base?: string | undefined;
+  readonly head: string;
+  readonly commits: readonly RebaseCommit[];
+}
+
+function rebaseCommitOf(value: unknown): RebaseCommit | undefined {
+  if (!isRecord(value)) return undefined;
+  const sha = str(value.sha);
+  if (sha === undefined) return undefined;
+  return {
+    sha,
+    subject: str(value.subject) ?? '',
+    message: str(value.message) ?? '',
+    merge: value.merge === true,
+    pushed: value.pushed === true,
+  };
+}
+
+export function rebasePlanOf(value: unknown): RebasePlan | undefined {
+  if (!isRecord(value)) return undefined;
+  const head = str(value.head);
+  if (head === undefined || !Array.isArray(value.commits)) return undefined;
+  return defined({ base: str(value.base), head, commits: list(value.commits, rebaseCommitOf) });
+}
+
 export function probeOf(value: unknown): string | undefined {
   return isRecord(value) ? str(value.fingerprint) : undefined;
 }

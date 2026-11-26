@@ -18,7 +18,9 @@ import {
   type GitPrompt,
   type PushTarget,
 } from './actions.js';
+import { ConflictPrompt } from './conflicts.js';
 import type { Repository } from './protocol.js';
+import { useGit } from './state.js';
 
 /** Paths a dialog lists before "and N more". */
 const LISTED = 10;
@@ -43,6 +45,7 @@ export function GitPrompts({
   readonly actions: GitActions;
 }) {
   const board = useGitBoard(sessionId);
+  const files = useGit(sessionId).status.value?.files ?? [];
   const prompt = board.prompt;
   if (prompt === undefined || repo === undefined) return null;
   const close = () => {
@@ -66,6 +69,21 @@ export function GitPrompts({
       return <PullModePrompt prompt={prompt} actions={actions} onClose={close} />;
     case 'branchName':
       return <BranchNamePrompt prompt={prompt} actions={actions} onClose={close} />;
+    case 'conflicts':
+    case 'markResolved':
+    case 'abort':
+    case 'merge':
+    case 'rebase':
+      return (
+        <ConflictPrompt
+          sessionId={sessionId}
+          prompt={prompt}
+          repo={repo}
+          files={files}
+          actions={actions}
+          onClose={close}
+        />
+      );
   }
 }
 

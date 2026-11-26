@@ -63,7 +63,8 @@ import {
 } from './model.js';
 import type { Changes, FileChange, Repository } from './protocol.js';
 import { gitSession, useGit, type GitSnapshot } from './state.js';
-import { useGitActions } from './actions.js';
+import { useGitActions, useGitBoard } from './actions.js';
+import { MergeView } from './MergeView.js';
 import { GitNotices, GitPrompts } from './GitPrompts.js';
 
 /** Changed lines past which every file starts folded. */
@@ -204,6 +205,7 @@ export function GitPanel({ sessionId }: { readonly sessionId: string }) {
   const { t, preferences } = useApp();
   const git = useGit(sessionId);
   const actions = useGitActions(sessionId);
+  const board = useGitBoard(sessionId);
   const visible = useToolVisible();
   useGitRefresh(sessionId, visible);
   useAutoFetch(sessionId, git.status.value?.repository, preferences.git.autoFetch, visible);
@@ -305,6 +307,9 @@ export function GitPanel({ sessionId }: { readonly sessionId: string }) {
           </button>
         </div>
       );
+    }
+    if (board.mergeView !== undefined) {
+      return <MergeView sessionId={sessionId} path={board.mergeView} actions={actions} />;
     }
     if (view === 'commit') return <CommitView sessionId={sessionId} git={git} width={width} />;
     if (view === 'log' && repo !== undefined) {

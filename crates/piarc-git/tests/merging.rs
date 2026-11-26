@@ -226,3 +226,26 @@ async fn interactive_rebases_reorder_reword_squash_fix_up_and_drop() {
     assert!(repo.join("2.txt").exists());
     assert!(!repo.join("4.txt").exists());
 }
+
+#[tokio::test]
+async fn local_changes_are_stashed_around_a_rebase_and_put_back() {
+    let root = temp_dir("rebase-dirty");
+    let home = home(&root);
+    let repo = repository(&root, "repo");
+    git(&repo, &["switch", "-q", "-c", "topic"]);
+    commit(&repo, "b.txt", "b\n", "topic: add b");
+    git(&repo, &["switch", "-q", "main"]);
+    commit(&repo, "c.txt", "c\n", "main: add c");
+    git(&repo, &["switch", "-q", "topic"]);
+    std::fs::write(repo.join("a.txt"), "a local edit\n").expect("edit");
+    let (reader, writer) = pair(&home, &repo).await;
+    let done = merge::rebase(&reader, &writer, "main")
+        .await
+        .expect("rebase");
+    assert!(matches!(done, RemoteOutcome::Done(_)), "{done:?}");
+    assert!(repo.join("c.txt").exists());
+    assert_eq!(
+        std::fs::read_to_string(repo.join("a.txt")).expect("a"),
+        "a local edit\n"
+    );
+}
