@@ -14,7 +14,22 @@ export type ProtocolValue =
   | PackagesList
   | PackageInstallRequest
   | PackageInstallResult
-  | UsageReport;
+  | UsageReport
+  | GitCall
+  | GitStatus
+  | GitProbe
+  | GitChanges
+  | GitFileChange
+  | GitText
+  | GitCommits
+  | GitBranches
+  | GitFileStages
+  | GitLastCommit
+  | GitCommitMessage
+  | GitOpResult
+  | GitDescription
+  | GitFailure
+  | GitEvent;
 /**
  * Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.
  */
@@ -1231,6 +1246,490 @@ export type PackageSourceKind = 'directory' | 'git' | 'npm';
  * Where a model's price comes from.
  */
 export type PriceSource = 'catalog' | 'user' | 'unknown';
+/**
+ * A request of `gitRequest`.
+ */
+export type GitRequest =
+  | {
+      op: 'probe';
+    }
+  | {
+      op: 'status';
+    }
+  | {
+      /**
+       * Ignore whitespace (`-w`).
+       */
+      ignore_whitespace?: boolean | null;
+      op: 'changes';
+      /**
+       * The range.
+       */
+      scope: GitScope;
+    }
+  | {
+      /**
+       * Ignore whitespace.
+       */
+      ignore_whitespace?: boolean | null;
+      /**
+       * Its previous path, for a rename.
+       */
+      old_path?: string | null;
+      op: 'fileDiff';
+      /**
+       * The file.
+       */
+      path: string;
+      /**
+       * The range.
+       */
+      scope: GitScope;
+    }
+  | {
+      op: 'fileText';
+      /**
+       * The file.
+       */
+      path: string;
+      /**
+       * Which content.
+       */
+      source: GitTextSource;
+    }
+  | {
+      /**
+       * The base branch; inferred when absent.
+       */
+      base?: string | null;
+      op: 'commits';
+    }
+  | {
+      op: 'branches';
+    }
+  | {
+      op: 'fileStages';
+      /**
+       * The file.
+       */
+      path: string;
+    }
+  | {
+      op: 'stage';
+      /**
+       * The files.
+       */
+      paths: string[];
+    }
+  | {
+      op: 'unstage';
+      /**
+       * The files.
+       */
+      paths: string[];
+    }
+  | {
+      /**
+       * The hunk.
+       */
+      hunk: GitHunkRef;
+      op: 'stageHunk';
+    }
+  | {
+      /**
+       * The hunk.
+       */
+      hunk: GitHunkRef;
+      op: 'unstageHunk';
+    }
+  | {
+      /**
+       * The hunk.
+       */
+      hunk: GitHunkRef;
+      op: 'rollbackHunk';
+    }
+  | {
+      op: 'rollback';
+      /**
+       * The files.
+       */
+      paths: string[];
+    }
+  | {
+      op: 'undoRollback';
+      /**
+       * The rollback.
+       */
+      restore_id: string;
+    }
+  | {
+      /**
+       * Replace the last commit.
+       */
+      amend?: boolean | null;
+      /**
+       * The message.
+       */
+      message: string;
+      op: 'commit';
+      /**
+       * Add a `Signed-off-by` trailer.
+       */
+      signoff?: boolean | null;
+    }
+  | {
+      op: 'lastCommit';
+    }
+  | {
+      /**
+       * Describe the last commit plus the staged changes.
+       */
+      amend?: boolean | null;
+      /**
+       * The commit instructions.
+       */
+      instructions: string;
+      /**
+       * The interface language; the main process fills it.
+       */
+      language: GitLanguage;
+      op: 'commitMessage';
+    }
+  | {
+      /**
+       * What to do with local changes in the way.
+       */
+      mode?: GitCheckoutMode | null;
+      op: 'checkout';
+      /**
+       * A local branch, a remote branch (`origin/x`), a tag or a commit.
+       */
+      target: string;
+    }
+  | {
+      /**
+       * Check it out.
+       */
+      checkout?: boolean | null;
+      /**
+       * Its name.
+       */
+      name: string;
+      op: 'createBranch';
+      /**
+       * Where it starts; `HEAD` when absent.
+       */
+      start?: string | null;
+    }
+  | {
+      /**
+       * The current name.
+       */
+      from: string;
+      op: 'renameBranch';
+      /**
+       * The new name.
+       */
+      to: string;
+    }
+  | {
+      /**
+       * `-D`.
+       */
+      force?: boolean | null;
+      /**
+       * The branch.
+       */
+      name: string;
+      op: 'deleteBranch';
+    }
+  | {
+      /**
+       * The branch.
+       */
+      name: string;
+      /**
+       * The commit it pointed at.
+       */
+      oid: string;
+      op: 'restoreBranch';
+      /**
+       * Its upstream (`origin/x`).
+       */
+      upstream?: string | null;
+    }
+  | {
+      /**
+       * The local branch.
+       */
+      branch: string;
+      op: 'setUpstream';
+      /**
+       * The remote branch (`origin/x`).
+       */
+      upstream?: string | null;
+    }
+  | {
+      op: 'fetch';
+    }
+  | {
+      /**
+       * How to integrate; the user setting when absent.
+       */
+      mode?: GitPullMode | null;
+      op: 'pull';
+    }
+  | {
+      /**
+       * The remote commit the confirmation showed ([`GitDescription::remote_oid`]).
+       */
+      expect?: string | null;
+      /**
+       * Force with lease (confirmed natively).
+       */
+      force?: boolean | null;
+      op: 'push';
+      /**
+       * A first push's target.
+       */
+      target?: GitPushTarget | null;
+    }
+  | {
+      op: 'continue';
+    }
+  | {
+      op: 'abort';
+    }
+  | {
+      op: 'skip';
+    }
+  | {
+      op: 'markResolved';
+      /**
+       * The files.
+       */
+      paths: string[];
+    }
+  | {
+      /**
+       * The operation.
+       */
+      action: GitDescribe;
+      op: 'describe';
+    };
+/**
+ * A range of changes the panel shows (ADR-0084 rule 1). The session scope is not a Git
+ * range: the client reads it from `sessionChanges`.
+ */
+export type GitScope =
+  | {
+      /**
+       * The branch to compare against; inferred when absent (ADR-0084 rule 2).
+       */
+      base?: string | null;
+      kind: 'branch';
+    }
+  | {
+      kind: 'uncommitted';
+    }
+  | {
+      kind: 'commit';
+      /**
+       * The full commit id.
+       */
+      sha: string;
+    };
+/**
+ * Which content of a file to read.
+ */
+export type GitTextSource =
+  | {
+      kind: 'commit';
+      /**
+       * The commit.
+       */
+      rev: string;
+    }
+  | {
+      kind: 'index';
+    }
+  | {
+      kind: 'worktree';
+    };
+/**
+ * Which side of a file's uncommitted change a hunk belongs to.
+ */
+export type GitStage = 'staged' | 'unstaged';
+/**
+ * The language of a generated commit message (the client's interface language).
+ */
+export type GitLanguage = 'en' | 'zh-CN';
+/**
+ * How a checkout treats local changes it would overwrite.
+ */
+export type GitCheckoutMode = 'normal' | 'smart' | 'force';
+/**
+ * How a pull integrates the upstream.
+ */
+export type GitPullMode = 'config' | 'merge' | 'rebase' | 'ffOnly';
+/**
+ * What a native confirmation describes before a destructive operation (ADR-0085 rule 6).
+ */
+export type GitDescribe =
+  | {
+      kind: 'rollback';
+      /**
+       * The files.
+       */
+      paths: string[];
+    }
+  | {
+      /**
+       * The hunk.
+       */
+      hunk: GitHunkRef;
+      kind: 'rollbackHunk';
+    }
+  | {
+      kind: 'forcePush';
+      /**
+       * The target of a first push.
+       */
+      target?: GitPushTarget | null;
+    }
+  | {
+      kind: 'deleteBranch';
+      /**
+       * The branch.
+       */
+      name: string;
+    }
+  | {
+      kind: 'forceCheckout';
+      /**
+       * The branch or revision.
+       */
+      target: string;
+    };
+/**
+ * The status of a file in a diff or on one side of `git status`.
+ */
+export type GitFileStatus =
+  | 'added'
+  | 'modified'
+  | 'deleted'
+  | 'renamed'
+  | 'copied'
+  | 'typeChanged'
+  | 'untracked'
+  | 'conflicted';
+/**
+ * What the repository is in the middle of.
+ */
+export type GitRepoState =
+  | {
+      kind: 'clean';
+    }
+  | {
+      kind: 'merging';
+      /**
+       * What is merged (`MERGE_MSG`'s branch, when known).
+       */
+      source?: string | null;
+    }
+  | {
+      /**
+       * The branch being rebased.
+       */
+      branch?: string | null;
+      kind: 'rebasing';
+      /**
+       * The commit it goes onto (short).
+       */
+      onto?: string | null;
+      /**
+       * The current step, 1-based.
+       */
+      step?: number | null;
+      /**
+       * The number of steps.
+       */
+      total?: number | null;
+    }
+  | {
+      /**
+       * The commit (short).
+       */
+      commit?: string | null;
+      kind: 'cherryPicking';
+    }
+  | {
+      /**
+       * The commit (short).
+       */
+      commit?: string | null;
+      kind: 'reverting';
+    };
+/**
+ * Why an operation did not happen.
+ */
+export type GitFailureKind =
+  | 'notRepo'
+  | 'gitMissing'
+  | 'untrusted'
+  | 'sessionBusy'
+  | 'stale'
+  | 'busy'
+  | 'auth'
+  | 'rejected'
+  | 'staleLease'
+  | 'protected'
+  | 'localChanges'
+  | 'untrackedOverwritten'
+  | 'conflict'
+  | 'noUpstream'
+  | 'choosePullMode'
+  | 'identity'
+  | 'nothingToCommit'
+  | 'hookFailed'
+  | 'inOtherWorktree'
+  | 'notMerged'
+  | 'noModel'
+  | 'invalid'
+  | 'cancelled'
+  | 'timedOut'
+  | 'failed';
+/**
+ * A `core/git` event of a long operation.
+ */
+export type GitEvent =
+  | {
+      /**
+       * The operation ([`GitCall::op_id`]).
+       */
+      op_id: string;
+      /**
+       * Percent done, when git reports it.
+       */
+      percent?: number | null;
+      /**
+       * What git is doing (`Receiving objects`).
+       */
+      phase: string;
+      /**
+       * The session.
+       */
+      session_id: string;
+      type: 'progress';
+    }
+  | {
+      /**
+       * The repository's top level.
+       */
+      root: string;
+      type: 'changed';
+    };
 
 /**
  * A request whose method is not interpreted.
@@ -9713,4 +10212,611 @@ export interface SubagentUsage {
    * The tokens.
    */
   tokens: UsageTokens;
+}
+/**
+ * One call of `gitRequest`: an optional operation id (for progress and cancel) and the
+ * request.
+ */
+export interface GitCall {
+  /**
+   * Names the operation in `core/git` events and `cancelGit`.
+   */
+  opId?: string | null;
+  /**
+   * What to do.
+   */
+  request: GitRequest;
+}
+/**
+ * Names one hunk the client showed (ADR-0085 rule 4): Core regenerates the patch and acts
+ * only when every value still matches.
+ */
+export interface GitHunkRef {
+  /**
+   * [`GitFileStages::hunk_hashes`] at that index.
+   */
+  hash: string;
+  /**
+   * Its index in that side's hunks.
+   */
+  index: number;
+  /**
+   * [`GitFileStages::index_oid`] when it was shown.
+   */
+  indexOid: string;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * The side the hunk was shown on.
+   */
+  stage: GitStage;
+  /**
+   * [`GitFileStages::worktree_hash`] when it was shown.
+   */
+  worktreeHash: string;
+}
+/**
+ * Where a first push goes.
+ */
+export interface GitPushTarget {
+  /**
+   * The branch name on the remote.
+   */
+  branch: string;
+  /**
+   * A configured remote's name.
+   */
+  remote: string;
+}
+/**
+ * `status`: the repository and its uncommitted files.
+ */
+export interface GitStatus {
+  /**
+   * The changed files, conflicts first, then by path.
+   */
+  files: GitStatusFile[];
+  /**
+   * The repository fingerprint, as `probe` returns it.
+   */
+  fingerprint: string;
+  /**
+   * The repository; absent outside one (see [`GitFailure`] for why).
+   */
+  repository?: GitRepository | null;
+  /**
+   * More than the limit of entries: the list stops there.
+   */
+  truncated?: boolean | null;
+}
+/**
+ * One entry of `git status`.
+ */
+export interface GitStatusFile {
+  /**
+   * Lines added from `HEAD` to the working tree; absent for binary files.
+   */
+  added?: number | null;
+  /**
+   * The two-letter conflict code (`UU`, `AA`, `DU`…), for an unmerged file.
+   */
+  conflict?: string | null;
+  /**
+   * Its previous path, for a rename or copy.
+   */
+  oldPath?: string | null;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * Lines removed from `HEAD` to the working tree.
+   */
+  removed?: number | null;
+  /**
+   * The change from `HEAD` to the index.
+   */
+  staged?: GitFileStatus | null;
+  /**
+   * A submodule (gitlink): shown, not acted on.
+   */
+  submodule?: boolean | null;
+  /**
+   * The change from the index to the working tree (`untracked` for an untracked file).
+   */
+  unstaged?: GitFileStatus | null;
+}
+/**
+ * The repository of a session's file root.
+ */
+export interface GitRepository {
+  /**
+   * Lines added across the uncommitted changes.
+   */
+  added: number;
+  /**
+   * Commits ahead of the upstream.
+   */
+  ahead: number;
+  /**
+   * The inferred base branch of the branch scope.
+   */
+  base?: GitBase | null;
+  /**
+   * Commits behind the upstream.
+   */
+  behind: number;
+  /**
+   * The current branch; absent on a detached `HEAD`.
+   */
+  branch?: string | null;
+  /**
+   * `HEAD` is detached.
+   */
+  detached?: boolean | null;
+  /**
+   * The commit `HEAD` names; absent before the first commit.
+   */
+  head?: string | null;
+  /**
+   * Protected from force pushes (the user setting).
+   */
+  protected: boolean;
+  /**
+   * The configured remotes' names.
+   */
+  remotes: string[];
+  /**
+   * Lines removed across them.
+   */
+  removed: number;
+  /**
+   * The top level of the working tree, absolute.
+   */
+  root: string;
+  /**
+   * An operation in progress.
+   */
+  state: GitRepoState;
+  /**
+   * The branch's upstream (`origin/main`).
+   */
+  upstream?: string | null;
+  /**
+   * Write operations are allowed: the project is trusted (ADR-0085 rule 2).
+   */
+  writable: boolean;
+}
+/**
+ * The branch a Git scope compares against.
+ */
+export interface GitBase {
+  /**
+   * The merge base with `HEAD`, when there is one.
+   */
+  mergeBase?: string | null;
+  /**
+   * The branch as shown (`main`).
+   */
+  name: string;
+  /**
+   * The ref resolved (`refs/remotes/origin/main` or `refs/heads/main`).
+   */
+  reference: string;
+}
+/**
+ * `probe`.
+ */
+export interface GitProbe {
+  /**
+   * Changes when `HEAD`, the index, refs or an operation in progress change.
+   */
+  fingerprint: string;
+}
+/**
+ * `changes`.
+ */
+export interface GitChanges {
+  /**
+   * Lines added across them.
+   */
+  added: number;
+  /**
+   * The base of a branch scope.
+   */
+  base?: GitBase | null;
+  /**
+   * The files in path order.
+   */
+  files: GitFileChange[];
+  /**
+   * Lines removed across them.
+   */
+  removed: number;
+  /**
+   * The range answered (a branch scope names its base; a branch scope without a merge base
+   * becomes `uncommitted`).
+   */
+  scope: GitScope;
+  /**
+   * More files than the limit: the list stops there.
+   */
+  truncated?: boolean | null;
+  /**
+   * Too many files, lines or bytes: diffs are left out, fetch each with `fileDiff`.
+   */
+  withheld?: boolean | null;
+}
+/**
+ * One file of a scope.
+ */
+export interface GitFileChange {
+  /**
+   * Lines added; absent for binary files.
+   */
+  added?: number | null;
+  /**
+   * Binary on either side.
+   */
+  binary?: boolean | null;
+  /**
+   * The diff; absent for binary files and when withheld.
+   */
+  diff?: FileDiff | null;
+  /**
+   * The mode after, when it changed.
+   */
+  newMode?: string | null;
+  /**
+   * The mode before (`100644`), when it changed.
+   */
+  oldMode?: string | null;
+  /**
+   * Its previous path, for a rename or copy.
+   */
+  oldPath?: string | null;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * Lines removed.
+   */
+  removed?: number | null;
+  /**
+   * How it changed.
+   */
+  status: GitFileStatus;
+  /**
+   * A submodule (gitlink).
+   */
+  submodule?: boolean | null;
+}
+/**
+ * `fileText`.
+ */
+export interface GitText {
+  /**
+   * Binary.
+   */
+  binary?: boolean | null;
+  /**
+   * The text (decoded as UTF-8, lossily); absent when the file does not exist there, is
+   * binary or too large.
+   */
+  text?: string | null;
+  /**
+   * Larger than the limit.
+   */
+  tooLarge?: boolean | null;
+}
+/**
+ * `commits`.
+ */
+export interface GitCommits {
+  /**
+   * The base used.
+   */
+  base?: GitBase | null;
+  /**
+   * The newest commits first, at most 100.
+   */
+  commits: GitCommitRow[];
+  /**
+   * How many commits `base..HEAD` has.
+   */
+  total: number;
+}
+/**
+ * One commit of `commits`.
+ */
+export interface GitCommitRow {
+  /**
+   * The author's name.
+   */
+  author: string;
+  /**
+   * The full id.
+   */
+  sha: string;
+  /**
+   * The abbreviated id.
+   */
+  short: string;
+  /**
+   * The first line of the message.
+   */
+  subject: string;
+  /**
+   * Commit time, Unix seconds.
+   */
+  time: number;
+}
+/**
+ * `branches`.
+ */
+export interface GitBranches {
+  /**
+   * Local branches by name.
+   */
+  local: GitLocalBranch[];
+  /**
+   * Recently checked-out local branches, newest first, the current one left out.
+   */
+  recent: string[];
+  /**
+   * Remote-tracking branches by remote and name (`HEAD` pointers left out).
+   */
+  remote: GitRemoteBranch[];
+  /**
+   * The configured remotes.
+   */
+  remotes: string[];
+}
+/**
+ * A local branch.
+ */
+export interface GitLocalBranch {
+  /**
+   * Commits ahead of the upstream.
+   */
+  ahead?: number | null;
+  /**
+   * Commits behind the upstream.
+   */
+  behind?: number | null;
+  /**
+   * The current branch.
+   */
+  current?: boolean | null;
+  /**
+   * The upstream is gone.
+   */
+  gone?: boolean | null;
+  /**
+   * Its name.
+   */
+  name: string;
+  /**
+   * The commit it names.
+   */
+  oid: string;
+  /**
+   * Last commit time, Unix seconds.
+   */
+  time: number;
+  /**
+   * Its upstream (`origin/x`).
+   */
+  upstream?: string | null;
+  /**
+   * Checked out in another worktree (its path).
+   */
+  worktree?: string | null;
+}
+/**
+ * A remote-tracking branch.
+ */
+export interface GitRemoteBranch {
+  /**
+   * The branch name without the remote (`x` of `origin/x`).
+   */
+  name: string;
+  /**
+   * The commit it names.
+   */
+  oid: string;
+  /**
+   * The remote.
+   */
+  remote: string;
+  /**
+   * Last commit time, Unix seconds.
+   */
+  time: number;
+}
+/**
+ * `fileStages`: one file's uncommitted change in two parts.
+ */
+export interface GitFileStages {
+  /**
+   * Binary on some side.
+   */
+  binary?: boolean | null;
+  /**
+   * Hunk actions are available (not binary, no filter attribute, not only a mode change).
+   */
+  hunkActions: boolean;
+  /**
+   * Hashes naming each unstaged hunk.
+   */
+  hunkHashes: string[];
+  /**
+   * The index entry's object id (`absent` when not in the index).
+   */
+  indexOid: string;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * `HEAD` to the index.
+   */
+  staged?: FileDiff | null;
+  /**
+   * Hashes naming each staged hunk.
+   */
+  stagedHashes: string[];
+  /**
+   * The index to the working tree (for an untracked file: everything).
+   */
+  unstaged?: FileDiff | null;
+  /**
+   * SHA-256 of the file on disk (`absent` when there is none).
+   */
+  worktreeHash: string;
+}
+/**
+ * `lastCommit`.
+ */
+export interface GitLastCommit {
+  /**
+   * The message; absent before the first commit.
+   */
+  message?: string | null;
+  /**
+   * The upstream already has the commit: amending it needs a force push.
+   */
+  pushed: boolean;
+}
+/**
+ * `commitMessage`.
+ */
+export interface GitCommitMessage {
+  /**
+   * The auxiliary model was unavailable and the session's model wrote it.
+   */
+  fallback?: boolean | null;
+  /**
+   * The model that wrote it.
+   */
+  model: string;
+  /**
+   * The message.
+   */
+  text: string;
+  /**
+   * Files sent by path only.
+   */
+  withheld: string[];
+}
+/**
+ * What a write operation did.
+ */
+export interface GitOpResult {
+  /**
+   * Files left conflicted.
+   */
+  conflicts?: string[];
+  /**
+   * The deleted branch.
+   */
+  deleted?: GitDeletedBranch | null;
+  /**
+   * `HEAD` afterwards.
+   */
+  head?: string | null;
+  /**
+   * A smart checkout's stash kept after conflicts (`stash@{0}` and its message).
+   */
+  keptStash?: string | null;
+  /**
+   * Output worth showing (hook messages), redacted and cut.
+   */
+  output?: string | null;
+  /**
+   * The rollback to undo with `undoRollback`.
+   */
+  restoreId?: string | null;
+  /**
+   * The new commit's subject.
+   */
+  subject?: string | null;
+}
+/**
+ * A deleted branch, for "Restore".
+ */
+export interface GitDeletedBranch {
+  /**
+   * The branch.
+   */
+  name: string;
+  /**
+   * The commit it named.
+   */
+  oid: string;
+  /**
+   * Its upstream.
+   */
+  upstream?: string | null;
+}
+/**
+ * `describe`: the facts a native confirmation shows, read by Core.
+ */
+export interface GitDescription {
+  /**
+   * The branch concerned.
+   */
+  branch?: string | null;
+  /**
+   * The local commit pushed.
+   */
+  localOid?: string | null;
+  /**
+   * The files affected.
+   */
+  paths?: string[];
+  /**
+   * Refused before asking (a protected branch, nothing to do).
+   */
+  refused?: GitFailure | null;
+  /**
+   * The remote concerned.
+   */
+  remote?: string | null;
+  /**
+   * The remote branch's commit the force push replaces (the lease).
+   */
+  remoteOid?: string | null;
+  /**
+   * Commits a deleted branch has that its upstream or `HEAD` lacks.
+   */
+  unmerged?: number | null;
+}
+/**
+ * A failed operation.
+ */
+export interface GitFailure {
+  /**
+   * The equivalent command, for "Run in terminal" after an authentication failure.
+   */
+  command?: string | null;
+  /**
+   * Why.
+   */
+  kind: GitFailureKind;
+  /**
+   * A short description (git's words, redacted and cut).
+   */
+  message?: string | null;
+  /**
+   * Files concerned.
+   */
+  paths?: string[];
+  /**
+   * Titles of the sessions that are busy.
+   */
+  sessions?: string[];
 }

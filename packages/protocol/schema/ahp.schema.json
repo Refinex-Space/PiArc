@@ -4342,6 +4342,970 @@
       "required": ["sessionId", "since"],
       "type": "object"
     },
+    "GitBase": {
+      "description": "The branch a Git scope compares against.",
+      "properties": {
+        "mergeBase": {
+          "description": "The merge base with `HEAD`, when there is one.",
+          "type": ["string", "null"]
+        },
+        "name": {
+          "description": "The branch as shown (`main`).",
+          "type": "string"
+        },
+        "reference": {
+          "description": "The ref resolved (`refs/remotes/origin/main` or `refs/heads/main`).",
+          "type": "string"
+        }
+      },
+      "required": ["name", "reference"],
+      "type": "object"
+    },
+    "GitBranches": {
+      "description": "`branches`.",
+      "properties": {
+        "local": {
+          "description": "Local branches by name.",
+          "items": {
+            "$ref": "#/$defs/GitLocalBranch"
+          },
+          "type": "array"
+        },
+        "recent": {
+          "description": "Recently checked-out local branches, newest first, the current one left out.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "remote": {
+          "description": "Remote-tracking branches by remote and name (`HEAD` pointers left out).",
+          "items": {
+            "$ref": "#/$defs/GitRemoteBranch"
+          },
+          "type": "array"
+        },
+        "remotes": {
+          "description": "The configured remotes.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["local", "remote", "recent", "remotes"],
+      "type": "object"
+    },
+    "GitCall": {
+      "description": "One call of `gitRequest`: an optional operation id (for progress and cancel) and the\nrequest.",
+      "properties": {
+        "opId": {
+          "description": "Names the operation in `core/git` events and `cancelGit`.",
+          "type": ["string", "null"]
+        },
+        "request": {
+          "$ref": "#/$defs/GitRequest",
+          "description": "What to do."
+        }
+      },
+      "required": ["request"],
+      "type": "object"
+    },
+    "GitChanges": {
+      "description": "`changes`.",
+      "properties": {
+        "added": {
+          "description": "Lines added across them.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "base": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitBase"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The base of a branch scope."
+        },
+        "files": {
+          "description": "The files in path order.",
+          "items": {
+            "$ref": "#/$defs/GitFileChange"
+          },
+          "type": "array"
+        },
+        "removed": {
+          "description": "Lines removed across them.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/$defs/GitScope",
+          "description": "The range answered (a branch scope names its base; a branch scope without a merge base\nbecomes `uncommitted`)."
+        },
+        "truncated": {
+          "description": "More files than the limit: the list stops there.",
+          "type": ["boolean", "null"]
+        },
+        "withheld": {
+          "description": "Too many files, lines or bytes: diffs are left out, fetch each with `fileDiff`.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "required": ["scope", "files", "added", "removed"],
+      "type": "object"
+    },
+    "GitCheckoutMode": {
+      "description": "How a checkout treats local changes it would overwrite.",
+      "oneOf": [
+        {
+          "const": "normal",
+          "description": "Refuse and report the files.",
+          "type": "string"
+        },
+        {
+          "const": "smart",
+          "description": "Stash them, check out, and restore them.",
+          "type": "string"
+        },
+        {
+          "const": "force",
+          "description": "Discard them (confirmed natively).",
+          "type": "string"
+        }
+      ]
+    },
+    "GitCommitMessage": {
+      "description": "`commitMessage`.",
+      "properties": {
+        "fallback": {
+          "description": "The auxiliary model was unavailable and the session's model wrote it.",
+          "type": ["boolean", "null"]
+        },
+        "model": {
+          "description": "The model that wrote it.",
+          "type": "string"
+        },
+        "text": {
+          "description": "The message.",
+          "type": "string"
+        },
+        "withheld": {
+          "description": "Files sent by path only.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["text", "model", "withheld"],
+      "type": "object"
+    },
+    "GitCommitRow": {
+      "description": "One commit of `commits`.",
+      "properties": {
+        "author": {
+          "description": "The author's name.",
+          "type": "string"
+        },
+        "sha": {
+          "description": "The full id.",
+          "type": "string"
+        },
+        "short": {
+          "description": "The abbreviated id.",
+          "type": "string"
+        },
+        "subject": {
+          "description": "The first line of the message.",
+          "type": "string"
+        },
+        "time": {
+          "description": "Commit time, Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sha", "short", "subject", "author", "time"],
+      "type": "object"
+    },
+    "GitCommits": {
+      "description": "`commits`.",
+      "properties": {
+        "base": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitBase"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The base used."
+        },
+        "commits": {
+          "description": "The newest commits first, at most 100.",
+          "items": {
+            "$ref": "#/$defs/GitCommitRow"
+          },
+          "type": "array"
+        },
+        "total": {
+          "description": "How many commits `base..HEAD` has.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["commits", "total"],
+      "type": "object"
+    },
+    "GitDeletedBranch": {
+      "description": "A deleted branch, for \"Restore\".",
+      "properties": {
+        "name": {
+          "description": "The branch.",
+          "type": "string"
+        },
+        "oid": {
+          "description": "The commit it named.",
+          "type": "string"
+        },
+        "upstream": {
+          "description": "Its upstream.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["name", "oid"],
+      "type": "object"
+    },
+    "GitDescribe": {
+      "description": "What a native confirmation describes before a destructive operation (ADR-0085 rule 6).",
+      "oneOf": [
+        {
+          "description": "Rolling back files to `HEAD`.",
+          "properties": {
+            "kind": {
+              "const": "rollback",
+              "type": "string"
+            },
+            "paths": {
+              "description": "The files.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": ["kind", "paths"],
+          "type": "object"
+        },
+        {
+          "description": "Rolling back one unstaged hunk.",
+          "properties": {
+            "hunk": {
+              "$ref": "#/$defs/GitHunkRef",
+              "description": "The hunk."
+            },
+            "kind": {
+              "const": "rollbackHunk",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "hunk"],
+          "type": "object"
+        },
+        {
+          "description": "Force-pushing the current branch.",
+          "properties": {
+            "kind": {
+              "const": "forcePush",
+              "type": "string"
+            },
+            "target": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitPushTarget"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The target of a first push."
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "Deleting a branch that is not fully merged.",
+          "properties": {
+            "kind": {
+              "const": "deleteBranch",
+              "type": "string"
+            },
+            "name": {
+              "description": "The branch.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "name"],
+          "type": "object"
+        },
+        {
+          "description": "A checkout that discards local changes.",
+          "properties": {
+            "kind": {
+              "const": "forceCheckout",
+              "type": "string"
+            },
+            "target": {
+              "description": "The branch or revision.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "target"],
+          "type": "object"
+        }
+      ]
+    },
+    "GitDescription": {
+      "description": "`describe`: the facts a native confirmation shows, read by Core.",
+      "properties": {
+        "branch": {
+          "description": "The branch concerned.",
+          "type": ["string", "null"]
+        },
+        "localOid": {
+          "description": "The local commit pushed.",
+          "type": ["string", "null"]
+        },
+        "paths": {
+          "description": "The files affected.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitFailure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Refused before asking (a protected branch, nothing to do)."
+        },
+        "remote": {
+          "description": "The remote concerned.",
+          "type": ["string", "null"]
+        },
+        "remoteOid": {
+          "description": "The remote branch's commit the force push replaces (the lease).",
+          "type": ["string", "null"]
+        },
+        "unmerged": {
+          "description": "Commits a deleted branch has that its upstream or `HEAD` lacks.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "GitEvent": {
+      "description": "A `core/git` event of a long operation.",
+      "oneOf": [
+        {
+          "description": "Progress git reported.",
+          "properties": {
+            "op_id": {
+              "description": "The operation ([`GitCall::op_id`]).",
+              "type": "string"
+            },
+            "percent": {
+              "description": "Percent done, when git reports it.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            },
+            "phase": {
+              "description": "What git is doing (`Receiving objects`).",
+              "type": "string"
+            },
+            "session_id": {
+              "description": "The session.",
+              "type": "string"
+            },
+            "type": {
+              "const": "progress",
+              "type": "string"
+            }
+          },
+          "required": ["type", "session_id", "op_id", "phase"],
+          "type": "object"
+        },
+        {
+          "description": "The repository changed because of an operation: clients of the same file root refresh.",
+          "properties": {
+            "root": {
+              "description": "The repository's top level.",
+              "type": "string"
+            },
+            "type": {
+              "const": "changed",
+              "type": "string"
+            }
+          },
+          "required": ["type", "root"],
+          "type": "object"
+        }
+      ]
+    },
+    "GitFailure": {
+      "description": "A failed operation.",
+      "properties": {
+        "command": {
+          "description": "The equivalent command, for \"Run in terminal\" after an authentication failure.",
+          "type": ["string", "null"]
+        },
+        "kind": {
+          "$ref": "#/$defs/GitFailureKind",
+          "description": "Why."
+        },
+        "message": {
+          "description": "A short description (git's words, redacted and cut).",
+          "type": ["string", "null"]
+        },
+        "paths": {
+          "description": "Files concerned.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sessions": {
+          "description": "Titles of the sessions that are busy.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["kind"],
+      "type": "object"
+    },
+    "GitFailureKind": {
+      "description": "Why an operation did not happen.",
+      "oneOf": [
+        {
+          "const": "notRepo",
+          "description": "The file root is not in a repository.",
+          "type": "string"
+        },
+        {
+          "const": "gitMissing",
+          "description": "No git program was found.",
+          "type": "string"
+        },
+        {
+          "const": "untrusted",
+          "description": "The project is not trusted: write operations wait for trust.",
+          "type": "string"
+        },
+        {
+          "const": "sessionBusy",
+          "description": "A session in the same file root is running a turn.",
+          "type": "string"
+        },
+        {
+          "const": "stale",
+          "description": "The file or index changed since the client showed it.",
+          "type": "string"
+        },
+        {
+          "const": "busy",
+          "description": "Another git process holds the repository's lock.",
+          "type": "string"
+        },
+        {
+          "const": "auth",
+          "description": "The remote refused the credentials, or git needed to ask for them.",
+          "type": "string"
+        },
+        {
+          "const": "rejected",
+          "description": "The remote has commits the local branch lacks.",
+          "type": "string"
+        },
+        {
+          "const": "staleLease",
+          "description": "The remote moved since the last fetch: the lease failed.",
+          "type": "string"
+        },
+        {
+          "const": "protected",
+          "description": "Force pushes to this branch are not allowed.",
+          "type": "string"
+        },
+        {
+          "const": "localChanges",
+          "description": "Local changes would be overwritten (`paths`).",
+          "type": "string"
+        },
+        {
+          "const": "untrackedOverwritten",
+          "description": "Untracked files would be overwritten (`paths`).",
+          "type": "string"
+        },
+        {
+          "const": "conflict",
+          "description": "The operation stopped with conflicts (`paths`).",
+          "type": "string"
+        },
+        {
+          "const": "noUpstream",
+          "description": "The branch has no upstream.",
+          "type": "string"
+        },
+        {
+          "const": "choosePullMode",
+          "description": "The branches diverged and no pull strategy is configured.",
+          "type": "string"
+        },
+        {
+          "const": "identity",
+          "description": "`user.name` or `user.email` is not set.",
+          "type": "string"
+        },
+        {
+          "const": "nothingToCommit",
+          "description": "Nothing staged to commit.",
+          "type": "string"
+        },
+        {
+          "const": "hookFailed",
+          "description": "A hook refused (`message` holds its output).",
+          "type": "string"
+        },
+        {
+          "const": "inOtherWorktree",
+          "description": "The branch is checked out in another worktree.",
+          "type": "string"
+        },
+        {
+          "const": "notMerged",
+          "description": "Not fully merged: deleting needs force.",
+          "type": "string"
+        },
+        {
+          "const": "noModel",
+          "description": "No model can generate the message.",
+          "type": "string"
+        },
+        {
+          "const": "invalid",
+          "description": "A request member is not acceptable.",
+          "type": "string"
+        },
+        {
+          "const": "cancelled",
+          "description": "The user cancelled.",
+          "type": "string"
+        },
+        {
+          "const": "timedOut",
+          "description": "It ran past its time limit.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Anything else (`message` holds git's words, redacted).",
+          "type": "string"
+        }
+      ]
+    },
+    "GitFileChange": {
+      "description": "One file of a scope.",
+      "properties": {
+        "added": {
+          "description": "Lines added; absent for binary files.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "binary": {
+          "description": "Binary on either side.",
+          "type": ["boolean", "null"]
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The diff; absent for binary files and when withheld."
+        },
+        "newMode": {
+          "description": "The mode after, when it changed.",
+          "type": ["string", "null"]
+        },
+        "oldMode": {
+          "description": "The mode before (`100644`), when it changed.",
+          "type": ["string", "null"]
+        },
+        "oldPath": {
+          "description": "Its previous path, for a rename or copy.",
+          "type": ["string", "null"]
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "removed": {
+          "description": "Lines removed.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "status": {
+          "$ref": "#/$defs/GitFileStatus",
+          "description": "How it changed."
+        },
+        "submodule": {
+          "description": "A submodule (gitlink).",
+          "type": ["boolean", "null"]
+        }
+      },
+      "required": ["path", "status"],
+      "type": "object"
+    },
+    "GitFileStages": {
+      "description": "`fileStages`: one file's uncommitted change in two parts.",
+      "properties": {
+        "binary": {
+          "description": "Binary on some side.",
+          "type": ["boolean", "null"]
+        },
+        "hunkActions": {
+          "description": "Hunk actions are available (not binary, no filter attribute, not only a mode change).",
+          "type": "boolean"
+        },
+        "hunkHashes": {
+          "description": "Hashes naming each unstaged hunk.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "indexOid": {
+          "description": "The index entry's object id (`absent` when not in the index).",
+          "type": "string"
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "staged": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`HEAD` to the index."
+        },
+        "stagedHashes": {
+          "description": "Hashes naming each staged hunk.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "unstaged": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The index to the working tree (for an untracked file: everything)."
+        },
+        "worktreeHash": {
+          "description": "SHA-256 of the file on disk (`absent` when there is none).",
+          "type": "string"
+        }
+      },
+      "required": ["path", "stagedHashes", "hunkHashes", "worktreeHash", "indexOid", "hunkActions"],
+      "type": "object"
+    },
+    "GitFileStatus": {
+      "description": "The status of a file in a diff or on one side of `git status`.",
+      "oneOf": [
+        {
+          "const": "added",
+          "description": "New.",
+          "type": "string"
+        },
+        {
+          "const": "modified",
+          "description": "Changed.",
+          "type": "string"
+        },
+        {
+          "const": "deleted",
+          "description": "Removed.",
+          "type": "string"
+        },
+        {
+          "const": "renamed",
+          "description": "Moved (with or without changes).",
+          "type": "string"
+        },
+        {
+          "const": "copied",
+          "description": "Copied.",
+          "type": "string"
+        },
+        {
+          "const": "typeChanged",
+          "description": "A file became a link or the reverse.",
+          "type": "string"
+        },
+        {
+          "const": "untracked",
+          "description": "Not tracked.",
+          "type": "string"
+        },
+        {
+          "const": "conflicted",
+          "description": "Unmerged.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitHunkRef": {
+      "description": "Names one hunk the client showed (ADR-0085 rule 4): Core regenerates the patch and acts\nonly when every value still matches.",
+      "properties": {
+        "hash": {
+          "description": "[`GitFileStages::hunk_hashes`] at that index.",
+          "type": "string"
+        },
+        "index": {
+          "description": "Its index in that side's hunks.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "indexOid": {
+          "description": "[`GitFileStages::index_oid`] when it was shown.",
+          "type": "string"
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "stage": {
+          "$ref": "#/$defs/GitStage",
+          "description": "The side the hunk was shown on."
+        },
+        "worktreeHash": {
+          "description": "[`GitFileStages::worktree_hash`] when it was shown.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "stage", "index", "hash", "worktreeHash", "indexOid"],
+      "type": "object"
+    },
+    "GitLanguage": {
+      "description": "The language of a generated commit message (the client's interface language).",
+      "oneOf": [
+        {
+          "const": "en",
+          "description": "English.",
+          "type": "string"
+        },
+        {
+          "const": "zh-CN",
+          "description": "Simplified Chinese.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitLastCommit": {
+      "description": "`lastCommit`.",
+      "properties": {
+        "message": {
+          "description": "The message; absent before the first commit.",
+          "type": ["string", "null"]
+        },
+        "pushed": {
+          "description": "The upstream already has the commit: amending it needs a force push.",
+          "type": "boolean"
+        }
+      },
+      "required": ["pushed"],
+      "type": "object"
+    },
+    "GitLocalBranch": {
+      "description": "A local branch.",
+      "properties": {
+        "ahead": {
+          "description": "Commits ahead of the upstream.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "behind": {
+          "description": "Commits behind the upstream.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "current": {
+          "description": "The current branch.",
+          "type": ["boolean", "null"]
+        },
+        "gone": {
+          "description": "The upstream is gone.",
+          "type": ["boolean", "null"]
+        },
+        "name": {
+          "description": "Its name.",
+          "type": "string"
+        },
+        "oid": {
+          "description": "The commit it names.",
+          "type": "string"
+        },
+        "time": {
+          "description": "Last commit time, Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "upstream": {
+          "description": "Its upstream (`origin/x`).",
+          "type": ["string", "null"]
+        },
+        "worktree": {
+          "description": "Checked out in another worktree (its path).",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["name", "oid", "time"],
+      "type": "object"
+    },
+    "GitOpResult": {
+      "description": "What a write operation did.",
+      "properties": {
+        "conflicts": {
+          "description": "Files left conflicted.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "deleted": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitDeletedBranch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The deleted branch."
+        },
+        "head": {
+          "description": "`HEAD` afterwards.",
+          "type": ["string", "null"]
+        },
+        "keptStash": {
+          "description": "A smart checkout's stash kept after conflicts (`stash@{0}` and its message).",
+          "type": ["string", "null"]
+        },
+        "output": {
+          "description": "Output worth showing (hook messages), redacted and cut.",
+          "type": ["string", "null"]
+        },
+        "restoreId": {
+          "description": "The rollback to undo with `undoRollback`.",
+          "type": ["string", "null"]
+        },
+        "subject": {
+          "description": "The new commit's subject.",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "GitProbe": {
+      "description": "`probe`.",
+      "properties": {
+        "fingerprint": {
+          "description": "Changes when `HEAD`, the index, refs or an operation in progress change.",
+          "type": "string"
+        }
+      },
+      "required": ["fingerprint"],
+      "type": "object"
+    },
+    "GitPullMode": {
+      "description": "How a pull integrates the upstream.",
+      "oneOf": [
+        {
+          "const": "config",
+          "description": "Whatever the repository's `pull.rebase` and `pull.ff` say.",
+          "type": "string"
+        },
+        {
+          "const": "merge",
+          "description": "`--no-rebase`.",
+          "type": "string"
+        },
+        {
+          "const": "rebase",
+          "description": "`--rebase`.",
+          "type": "string"
+        },
+        {
+          "const": "ffOnly",
+          "description": "`--ff-only`.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitPushTarget": {
+      "description": "Where a first push goes.",
+      "properties": {
+        "branch": {
+          "description": "The branch name on the remote.",
+          "type": "string"
+        },
+        "remote": {
+          "description": "A configured remote's name.",
+          "type": "string"
+        }
+      },
+      "required": ["remote", "branch"],
+      "type": "object"
+    },
     "GitRemote": {
       "description": "A git remote as the review shows it (T46).",
       "properties": {
@@ -4356,6 +5320,987 @@
       },
       "required": ["name", "url"],
       "type": "object"
+    },
+    "GitRemoteBranch": {
+      "description": "A remote-tracking branch.",
+      "properties": {
+        "name": {
+          "description": "The branch name without the remote (`x` of `origin/x`).",
+          "type": "string"
+        },
+        "oid": {
+          "description": "The commit it names.",
+          "type": "string"
+        },
+        "remote": {
+          "description": "The remote.",
+          "type": "string"
+        },
+        "time": {
+          "description": "Last commit time, Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["remote", "name", "oid", "time"],
+      "type": "object"
+    },
+    "GitRepoState": {
+      "description": "What the repository is in the middle of.",
+      "oneOf": [
+        {
+          "description": "Nothing.",
+          "properties": {
+            "kind": {
+              "const": "clean",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "A merge stopped for conflicts or a commit.",
+          "properties": {
+            "kind": {
+              "const": "merging",
+              "type": "string"
+            },
+            "source": {
+              "description": "What is merged (`MERGE_MSG`'s branch, when known).",
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "A rebase.",
+          "properties": {
+            "branch": {
+              "description": "The branch being rebased.",
+              "type": ["string", "null"]
+            },
+            "kind": {
+              "const": "rebasing",
+              "type": "string"
+            },
+            "onto": {
+              "description": "The commit it goes onto (short).",
+              "type": ["string", "null"]
+            },
+            "step": {
+              "description": "The current step, 1-based.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            },
+            "total": {
+              "description": "The number of steps.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": ["integer", "null"]
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "A cherry-pick.",
+          "properties": {
+            "commit": {
+              "description": "The commit (short).",
+              "type": ["string", "null"]
+            },
+            "kind": {
+              "const": "cherryPicking",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "A revert.",
+          "properties": {
+            "commit": {
+              "description": "The commit (short).",
+              "type": ["string", "null"]
+            },
+            "kind": {
+              "const": "reverting",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
+    },
+    "GitRepository": {
+      "description": "The repository of a session's file root.",
+      "properties": {
+        "added": {
+          "description": "Lines added across the uncommitted changes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ahead": {
+          "description": "Commits ahead of the upstream.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "base": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitBase"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The inferred base branch of the branch scope."
+        },
+        "behind": {
+          "description": "Commits behind the upstream.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "branch": {
+          "description": "The current branch; absent on a detached `HEAD`.",
+          "type": ["string", "null"]
+        },
+        "detached": {
+          "description": "`HEAD` is detached.",
+          "type": ["boolean", "null"]
+        },
+        "head": {
+          "description": "The commit `HEAD` names; absent before the first commit.",
+          "type": ["string", "null"]
+        },
+        "protected": {
+          "description": "Protected from force pushes (the user setting).",
+          "type": "boolean"
+        },
+        "remotes": {
+          "description": "The configured remotes' names.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "removed": {
+          "description": "Lines removed across them.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "root": {
+          "description": "The top level of the working tree, absolute.",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/GitRepoState",
+          "description": "An operation in progress."
+        },
+        "upstream": {
+          "description": "The branch's upstream (`origin/main`).",
+          "type": ["string", "null"]
+        },
+        "writable": {
+          "description": "Write operations are allowed: the project is trusted (ADR-0085 rule 2).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "root",
+        "ahead",
+        "behind",
+        "state",
+        "remotes",
+        "writable",
+        "protected",
+        "added",
+        "removed"
+      ],
+      "type": "object"
+    },
+    "GitRequest": {
+      "description": "A request of `gitRequest`.",
+      "oneOf": [
+        {
+          "description": "The repository's fingerprint: cheap, polled while the panel is visible.",
+          "properties": {
+            "op": {
+              "const": "probe",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Branch, upstream, state and the changed files ([`GitStatus`]).",
+          "properties": {
+            "op": {
+              "const": "status",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "The files and diffs of a scope ([`GitChanges`]).",
+          "properties": {
+            "ignore_whitespace": {
+              "description": "Ignore whitespace (`-w`).",
+              "type": ["boolean", "null"]
+            },
+            "op": {
+              "const": "changes",
+              "type": "string"
+            },
+            "scope": {
+              "$ref": "#/$defs/GitScope",
+              "description": "The range."
+            }
+          },
+          "required": ["op", "scope"],
+          "type": "object"
+        },
+        {
+          "description": "One file's diff in a scope, when [`GitChanges::withheld`] left it out ([`GitFileChange`]).",
+          "properties": {
+            "ignore_whitespace": {
+              "description": "Ignore whitespace.",
+              "type": ["boolean", "null"]
+            },
+            "old_path": {
+              "description": "Its previous path, for a rename.",
+              "type": ["string", "null"]
+            },
+            "op": {
+              "const": "fileDiff",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file.",
+              "type": "string"
+            },
+            "scope": {
+              "$ref": "#/$defs/GitScope",
+              "description": "The range."
+            }
+          },
+          "required": ["op", "scope", "path"],
+          "type": "object"
+        },
+        {
+          "description": "One file's complete text, to expand unchanged lines ([`GitText`]).",
+          "properties": {
+            "op": {
+              "const": "fileText",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file.",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/GitTextSource",
+              "description": "Which content."
+            }
+          },
+          "required": ["op", "source", "path"],
+          "type": "object"
+        },
+        {
+          "description": "The commits of `base..HEAD` ([`GitCommits`]).",
+          "properties": {
+            "base": {
+              "description": "The base branch; inferred when absent.",
+              "type": ["string", "null"]
+            },
+            "op": {
+              "const": "commits",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Local and remote branches ([`GitBranches`]).",
+          "properties": {
+            "op": {
+              "const": "branches",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "The staged and unstaged diffs of one file, for the commit view ([`GitFileStages`]).",
+          "properties": {
+            "op": {
+              "const": "fileStages",
+              "type": "string"
+            },
+            "path": {
+              "description": "The file.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "path"],
+          "type": "object"
+        },
+        {
+          "description": "Stage whole files.",
+          "properties": {
+            "op": {
+              "const": "stage",
+              "type": "string"
+            },
+            "paths": {
+              "description": "The files.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": ["op", "paths"],
+          "type": "object"
+        },
+        {
+          "description": "Unstage whole files.",
+          "properties": {
+            "op": {
+              "const": "unstage",
+              "type": "string"
+            },
+            "paths": {
+              "description": "The files.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": ["op", "paths"],
+          "type": "object"
+        },
+        {
+          "description": "Stage one unstaged hunk.",
+          "properties": {
+            "hunk": {
+              "$ref": "#/$defs/GitHunkRef",
+              "description": "The hunk."
+            },
+            "op": {
+              "const": "stageHunk",
+              "type": "string"
+            }
+          },
+          "required": ["op", "hunk"],
+          "type": "object"
+        },
+        {
+          "description": "Unstage one staged hunk.",
+          "properties": {
+            "hunk": {
+              "$ref": "#/$defs/GitHunkRef",
+              "description": "The hunk."
+            },
+            "op": {
+              "const": "unstageHunk",
+              "type": "string"
+            }
+          },
+          "required": ["op", "hunk"],
+          "type": "object"
+        },
+        {
+          "description": "Roll back one unstaged hunk in the working tree (confirmed natively).",
+          "properties": {
+            "hunk": {
+              "$ref": "#/$defs/GitHunkRef",
+              "description": "The hunk."
+            },
+            "op": {
+              "const": "rollbackHunk",
+              "type": "string"
+            }
+          },
+          "required": ["op", "hunk"],
+          "type": "object"
+        },
+        {
+          "description": "Roll back files to `HEAD`, index and working tree (confirmed natively).",
+          "properties": {
+            "op": {
+              "const": "rollback",
+              "type": "string"
+            },
+            "paths": {
+              "description": "The files.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": ["op", "paths"],
+          "type": "object"
+        },
+        {
+          "description": "Undo a rollback ([`GitOpResult::restore_id`]).",
+          "properties": {
+            "op": {
+              "const": "undoRollback",
+              "type": "string"
+            },
+            "restore_id": {
+              "description": "The rollback.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "restore_id"],
+          "type": "object"
+        },
+        {
+          "description": "Commit the index.",
+          "properties": {
+            "amend": {
+              "description": "Replace the last commit.",
+              "type": ["boolean", "null"]
+            },
+            "message": {
+              "description": "The message.",
+              "type": "string"
+            },
+            "op": {
+              "const": "commit",
+              "type": "string"
+            },
+            "signoff": {
+              "description": "Add a `Signed-off-by` trailer.",
+              "type": ["boolean", "null"]
+            }
+          },
+          "required": ["op", "message"],
+          "type": "object"
+        },
+        {
+          "description": "The last commit's message and whether its upstream has it ([`GitLastCommit`]).",
+          "properties": {
+            "op": {
+              "const": "lastCommit",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Generate a commit message from the staged changes ([`GitCommitMessage`], ADR-0086).",
+          "properties": {
+            "amend": {
+              "description": "Describe the last commit plus the staged changes.",
+              "type": ["boolean", "null"]
+            },
+            "instructions": {
+              "description": "The commit instructions.",
+              "type": "string"
+            },
+            "language": {
+              "$ref": "#/$defs/GitLanguage",
+              "description": "The interface language; the main process fills it."
+            },
+            "op": {
+              "const": "commitMessage",
+              "type": "string"
+            }
+          },
+          "required": ["op", "language", "instructions"],
+          "type": "object"
+        },
+        {
+          "description": "Check out a branch or revision.",
+          "properties": {
+            "mode": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitCheckoutMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What to do with local changes in the way."
+            },
+            "op": {
+              "const": "checkout",
+              "type": "string"
+            },
+            "target": {
+              "description": "A local branch, a remote branch (`origin/x`), a tag or a commit.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "target"],
+          "type": "object"
+        },
+        {
+          "description": "Create a branch.",
+          "properties": {
+            "checkout": {
+              "description": "Check it out.",
+              "type": ["boolean", "null"]
+            },
+            "name": {
+              "description": "Its name.",
+              "type": "string"
+            },
+            "op": {
+              "const": "createBranch",
+              "type": "string"
+            },
+            "start": {
+              "description": "Where it starts; `HEAD` when absent.",
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["op", "name"],
+          "type": "object"
+        },
+        {
+          "description": "Rename a local branch.",
+          "properties": {
+            "from": {
+              "description": "The current name.",
+              "type": "string"
+            },
+            "op": {
+              "const": "renameBranch",
+              "type": "string"
+            },
+            "to": {
+              "description": "The new name.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "from", "to"],
+          "type": "object"
+        },
+        {
+          "description": "Delete a local branch; `force` deletes one that is not fully merged (confirmed\nnatively).",
+          "properties": {
+            "force": {
+              "description": "`-D`.",
+              "type": ["boolean", "null"]
+            },
+            "name": {
+              "description": "The branch.",
+              "type": "string"
+            },
+            "op": {
+              "const": "deleteBranch",
+              "type": "string"
+            }
+          },
+          "required": ["op", "name"],
+          "type": "object"
+        },
+        {
+          "description": "Recreate a deleted branch.",
+          "properties": {
+            "name": {
+              "description": "The branch.",
+              "type": "string"
+            },
+            "oid": {
+              "description": "The commit it pointed at.",
+              "type": "string"
+            },
+            "op": {
+              "const": "restoreBranch",
+              "type": "string"
+            },
+            "upstream": {
+              "description": "Its upstream (`origin/x`).",
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["op", "name", "oid"],
+          "type": "object"
+        },
+        {
+          "description": "Set (or, without `upstream`, unset) a local branch's upstream.",
+          "properties": {
+            "branch": {
+              "description": "The local branch.",
+              "type": "string"
+            },
+            "op": {
+              "const": "setUpstream",
+              "type": "string"
+            },
+            "upstream": {
+              "description": "The remote branch (`origin/x`).",
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["op", "branch"],
+          "type": "object"
+        },
+        {
+          "description": "Fetch every remote, pruning.",
+          "properties": {
+            "op": {
+              "const": "fetch",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Pull into the current branch.",
+          "properties": {
+            "mode": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitPullMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "How to integrate; the user setting when absent."
+            },
+            "op": {
+              "const": "pull",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Push the current branch.",
+          "properties": {
+            "expect": {
+              "description": "The remote commit the confirmation showed ([`GitDescription::remote_oid`]).",
+              "type": ["string", "null"]
+            },
+            "force": {
+              "description": "Force with lease (confirmed natively).",
+              "type": ["boolean", "null"]
+            },
+            "op": {
+              "const": "push",
+              "type": "string"
+            },
+            "target": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitPushTarget"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A first push's target."
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Continue the merge, rebase, cherry-pick or revert in progress.",
+          "properties": {
+            "op": {
+              "const": "continue",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Abort it.",
+          "properties": {
+            "op": {
+              "const": "abort",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Skip the current commit of a rebase.",
+          "properties": {
+            "op": {
+              "const": "skip",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Mark conflicted files resolved.",
+          "properties": {
+            "op": {
+              "const": "markResolved",
+              "type": "string"
+            },
+            "paths": {
+              "description": "The files.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": ["op", "paths"],
+          "type": "object"
+        },
+        {
+          "description": "The facts a native confirmation shows ([`GitDescription`]).",
+          "properties": {
+            "action": {
+              "$ref": "#/$defs/GitDescribe",
+              "description": "The operation."
+            },
+            "op": {
+              "const": "describe",
+              "type": "string"
+            }
+          },
+          "required": ["op", "action"],
+          "type": "object"
+        }
+      ]
+    },
+    "GitScope": {
+      "description": "A range of changes the panel shows (ADR-0084 rule 1). The session scope is not a Git\nrange: the client reads it from `sessionChanges`.",
+      "oneOf": [
+        {
+          "description": "From the merge base of `base` and `HEAD` to the working tree, untracked files included.",
+          "properties": {
+            "base": {
+              "description": "The branch to compare against; inferred when absent (ADR-0084 rule 2).",
+              "type": ["string", "null"]
+            },
+            "kind": {
+              "const": "branch",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "From `HEAD` (the empty tree in a repository without commits) to the working tree.",
+          "properties": {
+            "kind": {
+              "const": "uncommitted",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "One commit against its first parent.",
+          "properties": {
+            "kind": {
+              "const": "commit",
+              "type": "string"
+            },
+            "sha": {
+              "description": "The full commit id.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "sha"],
+          "type": "object"
+        }
+      ]
+    },
+    "GitStage": {
+      "description": "Which side of a file's uncommitted change a hunk belongs to.",
+      "oneOf": [
+        {
+          "const": "staged",
+          "description": "`HEAD` to the index.",
+          "type": "string"
+        },
+        {
+          "const": "unstaged",
+          "description": "The index to the working tree.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitStatus": {
+      "description": "`status`: the repository and its uncommitted files.",
+      "properties": {
+        "files": {
+          "description": "The changed files, conflicts first, then by path.",
+          "items": {
+            "$ref": "#/$defs/GitStatusFile"
+          },
+          "type": "array"
+        },
+        "fingerprint": {
+          "description": "The repository fingerprint, as `probe` returns it.",
+          "type": "string"
+        },
+        "repository": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitRepository"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The repository; absent outside one (see [`GitFailure`] for why)."
+        },
+        "truncated": {
+          "description": "More than the limit of entries: the list stops there.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "required": ["files", "fingerprint"],
+      "type": "object"
+    },
+    "GitStatusFile": {
+      "description": "One entry of `git status`.",
+      "properties": {
+        "added": {
+          "description": "Lines added from `HEAD` to the working tree; absent for binary files.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "conflict": {
+          "description": "The two-letter conflict code (`UU`, `AA`, `DU`…), for an unmerged file.",
+          "type": ["string", "null"]
+        },
+        "oldPath": {
+          "description": "Its previous path, for a rename or copy.",
+          "type": ["string", "null"]
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "removed": {
+          "description": "Lines removed from `HEAD` to the working tree.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "staged": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitFileStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The change from `HEAD` to the index."
+        },
+        "submodule": {
+          "description": "A submodule (gitlink): shown, not acted on.",
+          "type": ["boolean", "null"]
+        },
+        "unstaged": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitFileStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The change from the index to the working tree (`untracked` for an untracked file)."
+        }
+      },
+      "required": ["path"],
+      "type": "object"
+    },
+    "GitText": {
+      "description": "`fileText`.",
+      "properties": {
+        "binary": {
+          "description": "Binary.",
+          "type": ["boolean", "null"]
+        },
+        "text": {
+          "description": "The text (decoded as UTF-8, lossily); absent when the file does not exist there, is\nbinary or too large.",
+          "type": ["string", "null"]
+        },
+        "tooLarge": {
+          "description": "Larger than the limit.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "GitTextSource": {
+      "description": "Which content of a file to read.",
+      "oneOf": [
+        {
+          "description": "The file in a commit (a full id, or `HEAD`).",
+          "properties": {
+            "kind": {
+              "const": "commit",
+              "type": "string"
+            },
+            "rev": {
+              "description": "The commit.",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "rev"],
+          "type": "object"
+        },
+        {
+          "description": "The file in the index.",
+          "properties": {
+            "kind": {
+              "const": "index",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        },
+        {
+          "description": "The file on disk.",
+          "properties": {
+            "kind": {
+              "const": "worktree",
+              "type": "string"
+            }
+          },
+          "required": ["kind"],
+          "type": "object"
+        }
+      ]
     },
     "GrepLine": {
       "description": "One line of grep output: a match or a context line.",

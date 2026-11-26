@@ -336,8 +336,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ### Git 面板 G1+G2（计划外，ADR-0084、0085、0086，设计增补 `docs/architecture/addenda/git-panel.md`）
 
 - [x] 1. 设计增补、ADR-0084/0085/0086、ADR 索引与 ADR-0044 状态。
-- [ ] 2. piarc-git 执行器：只读 / 用户两种模式、输出上限、取消、进度、参数校验。
-- [ ] 3. piarc-git 只读操作：status、diff、log、refs、文件全文、基础分支。
+- [x] 2. piarc-git 执行器：只读 / 用户两种模式、输出上限、取消、进度、参数校验（`exec.rs`、`env.rs`、`args.rs`、`repo.rs`；THR-15 恶意配置用例带正向对照）。
+- [x] 3. piarc-git 只读操作：status、diff、log、refs、文件全文、基础分支（`tests/panel.rs` 8 项）。
 - [ ] 4. piarc-protocol `git.rs` 与 AHP `session/commitMessage`、契约样本。
 - [ ] 5. piarc-core `git/` 只读路径、指纹、`core/git`；NAPI `gitRequest`/`cancelGit`。
 - [ ] 6. 主进程 `git-ipc.ts`、preload。

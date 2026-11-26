@@ -30,6 +30,12 @@ pub enum GitError {
         /// The git subcommand.
         command: String,
     },
+    /// The caller cancelled it and it was stopped.
+    #[error("git {command} was cancelled")]
+    Cancelled {
+        /// The git subcommand.
+        command: String,
+    },
     /// It exited with a failure.
     #[error("git {command} failed: {stderr}")]
     Failed {
@@ -56,10 +62,10 @@ pub struct Output {
 /// Runs `git` with a fixed program, environment and timeout. Cheap to clone.
 #[derive(Clone)]
 pub struct Git {
-    spawner: Arc<dyn ProcessSpawner>,
-    program: PathBuf,
-    env: Vec<(OsString, OsString)>,
-    timeout: Duration,
+    pub(crate) spawner: Arc<dyn ProcessSpawner>,
+    pub(crate) program: PathBuf,
+    pub(crate) env: Vec<(OsString, OsString)>,
+    pub(crate) timeout: Duration,
 }
 
 impl std::fmt::Debug for Git {
@@ -178,7 +184,7 @@ impl Git {
 }
 
 /// The first argument that is not an option: what error messages name.
-fn subcommand<S: AsRef<OsStr>>(args: &[S]) -> String {
+pub(crate) fn subcommand<S: AsRef<OsStr>>(args: &[S]) -> String {
     let mut iter = args.iter().map(|a| a.as_ref().to_string_lossy());
     while let Some(arg) = iter.next() {
         if arg == "-c" || arg == "-C" {
@@ -190,7 +196,7 @@ fn subcommand<S: AsRef<OsStr>>(args: &[S]) -> String {
     "git".into()
 }
 
-async fn read_all(
+pub(crate) async fn read_all(
     mut pipe: std::pin::Pin<Box<dyn AsyncRead + Send>>,
     limit: usize,
 ) -> std::io::Result<Vec<u8>> {
@@ -206,7 +212,7 @@ async fn read_all(
     }
 }
 
-async fn joined(
+pub(crate) async fn joined(
     task: tokio::task::JoinHandle<std::io::Result<Vec<u8>>>,
 ) -> Result<Vec<u8>, GitError> {
     task.await

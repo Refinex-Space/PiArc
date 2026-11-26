@@ -9,6 +9,10 @@
 //! - T40: clones of extension packages pinned to a commit, and their explicit update
 //!   ([`package`]).
 //! - T46: the remotes a working tree's repository configures ([`remotes`]).
+//! - Git panel (ADR-0084, ADR-0085): read-only queries with program-running configuration
+//!   overridden and the user's write operations ([`repo`], [`exec`], [`env`], [`args`]), status
+//!   ([`status`]), scope diffs ([`diff`]), commits and file texts ([`log`]), branches
+//!   ([`refs`]).
 //!
 //! # Not responsible for
 //!
@@ -24,12 +28,22 @@
 //! The authoritative rules are in `crates/deps-rules.json`, enforced by
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
+pub mod args;
 pub mod checkout;
+pub mod diff;
+pub mod env;
+pub mod exec;
 pub mod git;
+pub mod log;
 pub mod package;
+pub mod refs;
 pub mod remotes;
+pub mod repo;
+pub mod status;
 pub mod worktree;
 
 pub use checkout::{Checkout, CheckoutKind, Error, Result, canonical, resolve, strip_verbatim};
+pub use exec::{Cancel, ExecOptions, ExecOutput, Progress};
 pub use git::{Git, GitError};
+pub use repo::{Reader, Repo, Writer};
 pub use worktree::WorktreeError;
