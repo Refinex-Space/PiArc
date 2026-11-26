@@ -34,6 +34,7 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 | 2026-11-22 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 8533 | 10 | 0 |
 | 2026-11-23 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 8594 | 10 | 0 |
 | 2026-11-25 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 8600 | 10 | 0 |
+| 2026-11-26 | `963e0013184ecc1521289a0fc7d5da4bb6e45356` | 3533 | 9262 | 10 | 0 |
 
 ## T46 审查提示词的逐段自查
 
@@ -53,4 +54,8 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 
 ## Git 面板的提交信息提示词（ADR-0086）
 
-提示词在 `agent-host/src/harness/prompts/commit-message.ts`（system 段、两种语言要求、修正时的说明），user 消息的块标签与文件行在 `harness/commit-message.ts`。按 ADR-0086 第 3 条自写，写作时没有打开参考仓库的提示词；2026-11-25 用上面的脚本做 10 词窗口比对，0 个匹配窗口。
+提示词在 `agent-host/src/harness/prompts/commit-message.ts`（system 段、两种语言要求、修正时的说明），user 消息的块标签与文件行在 `harness/commit-message.ts`。按 ADR-0086 第 3 条自写，写作时没有打开参考仓库的提示词；2026-11-25 用上面的脚本做 10 词窗口比对，0 个匹配窗口。2026-11-26 起脚本的渲染清单明确列入这些文字（此前渲染清单没有它们），与 ADR-0087 的提示词一起重新比对，0 个匹配窗口。
+
+## PR 描述与审查的提示词（ADR-0087）
+
+提示词在 `agent-host/src/harness/prompts/git-assist.ts`（PR 描述与审查的 system 段、两种语言要求），user 消息的块标签与文件行在 `harness/git-assist.ts`。按 ADR-0087 自写，写作时没有打开参考仓库的提示词；审查答复的 JSON 形状是 PiArc 自定的（`summary`、`findings` 的 `path`、`line`、`severity`、`title`、`body`）。2026-11-26 用上面的脚本做 10 词窗口比对，0 个匹配窗口。

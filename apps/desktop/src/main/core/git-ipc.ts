@@ -1,8 +1,9 @@
 // The Git panel's commands (ADR-0084, ADR-0085). One channel carries every request: the main
 // process checks its shape, requires recent real input in the window for anything that writes,
-// fills the interface language of a commit message, and asks natively before an operation that
-// loses work (rollback, discarding checkout, force push, deleting an unmerged branch), showing
-// facts Core read; Core checks the values again and runs git.
+// fills the interface language of generated text (commit messages, PR descriptions, reviews), and
+// asks natively before an operation that loses work or cannot be taken back (rollback, discarding
+// checkout, force push, deleting an unmerged branch, merging a pull request), showing facts Core
+// read; Core checks the values again and runs git or gh.
 import { BrowserWindow } from 'electron';
 
 import { IPC_CHANNELS } from '../../shared/ipc.js';
@@ -50,7 +51,14 @@ const READ_ONLY = new Set([
   'fileBlob',
   'conflictSides',
   'rebasePlan',
+  'pullRequest',
 ]);
+
+/** Requests whose generated text follows the interface language. */
+const LANGUAGE = new Set(['commitMessage', 'prDescription', 'review']);
+
+/** The most characters of a pull request's title. */
+const MAX_TITLE = 256;
 
 /** The most characters of a merge view's result (Core counts 5 MiB of bytes). */
 const MAX_RESULT = 5 * 1024 * 1024;
@@ -427,6 +435,48 @@ function mergeRequest(op: string, raw: Json): Json {
         steps: steps(raw.steps),
       });
     default:
+      return githubRequest(op, raw);
+  }
+}
+
+/** The G5 requests (PR descriptions, reviews, pull requests on GitHub). */
+function githubRequest(op: string, raw: Json): Json {
+  switch (op) {
+    case 'prDescription':
+      return compact({
+        op,
+        instructions: text(raw.instructions, 'instructions', MAX_INSTRUCTIONS, true),
+        base: optionalName(raw.base, 'base'),
+      });
+    case 'review': {
+      const checked = scope(raw.scope);
+      if (checked.kind === 'commit')
+        throw new TypeError('a review covers a branch or uncommitted changes');
+      return { op, scope: checked };
+    }
+    case 'pullRequest':
+      return { op };
+    case 'createPullRequest': {
+      const title = text(raw.title, 'title', MAX_TITLE);
+      if (title.trim().length === 0) throw new TypeError('title must not be empty');
+      return compact({
+        op,
+        title,
+        body: text(raw.body, 'body', MAX_MESSAGE, true),
+        base: name(raw.base, 'base'),
+        draft: flag(raw.draft, 'draft'),
+      });
+    }
+    case 'mergePullRequest': {
+      const number = count(raw.number, 'number');
+      if (number === 0) throw new TypeError('number must be a pull request number');
+      return {
+        op,
+        number,
+        method: oneOf(raw.method, 'method', ['merge', 'squash', 'rebase'] as const),
+      };
+    }
+    default:
       throw new TypeError(`unknown Git operation ${op}`);
   }
 }
@@ -456,6 +506,8 @@ export function confirmationFor(request: Json): Json | undefined {
       return { kind: 'stashDrop', index: request.index, oid: request.oid };
     case 'deleteRemoteBranch':
       return { kind: 'deleteRemoteBranch', remote: request.remote, branch: request.branch };
+    case 'mergePullRequest':
+      return { kind: 'mergePullRequest', number: request.number, method: request.method };
     default:
       return undefined;
   }
@@ -557,6 +609,27 @@ export function confirmationText(
         },
         button: message('git.confirm.deleteRemoteBranchButton'),
       };
+    case 'mergePullRequest':
+      return {
+        text: {
+          message: message('git.confirm.mergePullRequest', {
+            number: typeof action.number === 'number' ? action.number : 0,
+            title: reveal(typeof described.message === 'string' ? described.message : ''),
+          }),
+          detail: message('git.confirm.mergePullRequestDetail', {
+            repo: reveal(typeof described.remote === 'string' ? described.remote : ''),
+            base: branch,
+            method: message(
+              action.method === 'merge'
+                ? 'git.pr.method.merge'
+                : action.method === 'rebase'
+                  ? 'git.pr.method.rebase'
+                  : 'git.pr.method.squash',
+            ),
+          }),
+        },
+        button: message('git.confirm.mergePullRequestButton'),
+      };
     default:
       return {
         text: {
@@ -601,7 +674,7 @@ export function registerGitHandlers(
     if (!READ_ONLY.has(String(request.op)) && !background) {
       input.requireInput(event.sender, session, 'changes');
     }
-    if (request.op === 'commitMessage') request.language = locale() === 'zh-CN' ? 'zh-CN' : 'en';
+    if (LANGUAGE.has(String(request.op))) request.language = locale() === 'zh-CN' ? 'zh-CN' : 'en';
     const action = confirmationFor(request);
     if (action !== undefined) {
       const described = parse(

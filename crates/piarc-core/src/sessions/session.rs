@@ -79,6 +79,8 @@ pub enum Op {
     },
     /// Generates a commit message on the session's auxiliary model channel (ADR-0086).
     CommitMessage(Box<piarc_protocol::session::CommitMessageParams>),
+    /// Writes a PR description or reviews a diff on the session's auxiliary channel (ADR-0087).
+    GitAssist(Box<piarc_protocol::session::GitAssistParams>),
     /// The session's context usage (`session/getContextUsage`, T27).
     ContextUsage,
     /// Switches the session permission mode and records a transcript entry.
@@ -992,6 +994,7 @@ impl Request {
                 self.control_side_chat(&supervisor, panel_id, close).await
             }
             Op::CommitMessage(params) => self.commit_message(&supervisor, *params).await,
+            Op::GitAssist(params) => self.git_assist(&supervisor, *params).await,
             Op::ContextUsage => {
                 let params = SessionTarget {
                     session_id: self.id.clone(),

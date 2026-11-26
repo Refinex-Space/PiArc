@@ -1977,6 +1977,13 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'git.confirm.deleteRemoteBranchDetail':
     '它指向 {oid}。所有使用这个远端的人都会失去该分支；删除后可以从提示条里推送回去。',
   'git.confirm.deleteRemoteBranchButton': '在远端删除',
+  'git.confirm.mergePullRequest': '合并拉取请求 #{number}“{title}”？',
+  'git.confirm.mergePullRequestDetail':
+    'GitHub 会把它合并到 {repo} 的 {base}（{method}）。在 PiArc 中无法撤销。',
+  'git.confirm.mergePullRequestButton': '合并拉取请求',
+  'git.pr.method.merge': '创建合并提交',
+  'git.pr.method.squash': '压缩并合并',
+  'git.pr.method.rebase': '变基并合并',
   'settings.git': 'Git',
   'usage.purpose.commitMessage': '提交信息',
   'diagnostics.reason.projectGit': 'Git 设置只在用户级设置中生效',

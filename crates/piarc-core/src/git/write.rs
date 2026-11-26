@@ -70,6 +70,22 @@ impl Context<'_> {
                 }
                 super::message::generate(&self, language, &instructions, amend == Some(true)).await
             }
+            GitRequest::PrDescription {
+                language,
+                instructions,
+                base,
+            } => {
+                if !self.hub.trusted(&self.place.project).await {
+                    return reply_failure(GitFailure::of(GitFailureKind::Untrusted));
+                }
+                super::assist::describe_pr(&self, language, &instructions, base.as_deref()).await
+            }
+            GitRequest::Review { scope, language } => {
+                if !self.hub.trusted(&self.place.project).await {
+                    return reply_failure(GitFailure::of(GitFailureKind::Untrusted));
+                }
+                super::assist::review(&self, scope, language).await
+            }
             other => self.write(other).await,
         }
     }
@@ -223,6 +239,18 @@ impl Context<'_> {
             GitRequest::Continue => self.sequence(writer, Sequencer::Continue).await,
             GitRequest::Abort => self.sequence(writer, Sequencer::Abort).await,
             GitRequest::Skip => self.sequence(writer, Sequencer::Skip).await,
+            GitRequest::CreatePullRequest {
+                title,
+                body,
+                base,
+                draft,
+            } => {
+                self.create_pull_request(writer, &title, &body, &base, draft == Some(true))
+                    .await
+            }
+            GitRequest::MergePullRequest { number, method } => {
+                self.merge_pull_request(number, method).await
+            }
             other => self.history(writer, other).await,
         }
     }
@@ -530,7 +558,7 @@ impl Context<'_> {
         )))
     }
 
-    async fn push(
+    pub(super) async fn push(
         &self,
         writer: &Writer,
         target: Option<GitPushTarget>,
@@ -594,6 +622,7 @@ impl Context<'_> {
             | GitDescribe::DeleteRemoteBranch { .. } => {
                 return self.describe_history(action).await;
             }
+            GitDescribe::MergePullRequest { number } => return self.describe_merge(number).await,
             GitDescribe::ForcePush { target } => match self.push_spec(target).await? {
                 Err(failure) => description.refused = Some(failure),
                 Ok((local, spec)) => {
@@ -751,7 +780,7 @@ fn check_push(
 
 /// Commit instructions: at most 8,192 characters, as the settings page and the main process
 /// count them.
-fn check_instructions(instructions: &str) -> std::result::Result<(), GitFailure> {
+pub(super) fn check_instructions(instructions: &str) -> std::result::Result<(), GitFailure> {
     if instructions.chars().count() > 8 * 1024 {
         return Err(GitFailure::new(
             GitFailureKind::Invalid,

@@ -35,7 +35,10 @@ export type ProtocolValue =
   | GitStashes
   | GitBlob
   | GitConflictSides
-  | GitRebasePlan;
+  | GitRebasePlan
+  | GitPrDraft
+  | GitReview
+  | GitPullRequestStatus;
 /**
  * Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.
  */
@@ -92,6 +95,8 @@ export type AhpMessage =
   | SideChatControlResponse
   | SessionCommitMessageRequest
   | SessionCommitMessageResponse
+  | SessionGitAssistRequest
+  | SessionGitAssistResponse
   | SessionCompactRequest
   | SessionCompactResponse
   | SessionForkRequest
@@ -404,6 +409,14 @@ export type SideChatControlled = Record<string, never>;
  * The language of a generated commit message (the client's interface language).
  */
 export type GitLanguage = 'en' | 'zh-CN';
+/**
+ * What `session/gitAssist` writes (ADR-0087).
+ */
+export type GitAssistTask = 'prDescription' | 'review';
+/**
+ * How much a review finding matters.
+ */
+export type GitFindingSeverity = 'high' | 'medium' | 'low';
 /**
  * Result of `session/steer` and `session/followUp`.
  */
@@ -1772,6 +1785,65 @@ export type GitRequest =
     }
   | {
       /**
+       * The base branch; inferred when absent.
+       */
+      base?: string | null;
+      /**
+       * The PR instructions.
+       */
+      instructions: string;
+      /**
+       * The interface language; the main process fills it.
+       */
+      language: GitLanguage;
+      op: 'prDescription';
+    }
+  | {
+      /**
+       * The interface language; the main process fills it.
+       */
+      language: GitLanguage;
+      op: 'review';
+      /**
+       * All changes against the base branch, or the uncommitted ones.
+       */
+      scope: GitScope;
+    }
+  | {
+      op: 'pullRequest';
+    }
+  | {
+      /**
+       * The base branch on the remote.
+       */
+      base: string;
+      /**
+       * The body (Markdown).
+       */
+      body: string;
+      /**
+       * Open it as a draft.
+       */
+      draft?: boolean | null;
+      op: 'createPullRequest';
+      /**
+       * The title.
+       */
+      title: string;
+    }
+  | {
+      /**
+       * How.
+       */
+      method: GitMergeMethod;
+      /**
+       * Its number.
+       */
+      number: number;
+      op: 'mergePullRequest';
+    }
+  | {
+      /**
        * The branch on it.
        */
       branch: string;
@@ -1907,6 +1979,13 @@ export type GitDescribe =
        * The remote.
        */
       remote: string;
+    }
+  | {
+      kind: 'mergePullRequest';
+      /**
+       * Its number.
+       */
+      number: number;
     };
 /**
  * How a reset moves the current branch.
@@ -1942,6 +2021,10 @@ export type GitSide = 'yours' | 'theirs';
  * What an interactive rebase does with one commit.
  */
 export type GitRebaseAction = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop';
+/**
+ * How GitHub merges a pull request.
+ */
+export type GitMergeMethod = 'merge' | 'squash' | 'rebase';
 /**
  * The status of a file in a diff or on one side of `git status`.
  */
@@ -2026,6 +2109,8 @@ export type GitFailureKind =
   | 'inOtherWorktree'
   | 'notMerged'
   | 'noModel'
+  | 'ghMissing'
+  | 'notGithub'
   | 'invalid'
   | 'cancelled'
   | 'timedOut'
@@ -2064,6 +2149,15 @@ export type GitEvent =
  * What a reference on a commit is.
  */
 export type GitRefKind = 'head' | 'local' | 'remote' | 'tag';
+/**
+ * Whether the panel can reach GitHub for the current branch.
+ */
+export type GitHubState =
+  'ready' | 'missing' | 'unauthenticated' | 'notGithub' | 'noRemote' | 'untrusted';
+/**
+ * A pull request's state.
+ */
+export type GitPrState = 'open' | 'closed' | 'merged';
 
 /**
  * A request whose method is not interpreted.
@@ -3717,6 +3811,119 @@ export interface CommitMessageAnswer {
    * The message, without code fences or control characters (at most 4 KiB).
    */
   text: string;
+}
+/**
+ * Request for `session/gitAssist`.
+ */
+export interface SessionGitAssistRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/gitAssist';
+  params: GitAssistParams;
+}
+/**
+ * Parameters of `session/gitAssist` (Core → Agent Host, ADR-0087).
+ */
+export interface GitAssistParams {
+  /**
+   * The branch the changes are compared with.
+   */
+  base?: string | null;
+  /**
+   * The current branch.
+   */
+  branch?: string | null;
+  /**
+   * The subjects of the branch's commits, oldest first (at most 50).
+   */
+  commits: string[];
+  /**
+   * The diff, cut and redacted by Core (at most 64 KiB).
+   */
+  diff: string;
+  /**
+   * The changed files.
+   */
+  files: CommitMessageFile[];
+  /**
+   * The user's PR instructions (at most 8 KiB; empty for a review).
+   */
+  instructions: string;
+  /**
+   * The interface language.
+   */
+  language: GitLanguage;
+  /**
+   * The session whose model channel answers.
+   */
+  sessionId: SessionId;
+  /**
+   * What to write.
+   */
+  task: GitAssistTask;
+}
+/**
+ * Successful response to `session/gitAssist`.
+ */
+export interface SessionGitAssistResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: GitAssistAnswer;
+}
+/**
+ * The answer of `session/gitAssist`.
+ */
+export interface GitAssistAnswer {
+  /**
+   * A PR's body (Markdown).
+   */
+  body?: string | null;
+  /**
+   * The chosen auxiliary model was unavailable and the session's model answered.
+   */
+  fallback?: boolean | null;
+  /**
+   * A review's findings, as parsed from the model's answer.
+   */
+  findings: GitAssistFinding[];
+  /**
+   * The model that wrote it.
+   */
+  model: ModelRef;
+  /**
+   * A review's summary.
+   */
+  summary?: string | null;
+  /**
+   * A PR's title.
+   */
+  title?: string | null;
+}
+/**
+ * One review finding, as the model reported it (Core checks it against the diff).
+ */
+export interface GitAssistFinding {
+  /**
+   * The explanation.
+   */
+  body: string;
+  /**
+   * A line of the file's new content (1-based).
+   */
+  line: number;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * How much it matters.
+   */
+  severity: GitFindingSeverity;
+  /**
+   * One line.
+   */
+  title: string;
 }
 /**
  * Request for `session/compact`.
@@ -11205,6 +11412,10 @@ export interface GitOpResult {
    * The new commit's subject.
    */
   subject?: string | null;
+  /**
+   * A created pull request's page.
+   */
+  url?: string | null;
 }
 /**
  * A deleted branch, for "Restore".
@@ -11257,9 +11468,13 @@ export interface GitDescription {
    */
   localOid?: string | null;
   /**
-   * A stash's message.
+   * A stash's message, or a pull request's title.
    */
   message?: string | null;
+  /**
+   * The pull request's merge method the user set.
+   */
+  method?: GitMergeMethod | null;
   /**
    * The files affected.
    */
@@ -11563,4 +11778,170 @@ export interface GitRebaseCommit {
    * The first line of the message.
    */
   subject: string;
+}
+/**
+ * `prDescription`.
+ */
+export interface GitPrDraft {
+  /**
+   * The body (Markdown).
+   */
+  body: string;
+  /**
+   * The auxiliary model was unavailable and the session's model wrote it.
+   */
+  fallback?: boolean | null;
+  /**
+   * The model that wrote it.
+   */
+  model: string;
+  /**
+   * The title.
+   */
+  title: string;
+  /**
+   * Files sent by path only.
+   */
+  withheld: string[];
+}
+/**
+ * `review`.
+ */
+export interface GitReview {
+  /**
+   * Findings left out because they named another file or line.
+   */
+  dropped: number;
+  /**
+   * The auxiliary model was unavailable and the session's model wrote it.
+   */
+  fallback?: boolean | null;
+  /**
+   * The findings that name a sent file and a line it has.
+   */
+  findings: GitFinding[];
+  /**
+   * The model that wrote it.
+   */
+  model: string;
+  /**
+   * The range reviewed.
+   */
+  scope: GitScope;
+  /**
+   * The model's summary.
+   */
+  summary: string;
+  /**
+   * Files sent by path only.
+   */
+  withheld: string[];
+}
+/**
+ * One review finding Core checked against the diff.
+ */
+export interface GitFinding {
+  /**
+   * The explanation.
+   */
+  body: string;
+  /**
+   * A line of its new content (1-based).
+   */
+  line: number;
+  /**
+   * The file.
+   */
+  path: string;
+  /**
+   * How much it matters.
+   */
+  severity: GitFindingSeverity;
+  /**
+   * One line.
+   */
+  title: string;
+}
+/**
+ * `pullRequest`.
+ */
+export interface GitPullRequestStatus {
+  /**
+   * The command that fixes `gh` (`gh auth login`).
+   */
+  command?: string | null;
+  /**
+   * Whether GitHub can be reached.
+   */
+  gh: GitHubState;
+  /**
+   * The current branch's pull request.
+   */
+  pr?: GitPullRequest | null;
+  /**
+   * `owner/name` on GitHub.
+   */
+  repo?: string | null;
+}
+/**
+ * The current branch's pull request.
+ */
+export interface GitPullRequest {
+  /**
+   * The base branch.
+   */
+  base: string;
+  /**
+   * Its checks.
+   */
+  checks: GitChecks;
+  /**
+   * A draft.
+   */
+  draft: boolean;
+  /**
+   * The head branch.
+   */
+  head: string;
+  /**
+   * `MERGEABLE`, `CONFLICTING`, `UNKNOWN`.
+   */
+  mergeable?: string | null;
+  /**
+   * Its number.
+   */
+  number: number;
+  /**
+   * `APPROVED`, `CHANGES_REQUESTED`, `REVIEW_REQUIRED`.
+   */
+  reviewDecision?: string | null;
+  /**
+   * Open, closed or merged.
+   */
+  state: GitPrState;
+  /**
+   * Its title.
+   */
+  title: string;
+  /**
+   * Its page.
+   */
+  url: string;
+}
+/**
+ * The checks of a pull request's head commit.
+ */
+export interface GitChecks {
+  /**
+   * Failed, cancelled or timed out.
+   */
+  failed: number;
+  /**
+   * Passed (or skipped, or neutral).
+   */
+  passed: number;
+  /**
+   * Not finished.
+   */
+  pending: number;
 }

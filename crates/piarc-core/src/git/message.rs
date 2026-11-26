@@ -23,6 +23,11 @@ use crate::sessions::Op;
 pub(crate) const FILE_BUDGET: usize = 8 * 1024;
 /// The most diff bytes sent in all.
 pub(crate) const TOTAL_BUDGET: usize = 32 * 1024;
+/// A commit message's diff budget.
+const BUDGET: Budget = Budget {
+    file: FILE_BUDGET,
+    total: TOTAL_BUDGET,
+};
 /// The most bytes of a generated message kept.
 const MESSAGE_LIMIT: usize = 4 * 1024;
 
@@ -71,7 +76,7 @@ pub(crate) async fn generate(
 }
 
 /// The message without control characters (line breaks kept), cut to the limit.
-fn tidy(text: &str) -> String {
+pub(crate) fn tidy(text: &str) -> String {
     let kept: String = text
         .chars()
         .filter(|c| *c == '\n' || *c == '\t' || !c.is_control())
@@ -137,7 +142,7 @@ async fn assemble(
         .map(|e| reader.repo.root.join(&e.path))
         .collect();
     let denied = context.hub.read_denied(context.session, &paths).await;
-    let (files, text, withheld) = describe(&entries, &counts, &sections, &denied);
+    let (files, text, withheld) = describe(&entries, &counts, &sections, &denied, BUDGET);
     let subjects = if head.is_some() {
         let out = reader
             .run(
@@ -204,12 +209,20 @@ fn cached<'a>(base: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
     args
 }
 
+/// How many diff bytes go to the model: per file and in all.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Budget {
+    pub file: usize,
+    pub total: usize,
+}
+
 /// The file list, the diff text within budget, and the files sent by path only.
-fn describe(
+pub(crate) fn describe(
     entries: &[diff::RawEntry],
     counts: &HashMap<String, Option<(u64, u64)>>,
     sections: &HashMap<String, ParsedFile>,
     denied: &[bool],
+    budget: Budget,
 ) -> (Vec<CommitMessageFile>, String, Vec<String>) {
     let mut files = Vec::new();
     let mut text = String::new();
@@ -241,8 +254,8 @@ fn describe(
         if reason.is_none()
             && let Some(body) = body
         {
-            let piece = cut(&body, FILE_BUDGET);
-            if text.len() + piece.len() > TOTAL_BUDGET {
+            let piece = cut(&body, budget.file);
+            if text.len() + piece.len() > budget.total {
                 reason = Some("budget".to_owned());
             } else {
                 text.push_str(&piece);

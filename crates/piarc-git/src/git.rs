@@ -66,6 +66,8 @@ pub struct Git {
     pub(crate) program: PathBuf,
     pub(crate) env: Vec<(OsString, OsString)>,
     pub(crate) timeout: Duration,
+    /// Git's own `-c core.longpaths=true` goes first (false for `gh`).
+    pub(crate) git_args: bool,
 }
 
 impl std::fmt::Debug for Git {
@@ -93,6 +95,32 @@ impl Git {
             program,
             env,
             timeout: DEFAULT_TIMEOUT,
+            git_args: true,
+        }
+    }
+
+    /// Another program (`gh`) run the same way, with exactly `env` and no git arguments.
+    #[must_use]
+    pub fn other(
+        spawner: Arc<dyn ProcessSpawner>,
+        program: PathBuf,
+        env: Vec<(OsString, OsString)>,
+    ) -> Self {
+        Self {
+            spawner,
+            program,
+            env,
+            timeout: DEFAULT_TIMEOUT,
+            git_args: false,
+        }
+    }
+
+    /// The arguments before the caller's.
+    pub(crate) fn prefix(&self) -> &'static [&'static str] {
+        if self.git_args {
+            &["-c", "core.longpaths=true"]
+        } else {
+            &[]
         }
     }
 
@@ -144,9 +172,10 @@ impl Git {
         // ignores the key (W3).
         let spec = SpawnSpec {
             program: self.program.clone(),
-            args: [OsStr::new("-c"), OsStr::new("core.longpaths=true")]
-                .into_iter()
-                .map(OsStr::to_owned)
+            args: self
+                .prefix()
+                .iter()
+                .map(OsString::from)
                 .chain(args.iter().map(|a| a.as_ref().to_owned()))
                 .collect(),
             cwd: cwd.to_owned(),

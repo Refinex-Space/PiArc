@@ -87,7 +87,7 @@ pub enum ForkPoint {
     BeforeTurn(String),
 }
 pub(crate) use diagnostics::PreparedBundle;
-pub(crate) use git::Place;
+pub(crate) use git::{Place, check_scope, session_base};
 pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
 pub use piarc_store::SessionPrefsChange;

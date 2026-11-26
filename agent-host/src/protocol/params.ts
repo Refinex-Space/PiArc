@@ -2,6 +2,7 @@
 // `unknown` until one of these functions has narrowed them.
 import type {
   CommitMessageParams,
+  GitAssistParams,
   CoreWelcome,
   InputAttachment,
   InputMention,
@@ -289,7 +290,36 @@ export function reviewParams(params: unknown): PolicyReviewParams {
 
 /** `session/commitMessage`'s params (ADR-0086), bounded as Core sends them. */
 export function commitMessageParams(params: unknown): CommitMessageParams {
-  const method = 'session/commitMessage';
+  return changeParams('session/commitMessage', params);
+}
+
+/** `session/gitAssist`'s params (ADR-0087), bounded as Core sends them. */
+export function gitAssistParams(params: unknown): GitAssistParams {
+  const method = 'session/gitAssist';
+  const base = changeParams(method, params);
+  const fields = paramsObject(method, params);
+  const task = fields.task;
+  if (task !== 'prDescription' && task !== 'review') {
+    throw new AhpError('invalidParams', `${method}: task must be prDescription or review`, {
+      details: { member: 'task' },
+    });
+  }
+  const baseBranch = optionalString(method, fields, 'base');
+  return {
+    sessionId: base.sessionId,
+    task,
+    language: base.language,
+    instructions: base.instructions,
+    commits: stringList(method, fields, 'commits').slice(0, 50),
+    files: base.files,
+    diff: base.diff,
+    ...(base.branch === undefined ? {} : { branch: base.branch }),
+    ...(baseBranch === undefined ? {} : { base: baseBranch }),
+  };
+}
+
+/** The members `session/commitMessage` and `session/gitAssist` share. */
+function changeParams(method: string, params: unknown): CommitMessageParams {
   const fields = paramsObject(method, params);
   const fail = (member: string, what: string): never => {
     throw new AhpError('invalidParams', `${method}: ${member} ${what}`, { details: { member } });
@@ -300,7 +330,11 @@ export function commitMessageParams(params: unknown): CommitMessageParams {
   if (instructions.length > 8192) fail('instructions', 'is too long');
   const diff = typeof fields.diff === 'string' ? fields.diff : fail('diff', 'must be a string');
   if (diff.length > 64 * 1024) fail('diff', 'is too long');
-  const recentSubjects = stringList(method, fields, 'recentSubjects').slice(0, 10);
+  // A PR description or review has no recent subjects; a commit message needs them.
+  const recentSubjects =
+    method === 'session/commitMessage'
+      ? stringList(method, fields, 'recentSubjects').slice(0, 10)
+      : [];
   const rawFiles = Array.isArray(fields.files) ? fields.files : fail('files', 'must be a list');
   const files = rawFiles.slice(0, 2000).map((file) => {
     if (!isFields(file) || typeof file.path !== 'string' || typeof file.status !== 'string') {

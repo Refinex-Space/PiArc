@@ -215,6 +215,13 @@ impl Hub {
             GitRequest::Branches => reply(&refs::branches(reader).await?),
             GitRequest::FileStages { path } => reply(&index::file_stages(reader, &path).await?),
             GitRequest::LastCommit => reply(&commit::last_commit(reader).await?),
+            GitRequest::PullRequest => match self
+                .pull_request_status(place, reader, piarc_git::Cancel::new())
+                .await?
+            {
+                Ok(status) => reply(&status),
+                Err(failure) => reply_failure(failure),
+            },
             other => answer_history(reader, other).await?,
         };
         Ok(value.unwrap_or(Value::Null))
@@ -261,6 +268,11 @@ impl Hub {
         self.git_event(&GitEvent::Changed {
             root: piarc_fs::display(root),
         });
+    }
+
+    /// The user's `gh` for `root` and their `GH_HOST` (G5); `None` without `gh`.
+    pub(crate) async fn gh_runner(&self, root: &Path) -> Option<(piarc_git::Git, Option<String>)> {
+        self.ctx.tool_io.gh_runner(root).await
     }
 
     /// Where interactive rebases keep their todo and messages: `<data>/tmp/git`.
@@ -378,7 +390,7 @@ async fn answer_history(
 }
 
 /// The base a branch's creation names (a worktree session's base, ADR-0084 rule 2).
-async fn session_base(reader: &Reader) -> Option<String> {
+pub(crate) async fn session_base(reader: &Reader) -> Option<String> {
     let branch = piarc_git::worktree::head_branch(&reader.repo.root)?;
     status::created_from(reader, &branch).await.ok().flatten()
 }
@@ -482,6 +494,7 @@ impl ReadOnly for GitRequest {
                 | Self::FileBlob { .. }
                 | Self::ConflictSides { .. }
                 | Self::RebasePlan { .. }
+                | Self::PullRequest
         )
     }
 }

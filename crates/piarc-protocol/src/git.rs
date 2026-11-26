@@ -199,6 +199,23 @@ pub enum GitDescribe {
         /// The branch on it.
         branch: String,
     },
+    /// Merging a pull request on GitHub.
+    MergePullRequest {
+        /// Its number.
+        number: u64,
+    },
+}
+
+/// How GitHub merges a pull request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitMergeMethod {
+    /// A merge commit.
+    Merge,
+    /// One commit with all the changes.
+    Squash,
+    /// The commits replayed onto the base.
+    Rebase,
 }
 
 /// Which commits a log lists.
@@ -644,6 +661,44 @@ pub enum GitRequest {
         head: String,
         /// Every commit of `base..HEAD`, in the new order.
         steps: Vec<GitRebaseStep>,
+    },
+    /// Write a pull request's title and body from the branch's commits (ADR-0087).
+    PrDescription {
+        /// The interface language; the main process fills it.
+        language: GitLanguage,
+        /// The PR instructions.
+        instructions: String,
+        /// The base branch; inferred when absent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        base: Option<String>,
+    },
+    /// Review a scope's diff (ADR-0087).
+    Review {
+        /// All changes against the base branch, or the uncommitted ones.
+        scope: GitScope,
+        /// The interface language; the main process fills it.
+        language: GitLanguage,
+    },
+    /// The current branch's pull request on GitHub ([`GitPullRequestStatus`]).
+    PullRequest,
+    /// Push the current branch when needed and open a pull request.
+    CreatePullRequest {
+        /// The title.
+        title: String,
+        /// The body (Markdown).
+        body: String,
+        /// The base branch on the remote.
+        base: String,
+        /// Open it as a draft.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        draft: Option<bool>,
+    },
+    /// Merge a pull request on GitHub (confirmed natively).
+    MergePullRequest {
+        /// Its number.
+        number: u64,
+        /// How.
+        method: GitMergeMethod,
     },
     /// Push a deleted remote branch back.
     RestoreRemoteBranch {
@@ -1244,6 +1299,147 @@ pub struct GitRebasePlan {
     pub commits: Vec<GitRebaseCommit>,
 }
 
+/// `prDescription`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitPrDraft {
+    /// The title.
+    pub title: String,
+    /// The body (Markdown).
+    pub body: String,
+    /// The model that wrote it.
+    pub model: String,
+    /// The auxiliary model was unavailable and the session's model wrote it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<bool>,
+    /// Files sent by path only.
+    pub withheld: Vec<String>,
+}
+
+/// One review finding Core checked against the diff.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFinding {
+    /// The file.
+    pub path: String,
+    /// A line of its new content (1-based).
+    pub line: u64,
+    /// How much it matters.
+    pub severity: crate::session::GitFindingSeverity,
+    /// One line.
+    pub title: String,
+    /// The explanation.
+    pub body: String,
+}
+
+/// `review`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitReview {
+    /// The range reviewed.
+    pub scope: GitScope,
+    /// The model's summary.
+    pub summary: String,
+    /// The findings that name a sent file and a line it has.
+    pub findings: Vec<GitFinding>,
+    /// Findings left out because they named another file or line.
+    pub dropped: u64,
+    /// The model that wrote it.
+    pub model: String,
+    /// The auxiliary model was unavailable and the session's model wrote it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<bool>,
+    /// Files sent by path only.
+    pub withheld: Vec<String>,
+}
+
+/// Whether the panel can reach GitHub for the current branch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitHubState {
+    /// `gh` works for this repository.
+    Ready,
+    /// No `gh` on the PATH.
+    Missing,
+    /// `gh` is not signed in to the host.
+    Unauthenticated,
+    /// The upstream remote is not on GitHub.
+    NotGithub,
+    /// The branch has no remote to compare.
+    NoRemote,
+    /// The project is not trusted.
+    Untrusted,
+}
+
+/// A pull request's state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitPrState {
+    /// Open.
+    Open,
+    /// Closed without merging.
+    Closed,
+    /// Merged.
+    Merged,
+}
+
+/// The checks of a pull request's head commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitChecks {
+    /// Passed (or skipped, or neutral).
+    pub passed: u64,
+    /// Failed, cancelled or timed out.
+    pub failed: u64,
+    /// Not finished.
+    pub pending: u64,
+}
+
+/// The current branch's pull request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitPullRequest {
+    /// Its number.
+    pub number: u64,
+    /// Its title.
+    pub title: String,
+    /// Open, closed or merged.
+    pub state: GitPrState,
+    /// A draft.
+    pub draft: bool,
+    /// Its page.
+    pub url: String,
+    /// The base branch.
+    pub base: String,
+    /// The head branch.
+    pub head: String,
+    /// `APPROVED`, `CHANGES_REQUESTED`, `REVIEW_REQUIRED`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_decision: Option<String>,
+    /// Its checks.
+    pub checks: GitChecks,
+    /// `MERGEABLE`, `CONFLICTING`, `UNKNOWN`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mergeable: Option<String>,
+}
+
+/// `pullRequest`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitPullRequestStatus {
+    /// Whether GitHub can be reached.
+    pub gh: GitHubState,
+    /// `owner/name` on GitHub.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// The current branch's pull request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr: Option<GitPullRequest>,
+    /// The command that fixes `gh` (`gh auth login`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+}
+
 /// A deleted remote branch, for "Restore".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -1281,6 +1477,9 @@ pub struct GitOpResult {
     /// An automatic fetch did nothing because another operation held the repository.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skipped: Option<bool>,
+    /// A created pull request's page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     /// A smart checkout's stash kept after conflicts (`stash@{0}` and its message).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kept_stash: Option<String>,
@@ -1317,9 +1516,12 @@ pub struct GitDescription {
     /// Of those, commits the upstream already has.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pushed: Option<u64>,
-    /// A stash's message.
+    /// A stash's message, or a pull request's title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// The pull request's merge method the user set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<GitMergeMethod>,
     /// The files affected.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub paths: Vec<String>,
@@ -1374,6 +1576,10 @@ pub enum GitFailureKind {
     NotMerged,
     /// No model can generate the message.
     NoModel,
+    /// No `gh` on the PATH (G5).
+    GhMissing,
+    /// The upstream remote is not a GitHub repository `gh` is used for (G5).
+    NotGithub,
     /// A request member is not acceptable.
     Invalid,
     /// The user cancelled.

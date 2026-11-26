@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use piarc_host::HostSupervisor;
 use piarc_protocol::session::{
-    CommitMessageParams, SessionCommitMessage, SideChatAsk, SideChatAskParams, SideChatControl,
-    SideChatControlParams,
+    CommitMessageParams, GitAssistParams, SessionCommitMessage, SessionGitAssist, SideChatAsk,
+    SideChatAskParams, SideChatControl, SideChatControlParams,
 };
 use serde_json::{Value, json};
 
@@ -95,6 +95,23 @@ impl Request {
             .map_err(host_error)?;
         serde_json::to_value(answer).map_err(|e| Error::Internal {
             reason: format!("cannot encode the commit message: {e}"),
+        })
+    }
+
+    /// `session/gitAssist` (ADR-0087): a PR description or a review, one auxiliary request
+    /// outside the turn; a review may take longer than a commit message.
+    pub(super) async fn git_assist(
+        &self,
+        host: &HostSupervisor,
+        mut params: GitAssistParams,
+    ) -> Result<Value> {
+        params.session_id = self.id.clone();
+        let answer = host
+            .session_call_within::<SessionGitAssist>(&self.id, params, Duration::from_secs(130))
+            .await
+            .map_err(host_error)?;
+        serde_json::to_value(answer).map_err(|e| Error::Internal {
+            reason: format!("cannot encode the Git answer: {e}"),
         })
     }
 

@@ -2079,6 +2079,7 @@ dependencies = [
  "base64",
  "piarc-ports",
  "piarc-protocol",
+ "serde_json",
  "sha2",
  "thiserror 2.0.21",
  "tokio",

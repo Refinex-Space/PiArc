@@ -2047,6 +2047,13 @@ export const en = {
   'git.confirm.deleteRemoteBranchDetail':
     'It points at {oid}. Everyone using the remote loses the branch; you can push it back from the notice right after.',
   'git.confirm.deleteRemoteBranchButton': 'Delete on Remote',
+  'git.confirm.mergePullRequest': 'Merge pull request #{number} “{title}”?',
+  'git.confirm.mergePullRequestDetail':
+    'GitHub merges it into {base} of {repo} ({method}). This cannot be undone from PiArc.',
+  'git.confirm.mergePullRequestButton': 'Merge Pull Request',
+  'git.pr.method.merge': 'Create a merge commit',
+  'git.pr.method.squash': 'Squash and merge',
+  'git.pr.method.rebase': 'Rebase and merge',
   'settings.git': 'Git',
   'usage.purpose.commitMessage': 'Commit messages',
   'diagnostics.reason.projectGit': 'Git settings apply from your user settings only',

@@ -4437,6 +4437,133 @@
       "required": ["sessionId", "since"],
       "type": "object"
     },
+    "GitAssistAnswer": {
+      "description": "The answer of `session/gitAssist`.",
+      "properties": {
+        "body": {
+          "description": "A PR's body (Markdown).",
+          "type": ["string", "null"]
+        },
+        "fallback": {
+          "description": "The chosen auxiliary model was unavailable and the session's model answered.",
+          "type": ["boolean", "null"]
+        },
+        "findings": {
+          "description": "A review's findings, as parsed from the model's answer.",
+          "items": {
+            "$ref": "#/$defs/GitAssistFinding"
+          },
+          "type": "array"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "The model that wrote it."
+        },
+        "summary": {
+          "description": "A review's summary.",
+          "type": ["string", "null"]
+        },
+        "title": {
+          "description": "A PR's title.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["findings", "model"],
+      "type": "object"
+    },
+    "GitAssistFinding": {
+      "description": "One review finding, as the model reported it (Core checks it against the diff).",
+      "properties": {
+        "body": {
+          "description": "The explanation.",
+          "type": "string"
+        },
+        "line": {
+          "description": "A line of the file's new content (1-based).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/GitFindingSeverity",
+          "description": "How much it matters."
+        },
+        "title": {
+          "description": "One line.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "line", "severity", "title", "body"],
+      "type": "object"
+    },
+    "GitAssistParams": {
+      "description": "Parameters of `session/gitAssist` (Core → Agent Host, ADR-0087).",
+      "properties": {
+        "base": {
+          "description": "The branch the changes are compared with.",
+          "type": ["string", "null"]
+        },
+        "branch": {
+          "description": "The current branch.",
+          "type": ["string", "null"]
+        },
+        "commits": {
+          "description": "The subjects of the branch's commits, oldest first (at most 50).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "diff": {
+          "description": "The diff, cut and redacted by Core (at most 64 KiB).",
+          "type": "string"
+        },
+        "files": {
+          "description": "The changed files.",
+          "items": {
+            "$ref": "#/$defs/CommitMessageFile"
+          },
+          "type": "array"
+        },
+        "instructions": {
+          "description": "The user's PR instructions (at most 8 KiB; empty for a review).",
+          "type": "string"
+        },
+        "language": {
+          "$ref": "#/$defs/GitLanguage",
+          "description": "The interface language."
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose model channel answers."
+        },
+        "task": {
+          "$ref": "#/$defs/GitAssistTask",
+          "description": "What to write."
+        }
+      },
+      "required": ["sessionId", "task", "language", "instructions", "commits", "files", "diff"],
+      "type": "object"
+    },
+    "GitAssistTask": {
+      "description": "What `session/gitAssist` writes (ADR-0087).",
+      "oneOf": [
+        {
+          "const": "prDescription",
+          "description": "A pull request's title and body.",
+          "type": "string"
+        },
+        {
+          "const": "review",
+          "description": "Review findings on a diff.",
+          "type": "string"
+        }
+      ]
+    },
     "GitBase": {
       "description": "The branch a Git scope compares against.",
       "properties": {
@@ -4595,6 +4722,31 @@
           "type": "string"
         }
       ]
+    },
+    "GitChecks": {
+      "description": "The checks of a pull request's head commit.",
+      "properties": {
+        "failed": {
+          "description": "Failed, cancelled or timed out.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "passed": {
+          "description": "Passed (or skipped, or neutral).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pending": {
+          "description": "Not finished.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["passed", "failed", "pending"],
+      "type": "object"
     },
     "GitCommitDetail": {
       "description": "`commitDetail`.",
@@ -4991,6 +5143,23 @@
           },
           "required": ["kind", "remote", "branch"],
           "type": "object"
+        },
+        {
+          "description": "Merging a pull request on GitHub.",
+          "properties": {
+            "kind": {
+              "const": "mergePullRequest",
+              "type": "string"
+            },
+            "number": {
+              "description": "Its number.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": ["kind", "number"],
+          "type": "object"
         }
       ]
     },
@@ -5012,8 +5181,19 @@
           "type": ["string", "null"]
         },
         "message": {
-          "description": "A stash's message.",
+          "description": "A stash's message, or a pull request's title.",
           "type": ["string", "null"]
+        },
+        "method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitMergeMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The pull request's merge method the user set."
         },
         "paths": {
           "description": "The files affected.",
@@ -5247,6 +5427,16 @@
           "type": "string"
         },
         {
+          "const": "ghMissing",
+          "description": "No `gh` on the PATH (G5).",
+          "type": "string"
+        },
+        {
+          "const": "notGithub",
+          "description": "The upstream remote is not a GitHub repository `gh` is used for (G5).",
+          "type": "string"
+        },
+        {
           "const": "invalid",
           "description": "A request member is not acceptable.",
           "type": "string"
@@ -5430,6 +5620,90 @@
         {
           "const": "conflicted",
           "description": "Unmerged.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitFinding": {
+      "description": "One review finding Core checked against the diff.",
+      "properties": {
+        "body": {
+          "description": "The explanation.",
+          "type": "string"
+        },
+        "line": {
+          "description": "A line of its new content (1-based).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "The file.",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/GitFindingSeverity",
+          "description": "How much it matters."
+        },
+        "title": {
+          "description": "One line.",
+          "type": "string"
+        }
+      },
+      "required": ["path", "line", "severity", "title", "body"],
+      "type": "object"
+    },
+    "GitFindingSeverity": {
+      "description": "How much a review finding matters.",
+      "oneOf": [
+        {
+          "const": "high",
+          "description": "Likely a bug, a security problem or data loss.",
+          "type": "string"
+        },
+        {
+          "const": "medium",
+          "description": "Worth fixing.",
+          "type": "string"
+        },
+        {
+          "const": "low",
+          "description": "A nit.",
+          "type": "string"
+        }
+      ]
+    },
+    "GitHubState": {
+      "description": "Whether the panel can reach GitHub for the current branch.",
+      "oneOf": [
+        {
+          "const": "ready",
+          "description": "`gh` works for this repository.",
+          "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "No `gh` on the PATH.",
+          "type": "string"
+        },
+        {
+          "const": "unauthenticated",
+          "description": "`gh` is not signed in to the host.",
+          "type": "string"
+        },
+        {
+          "const": "notGithub",
+          "description": "The upstream remote is not on GitHub.",
+          "type": "string"
+        },
+        {
+          "const": "noRemote",
+          "description": "The branch has no remote to compare.",
+          "type": "string"
+        },
+        {
+          "const": "untrusted",
+          "description": "The project is not trusted.",
           "type": "string"
         }
       ]
@@ -5649,6 +5923,26 @@
         }
       ]
     },
+    "GitMergeMethod": {
+      "description": "How GitHub merges a pull request.",
+      "oneOf": [
+        {
+          "const": "merge",
+          "description": "A merge commit.",
+          "type": "string"
+        },
+        {
+          "const": "squash",
+          "description": "One commit with all the changes.",
+          "type": "string"
+        },
+        {
+          "const": "rebase",
+          "description": "The commits replayed onto the base.",
+          "type": "string"
+        }
+      ]
+    },
     "GitMergeMode": {
       "description": "How a merge joins a branch into the current one.",
       "oneOf": [
@@ -5728,9 +6022,63 @@
         "subject": {
           "description": "The new commit's subject.",
           "type": ["string", "null"]
+        },
+        "url": {
+          "description": "A created pull request's page.",
+          "type": ["string", "null"]
         }
       },
       "type": "object"
+    },
+    "GitPrDraft": {
+      "description": "`prDescription`.",
+      "properties": {
+        "body": {
+          "description": "The body (Markdown).",
+          "type": "string"
+        },
+        "fallback": {
+          "description": "The auxiliary model was unavailable and the session's model wrote it.",
+          "type": ["boolean", "null"]
+        },
+        "model": {
+          "description": "The model that wrote it.",
+          "type": "string"
+        },
+        "title": {
+          "description": "The title.",
+          "type": "string"
+        },
+        "withheld": {
+          "description": "Files sent by path only.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["title", "body", "model", "withheld"],
+      "type": "object"
+    },
+    "GitPrState": {
+      "description": "A pull request's state.",
+      "oneOf": [
+        {
+          "const": "open",
+          "description": "Open.",
+          "type": "string"
+        },
+        {
+          "const": "closed",
+          "description": "Closed without merging.",
+          "type": "string"
+        },
+        {
+          "const": "merged",
+          "description": "Merged.",
+          "type": "string"
+        }
+      ]
     },
     "GitProbe": {
       "description": "`probe`.",
@@ -5767,6 +6115,85 @@
           "type": "string"
         }
       ]
+    },
+    "GitPullRequest": {
+      "description": "The current branch's pull request.",
+      "properties": {
+        "base": {
+          "description": "The base branch.",
+          "type": "string"
+        },
+        "checks": {
+          "$ref": "#/$defs/GitChecks",
+          "description": "Its checks."
+        },
+        "draft": {
+          "description": "A draft.",
+          "type": "boolean"
+        },
+        "head": {
+          "description": "The head branch.",
+          "type": "string"
+        },
+        "mergeable": {
+          "description": "`MERGEABLE`, `CONFLICTING`, `UNKNOWN`.",
+          "type": ["string", "null"]
+        },
+        "number": {
+          "description": "Its number.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reviewDecision": {
+          "description": "`APPROVED`, `CHANGES_REQUESTED`, `REVIEW_REQUIRED`.",
+          "type": ["string", "null"]
+        },
+        "state": {
+          "$ref": "#/$defs/GitPrState",
+          "description": "Open, closed or merged."
+        },
+        "title": {
+          "description": "Its title.",
+          "type": "string"
+        },
+        "url": {
+          "description": "Its page.",
+          "type": "string"
+        }
+      },
+      "required": ["number", "title", "state", "draft", "url", "base", "head", "checks"],
+      "type": "object"
+    },
+    "GitPullRequestStatus": {
+      "description": "`pullRequest`.",
+      "properties": {
+        "command": {
+          "description": "The command that fixes `gh` (`gh auth login`).",
+          "type": ["string", "null"]
+        },
+        "gh": {
+          "$ref": "#/$defs/GitHubState",
+          "description": "Whether GitHub can be reached."
+        },
+        "pr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GitPullRequest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The current branch's pull request."
+        },
+        "repo": {
+          "description": "`owner/name` on GitHub.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["gh"],
+      "type": "object"
     },
     "GitPushTarget": {
       "description": "Where a first push goes.",
@@ -7129,6 +7556,107 @@
           "type": "object"
         },
         {
+          "description": "Write a pull request's title and body from the branch's commits (ADR-0087).",
+          "properties": {
+            "base": {
+              "description": "The base branch; inferred when absent.",
+              "type": ["string", "null"]
+            },
+            "instructions": {
+              "description": "The PR instructions.",
+              "type": "string"
+            },
+            "language": {
+              "$ref": "#/$defs/GitLanguage",
+              "description": "The interface language; the main process fills it."
+            },
+            "op": {
+              "const": "prDescription",
+              "type": "string"
+            }
+          },
+          "required": ["op", "language", "instructions"],
+          "type": "object"
+        },
+        {
+          "description": "Review a scope's diff (ADR-0087).",
+          "properties": {
+            "language": {
+              "$ref": "#/$defs/GitLanguage",
+              "description": "The interface language; the main process fills it."
+            },
+            "op": {
+              "const": "review",
+              "type": "string"
+            },
+            "scope": {
+              "$ref": "#/$defs/GitScope",
+              "description": "All changes against the base branch, or the uncommitted ones."
+            }
+          },
+          "required": ["op", "scope", "language"],
+          "type": "object"
+        },
+        {
+          "description": "The current branch's pull request on GitHub ([`GitPullRequestStatus`]).",
+          "properties": {
+            "op": {
+              "const": "pullRequest",
+              "type": "string"
+            }
+          },
+          "required": ["op"],
+          "type": "object"
+        },
+        {
+          "description": "Push the current branch when needed and open a pull request.",
+          "properties": {
+            "base": {
+              "description": "The base branch on the remote.",
+              "type": "string"
+            },
+            "body": {
+              "description": "The body (Markdown).",
+              "type": "string"
+            },
+            "draft": {
+              "description": "Open it as a draft.",
+              "type": ["boolean", "null"]
+            },
+            "op": {
+              "const": "createPullRequest",
+              "type": "string"
+            },
+            "title": {
+              "description": "The title.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "title", "body", "base"],
+          "type": "object"
+        },
+        {
+          "description": "Merge a pull request on GitHub (confirmed natively).",
+          "properties": {
+            "method": {
+              "$ref": "#/$defs/GitMergeMethod",
+              "description": "How."
+            },
+            "number": {
+              "description": "Its number.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "mergePullRequest",
+              "type": "string"
+            }
+          },
+          "required": ["op", "number", "method"],
+          "type": "object"
+        },
+        {
           "description": "Push a deleted remote branch back.",
           "properties": {
             "branch": {
@@ -7177,6 +7705,49 @@
           "type": "string"
         }
       ]
+    },
+    "GitReview": {
+      "description": "`review`.",
+      "properties": {
+        "dropped": {
+          "description": "Findings left out because they named another file or line.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fallback": {
+          "description": "The auxiliary model was unavailable and the session's model wrote it.",
+          "type": ["boolean", "null"]
+        },
+        "findings": {
+          "description": "The findings that name a sent file and a line it has.",
+          "items": {
+            "$ref": "#/$defs/GitFinding"
+          },
+          "type": "array"
+        },
+        "model": {
+          "description": "The model that wrote it.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/GitScope",
+          "description": "The range reviewed."
+        },
+        "summary": {
+          "description": "The model's summary.",
+          "type": "string"
+        },
+        "withheld": {
+          "description": "Files sent by path only.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["scope", "summary", "findings", "dropped", "model", "withheld"],
+      "type": "object"
     },
     "GitScope": {
       "description": "A range of changes the panel shows (ADR-0084 rule 1). The session scope is not a Git\nrange: the client reads it from `sessionChanges`.",
@@ -15103,6 +15674,43 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "SessionGitAssistRequest": {
+      "description": "Request for `session/gitAssist`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/gitAssist",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/GitAssistParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionGitAssistResponse": {
+      "description": "Successful response to `session/gitAssist`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/GitAssistAnswer"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionHistoryRequest": {
       "description": "Request for `session/history`.",
       "properties": {
@@ -19754,6 +20362,12 @@
     },
     {
       "$ref": "#/$defs/SessionCommitMessageResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionGitAssistRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionGitAssistResponse"
     },
     {
       "$ref": "#/$defs/SessionCompactRequest"

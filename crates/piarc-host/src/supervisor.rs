@@ -468,7 +468,17 @@ impl Tracking {
 
 impl Link {
     fn check_method(&self, method: &str) -> Result<()> {
-        if !self.commit_message_enabled && method == "session/commitMessage" {
+        if !self.enabled.git_assist && method == "session/gitAssist" {
+            return Err(Error::Remote {
+                method: method.to_owned(),
+                error: piarc_protocol::ErrorObject::new(
+                    ErrorKind::MethodNotFound,
+                    "the connected Agent Host does not write PR descriptions or reviews",
+                    false,
+                ),
+            });
+        }
+        if !self.enabled.commit_message && method == "session/commitMessage" {
             return Err(Error::Remote {
                 method: method.to_owned(),
                 error: piarc_protocol::ErrorObject::new(
@@ -478,7 +488,7 @@ impl Link {
                 ),
             });
         }
-        if !self.side_chat_enabled
+        if !self.enabled.side_chat
             && matches!(method, "session/sideChatAsk" | "session/sideChatControl")
         {
             return Err(Error::Remote {
@@ -490,7 +500,7 @@ impl Link {
                 ),
             });
         }
-        if !self.models_enabled
+        if !self.enabled.models
             && (method.starts_with("models/")
                 || matches!(
                     method,

@@ -25,6 +25,38 @@ const USER_EXTRA: &[&str] = &[
     "NO_PROXY",
 ];
 
+/// Added to `gh` (ADR-0085 rule 9): the user's write-mode variables, and GitHub's own only when
+/// the login shell has them.
+const GH_EXTRA: &[&str] = &[
+    "XDG_CONFIG_HOME",
+    "SSH_AUTH_SOCK",
+    "SSH_AGENT_PID",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_HOST",
+    "GH_CONFIG_DIR",
+    "GH_ENTERPRISE_TOKEN",
+    "GITHUB_ENTERPRISE_TOKEN",
+];
+
+/// Set on every `gh` run: no prompt, no update check, no colors or spinners.
+const GH_SET: &[(&str, &str)] = &[
+    ("GH_PROMPT_DISABLED", "1"),
+    ("GH_NO_UPDATE_NOTIFIER", "1"),
+    ("GH_SPINNER_DISABLED", "1"),
+    ("GH_PAGER", "cat"),
+    ("NO_COLOR", "1"),
+    ("GIT_TERMINAL_PROMPT", "0"),
+];
+
 /// Set on every read-only query.
 const READ_SET: &[(&str, &str)] = &[
     ("GIT_OPTIONAL_LOCKS", "0"),
@@ -65,6 +97,15 @@ pub fn user_env(
     login: &[(OsString, OsString)],
 ) -> Vec<(OsString, OsString)> {
     build(inherited, login, USER_EXTRA, USER_SET)
+}
+
+/// The environment of `gh` (G5).
+#[must_use]
+pub fn gh_env(
+    inherited: &[(OsString, OsString)],
+    login: &[(OsString, OsString)],
+) -> Vec<(OsString, OsString)> {
+    build(inherited, login, GH_EXTRA, GH_SET)
 }
 
 fn build(

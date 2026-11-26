@@ -276,4 +276,63 @@ describe('Git panel IPC', () => {
     await call(['s1', { op: 'log', revs: { kind: 'all' } }]);
     expect(sent).toHaveLength(2);
   });
+
+  it('checks the pull request requests and fills the language of descriptions and reviews', async () => {
+    expect(
+      gitRequest({ op: 'createPullRequest', title: '--web', body: '## a\n', base: 'main' }),
+    ).toEqual({ op: 'createPullRequest', title: '--web', body: '## a\n', base: 'main' });
+    expect(() =>
+      gitRequest({ op: 'createPullRequest', title: ' ', body: '', base: 'main' }),
+    ).toThrow();
+    expect(() =>
+      gitRequest({ op: 'createPullRequest', title: 'a\nb', body: '', base: 'main' }),
+    ).toThrow();
+    expect(() =>
+      gitRequest({ op: 'createPullRequest', title: 'x'.repeat(257), body: '', base: 'main' }),
+    ).toThrow();
+    expect(() =>
+      gitRequest({ op: 'createPullRequest', title: 't', body: '', base: '--repo=x/y' }),
+    ).toThrow();
+    expect(() => gitRequest({ op: 'mergePullRequest', number: 0, method: 'squash' })).toThrow();
+    expect(() => gitRequest({ op: 'mergePullRequest', number: 1, method: 'auto' })).toThrow();
+    expect(() => gitRequest({ op: 'review', scope: { kind: 'commit', sha: 'a' } })).toThrow();
+    expect(() =>
+      gitRequest({ op: 'prDescription', instructions: 'x'.repeat(8 * 1024 + 1) }),
+    ).toThrow();
+
+    const { call, sent, inputs } = harness({ result: {} }, true);
+    await call(['s1', { op: 'prDescription', instructions: 'i', base: 'main', language: 'en' }]);
+    await call(['s1', { op: 'review', scope: { kind: 'uncommitted' } }]);
+    expect(sent.map((s) => s.json.request)).toEqual([
+      { op: 'prDescription', instructions: 'i', base: 'main', language: 'zh-CN' },
+      { op: 'review', scope: { kind: 'uncommitted' }, language: 'zh-CN' },
+    ]);
+    // Both send the diff to the model provider: only on a click. The status read needs none.
+    expect(inputs).toEqual(['s1', 's1']);
+    await call(['s1', { op: 'pullRequest' }]);
+    expect(inputs).toHaveLength(2);
+  });
+
+  it('merges a pull request only after the native confirmation that names it', async () => {
+    const facts = { message: 'Add login', branch: 'main', remote: 'octo/app' };
+    const { call, sent, confirm } = harness({ result: facts });
+    confirm.answerNext(false);
+    const cancelled = await call(['s1', { op: 'mergePullRequest', number: 7, method: 'rebase' }]);
+    expect(JSON.parse(String(cancelled))).toEqual({ failure: { kind: 'cancelled' } });
+    expect(sent.map((s) => s.json.request)).toEqual([
+      { op: 'describe', action: { kind: 'mergePullRequest', number: 7, method: 'rebase' } },
+    ]);
+    expect(confirm.shown()[0]).toEqual({
+      message: 'Merge pull request #7 “Add login”?',
+      detail:
+        'GitHub merges it into main of octo/app (Rebase and merge). This cannot be undone from PiArc.',
+    });
+    confirm.answerNext(true);
+    await call(['s1', { op: 'mergePullRequest', number: 7, method: 'rebase' }]);
+    expect(sent.at(-1)?.json.request).toEqual({
+      op: 'mergePullRequest',
+      number: 7,
+      method: 'rebase',
+    });
+  });
 });

@@ -648,6 +648,35 @@ impl ToolIo {
         ))
     }
 
+    /// The user's `gh` for the Git panel (ADR-0085 rule 9): the one on the commands' `PATH`
+    /// outside `workspace`, with the gh environment, and the login shell's `GH_HOST`; `None`
+    /// when there is no `gh`.
+    pub(crate) async fn gh_runner(
+        &self,
+        workspace: &Path,
+    ) -> Option<(piarc_git::Git, Option<String>)> {
+        let inherited = self.command_environment().await;
+        let login = self.expansion_environment().await;
+        let path = inherited
+            .iter()
+            .find(|(k, _)| k.to_string_lossy().eq_ignore_ascii_case("PATH"))
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default();
+        let program = piarc_git::gh::find(&path, Some(workspace))?;
+        let host = login
+            .iter()
+            .find(|(k, _)| k == "GH_HOST")
+            .map(|(_, v)| v.to_string_lossy().into_owned());
+        Some((
+            piarc_git::Git::other(
+                Arc::new(piarc_exec::ProcessTreeSpawner),
+                program,
+                piarc_git::env::gh_env(&inherited, &login),
+            ),
+            host,
+        ))
+    }
+
     /// The workspace of a registered session's settings and trust (T35: a worktree session's
     /// main workspace).
     #[must_use]

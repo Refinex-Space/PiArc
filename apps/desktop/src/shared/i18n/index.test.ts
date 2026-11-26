@@ -153,9 +153,11 @@ describe('i18n', () => {
             label: 'Before',
             yours: 'main',
             theirs: 'topic',
-            current: 'main',
             pushed: 1,
             oid: 'abc1234',
+            // G5: pull requests and reviews (ADR-0085, ADR-0087).
+            repo: 'octo/app',
+            method: 'Squash and merge',
           }),
         ).not.toThrow();
       }

@@ -315,6 +315,18 @@
     },
     {
       "kind": "request",
+      "method": "session/gitAssist",
+      "name": "session/gitAssist",
+      "schema": "SessionGitAssistRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/gitAssist",
+      "name": "session/gitAssist/result",
+      "schema": "SessionGitAssistResponse"
+    },
+    {
+      "kind": "request",
       "method": "session/compact",
       "name": "session/compact",
       "schema": "SessionCompactRequest"

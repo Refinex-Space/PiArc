@@ -356,7 +356,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 16. G3 的渲染进程：日志视图、提交图、详情与操作、stash、远程分支删除、自动获取、图片 diff、设置（`graph.test.ts` 5 项；L4 `git-history` 3 项与 `git-panel` 4 项通过；T43 新登记 `state:git-log`、`state:git-stashes`、`dialog:git-history`，全套 16 项通过）。
 - [x] 17. G4 的 piarc-git、协议、Core、主进程（`tests/merging.rs` 4 项、`sessions git::a_merge_conflict_is_saved_only_over_what_the_merge_view_read` 与 `interactive_rebases_follow_the_plan_they_were_given`、`git-ipc.test.ts` 11 项；单次请求上限调到 12 MiB 以容纳 5 MiB 的合并结果）。
 - [x] 18. G4 的渲染进程：合并与变基入口、冲突对话框、三方合并视图、交互式变基、状态条补齐（`merge3.test.ts` 7 项、`rebase-dialog.test.ts` 2 项；L4 `git-merge` 2 项，Git L4 共 9 项通过；T43 新登记 4 个状态，全套 17 项通过；合并与变基改为 `--autostash`，L4 发现工作区有改动时变基被拒）。
-- [ ] 19. G5：`gh`、ADR-0087 的 AHP 与 Agent Host、Core、主进程。
+- [x] 19. G5：`gh`、ADR-0087 的 AHP 与 Agent Host、Core、主进程（`tests/github.rs` 2 项、`sessions git::` 新增 3 项（PR 描述、审查结论按 diff 过滤、经假 `gh` 推送后开 PR 与合并）、`git-ipc.test.ts` 13 项、`git-assist.test.ts`；原创性检查的渲染清单补上提交信息与 ADR-0087 的提示词，9,262 词 0 命中）。
 - [ ] 20. G5 的渲染进程：PR 条与对话框、审查两种呈现、设置。
 - [ ] 21. 文档同步、a11y 与 i18n、全量 verify。
 

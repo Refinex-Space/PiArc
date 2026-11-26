@@ -1,7 +1,8 @@
 //! The Git panel through Core's public API with a real Agent Host and the mock provider
-//! (ADR-0084 to ADR-0086): read-only status, writes that wait for trust and refuse while a
-//! session in the same root runs a turn, and a commit message generated in the interface
-//! language from the staged changes with secrets left out.
+//! (ADR-0084 to ADR-0087): read-only status, writes that wait for trust and refuse while a
+//! session in the same root runs a turn, a commit message generated in the interface language
+//! from the staged changes with secrets left out, and a PR description and a review written from
+//! the branch's or the uncommitted diff, the review keeping only findings the diff can carry.
 
 use std::path::Path;
 
@@ -584,5 +585,306 @@ async fn interactive_rebases_follow_the_plan_they_were_given() {
         String::from_utf8_lossy(&subject.stdout).trim(),
         "feat: 合并后的提交"
     );
+    shutdown(core).await;
+}
+
+/// A PR description covers the branch's commits against its inferred base, leaves sensitive
+/// content out, and runs only in a trusted project (ADR-0087).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn pull_request_descriptions_cover_the_branch_against_its_base() {
+    let env = Env::new("git-pr-description").await;
+    repository(&env);
+    run_git(&env.ws, &env.root, &["checkout", "-qb", "feature/login"]);
+    run_git(
+        &env.ws,
+        &env.root,
+        &["commit", "-qm", "feat: validate login"],
+    );
+    let (core, _events) = env.start(env.config(&[]));
+    let id = open(&core, &env).await;
+    let request = json!({
+        "op": "prDescription",
+        "language": "en",
+        "instructions": "Keep it short. [[piarc-scenario:git-pr-description]]",
+    });
+
+    let refused = git(&core, &id, request.clone()).await;
+    assert_eq!(refused["failure"]["kind"], "untrusted", "{refused}");
+    assert!(env.requests("git-pr-description").is_empty());
+    trust(&core, &env.ws).await;
+
+    let drafted = git(&core, &id, request).await;
+    let result = &drafted["result"];
+    assert_eq!(result["title"], "Validate the login form", "{drafted}");
+    assert_eq!(
+        result["body"], "## Summary\n- Checks both fields before sending.",
+        "{drafted}"
+    );
+    assert_eq!(result["withheld"], json!([".env"]), "{drafted}");
+
+    let requests = env.requests("git-pr-description");
+    assert_eq!(requests.len(), 1);
+    let body = &requests[0].body;
+    for expected in [
+        "Keep it short.",
+        "Language: write in English.",
+        "Branch: feature/login",
+        "Compared with: main",
+        "- feat: validate login",
+        "export const b = 3;",
+        "[content withheld: sensitive]",
+    ] {
+        assert!(body.contains(expected), "{expected} missing from {body}");
+    }
+    assert!(
+        !body.contains("feat: start"),
+        "a commit of the base reached the model"
+    );
+    assert!(
+        !body.contains("do-not-send-this-value"),
+        "the .env content reached the model"
+    );
+    shutdown(core).await;
+}
+
+/// A review keeps only findings on a file Core sent and a line that file has; it covers a
+/// branch or the uncommitted changes, never one commit.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn reviews_keep_only_findings_on_lines_the_diff_has() {
+    let env = Env::new("git-review").await;
+    repository(&env);
+    std::fs::write(
+        env.ws.join("login.ts"),
+        "export const a = 2;\nexport const b = 3; // [[piarc-scenario:git-review]]\n",
+    )
+    .expect("edit");
+    let (core, _events) = env.start(env.config(&[]));
+    let id = open(&core, &env).await;
+    let request =
+        json!({ "op": "review", "scope": { "kind": "uncommitted" }, "language": "zh-CN" });
+
+    let refused = git(&core, &id, request.clone()).await;
+    assert_eq!(refused["failure"]["kind"], "untrusted", "{refused}");
+    trust(&core, &env.ws).await;
+    let one = git(
+        &core,
+        &id,
+        json!({ "op": "review", "scope": { "kind": "commit", "sha": "HEAD" }, "language": "en" }),
+    )
+    .await;
+    assert_eq!(one["failure"]["kind"], "invalid", "{one}");
+    assert!(env.requests("git-review").is_empty());
+
+    let reviewed = git(&core, &id, request).await;
+    let result = &reviewed["result"];
+    assert_eq!(
+        result["scope"],
+        json!({ "kind": "uncommitted" }),
+        "{reviewed}"
+    );
+    assert_eq!(result["summary"], "Adds a second export.", "{reviewed}");
+    assert_eq!(
+        result["findings"],
+        json!([{
+            "path": "login.ts",
+            "line": 2,
+            "severity": "high",
+            "title": "b is never checked",
+            "body": "Check it.",
+        }]),
+        "{reviewed}"
+    );
+    assert_eq!(result["dropped"], 3, "{reviewed}");
+    assert_eq!(result["withheld"], json!([".env"]), "{reviewed}");
+
+    let requests = env.requests("git-review");
+    assert_eq!(requests.len(), 1);
+    let body = &requests[0].body;
+    assert!(body.contains("Simplified Chinese"), "{body}");
+    assert!(body.contains("export const b = 3;"), "{body}");
+    assert!(
+        !body.contains("do-not-send-this-value"),
+        "the .env content reached the model"
+    );
+    assert!(
+        !body.contains("notes 笔记.md"),
+        "an untracked file reached the model"
+    );
+    shutdown(core).await;
+}
+
+/// A fake `gh` in a directory with a space and Chinese characters: it logs its arguments, keeps
+/// the body it reads from stdin, and answers "no pull request" until one was created.
+#[cfg(unix)]
+fn fake_gh(env: &Env) -> (std::path::PathBuf, std::path::PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = env.root.join("fake gh 工具");
+    std::fs::create_dir_all(&dir).expect("dir");
+    let log = dir.join("calls.log");
+    let at = |name: &str| dir.join(name).to_str().expect("utf-8").to_owned();
+    let pr = r#"{"number":8,"title":"Validate the login form","state":"OPEN","isDraft":true,"url":"https://github.com/octo/app/pull/8","baseRefName":"main","headRefName":"feature/login","reviewDecision":null,"mergeable":"MERGEABLE","statusCheckRollup":[]}"#;
+    let script = format!(
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" --- >> '{log}'\ncase \"$1 $2\" in\n  \"pr view\") if [ -f '{created}' ]; then echo '{pr}'; else echo 'no pull requests found for branch \"feature/login\"' >&2; exit 1; fi ;;\n  \"pr create\") cat > '{body}'; touch '{created}'; echo https://github.com/octo/app/pull/8 ;;\n  \"pr merge\") exit 0 ;;\nesac\n",
+        log = at("calls.log"),
+        created = at("created"),
+        body = at("body.md"),
+    );
+    let program = dir.join("gh");
+    std::fs::write(&program, script).expect("script");
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).expect("mode");
+    (dir, log)
+}
+
+/// A feature branch whose remote names GitHub but pushes to a local bare repository, and Core's
+/// settings with the fake `gh` first on the command `PATH`.
+#[cfg(unix)]
+fn github_fixture(
+    env: &Env,
+) -> (
+    piarc_core::CoreConfig,
+    std::path::PathBuf,
+    std::path::PathBuf,
+    std::path::PathBuf,
+) {
+    repository(env);
+    run_git(
+        &env.ws,
+        &env.root,
+        &["commit", "-qm", "feat: validate login"],
+    );
+    let bare = remote(env);
+    run_git(&env.ws, &env.root, &["checkout", "-qb", "feature/login"]);
+    run_git(
+        &env.ws,
+        &env.root,
+        &["remote", "set-url", "origin", "git@github.com:octo/app.git"],
+    );
+    run_git(
+        &env.ws,
+        &env.root,
+        &[
+            "config",
+            "remote.origin.pushurl",
+            bare.to_str().expect("utf-8"),
+        ],
+    );
+    let (dir, log) = fake_gh(env);
+    let mut config = env.config(&[]);
+    let Some(piarc_core::tool_io::CommandEnv::Fixed(vars)) = &mut config.command_env else {
+        panic!("a fixed command environment")
+    };
+    for (key, value) in vars.iter_mut() {
+        if key.to_string_lossy().eq_ignore_ascii_case("PATH") {
+            let mut path = dir.clone().into_os_string();
+            path.push(":");
+            path.push(&*value);
+            *value = path;
+        }
+    }
+    (config, dir, log, bare)
+}
+
+/// The open pull request is described for the confirmation, a stale number is refused, and the
+/// merge runs with the chosen method.
+#[cfg(unix)]
+async fn merge_round_trip(core: &CoreRuntime, id: &str, log: &Path) {
+    let open_pr = git(core, id, json!({ "op": "pullRequest" })).await;
+    assert_eq!(open_pr["result"]["pr"]["number"], 8, "{open_pr}");
+    let described = git(
+        core,
+        id,
+        json!({ "op": "describe", "action": { "kind": "mergePullRequest", "number": 8 } }),
+    )
+    .await;
+    assert_eq!(
+        described["result"]["message"], "Validate the login form",
+        "{described}"
+    );
+    assert_eq!(described["result"]["remote"], "octo/app", "{described}");
+    let stale = git(
+        core,
+        id,
+        json!({ "op": "describe", "action": { "kind": "mergePullRequest", "number": 9 } }),
+    )
+    .await;
+    assert_eq!(stale["result"]["refused"]["kind"], "stale", "{stale}");
+    let merged = git(
+        core,
+        id,
+        json!({ "op": "mergePullRequest", "number": 8, "method": "squash" }),
+    )
+    .await;
+    assert!(merged.get("result").is_some(), "{merged}");
+    let calls = std::fs::read_to_string(log).expect("log");
+    assert!(
+        calls.contains("pr\nmerge\n--repo=github.com/octo/app\n--squash\n--\n8\n---"),
+        "{calls}"
+    );
+}
+
+/// GitHub through the user's `gh` (ADR-0085 rule 9): nothing runs in an untrusted project, the
+/// branch is pushed before the pull request is opened, the repository comes from the remote's
+/// URL, and a remote that is not on GitHub is reported as such.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn pull_requests_open_and_merge_through_the_users_gh() {
+    let env = Env::new("git-github").await;
+    let (config, dir, log, bare) = github_fixture(&env);
+    let (core, _events) = env.start(config);
+    let id = open(&core, &env).await;
+
+    let untrusted = git(&core, &id, json!({ "op": "pullRequest" })).await;
+    assert_eq!(untrusted["result"]["gh"], "untrusted", "{untrusted}");
+    assert!(!log.exists(), "gh ran in an untrusted project");
+    trust(&core, &env.ws).await;
+
+    let none = git(&core, &id, json!({ "op": "pullRequest" })).await;
+    assert_eq!(none["result"]["gh"], "ready", "{none}");
+    assert_eq!(none["result"]["repo"], "octo/app", "{none}");
+    assert!(none["result"].get("pr").is_none(), "{none}");
+
+    let body = "## Summary\n- 校验登录表单\n";
+    let created = git(
+        &core,
+        &id,
+        json!({ "op": "createPullRequest", "title": "--web", "body": body, "base": "main", "draft": true }),
+    )
+    .await;
+    assert_eq!(
+        created["result"]["url"], "https://github.com/octo/app/pull/8",
+        "{created}"
+    );
+    assert_eq!(
+        head_of(&bare, &env.root, "refs/heads/feature/login"),
+        head_of(&env.ws, &env.root, "HEAD"),
+        "the branch was pushed first"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.join("body.md")).expect("body"),
+        body
+    );
+    let calls = std::fs::read_to_string(&log).expect("log");
+    // A title that looks like a flag stays the title's value.
+    assert!(
+        calls.contains(
+            "pr\ncreate\n--repo=github.com/octo/app\n--base=main\n--head=feature/login\n--title=--web\n--body-file=-\n--draft\n---"
+        ),
+        "{calls}"
+    );
+
+    merge_round_trip(&core, &id, &log).await;
+
+    run_git(
+        &env.ws,
+        &env.root,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "https://gitlab.example.invalid/octo/app.git",
+        ],
+    );
+    let elsewhere = git(&core, &id, json!({ "op": "pullRequest" })).await;
+    assert_eq!(elsewhere["result"]["gh"], "notGithub", "{elsewhere}");
     shutdown(core).await;
 }

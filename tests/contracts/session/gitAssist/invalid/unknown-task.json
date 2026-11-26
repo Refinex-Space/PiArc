@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "method": "session/gitAssist",
+  "params": {
+    "sessionId": "main",
+    "task": "deploy",
+    "language": "en",
+    "instructions": "",
+    "commits": [],
+    "files": [],
+    "diff": ""
+  }
+}

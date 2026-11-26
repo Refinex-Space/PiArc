@@ -125,9 +125,8 @@ pub(crate) type Restores = Mutex<BTreeMap<String, watch::Receiver<crate::Result<
 #[derive(Clone)]
 pub(crate) struct Link {
     pub epoch: u64,
-    pub models_enabled: bool,
-    pub side_chat_enabled: bool,
-    pub commit_message_enabled: bool,
+    /// The optional methods the handshake enabled.
+    pub enabled: Enabled,
     pub writer: mpsc::Sender<Vec<u8>>,
     /// Closes the Agent Host's stdin once the queued frames are written: the signal for an
     /// orderly exit.
@@ -140,13 +139,25 @@ pub(crate) struct Link {
     pub accepted: Arc<AtomicBool>,
 }
 
+/// Optional methods a connection may call, by the capabilities its handshake enabled.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Enabled {
+    pub models: bool,
+    pub side_chat: bool,
+    pub commit_message: bool,
+    pub git_assist: bool,
+}
+
 impl Link {
     /// Records which optional methods the handshake enabled on this connection.
     fn enable(&mut self, enabled: &[piarc_protocol::Capability]) {
         let on = |name: &str| enabled.iter().any(|c| c.as_str() == name);
-        self.side_chat_enabled = on("sideChat");
-        self.commit_message_enabled = on("commitMessage");
-        self.models_enabled = on("models");
+        self.enabled = Enabled {
+            models: on("models"),
+            side_chat: on("sideChat"),
+            commit_message: on("commitMessage"),
+            git_assist: on("gitAssist"),
+        };
     }
 }
 
@@ -209,9 +220,7 @@ pub(crate) async fn start(
     tokio::spawn(write_frames(stdin, queue, Arc::clone(&close_stdin)));
     tokio::spawn(log_stderr(stderr, shared.workspace.clone(), epoch));
     let mut link = Link {
-        models_enabled: false,
-        side_chat_enabled: false,
-        commit_message_enabled: false,
+        enabled: Enabled::default(),
         epoch,
         writer,
         close_stdin,

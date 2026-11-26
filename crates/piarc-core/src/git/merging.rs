@@ -285,7 +285,7 @@ pub(super) fn check(request: &GitRequest) -> std::result::Result<(), GitFailure>
             full_id(head)?;
             check_steps(steps)
         }
-        _ => Ok(()),
+        other => super::github::check(other),
     }
 }
 

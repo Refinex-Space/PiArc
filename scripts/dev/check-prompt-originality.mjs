@@ -30,6 +30,8 @@ function render() {
         import { HOOK_JUDGE_SYSTEM } from './agent-host/src/harness/prompts/hook-judge.ts';
         import * as review from './agent-host/src/harness/prompts/auto-review.ts';
         import * as memory from './agent-host/src/harness/prompts/auto-memory.ts';
+        import * as commit from './agent-host/src/harness/prompts/commit-message.ts';
+        import * as assist from './agent-host/src/harness/prompts/git-assist.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -86,7 +88,10 @@ function render() {
           // T47: the lines around the auto memory index, the managed instructions and a note
           // restored after a compaction (the tool's description and guidance come with the
           // profile and the system prompt above).
-          memory.MEMORY_PREAMBLE, memory.managedSource(''), memory.restoredMemory('')];
+          memory.MEMORY_PREAMBLE, memory.managedSource(''), memory.restoredMemory(''),
+          // ADR-0086, ADR-0087: the Git tool's commit message, PR description and review requests.
+          commit.COMMIT_MESSAGE_SYSTEM, ...Object.values(commit.LANGUAGE_REQUIREMENT), commit.AMEND_NOTE,
+          assist.PR_DESCRIPTION_SYSTEM, assist.REVIEW_SYSTEM, ...Object.values(assist.ASSIST_LANGUAGE)];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },

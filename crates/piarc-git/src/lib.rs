@@ -15,7 +15,8 @@
 //!   ([`refs`]); the index and hunks ([`index`]), commits ([`commit`]), branch operations
 //!   ([`branches`]), fetch, pull, push and the operation in progress ([`remote`]). G3: history
 //!   pages, commit details and commit operations ([`history`]), stashes ([`stash`]). G4: merges,
-//!   rebases, conflict sides and interactive rebases ([`merge`]).
+//!   rebases, conflict sides and interactive rebases ([`merge`]). G5: GitHub through the user's
+//!   `gh` ([`gh`]).
 //!
 //! # Not responsible for
 //!
@@ -38,6 +39,7 @@ pub mod commit;
 pub mod diff;
 pub mod env;
 pub mod exec;
+pub mod gh;
 pub mod git;
 pub mod history;
 pub mod index;

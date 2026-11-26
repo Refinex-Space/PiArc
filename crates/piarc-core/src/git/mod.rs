@@ -15,6 +15,8 @@ use piarc_protocol::git::{GitFailure, GitFailureKind, GitPullMode};
 use serde::Serialize;
 use serde_json::{Value, json};
 
+mod assist;
+mod github;
 mod history;
 pub(crate) mod merging;
 mod message;

@@ -156,9 +156,10 @@ impl Git {
         }
         let spec = SpawnSpec {
             program: self.program.clone(),
-            args: [OsStr::new("-c"), OsStr::new("core.longpaths=true")]
-                .into_iter()
-                .map(OsStr::to_owned)
+            args: self
+                .prefix()
+                .iter()
+                .map(std::ffi::OsString::from)
                 .chain(args.iter().map(|a| a.as_ref().to_owned()))
                 .collect(),
             cwd: cwd.to_owned(),

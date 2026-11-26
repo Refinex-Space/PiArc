@@ -422,6 +422,98 @@ request!(
     SessionCommitMessage, "session/commitMessage", CommitMessageParams, CommitMessageAnswer
 );
 
+/// What `session/gitAssist` writes (ADR-0087).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitAssistTask {
+    /// A pull request's title and body.
+    PrDescription,
+    /// Review findings on a diff.
+    Review,
+}
+
+/// How much a review finding matters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GitFindingSeverity {
+    /// Likely a bug, a security problem or data loss.
+    High,
+    /// Worth fixing.
+    Medium,
+    /// A nit.
+    Low,
+}
+
+/// One review finding, as the model reported it (Core checks it against the diff).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitAssistFinding {
+    /// The file.
+    pub path: String,
+    /// A line of the file's new content (1-based).
+    pub line: u64,
+    /// How much it matters.
+    pub severity: GitFindingSeverity,
+    /// One line.
+    pub title: String,
+    /// The explanation.
+    pub body: String,
+}
+
+/// Parameters of `session/gitAssist` (Core → Agent Host, ADR-0087).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitAssistParams {
+    /// The session whose model channel answers.
+    pub session_id: SessionId,
+    /// What to write.
+    pub task: GitAssistTask,
+    /// The interface language.
+    pub language: crate::git::GitLanguage,
+    /// The user's PR instructions (at most 8 KiB; empty for a review).
+    pub instructions: String,
+    /// The current branch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// The branch the changes are compared with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<String>,
+    /// The subjects of the branch's commits, oldest first (at most 50).
+    pub commits: Vec<String>,
+    /// The changed files.
+    pub files: Vec<CommitMessageFile>,
+    /// The diff, cut and redacted by Core (at most 64 KiB).
+    pub diff: String,
+}
+
+/// The answer of `session/gitAssist`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GitAssistAnswer {
+    /// A PR's title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// A PR's body (Markdown).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    /// A review's summary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// A review's findings, as parsed from the model's answer.
+    pub findings: Vec<GitAssistFinding>,
+    /// The model that wrote it.
+    pub model: ModelRef,
+    /// The chosen auxiliary model was unavailable and the session's model answered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<bool>,
+}
+
+request!(
+    /// Write a PR description or review a diff on the session's auxiliary model channel
+    /// (Core → Agent Host).
+    SessionGitAssist, "session/gitAssist", GitAssistParams, GitAssistAnswer
+);
+
 /// Parameters of `session/compact`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

@@ -27,6 +27,8 @@ import {
 import type {
   CommitMessageAnswer,
   CommitMessageParams,
+  GitAssistAnswer,
+  GitAssistParams,
   HistoryWindow,
   HooksPromptResult,
   PolicyReviewParams,
@@ -51,6 +53,7 @@ import type {
 
 import { reviewCall } from '../harness/auto-review.js';
 import { generateCommitMessage } from '../harness/commit-message.js';
+import { generateGitAssist } from '../harness/git-assist.js';
 import { judgeHook, type JudgeRequest } from '../harness/hook-judge.js';
 import { expiredApprovals } from '../harness/policy.js';
 import { fetchCatalog } from '../harness/subagents/definitions.js';
@@ -763,6 +766,22 @@ export class SessionRegistry {
       );
     }
     return generateCommitMessage(params, {
+      auxiliary,
+      preferences: this.#options.workspace.preferences,
+    });
+  }
+
+  /** `session/gitAssist` (ADR-0087): a PR description or a review from session `sessionId`'s
+   * channel. */
+  async gitAssist(sessionId: string, params: GitAssistParams): Promise<GitAssistAnswer> {
+    const auxiliary = this.#get(sessionId).harness.auxiliary;
+    if (auxiliary === undefined) {
+      throw new AhpError(
+        'invalidParams',
+        `session/gitAssist: session ${sessionId} has no model channel`,
+      );
+    }
+    return generateGitAssist(params, {
       auxiliary,
       preferences: this.#options.workspace.preferences,
     });
