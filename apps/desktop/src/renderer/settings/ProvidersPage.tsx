@@ -1,23 +1,26 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AliasSection } from './AliasSection.js';
 import { ModelSettingsSection } from './ModelSettingsSection.js';
 import { WebSearchSection } from './WebSearchSection.js';
-import { SignInSection } from './SignInSection.js';
+import { useSignInDialog } from './SignInSection.js';
+import { ServiceChooser, type ServiceChoice } from './ServiceChooser.js';
+import { ConnectionList } from './ConnectionList.js';
+import { ModelDiscovery } from './ModelDiscovery.js';
 import { useT } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { reason } from '../shell/errors.js';
 import {
   APIS,
-  KINDS,
   configOf,
   makeForm,
   fieldErrors,
   hasEndpoint,
   takesKey,
   parseSettings,
+  type Account,
   type Auth,
   type Form,
-  type Kind,
+  type LoginProvider,
   type Provider,
   type ProviderSettings,
 } from './provider-form.js';
@@ -40,6 +43,7 @@ export function ProvidersPage() {
   const [busy, setBusy] = useState(false);
   // The catalog refresh choice while Core saves it (I100: the settings Host takes a moment).
   const [refreshing, setRefreshing] = useState<boolean>();
+  const [choosing, setChoosing] = useState(false);
   const reload = useCallback((text?: string) => {
     (text === undefined ? window.piarc.providerSettings() : Promise.resolve(text))
       .then(parseSettings)
@@ -51,11 +55,47 @@ export function ProvidersPage() {
   useEffect(() => {
     reload();
   }, [reload]);
+  // The account in use of a provider, to say who signed in (ADR-0083).
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const accountOf = useCallback(
+    (provider: string) =>
+      settingsRef.current?.loginProviders.find((l) => l.id === provider && l.signedIn)?.account,
+    [],
+  );
+  const signIn = useSignInDialog(reload, accountOf);
   const edit = (p?: Provider) => {
     setOriginal(p);
     setForm(makeForm(p));
     setErrors({});
     setFailure('');
+  };
+  const pick = (choice: ServiceChoice) => {
+    setChoosing(false);
+    setFailure('');
+    if (choice.type === 'login') {
+      signIn.start(choice.provider, () => window.piarc.startLogin(choice.provider.id));
+      return;
+    }
+    edit();
+    setForm({
+      ...makeForm(),
+      kind: choice.kind,
+      id: choice.id,
+      auth: choice.id === 'amazon-bedrock' ? 'bearer' : 'apiKey',
+    });
+  };
+  const signOut = (p: LoginProvider) => {
+    setFailure('');
+    window.piarc.logoutProvider(p.id).then(
+      (done) => {
+        // Core answers the sign-out itself; read the settings again.
+        if (done !== null) reload();
+      },
+      (e: unknown) => {
+        setFailure(reason(e));
+      },
+    );
   };
   const mutate = async (request: () => Promise<string | null>, close: boolean) => {
     setBusy(true);
@@ -134,8 +174,9 @@ export function ProvidersPage() {
         </p>
       )
     );
-  const cloudIds = ['amazon-bedrock', 'google-vertex'];
   const endpoint = form && hasEndpoint(form.kind);
+  const nameOf = (id: string): string =>
+    settings.builtinProviders.find((p) => p.id === id)?.name ?? id;
   const header = (
     <label className="checkbox">
       <input
@@ -160,10 +201,16 @@ export function ProvidersPage() {
       )}
     </label>
   );
+  const useAccount = (account: Account) => {
+    void mutate(() => window.piarc.useProviderAccount(account.provider, account.id), false);
+  };
+  const removeAccount = (account: Account) => {
+    void mutate(() => window.piarc.removeProviderAccount(account.provider, account.id), false);
+  };
   if (!form)
     return (
       <div className="settings-section settings-detail-page">
-        <section className="settings-connection-section">
+        <section className="settings-connection-section" data-testid="provider-connections">
           <h2 className="settings-heading">{t('providers.connections')}</h2>
           <div className="settings-connection-box">
             <div className="settings-connect-row">
@@ -174,54 +221,38 @@ export function ProvidersPage() {
               <Button
                 size="small"
                 data-testid="provider-add"
-                disabled={busy}
+                disabled={busy || signIn.open}
                 onClick={() => {
-                  edit();
+                  setChoosing(true);
                 }}
               >
                 {t('providers.add')}
               </Button>
             </div>
-            {settings.providers.length === 0 ? (
-              <p className="muted settings-connection-empty">{t('providers.empty')}</p>
-            ) : (
-              <ul className="provider-list">
-                {settings.providers.map((p) => (
-                  <li key={p.id}>
-                    <div>
-                      <strong>{p.id}</strong>
-                      <div className="muted small">{p.baseUrl ?? t(`providers.${p.kind}`)}</div>
-                    </div>
-                    <Button
-                      size="small"
-                      data-testid={`provider-edit-${p.id}`}
-                      disabled={busy}
-                      onClick={() => {
-                        edit(p);
-                      }}
-                    >
-                      {t('providers.edit')}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="small"
-                      data-testid={`provider-delete-${p.id}`}
-                      disabled={busy}
-                      onClick={() => {
-                        void mutate(() => window.piarc.deleteProvider(p.id), false);
-                      }}
-                    >
-                      {t('providers.remove')}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ConnectionList
+              settings={settings}
+              busy={busy}
+              signingIn={signIn.open}
+              onEdit={edit}
+              onDelete={(id) => {
+                void mutate(() => window.piarc.deleteProvider(id), false);
+              }}
+              onSetEnabled={(id, enabled) => {
+                void mutate(() => window.piarc.setProviderEnabled(id, enabled), false);
+              }}
+              onSignOut={signOut}
+              onUseAccount={useAccount}
+              onRemoveAccount={removeAccount}
+            />
           </div>
           {header}
         </section>
         {failed}
-        <SignInSection providers={settings.loginProviders} busy={busy} onChanged={reload} />
+        {signIn.failure === '' ? null : (
+          <p className="error-text" role="alert">
+            {t('providers.failed', { reason: signIn.failure })}
+          </p>
+        )}
         <ModelSettingsSection
           settings={settings}
           busy={busy}
@@ -237,13 +268,21 @@ export function ProvidersPage() {
           }}
         />
         <WebSearchSection settings={settings} />
+        {choosing ? (
+          <ServiceChooser
+            settings={settings}
+            onPick={pick}
+            onCancel={() => {
+              setChoosing(false);
+            }}
+          />
+        ) : null}
+        {signIn.dialog}
       </div>
     );
-  const selectedProviders = settings.builtinProviders.filter((p) =>
-    form.kind === 'cloud' ? cloudIds.includes(p.id) : !cloudIds.includes(p.id),
-  );
   const authChoices: Auth[] =
     form.id === 'amazon-bedrock' ? ['bearer', 'profile'] : ['apiKey', 'adc', 'serviceAccount'];
+  const formName = endpoint ? t(`providers.${form.kind}`) : nameOf(form.id);
   return (
     <form
       className="settings-section settings-detail-page"
@@ -270,75 +309,27 @@ export function ProvidersPage() {
         );
       }}
     >
-      <h2 className="settings-heading">{t(original ? 'providers.editTitle' : 'providers.add')}</h2>
+      <div className="provider-form-head">
+        <h2 className="settings-heading" data-testid="provider-form-title">
+          {original ? formName : t('providers.addNamed', { name: formName })}
+        </h2>
+        {endpoint ? null : <span className="muted small">{t(`providers.${form.kind}`)}</span>}
+      </div>
       <fieldset className="settings-section provider-form" disabled={busy}>
-        {field(
-          'kind',
-          'providers.kind',
-          <select
-            {...props('kind')}
-            value={form.kind}
-            disabled={original !== undefined}
-            onChange={(e) => {
-              const kind = e.currentTarget.value as Kind;
-              const id =
-                kind === 'cloud'
-                  ? 'amazon-bedrock'
-                  : kind === 'builtin'
-                    ? (settings.builtinProviders.find((p) => !cloudIds.includes(p.id))?.id ?? '')
-                    : '';
-              setForm({
-                ...makeForm(),
-                kind,
-                id,
-                auth: id === 'amazon-bedrock' ? 'bearer' : 'apiKey',
-              });
-              setErrors({});
-            }}
-          >
-            {KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {t(`providers.${kind}`)}
-              </option>
-            ))}
-          </select>,
-        )}
-        {field(
-          'id',
-          'providers.id',
-          endpoint ? (
-            <input
-              {...props('id')}
-              disabled={Boolean(original)}
-              value={form.id}
-              onChange={(e) => {
-                change('id', e.currentTarget.value);
-              }}
-            />
-          ) : (
-            <select
-              {...props('id')}
-              disabled={Boolean(original)}
-              value={form.id}
-              onChange={(e) => {
-                const id = e.currentTarget.value;
-                setForm({
-                  ...form,
-                  id,
-                  auth: id === 'amazon-bedrock' ? 'bearer' : 'apiKey',
-                  key: '',
-                });
-                setErrors({});
-              }}
-            >
-              {selectedProviders.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          ),
-        )}
+        {endpoint
+          ? field(
+              'id',
+              'providers.id',
+              <input
+                {...props('id')}
+                disabled={Boolean(original)}
+                value={form.id}
+                onChange={(e) => {
+                  change('id', e.currentTarget.value);
+                }}
+              />,
+            )
+          : null}
         {endpoint && (
           <>
             {field(
@@ -371,6 +362,14 @@ export function ProvidersPage() {
                 }}
               />,
             )}
+            <ModelDiscovery
+              form={form}
+              savedId={original?.id}
+              disabled={busy}
+              onModels={(models) => {
+                change('models', models);
+              }}
+            />
           </>
         )}
         {form.kind === 'cloud' && (

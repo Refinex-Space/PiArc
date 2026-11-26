@@ -26,3 +26,11 @@ Node 24 自带 `NODE_USE_ENV_PROXY=1`：带上它，内置 `fetch` 按 `HTTP_PRO
 - 在 Agent Host 里引入 undici，自己装全局分发器：要新增直接依赖，还要处理 Node 内置 `fetch` 与 npm 版 undici 混用的问题（Pi 的注释提到 Node 26 下的压缩问题）。环境变量方案用 Node 自带能力即可。
 - 在 Core 里读系统代理（注册表、`scutil`）：读不了 PAC，Electron 的解析覆盖得更全。
 - 支持带用户名和密码的代理：需要把凭据放进保险箱，再在启动时单独注入，先不做。
+
+## 补充：Pi 加载后代理失效（2026-11-25）
+
+上文“已实测支持”只测了不加载 Pi 的 `fetch`。Pi 依赖的 npm 版 undici（8.x）加载时会安装自己的全局 dispatcher（普通 `Agent`，不走代理），并覆盖 Node 内置 `fetch` 读取的 `Symbol.for('undici.globalDispatcher.1')`。Node 24.13.1（源码树运行时 PATH 上的 node）因此在 Agent Host 里全部直连，登录 xAI、Meta 等被地区屏蔽的服务商报 “fetch failed”；内置的 Node 24.22.3 不受影响。
+
+1. **恢复。** `agent-host/src/runtime/env-proxy.ts` 在 Pi 之前加载（入口 `main.ts` 只静态导入它，Pi 与主体 `start.ts` 动态导入），记下 Node 启动时装好的代理 dispatcher；Pi 加载完后，若带着 `NODE_USE_ENV_PROXY=1` 与代理变量且该槽位被换掉，就放回去并写一行日志。不引入 undici 依赖，与 Node 版本无关。
+2. **验证。** `agent-host/src/runtime/env-proxy.test.ts` 在子进程里按入口顺序加载模块，经本地代理请求一个不可解析的主机，断言代理收到 `CONNECT`；去掉恢复时该用例在 Node 24.13.1 上失败。
+3. **登录失败的提示。** 连不上服务商时（`fetch` 的连接类错误码），Agent Host 在错误里带 `details.reason: "network"` 并把错误码附在消息后，Core 在 `core/login` 的结束事件加 `network: true`，登录对话框据此提供“代理设置”入口；授权被拒等其他失败不提供。

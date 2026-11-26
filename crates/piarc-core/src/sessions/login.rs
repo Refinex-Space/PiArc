@@ -158,7 +158,9 @@ impl Logins {
 }
 
 /// The last `core/login` event of a sign-in: `succeeded`, `cancelled` or `failed` with the
-/// message (without the method prefix the bridge adds).
+/// message (without the method prefix the bridge adds). A failure to reach the provider (the
+/// Agent Host's `details.reason: "network"`) also carries `network: true`, for which the client
+/// offers the proxy settings (ADR-0082).
 pub(crate) fn end_payload(
     id: &str,
     provider: &str,
@@ -180,7 +182,19 @@ pub(crate) fn end_payload(
         .filter(|(method, _)| method.contains('/'))
         .map_or(error.message.as_str(), |(_, rest)| rest)
         .to_owned();
-    json!({"loginId": id, "provider": provider, "state": state, "message": message})
+    let mut payload =
+        json!({"loginId": id, "provider": provider, "state": state, "message": message});
+    let network = error
+        .data
+        .details
+        .as_ref()
+        .and_then(|details| details.get("reason"))
+        .and_then(Value::as_str)
+        == Some("network");
+    if network && state == "failed" {
+        payload["network"] = Value::Bool(true);
+    }
+    payload
 }
 
 /// What answers the settings Host during a sign-in: the vault and `ui/loginInteraction`.
@@ -262,6 +276,65 @@ impl Hub {
             events: self.ctx.events.clone(),
         });
         let host = self.settings_host_with(inbound).await?;
+        let outcome = self.login_as_new_account(&host, id, provider, cancel).await;
+        host.shutdown().await;
+        outcome
+    }
+
+    /// Runs the sign-in on `host` as a new account of `provider` (ADR-0083): the account in use
+    /// moves aside first and comes back when the sign-in does not complete.
+    async fn login_as_new_account(
+        &self,
+        host: &piarc_host::HostSupervisor,
+        id: &str,
+        provider: &str,
+        cancel: &CancellationToken,
+    ) -> Result<()> {
+        let (mut settings, logins) = self.settings_with_logins(host).await?;
+        let in_use = super::provider_settings::account_name(&logins, provider);
+        let aside = crate::provider_accounts::set_aside(
+            &self.ctx.secrets,
+            &mut settings,
+            provider,
+            in_use.as_deref(),
+        )
+        .await?;
+        self.persist_settings(&settings)?;
+        let outcome = self.sign_in_on(host, id, provider, cancel).await;
+        match &outcome {
+            Ok(account) => {
+                crate::provider_accounts::signed_in(
+                    &self.ctx.secrets,
+                    &mut settings,
+                    provider,
+                    account.clone(),
+                )
+                .await?;
+            }
+            Err(_) => {
+                if let Some(aside) = aside {
+                    crate::provider_accounts::put_back(
+                        &self.ctx.secrets,
+                        &mut settings,
+                        provider,
+                        &aside,
+                    )
+                    .await?;
+                }
+            }
+        }
+        self.persist_settings(&settings)?;
+        outcome.map(drop)
+    }
+
+    /// `models/login/start` on `host`, cancelled with `cancel`; answers the account's name.
+    async fn sign_in_on(
+        &self,
+        host: &piarc_host::HostSupervisor,
+        id: &str,
+        provider: &str,
+        cancel: &CancellationToken,
+    ) -> Result<Option<String>> {
         let call = host.call_within::<ModelsLoginStart>(
             LoginStartParams {
                 login_id: id.to_owned(),
@@ -279,8 +352,7 @@ impl Hub {
                 call.await
             }
         };
-        host.shutdown().await;
-        outcome.map(|_| ()).map_err(host_error)
+        outcome.map(|r| r.account).map_err(host_error)
     }
 
     /// The user's answer to the sign-in's question; `None` cancels the sign-in.
@@ -290,14 +362,26 @@ impl Hub {
 
     /// Signs out of `provider`: its stored credential is removed.
     pub async fn logout(&self, provider: String) -> Result<Value> {
+        // The provider id is used after the call.
+        let provider_id = provider.clone();
         let _writer = self.ctx.provider_writer.lock().await;
         let host = self.settings_host().await?;
         let result = host
             .call::<ModelsLogout>(LogoutParams { provider })
             .await
             .map_err(host_error);
+        let recorded = match result {
+            Ok(_) => self
+                .settings_with_logins(&host)
+                .await
+                .and_then(|(mut settings, _)| {
+                    crate::provider_accounts::signed_out(&mut settings, &provider_id);
+                    self.persist_settings(&settings)
+                }),
+            Err(e) => Err(e),
+        };
         host.shutdown().await;
-        result?;
+        recorded?;
         self.reload_models(
             self.ctx
                 .catalog_network
@@ -305,5 +389,45 @@ impl Hub {
         )
         .await?;
         Ok(json!({}))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn failure(details: Option<&str>) -> Error {
+        Error::Feature {
+            kind: ErrorKind::PermissionDenied,
+            retryable: false,
+            message: "models/login/start failed: fetch failed (UND_ERR_CONNECT_TIMEOUT)".into(),
+            details: details.map(ToOwned::to_owned),
+        }
+    }
+
+    #[test]
+    fn a_provider_out_of_reach_is_marked_for_the_proxy_settings() {
+        let cancel = CancellationToken::new();
+        let payload = end_payload(
+            "l1",
+            "xai",
+            Some(&failure(Some(r#"{"reason":"network"}"#))),
+            &cancel,
+        );
+        assert_eq!(payload["state"], "failed");
+        assert_eq!(payload["message"], "fetch failed (UND_ERR_CONNECT_TIMEOUT)");
+        assert_eq!(payload["network"], true);
+
+        let refused = end_payload("l1", "xai", Some(&failure(None)), &cancel);
+        assert!(refused.get("network").is_none(), "{refused}");
+        cancel.cancel();
+        let cancelled = end_payload(
+            "l1",
+            "xai",
+            Some(&failure(Some(r#"{"reason":"network"}"#))),
+            &cancel,
+        );
+        assert_eq!(cancelled["state"], "cancelled");
+        assert!(cancelled.get("network").is_none(), "{cancelled}");
     }
 }

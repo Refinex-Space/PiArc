@@ -382,6 +382,20 @@ describe.each(stores)('Pi CredentialStore contract: %s', (_name, make) => {
 });
 
 describe('CoreCredentialStore', () => {
+  it('hides the credentials of providers the user turned off (ADR-0083)', async () => {
+    const core = new FakeCore();
+    core.write('provider/p1', { type: 'api_key', key: 'k1' });
+    core.write('oauth/p2', { type: 'oauth', access: 'a', refresh: 'r', expires: 1 });
+    const { store } = await coreStore(core);
+    store.hide(['p1', 'p2']);
+    expect(await store.read('p1')).toBeUndefined();
+    expect(await store.read('p2')).toBeUndefined();
+    expect(await store.list()).toEqual([]);
+    store.hide([]);
+    expect(await store.read('p1')).toEqual({ type: 'api_key', key: 'k1' });
+    expect((await store.list()).map((c) => c.providerId).sort()).toEqual(['p1', 'p2']);
+  });
+
   it('answers reads from memory without asking Core', async () => {
     const core = new FakeCore();
     core.write('provider/p1', { type: 'api_key', key: 'k1' });

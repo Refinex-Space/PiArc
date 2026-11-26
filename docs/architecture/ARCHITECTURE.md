@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.71（2026-11-25） |
+| 版本 | 2.72（2026-11-26） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -375,6 +375,7 @@ agent-host/
 - OAuth 与设备码登录调用 `ModelRuntime.login(provider, type, interaction)`，`interaction` 的回调（授权 URL、设备码、输入提示）转成 AHP 请求，由客户端呈现：授权页在系统浏览器中打开，回调经本地回环端口或 `piarc://` 深链接返回，不在应用窗口内加载第三方登录页。
 - **Anthropic 的订阅 OAuth 登录方式在 Agent Host 中被屏蔽**（ADR-0006）；CI 中有测试断言可用登录方式列表不包含它。
 - T29 落地（ADR-0045）：登录在 Core 为该操作启动的设置 Host 上运行（`models/login/start` 结束时才应答，上限 15 分钟；`models/login/cancel`、`models/logout`）。`AuthInteraction` 的授权 URL、设备码、进度、说明与提问经 `ui/loginInteraction` 交给 Core，Core 一次只运行一个登录，把每一步发到事件路由 `core/login`，客户端答复经 `answerLogin(loginId, value)`（空值即取消）；新的提问顶替屏幕上的提问，进度与说明不顶替。授权页经主进程外链确认交给系统浏览器，回调由服务商流程在 Agent Host 内的回环端口接收；本任务不注册 `piarc://`（T35）。Pi 的 OAuth 流程经 `registerLazyOAuthFlows` 打进 bundle。可登录服务商在 `models/list` 的 `loginProviders` 中列出（不含 Anthropic）。凭据经适配层只进保险箱：`tests/sessions/login.rs` 用 `piarc-testkit` 的 mock 授权服务器跑授权码、设备码、拒绝、过期与取消，并扫描数据目录确认无明文。
+- 账号、测试与启停（ADR-0083）：同一服务商可登录多个账号，同一时刻一个在用。在用账号的凭据在 `oauth/<服务商>`，其余在只给 Core 的 `account/<服务商>/<账号 id>`，账号的公开信息在用户设置 `modelProviders.accounts`；再次登录前 Core 把在用凭据移开，登录失败放回，切换时互换，运行中的 Agent Host 经 `secrets/changed` 换用新账号。账号显示名由 Agent Host 从凭据推导（JWT 的 email 等；GitHub Copilot 在登录完成时查一次 `/user`），只交出名字。`models/test` 向该服务商的一个模型发一次很短的请求；`models/discover` 请求端点的模型列表，已存的密钥只发给它绑定的地址与协议。`modelProviders.disabled` 列出停用的服务商，随 `ModelPreferences.disabledProviders` 下发，凭据适配层对它们视而不见，自定义端点另从 `pi/models.json` 移除；设置 Host 不受影响。
 
 ### 5.5 Pi 配置隔离
 
@@ -1161,7 +1162,7 @@ T25 已实现（ADR-0039）：Agent Host → Core 的 `hooks/run`（能力 `hook
 
 T07 已实现的方法（Agent Host → Core，`piarc-core::tool_io::ToolIo` 应答）：`fs/stat`、`fs/read`、`fs/write`、`fs/mkdir`、`fs/list`、`fs/glob`、`fs/grep`、`exec/run`、`exec/kill`，以及 Core → Agent Host 的通知 `exec/output`（`{ requestId, stream, seq, data }`，按流解 UTF-8、不切断序列，全部写在 `exec/run` 的响应之前）。每个请求带 `sessionId` 与可选的 `origin { tool, toolCallId }`（规范名）；Core 按该会话登记的工作区根与 cwd 解析路径：接到 cwd 上、按词法去掉 `.` 与 `..`、解析存在部分的符号链接（悬空链接按目标继续），结果不在根内时返回 `outsideWorkspace`，不触碰目标（T16 改为询问）。文本以 ≤ 1 MiB 的范围内联（`fs/read` 的 `offset`/`length`，`fs/write` 的 `append`），二进制以 blob 引用（`<数据目录>/sessions/<会话 id>/blobs/<sha256>`）。`exec/run` 用 bash（Unix `/bin/bash`，Windows Git Bash）在会话 cwd 执行，环境为 Core 的白名单环境加请求的 `env` 叠加；`exec/kill` 按 `requestId` 终止直接子进程，连接断开时同样终止（进程树、超时与转后台为 T17）。新增错误类别：`notFound`、`outsideWorkspace`、`ioError`（`details.code` 为 POSIX 风格的错误码）。入站处理者经 `piarc-host` 的 `Peer` 在同一连接上发通知。
 
-T08 已实现的方法（Agent Host → Core，`piarc-core::secrets::SecretsService` 应答，所有 Agent Host 共用一个，ADR-0021）：`secrets/getAll`（启动时取回全部凭据，可用 `prefixes` 只取某几类键；并把该连接登记为变更订阅者）、`secrets/get`、`secrets/set`、`secrets/delete`（值是 JSON 对象，结果带保险箱级递增的 `revision`）、`secrets/lock`（一组键一起加锁，结果带它们的当前值与 `expiresInMs`；持锁期间其他锁与未持锁的写入等待；`secrets/unlock`、30 秒租约或持有者连接结束时释放）、`secrets/unlock`，以及 Core → Agent Host 的通知 `secrets/changed`（`{ key, revision, value? }`，删除时没有 `value`，推给所有订阅者）。键为 `provider/<id>`、`oauth/<id>`、`mcp/<server>`。新增错误类别：`masterKeyMissing`、`credentialStoreUnavailable`（可重试，`details.reason` 为 `accessDenied`、`unavailable` 或 `failed`）、`vaultIntegrity`、`vaultVersion`、`secretLockLost`。保险箱在第一次请求时打开，失败的请求返回上述错误，下一次请求重新尝试。参数错误不带 serde 的原文（它可能引用凭据值）。
+T08 已实现的方法（Agent Host → Core，`piarc-core::secrets::SecretsService` 应答，所有 Agent Host 共用一个，ADR-0021）：`secrets/getAll`（启动时取回全部凭据，可用 `prefixes` 只取某几类键；并把该连接登记为变更订阅者）、`secrets/get`、`secrets/set`、`secrets/delete`（值是 JSON 对象，结果带保险箱级递增的 `revision`）、`secrets/lock`（一组键一起加锁，结果带它们的当前值与 `expiresInMs`；持锁期间其他锁与未持锁的写入等待；`secrets/unlock`、30 秒租约或持有者连接结束时释放）、`secrets/unlock`，以及 Core → Agent Host 的通知 `secrets/changed`（`{ key, revision, value? }`，删除时没有 `value`，推给所有订阅者）。键为 `provider/<id>`、`oauth/<id>`、`mcp/<server>`；`websearch/<后端>`（T38）与 `account/<服务商>/<账号 id>`（ADR-0083）只给 Core，Agent Host 读、写、锁、列举都被拒绝。新增错误类别：`masterKeyMissing`、`credentialStoreUnavailable`（可重试，`details.reason` 为 `accessDenied`、`unavailable` 或 `failed`）、`vaultIntegrity`、`vaultVersion`、`secretLockLost`。保险箱在第一次请求时打开，失败的请求返回上述错误，下一次请求重新尝试。参数错误不带 serde 的原文（它可能引用凭据值）。
 
 T13 已实现的方法（Agent Host → Core，`piarc-core::trust::TrustService` 应答）：`trust/get` 先把路径解析到仓库主 checkout（`piarc-git`），再查 `project_trust`；目录解析不了、数据库出错、任务 panic 都回答 `trusted: false`，只有参数格式错回 `invalidParams`。信任变化时 Core 计划内重启该工作区的 Agent Host（`HostSupervisor::restart`，不计入崩溃退避），会话随之 `session/resume`。
 
@@ -1903,6 +1904,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.58 | 2026-11-22 | R5（M4 macOS 阶段门）：第 16 章标注 M4（macOS）未达标（性能一条）；6.0 节矩阵按 M4 交付更新 Hooks、插件、沙箱、多模型四行；6.2.2 节写明 `Read(…)` deny 作用于 Grep 与 Glob 的结果（I120）；第 4 章以提议列出 ADR-0063、ADR-0064；10.2 节 I79 改为 ADR-0064（提议）；10.3 节 Agent Host 配置收紧 `<数据目录>/pi` 中会让代码运行的部分（R5 S1）；第 11 章补 R5 对测量框架与探针口径的修复和 ADR-0063（提议）。预算与安全基线未改；ADR-0063、ADR-0064 等用户决定，采纳后再改正文 |
 | 2.59 | 2026-11-22 | 用户在 R5 采纳 ADR-0063、ADR-0064：第 4 章去掉两者的"提议"；第 11 章"应用全部进程合计"改按各进程物理占用之和测量（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。**这是放宽**：原因是 RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，两个平台从 M0 起超出而独占内存约为其 40–50%（R4、T44、W3 的数据，ADR-0063 背景）；按新口径 R5 实测 208 MB，3 会话场景最大 264 MB。第 16 章 M3（macOS）按新口径达标、M4 的性能一条余下三行；10.2 节信任决定的原生确认（ADR-0064，实现登记 I223） |
 | 2.71 | 2026-11-25 | 第 5.5 节：Agent Host 的网络代理，用户设置或系统代理经启动环境生效（ADR-0082）。 |
+| 2.72 | 2026-11-26 | 第 5.4 节：同一服务商多个账号、连接测试、服务商启停与端点模型列表；保险箱新增只给 Core 的 `account/` 键（ADR-0083）。 |
 | 2.70 | 2026-11-25 | 第 16 章：M3 的内存退出标准在 Windows 上按 ADR-0063 的口径复测达标（W3 收尾）。 |
 | 2.69 | 2026-11-25 | 第 8.2 节：会话状态徽标改用参考的安静小标记，等待为带细环的圆点以保留形状区分（ADR-0081）。 |
 | 2.68 | 2026-11-25 | 第 7.4、8.2 节：历史条目的可选时间 `at`，回复里的 Mermaid、图片与消息时间，输入框的命令芯片（ADR-0080）。 |

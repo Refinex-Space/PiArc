@@ -90,6 +90,11 @@ export const IPC_CHANNELS = {
   startLogin: 'piarc:providers.login',
   answerLogin: 'piarc:providers.answerLogin',
   logoutProvider: 'piarc:providers.logout',
+  setProviderEnabled: 'piarc:providers.setEnabled',
+  testProvider: 'piarc:providers.test',
+  discoverModels: 'piarc:providers.discover',
+  useProviderAccount: 'piarc:providers.useAccount',
+  removeProviderAccount: 'piarc:providers.removeAccount',
   workspaceModels: 'piarc:workspace.models',
   sessionModels: 'piarc:session.models',
   previewModelSwitch: 'piarc:session.previewModelSwitch',
@@ -689,6 +694,16 @@ export interface PiarcApi {
   answerLogin(loginId: string, value: string | null): Promise<void>;
   /** Signs out of a provider after a native confirmation; `null` when the user declined. */
   logoutProvider(provider: string): Promise<string | null>;
+  /** Turns a provider on or off (ADR-0083); resolves with the settings. */
+  setProviderEnabled(id: string, enabled: boolean): Promise<string>;
+  /** One short request to a model of the provider (ADR-0083): `{ ok, model?, latencyMs?, message?, network? }`. */
+  testProvider(id: string): Promise<string>;
+  /** An endpoint's model list (ADR-0083): `{ api, baseUrl, provider? }` and `{ key }`; resolves with `{ models }`. */
+  discoverModels(requestJson: string, secretJson?: string): Promise<string>;
+  /** Makes a signed-in account the one in use (ADR-0083); resolves with the settings. */
+  useProviderAccount(provider: string, account: string): Promise<string>;
+  /** Removes a signed-in account not in use after a native confirmation; `null` when declined. */
+  removeProviderAccount(provider: string, account: string): Promise<string | null>;
   workspaceModels(workspace: string): Promise<string>;
   sessionModels(sessionId: string): Promise<string>;
   previewModelSwitch(sessionId: string, provider: string, model: string): Promise<string>;

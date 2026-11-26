@@ -89,6 +89,7 @@ mod markdown_images;
 pub mod mcp;
 pub mod network;
 pub mod plugins;
+pub(crate) mod provider_accounts;
 pub mod providers;
 pub mod release;
 pub mod route;

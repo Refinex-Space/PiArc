@@ -11,7 +11,7 @@
 // Process-wide state is the hazard of running sessions side by side (ADR-0010). This file
 // never touches `process.cwd()` or `process.env`; Pi resolves relative tool paths against each
 // session's cwd. The few Pi defaults that read the process-global agent directory
-// (`getAgentDir()`) are pinned to PiArc's directory once, in main.ts.
+// (`getAgentDir()`) are pinned to PiArc's directory once, in start.ts.
 import { runDelegation } from '../harness/subagents/agent-tool.js';
 import { SideChats } from './side-chat.js';
 import { trackForkContext } from './fork-context.js';

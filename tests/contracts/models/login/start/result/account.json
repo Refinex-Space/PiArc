@@ -1,0 +1,7 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "account": "dev@example.com"
+  }
+}

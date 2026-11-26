@@ -1,5 +1,7 @@
 // The Agent Host program, independent of the real process: wires the AHP connection, the
-// handshake, the request handlers and the orderly shutdown. main.ts runs it on stdio.
+// handshake, the request handlers and the orderly shutdown. start.ts runs it on stdio.
+import path from 'node:path';
+
 import { PROTOCOL_VERSION, isPermissionMode } from '@piarc/protocol';
 import type { HostShutdownResult, HostStatus } from '@piarc/protocol';
 
@@ -32,7 +34,8 @@ import {
 } from './runtime/test-oauth-provider.js';
 import { agentDirOf, openWorkspace } from './runtime/workspace.js';
 import { parsePreferences } from './providers/preferences.js';
-import { Logins } from './providers/login.js';
+import { discoverModels, testProvider } from './providers/checks.js';
+import { installationId, Logins } from './providers/login.js';
 import { CoreIo, DEFAULT_PROFILE, ExecOutputRouter, type ToolProfile } from './tools/index.js';
 import { McpPool, type PoolClock } from './mcp/pool.js';
 import { signInToServer } from './mcp/sign-in.js';
@@ -231,7 +234,12 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     if (typeof allowNetwork !== 'boolean')
       throw new AhpError('invalidParams', 'Expected allowNetwork');
     const registry = await sessions(method);
-    if (preferences != null) await registry.setPreferences(parsePreferences(preferences));
+    if (preferences != null) {
+      const parsed = parsePreferences(preferences);
+      // Providers the user turned off look unconfigured to Pi (ADR-0083).
+      credentials.hide(parsed.disabledProviders ?? []);
+      await registry.setPreferences(parsed);
+    }
     await credentials.synchronize();
     await registry.workspace.reload(allowNetwork);
     return {};
@@ -251,7 +259,10 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   let logins: Logins | undefined;
   const loginsFor = async (method: string): Promise<Logins> => {
     const registry = await sessions(method);
-    logins ??= new Logins(registry.workspace.modelRuntime, connection.bridge, log);
+    logins ??= new Logins(registry.workspace.modelRuntime, connection.bridge, log, {
+      deviceId: () => installationId(path.join(options.dataDir, 'agent-host', 'installation-id')),
+      credentials,
+    });
     return logins;
   };
   connection.handle('models/login/start', async (params) => {
@@ -272,6 +283,33 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const method = 'models/logout';
     return (await loginsFor(method)).logout(
       stringField(method, paramsObject(method, params), 'provider'),
+    );
+  });
+  // Checks of the settings window (ADR-0083).
+  connection.handle('models/test', async (params) => {
+    const method = 'models/test';
+    const fields = paramsObject(method, params);
+    const registry = await sessions(method);
+    const model = optionalString(method, fields, 'model');
+    return testProvider(registry.workspace.modelRuntime, {
+      provider: stringField(method, fields, 'provider'),
+      ...(model === undefined ? {} : { model }),
+    });
+  });
+  connection.handle('models/discover', async (params) => {
+    const method = 'models/discover';
+    const fields = paramsObject(method, params);
+    await sessions(method);
+    const key = optionalString(method, fields, 'key');
+    const storedKeyOf = optionalString(method, fields, 'storedKeyOf');
+    return discoverModels(
+      {
+        api: stringField(method, fields, 'api'),
+        baseUrl: stringField(method, fields, 'baseUrl'),
+        ...(key === undefined ? {} : { key }),
+        ...(storedKeyOf === undefined ? {} : { storedKeyOf }),
+      },
+      credentials,
     );
   });
   connection.handle('models/credentialStatus', async (params) => {
@@ -682,6 +720,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     try {
       // A failed load is logged and retried by the first operation that needs credentials.
       await credentials.load();
+      credentials.hide(welcome.modelPreferences?.disabledProviders ?? []);
       const workspace = await openWorkspace(
         welcome.workspace,
         agentDirOf(options.dataDir),

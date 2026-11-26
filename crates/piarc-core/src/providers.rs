@@ -26,6 +26,25 @@ pub enum Operation {
     Refresh(bool),
     /// Replace the per-model settings and the auxiliary model (T29).
     Preferences(Box<ModelPreferences>),
+    /// Turn a provider on or off (ADR-0083).
+    SetEnabled(String, bool),
+    /// One short request to a model of the provider (ADR-0083).
+    Test(String),
+    /// The model list of an endpoint (ADR-0083).
+    Discover(Box<Discover>),
+    /// Make a signed-in account the one in use (ADR-0083): provider, account id.
+    UseAccount(String, String),
+    /// Remove a signed-in account not in use (ADR-0083): provider, account id.
+    RemoveAccount(String, String),
+}
+
+/// What `models/discover` asks of an endpoint (ADR-0083). The key never appears in Debug.
+pub struct Discover {
+    pub(crate) api: String,
+    pub(crate) base_url: String,
+    pub(crate) key: Option<String>,
+    /// The saved provider whose stored key may be sent when no key was typed.
+    pub(crate) provider: Option<String>,
 }
 
 impl Operation {
@@ -34,30 +53,48 @@ impl Operation {
     /// # Errors
     /// Invalid fields or malformed configuration objects.
     pub fn save(config: &str, secret: Option<&str>) -> Result<Self> {
-        #[derive(Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Secret {
-            key: String,
-        }
         let provider = serde_json::from_str::<Provider>(config)
             .map_err(|_| invalid("config", "invalid provider fields"))?;
         provider.validate()?;
-        let key = secret
-            .map(|s| {
-                serde_json::from_str::<Secret>(s)
-                    .map(|s| s.key)
-                    .map_err(|_| invalid("key", "expected a key"))
-            })
-            .transpose()?;
-        if let Some(s) = &key
-            && (s.chars().any(char::is_control)
-                || s.contains("sk-ant-oat")
-                || s.trim() != s
-                || s.len() > 32768)
-        {
-            return Err(invalid("key", "invalid or unsupported credential"));
+        Ok(Self::Save(Box::new(provider), secret_key(secret)?))
+    }
+
+    /// Parses a model list request (ADR-0083): `{ api, baseUrl, provider? }` and the key typed
+    /// in the form, if any, as `{ key }`. A key goes over HTTPS or to a loopback address only.
+    ///
+    /// # Errors
+    /// Malformed JSON, an unsupported protocol, an invalid address or key.
+    pub fn discover(request: &str, secret: Option<&str>) -> Result<Self> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct Request {
+            api: String,
+            base_url: String,
+            #[serde(default)]
+            provider: Option<String>,
         }
-        Ok(Self::Save(Box::new(provider), key))
+        let r = serde_json::from_str::<Request>(request)
+            .map_err(|_| invalid("discover", "invalid model list request"))?;
+        if !matches!(
+            r.api.as_str(),
+            "anthropic-messages" | "openai-completions" | "openai-responses"
+        ) {
+            return Err(invalid("api", "choose a supported wire protocol"));
+        }
+        endpoint(&r.base_url)?;
+        let key = secret_key(secret)?.filter(|k| !k.is_empty());
+        if key.is_some() && !secure_for_key(&r.base_url)? {
+            return Err(invalid(
+                "baseUrl",
+                "keys require HTTPS or a loopback address",
+            ));
+        }
+        Ok(Self::Discover(Box::new(Discover {
+            api: r.api,
+            base_url: r.base_url,
+            key,
+            provider: r.provider,
+        })))
     }
 
     /// Parses the settings window's per-model settings and auxiliary model (T29).
@@ -135,6 +172,31 @@ pub struct Provider {
     profile: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     credential_path: Option<String>,
+}
+
+/// The key of `{ key }` from the settings window, checked without echoing it in errors.
+fn secret_key(secret: Option<&str>) -> Result<Option<String>> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Secret {
+        key: String,
+    }
+    let key = secret
+        .map(|s| {
+            serde_json::from_str::<Secret>(s)
+                .map(|s| s.key)
+                .map_err(|_| invalid("key", "expected a key"))
+        })
+        .transpose()?;
+    if let Some(s) = &key
+        && (s.chars().any(char::is_control)
+            || s.contains("sk-ant-oat")
+            || s.trim() != s
+            || s.len() > 32768)
+    {
+        return Err(invalid("key", "invalid or unsupported credential"));
+    }
+    Ok(key)
 }
 
 fn invalid(field: &'static str, reason: &str) -> Error {
@@ -295,18 +357,12 @@ impl Provider {
         if self.custom()
             && has_key
             && let Some(url) = &self.base_url
+            && !secure_for_key(url)?
         {
-            let uri = endpoint(url)?;
-            let host = uri.host().unwrap_or_default().trim_matches(['[', ']']);
-            if uri.scheme_str() == Some("http")
-                && !(host.eq_ignore_ascii_case("localhost")
-                    || host.parse::<IpAddr>().is_ok_and(|a| a.is_loopback()))
-            {
-                return Err(invalid(
-                    "baseUrl",
-                    "keys require HTTPS or a loopback address",
-                ));
-            }
+            return Err(invalid(
+                "baseUrl",
+                "keys require HTTPS or a loopback address",
+            ));
         }
         if !has_key && !no_key_mode {
             return Ok(None);
@@ -337,6 +393,15 @@ impl Provider {
             env: Some(env),
         }))
     }
+}
+
+/// Whether a key may be sent to `url`: HTTPS, or plain HTTP to a loopback address.
+fn secure_for_key(url: &str) -> Result<bool> {
+    let uri = endpoint(url)?;
+    let host = uri.host().unwrap_or_default().trim_matches(['[', ']']);
+    Ok(uri.scheme_str() != Some("http")
+        || host.eq_ignore_ascii_case("localhost")
+        || host.parse::<IpAddr>().is_ok_and(|a| a.is_loopback()))
 }
 
 fn endpoint(url: &str) -> Result<http::Uri> {
@@ -401,6 +466,12 @@ pub(crate) struct Settings {
     /// settings.
     #[serde(skip)]
     pub(crate) aliases: BTreeMap<ModelAlias, String>,
+    /// Providers the user turned off (ADR-0083): configured ones and sign-in ones.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) disabled: Vec<String>,
+    /// The signed-in accounts (ADR-0083): public details only, the tokens are in the vault.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) accounts: Vec<crate::provider_accounts::Account>,
     #[serde(skip)]
     pending: Option<Pending>,
 }
@@ -413,6 +484,8 @@ impl Default for Settings {
             auxiliary: None,
             auxiliary_alias: None,
             aliases: BTreeMap::new(),
+            disabled: vec![],
+            accounts: vec![],
             pending: None,
         }
     }
@@ -485,7 +558,7 @@ impl Settings {
         }
     }
     pub(crate) fn view(&self, builtins: &[CatalogProvider]) -> Value {
-        json!({"catalogRefresh":self.catalog_refresh,"providers":self.providers,"builtinProviders":builtins,"models":self.models,"auxiliary":self.auxiliary,"auxiliaryAlias":self.auxiliary_alias,"aliases":self.aliases})
+        json!({"catalogRefresh":self.catalog_refresh,"providers":self.providers,"builtinProviders":builtins,"models":self.models,"auxiliary":self.auxiliary,"auxiliaryAlias":self.auxiliary_alias,"aliases":self.aliases,"disabled":self.disabled})
     }
 
     /// What the Agent Hosts get (T29): the user's per-model settings, and low tool reliability
@@ -512,7 +585,62 @@ impl Settings {
             models,
             auxiliary_alias: None,
             aliases: BTreeMap::new(),
+            disabled_providers: self.disabled.clone(),
         }
+    }
+
+    /// Turns `id` on or off (ADR-0083). `known` tells whether a provider of that id exists to
+    /// be turned off (configured or offering sign-in).
+    pub(crate) fn set_enabled(&mut self, id: &str, enabled: bool, known: bool) -> Result<()> {
+        if !enabled && !known {
+            return Err(invalid("id", "provider does not exist"));
+        }
+        self.disabled.retain(|d| d != id);
+        if !enabled {
+            self.disabled.push(id.to_owned());
+            self.disabled.sort();
+        }
+        Ok(())
+    }
+
+    /// The saved provider whose stored key a model list request may use: a custom one with a
+    /// key, saved for the same address and protocol (ADR-0083).
+    pub(crate) fn stored_key_for(&self, d: &Discover) -> Option<String> {
+        let id = d.provider.as_deref()?;
+        self.providers
+            .iter()
+            .find(|s| {
+                s.provider.id == id
+                    && s.provider.custom()
+                    && s.has_credential
+                    && s.provider.base_url.as_deref() == Some(d.base_url.as_str())
+                    && s.provider.api.as_deref() == Some(d.api.as_str())
+            })
+            .map(|s| s.provider.id.clone())
+    }
+
+    /// Whether `id` is a configured provider.
+    pub(crate) fn configured(&self, id: &str) -> bool {
+        self.providers.iter().any(|s| s.provider.id == id)
+    }
+
+    /// Writes the `models.json` entry of custom provider `id` as its settings say: present when
+    /// turned on, absent when off (ADR-0083). Other entries stay as they are.
+    pub(crate) fn project_one(&self, dir: &Path, id: &str) -> Result<()> {
+        let Some(stored) = self.providers.iter().find(|s| s.provider.id == id) else {
+            return Ok(());
+        };
+        if !stored.provider.custom() {
+            return Ok(());
+        }
+        let mut models = read_models(dir)?;
+        let providers = providers_of(&mut models)?;
+        if self.disabled.iter().any(|d| d == id) {
+            providers.remove(id);
+        } else {
+            providers.insert(id.to_owned(), definition(stored));
+        }
+        write_models(dir, &models)
     }
     pub(crate) fn prepare(
         &mut self,
@@ -601,38 +729,26 @@ impl Settings {
         {
             return Ok(());
         }
-        let path = dir.join("pi").join("models.json");
         let mut models = read_models(dir)?;
-        let providers = models
-            .as_object_mut()
-            .ok_or_else(|| invalid("models.json", "expected an object"))?
-            .entry("providers")
-            .or_insert_with(|| json!({}))
-            .as_object_mut()
-            .ok_or_else(|| invalid("models.json", "expected providers object"))?;
+        let providers = providers_of(&mut models)?;
         let target = if apply { p.next.as_ref() } else { old };
-        if let Some(stored) = target.filter(|s| s.provider.custom()) {
-            let config = &stored.provider;
-            let mut def = json!({"api":config.api,"baseUrl":config.base_url,"models":config.models.iter().map(|id|json!({"id":id})).collect::<Vec<_>>()});
-            if !stored.has_credential {
-                def["apiKey"] = json!("piarc-no-key");
-            }
-            providers.insert(p.id.clone(), def);
+        // A provider the user turned off stays out of Pi's catalog (ADR-0083).
+        let off = self.disabled.iter().any(|d| d == &p.id);
+        if let Some(stored) = target.filter(|s| s.provider.custom() && !off) {
+            providers.insert(p.id.clone(), definition(stored));
         } else {
             providers.remove(&p.id);
         }
-        piarc_config::write::replace_file(
-            &path,
-            &serde_json::to_vec_pretty(&models)
-                .map_err(|_| invalid("models.json", "cannot encode models"))?,
-        )?;
-        Ok(())
+        write_models(dir, &models)
     }
     pub(crate) fn finish(&mut self, apply: bool) {
         if let Some(p) = self.pending.take()
             && apply
         {
             self.providers.retain(|s| s.provider.id != p.id);
+            if p.next.is_none() {
+                self.disabled.retain(|d| d != &p.id);
+            }
             if let Some(next) = p.next {
                 self.providers.push(next);
                 self.providers
@@ -677,6 +793,35 @@ pub(crate) fn ensure_pi_defaults(dir: &Path) -> Result<()> {
     }
     Ok(())
 }
+/// The `models.json` definition of a custom provider.
+fn definition(stored: &Stored) -> Value {
+    let config = &stored.provider;
+    let mut def = json!({"api":config.api,"baseUrl":config.base_url,"models":config.models.iter().map(|id|json!({"id":id})).collect::<Vec<_>>()});
+    if !stored.has_credential {
+        def["apiKey"] = json!("piarc-no-key");
+    }
+    def
+}
+
+fn providers_of(models: &mut Value) -> Result<&mut serde_json::Map<String, Value>> {
+    models
+        .as_object_mut()
+        .ok_or_else(|| invalid("models.json", "expected an object"))?
+        .entry("providers")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .ok_or_else(|| invalid("models.json", "expected providers object"))
+}
+
+fn write_models(dir: &Path, models: &Value) -> Result<()> {
+    piarc_config::write::replace_file(
+        &dir.join("pi").join("models.json"),
+        &serde_json::to_vec_pretty(models)
+            .map_err(|_| invalid("models.json", "cannot encode models"))?,
+    )?;
+    Ok(())
+}
+
 fn read_models(dir: &Path) -> Result<Value> {
     match std::fs::read(dir.join("pi").join("models.json")) {
         Ok(bytes) => serde_json::from_slice(&bytes)
@@ -720,240 +865,5 @@ fn resolve_alias(alias: ModelAlias, table: &BTreeMap<ModelAlias, String>) -> Opt
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use piarc_protocol::models::CredentialStatusResult;
-
-    fn dir() -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "piarc-provider-{}",
-            crate::sessions::new_session_id().unwrap()
-        ));
-        for child in ["pi", "agent-host"] {
-            std::fs::create_dir_all(dir.join(child)).unwrap();
-        }
-        dir
-    }
-    fn relay(url: &str) -> Value {
-        json!({"kind":"custom","id":"relay","api":"anthropic-messages","baseUrl":url,"models":["one"]})
-    }
-    fn save(config: Value, key: Option<&str>) -> Operation {
-        Operation::save(
-            &config.to_string(),
-            key.map(|s| json!({"key":s}).to_string()).as_deref(),
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn recovery_keeps_the_matching_credential_and_reverts_an_uncommitted_edit() {
-        let dir = dir();
-        let mut s = Settings::read(&dir, true).unwrap();
-        let first = relay("https://first.example/v1");
-        let req = s
-            .prepare(save(first.clone(), Some("fake-first")), &[])
-            .unwrap();
-        s.write_pending(&dir).unwrap();
-        s.project(&dir, true).unwrap();
-        let status = CredentialStatusResult {
-            has_credential: true,
-            change_id: req
-                .credential
-                .unwrap()
-                .env
-                .unwrap()
-                .remove("PIARC_CHANGE_ID"),
-        };
-        let mut restarted = Settings::read(&dir, true).unwrap();
-        assert!(restarted.committed(&status));
-        restarted.finish(true);
-        restarted
-            .persist(&dir, &crate::managed::ManagedSettings::none())
-            .unwrap();
-        let second = relay("https://other.example/v1");
-        assert!(restarted.prepare(save(second.clone(), None), &[]).is_err());
-        restarted
-            .prepare(save(second, Some("fake-second")), &[])
-            .unwrap();
-        restarted.write_pending(&dir).unwrap();
-        restarted.project(&dir, true).unwrap();
-        let mut interrupted = Settings::read(&dir, true).unwrap();
-        assert!(!interrupted.committed(&status));
-        interrupted.project(&dir, false).unwrap();
-        interrupted.finish(false);
-        interrupted
-            .persist(&dir, &crate::managed::ManagedSettings::none())
-            .unwrap();
-        assert_eq!(
-            read_models(&dir).unwrap()["providers"]["relay"]["baseUrl"],
-            first["baseUrl"]
-        );
-        assert!(!Settings::journal(&dir).exists());
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-    #[test]
-    fn imported_id_conflict_never_changes_existing_configuration() {
-        let dir = dir();
-        let existing = json!({"providers":{"relay":{"models":[{"id":"existing"}],"api":"openai-responses","baseUrl":"https://original.example/"}}});
-        let path = dir.join("pi/models.json");
-        std::fs::write(&path, existing.to_string()).unwrap();
-        let mut s = Settings::read(&dir, true).unwrap();
-        s.prepare(save(relay("https://other.example"), Some("example")), &[])
-            .unwrap();
-        assert!(matches!(
-            s.write_pending(&dir),
-            Err(Error::InvalidArgument { field: "id", .. })
-        ));
-        assert!(!Settings::journal(&dir).exists());
-        assert_eq!(std::fs::read_to_string(path).unwrap(), existing.to_string());
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-    #[test]
-    fn authenticated_remote_urls_reject_userinfo_plaintext_and_lookalike_hosts() {
-        for url in [
-            "http://127.example.org/v1",
-            "http://localhost.example",
-            "http://[::2]",
-            "https://localhost@somewhere.example",
-            "https://host.example?token=hidden",
-            "https://host.example:wrong/v1",
-        ] {
-            let result = Operation::save(&relay(url).to_string(), Some(r#"{"key":"example"}"#))
-                .and_then(|op| Settings::default().prepare(op, &[]));
-            assert!(
-                matches!(
-                    result,
-                    Err(Error::InvalidArgument {
-                        field: "baseUrl",
-                        ..
-                    })
-                ),
-                "{url}"
-            );
-        }
-        for url in [
-            "http://127.0.0.2",
-            "http://[::1]:12345/v1",
-            "https://example.org",
-        ] {
-            Settings::default()
-                .prepare(save(relay(url), Some("example")), &[])
-                .expect("valid endpoint");
-        }
-    }
-    #[test]
-    fn paid_cache_warming_is_opt_in_and_existing_preferences_are_preserved() {
-        let dir = dir();
-        ensure_pi_defaults(&dir).unwrap();
-        let path = dir.join("pi/settings.json");
-        let data: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        assert_eq!(
-            data,
-            json!({"cacheWarming":"off","images":{"autoResize":true}})
-        );
-        let settings =
-            json!({"cacheWarming":"idle","images":{"autoResize":false},"retry":{"enabled":false}});
-        std::fs::write(&path, settings.to_string()).unwrap();
-        ensure_pi_defaults(&dir).unwrap();
-        assert_eq!(std::fs::read_to_string(path).unwrap(), settings.to_string());
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn model_preferences_are_validated_and_local_models_graded_low() {
-        let ok = Operation::preferences(
-            &json!({"models":{"relay/one":{"displayName":"One","contextWindow":200000,"vision":false,"defaultEffort":"high","toolProfile":"default"}},"auxiliary":{"provider":"relay","id":"one"}}).to_string(),
-        )
-        .unwrap();
-        let Operation::Preferences(prefs) = ok else {
-            panic!("preferences")
-        };
-        assert_eq!(prefs.models["relay/one"].context_window, Some(200_000));
-        for bad in [
-            json!({"models":{"noslash":{}}}),
-            json!({"models":{"a/b":{"contextWindow":10}}}),
-            json!({"models":{"a/b":{"displayName":""}}}),
-            json!({"models":{"a/b":{"toolReliability":"low"}}}),
-            json!({"models":{"a/b":{"toolProfile":"strict"}}}),
-        ] {
-            assert!(Operation::preferences(&bad.to_string()).is_err(), "{bad}");
-        }
-        let mut settings = Settings {
-            models: prefs.models.clone(),
-            auxiliary: prefs.auxiliary.clone(),
-            ..Settings::default()
-        };
-        let local: Provider = serde_json::from_value(json!({"kind":"local","id":"lan","api":"openai-completions","baseUrl":"http://127.0.0.1:11434/v1","models":["qwen","coder"]})).unwrap();
-        settings.providers.push(Stored {
-            provider: local,
-            has_credential: false,
-        });
-        let out = settings.preferences();
-        assert_eq!(
-            out.models["lan/qwen"].tool_reliability,
-            Some(ToolReliability::Low)
-        );
-        assert_eq!(
-            out.models["lan/coder"].tool_reliability,
-            Some(ToolReliability::Low)
-        );
-        assert_eq!(out.models["relay/one"].tool_reliability, None);
-        assert_eq!(out.auxiliary.as_ref().map(|m| m.id.as_str()), Some("one"));
-        assert!(settings.view(&[])["models"]["relay/one"].is_object());
-    }
-
-    /// T31: the alias table is saved as the user's `modelAliases`, read back with the provider
-    /// settings, and an auxiliary alias reaches the Agent Host as the model it names.
-    #[test]
-    fn aliases_are_saved_and_an_auxiliary_alias_resolves() {
-        let dir = dir();
-        let ok = Operation::preferences(
-            &json!({"auxiliaryAlias":"haiku","aliases":{"fast":"relay/one","strong":"cloud/big"}})
-                .to_string(),
-        )
-        .unwrap();
-        let Operation::Preferences(prefs) = ok else {
-            panic!("preferences")
-        };
-        let settings = Settings {
-            auxiliary_alias: prefs.auxiliary_alias,
-            aliases: prefs.aliases.clone(),
-            ..Settings::default()
-        };
-        settings
-            .persist(&dir, &crate::managed::ManagedSettings::none())
-            .unwrap();
-        let file = crate::client_settings::read(&dir).unwrap();
-        assert_eq!(
-            file["modelAliases"],
-            json!({"fast":"relay/one","strong":"cloud/big"})
-        );
-        let read = Settings::read(&dir, true).unwrap();
-        assert_eq!(read.aliases, prefs.aliases);
-        assert_eq!(read.view(&[])["auxiliaryAlias"], "haiku");
-        // haiku follows fast, which is set.
-        let out = read.preferences();
-        assert_eq!(
-            out.auxiliary,
-            Some(ModelRef {
-                provider: "relay".into(),
-                id: "one".into()
-            })
-        );
-        assert!(out.aliases.is_empty() && out.auxiliary_alias.is_none());
-        // sonnet follows balanced, which is not set: the session's model.
-        let unset = Settings {
-            auxiliary_alias: Some(ModelAlias::Sonnet),
-            ..read
-        };
-        assert_eq!(unset.preferences().auxiliary, None);
-        for bad in [
-            json!({"aliases":{"fast":"noslash"}}),
-            json!({"aliases":{"fast":""}}),
-            json!({"aliases":{"fable":"a/b"}}),
-        ] {
-            assert!(Operation::preferences(&bad.to_string()).is_err(), "{bad}");
-        }
-        let _ = std::fs::remove_dir_all(dir);
-    }
-}
+#[path = "providers_tests.rs"]
+mod tests;

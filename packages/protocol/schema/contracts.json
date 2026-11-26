@@ -1011,6 +1011,30 @@
     },
     {
       "kind": "request",
+      "method": "models/test",
+      "name": "models/test",
+      "schema": "ModelsTestRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/test",
+      "name": "models/test/result",
+      "schema": "ModelsTestResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/discover",
+      "name": "models/discover",
+      "schema": "ModelsDiscoverRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/discover",
+      "name": "models/discover/result",
+      "schema": "ModelsDiscoverResponse"
+    },
+    {
+      "kind": "request",
       "method": "models/login/cancel",
       "name": "models/login/cancel",
       "schema": "ModelsLoginCancelRequest"

@@ -34,7 +34,7 @@ export async function listModels(
   return {
     providers,
     models,
-    loginProviders: await loginProviders(runtime),
+    loginProviders: await loginProviders(runtime, workspace.credentials),
     ...(session && model
       ? {
           model: { provider: model.provider, id: model.id },

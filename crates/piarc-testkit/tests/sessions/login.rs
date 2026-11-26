@@ -11,10 +11,10 @@ use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 use super::support::{Env, Events, answer, reply, shutdown};
 
-const PROVIDER: &str = "piarc-test-oauth";
+pub(super) const PROVIDER: &str = "piarc-test-oauth";
 
 /// The `--test-oauth-provider` file for `flow`.
-fn provider_file(env: &Env, auth: &MockAuthServer, flow: &str) -> PathBuf {
+pub(super) fn provider_file(env: &Env, auth: &MockAuthServer, flow: &str) -> PathBuf {
     let path = env.root.join(format!("oauth-{flow}.json"));
     let config = json!({
         "id": PROVIDER,
@@ -29,12 +29,12 @@ fn provider_file(env: &Env, auth: &MockAuthServer, flow: &str) -> PathBuf {
     path
 }
 
-fn start(env: &Env, file: &Path) -> (piarc_core::CoreRuntime, std::sync::Arc<Events>) {
+pub(super) fn start(env: &Env, file: &Path) -> (piarc_core::CoreRuntime, std::sync::Arc<Events>) {
     let file = file.to_string_lossy().into_owned();
     env.start(env.config(&["--test-oauth-provider", &file]))
 }
 
-async fn list(core: &piarc_core::CoreRuntime) -> Value {
+pub(super) async fn list(core: &piarc_core::CoreRuntime) -> Value {
     let (done, rx) = reply();
     core.provider_op(Operation::List, done).expect("queued");
     answer(rx).await.expect("settings")

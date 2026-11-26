@@ -25,6 +25,14 @@
         "label": "Sign in with GitHub",
         "subscription": true,
         "signedIn": false
+      },
+      {
+        "id": "openai-codex",
+        "name": "OpenAI Codex",
+        "label": "ChatGPT Plus/Pro",
+        "subscription": true,
+        "signedIn": true,
+        "account": "dev@example.com"
       }
     ]
   }

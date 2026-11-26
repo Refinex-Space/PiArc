@@ -32,6 +32,8 @@ it('offers only the supported server strategies and preserves the other per-mode
     catalogModels: [model],
     models: { [key]: { displayName: 'Work' } },
     aliases: {},
+    disabled: [],
+    accounts: [],
     auxiliary: null,
     auxiliaryAlias: null,
     catalogRefresh: false,

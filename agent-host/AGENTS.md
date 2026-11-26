@@ -15,7 +15,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 ## 入口与进程边界
 
-- `src/main.ts` 设置 Pi 数据目录并把第三方 stdout 日志改写到 stderr。首次退出信号启动有序关闭，第二次立即退出。`src/host.ts` 处理握手、分派与关闭，主版本不兼容退出码为 3，出站积压超限为 70。
+- `src/main.ts` 是进程入口：先静态加载 `runtime/env-proxy.ts` 记下 Node 的代理 dispatcher，再动态加载 Pi 与 `src/start.ts`，之后放回被 Pi 的 undici 换掉的 dispatcher（ADR-0082 补充）；不要在 `main.ts` 静态导入任何会加载 Pi 的模块。`src/start.ts` 设置 Pi 数据目录并把第三方 stdout 日志改写到 stderr。首次退出信号启动有序关闭，第二次立即退出。`src/host.ts` 处理握手、分派与关闭，主版本不兼容退出码为 3，出站积压超限为 70。
 - `runtime/session-registry.ts` 管理会话与恢复。实时投影和历史回放共用 `items.ts`；投影规则见 `projector.ts` 文件头和 `test/golden/`。工具批次、中断补齐与结果预算在 `harness/`，50K/200K 阈值统一由 `TOOL_RESULT_LIMITS` 提供。
 - `CoreBridge` 默认等待 30 秒。审批请求只有收到匹配的 `policy/pending` 后才停表，中断或断连会取消等待。`OutboundQueue` 写出时分配 seq，每会话保留最近 4,096 条或 8 MiB 通知供回放；超 8 MiB 的单条通知不占 seq。
 - `tools/profile.ts` 负责规范名与模型可见名的映射，`tools/core-io.ts` 负责委托 I/O。文件工具的替身路径、shell 探测及结果格式见下文。项目资源必须等待 `harness/project-trust.ts` 的 Core 信任答复；凭据只经 `runtime/credentials.ts` 的 `CoreCredentialStore`。
@@ -114,7 +114,7 @@ Agent Host：一个 Node 进程，用 Pi SDK 托管一个工作区的多个会�
 
 - 不要调用 `process.chdir`，也不要读 `process.cwd()` 推断会话目录：Pi 按每个会话的 `cwd` 解析工具路径。
 - 不要在会话代码里改 `process.env`：bash 工具的子进程继承它，所有会话共享。
-- Pi 的默认会话目录、默认 `auth.json` 读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`（Pi 的 MCP 扩展也是，T36 起不再加载）。`main.ts` 把 `PI_CODING_AGENT_DIR` 固定为 `<data>/pi`，`SessionRegistry` 构造时校验；测试直接用注册表时也要先设它。
+- Pi 的默认会话目录、默认 `auth.json` 读进程级的 `getAgentDir()`，不看 SDK 的 `agentDir`（Pi 的 MCP 扩展也是，T36 起不再加载）。`start.ts` 把 `PI_CODING_AGENT_DIR` 固定为 `<data>/pi`，`SessionRegistry` 构造时校验；测试直接用注册表时也要先设它。
 - `SettingsManager.create()` 默认 `projectTrusted: true`：注册表总是传 `false`，由信任钩子改成 Core 的回答。Pi 的 `project_trust` 扩展事件、`<agentDir>/trust.json` 与 `defaultProjectTrust` 只在 Pi 的 CLI 路径生效，SDK 路径不经过它们；不要调用 Pi 的 `resolveProjectTrusted`。
 - `ModelRuntime` 是工作区共享的：扩展注册的 provider 对所有会话可见。
 - 关闭会话要走 `AgentSessionRuntime.dispose()`：单独的 `session.dispose()` 不发 `session_shutdown`，会话占着的 MCP 租约不会交还，池不会空闲断开。

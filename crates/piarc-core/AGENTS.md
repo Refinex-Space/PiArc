@@ -19,6 +19,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 | `cargo test -p piarc-core --test background_tasks` | 后台命令（T32）：`background` 立即作答并写输出文件、KillShell 结束整棵进程树（含忽略 SIGTERM 的孙进程）并保留输出、其他会话停不了、Monitor 以任务运行；单测 `--lib tasks::`（通知、Monitor 节奏与手动时钟、权限范围、子 agent 状态、分段读取） |
 | `cargo test -p piarc-core --test terminal` | 终端：`term/<id>` 事件、经回调取帧、错误类别、关闭终端与关闭 Core 都结束整棵进程树（自成进程组的作业、忽略 HUP/TERM 的进程，Unix；Windows 版在 `tests/terminal_windows.rs`） |
 | `cargo test -p piarc-core --lib terminal::` | 会话终端（T33）：会话目录与命令环境、没有 locale 时补 UTF-8、智能体的终端任务（退出码、命令结束通知、屏幕文件与 formatter 一致）、未共享的终端模型看不到、退出时保存与关闭时丢弃 snapshot |
+| `cargo test -p piarc-core --lib provider_accounts` 与 `cargo test -p piarc-testkit --test sessions accounts::` | 同一服务商多个账号（ADR-0083）：再次登录、切换、移除、登录失败放回、同名账号去重，`account/` 只给 Core；端到端另有连接测试与停用后工作区看不到模型 |
 | `cargo test -p piarc-core --lib network` 与 `cargo test -p piarc-testkit --test sessions network::` | 代理（ADR-0082）：地址校验、设置读取与生效值、环境变量；真实 Agent Host 在系统代理变化后空闲重启并带上代理变量、本机 mock 直连、相同代理不重启、回合进行中不重启 |
 | `cargo test -p piarc-core --lib mcp::` | MCP 配置（T36）：未信任项目的 server 等待信任、各来源与同名取舍、用户启停与 `disabledMcpjsonServers`、子 agent 的内联 server、配置诊断不展开变量；`--lib host_probe` 含探针的 `mcp/servers` |
 | `cargo clippy -p piarc-core --all-targets -- -D warnings` | lint |

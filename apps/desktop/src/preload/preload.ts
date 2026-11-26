@@ -518,6 +518,24 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.logoutProvider, provider)
       .then((v: unknown) => (v === null ? null : expectString(v))),
+  setProviderEnabled: (id, enabled) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.setProviderEnabled, id, enabled)
+      .then((v: unknown) => expectString(v)),
+  testProvider: (id) =>
+    ipcRenderer.invoke(IPC_CHANNELS.testProvider, id).then((v: unknown) => expectString(v)),
+  discoverModels: (request, secret) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.discoverModels, request, secret)
+      .then((v: unknown) => expectString(v)),
+  useProviderAccount: (provider, account) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.useProviderAccount, provider, account)
+      .then((v: unknown) => expectString(v)),
+  removeProviderAccount: (provider, account) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.removeProviderAccount, provider, account)
+      .then((v: unknown) => (v === null ? null : expectString(v))),
   workspaceModels: (workspace) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.workspaceModels, workspace)

@@ -1704,18 +1704,366 @@ textarea.input {
   font-weight: var(--piarc-font-weight-semibold);
 }
 
-.login-step {
+.login-dialog .login-step {
   display: flex;
   flex-direction: column;
   gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.login-code {
+.login-dialog .login-step + .login-step {
+  margin-top: var(--piarc-space-4);
+  padding-top: var(--piarc-space-4);
+  border-top: 1px solid var(--piarc-border-subtle);
+}
+
+.login-dialog .login-step > p,
+.login-dialog .login-note,
+.login-dialog .login-outcome {
   margin: 0;
+}
+
+.login-dialog .login-note {
+  margin-top: var(--piarc-space-3);
+}
+
+.login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+
+.login-dialog .dialog-actions .login-proxy {
+  margin-inline-end: auto;
+}
+
+.button.login-copy {
+  gap: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+}
+
+.button.login-copy[data-copied] {
+  color: var(--piarc-text-success);
+}
+
+/* The device code is the thing to copy: the whole block is the button. */
+.login-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-3);
+  width: 100%;
+  padding: var(--piarc-space-3) var(--piarc-space-4);
+  border: 1px dashed var(--piarc-border-strong);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.login-code > span:first-child {
   font-family: var(--piarc-font-mono);
   font-size: var(--piarc-font-size-title);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   user-select: all;
+}
+
+.login-code:hover {
+  background: var(--piarc-surface-hover);
+}
+
+.login-code[data-copied] {
+  border-style: solid;
+  border-color: var(--piarc-text-success);
+}
+
+.login-code-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  white-space: nowrap;
+}
+
+.login-code[data-copied] .login-code-hint {
+  color: var(--piarc-text-success);
+}
+
+.login-options > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: var(--piarc-space-2);
+  padding: 0;
+}
+
+.login-option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.login-option:hover {
+  border-color: var(--piarc-border-strong);
+  background: var(--piarc-surface-hover);
+}
+
+.login-answer {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+
+.login-answer > .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Provider connections (T21, T29): name with status, and the "add a service" chooser. */
+
+.provider-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+
+.provider-badge,
+.service-badge {
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.provider-badge.is-warning {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
+.provider-badge.is-muted {
+  background: var(--piarc-surface-active);
+  color: var(--piarc-text-secondary);
+}
+
+/* A provider turned off (ADR-0083): its name and details recede; the controls stay usable. */
+.provider-list > li.is-off > div:first-child {
+  opacity: 0.6;
+  transition: opacity var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.provider-list > li > .preference-switch {
+  flex-shrink: 0;
+}
+
+/* The connection test's answer takes the row's full width under its controls. */
+.provider-test {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  margin: 0;
+}
+
+.provider-test.is-ok {
+  color: var(--piarc-text-success);
+}
+
+.provider-test-link {
+  color: var(--piarc-text-accent);
+}
+
+.model-discovery {
+  display: grid;
+  gap: var(--piarc-space-2);
+  justify-items: start;
+}
+
+.model-discovery > p {
+  margin: 0;
+}
+
+.model-discovered {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--piarc-space-1) var(--piarc-space-3);
+  width: 100%;
+  max-height: 14rem;
+  margin: 0;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  overflow-y: auto;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+
+.model-discovered > legend {
+  padding: 0 var(--piarc-space-1);
+}
+
+.model-discovered-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.provider-form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+
+.dialog.service-chooser {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100% - 32px);
+  height: min(560px, 100% - 64px);
+  overflow: hidden;
+}
+
+.service-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.service-search > .icon {
+  position: absolute;
+  inset-inline-start: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  pointer-events: none;
+}
+
+.service-search > .input {
+  flex: 1;
+  padding-inline-start: calc(var(--piarc-space-2) * 2 + 16px);
+}
+
+.service-groups {
+  flex: 1;
+  min-height: 0;
+  margin: var(--piarc-space-3) calc(var(--piarc-space-5) * -1) calc(var(--piarc-space-5) * -1);
+  padding: 0 var(--piarc-space-5) var(--piarc-space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.service-group + .service-group {
+  margin-top: var(--piarc-space-4);
+}
+
+.service-group-title {
+  margin: 0 0 var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.service-item > .icon {
+  flex-shrink: 0;
+  color: var(--piarc-text-secondary);
+  opacity: 0;
+  transform: translateX(-2px);
+  transition:
+    opacity var(--piarc-motion-fast) var(--piarc-motion-easing),
+    transform var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.service-item:hover {
+  border-color: var(--piarc-border-strong);
+  background: var(--piarc-surface-hover);
+}
+
+.service-item:is(:hover, :focus-visible) > .icon {
+  opacity: 1;
+  transform: none;
+}
+
+.service-item-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.service-item-name {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  font-weight: var(--piarc-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.service-item-detail {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.service-empty {
+  display: grid;
+  gap: var(--piarc-space-3);
+  justify-items: start;
+}
+
+.service-empty > p {
+  margin: 0;
 }
 .model-list {
   max-height: 45vh;

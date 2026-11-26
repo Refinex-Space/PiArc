@@ -198,6 +198,9 @@ pub struct ModelPreferences {
     /// sends the whole table with every change.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub aliases: BTreeMap<ModelAlias, String>,
+    /// Providers the user turned off (ADR-0083): the Agent Host treats them as unconfigured.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disabled_providers: Vec<String>,
 }
 
 /// A provider that offers sign-in (OAuth or device code) in the settings window (T29).
@@ -215,6 +218,9 @@ pub struct LoginProvider {
     pub subscription: bool,
     /// Whether a signed-in credential is stored in the vault.
     pub signed_in: bool,
+    /// Who is signed in, as far as the credential tells (ADR-0083): an email or a user name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 /// A built-in provider accepting API key credentials.
@@ -342,6 +348,74 @@ pub struct LoginStartParams {
     pub login_id: String,
     /// Provider id.
     pub provider: String,
+}
+
+/// Result of `models/login/start`: the signed-in account's name, when the credential tells it
+/// (ADR-0083).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginStartResult {
+    /// An email or a user name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
+}
+
+/// Parameters of `models/test` (Core → settings Agent Host, ADR-0083): one short request to a
+/// model of the provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelsTestParams {
+    /// Provider id.
+    pub provider: String,
+    /// The model to ask; absent: the provider's first available model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+/// Result of `models/test`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelsTestResult {
+    /// Whether the model answered.
+    pub ok: bool,
+    /// The model asked (`<model id>`), when there was one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// How long the request took, in milliseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
+    /// Why it failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// The provider could not be reached (ADR-0082).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub network: bool,
+}
+
+/// Parameters of `models/discover` (Core → settings Agent Host, ADR-0083): the model list of an
+/// OpenAI- or Anthropic-compatible endpoint.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelsDiscoverParams {
+    /// Wire protocol: `openai-completions`, `openai-responses` or `anthropic-messages`.
+    pub api: String,
+    /// The endpoint's base URL.
+    pub base_url: String,
+    /// The key to send, typed in the form.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    /// Send the key stored for this provider instead (Core checked that the endpoint is the one
+    /// it was saved for).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stored_key_of: Option<String>,
+}
+
+/// Result of `models/discover`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelsDiscoverResult {
+    /// Model ids, sorted and unique.
+    pub models: Vec<String>,
 }
 
 /// Parameters of `models/login/cancel`.
@@ -554,7 +628,15 @@ request!(
 );
 request!(
     /// Method marker for `models/login/start`.
-    ModelsLoginStart, "models/login/start", LoginStartParams, ModelsUpdated
+    ModelsLoginStart, "models/login/start", LoginStartParams, LoginStartResult
+);
+request!(
+    /// Method marker for `models/test`.
+    ModelsTest, "models/test", ModelsTestParams, ModelsTestResult
+);
+request!(
+    /// Method marker for `models/discover`.
+    ModelsDiscover, "models/discover", ModelsDiscoverParams, ModelsDiscoverResult
 );
 request!(
     /// Method marker for `models/login/cancel`.

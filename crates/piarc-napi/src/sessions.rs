@@ -149,6 +149,82 @@ impl CoreRuntime {
         })
     }
 
+    /// Turns a provider on or off (ADR-0083); answers the provider settings.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn set_provider_enabled<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+        enabled: bool,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.setProviderEnabled", |core, done| {
+            core.provider_op(
+                piarc_core::providers::Operation::SetEnabled(id, enabled),
+                done,
+            )
+        })
+    }
+
+    /// Sends one short request to a model of the provider (ADR-0083); answers
+    /// `{ ok, model?, latencyMs?, message?, network? }`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn test_provider<'env>(&self, env: &'env Env, id: String) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.testProvider", |core, done| {
+            core.provider_op(piarc_core::providers::Operation::Test(id), done)
+        })
+    }
+
+    /// Lists an endpoint's models (ADR-0083): `{ api, baseUrl, provider? }` and the key typed in
+    /// the form as `{ key }`; answers `{ models }`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn discover_models<'env>(
+        &self,
+        env: &'env Env,
+        request_json: String,
+        #[napi(ts_arg_type = "string | null")] secret_json: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        let op = boundary::call(env, "CoreRuntime.discoverModels", || {
+            piarc_core::providers::Operation::discover(&request_json, secret_json.as_deref())
+        })?;
+        self.queue(env, "CoreRuntime.discoverModels", |core, done| {
+            core.provider_op(op, done)
+        })
+    }
+
+    /// Makes a signed-in account of the provider the one in use (ADR-0083); answers the
+    /// provider settings.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn use_provider_account<'env>(
+        &self,
+        env: &'env Env,
+        provider: String,
+        account: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.useProviderAccount", |core, done| {
+            core.provider_op(
+                piarc_core::providers::Operation::UseAccount(provider, account),
+                done,
+            )
+        })
+    }
+
+    /// Removes a signed-in account not in use, with its stored sign-in (ADR-0083); answers the
+    /// provider settings.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn remove_provider_account<'env>(
+        &self,
+        env: &'env Env,
+        provider: String,
+        account: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.removeProviderAccount", |core, done| {
+            core.provider_op(
+                piarc_core::providers::Operation::RemoveAccount(provider, account),
+                done,
+            )
+        })
+    }
+
     /// Saves the per-model settings and the auxiliary model (T29); the JSON is
     /// `{ models: { "<provider>/<model>": {...} }, auxiliary?: { provider, id } }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]

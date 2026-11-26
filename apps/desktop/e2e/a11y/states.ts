@@ -258,6 +258,12 @@ export const A11Y_STATES = [
     note: 'rewind to a message',
   },
   {
+    id: 'dialog:add-service',
+    area: 'dialog',
+    source: 'settings/ServiceChooser.tsx',
+    note: 'add a model service',
+  },
+  {
     id: 'dialog:sign-in',
     area: 'dialog',
     source: 'settings/SignInSection.tsx',

@@ -5,15 +5,23 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use piarc_host::{HostEvent, HostSupervisor};
+use std::time::Duration;
+
 use piarc_protocol::models::{
-    CatalogProvider, CredentialStatusParams, ModelsCredential, ModelsCredentialStatus, ModelsList,
-    ModelsListParams, ModelsReload, ModelsReloadParams,
+    CatalogProvider, CredentialStatusParams, LoginProvider, ModelsCredential,
+    ModelsCredentialStatus, ModelsDiscover, ModelsDiscoverParams, ModelsList, ModelsListParams,
+    ModelsReload, ModelsReloadParams, ModelsTest, ModelsTestParams,
 };
 use serde_json::{Value, json};
 
 use super::{Hub, host_error, lock};
 use crate::error::{Error, Result};
-use crate::providers::{Operation, Settings, io_error};
+use crate::providers::{Discover, Operation, Settings, io_error};
+
+/// How long a connection test may take (the Agent Host gives the request 30 s).
+const TEST_TIMEOUT: Duration = Duration::from_secs(45);
+/// How long a model list request may take (the Agent Host gives it 15 s).
+const DISCOVER_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl Hub {
     pub async fn workspace_models(&self, path: PathBuf) -> Result<Value> {
@@ -104,6 +112,32 @@ impl Hub {
         Ok(host)
     }
 
+    /// The provider settings as saved, an interrupted change resolved first, and the sign-in
+    /// providers as the settings Host lists them (ADR-0083: accounts change under the writer
+    /// lock with both at hand).
+    pub(super) async fn settings_with_logins(
+        &self,
+        host: &HostSupervisor,
+    ) -> Result<(Settings, Vec<LoginProvider>)> {
+        let dir = self.ctx.storage.dirs().data();
+        let mut settings = Settings::read(dir, self.ctx.catalog_network.load(Ordering::Acquire))?;
+        if settings.pending() {
+            self.recover(&mut settings, host).await?;
+        }
+        let list = host
+            .call::<ModelsList>(ModelsListParams { session_id: None })
+            .await
+            .map_err(host_error)?;
+        Ok((settings, list.login_providers))
+    }
+
+    pub(super) fn persist_settings(&self, settings: &Settings) -> Result<()> {
+        settings.persist(
+            self.ctx.storage.dirs().data(),
+            self.ctx.storage.dirs().managed(),
+        )
+    }
+
     async fn recover(&self, settings: &mut Settings, host: &HostSupervisor) -> Result<()> {
         let Some(id) = settings.pending_id() else {
             return Ok(());
@@ -129,6 +163,24 @@ impl Hub {
         if settings.pending() {
             self.recover(&mut settings, host).await?;
         }
+        // Checks answer their own result and change nothing (ADR-0083).
+        let op = match op {
+            Operation::Test(provider) => {
+                let result = host
+                    .call_within::<ModelsTest>(
+                        ModelsTestParams {
+                            provider,
+                            model: None,
+                        },
+                        TEST_TIMEOUT,
+                    )
+                    .await
+                    .map_err(host_error)?;
+                return Ok(json!(result));
+            }
+            Operation::Discover(request) => return discover(host, &settings, *request).await,
+            op => op,
+        };
         let list = host
             .call::<ModelsList>(ModelsListParams { session_id: None })
             .await
@@ -142,6 +194,12 @@ impl Hub {
                 settings.persist(dir, self.ctx.storage.dirs().managed())?;
                 self.ctx.catalog_network.store(enabled, Ordering::Release);
                 self.reload_models(enabled).await?;
+            }
+            op @ (Operation::SetEnabled(..)
+            | Operation::UseAccount(..)
+            | Operation::RemoveAccount(..)) => {
+                self.change_state(op, &mut settings, &list.login_providers)
+                    .await?;
             }
             Operation::Preferences(prefs) => {
                 let prefs = *prefs;
@@ -160,10 +218,58 @@ impl Hub {
             }
         }
         let mut view = settings.view(&builtins);
+        view["accounts"] =
+            crate::provider_accounts::view(&settings.accounts, &list.login_providers);
         view["loginProviders"] = json!(list.login_providers);
         // The catalog's own values: the settings Host gets no model preferences.
         view["catalogModels"] = json!(list.models);
         Ok(view)
+    }
+
+    /// A change of provider state (ADR-0083): turning a provider on or off, or which account
+    /// is in use; nothing about the providers' configuration.
+    async fn change_state(
+        &self,
+        op: Operation,
+        settings: &mut Settings,
+        logins: &[LoginProvider],
+    ) -> Result<()> {
+        let dir = self.ctx.storage.dirs().data();
+        let secrets = &self.ctx.secrets;
+        match op {
+            Operation::SetEnabled(id, enabled) => {
+                let known = settings.configured(&id) || logins.iter().any(|l| l.id == id);
+                settings.set_enabled(&id, enabled, known)?;
+                settings.project_one(dir, &id)?;
+                settings.persist(dir, self.ctx.storage.dirs().managed())?;
+                self.publish_preferences(settings);
+            }
+            Operation::UseAccount(provider, account) => {
+                let in_use = account_name(logins, &provider);
+                crate::provider_accounts::switch(
+                    secrets,
+                    settings,
+                    &provider,
+                    &account,
+                    in_use.as_deref(),
+                )
+                .await?;
+                settings.persist(dir, self.ctx.storage.dirs().managed())?;
+            }
+            Operation::RemoveAccount(provider, account) => {
+                crate::provider_accounts::remove(secrets, settings, &provider, &account).await?;
+                settings.persist(dir, self.ctx.storage.dirs().managed())?;
+                // Nothing the Agent Hosts see changed.
+                return Ok(());
+            }
+            _ => {
+                return Err(Error::Internal {
+                    reason: "expected a provider state change".into(),
+                });
+            }
+        }
+        self.reload_models(self.ctx.catalog_network.load(Ordering::Acquire))
+            .await
     }
 
     async fn change_provider(
@@ -232,4 +338,35 @@ impl Hub {
         }
         first_error.map_or(Ok(()), Err)
     }
+}
+
+/// The name of the account in use of `provider`, as the credential tells it.
+pub(super) fn account_name(logins: &[LoginProvider], provider: &str) -> Option<String> {
+    logins
+        .iter()
+        .find(|l| l.id == provider)
+        .and_then(|l| l.account.clone())
+}
+
+/// `models/discover` on the settings Host (ADR-0083): the key typed in the form, else the key
+/// stored for the saved provider when the address and protocol are the ones it was saved for.
+async fn discover(host: &HostSupervisor, settings: &Settings, request: Discover) -> Result<Value> {
+    let stored_key_of = if request.key.is_none() {
+        settings.stored_key_for(&request)
+    } else {
+        None
+    };
+    let result = host
+        .call_within::<ModelsDiscover>(
+            ModelsDiscoverParams {
+                api: request.api,
+                base_url: request.base_url,
+                key: request.key,
+                stored_key_of,
+            },
+            DISCOVER_TIMEOUT,
+        )
+        .await
+        .map_err(host_error)?;
+    Ok(json!(result))
 }

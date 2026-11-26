@@ -571,6 +571,9 @@ test.describe('sign in', () => {
       await prefer(page, { key: 'language', value: 'en' });
       const settings = await openSettings(page);
       await settings.getByTestId('settings-nav-providers').click();
+      await settings.getByTestId('provider-add').click();
+      await expect(settings.getByTestId(`login-${PROVIDER}`)).toBeVisible();
+      await checkState(settings, 'dialog:add-service');
       await settings.getByTestId(`login-${PROVIDER}`).click();
       await expect(settings.getByTestId('login-user-code')).toBeVisible({ timeout: 30_000 });
       await checkState(settings, 'dialog:sign-in');

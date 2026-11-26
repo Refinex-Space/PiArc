@@ -23,7 +23,9 @@ async function shoot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: path.join(EVIDENCE, `${name}.png`) });
 }
 
+/** Opens "add a service" and picks the test provider's sign-in. */
 async function signIn(settings: Page): Promise<void> {
+  await settings.getByTestId('provider-add').click();
   await settings.getByTestId(`login-${PROVIDER}`).click();
   await expect(settings.getByTestId('login-dialog')).toBeVisible();
 }
@@ -46,10 +48,13 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     await writeProvider(auth, mock.baseUrl, 'authorizationCode');
     await browserDouble(app);
     const settings = await settingsWindow(page);
-    const row = settings.getByTestId(`login-provider-${PROVIDER}`);
-    await expect(row).toBeVisible();
+    // "Add a service" offers the sign-in; Anthropic's subscription sign-in is not offered.
+    await settings.getByTestId('provider-add').click();
+    await expect(settings.getByTestId(`login-provider-${PROVIDER}`)).toBeVisible();
     await expect(settings.getByTestId('login-provider-anthropic')).toHaveCount(0);
     await shoot(settings, 'login-providers');
+    await settings.keyboard.press('Escape');
+    const row = settings.getByTestId(`account-${PROVIDER}`);
 
     // Authorization code: the page opens in the browser (after the confirmation) and the
     // loopback callback finishes the sign-in.
@@ -65,9 +70,9 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     expect(opened).toHaveLength(1);
     expect(opened[0]).toContain(`${auth.base}/authorize?`);
     await settings.getByTestId('login-close').click();
-    await expect(row).toContainText('Signed in');
+    await expect(row).toBeVisible();
     await settings.getByTestId(`logout-${PROVIDER}`).click();
-    await expect(settings.getByTestId(`login-${PROVIDER}`)).toBeVisible();
+    await expect(row).toHaveCount(0);
 
     // The user refuses at the authorization server.
     auth.decide('deny');
@@ -90,7 +95,7 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     await writeProvider(auth, mock.baseUrl, 'deviceCode');
     auth.decide('expire');
     await signIn(settings);
-    await expect(settings.getByTestId('login-user-code')).toHaveText('PIAR-C029');
+    await expect(settings.getByTestId('login-user-code')).toContainText('PIAR-C029');
     await shoot(settings, 'login-device-code');
     await outcome(settings, 'failed');
     await expect(settings.getByTestId('login-outcome')).toContainText('expired');
@@ -100,7 +105,7 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     await signIn(settings);
     await outcome(settings, 'succeeded');
     await settings.getByTestId('login-close').click();
-    await expect(row).toContainText('Signed in');
+    await expect(row).toBeVisible();
 
     // Per-model settings and the auxiliary model, saved to the user's settings.
     const key = `${PROVIDER}/oauth-model`;
@@ -129,6 +134,31 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     expect(saved.modelProviders?.auxiliary).toEqual({ provider: PROVIDER, id: 'oauth-model' });
     // No token in the settings file (the vault holds it).
     expect(JSON.stringify(saved)).not.toContain('piarc-t29-access');
+
+    // ADR-0083: signing in again adds an account; the first one moves aside, comes back in
+    // use, and the other one is removed (the native confirmation answers yes).
+    await signIn(settings);
+    await outcome(settings, 'succeeded');
+    await settings.getByTestId('login-close').click();
+    const aside = settings.locator(`[data-testid^="account-${PROVIDER}-"]`);
+    await expect(aside).toHaveCount(1);
+    await expect(row).toBeVisible();
+    await shoot(settings, 'accounts-two');
+    // The account set aside is the other one once the switch is done.
+    const first = await aside.getAttribute('data-testid');
+    await settings.locator(`[data-testid^="account-use-${PROVIDER}-"]`).click();
+    await expect(aside).not.toHaveAttribute('data-testid', first ?? '');
+    await expect(aside).toHaveCount(1);
+    await settings.locator(`[data-testid^="account-remove-${PROVIDER}-"]`).click();
+    await expect(aside).toHaveCount(0);
+    await expect(row).toBeVisible();
+
+    // Turned off, the provider stays listed and marked; on again.
+    await settings.getByTestId(`provider-enabled-${PROVIDER}`).uncheck();
+    await expect(row).toHaveClass(/is-off/u);
+    await shoot(settings, 'provider-off');
+    await settings.getByTestId(`provider-enabled-${PROVIDER}`).check();
+    await expect(row).not.toHaveClass(/is-off/u);
   } finally {
     auth.stop();
   }

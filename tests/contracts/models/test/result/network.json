@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 51,
+  "result": {
+    "ok": false,
+    "message": "fetch failed (UND_ERR_CONNECT_TIMEOUT)",
+    "network": true
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 62,
+  "method": "models/discover",
+  "params": {
+    "api": "anthropic-messages",
+    "baseUrl": "https://relay.example/anthropic",
+    "storedKeyOf": "relay"
+  }
+}

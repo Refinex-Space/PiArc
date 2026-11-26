@@ -97,4 +97,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0080](0080-transcript-media-times-and-command-chips.md) | 对话里的 Mermaid、图片、消息时间与输入框的命令芯片 | 已接受（补充） |
 | [0081](0081-session-status-marks.md) | 会话状态徽标对齐参考，仍按形状区分 | 已接受 |
 | [0082](0082-agent-host-proxy.md) | Agent Host 的网络代理 | 已接受 |
+| [0083](0083-provider-accounts-and-checks.md) | 服务商的账号、连接测试、启停与模型发现 | 已接受 |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |

@@ -15,6 +15,8 @@ export interface Workspace {
   readonly root: string;
   readonly agentDir: string;
   readonly modelRuntime: ModelRuntime;
+  /** Where the credentials are (ADR-0083: the settings Host reads sign-ins and stored keys). */
+  readonly credentials: CredentialStore;
   readonly unpriced: ReadonlySet<string>;
   /** Per-model settings and the auxiliary model from Core (T29). */
   readonly preferences: ModelPreferencesStore;
@@ -66,6 +68,7 @@ export async function openWorkspace(
     root,
     agentDir,
     modelRuntime,
+    credentials,
     preferences,
     get unpriced() {
       return unpriced;

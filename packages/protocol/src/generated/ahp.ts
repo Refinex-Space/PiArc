@@ -187,6 +187,10 @@ export type AhpMessage =
   | WebSearchBackendResponse
   | ModelsLoginStartRequest
   | ModelsLoginStartResponse
+  | ModelsTestRequest
+  | ModelsTestResponse
+  | ModelsDiscoverRequest
+  | ModelsDiscoverResponse
   | ModelsLoginCancelRequest
   | ModelsLoginCancelResponse
   | ModelsLogoutRequest
@@ -1464,6 +1468,10 @@ export interface ModelPreferences {
    */
   auxiliaryAlias?: ModelAlias | null;
   /**
+   * Providers the user turned off (ADR-0083): the Agent Host treats them as unconfigured.
+   */
+  disabledProviders?: string[];
+  /**
    * Per-model settings keyed by `<provider>/<model id>`.
    */
   models?: {
@@ -2201,6 +2209,10 @@ export interface ModelsListResult {
  * Anthropic's subscription sign-in is never listed (ADR-0006).
  */
 export interface LoginProvider {
+  /**
+   * Who is signed in, as far as the credential tells (ADR-0083): an email or a user name.
+   */
+  account?: string | null;
   /**
    * Pi provider id.
    */
@@ -7077,7 +7089,124 @@ export interface ModelsLoginStartResponse {
   error?: never;
   id: RequestId;
   jsonrpc: JsonRpcVersion;
-  result: ModelsUpdated;
+  result: LoginStartResult;
+}
+/**
+ * Result of `models/login/start`: the signed-in account's name, when the credential tells it
+ * (ADR-0083).
+ */
+export interface LoginStartResult {
+  /**
+   * An email or a user name.
+   */
+  account?: string | null;
+}
+/**
+ * Request for `models/test`.
+ */
+export interface ModelsTestRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/test';
+  params: ModelsTestParams;
+}
+/**
+ * Parameters of `models/test` (Core → settings Agent Host, ADR-0083): one short request to a
+ * model of the provider.
+ */
+export interface ModelsTestParams {
+  /**
+   * The model to ask; absent: the provider's first available model.
+   */
+  model?: string | null;
+  /**
+   * Provider id.
+   */
+  provider: string;
+}
+/**
+ * Successful response to `models/test`.
+ */
+export interface ModelsTestResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsTestResult;
+}
+/**
+ * Result of `models/test`.
+ */
+export interface ModelsTestResult {
+  /**
+   * How long the request took, in milliseconds.
+   */
+  latencyMs?: number | null;
+  /**
+   * Why it failed.
+   */
+  message?: string | null;
+  /**
+   * The model asked (`<model id>`), when there was one.
+   */
+  model?: string | null;
+  /**
+   * The provider could not be reached (ADR-0082).
+   */
+  network?: boolean;
+  /**
+   * Whether the model answered.
+   */
+  ok: boolean;
+}
+/**
+ * Request for `models/discover`.
+ */
+export interface ModelsDiscoverRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'models/discover';
+  params: ModelsDiscoverParams;
+}
+/**
+ * Parameters of `models/discover` (Core → settings Agent Host, ADR-0083): the model list of an
+ * OpenAI- or Anthropic-compatible endpoint.
+ */
+export interface ModelsDiscoverParams {
+  /**
+   * Wire protocol: `openai-completions`, `openai-responses` or `anthropic-messages`.
+   */
+  api: string;
+  /**
+   * The endpoint's base URL.
+   */
+  baseUrl: string;
+  /**
+   * The key to send, typed in the form.
+   */
+  key?: string | null;
+  /**
+   * Send the key stored for this provider instead (Core checked that the endpoint is the one
+   * it was saved for).
+   */
+  storedKeyOf?: string | null;
+}
+/**
+ * Successful response to `models/discover`.
+ */
+export interface ModelsDiscoverResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: ModelsDiscoverResult;
+}
+/**
+ * Result of `models/discover`.
+ */
+export interface ModelsDiscoverResult {
+  /**
+   * Model ids, sorted and unique.
+   */
+  models: string[];
 }
 /**
  * Request for `models/login/cancel`.

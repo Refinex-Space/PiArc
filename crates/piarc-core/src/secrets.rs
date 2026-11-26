@@ -158,9 +158,10 @@ struct Inner {
     changes: broadcast::Sender<SecretChange>,
 }
 
-/// Keys only Core reads (T38: search services' API keys): an Agent Host can neither read,
-/// write nor lock them, `secrets/getAll` leaves them out and changes to them are not pushed.
-const CORE_ONLY_PREFIXES: &[&str] = &["websearch/"];
+/// Keys only Core reads (T38: search services' API keys; ADR-0083: the signed-in accounts not in
+/// use): an Agent Host can neither read, write nor lock them, `secrets/getAll` leaves them out
+/// and changes to them are not pushed.
+const CORE_ONLY_PREFIXES: &[&str] = &["websearch/", "account/"];
 
 fn core_only(key: &str) -> bool {
     CORE_ONLY_PREFIXES.iter().any(|p| key.starts_with(p))
@@ -793,6 +794,65 @@ mod tests {
             );
         }
         assert_eq!(call.await.unwrap()["revision"], 0);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// ADR-0083: the signed-in accounts not in use stay with Core.
+    #[tokio::test]
+    async fn accounts_not_in_use_are_for_core_only() {
+        let dir = std::env::temp_dir().join(format!("piarc-accounts-{}", random_id().unwrap()));
+        std::fs::create_dir(&dir).unwrap();
+        let config = SecretsConfig::with_master_key(&dir, test_master_key_name("accounts"));
+        let service = SecretsService::new(config, Arc::new(MemorySecretStore::new()));
+        let token =
+            serde_json::json!({"type": "oauth", "access": "a-1", "refresh": "r-1", "expires": 1});
+        let value = token.as_object().unwrap().clone();
+        service
+            .store_value("account/openai-codex/a1", Some(value.clone()))
+            .await
+            .unwrap();
+        assert_eq!(
+            service.value_of("account/openai-codex/a1").await.unwrap(),
+            Some(value)
+        );
+        let (peer, _frames) = Peer::channel(8);
+        let all = service
+            .dispatch("secrets/getAll", Map::new(), peer.clone())
+            .await
+            .unwrap();
+        assert!(!all.to_string().contains("r-1"), "{all}");
+        for (method, params) in [
+            (
+                "secrets/get",
+                serde_json::json!({"key": "account/openai-codex/a1"}),
+            ),
+            (
+                "secrets/set",
+                serde_json::json!({"key": "account/openai-codex/a1", "value": {"type": "oauth"}}),
+            ),
+            (
+                "secrets/delete",
+                serde_json::json!({"key": "account/openai-codex/a1"}),
+            ),
+            (
+                "secrets/lock",
+                serde_json::json!({"keys": ["oauth/openai-codex", "account/openai-codex/a1"]}),
+            ),
+        ] {
+            let refused = service
+                .dispatch(method, params.as_object().unwrap().clone(), peer.clone())
+                .await
+                .unwrap_err();
+            assert_eq!(refused.data.kind, ErrorKind::PermissionDenied, "{method}");
+        }
+        service
+            .store_value("account/openai-codex/a1", None)
+            .await
+            .unwrap();
+        assert_eq!(
+            service.value_of("account/openai-codex/a1").await.unwrap(),
+            None
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
