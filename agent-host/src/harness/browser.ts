@@ -17,7 +17,9 @@ import { presentationOf } from '../tools/presentation.js';
 import type { ToolPresentation } from '../tools/profile.js';
 import {
   blockedNote,
+  browserStateText,
   BROWSER_UNAVAILABLE,
+  type StateSpaceText,
   imagesNote,
   scriptError,
   truncatedNote,
@@ -59,6 +61,56 @@ export interface BrowserDetails {
 type Block =
   | { readonly type: 'text'; readonly text: string }
   | { readonly type: 'image'; readonly data: string; readonly mimeType: string };
+
+/**
+ * The text of a `browserState` reminder (B2.7.3) from Core's JSON summary, or undefined when it
+ * is not one. Page titles and addresses go inside a boundary named with `nonce`.
+ */
+export function browserStateNotice(json: string, nonce: string): string | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { spaces, userTabs } = value as { spaces?: unknown; userTabs?: unknown };
+  if (!Array.isArray(spaces) || typeof userTabs !== 'number') return undefined;
+  const parsed: StateSpaceText[] = [];
+  for (const space of spaces as unknown[]) {
+    const read = stateSpace(space);
+    if (read === undefined) return undefined;
+    parsed.push(read);
+  }
+  return browserStateText(parsed, userTabs, nonce);
+}
+
+function stateSpace(value: unknown): StateSpaceText | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const space = value as Record<string, unknown>;
+  if (
+    typeof space.id !== 'number' ||
+    typeof space.name !== 'string' ||
+    (space.controlledBy !== 'agent' && space.controlledBy !== 'user') ||
+    typeof space.tabCount !== 'number'
+  ) {
+    return undefined;
+  }
+  const tabs: { title: string; url: string }[] = [];
+  for (const tab of Array.isArray(space.tabs) ? (space.tabs as unknown[]) : []) {
+    if (typeof tab !== 'object' || tab === null) return undefined;
+    const { title, url } = tab as { title?: unknown; url?: unknown };
+    if (typeof title !== 'string' || typeof url !== 'string') return undefined;
+    tabs.push({ title, url });
+  }
+  return {
+    id: space.id,
+    name: space.name,
+    mine: space.controlledBy === 'agent',
+    tabs,
+    tabCount: space.tabCount,
+  };
+}
 
 /** The model's view of a run: output in a nonce boundary, notes, then the images. */
 export function browserContent(result: BrowserRunResult, nonce: string): Block[] {

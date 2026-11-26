@@ -30,6 +30,7 @@ function render() {
         import { HOOK_JUDGE_SYSTEM } from './agent-host/src/harness/prompts/hook-judge.ts';
         import * as review from './agent-host/src/harness/prompts/auto-review.ts';
         import * as memory from './agent-host/src/harness/prompts/auto-memory.ts';
+        import * as browserNotices from './agent-host/src/harness/prompts/browser-notices.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -86,7 +87,9 @@ function render() {
           // T47: the lines around the auto memory index, the managed instructions and a note
           // restored after a compaction (the tool's description and guidance come with the
           // profile and the system prompt above).
-          memory.MEMORY_PREAMBLE, memory.managedSource(''), memory.restoredMemory('')];
+          memory.MEMORY_PREAMBLE, memory.managedSource(''), memory.restoredMemory(''),
+          // ADR-0092: the reminder after the agent changed a running dev server's front end.
+          browserNotices.browserVerifyNotice(' ' + String.fromCharCode(10) + ' ')];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },
