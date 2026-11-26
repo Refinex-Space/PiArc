@@ -16,9 +16,13 @@ import { IPC_CHANNELS } from '../src/shared/ipc.js';
 import { expectTestHooks } from './core.js';
 import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from './oauth.js';
 import { idle, killAgentHost, openSession, prefer, send } from './t19.js';
-import { conflictOnMain, git, makeRepository } from './git.js';
+import { conflictOnMain, fakeGh, git, githubRemote, makeRepository } from './git.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+/** G5's pull request states need a `gh`: a fake one, never the machine's (see git-github). */
+const gh = fakeGh();
+test.use({ appEnv: { PIARC_TEST_GH: gh.program } });
 
 /** Starts another session in the open workspace with `scenario`. */
 async function newSession(page: Page, text: string, scenario: string): Promise<void> {
@@ -681,6 +685,42 @@ test('the Git tool resolving a conflict and rebasing interactively', async ({
   await expect(page.getByTestId('git-rebase-row').first()).toBeVisible();
   await checkState(page, 'dialog:git-rebase');
   await page.keyboard.press('Escape');
+});
+
+test('the Git tool with a review and a pull request on GitHub', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.skip(process.platform === 'win32', 'the fake gh is a script with a shebang');
+  test.setTimeout(120_000);
+  gh.reset();
+  const { ws } = await openSession(app, page, workspaces, 'git github', 'git-start', 'Start.');
+  await makeRepository(ws);
+  await githubRemote(ws);
+  await writeFile(
+    path.join(ws, 'README.md'),
+    '# Demo\n\nA demo project with sign-in. [[piarc-scenario:git-review]]\n',
+  );
+  await idle(page);
+  await railTab(page, 'changes-card');
+  await page.getByTestId('changes-open').click();
+  await page.getByTestId('git-scope').click();
+  await page.getByTestId('git-scope-uncommitted').click();
+  await page.getByTestId('git-review').click();
+  await expect(page.getByTestId('git-finding').first()).toBeVisible({ timeout: 30_000 });
+  await checkState(page, 'state:git-review-inline');
+  await prefer(page, { key: 'git.reviewPresentation', value: 'separate' });
+  await expect(page.getByTestId('git-review-list')).toBeVisible();
+  await checkState(page, 'state:git-review-list');
+
+  await page.getByTestId('git-view-commit').click();
+  await page.getByTestId('git-pr-create').click();
+  await expect(page.getByTestId('git-pr-dialog')).toBeVisible();
+  await checkState(page, 'dialog:git-pull-request');
+  await page.getByTestId('git-pr-submit').click();
+  await expect(page.getByTestId('git-pr')).toBeVisible({ timeout: 30_000 });
+  await checkState(page, 'state:git-pull-request');
 });
 
 test('every listed state was checked in this run', async () => {

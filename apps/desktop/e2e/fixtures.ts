@@ -89,7 +89,14 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     const app = await electron.launch({
       executablePath: command,
       args,
-      env: { ...process.env, ...appEnv, PIARC_TEST_MEMORY_KEYCHAIN: '1' },
+      env: {
+        ...process.env,
+        // The Git tool never runs the machine's own `gh` (and the user's GitHub account) in L4:
+        // a missing program unless a G5 spec passes its fake.
+        PIARC_TEST_GH: path.join(os.tmpdir(), 'piarc-l4-no-gh'),
+        ...appEnv,
+        PIARC_TEST_MEMORY_KEYCHAIN: '1',
+      },
     });
     const log = createLog(app);
     await use({ app, log });

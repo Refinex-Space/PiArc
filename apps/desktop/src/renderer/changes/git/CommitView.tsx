@@ -43,6 +43,7 @@ import { revealBidi } from '../../transcript/reveal.js';
 import { isImeComposing } from '../../composer/ime-guard.js';
 import { pushNotice, useGitActions, useGitBoard, type GitActions } from './actions.js';
 import { BranchPopup } from './BranchPopup.js';
+import { PullRequestBand } from './PullRequest.js';
 import { Divider } from './FileColumn.js';
 import { ActionHunk, asChangesFile, type DiffDisplay } from './GitDiff.js';
 import { readDisplay } from './model.js';
@@ -259,6 +260,7 @@ export function CommitView({
   return (
     <div className="git-commit" data-testid="git-commit-view" data-columns={oneColumn ? 1 : 2}>
       <SyncBar sessionId={sessionId} git={git} repo={repo} actions={actions} />
+      <PullRequestBand sessionId={sessionId} git={git} repo={repo} actions={actions} />
       <div className="git-commit-body">
         {oneColumn ? (
           file === undefined ? (

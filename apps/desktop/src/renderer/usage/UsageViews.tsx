@@ -14,6 +14,8 @@ const PURPOSES: Readonly<Record<string, MessageId>> = {
   hookPrompt: 'usage.purpose.hookPrompt',
   autoReview: 'usage.purpose.autoReview',
   commitMessage: 'usage.purpose.commitMessage',
+  prDescription: 'usage.purpose.prDescription',
+  review: 'usage.purpose.review',
   sideChat: 'sideChat.title',
   cache_warm: 'usage.purpose.cacheWarm',
 };

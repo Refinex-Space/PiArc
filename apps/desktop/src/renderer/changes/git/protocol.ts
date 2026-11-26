@@ -193,6 +193,8 @@ export interface OpResult {
   readonly keptStash?: string | undefined;
   readonly conflicts: readonly string[];
   readonly output?: string | undefined;
+  /** The page of a pull request just opened (G5). */
+  readonly url?: string | undefined;
 }
 
 export type FailureKind =
@@ -217,6 +219,8 @@ export type FailureKind =
   | 'inOtherWorktree'
   | 'notMerged'
   | 'noModel'
+  | 'ghMissing'
+  | 'notGithub'
   | 'invalid'
   | 'cancelled'
   | 'timedOut'
@@ -538,6 +542,7 @@ export function opResultOf(value: unknown): OpResult | undefined {
     keptStash: str(value.keptStash),
     conflicts: strings(value.conflicts),
     output: str(value.output),
+    url: str(value.url),
   });
 }
 
@@ -736,6 +741,153 @@ export function rebasePlanOf(value: unknown): RebasePlan | undefined {
   return defined({ base: str(value.base), head, commits: list(value.commits, rebaseCommitOf) });
 }
 
+/** A pull request's title and body written by the model (ADR-0087). */
+export interface PrDraft {
+  readonly title: string;
+  readonly body: string;
+  readonly model: string;
+  readonly fallback: boolean;
+  readonly withheld: readonly string[];
+}
+
+export type FindingSeverity = 'high' | 'medium' | 'low';
+
+/** One review finding on a line of the new version of a file. */
+export interface Finding {
+  readonly path: string;
+  readonly line: number;
+  readonly severity: FindingSeverity;
+  readonly title: string;
+  readonly body: string;
+}
+
+export interface Review {
+  readonly scope: Scope;
+  readonly summary: string;
+  readonly findings: readonly Finding[];
+  /** Findings Core left out: their file or line was not in the diff it sent. */
+  readonly dropped: number;
+  readonly model: string;
+  readonly fallback: boolean;
+  readonly withheld: readonly string[];
+}
+
+/** Whether GitHub can be reached through the user's `gh` for this repository. */
+export type GhState =
+  'ready' | 'missing' | 'unauthenticated' | 'notGithub' | 'noRemote' | 'untrusted';
+
+export interface PullRequest {
+  readonly number: number;
+  readonly title: string;
+  readonly state: 'open' | 'closed' | 'merged';
+  readonly draft: boolean;
+  readonly url: string;
+  readonly base: string;
+  readonly head: string;
+  /** GitHub's word: APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED. */
+  readonly reviewDecision?: string | undefined;
+  readonly checks: { readonly passed: number; readonly failed: number; readonly pending: number };
+  readonly mergeable?: string | undefined;
+}
+
+export interface PullRequestStatus {
+  readonly gh: GhState;
+  /** `owner/name`. */
+  readonly repo?: string | undefined;
+  readonly pr?: PullRequest | undefined;
+  /** The command that signs `gh` in. */
+  readonly command?: string | undefined;
+}
+
+export function prDraftOf(value: unknown): PrDraft | undefined {
+  if (!isRecord(value)) return undefined;
+  const title = str(value.title);
+  const body = str(value.body);
+  if (title === undefined || body === undefined) return undefined;
+  return {
+    title,
+    body,
+    model: str(value.model) ?? '',
+    fallback: value.fallback === true,
+    withheld: strings(value.withheld),
+  };
+}
+
+const SEVERITIES: readonly FindingSeverity[] = ['high', 'medium', 'low'];
+
+function findingOf(value: unknown): Finding | undefined {
+  if (!isRecord(value)) return undefined;
+  const path = str(value.path);
+  const line = optCount(value.line);
+  const severity = SEVERITIES.find((s) => s === value.severity);
+  const title = str(value.title);
+  if (path === undefined || line === undefined || line < 1) return undefined;
+  if (severity === undefined || title === undefined) return undefined;
+  return { path, line, severity, title, body: str(value.body) ?? '' };
+}
+
+export function reviewOf(value: unknown): Review | undefined {
+  if (!isRecord(value)) return undefined;
+  const scope = scopeOf(value.scope);
+  if (scope === undefined) return undefined;
+  return {
+    scope,
+    summary: str(value.summary) ?? '',
+    findings: list(value.findings, findingOf),
+    dropped: count(value.dropped),
+    model: str(value.model) ?? '',
+    fallback: value.fallback === true,
+    withheld: strings(value.withheld),
+  };
+}
+
+const GH_STATES: readonly GhState[] = [
+  'ready',
+  'missing',
+  'unauthenticated',
+  'notGithub',
+  'noRemote',
+  'untrusted',
+];
+const PR_STATES = ['open', 'closed', 'merged'] as const;
+
+function pullRequestOf(value: unknown): PullRequest | undefined {
+  if (!isRecord(value)) return undefined;
+  const number = optCount(value.number);
+  const state = PR_STATES.find((s) => s === value.state);
+  const url = str(value.url);
+  if (number === undefined || state === undefined || url === undefined) return undefined;
+  const checks = isRecord(value.checks) ? value.checks : {};
+  return defined({
+    number,
+    title: str(value.title) ?? '',
+    state,
+    draft: value.draft === true,
+    url,
+    base: str(value.base) ?? '',
+    head: str(value.head) ?? '',
+    reviewDecision: str(value.reviewDecision),
+    checks: {
+      passed: count(checks.passed),
+      failed: count(checks.failed),
+      pending: count(checks.pending),
+    },
+    mergeable: str(value.mergeable),
+  });
+}
+
+export function pullRequestStatusOf(value: unknown): PullRequestStatus | undefined {
+  if (!isRecord(value)) return undefined;
+  const gh = GH_STATES.find((s) => s === value.gh);
+  if (gh === undefined) return undefined;
+  return defined({
+    gh,
+    repo: str(value.repo),
+    pr: pullRequestOf(value.pr),
+    command: str(value.command),
+  });
+}
+
 export function probeOf(value: unknown): string | undefined {
   return isRecord(value) ? str(value.fingerprint) : undefined;
 }
@@ -762,6 +914,8 @@ const FAILURES: readonly FailureKind[] = [
   'inOtherWorktree',
   'notMerged',
   'noModel',
+  'ghMissing',
+  'notGithub',
   'invalid',
   'cancelled',
   'timedOut',

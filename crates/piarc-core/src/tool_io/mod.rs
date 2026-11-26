@@ -116,6 +116,9 @@ pub struct ToolIoConfig {
     /// Core's managed settings (T47): their `enterprise` layer joins the settings this module
     /// reads, their memory documents lead the memory snapshot.
     pub managed: crate::managed::ManagedSettings,
+    /// The `gh` program to run instead of the one on the command `PATH` (tests only: L4 and
+    /// session tests must never reach the machine's own `gh` and the user's GitHub account).
+    pub gh_program: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for ToolIoConfig {
@@ -144,6 +147,7 @@ impl ToolIoConfig {
             web: WebConfig::default(),
             sandbox: SandboxConfig::default(),
             managed: crate::managed::ManagedSettings::none(),
+            gh_program: None,
         }
     }
 }
@@ -654,27 +658,30 @@ impl ToolIo {
     pub(crate) async fn gh_runner(
         &self,
         workspace: &Path,
-    ) -> Option<(piarc_git::Git, Option<String>)> {
+    ) -> (Option<piarc_git::Git>, Option<String>) {
         let inherited = self.command_environment().await;
         let login = self.expansion_environment().await;
+        let host = login
+            .iter()
+            .find(|(k, _)| k == "GH_HOST")
+            .map(|(_, v)| v.to_string_lossy().into_owned());
         let path = inherited
             .iter()
             .find(|(k, _)| k.to_string_lossy().eq_ignore_ascii_case("PATH"))
             .map(|(_, v)| v.clone())
             .unwrap_or_default();
-        let program = piarc_git::gh::find(&path, Some(workspace))?;
-        let host = login
-            .iter()
-            .find(|(k, _)| k == "GH_HOST")
-            .map(|(_, v)| v.to_string_lossy().into_owned());
-        Some((
+        let program = match &self.config.gh_program {
+            Some(program) => Some(program.clone()),
+            None => piarc_git::gh::find(&path, Some(workspace)),
+        };
+        let gh = program.map(|program| {
             piarc_git::Git::other(
                 Arc::new(piarc_exec::ProcessTreeSpawner),
                 program,
                 piarc_git::env::gh_env(&inherited, &login),
-            ),
-            host,
-        ))
+            )
+        });
+        (gh, host)
     }
 
     /// The workspace of a registered session's settings and trust (T35: a worktree session's

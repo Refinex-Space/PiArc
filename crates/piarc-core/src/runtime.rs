@@ -119,6 +119,9 @@ pub struct CoreConfig {
     /// Where managed (enterprise) settings are read and how often (T47). None by default;
     /// the app passes the system's places, tests a directory of their own.
     pub managed: crate::managed::ManagedConfig,
+    /// The `gh` program for GitHub (G5) instead of the one on the command `PATH`: tests only,
+    /// so they never reach the machine's `gh` and the user's account.
+    pub gh_program: Option<PathBuf>,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -158,6 +161,7 @@ impl Default for CoreConfig {
             sandbox: crate::tool_io::SandboxConfig::default(),
             review_timeout: piarc_policy::review::REVIEW_TIMEOUT,
             managed: crate::managed::ManagedConfig::default(),
+            gh_program: None,
         }
     }
 }
@@ -726,6 +730,7 @@ fn state_tool_io(
             web: config.web.clone(),
             sandbox: config.sandbox.clone(),
             managed: storage.dirs().managed().clone(),
+            gh_program: config.gh_program.clone(),
             ..ToolIoConfig::new(data)
         },
         Some(events.clone()),

@@ -888,3 +888,54 @@ async fn pull_requests_open_and_merge_through_the_users_gh() {
     assert_eq!(elsewhere["result"]["gh"], "notGithub", "{elsewhere}");
     shutdown(core).await;
 }
+
+/// Without `gh`, only a GitHub remote reports it missing; a remote elsewhere is "not GitHub",
+/// so nothing tells someone on another host to install the GitHub CLI.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_missing_gh_is_reported_only_for_a_github_remote() {
+    let env = Env::new("git-no-gh").await;
+    repository(&env);
+    run_git(
+        &env.ws,
+        &env.root,
+        &["remote", "add", "origin", "git@github.com:octo/app.git"],
+    );
+    // A PATH with git and nothing else: CI runners often have `gh` in /usr/bin.
+    let bin = env.root.join("only git 工具");
+    std::fs::create_dir_all(&bin).expect("bin");
+    let found = std::process::Command::new("sh")
+        .args(["-c", "command -v git"])
+        .output()
+        .expect("sh");
+    let program = String::from_utf8_lossy(&found.stdout).trim().to_owned();
+    std::os::unix::fs::symlink(&program, bin.join("git")).expect("link");
+    let mut config = env.config(&[]);
+    let Some(piarc_core::tool_io::CommandEnv::Fixed(vars)) = &mut config.command_env else {
+        panic!("a fixed command environment")
+    };
+    for (key, value) in vars.iter_mut() {
+        if key.to_string_lossy().eq_ignore_ascii_case("PATH") {
+            *value = bin.clone().into_os_string();
+        }
+    }
+    let (core, _events) = env.start(config);
+    let id = open(&core, &env).await;
+    trust(&core, &env.ws).await;
+
+    let github = git(&core, &id, json!({ "op": "pullRequest" })).await;
+    assert_eq!(github["result"]["gh"], "missing", "{github}");
+    run_git(
+        &env.ws,
+        &env.root,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "https://gitlab.example.invalid/octo/app.git",
+        ],
+    );
+    let elsewhere = git(&core, &id, json!({ "op": "pullRequest" })).await;
+    assert_eq!(elsewhere["result"]["gh"], "notGithub", "{elsewhere}");
+    shutdown(core).await;
+}

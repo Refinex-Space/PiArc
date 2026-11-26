@@ -39,6 +39,7 @@ import { useSession, useTurnInfo } from '../../store/hooks.js';
 import { revealBidi } from '../../transcript/reveal.js';
 import { ChangesPanel } from '../ChangesPanel.js';
 import { isSendKey } from '../comments.js';
+import { ReviewArea, ReviewButton } from './ReviewPanel.js';
 import { CommentsBar, DiffCommentsProvider, useDiffCommentsState } from '../DiffComments.js';
 import { CommitView } from './CommitView.js';
 import { LogView } from './LogView.js';
@@ -390,6 +391,19 @@ export function GitPanel({ sessionId }: { readonly sessionId: string }) {
             />
           ) : null}
           <span className="git-heading-spacer" />
+          {view === 'changes' && !notRepo && repo !== undefined ? (
+            <ReviewButton
+              sessionId={sessionId}
+              scope={effectiveScope}
+              files={
+                effectiveScope.kind === 'session'
+                  ? undefined
+                  : gitSession(sessionId).changes(effectiveScope, display.hideWhitespace).value
+                      ?.files
+              }
+              writable={repo.writable}
+            />
+          ) : null}
           {view === 'changes' && !notRepo && !compact ? (
             <IconButton
               label={t('git.goto.open')}
@@ -780,6 +794,26 @@ function GitChangesView({
     );
   }, [changes, key, large]);
   const list = useRef<HTMLDivElement>(null);
+  /** Opens `path` and scrolls to a finding, or to line `line` of its new version. */
+  const revealAt = (path: string, line: number, finding?: string) => {
+    setCurrent(path);
+    setOpen((old) => new Set(old).add(path));
+    // Two frames: the file opens, then its rows (and inline findings) are there.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const section = list.current?.querySelector<HTMLElement>(
+          `[data-path="${CSS.escape(path)}"]`,
+        );
+        const target =
+          (finding === undefined
+            ? undefined
+            : section?.querySelector<HTMLElement>(`[data-finding="${CSS.escape(finding)}"]`)) ??
+          section?.querySelector<HTMLElement>(`[data-new-line="${String(line)}"]`) ??
+          section;
+        target?.scrollIntoView({ block: 'center' });
+      });
+    });
+  };
   const reveal = (path: string, focus: boolean) => {
     setCurrent(path);
     setOpen((old) => new Set(old).add(path));
@@ -962,53 +996,57 @@ function GitChangesView({
           />
         ) : null}
         <div className="git-diff-list" ref={list} tabIndex={-1} data-testid="git-diff-list">
-          {large ? (
-            <p className="git-banner" data-testid="git-large">
-              {t('git.large')}
-            </p>
-          ) : null}
-          {changes.truncated ? (
-            <p className="git-banner" data-testid="git-truncated">
-              {t('git.truncated')}
-            </p>
-          ) : null}
-          {files.length === 0 ? (
-            <PanelEmpty
-              title={t(settled.kind === 'uncommitted' ? 'git.empty.uncommitted' : 'git.empty.all')}
-              icon={<GitBranchIcon size={20} />}
-              testId="git-empty"
-            />
-          ) : (
-            files.map((file) => (
-              <FileSection
-                key={file.path}
-                sessionId={sessionId}
-                file={file}
-                scope={gitScope(settled) ?? { kind: 'uncommitted' }}
-                display={{
-                  split,
-                  wrap: display.wrap,
-                  wordDiff: display.wordDiff,
-                  hideWhitespace: display.hideWhitespace,
-                }}
-                open={open.has(file.path)}
-                current={current === file.path}
-                highlight={transcriptServices.highlight}
-                mergeBase={changes.base?.mergeBase}
-                onToggle={() => {
-                  setOpen((old) => {
-                    const next = new Set(old);
-                    if (next.has(file.path)) next.delete(file.path);
-                    else next.add(file.path);
-                    return next;
-                  });
-                }}
-                onOpenFile={projectOf(file.path) === undefined ? undefined : openFile}
-                onMenu={onMenu}
+          <ReviewArea sessionId={sessionId} scope={settled} files={files} onReveal={revealAt}>
+            {large ? (
+              <p className="git-banner" data-testid="git-large">
+                {t('git.large')}
+              </p>
+            ) : null}
+            {changes.truncated ? (
+              <p className="git-banner" data-testid="git-truncated">
+                {t('git.truncated')}
+              </p>
+            ) : null}
+            {files.length === 0 ? (
+              <PanelEmpty
+                title={t(
+                  settled.kind === 'uncommitted' ? 'git.empty.uncommitted' : 'git.empty.all',
+                )}
+                icon={<GitBranchIcon size={20} />}
+                testId="git-empty"
               />
-            ))
-          )}
-          <CommentsBar />
+            ) : (
+              files.map((file) => (
+                <FileSection
+                  key={file.path}
+                  sessionId={sessionId}
+                  file={file}
+                  scope={gitScope(settled) ?? { kind: 'uncommitted' }}
+                  display={{
+                    split,
+                    wrap: display.wrap,
+                    wordDiff: display.wordDiff,
+                    hideWhitespace: display.hideWhitespace,
+                  }}
+                  open={open.has(file.path)}
+                  current={current === file.path}
+                  highlight={transcriptServices.highlight}
+                  mergeBase={changes.base?.mergeBase}
+                  onToggle={() => {
+                    setOpen((old) => {
+                      const next = new Set(old);
+                      if (next.has(file.path)) next.delete(file.path);
+                      else next.add(file.path);
+                      return next;
+                    });
+                  }}
+                  onOpenFile={projectOf(file.path) === undefined ? undefined : openFile}
+                  onMenu={onMenu}
+                />
+              ))
+            )}
+            <CommentsBar />
+          </ReviewArea>
         </div>
         {goto ? (
           <GoToFile

@@ -11,6 +11,7 @@
 @import './changes/git/git.css';
 @import './changes/git/history.css';
 @import './changes/git/merge.css';
+@import './changes/git/review.css';
 
 /* PiArc's window styles. Colors, fonts and sizes come only from the design tokens
    (theme/tokens.generated.css, generated from design/tokens/): a change of visual direction

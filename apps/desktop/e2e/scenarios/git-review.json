@@ -1,0 +1,8 @@
+{
+  "id": "git-review",
+  "steps": [
+    {
+      "text": "{\"summary\": \"Rewords the README.\", \"findings\": [{\"path\": \"README.md\", \"line\": 3, \"severity\": \"high\", \"title\": \"The sentence leaks a test marker\", \"body\": \"Remove the bracketed marker before merging.\"}, {\"path\": \"README.md\", \"line\": 1, \"severity\": \"low\", \"title\": \"The heading is generic\", \"body\": \"\"}, {\"path\": \"src/other.ts\", \"line\": 1, \"severity\": \"medium\", \"title\": \"Not in the diff\", \"body\": \"\"}]}"
+    }
+  ]
+}

@@ -519,7 +519,7 @@ function Notice({ sessionId, notice }: { readonly sessionId: string; readonly no
         ))}
         <button
           type="button"
-          className="git-link-button"
+          className="git-link-button git-notice-dismiss"
           aria-label={t('git.notice.dismiss')}
           onClick={() => {
             dismissNotice(sessionId, notice.id);

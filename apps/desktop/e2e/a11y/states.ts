@@ -197,6 +197,21 @@ export const A11Y_STATES = [
     area: 'state',
     note: 'Git tool: the three-way merge view of a conflicted file',
   },
+  {
+    id: 'state:git-pull-request',
+    area: 'state',
+    note: "Git tool: the Commit view with the branch's pull request on GitHub (fake gh)",
+  },
+  {
+    id: 'state:git-review-inline',
+    area: 'state',
+    note: 'Git tool: review findings under their lines in the diff',
+  },
+  {
+    id: 'state:git-review-list',
+    area: 'state',
+    note: 'Git tool: review findings as a list grouped by file',
+  },
   { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
   {
     id: 'state:md-read',
@@ -326,6 +341,12 @@ export const A11Y_STATES = [
     area: 'dialog',
     source: 'changes/git/RebaseDialog.tsx',
     note: 'Git: an interactive rebase',
+  },
+  {
+    id: 'dialog:git-pull-request',
+    area: 'dialog',
+    source: 'changes/git/PullRequest.tsx',
+    note: 'Git: create a pull request',
   },
   {
     id: 'dialog:terminal-text',

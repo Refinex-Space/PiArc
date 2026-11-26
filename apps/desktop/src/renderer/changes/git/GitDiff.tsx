@@ -20,6 +20,7 @@ import { Gutter, useHighlighted } from '../DiffBody.js';
 import { CommentEditorRow, CommentRow, useDiffComments } from '../DiffComments.js';
 import { languageOf } from '../language.js';
 import { ImageDiff, imageType } from './ImageDiff.js';
+import { FileFindings, FindingsBelow } from './ReviewPanel.js';
 import { changedWords, gapsOf, GAP_STEP, pairedLines, splitRows, type Gap } from './model.js';
 import { fileChangeOf, gitCall, textOf, type FileChange, type Scope } from './protocol.js';
 
@@ -156,6 +157,7 @@ function CommentsBelow({
       {draft !== undefined && draft.id === undefined && endsHere(draft) ? (
         <CommentEditorRow file={file} span={span} />
       ) : null}
+      <FindingsBelow path={file.label} now={now} span={span} />
     </>
   );
 }
@@ -173,7 +175,7 @@ function UnifiedHunk({ hunk, index, file, language, highlight, display }: HunkPr
         const now = line.kind === 'removed' ? undefined : newLine++;
         return (
           <Fragment key={at}>
-            <tr className={`git-line is-${line.kind}`} data-kind={line.kind}>
+            <tr className={`git-line is-${line.kind}`} data-kind={line.kind} data-new-line={now}>
               <Gutter
                 file={file}
                 side={line.kind === 'removed' ? 'old' : 'new'}
@@ -235,7 +237,7 @@ function SplitHunk({ hunk, index, file, language, highlight, display }: HunkProp
     <tbody className="git-hunk is-split" data-testid="git-hunk" data-index={index}>
       {rows.map((row, at) => (
         <Fragment key={at}>
-          <tr className="git-line">
+          <tr className="git-line" data-new-line={row.new?.number}>
             <SplitCell
               side="old"
               entry={row.old}
@@ -591,6 +593,7 @@ export function FileSection(props: FileSectionProps) {
           </IconButton>
         </span>
       </header>
+      {open ? <FileFindings path={file.path} hunks={hunks} /> : null}
       {open && image ? (
         <ImageDiff sessionId={sessionId} file={file} scope={scope} mergeBase={props.mergeBase} />
       ) : !open ? null : loading ? (

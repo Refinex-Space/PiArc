@@ -158,6 +158,9 @@ describe('i18n', () => {
             // G5: pull requests and reviews (ADR-0085, ADR-0087).
             repo: 'octo/app',
             method: 'Squash and merge',
+            passed: 3,
+            failed: 1,
+            pending: 2,
           }),
         ).not.toThrow();
       }

@@ -1,0 +1,4 @@
+{
+  "id": "git-pr-description",
+  "steps": [{ "text": "Add sign-in\n\n## Summary\n- Adds the login function.\n" }]
+}

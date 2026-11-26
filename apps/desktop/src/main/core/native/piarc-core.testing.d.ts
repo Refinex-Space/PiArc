@@ -525,7 +525,9 @@ export declare class CoreRuntime {
    * search service that answers instead of the real one). From T39,
    * `PIARC_TEST_SANDBOX_HOSTS` (comma-separated `name=port`: the sandbox's proxy reaches
    * these names on local ports and nothing else) and `PIARC_TEST_SANDBOX_ENTERPRISE_DOMAINS`
-   * (comma-separated domains standing in for the enterprise's allowlist until T47).
+   * (comma-separated domains standing in for the enterprise's allowlist until T47). G5:
+   * `PIARC_TEST_GH` (the fake `gh` the Git tool runs instead of the one on `PATH`, so L4
+   * never reaches the machine's `gh` and the user's GitHub account).
    */
   static createForTests(
     options: CoreOptions,

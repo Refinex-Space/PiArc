@@ -1,7 +1,7 @@
 # Git 面板（G1–G5）设计增补
 
 - 日期：2026-11-25
-- 状态：G1、G2 已交付；G3–G5 实施中（第 9 节）
+- 状态：G1–G5 已交付（G3–G5 见第 9 节，实施偏差见第 9.7 节）
 - 决策：[ADR-0084](../../adr/0084-git-panel-scopes.md)（数据来源与范围，取代 ADR-0044 第 8 条）、[ADR-0085](../../adr/0085-git-command-boundaries.md)（Git 命令的执行边界）、[ADR-0086](../../adr/0086-commit-message-generation.md)（提交信息生成）、[ADR-0087](../../adr/0087-pr-description-and-review.md)（PR 描述与 AI 审查）
 - 参考：Claude Desktop `next-4.16336.0`（ADR-0073，只研读行为与视觉）；Rebased / IntelliJ git4idea（只参考功能与 git 命令行，不移植代码、不照抄文案）
 
@@ -488,6 +488,16 @@ GitPanel ─ window.piarc.git ─▶ 校验 · 近期输入 · 原生确认 ─�
 | 19 | G5：`gh`、ADR-0087 的 AHP 与 Agent Host、Core、主进程 | 同 15；`npx vitest run agent-host/src/harness/git-assist.test.ts`；`node scripts/dev/check-prompt-originality.mjs` |
 | 20 | G5 的渲染进程：PR 条与对话框、审查两种呈现、设置 | 同 16 |
 | 21 | 文档同步、a11y 与 i18n、全量 verify | `npm run verify` |
+
+### 9.7 实施偏差与补充（2026-11-26，G3–G5 实施后）
+
+- M4.2：只有一侧改动的块在打开三方视图时已经采用，顶栏因此没有“采用全部无冲突改动”。冲突文件的菜单仍没有“打开文件”（B6.2 的这一项，第 8.1 节）。
+- 合并、变基与交互式变基带 `--autostash`：工作区有改动时 git 先储藏、结束后放回（L4 发现变基会被拒绝）。
+- `gh` 只用到 `pr view`（检查汇总取自它的 `statusCheckRollup`）、`pr create`、`pr merge`；`pr list`、`pr checks`、`repo view` 在白名单内，现在不用。不做“标记为可审查”（`gh pr ready` 不在白名单）。
+- P1：先判断远端是不是 GitHub，再查找 `gh`。远端在别处时答“不是 GitHub”，PR 条不显示，也不提示安装 GitHub CLI。
+- V1：审查覆盖已跟踪文件的改动（与 `git diff` 相同），未跟踪文件不送审。V1.3 的“可能过期”比较范围内每个文件的状态、行数与 hunk 的行内容。
+- 测试从不运行本机的 `gh`：开发构建的 `createForTests` 读 `PIARC_TEST_GH`，L4 夹具缺省给一个不存在的程序，G5 用例换成假 `gh`（`apps/desktop/e2e/git.ts` 的 `fakeGh`，远端 URL 指向 `github.com`、`pushurl` 指向本地裸仓库）。会话测试把假 `gh` 放在固定命令环境的 `PATH` 前面。
+- 随 G5 修复的既有问题：Log 视图筛选框聚焦时内层出现直角边框（改为圆角外框换色，内层不画）；行数不变的再次修改不刷新 diff（每次读取状态后都重新读取当前范围的 diff，提交与分支仍只在 HEAD 或文件状态变化时重读）；Commit 视图两栏之间的分隔条因选择器优先级落在右边缘、造成横向滚动条。
 
 ## 附录：评审裁决
 

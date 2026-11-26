@@ -69,9 +69,11 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitMerge,
+  GitPullRequest,
   List,
   Minus,
   RefreshCw,
+  ScanSearch,
   Sparkles,
   Tag,
   Undo2,
@@ -155,6 +157,10 @@ export const FetchIcon = glyph(RefreshCw);
 export const PullIcon = glyph(ArrowDownToLine);
 export const PushIcon = glyph(ArrowUpFromLine);
 export const GenerateIcon = glyph(Sparkles);
+/** A pull request on GitHub (G5). */
+export const PullRequestIcon = glyph(GitPullRequest);
+/** An AI review of the changes (G5). */
+export const ReviewIcon = glyph(ScanSearch);
 export const RollbackIcon = glyph(Undo2);
 export const MinusIcon = glyph(Minus);
 export const TagIcon = glyph(Tag);

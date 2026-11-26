@@ -1,6 +1,7 @@
-// Settings · Git (ADR-0085, SPEC A8): branches (prefix for new branches, protected branches),
-// push and pull (pull mode, always force push), and commits (the instructions handed to the
-// model when it writes a commit message). Everything is the user's own file; managed settings
+// Settings · Git (ADR-0085, SPEC A8, design addendum P5): branches (prefix for new branches,
+// protected branches), push and pull (pull mode, always force push, automatic fetch), commits
+// (the instructions handed to the model when it writes a commit message), pull requests (merge
+// method, drafts, the instructions for descriptions) and code review (how findings show). Everything is the user's own file; managed settings
 // lock single values; project files have no say. Turning "always force push" on is confirmed
 // natively by the main process.
 import { useEffect, useId, useState } from 'react';
@@ -11,7 +12,9 @@ import {
   GIT_LIMITS,
   isBranchPattern,
   isBranchPrefix,
+  MERGE_METHODS,
   PULL_MODES,
+  REVIEW_PRESENTATIONS,
   type PreferenceChange,
 } from '../../shared/preferences.js';
 import type { MessageId } from '../../shared/i18n/index.js';
@@ -57,7 +60,26 @@ export function GitPage() {
         <h2 id="git-settings-commits" className="permission-heading">
           {t('gitSettings.commits')}
         </h2>
-        <InstructionsField value={git.commitInstructions} language={locale} onSave={save} />
+        <InstructionsField
+          kind="commit"
+          value={git.commitInstructions}
+          language={locale}
+          onSave={save}
+        />
+      </section>
+      <section className="settings-subsection" aria-labelledby="git-settings-prs">
+        <h2 id="git-settings-prs" className="permission-heading">
+          {t('gitSettings.pullRequests')}
+        </h2>
+        <MergeMethodRow value={git.mergeMethod} onSave={save} />
+        <DraftRow value={git.draftPullRequests} onSave={save} />
+        <InstructionsField kind="pr" value={git.prInstructions} language={locale} onSave={save} />
+      </section>
+      <section className="settings-subsection" aria-labelledby="git-settings-review">
+        <h2 id="git-settings-review" className="permission-heading">
+          {t('gitSettings.review')}
+        </h2>
+        <ReviewPresentationRow value={git.reviewPresentation} onSave={save} />
       </section>
     </div>
   );
@@ -327,19 +349,42 @@ function AutoFetchRow({
   );
 }
 
+/** The two instruction fields: commit messages, and pull request descriptions (G5). */
+const INSTRUCTIONS = {
+  commit: {
+    key: 'git.commitInstructions',
+    pointer: '/git/commitInstructions',
+    label: 'gitSettings.instructions',
+    hint: 'gitSettings.instructionsHint',
+    defaults: 'git.instructions.default',
+    testId: 'git-setting-instructions',
+  },
+  pr: {
+    key: 'git.prInstructions',
+    pointer: '/git/prInstructions',
+    label: 'gitSettings.prInstructions',
+    hint: 'gitSettings.prInstructionsHint',
+    defaults: 'git.instructions.prDefault',
+    testId: 'git-setting-pr-instructions',
+  },
+} as const;
+
 function InstructionsField({
+  kind,
   value,
   language,
   onSave,
 }: {
+  readonly kind: keyof typeof INSTRUCTIONS;
   readonly value: string;
   readonly language: string;
   readonly onSave: (change: PreferenceChange) => void;
 }) {
   const { t } = useApp();
   const id = useId();
-  const managed = useIsManaged('/git/commitInstructions');
-  const defaults = t('git.instructions.default');
+  const field = INSTRUCTIONS[kind];
+  const managed = useIsManaged(field.pointer);
+  const defaults = t(field.defaults);
   const shown = value.trim() === '' ? defaults : value;
   const [draft, setDraft] = useState(shown);
   useEffect(() => {
@@ -353,15 +398,15 @@ function InstructionsField({
       onSubmit={(event) => {
         event.preventDefault();
         // The default text is not written: it follows the interface language.
-        onSave({ key: 'git.commitInstructions', value: isDefault ? null : draft });
+        onSave({ key: field.key, value: isDefault ? null : draft });
       }}
     >
       <label htmlFor={id} className="git-setting-label">
-        {t('gitSettings.instructions')}
-        {managed && <ManagedBadge testId="managed-git-instructions" />}
+        {t(field.label)}
+        {managed && <ManagedBadge testId={`managed-${field.testId}`} />}
       </label>
       <p className="muted">
-        {t('gitSettings.instructionsHint', {
+        {t(field.hint, {
           language: t(language === 'zh-CN' ? 'gitSettings.language.zh' : 'gitSettings.language.en'),
         })}
       </p>
@@ -373,7 +418,7 @@ function InstructionsField({
         maxLength={GIT_LIMITS.instructions}
         disabled={managed}
         spellCheck={false}
-        data-testid="git-setting-instructions"
+        data-testid={field.testId}
         onChange={(event) => {
           setDraft(event.target.value);
         }}
@@ -383,7 +428,7 @@ function InstructionsField({
           type="submit"
           size="small"
           disabled={managed || !changed}
-          data-testid="git-setting-instructions-save"
+          data-testid={`${field.testId}-save`}
         >
           {t('gitSettings.save')}
         </Button>
@@ -391,15 +436,109 @@ function InstructionsField({
           variant="ghost"
           size="small"
           disabled={managed || (value.trim() === '' && isDefault)}
-          data-testid="git-setting-instructions-reset"
+          data-testid={`${field.testId}-reset`}
           onClick={() => {
             setDraft(defaults);
-            onSave({ key: 'git.commitInstructions', value: null });
+            onSave({ key: field.key, value: null });
           }}
         >
           {t('gitSettings.restoreDefault')}
         </Button>
       </span>
     </form>
+  );
+}
+
+function MergeMethodRow({
+  value,
+  onSave,
+}: {
+  readonly value: (typeof MERGE_METHODS)[number];
+  readonly onSave: (change: PreferenceChange) => void;
+}) {
+  const { t } = useApp();
+  const labelId = useId();
+  const managed = useIsManaged('/git/mergeMethod');
+  return (
+    <div className="setting git-setting">
+      <span id={labelId} className="git-setting-label">
+        {t('gitSettings.mergeMethod')}
+        {managed && <ManagedBadge testId="managed-git-merge-method" />}
+      </span>
+      <SegmentedControl
+        options={MERGE_METHODS}
+        value={value}
+        disabled={managed}
+        name="git-merge-method"
+        testIdPrefix="git-setting-merge"
+        aria-labelledby={labelId}
+        onChange={(method) => {
+          onSave({ key: 'git.mergeMethod', value: method });
+        }}
+        labelOf={(method) => t(`git.pr.method.${method}`)}
+      />
+      <p className="muted">{t('gitSettings.mergeMethodHint')}</p>
+    </div>
+  );
+}
+
+function DraftRow({
+  value,
+  onSave,
+}: {
+  readonly value: boolean;
+  readonly onSave: (change: PreferenceChange) => void;
+}) {
+  const { t } = useApp();
+  const managed = useIsManaged('/git/draftPullRequests');
+  return (
+    <div className="setting git-setting">
+      {managed && <ManagedBadge testId="managed-git-draft" />}
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={value}
+          disabled={managed}
+          data-testid="git-setting-draft"
+          onChange={(event) => {
+            onSave({ key: 'git.draftPullRequests', value: event.currentTarget.checked });
+          }}
+        />
+        {t('gitSettings.draft')}
+      </label>
+    </div>
+  );
+}
+
+function ReviewPresentationRow({
+  value,
+  onSave,
+}: {
+  readonly value: (typeof REVIEW_PRESENTATIONS)[number];
+  readonly onSave: (change: PreferenceChange) => void;
+}) {
+  const { t } = useApp();
+  const labelId = useId();
+  const managed = useIsManaged('/git/reviewPresentation');
+  return (
+    <div className="setting git-setting">
+      <span id={labelId} className="git-setting-label">
+        {t('gitSettings.reviewPresentation')}
+        {managed && <ManagedBadge testId="managed-git-review" />}
+      </span>
+      <SegmentedControl
+        options={REVIEW_PRESENTATIONS}
+        value={value}
+        disabled={managed}
+        name="git-review-presentation"
+        testIdPrefix="git-setting-review"
+        aria-labelledby={labelId}
+        onChange={(presentation) => {
+          onSave({ key: 'git.reviewPresentation', value: presentation });
+        }}
+        labelOf={(presentation) => t(`gitSettings.reviewPresentation.${presentation}`)}
+      />
+      <p className="muted">{t(`gitSettings.reviewPresentationHint.${value}`)}</p>
+    </div>
   );
 }

@@ -270,8 +270,8 @@ impl Hub {
         });
     }
 
-    /// The user's `gh` for `root` and their `GH_HOST` (G5); `None` without `gh`.
-    pub(crate) async fn gh_runner(&self, root: &Path) -> Option<(piarc_git::Git, Option<String>)> {
+    /// The user's `gh` for `root` (`None` without one) and their `GH_HOST` (G5).
+    pub(crate) async fn gh_runner(&self, root: &Path) -> (Option<piarc_git::Git>, Option<String>) {
         self.ctx.tool_io.gh_runner(root).await
     }
 

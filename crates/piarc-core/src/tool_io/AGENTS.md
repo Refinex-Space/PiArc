@@ -71,6 +71,7 @@
 
 - `SessionIo.scope` 的根是会话能读写的文件根，`SessionIo.project` 是设置、规则、信任、审计、模式记忆、memory 设置与 hooks 的来源。普通会话两者相同（`open_session`）；worktree 会话与带 worktree 的子 agent 文件根是 worktree、`project` 是主工作区（`open_session_in`、`open_linked`）。读设置、写"总是允许"规则、写审计、算任务的工作区一律用 `project()`；路径边界、受保护路径、规则里的相对路径、cwd 回退用 `scope.root()`。新增读设置的入口时按这条分。
 - `git_runner(workspace)`：worktree 的 git 用命令环境与进程树启动器，git 程序从该 `PATH` 中工作区以外的目录找。
+- `gh_runner(workspace)`（G5）：用户的 `gh`（同样从 `PATH` 中工作区以外的目录找，没有时为 `None`）与登录环境的 `GH_HOST`，环境由 `piarc_git::env::gh_env` 生成。`ToolIoConfig.gh_program`（`CoreConfig.gh_program`）只给测试：开发构建的 `createForTests` 由 `PIARC_TEST_GH` 设置，测试从不运行本机的 `gh`。
 
 ## 子 agent（T31，ADR-0048）
 

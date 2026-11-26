@@ -14,7 +14,8 @@
 | 提交视图 | `git/CommitView.tsx`、`git/BranchPopup.tsx`、`git/GitPrompts.tsx`、`git/actions.ts` | 同步栏（分支弹窗、领先落后、获取、拉取、推送、进度与取消）、合并或变基中的状态条、三态复选框的文件列表、提交信息（按会话草稿、生成与停止、修正、提交与提交并推送）、选中文件的已暂存与未暂存 hunk 按钮；写操作只经 `actions.ts` 的 `run`，失败变成面板内提示或对话框（检出冲突、推送被拒、首次推送、拉取方式、分支名） |
 | 日志视图（G3，设计增补第 9.1 节） | `git/LogView.tsx`、`git/CommitDetail.tsx`、`git/graph.ts`、`git/history-actions.ts`、`git/HistoryPrompts.tsx`、`git/ImageDiff.tsx`、`git/auto-fetch.ts`、`git/history.css` | 视图切换第三项"日志"：提交表是 listbox（↑/↓、Enter 打开详情、Shift+F10 行菜单、Mod+C 复制哈希），提交图由 `graph.ts` 按父提交分配泳道（颜色令牌 `graph.lane0`–`lane7`），筛选时不画图；行菜单是复制、在改动视图查看、检出修订、新建分支或标签、拣选、还原、重置、撤销提交；"stash"列表与详情（应用、弹出、新建分支、删除）；二进制图片在 diff 里显示前后两张图（`fileBlob`，`data:` URL）；自动获取在工具或卡片可见且窗口在前台时运行（设置 `git.autoFetch`，失败只写在获取按钮的提示里）。hard 重置、删除 stash、在远端删除分支由主进程原生确认 |
 | 冲突、合并与变基（G4，设计增补第 9.2 节） | `git/conflicts.tsx`、`git/MergeView.tsx`、`git/merge3.ts`、`git/RebaseDialog.tsx`、`git/merge.css` | 分支弹窗的"合并到当前分支…"（三种方式）与"将当前分支变基到此分支"（有上游时应用内确认）；状态条也显示"有未解决的冲突"（stash 应用后），"解决…"打开冲突对话框（用我的、用他们的、合并…，可多选），中止先应用内确认，标记已解决遇到冲突标记先确认；三方合并视图（`merge3.ts`：Myers 行匹配后按 diff3 切块，单侧改动自动采用，冲突块用我的 / 他们的 / 两者 / 都不要，或编辑全文，F7 跳转），应用时 Core 核对文件仍是读取时的内容；交互式变基对话框（pick / reword / squash / fixup / drop，按钮或 Alt+↑/↓ 调整顺序）。"我的"是用户一侧：变基时由 Core 换算 |
-| 状态 | `git/state.ts` | 每个会话一份：状态、各范围的改动、提交、分支、进度；`core/git` 的 `changed` 让同一仓库的会话刷新，`progress` 给发起操作的会话。刷新时机：显示、窗口获得焦点、回合开始与结束、运行中每 10 秒、可见时每 3 秒探测指纹 |
+| PR 与审查（G5，设计增补第 9.3 节） | `git/PullRequest.tsx`、`git/ReviewPanel.tsx`、`git/review.ts`、`git/review.css` | 提交视图同步栏下方的 PR 条（`pullRequest`：编号与标题、状态、检查汇总、审查结论，“在 GitHub 上打开”经 `openExternal`，“合并 ▾”默认取 `git.mergeMethod`，草稿不能合并；没有 `gh` 或未登录时给说明与“在终端中运行”）与创建对话框（基础分支、标题、正文、草稿默认取 `git.draftPullRequests`，“生成”按 `git.prInstructions` 或目录的 `git.instructions.prDefault`）；改动视图标题行的“审查”（“全部改动”与“未提交”），结果按会话与范围放在内存（`review.ts`），按 `git.reviewPresentation` 显示在 diff 行下（`FindingsBelow`，不在 hunk 里的行列在文件头下）或按文件分组的列表；忽略、清除、上一条 / 下一条、“可能过期”、“交给 Agent 修复”（`formatFindings` 是消息格式的唯一位置，空闲时 `prompt`，运行中 `followUp`）。合并 PR 由主进程原生确认 |
+| 状态 | `git/state.ts` | 每个会话一份：状态、各范围的改动、提交、分支、进度；`core/git` 的 `changed` 让同一仓库的会话刷新，`progress` 给发起操作的会话。刷新时机：显示、窗口获得焦点、回合开始与结束、运行中每 10 秒、可见时每 3 秒探测指纹。每次读取状态后都重新读取当前范围的 diff（行数不变的修改也要显示），提交与分支只在 HEAD 或文件状态变化时重读 |
 | 本会话的改动 | `ChangesPanel.tsx`、`DiffBody.tsx` | 范围"本会话"与非仓库时的视图：按 hunk 丢弃只在这里（ADR-0084 第 3 条） |
 | 分支切换 | `BranchSwitcher.tsx`、`use-branch-actions.ts` | 有兄弟分支的用户消息显示"‹ 2 / 3 ›"；回退后尚未发送时输入框上方列出可切回的分支（`BranchTail`）；"从这里分支"新建会话，消息经 `drafts.ts` 放进新会话的输入框 |
 | diff 行内评论（T42，ADR-0060） | `comments.ts`、`DiffComments.tsx`、`DiffBody.tsx` 的 `Gutter` | 行号是按钮（Shift+点击扩成范围），评论绑定旧侧或新侧的行号范围并带摘录；按会话存 `localStorage`（`piarc.diffComments.<会话 id>`），diff 更新后 `reanchor` 先原位、再同侧按摘录找回，找不到标 `stale` 并保留文本；Mod+Enter（`isSendKey`）或"发送评论"把未失效的评论经 `formatComments` 拼成一条消息，空闲时 `prompt`，运行中 `followUp` 排队。消息格式只在 `formatComments` |
@@ -37,11 +38,14 @@
 
 - 单测：`npx vitest run apps/desktop/src/renderer/changes apps/desktop/src/renderer/store`（`rewind.test.ts`、`language.test.ts`、`user-row.test.tsx`、`store/changes.test.ts`、`store/branches.test.ts`）。
 - L4：`PIARC_EVIDENCE_TASK=T28 npx playwright test -c apps/desktop/playwright.config.ts t28-rewind --project dev`（面板、hunk 与文件丢弃、CRLF 与 BOM、Mod+Shift+D、降级、回退与撤销、焦点、分支切换、从这里分支、`/rewind`），mock 脚本在 `e2e/scenarios/t28-*.json`。
+- Git 工具：单测 `git/*.test.ts`（`review.test.ts` 是审查的过滤、排序、过期判断与消息格式）；L4 `PIARC_EVIDENCE_TASK=git npx playwright test -c apps/desktop/playwright.config.ts git- --project dev`（`git-github` 用假 `gh`：创建、生成描述、推送到本地裸仓库、原生确认后合并、两种审查呈现与“交给 Agent 修复”）。
 - 评论：单测 `comments.test.ts`（重新定位与失效、消息格式、快捷键）；L4 `PIARC_EVIDENCE_TASK=T42 npx playwright test -c apps/desktop/playwright.config.ts t42-comments --project dev`（两侧与范围、跨文件、编辑与删除、Mod+Enter 一次发送并断言 mock 收到的消息、运行中排队，亮暗截图在 `tmp/evidence/T42/`）。
 
 改动面板的文件名在当前会话的 Files 中打开，展开箭头独立控制 diff。路径的可达范围由当前会话的工作树确定。
 
 ## 易错点
 
+- L4 不运行本机的 `gh`：夹具给应用设 `PIARC_TEST_GH`（缺省是一个不存在的程序），G5 用例用 `e2e/git.ts` 的 `fakeGh` 覆盖。不要让测试仓库的 GitHub 远端在没有假 `gh` 的用例里出现。
+- 输入框放在带边框的圆角容器里时（如 Log 视图的筛选框），在容器上显示焦点、输入框自己不画 outline：全局的内嵌 outline 会在圆角框里画出直角矩形。
 - `.badge` 在 `app.css` 中有固定字号与颜色：面板与对话框的标签用自己的 `change-tag`。
 - 高亮语言名不在 worker 的 `GRAMMARS` 里时 worker 抛出 `No grammar for …`，该文件不高亮：新增扩展名映射先查 `workers/highlight.worker.ts` 的 `GRAMMARS`。

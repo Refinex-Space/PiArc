@@ -71,12 +71,15 @@ async fn target(
     let url = String::from_utf8_lossy(&reader.ok(&["remote", "get-url", &remote]).await?)
         .trim()
         .to_owned();
-    let Some((gh, gh_host)) = hub.gh_runner(&place.root).await else {
-        return Ok(Err(GitHubState::Missing));
-    };
+    // A remote elsewhere is told apart before `gh` is looked for: without `gh` it is not on
+    // GitHub either, and nothing should ask to install it.
+    let (gh, gh_host) = hub.gh_runner(&place.root).await;
     let Some(repo) = gh::repo_of(&url).filter(|r| gh::known_host(&r.host, gh_host.as_deref()))
     else {
         return Ok(Err(GitHubState::NotGithub));
+    };
+    let Some(gh) = gh else {
+        return Ok(Err(GitHubState::Missing));
     };
     Ok(Ok(Target {
         gh,
