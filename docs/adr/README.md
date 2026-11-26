@@ -59,7 +59,7 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0041](0041-windows-ahp-round-trip-budget.md) | Windows 上小文件 fs 操作的 AHP 往返预算 | 已接受 |
 | [0042](0042-plan-todo-ask-next-steps.md) | 计划模式、任务清单、提问与下一步的宿主工具（补充 ADR-0009、0031、0033、0037） | 已接受 |
 | [0043](0043-reminders-compaction-usage.md) | System reminder 通道、压缩与上下文用量（补充 ADR-0009、0027、0033、0038、0039、0042） | 已接受 |
-| [0044](0044-checkpoints-rewind-changes.md) | 检查点、回退、Changes 面板与会话分支的落地（补充 ADR-0009、0011、0026、0027、0030） | 已接受 |
+| [0044](0044-checkpoints-rewind-changes.md) | 检查点、回退、Changes 面板与会话分支的落地（补充 ADR-0009、0011、0026、0027、0030） | 已接受（第 8 条被 0084 取代） |
 | [0045](0045-webfetch-sign-in-model-settings.md) | WebFetch、服务商登录、每模型设置与辅助模型的落地（补充 ADR-0004、0006、0021、0032） | 已接受 |
 | [0046](0046-l3-behavior-alignment.md) | L3 行为对齐基座的落地（补充 ADR-0005、0006、0039） | 已接受 |
 | [0047](0047-outside-paths-before-wildcard-command-rules.md) | 越界路径的询问先于带通配的命令 allow 规则（修订 ADR-0037 阶梯第 6、7 步的顺序） | 已接受 |
@@ -98,4 +98,7 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0081](0081-session-status-marks.md) | 会话状态徽标对齐参考，仍按形状区分 | 已接受 |
 | [0082](0082-agent-host-proxy.md) | Agent Host 的网络代理 | 已接受 |
 | [0083](0083-provider-accounts-and-checks.md) | 服务商的账号、连接测试、启停与模型发现 | 已接受 |
+| [0084](0084-git-panel-scopes.md) | Git 面板的数据来源与范围：全部改动 / 未提交 / 单个提交 / 本会话，回滚只在未提交范围（取代 0044 第 8 条） | 已接受 |
+| [0085](0085-git-command-boundaries.md) | Git 命令的执行边界：只读模式命令行覆盖可执行键、写操作只在受信任项目、用户模式环境、参数约束、串行与忙碌、危险操作原生确认、回滚快照、输出脱敏、gh 约束 | 已接受（补充） |
+| [0086](0086-commit-message-generation.md) | 提交信息生成：会话级 `session/commitMessage`、Core 组装与扣下敏感文件、语言跟随界面、只填入输入框 | 已接受（补充） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |
