@@ -4,16 +4,18 @@
 // panel's refreshes (the same per-session state).
 import { useEffect } from 'react';
 
-import { useT } from '../../app/app-context.js';
+import { useApp } from '../../app/app-context.js';
 import { GitBranchIcon } from '../../shell/icons.js';
 import { revealBidi } from '../../transcript/reveal.js';
 import { ChangesCard } from '../ChangesPanel.js';
 import { openChangesPanel } from '../panel-state.js';
+import { useAutoFetch } from './auto-fetch.js';
 import { gitSession, useGit } from './state.js';
 
 export function GitCard({ sessionId }: { readonly sessionId: string }) {
-  const t = useT();
+  const { t, preferences } = useApp();
   const git = useGit(sessionId);
+  useAutoFetch(sessionId, git.status.value?.repository, preferences.git.autoFetch, true);
   useEffect(() => {
     const session = gitSession(sessionId);
     if (session.snapshot().status.value === undefined) void session.refreshStatus();

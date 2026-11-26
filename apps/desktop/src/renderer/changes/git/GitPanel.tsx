@@ -41,6 +41,8 @@ import { ChangesPanel } from '../ChangesPanel.js';
 import { isSendKey } from '../comments.js';
 import { CommentsBar, DiffCommentsProvider, useDiffCommentsState } from '../DiffComments.js';
 import { CommitView } from './CommitView.js';
+import { LogView } from './LogView.js';
+import { useAutoFetch } from './auto-fetch.js';
 import { FileColumn } from './FileColumn.js';
 import { claimCommands } from './focus.js';
 import { asChangesFile, FileSection } from './GitDiff.js';
@@ -73,13 +75,14 @@ const PROBE_MS = 3000;
 /** How often the status is read while the session's turn runs. */
 const RUNNING_MS = 10_000;
 
-type View = 'changes' | 'commit';
+type View = 'changes' | 'commit' | 'log';
 
 const VIEW_KEY = 'piarc.git.view.v1';
 
 function rememberedView(): View {
   try {
-    return window.localStorage.getItem(VIEW_KEY) === 'commit' ? 'commit' : 'changes';
+    const saved = window.localStorage.getItem(VIEW_KEY);
+    return saved === 'commit' || saved === 'log' ? saved : 'changes';
   } catch {
     return 'changes';
   }
@@ -198,11 +201,12 @@ function commentHeading(choice: ScopeChoice, changes: Changes | undefined): stri
 }
 
 export function GitPanel({ sessionId }: { readonly sessionId: string }) {
-  const { t } = useApp();
+  const { t, preferences } = useApp();
   const git = useGit(sessionId);
   const actions = useGitActions(sessionId);
   const visible = useToolVisible();
   useGitRefresh(sessionId, visible);
+  useAutoFetch(sessionId, git.status.value?.repository, preferences.git.autoFetch, visible);
   const root = useRef<HTMLDivElement>(null);
   const width = useWidth(root);
   const [view, setViewState] = useState<View>(rememberedView);
@@ -303,6 +307,27 @@ export function GitPanel({ sessionId }: { readonly sessionId: string }) {
       );
     }
     if (view === 'commit') return <CommitView sessionId={sessionId} git={git} width={width} />;
+    if (view === 'log' && repo !== undefined) {
+      return (
+        <LogView
+          sessionId={sessionId}
+          git={git}
+          repo={repo}
+          actions={actions}
+          width={width}
+          display={{
+            split: display.layout === 'split' && (width === 0 || width >= SPLIT_FIT_WIDTH * 2),
+            wrap: display.wrap,
+            wordDiff: display.wordDiff,
+            hideWhitespace: display.hideWhitespace,
+          }}
+          onShowCommit={(choice) => {
+            setScope(choice);
+            setView('changes');
+          }}
+        />
+      );
+    }
     if (effectiveScope.kind === 'session') return <ChangesPanel sessionId={sessionId} />;
     return (
       <GitChangesView
@@ -326,10 +351,10 @@ export function GitPanel({ sessionId }: { readonly sessionId: string }) {
             <span className="git-heading-title">{t('panel.changes')}</span>
           ) : (
             <SegmentedControl
-              options={['changes', 'commit'] as const}
+              options={['changes', 'commit', 'log'] as const}
               value={view}
               onChange={setView}
-              labelOf={(v) => t(v === 'changes' ? 'git.view.changes' : 'git.view.commit')}
+              labelOf={(v) => t(`git.view.${v}`)}
               aria-label={t('git.view.label')}
               testId="git-view"
               testIdPrefix="git-view"
@@ -585,7 +610,7 @@ function DisplayMenu({
     },
   };
   const items: MenuItem[] =
-    view === 'commit'
+    view !== 'changes'
       ? [refresh]
       : [
           ...(compact
@@ -964,6 +989,7 @@ function GitChangesView({
                 open={open.has(file.path)}
                 current={current === file.path}
                 highlight={transcriptServices.highlight}
+                mergeBase={changes.base?.mergeBase}
                 onToggle={() => {
                   setOpen((old) => {
                     const next = new Set(old);

@@ -6,6 +6,7 @@
 import { useEffect, useId, useState } from 'react';
 
 import {
+  AUTO_FETCH_MINUTES,
   DEFAULT_PROTECTED_BRANCHES,
   GIT_LIMITS,
   isBranchPattern,
@@ -13,6 +14,7 @@ import {
   PULL_MODES,
   type PreferenceChange,
 } from '../../shared/preferences.js';
+import type { MessageId } from '../../shared/i18n/index.js';
 import { Button } from '../app/Button.js';
 import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
@@ -49,6 +51,7 @@ export function GitPage() {
         </h2>
         <PullModeRow value={git.pullMode} onSave={save} />
         <ForcePushRow value={git.alwaysForcePush} onSave={save} />
+        <AutoFetchRow value={git.autoFetch} onSave={save} />
       </section>
       <section className="settings-subsection" aria-labelledby="git-settings-commits">
         <h2 id="git-settings-commits" className="permission-heading">
@@ -274,6 +277,52 @@ function ForcePushRow({
         {t('gitSettings.forcePush')}
       </label>
       <p className="muted">{t('gitSettings.forcePushHint')}</p>
+    </div>
+  );
+}
+
+const AUTO_FETCH_LABELS = {
+  0: 'gitSettings.autoFetch.0',
+  5: 'gitSettings.autoFetch.5',
+  15: 'gitSettings.autoFetch.15',
+  30: 'gitSettings.autoFetch.30',
+  60: 'gitSettings.autoFetch.60',
+} as const satisfies Record<(typeof AUTO_FETCH_MINUTES)[number], MessageId>;
+
+function AutoFetchRow({
+  value,
+  onSave,
+}: {
+  readonly value: (typeof AUTO_FETCH_MINUTES)[number];
+  readonly onSave: (change: PreferenceChange) => void;
+}) {
+  const { t } = useApp();
+  const selectId = useId();
+  const managed = useIsManaged('/git/autoFetch');
+  return (
+    <div className="setting git-setting">
+      <label htmlFor={selectId} className="git-setting-label">
+        {t('gitSettings.autoFetch')}
+        {managed && <ManagedBadge testId="managed-git-auto-fetch" />}
+      </label>
+      <select
+        id={selectId}
+        className="input git-setting-select"
+        value={String(value)}
+        disabled={managed}
+        data-testid="git-setting-auto-fetch"
+        onChange={(event) => {
+          const minutes = AUTO_FETCH_MINUTES.find((m) => String(m) === event.currentTarget.value);
+          if (minutes !== undefined) onSave({ key: 'git.autoFetch', value: minutes });
+        }}
+      >
+        {AUTO_FETCH_MINUTES.map((minutes) => (
+          <option key={minutes} value={String(minutes)}>
+            {t(AUTO_FETCH_LABELS[minutes])}
+          </option>
+        ))}
+      </select>
+      <p className="muted">{t('gitSettings.autoFetchHint')}</p>
     </div>
   );
 }

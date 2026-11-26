@@ -186,6 +186,12 @@ export const A11Y_STATES = [
     note: 'Git tool: the Commit view with a staged file and the message box',
   },
   { id: 'state:git-branches', area: 'state', note: 'Git tool: the branch popup' },
+  {
+    id: 'state:git-log',
+    area: 'state',
+    note: 'Git tool: the Log view with the commit graph and the details of a commit',
+  },
+  { id: 'state:git-stashes', area: 'state', note: 'Git tool: a stash and its details' },
   { id: 'panel:side-chat', area: 'panel', panel: 'side-chat', note: 'side conversation' },
   {
     id: 'state:md-read',
@@ -291,6 +297,12 @@ export const A11Y_STATES = [
     area: 'dialog',
     source: 'changes/git/GitPrompts.tsx',
     note: 'Git: a new branch name',
+  },
+  {
+    id: 'dialog:git-history',
+    area: 'dialog',
+    source: 'changes/git/HistoryPrompts.tsx',
+    note: 'Git: reset the branch to a commit',
   },
   {
     id: 'dialog:terminal-text',

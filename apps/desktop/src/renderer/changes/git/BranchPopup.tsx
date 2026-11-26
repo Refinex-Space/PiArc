@@ -16,6 +16,7 @@ import { useT } from '../../app/app-context.js';
 import { useSurfaceDocument } from '../../app/surface-document.js';
 import { isImeComposing } from '../../composer/ime-guard.js';
 import { MenuPopup, useMenu, type MenuItem } from '../../shell/Menu.js';
+import { useHistoryActions } from './history-actions.js';
 import { CheckIcon, GitBranchIcon, PlusIcon, SpinnerGlyph, TagIcon } from '../../shell/icons.js';
 import { revealBidi } from '../../transcript/reveal.js';
 import { fuzzyFilter } from '../../../shared/fuzzy.js';
@@ -70,6 +71,7 @@ export function BranchPopup({
   const [showAll, setShowAll] = useState(false);
   const [place, setPlace] = useState<{ left: number; top: number; maxHeight: number }>();
   const menu = useMenu();
+  const history = useHistoryActions(sessionId, actions);
   const [menuRow, setMenuRow] = useState<Row | undefined>(undefined);
   const branches = git.branches.value;
   useEffect(() => {
@@ -258,6 +260,17 @@ export function BranchPopup({
           label: t('git.branch.newFrom', { name: full }),
           run: () => {
             newBranch(full);
+          },
+        },
+        {
+          id: 'deleteRemote',
+          label: t('git.branch.deleteRemote', { remote: row.branch.remote }),
+          testId: 'git-branch-delete-remote',
+          danger: true,
+          ...(repo.writable ? {} : { disabled: true, hint: t('git.log.untrusted') }),
+          run: () => {
+            onClose();
+            void history.deleteRemoteBranch(row.branch.remote, row.branch.name);
           },
         },
       ];

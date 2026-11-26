@@ -22,6 +22,7 @@ import { PanelEmpty } from '../../shell/PanelEmpty.js';
 import { useUi } from '../../shell/ui.js';
 import {
   CheckIcon,
+  ArchiveIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   FetchIcon,
@@ -35,6 +36,8 @@ import {
   SpinnerGlyph,
   StopGlyph,
 } from '../../shell/icons.js';
+import { StashButtonDialog } from './LogView.js';
+import { useAutoFetchFailure } from './auto-fetch.js';
 import { revealBidi } from '../../transcript/reveal.js';
 import { isImeComposing } from '../../composer/ime-guard.js';
 import { pushNotice, useGitActions, useGitBoard, type GitActions } from './actions.js';
@@ -307,6 +310,9 @@ function SyncBar({
   const t = useT();
   const board = useGitBoard(sessionId);
   const [branches, setBranches] = useState<HTMLElement | undefined>(undefined);
+  const [stashing, setStashing] = useState(false);
+  const autoFetchFailure = useAutoFetchFailure(repo.root);
+  const dirty = (git.status.value?.files.length ?? 0) > 0;
   const running = [...board.running.entries()].filter(([, label]) => label !== '');
   const busy = board.running.size > 0;
   const branch = repo.detached ? `HEAD ${(repo.head ?? '').slice(0, 7)}` : (repo.branch ?? '');
@@ -339,7 +345,11 @@ function SyncBar({
       </button>
       <span className="git-sync-spacer" />
       <IconButton
-        label={t('git.sync.fetch')}
+        label={
+          autoFetchFailure === undefined
+            ? t('git.sync.fetch')
+            : t('git.sync.autoFetchFailed', { reason: autoFetchFailure })
+        }
         size="sm"
         disabled={busy || noRemote || !repo.writable}
         data-testid="git-fetch"
@@ -366,6 +376,17 @@ function SyncBar({
         onClick={() => void actions.push()}
       >
         <PushIcon />
+      </IconButton>
+      <IconButton
+        label={t('git.sync.stash')}
+        size="sm"
+        disabled={busy || !dirty || !repo.writable}
+        data-testid="git-stash"
+        onClick={() => {
+          setStashing(true);
+        }}
+      >
+        <ArchiveIcon />
       </IconButton>
       {running.length === 0 ? null : (
         <div className="git-progress" role="status" data-testid="git-progress">
@@ -394,6 +415,15 @@ function SyncBar({
             );
           })}
         </div>
+      )}
+      {!stashing ? null : (
+        <StashButtonDialog
+          sessionId={sessionId}
+          actions={actions}
+          onClose={() => {
+            setStashing(false);
+          }}
+        />
       )}
       {branches === undefined ? null : (
         <BranchPopup

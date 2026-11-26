@@ -16,7 +16,7 @@ import { IPC_CHANNELS } from '../src/shared/ipc.js';
 import { expectTestHooks } from './core.js';
 import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from './oauth.js';
 import { idle, killAgentHost, openSession, prefer, send } from './t19.js';
-import { makeRepository } from './git.js';
+import { git, makeRepository } from './git.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -618,6 +618,29 @@ test('the Git tool in a repository: changes, commit view, branches and a branch 
   await expect(page.getByTestId('git-branch-name-dialog')).toBeVisible();
   await checkState(page, 'dialog:git-prompt');
   await page.keyboard.press('Escape');
+
+  // G3: the Log view with a commit's details (one column at this width), the reset dialog,
+  // and a stash.
+  await page.getByTestId('git-view-log').click();
+  await page.getByTestId('git-log-row').filter({ hasText: 'feat: add login' }).click();
+  await expect(page.getByTestId('git-commit-detail')).toBeVisible();
+  await checkState(page, 'state:git-log');
+  if (await page.getByTestId('git-log-back').isVisible()) {
+    await page.getByTestId('git-log-back').click();
+  }
+  await page
+    .getByTestId('git-log-row')
+    .filter({ hasText: 'chore: initial commit' })
+    .click({ button: 'right' });
+  await page.getByTestId('git-log-reset').click();
+  await expect(page.getByTestId('git-reset-dialog')).toBeVisible();
+  await checkState(page, 'dialog:git-history');
+  await page.keyboard.press('Escape');
+  await git(ws, 'stash', '-q', '-u', '-m', '半成品 work in progress');
+  await page.getByTestId('git-log-mode-stashes').click();
+  await page.getByTestId('git-stash-row').click();
+  await expect(page.getByTestId('git-stash-detail')).toBeVisible();
+  await checkState(page, 'state:git-stashes');
 });
 
 test('every listed state was checked in this run', async () => {

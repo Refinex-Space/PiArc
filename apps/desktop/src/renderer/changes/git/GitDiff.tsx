@@ -19,6 +19,7 @@ import type { Side } from '../comments.js';
 import { Gutter, useHighlighted } from '../DiffBody.js';
 import { CommentEditorRow, CommentRow, useDiffComments } from '../DiffComments.js';
 import { languageOf } from '../language.js';
+import { ImageDiff, imageType } from './ImageDiff.js';
 import { changedWords, gapsOf, GAP_STEP, pairedLines, splitRows, type Gap } from './model.js';
 import { fileChangeOf, gitCall, textOf, type FileChange, type Scope } from './protocol.js';
 
@@ -429,6 +430,8 @@ export interface FileSectionProps {
   readonly onToggle: () => void;
   readonly onOpenFile: ((path: string) => void) | undefined;
   readonly onMenu: (file: FileChange, x: number, y: number) => void;
+  /** The branch scope's merge base: the old side of an image diff. */
+  readonly mergeBase?: string | undefined;
 }
 
 /** One file of the diff list. */
@@ -441,6 +444,7 @@ export function FileSection(props: FileSectionProps) {
   const [shown, setShown] = useState(new Map<number, { top: number; bottom: number }>());
   const diff = file.diff ?? loaded;
   const withheld = diff === undefined && !file.binary && !file.submodule;
+  const image = file.binary && imageType(file.path) !== undefined;
   useEffect(() => {
     if (!open || !withheld || loading || loaded !== undefined) return;
     setLoading(true);
@@ -520,7 +524,7 @@ export function FileSection(props: FileSectionProps) {
           className="git-file-toggle"
           aria-expanded={open}
           aria-label={t('git.file.toggle', { path: revealBidi(file.path) })}
-          disabled={diff === undefined && !withheld}
+          disabled={diff === undefined && !withheld && !image}
           data-testid="git-file-toggle"
           onClick={props.onToggle}
         >
@@ -587,7 +591,9 @@ export function FileSection(props: FileSectionProps) {
           </IconButton>
         </span>
       </header>
-      {!open ? null : loading ? (
+      {open && image ? (
+        <ImageDiff sessionId={sessionId} file={file} scope={scope} mergeBase={props.mergeBase} />
+      ) : !open ? null : loading ? (
         <p className="git-note">{t('git.diff.loading')}</p>
       ) : diff?.degraded === true ? (
         <pre className="git-plain" data-testid="git-plain">

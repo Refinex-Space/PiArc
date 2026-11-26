@@ -150,6 +150,7 @@ describe('i18n', () => {
             pattern: 'release/*',
             language: 'English',
             leaving: 2,
+            label: 'Before',
             pushed: 1,
             oid: 'abc1234',
           }),
