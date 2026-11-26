@@ -13,8 +13,8 @@ use piarc_git::index::{self, HunkAction, HunkOutcome};
 use piarc_git::remote::{self, PushSpec, RemoteOutcome, Sequencer};
 use piarc_git::{Cancel, Git, GitError, Progress, Reader, Writer, args};
 use piarc_protocol::git::{
-    GitCheckoutMode, GitDescribe, GitDescription, GitEvent, GitFailure, GitFailureKind,
-    GitHunkRef, GitOpResult, GitPushTarget, GitRequest,
+    GitCheckoutMode, GitDescribe, GitDescription, GitEvent, GitFailure, GitFailureKind, GitHunkRef,
+    GitOpResult, GitPushTarget, GitRequest,
 };
 use serde_json::{Value, json};
 
@@ -64,8 +64,11 @@ impl Context<'_> {
                 instructions,
                 amend,
             } => {
-                super::message::generate(&self, language, &instructions, amend == Some(true))
-                    .await
+                // The staged changes leave the machine: a trusted project only (ADR-0086).
+                if !self.hub.trusted(&self.place.project).await {
+                    return reply_failure(GitFailure::of(GitFailureKind::Untrusted));
+                }
+                super::message::generate(&self, language, &instructions, amend == Some(true)).await
             }
             other => self.write(other).await,
         }
@@ -97,7 +100,11 @@ impl Context<'_> {
         }
     }
 
-    async fn perform(&self, writer: &Writer, request: GitRequest) -> std::result::Result<Answer, GitError> {
+    async fn perform(
+        &self,
+        writer: &Writer,
+        request: GitRequest,
+    ) -> std::result::Result<Answer, GitError> {
         match request {
             GitRequest::Stage { paths } => {
                 retry(|| index::stage(writer, &paths)).await?;
@@ -113,9 +120,7 @@ impl Context<'_> {
                 Ok(Ok(GitOpResult::default()))
             }
             GitRequest::StageHunk { hunk } => self.hunk(writer, &hunk, HunkAction::Stage).await,
-            GitRequest::UnstageHunk { hunk } => {
-                self.hunk(writer, &hunk, HunkAction::Unstage).await
-            }
+            GitRequest::UnstageHunk { hunk } => self.hunk(writer, &hunk, HunkAction::Unstage).await,
             GitRequest::RollbackHunk { hunk } => self.rollback_hunk(writer, &hunk).await,
             GitRequest::Rollback { paths } => self.rollback(writer, &paths).await,
             GitRequest::UndoRollback { restore_id } => self.undo(writer, &restore_id).await,
@@ -128,7 +133,8 @@ impl Context<'_> {
                     .await
             }
             GitRequest::Checkout { target, mode } => {
-                self.checkout(writer, &target, mode.unwrap_or_default()).await
+                self.checkout(writer, &target, mode.unwrap_or_default())
+                    .await
             }
             other => self.branch_or_remote(writer, other).await,
         }
@@ -176,9 +182,14 @@ impl Context<'_> {
                     Some(mode) => mode,
                     None => self.hub.git_settings(&self.place.project).await.pull_mode,
                 };
-                let outcome =
-                    remote::pull(&self.reader, writer, mode, self.progress(), self.cancel.clone())
-                        .await?;
+                let outcome = remote::pull(
+                    &self.reader,
+                    writer,
+                    mode,
+                    self.progress(),
+                    self.cancel.clone(),
+                )
+                .await?;
                 self.hub.forget_root(&self.reader.repo.root);
                 Ok(remote_answer(outcome, "git pull"))
             }
@@ -215,7 +226,8 @@ impl Context<'_> {
             return Ok(fail(GitFailureKind::Failed, "checkpoints are not open"));
         };
         let root = self.reader.repo.root.clone();
-        let mut files = restore::snapshot(&self.reader, &store, std::slice::from_ref(&hunk.path)).await?;
+        let mut files =
+            restore::snapshot(&self.reader, &store, std::slice::from_ref(&hunk.path)).await?;
         if index::apply_hunk(&self.reader, writer, hunk, HunkAction::Rollback).await?
             == HunkOutcome::Stale
         {
@@ -224,14 +236,19 @@ impl Context<'_> {
         restore::settle(&root, &mut files);
         self.hub.forget_paths(&[root.join(&hunk.path)]);
         let id = self.keep(files);
-        self.audit("rollback", json!({ "paths": 1, "hunk": true })).await;
+        self.audit("rollback", json!({ "paths": 1, "hunk": true }))
+            .await;
         Ok(Ok(GitOpResult {
             restore_id: Some(id),
             ..GitOpResult::default()
         }))
     }
 
-    async fn rollback(&self, writer: &Writer, paths: &[String]) -> std::result::Result<Answer, GitError> {
+    async fn rollback(
+        &self,
+        writer: &Writer,
+        paths: &[String],
+    ) -> std::result::Result<Answer, GitError> {
         let Some(store) = self.hub.snapshot_store() else {
             return Ok(fail(GitFailureKind::Failed, "checkpoints are not open"));
         };
@@ -242,7 +259,11 @@ impl Context<'_> {
             paths.iter().cloned().partition(|p| in_head.contains(p));
         if !tracked.is_empty() {
             retry(|| {
-                index::with_paths(writer, &["restore", "--source=HEAD", "--staged", "--worktree"], &tracked)
+                index::with_paths(
+                    writer,
+                    &["restore", "--source=HEAD", "--staged", "--worktree"],
+                    &tracked,
+                )
             })
             .await?;
         }
@@ -260,7 +281,8 @@ impl Context<'_> {
         let touched: Vec<PathBuf> = paths.iter().map(|p| root.join(p)).collect();
         self.hub.forget_paths(&touched);
         let id = self.keep(files);
-        self.audit("rollback", json!({ "paths": paths.len() })).await;
+        self.audit("rollback", json!({ "paths": paths.len() }))
+            .await;
         Ok(Ok(GitOpResult {
             restore_id: Some(id),
             ..GitOpResult::default()
@@ -280,8 +302,25 @@ impl Context<'_> {
             self.hub.git_state().restores.take(id, self.session),
             self.hub.snapshot_store(),
         ) else {
-            return Ok(fail(GitFailureKind::Stale, "this rollback can no longer be undone"));
+            return Ok(fail(
+                GitFailureKind::Stale,
+                "this rollback can no longer be undone",
+            ));
         };
+        // Nothing is written back unless every file still holds what the rollback left; the
+        // record stays for another try (SPEC B1.6).
+        let changed: Vec<String> = record
+            .files
+            .iter()
+            .filter(|file| !restore::unchanged_since(&record.root, file))
+            .map(|file| file.path.clone())
+            .collect();
+        if !changed.is_empty() {
+            self.hub.git_state().restores.put_back(id, record);
+            let mut failure = GitFailure::of(GitFailureKind::Stale);
+            failure.paths = changed;
+            return Ok(Err(failure));
+        }
         let mut changed = Vec::new();
         for file in &record.files {
             let session = self.session.to_owned();
@@ -295,7 +334,11 @@ impl Context<'_> {
                 Err(reason) => return Ok(fail(GitFailureKind::Failed, reason)),
             }
         }
-        let touched: Vec<PathBuf> = record.files.iter().map(|f| record.root.join(&f.path)).collect();
+        let touched: Vec<PathBuf> = record
+            .files
+            .iter()
+            .map(|f| record.root.join(&f.path))
+            .collect();
         self.hub.forget_paths(&touched);
         if changed.is_empty() {
             Ok(Ok(GitOpResult::default()))
@@ -314,12 +357,22 @@ impl Context<'_> {
         signoff: bool,
     ) -> std::result::Result<Answer, GitError> {
         if !commit::has_identity(writer).await? {
-            return Ok(Err(GitFailure::of(GitFailureKind::Identity)));
+            return Ok(Err(identity_failure()));
         }
         if !amend && !commit::has_staged(&self.reader).await? {
             return Ok(Err(GitFailure::of(GitFailureKind::NothingToCommit)));
         }
-        let outcome = commit::commit(writer, message, amend, signoff, self.cancel.clone()).await?;
+        // Another git holding the index lock gets the same two retries as the index writes.
+        let mut tries = 0;
+        let outcome = loop {
+            let outcome =
+                commit::commit(writer, message, amend, signoff, self.cancel.clone()).await?;
+            if !matches!(outcome, CommitOutcome::Locked) || tries == 2 {
+                break outcome;
+            }
+            tries += 1;
+            tokio::time::sleep(Duration::from_millis(300)).await;
+        };
         Ok(match outcome {
             CommitOutcome::Committed {
                 head,
@@ -331,7 +384,8 @@ impl Context<'_> {
                 output: Some(clean(&output)).filter(|o| !o.is_empty()),
                 ..GitOpResult::default()
             }),
-            CommitOutcome::Identity => Err(GitFailure::of(GitFailureKind::Identity)),
+            CommitOutcome::Identity => Err(identity_failure()),
+            CommitOutcome::Locked => Err(GitFailure::of(GitFailureKind::Busy)),
             CommitOutcome::NothingToCommit => Err(GitFailure::of(GitFailureKind::NothingToCommit)),
             CommitOutcome::HookFailed(out) => fail(GitFailureKind::HookFailed, out),
             CommitOutcome::Failed(out) => fail(GitFailureKind::Failed, out),
@@ -347,7 +401,8 @@ impl Context<'_> {
         let outcome = branches::checkout(&self.reader, writer, target, mode).await?;
         self.hub.forget_root(&self.reader.repo.root);
         if mode == GitCheckoutMode::Force {
-            self.audit("forceCheckout", json!({ "target": target })).await;
+            self.audit("forceCheckout", json!({ "target": target }))
+                .await;
         }
         let with_paths = |kind, paths: Vec<String>| {
             let mut failure = GitFailure::of(kind);
@@ -369,9 +424,17 @@ impl Context<'_> {
         })
     }
 
-    async fn delete(&self, writer: &Writer, name: &str, force: bool) -> std::result::Result<Answer, GitError> {
+    async fn delete(
+        &self,
+        writer: &Writer,
+        name: &str,
+        force: bool,
+    ) -> std::result::Result<Answer, GitError> {
         if piarc_git::worktree::head_branch(&self.reader.repo.root).as_deref() == Some(name) {
-            return Ok(fail(GitFailureKind::Invalid, "the current branch cannot be deleted"));
+            return Ok(fail(
+                GitFailureKind::Invalid,
+                "the current branch cannot be deleted",
+            ));
         }
         match branches::delete(&self.reader, writer, name, force).await? {
             DeleteOutcome::NotMerged => Ok(Err(GitFailure::of(GitFailureKind::NotMerged))),
@@ -389,7 +452,11 @@ impl Context<'_> {
         }
     }
 
-    async fn sequence(&self, writer: &Writer, action: Sequencer) -> std::result::Result<Answer, GitError> {
+    async fn sequence(
+        &self,
+        writer: &Writer,
+        action: Sequencer,
+    ) -> std::result::Result<Answer, GitError> {
         let outcome = remote::sequence(&self.reader, writer, action).await?;
         self.hub.forget_root(&self.reader.repo.root);
         Ok(remote_answer(outcome, ""))
@@ -401,7 +468,10 @@ impl Context<'_> {
         target: Option<GitPushTarget>,
     ) -> std::result::Result<std::result::Result<(String, PushSpec), GitFailure>, GitError> {
         let Some(local) = piarc_git::worktree::head_branch(&self.reader.repo.root) else {
-            return Ok(Err(GitFailure::new(GitFailureKind::Invalid, "HEAD is detached")));
+            return Ok(Err(GitFailure::new(
+                GitFailureKind::Invalid,
+                "HEAD is detached",
+            )));
         };
         if let Some(target) = target {
             return Ok(Ok((
@@ -453,14 +523,22 @@ impl Context<'_> {
             return Ok(Err(bad(&e)));
         }
         let settings = self.hub.git_settings(&self.place.project).await;
-        let forced = force || settings.always_force_push;
+        let protected = is_protected(&local, &settings.protected)
+            || is_protected(&spec.branch, &settings.protected);
+        // An explicit force push of a protected branch is refused; "always force push" leaves
+        // protected branches to plain pushes (SPEC A8.2, B4.3).
+        if force && protected {
+            return Ok(Err(GitFailure::of(GitFailureKind::Protected)));
+        }
+        let forced = force || (settings.always_force_push && !protected);
         if forced {
-            if is_protected(&local, &settings.protected) || is_protected(&spec.branch, &settings.protected) {
-                return Ok(Err(GitFailure::of(GitFailureKind::Protected)));
-            }
             let lease = match expect {
                 Some(oid) => oid,
-                None => self.reader.tracking_oid(&spec.remote, &spec.branch).await?.unwrap_or_default(),
+                None => self
+                    .reader
+                    .tracking_oid(&spec.remote, &spec.branch)
+                    .await?
+                    .unwrap_or_default(),
             };
             spec.lease = Some(lease);
         }
@@ -488,22 +566,20 @@ impl Context<'_> {
                 description.paths = self.reader.changed_tracked().await?;
                 description.branch = Some(target);
             }
-            GitDescribe::ForcePush { target } => {
-                match self.push_spec(target).await? {
-                    Err(failure) => description.refused = Some(failure),
-                    Ok((local, spec)) => {
-                        let protected = self.hub.git_settings(&self.place.project).await.protected;
-                        if is_protected(&local, &protected) || is_protected(&spec.branch, &protected) {
-                            description.refused = Some(GitFailure::of(GitFailureKind::Protected));
-                        }
-                        description.remote_oid =
-                            self.reader.tracking_oid(&spec.remote, &spec.branch).await?;
-                        description.local_oid = self.reader.repo_head().await?;
-                        description.branch = Some(spec.branch);
-                        description.remote = Some(spec.remote);
+            GitDescribe::ForcePush { target } => match self.push_spec(target).await? {
+                Err(failure) => description.refused = Some(failure),
+                Ok((local, spec)) => {
+                    let protected = self.hub.git_settings(&self.place.project).await.protected;
+                    if is_protected(&local, &protected) || is_protected(&spec.branch, &protected) {
+                        description.refused = Some(GitFailure::of(GitFailureKind::Protected));
                     }
+                    description.remote_oid =
+                        self.reader.tracking_oid(&spec.remote, &spec.branch).await?;
+                    description.local_oid = self.reader.repo_head().await?;
+                    description.branch = Some(spec.branch);
+                    description.remote = Some(spec.remote);
                 }
-            }
+            },
         }
         Ok(description)
     }
@@ -518,8 +594,12 @@ impl Context<'_> {
             let Some((phase, percent)) = remote::parse_progress(line) else {
                 return;
             };
-            let mut seen = last.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            let quiet = seen.0.is_some_and(|t| t.elapsed() < Duration::from_millis(100));
+            let mut seen = last
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let quiet = seen
+                .0
+                .is_some_and(|t| t.elapsed() < Duration::from_millis(100));
             if quiet && seen.1 == phase && percent != Some(100) {
                 return;
             }
@@ -588,6 +668,16 @@ where
     }
 }
 
+/// No committer identity: the commands to set one, for the user to complete in a terminal.
+fn identity_failure() -> GitFailure {
+    let mut failure = GitFailure::of(GitFailureKind::Identity);
+    failure.command = Some(
+        "git config user.name \"Your Name\" && git config user.email \"you@example.com\""
+            .to_owned(),
+    );
+    failure
+}
+
 /// Operations that rewrite files a running session may be working on.
 fn rewrites_files(request: &GitRequest) -> bool {
     matches!(
@@ -608,12 +698,49 @@ fn rewrites_files(request: &GitRequest) -> bool {
     )
 }
 
+/// A push's target and expected remote object.
+fn check_push(
+    target: Option<&GitPushTarget>,
+    expect: Option<&str>,
+) -> std::result::Result<(), GitFailure> {
+    if let Some(t) = target {
+        args::check_branch_name(&t.branch).map_err(|e| bad(&e))?;
+        if t.remote.starts_with('-') || t.remote.contains([':', '/', '\\']) {
+            return Err(GitFailure::new(
+                GitFailureKind::Invalid,
+                "not a remote name",
+            ));
+        }
+    }
+    match expect {
+        Some(oid) if !args::is_object_id(oid) => {
+            Err(GitFailure::new(GitFailureKind::Invalid, "not an object id"))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Commit instructions: at most 8,192 characters, as the settings page and the main process
+/// count them.
+fn check_instructions(instructions: &str) -> std::result::Result<(), GitFailure> {
+    if instructions.chars().count() > 8 * 1024 {
+        return Err(GitFailure::new(
+            GitFailureKind::Invalid,
+            "instructions are too long",
+        ));
+    }
+    Ok(())
+}
+
 /// Checks every value a write request passes to git.
 fn check(request: &GitRequest) -> std::result::Result<(), GitFailure> {
     let path = |p: &String| args::check_path(p).map_err(|e| bad(&e));
     let paths = |list: &[String]| {
         if list.is_empty() || list.len() > 10_000 {
-            return Err(GitFailure::new(GitFailureKind::Invalid, "no or too many paths"));
+            return Err(GitFailure::new(
+                GitFailureKind::Invalid,
+                "no or too many paths",
+            ));
         }
         list.iter().try_for_each(path)
     };
@@ -630,7 +757,10 @@ fn check(request: &GitRequest) -> std::result::Result<(), GitFailure> {
         | GitRequest::RollbackHunk { hunk: h } => hunk(h),
         GitRequest::Commit { message, .. } => {
             if message.trim().is_empty() || message.len() > commit::MAX_MESSAGE {
-                Err(GitFailure::new(GitFailureKind::Invalid, "empty or overlong message"))
+                Err(GitFailure::new(
+                    GitFailureKind::Invalid,
+                    "empty or overlong message",
+                ))
             } else {
                 Ok(())
             }
@@ -653,36 +783,47 @@ fn check(request: &GitRequest) -> std::result::Result<(), GitFailure> {
             }
             upstream.as_deref().map_or(Ok(()), rev)
         }
-        GitRequest::SetUpstream { branch: b, upstream } => {
+        GitRequest::SetUpstream {
+            branch: b,
+            upstream,
+        } => {
             branch(b)?;
             upstream.as_deref().map_or(Ok(()), rev)
         }
-        GitRequest::Push { target, expect, .. } => {
-            if let Some(t) = target {
-                branch(&t.branch)?;
-                if t.remote.starts_with('-') || t.remote.contains([':', '/', '\\']) {
-                    return Err(GitFailure::new(GitFailureKind::Invalid, "not a remote name"));
-                }
-            }
-            match expect {
-                Some(oid) if !args::is_object_id(oid) => {
-                    Err(GitFailure::new(GitFailureKind::Invalid, "not an object id"))
-                }
-                _ => Ok(()),
-            }
-        }
-        GitRequest::CommitMessage { instructions, .. } if instructions.len() > 8 * 1024 => Err(
-            GitFailure::new(GitFailureKind::Invalid, "instructions are too long"),
-        ),
+        GitRequest::Push { target, expect, .. } => check_push(target.as_ref(), expect.as_deref()),
+        GitRequest::CommitMessage { instructions, .. } => check_instructions(instructions),
         GitRequest::Describe { action } => match action {
             GitDescribe::Rollback { paths: list } => paths(list),
             GitDescribe::RollbackHunk { hunk: h } => hunk(h),
             GitDescribe::DeleteBranch { name } => branch(name),
             GitDescribe::ForceCheckout { target } => rev(target),
-            GitDescribe::ForcePush { target } => target
-                .as_ref()
-                .map_or(Ok(()), |t| branch(&t.branch)),
+            GitDescribe::ForcePush { target } => {
+                target.as_ref().map_or(Ok(()), |t| branch(&t.branch))
+            }
         },
         _ => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use piarc_protocol::git::{GitLanguage, GitRequest};
+
+    use super::check;
+
+    fn message(instructions: String) -> GitRequest {
+        GitRequest::CommitMessage {
+            language: GitLanguage::SimplifiedChinese,
+            instructions,
+            amend: None,
+        }
+    }
+
+    /// The settings page and the main process count characters; so does Core (8,192).
+    #[test]
+    fn instructions_are_limited_in_characters_not_bytes() {
+        assert!(check(&message("中".repeat(8 * 1024))).is_ok());
+        assert!(check(&message("中".repeat(8 * 1024 + 1))).is_err());
+        assert!(check(&message("a".repeat(8 * 1024 + 1))).is_err());
     }
 }

@@ -56,6 +56,18 @@ impl Restores {
         id
     }
 
+    /// Keeps a taken record again under its id (an undo that did not happen).
+    pub fn put_back(&self, id: &str, restore: Restore) {
+        let mut entries = self
+            .entries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if entries.len() >= KEPT {
+            entries.pop_front();
+        }
+        entries.push_back((id.to_owned(), restore));
+    }
+
     /// Takes rollback `id` of session `session`.
     pub fn take(&self, id: &str, session: &str) -> Option<Restore> {
         let mut entries = self
@@ -106,6 +118,11 @@ pub(crate) fn settle(root: &Path, files: &mut [RestoredFile]) {
     for file in files {
         file.after = index::worktree_bytes(root, &file.path).map(|b| hash_of(&b));
     }
+}
+
+/// Whether `file` still holds what the rollback left.
+pub(crate) fn unchanged_since(root: &Path, file: &RestoredFile) -> bool {
+    index::worktree_bytes(root, &file.path).map(|b| hash_of(&b)) == file.after
 }
 
 /// Replaces a file under the session's path lock: (path, expected hash, content); `None` when

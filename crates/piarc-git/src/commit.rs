@@ -28,6 +28,8 @@ pub enum CommitOutcome {
     NothingToCommit,
     /// A hook refused, with what it printed.
     HookFailed(String),
+    /// Another git holds the index lock.
+    Locked,
     /// Anything else, with git's words.
     Failed(String),
 }
@@ -51,7 +53,10 @@ pub async fn has_identity(writer: &Writer) -> Result<bool, GitError> {
 /// The reader's errors.
 pub async fn has_staged(reader: &Reader) -> Result<bool, GitError> {
     let out = reader
-        .run(&["diff", "--cached", "--quiet", "--no-ext-diff"], ExecOptions::default())
+        .run(
+            &["diff", "--cached", "--quiet", "--no-ext-diff"],
+            ExecOptions::default(),
+        )
         .await?;
     Ok(out.code == Some(1))
 }
@@ -93,7 +98,10 @@ pub async fn commit(
             .run(&["rev-parse", "HEAD"], ExecOptions::default())
             .await?;
         let subject = writer
-            .run(&["log", "-1", "--no-show-signature", "--format=%s"], ExecOptions::default())
+            .run(
+                &["log", "-1", "--no-show-signature", "--format=%s"],
+                ExecOptions::default(),
+            )
             .await?;
         return Ok(CommitOutcome::Committed {
             head: String::from_utf8_lossy(&head.stdout).trim().to_owned(),
@@ -111,6 +119,9 @@ pub async fn commit(
     }
     if lower.contains("aborting commit due to empty commit message") {
         return Ok(CommitOutcome::Failed(printed));
+    }
+    if lower.contains("index.lock") {
+        return Ok(CommitOutcome::Locked);
     }
     if has_commit_hooks(writer).await? {
         return Ok(CommitOutcome::HookFailed(printed));
@@ -140,7 +151,10 @@ fn hook_lines(printed: &str) -> String {
 /// Whether a hook that runs on commit exists (in `core.hooksPath` when set).
 async fn has_commit_hooks(writer: &Writer) -> Result<bool, GitError> {
     let out = writer
-        .run(&["rev-parse", "--git-path", "hooks"], ExecOptions::default())
+        .run(
+            &["rev-parse", "--git-path", "hooks"],
+            ExecOptions::default(),
+        )
         .await?;
     if !out.success() {
         return Ok(false);
@@ -159,7 +173,10 @@ async fn has_commit_hooks(writer: &Writer) -> Result<bool, GitError> {
 /// The reader's errors.
 pub async fn last_commit(reader: &Reader) -> Result<GitLastCommit, GitError> {
     let message = reader
-        .run(&["log", "-1", "--no-show-signature", "--format=%B"], ExecOptions::default())
+        .run(
+            &["log", "-1", "--no-show-signature", "--format=%B"],
+            ExecOptions::default(),
+        )
         .await?;
     if !message.success() {
         return Ok(GitLastCommit {
@@ -175,7 +192,11 @@ pub async fn last_commit(reader: &Reader) -> Result<GitLastCommit, GitError> {
         .await?
         .success();
     Ok(GitLastCommit {
-        message: Some(String::from_utf8_lossy(&message.stdout).trim_end().to_owned()),
+        message: Some(
+            String::from_utf8_lossy(&message.stdout)
+                .trim_end()
+                .to_owned(),
+        ),
         pushed,
     })
 }

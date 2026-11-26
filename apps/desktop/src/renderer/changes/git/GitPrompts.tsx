@@ -52,7 +52,14 @@ export function GitPrompts({
     case 'checkout':
       return <CheckoutPrompt prompt={prompt} actions={actions} onClose={close} />;
     case 'pushRejected':
-      return <RejectedPrompt prompt={prompt} actions={actions} onClose={close} />;
+      return (
+        <RejectedPrompt
+          prompt={prompt}
+          protectedBranch={repo.protected}
+          actions={actions}
+          onClose={close}
+        />
+      );
     case 'pushTarget':
       return <PushTargetPrompt prompt={prompt} repo={repo} actions={actions} onClose={close} />;
     case 'pullMode':
@@ -132,10 +139,13 @@ function CheckoutPrompt({
 
 function RejectedPrompt({
   prompt,
+  protectedBranch,
   actions,
   onClose,
 }: {
   readonly prompt: Extract<GitPrompt, { kind: 'pushRejected' }>;
+  /** Core never force-pushes a protected branch: no button for it. */
+  readonly protectedBranch: boolean;
   readonly actions: GitActions;
   readonly onClose: () => void;
 }) {
@@ -151,17 +161,19 @@ function RejectedPrompt({
         <button type="button" className="button" onClick={onClose}>
           {t('dialog.cancel')}
         </button>
-        <button
-          type="button"
-          className="button button-destructive"
-          data-testid="git-force-push"
-          onClick={() => {
-            onClose();
-            void actions.push(prompt.target, true);
-          }}
-        >
-          {t('git.dialog.forcePush')}
-        </button>
+        {protectedBranch ? null : (
+          <button
+            type="button"
+            className="button button-destructive"
+            data-testid="git-force-push"
+            onClick={() => {
+              onClose();
+              void actions.push(prompt.target, true);
+            }}
+          >
+            {t('git.dialog.forcePush')}
+          </button>
+        )}
         <button
           type="button"
           className="button button-primary"

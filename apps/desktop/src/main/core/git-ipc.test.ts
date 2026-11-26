@@ -16,7 +16,7 @@ import { NativeConfirm } from './plugins-ipc.js';
 
 type Handler = (event: { sender: unknown }, args: unknown[]) => unknown;
 
-function harness(describeAnswer: Record<string, unknown> = { result: {} }) {
+function harness(describeAnswer: Record<string, unknown> = { result: {} }, recentInput = true) {
   const handlers = new Map<string, Handler>();
   const register = ((channel: string, handler: Handler) => {
     handlers.set(channel, handler);
@@ -38,6 +38,7 @@ function harness(describeAnswer: Record<string, unknown> = { result: {} }) {
   const input = {
     requireInput: (_contents: unknown, target?: unknown) => {
       inputs.push(target);
+      if (!recentInput) throw new Error('no recent input in this window');
     },
   };
   registerGitHandlers(
@@ -134,7 +135,7 @@ describe('Git panel IPC', () => {
     expect(sent).toHaveLength(1);
   });
 
-  it('fills the interface language and needs no input for reads', async () => {
+  it('fills the interface language; reads need no input, a commit message does', async () => {
     const { call, sent, inputs } = harness();
     await call(['s1', { op: 'commitMessage', instructions: 'x', language: 'en' }]);
     expect(sent[0]?.json.request).toEqual({
@@ -142,8 +143,27 @@ describe('Git panel IPC', () => {
       instructions: 'x',
       language: 'zh-CN',
     });
+    // It sends the staged changes to the model provider: only on the user's click (ADR-0086).
+    expect(inputs).toEqual(['s1']);
     await call(['s1', { op: 'status' }]);
-    expect(inputs).toEqual([]);
+    expect(inputs).toEqual(['s1']);
     await expect(Promise.resolve().then(() => call(['../s', { op: 'status' }]))).rejects.toThrow();
+  });
+
+  it('sends no write and no commit message without recent real input', async () => {
+    const { call, sent } = harness({ result: {} }, false);
+    for (const request of [
+      { op: 'stage', paths: ['a.txt'] },
+      { op: 'commit', message: 'm' },
+      { op: 'push' },
+      { op: 'commitMessage', instructions: 'x' },
+    ]) {
+      await expect(Promise.resolve().then(() => call(['s1', request]))).rejects.toThrow(
+        'no recent input',
+      );
+    }
+    expect(sent).toEqual([]);
+    await call(['s1', { op: 'status' }]);
+    expect(sent).toHaveLength(1);
   });
 });

@@ -18,7 +18,11 @@ async fn pair(home: &Path, repo: &Path) -> (Reader, Writer) {
     (reader(home, repo).await, writer(home, repo).await)
 }
 
-fn hunk_ref(stages: &piarc_protocol::git::GitFileStages, stage: GitStage, index: usize) -> GitHunkRef {
+fn hunk_ref(
+    stages: &piarc_protocol::git::GitFileStages,
+    stage: GitStage,
+    index: usize,
+) -> GitHunkRef {
     let hashes = match stage {
         GitStage::Staged => &stages.staged_hashes,
         GitStage::Unstaged => &stages.hunk_hashes,
@@ -56,7 +60,10 @@ async fn hunks_stage_unstage_and_roll_back_only_when_fresh() {
         .expect("stage");
     assert_eq!(applied, HunkOutcome::Applied);
     let cached = git(&repo, &["diff", "--cached"]);
-    assert!(cached.contains("+LINE 2") && !cached.contains("LINE 26"), "{cached}");
+    assert!(
+        cached.contains("+LINE 2") && !cached.contains("LINE 26"),
+        "{cached}"
+    );
 
     // Shown before the file changed: refused, nothing moves.
     let stale = index::file_stages(&reader, "a.txt").await.expect("stages");
@@ -85,8 +92,14 @@ async fn hunks_stage_unstage_and_roll_back_only_when_fresh() {
         .expect("rollback");
     assert_eq!(rolled, HunkOutcome::Applied);
     let text = std::fs::read_to_string(repo.join("a.txt")).expect("read");
-    assert!(text.contains("LINE 2\n") && text.contains("LINE 15"), "{text}");
-    assert!(!text.contains("LINE 26") && text.contains("line 26"), "{text}");
+    assert!(
+        text.contains("LINE 2\n") && text.contains("LINE 15"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("LINE 26") && text.contains("line 26"),
+        "{text}"
+    );
 }
 
 #[tokio::test]
@@ -100,8 +113,13 @@ async fn files_stage_and_unstage_including_new_and_deleted() {
     let paths = vec!["新 文件.txt".to_owned(), "a.txt".to_owned()];
     index::stage(&writer, &paths).await.expect("stage");
     let cached = git(&repo, &["diff", "--cached", "--name-status"]);
-    assert!(cached.contains("D\ta.txt") && cached.contains("新 文件.txt"), "{cached}");
-    index::unstage(&writer, &paths, false).await.expect("unstage");
+    assert!(
+        cached.contains("D\ta.txt") && cached.contains("新 文件.txt"),
+        "{cached}"
+    );
+    index::unstage(&writer, &paths, false)
+        .await
+        .expect("unstage");
     assert!(git(&repo, &["diff", "--cached", "--name-only"]).is_empty());
     assert!(commit::has_staged(&reader).await.is_ok_and(|s| !s));
 }
@@ -115,8 +133,11 @@ async fn commits_run_hooks_and_report_identity() {
     let home = home(&root);
     let repo = repository(&root, "repo");
     let hook = repo.join(".git/hooks/pre-commit");
-    std::fs::write(&hook, "#!/bin/sh\necho checked > \"$(git rev-parse --show-toplevel)/hook-ran\"\n")
-        .expect("hook");
+    std::fs::write(
+        &hook,
+        "#!/bin/sh\necho checked > \"$(git rev-parse --show-toplevel)/hook-ran\"\n",
+    )
+    .expect("hook");
     std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     std::fs::write(repo.join("b.txt"), "b\n").expect("b");
     git(&repo, &["add", "b.txt"]);
@@ -135,9 +156,21 @@ async fn commits_run_hooks_and_report_identity() {
         .expect("commit");
     assert!(matches!(&refused, CommitOutcome::HookFailed(out) if out.contains("lint failed")));
 
+    // Another git holding the index lock is not a hook failure, even with hooks installed.
+    std::fs::write(repo.join(".git/index.lock"), "").expect("lock");
+    let locked = commit::commit(&writer, "feat: c", false, false, Cancel::new())
+        .await
+        .expect("commit");
+    assert!(matches!(&locked, CommitOutcome::Locked), "{locked:?}");
+    std::fs::remove_file(repo.join(".git/index.lock")).expect("unlock");
+
     let anonymous = root.join("anonymous");
     std::fs::create_dir_all(&anonymous).expect("home");
-    std::fs::write(anonymous.join(".gitconfig"), "[user]\n\tuseConfigOnly = true\n").expect("cfg");
+    std::fs::write(
+        anonymous.join(".gitconfig"),
+        "[user]\n\tuseConfigOnly = true\n",
+    )
+    .expect("cfg");
     std::fs::remove_file(&hook).expect("rm hook");
     let (_, nobody) = pair(&anonymous, &repo).await;
     assert!(!commit::has_identity(&nobody).await.expect("ident"));
@@ -177,7 +210,10 @@ async fn checkouts_refuse_stash_or_discard_local_changes() {
         .await
         .expect("force");
     assert_eq!(forced, CheckoutOutcome::Done);
-    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).expect("a"), "other\n");
+    assert_eq!(
+        std::fs::read_to_string(repo.join("a.txt")).expect("a"),
+        "other\n"
+    );
 }
 
 #[tokio::test]
@@ -185,9 +221,20 @@ async fn deleted_branches_restore_with_their_upstream() {
     let root = temp_dir("delete");
     let home = home(&root);
     let remote_dir = root.join("remote.git");
-    git(&root, &["init", "-q", "--bare", remote_dir.to_str().expect("utf8")]);
+    git(
+        &root,
+        &["init", "-q", "--bare", remote_dir.to_str().expect("utf8")],
+    );
     let repo = repository(&root, "repo");
-    git(&repo, &["remote", "add", "origin", remote_dir.to_str().expect("utf8")]);
+    git(
+        &repo,
+        &[
+            "remote",
+            "add",
+            "origin",
+            remote_dir.to_str().expect("utf8"),
+        ],
+    );
     git(&repo, &["switch", "-q", "-c", "topic"]);
     std::fs::write(repo.join("t.txt"), "t\n").expect("t");
     git(&repo, &["add", "t.txt"]);
@@ -199,11 +246,19 @@ async fn deleted_branches_restore_with_their_upstream() {
     git(&repo, &["switch", "-q", "main"]);
     let (reader, writer) = pair(&home, &repo).await;
 
-    assert_eq!(branches::unmerged_count(&reader, "topic").await.expect("count"), 1);
-    let refused = branches::delete(&reader, &writer, "topic", false).await.expect("delete");
+    assert_eq!(
+        branches::unmerged_count(&reader, "topic")
+            .await
+            .expect("count"),
+        1
+    );
+    let refused = branches::delete(&reader, &writer, "topic", false)
+        .await
+        .expect("delete");
     assert_eq!(refused, DeleteOutcome::NotMerged);
-    let DeleteOutcome::Deleted(deleted) =
-        branches::delete(&reader, &writer, "topic", true).await.expect("force")
+    let DeleteOutcome::Deleted(deleted) = branches::delete(&reader, &writer, "topic", true)
+        .await
+        .expect("force")
     else {
         panic!("not deleted");
     };
@@ -213,7 +268,10 @@ async fn deleted_branches_restore_with_their_upstream() {
         .await
         .expect("restore");
     assert_eq!(git(&repo, &["rev-parse", "topic"]), tip);
-    assert_eq!(git(&repo, &["rev-parse", "--abbrev-ref", "topic@{upstream}"]), "origin/topic");
+    assert_eq!(
+        git(&repo, &["rev-parse", "--abbrev-ref", "topic@{upstream}"]),
+        "origin/topic"
+    );
 }
 
 #[tokio::test]
@@ -221,7 +279,10 @@ async fn pushes_are_rejected_leased_and_pulls_stop_on_conflicts() {
     let root = temp_dir("push");
     let home = home(&root);
     let remote_dir = root.join("remote.git");
-    git(&root, &["init", "-q", "--bare", remote_dir.to_str().expect("utf8")]);
+    git(
+        &root,
+        &["init", "-q", "--bare", remote_dir.to_str().expect("utf8")],
+    );
     let url = remote_dir.to_str().expect("utf8").to_owned();
     let repo = repository(&root, "mine");
     git(&repo, &["remote", "add", "origin", &url]);
@@ -232,25 +293,40 @@ async fn pushes_are_rejected_leased_and_pulls_stop_on_conflicts() {
         set_upstream,
         lease,
     };
-    let first = remote::push(&writer, &spec(None, true), None, Cancel::new()).await.expect("push");
+    let first = remote::push(&writer, &spec(None, true), None, Cancel::new())
+        .await
+        .expect("push");
     assert!(matches!(first, RemoteOutcome::Done(_)), "{first:?}");
 
     let theirs = root.join("theirs");
-    git(&root, &["clone", "-q", &url, theirs.to_str().expect("utf8")]);
+    git(
+        &root,
+        &["clone", "-q", &url, theirs.to_str().expect("utf8")],
+    );
     std::fs::write(theirs.join("a.txt"), "theirs\n").expect("theirs");
     git(&theirs, &["commit", "-q", "-am", "theirs"]);
     git(&theirs, &["push", "-q", "origin", "main"]);
 
     std::fs::write(repo.join("a.txt"), "mine\n").expect("mine");
     git(&repo, &["commit", "-q", "-am", "mine"]);
-    let rejected = remote::push(&writer, &spec(None, false), None, Cancel::new()).await.expect("push");
-    assert!(matches!(rejected, RemoteOutcome::Rejected(_)), "{rejected:?}");
+    let rejected = remote::push(&writer, &spec(None, false), None, Cancel::new())
+        .await
+        .expect("push");
+    assert!(
+        matches!(rejected, RemoteOutcome::Rejected(_)),
+        "{rejected:?}"
+    );
 
     // The lease names the remote-tracking commit from before their push: refused.
     let stale_lease = git(&repo, &["rev-parse", "origin/main"]);
-    let leased = remote::push(&writer, &spec(Some(stale_lease), false), None, Cancel::new())
-        .await
-        .expect("push");
+    let leased = remote::push(
+        &writer,
+        &spec(Some(stale_lease), false),
+        None,
+        Cancel::new(),
+    )
+    .await
+    .expect("push");
     assert!(matches!(leased, RemoteOutcome::StaleLease(_)), "{leased:?}");
 
     let pulled = remote::pull(&reader, &writer, GitPullMode::Merge, None, Cancel::new())
@@ -258,10 +334,16 @@ async fn pushes_are_rejected_leased_and_pulls_stop_on_conflicts() {
         .expect("pull");
     assert_eq!(pulled, RemoteOutcome::Conflict(vec!["a.txt".into()]));
     std::fs::write(repo.join("a.txt"), "both\n").expect("resolve");
-    index::mark_resolved(&writer, &["a.txt".to_owned()]).await.expect("resolved");
-    let continued = remote::sequence(&reader, &writer, Sequencer::Continue).await.expect("continue");
+    index::mark_resolved(&writer, &["a.txt".to_owned()])
+        .await
+        .expect("resolved");
+    let continued = remote::sequence(&reader, &writer, Sequencer::Continue)
+        .await
+        .expect("continue");
     assert!(matches!(continued, RemoteOutcome::Done(_)), "{continued:?}");
-    let pushed = remote::push(&writer, &spec(None, false), None, Cancel::new()).await.expect("push");
+    let pushed = remote::push(&writer, &spec(None, false), None, Cancel::new())
+        .await
+        .expect("push");
     assert!(matches!(pushed, RemoteOutcome::Done(_)), "{pushed:?}");
 
     // A lease on the current remote commit replaces it.

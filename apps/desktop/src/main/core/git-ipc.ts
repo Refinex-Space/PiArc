@@ -44,7 +44,6 @@ const READ_ONLY = new Set([
   'branches',
   'fileStages',
   'lastCommit',
-  'commitMessage',
 ]);
 
 function isRecord(value: unknown): value is Json {

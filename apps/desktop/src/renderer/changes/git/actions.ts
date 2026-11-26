@@ -173,11 +173,14 @@ export function useGitActions(sessionId: string) {
           testId: 'git-notice-terminal',
           run: () => {
             runInTerminal(sessionId, failure.command);
-            pushNotice(sessionId, {
-              tone: 'info',
-              text: t('git.notice.commandCopied'),
-              actions: [],
-            });
+            // Say "copied" only when there was a command to copy.
+            if (failure.command !== undefined) {
+              pushNotice(sessionId, {
+                tone: 'info',
+                text: t('git.notice.commandCopied'),
+                actions: [],
+              });
+            }
           },
         });
       }

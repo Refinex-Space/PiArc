@@ -63,7 +63,10 @@ pub fn check_revision(rev: &str) -> Result<(), ArgError> {
 /// A full or abbreviated object id (4–64 lowercase hex digits).
 #[must_use]
 pub fn is_object_id(value: &str) -> bool {
-    (4..=64).contains(&value.len()) && value.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    (4..=64).contains(&value.len())
+        && value
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// A path relative to the repository's top level, with `/` separators, staying inside it.
@@ -79,10 +82,11 @@ pub fn check_path(path: &str) -> Result<(), ArgError> {
     if path.starts_with('/') || has_drive(path) {
         return bad();
     }
-    if path
-        .split('/')
-        .any(|part| part.is_empty() || part == "." || part == "..")
-    {
+    // `.git` in any case: the repository's own files (and a submodule's) are never the panel's
+    // to roll back, stage or read (a rollback of `.git/config` would delete it).
+    if path.split('/').any(|part| {
+        part.is_empty() || part == "." || part == ".." || part.eq_ignore_ascii_case(".git")
+    }) {
         return bad();
     }
     Ok(())
@@ -173,7 +177,15 @@ mod tests {
 
     #[test]
     fn paths_stay_inside_the_repository() {
-        for good in ["a.txt", "dir/中文 文件.md", "-leading-dash", ":magic"] {
+        for good in [
+            "a.txt",
+            "dir/中文 文件.md",
+            "-leading-dash",
+            ":magic",
+            ".gitignore",
+            ".github/workflows/ci.yml",
+            "docs/.git-notes",
+        ] {
             assert!(check_path(good).is_ok(), "{good}");
         }
         for bad in [
@@ -186,6 +198,12 @@ mod tests {
             "./a",
             "a\\b",
             "a\0b",
+            // The repository's own files (a rollback would delete `.git/config`), in any case
+            // (case-insensitive file systems) and in submodules.
+            ".git",
+            ".git/config",
+            ".GIT/hooks/pre-commit",
+            "vendor/lib/.git/config",
         ] {
             assert!(check_path(bad).is_err(), "{bad:?}");
         }

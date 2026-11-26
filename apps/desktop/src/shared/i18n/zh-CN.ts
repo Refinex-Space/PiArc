@@ -2247,4 +2247,5 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'gitSettings.language.zh': '简体中文',
   'gitSettings.protectedPlaceholder': '例如 release/*',
   'git.scope.head': 'HEAD',
+  'git.commit.fallbackModel': '辅助模型不可用，已用会话模型 {model} 生成。',
 };

@@ -224,8 +224,7 @@ pub fn repo_state(repo: &Repo) -> GitRepoState {
                 (file("next"), file("last"))
             };
             return GitRepoState::Rebasing {
-                branch: file("head-name")
-                    .map(|h| h.trim_start_matches("refs/heads/").to_owned()),
+                branch: file("head-name").map(|h| h.trim_start_matches("refs/heads/").to_owned()),
                 onto: short(file("onto")),
                 step: step.and_then(|s| s.parse().ok()),
                 total: total.and_then(|s| s.parse().ok()),
@@ -265,7 +264,10 @@ fn merge_source(message: &str) -> Option<String> {
 /// The reader's errors.
 pub async fn empty_tree(reader: &Reader) -> Result<String, GitError> {
     let out = reader
-        .run(&["hash-object", "-t", "tree", "--stdin"], ExecOptions::default())
+        .run(
+            &["hash-object", "-t", "tree", "--stdin"],
+            ExecOptions::default(),
+        )
         .await?;
     if !out.success() {
         return Err(crate::repo::failed(&["hash-object"], &out));
@@ -302,23 +304,16 @@ pub async fn status(
         None => empty_tree(reader).await?,
     };
     let numstat = reader
-        .ok(&["diff", "--numstat", "-z", "--no-ext-diff", "--no-textconv", &against])
+        .ok(&[
+            "diff",
+            "--numstat",
+            "-z",
+            "--no-ext-diff",
+            "--no-textconv",
+            &against,
+        ])
         .await?;
-    let counts = parse_numstat(&numstat);
-    let (mut added, mut removed) = (0, 0);
-    for file in &mut files {
-        let pair = if file.unstaged == Some(GitFileStatus::Untracked) {
-            count_untracked(&reader.repo.root.join(&file.path)).map(|n| (n, 0))
-        } else {
-            counts.get(&file.path).copied().flatten()
-        };
-        if let Some((a, r)) = pair {
-            file.added = Some(a);
-            file.removed = Some(r);
-            added += a;
-            removed += r;
-        }
-    }
+    let (added, removed) = add_counts(&reader.repo.root, &mut files, &parse_numstat(&numstat));
     files.sort_by(|a, b| {
         let conflict = |f: &GitStatusFile| u8::from(f.conflict.is_none());
         conflict(a)
@@ -327,7 +322,16 @@ pub async fn status(
     });
     let refs = crate::refs::ref_names(reader).await?;
     let base = match branch.oid {
-        Some(_) => infer_base(reader, &refs, preferred, session_base, branch.head.as_deref()).await?,
+        Some(_) => {
+            infer_base(
+                reader,
+                &refs,
+                preferred,
+                session_base,
+                branch.head.as_deref(),
+            )
+            .await?
+        }
         None => None,
     };
     let remotes = crate::refs::remotes(reader).await?;
@@ -354,6 +358,30 @@ pub async fn status(
     })
 }
 
+/// Fills each file's added and removed lines (untracked files count their lines) and returns
+/// the totals.
+fn add_counts(
+    root: &Path,
+    files: &mut [GitStatusFile],
+    counts: &HashMap<String, Option<(u64, u64)>>,
+) -> (u64, u64) {
+    let (mut added, mut removed) = (0, 0);
+    for file in files {
+        let pair = if file.unstaged == Some(GitFileStatus::Untracked) {
+            count_untracked(&root.join(&file.path)).map(|n| (n, 0))
+        } else {
+            counts.get(&file.path).copied().flatten()
+        };
+        if let Some((a, r)) = pair {
+            file.added = Some(a);
+            file.removed = Some(r);
+            added += a;
+            removed += r;
+        }
+    }
+    (added, removed)
+}
+
 /// The branch `branch` was created from, read from its reflog ("branch: Created from main"):
 /// a worktree session's branch names its base this way (ADR-0084 rule 2). `None` when the
 /// reflog is gone or names `HEAD`.
@@ -365,7 +393,14 @@ pub async fn created_from(reader: &Reader, branch: &str) -> Result<Option<String
     let reference = format!("refs/heads/{branch}");
     let out = reader
         .run(
-            &["reflog", "show", "--format=%gs", "--end-of-options", &reference, "--"],
+            &[
+                "reflog",
+                "show",
+                "--format=%gs",
+                "--end-of-options",
+                &reference,
+                "--",
+            ],
             ExecOptions::default(),
         )
         .await?;
@@ -410,15 +445,18 @@ pub async fn infer_base(
     }
     candidates.extend(current.map(str::to_owned));
     for name in candidates {
-        let reference = [format!("refs/remotes/origin/{name}"), format!("refs/heads/{name}")]
-            .into_iter()
-            .chain(name.starts_with("refs/").then(|| name.clone()))
-            .chain(
-                name.split_once('/')
-                    .filter(|(remote, _)| refs.remotes.iter().any(|r| r == remote))
-                    .map(|_| format!("refs/remotes/{name}")),
-            )
-            .find(|r| refs.has(r));
+        let reference = [
+            format!("refs/remotes/origin/{name}"),
+            format!("refs/heads/{name}"),
+        ]
+        .into_iter()
+        .chain(name.starts_with("refs/").then(|| name.clone()))
+        .chain(
+            name.split_once('/')
+                .filter(|(remote, _)| refs.remotes.iter().any(|r| r == remote))
+                .map(|_| format!("refs/remotes/{name}")),
+        )
+        .find(|r| refs.has(r));
         let Some(reference) = reference else {
             continue;
         };

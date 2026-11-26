@@ -359,8 +359,40 @@ GitPanel ─ window.piarc.git ─▶ 校验 · 近期输入 · 原生确认 ─�
 | B2.5 / B4.6 在终端中运行 | 在会话终端中填入命令、不执行 | 打开会话终端并把命令复制到剪贴板，由用户粘贴运行 | 向终端写入要求窗口近期真实输入且走同一写线程（ADR-0051），由页面代填会绕过它 |
 | B1.1 窄宽度 | 左列换成 diff，顶部有"返回" | 同设计；改动视图宽度不足 560 px 时并排自动退回统一，菜单项写明"面板加宽后可用" | — |
 | 协议字段 | camelCase | 内部标签枚举的结构体变体字段原为 snake_case，`undoRollback` 解析失败、`ignoreWhitespace` 被忽略、进度事件字段名不对；已加 `rename_all_fields` 与回归测试（`git::tests`） | 已修复 |
-| L4 覆盖 | 第 5.4 节 E1–E12 | `git-panel.e2e.ts` 覆盖 E1 的范围、提交列表、跳转与并排，E3 的勾选、按 hunk 显示、生成（英文界面）与提交，E4 的检出与带前缀新建，回滚的原生确认与撤销，E10 的保存与始终强推的确认；`t43-a11y.e2e.ts` 覆盖 E11 的 axe（改动视图、提交视图、分支弹窗、分支名对话框、设置页） | E2、E5–E9、E12 与 E1 的评论发送、F7、E3 的推送、E4 的重命名与删除恢复尚无 L4；对应的 Core 行为由 `tests/writes.rs`（推送被拒与 lease、拉取冲突、智能与强制检出、删除与恢复分支）、`sessions git::`（信任与运行中会话）与 `git-ipc.test.ts`（没有真实输入、取消确认）覆盖。G3 开工时补齐 |
+| L4 覆盖 | 第 5.4 节 E1–E12 | `git-panel.e2e.ts` 覆盖 E1 的范围、提交列表、跳转与并排，E3 的勾选、按 hunk 显示、生成（英文界面）与提交，E4 的检出与带前缀新建，回滚的原生确认与撤销，E10 的保存与始终强推的确认；`t43-a11y.e2e.ts` 覆盖 E11 的 axe（改动视图、提交视图、分支弹窗、分支名对话框、设置页）；E9 的"没有真实输入不发写请求"由 `git-ipc.test.ts` 的 `sends no write and no commit message without recent real input` 覆盖（主进程层，不是 L4） | E2、E5–E8、E12 与 E1 的评论发送、F7，E3 的推送，E4 的重命名与删除恢复尚无 L4；对应的 Core 行为由 `tests/writes.rs`（推送被拒与 lease、拉取冲突、智能与强制检出、删除与恢复分支）与 `sessions git::`（信任、运行中会话、受保护分支的推送、撤销）覆盖。G3 开工时补齐 |
 | 打包 | `npm run package:desktop -- --flavor development` | 本机缺 Xcode（只有 Command Line Tools），App Intents 的 `xcodebuild` 失败；Core、Agent Host bundle 与 `.vite/` 已在失败之前生成，L4 以 `dev` 形态运行 | 打包产物形态的 L4 需要装有 Xcode 的机器或 CI |
+
+### 8.1 实施后复核（2026-11-26，`dev-flow:spec-reviewer`）
+
+已修复（每项先写复现测试）：
+
+| 复核项 | 问题 | 修复与测试 |
+|---|---|---|
+| 1（A8.2、B4.3） | 开启"始终强制推送"后，受保护分支连普通推送都被拒 | 只有显式强推遇到受保护分支才拒绝，始终强推对受保护分支改为普通推送（`write.rs` 的 `push`）；`sessions git::protected_pushes_stay_plain_git_paths_are_refused_and_undo_is_whole` |
+| 2（B7.3、B8.1、ADR-0086） | 生成提交信息不要求真实输入、未受信任的项目也会发送已暂存内容 | 主进程对 `commitMessage` 要求近期真实输入，Core 对未受信任项目答 `untrusted`；`git-ipc.test.ts` 两项与 `sessions git::commit_messages_follow_the_language_and_leave_secrets_out` |
+| 8（B1.6） | 撤销回滚时逐个写回，遇到已变化的文件仍恢复其余文件且记录被取走 | 先核对全部文件，任何一个变化就不写并保留记录，可在还原后重试（`restore::unchanged_since`、`Restores::put_back`）；同上的 `sessions` 用例 |
+| 9（C5） | 回滚接受 `.git/config` 这类路径，会删除仓库自己的文件 | `args::check_path` 拒绝任何大小写的 `.git` 路径段；`args::tests::paths_stay_inside_the_repository` 与同上的 `sessions` 用例 |
+| 16（A8.3） | 提交指令上限主进程按字符、Core 按字节，中文指令约 2,700 字以上无法生成 | Core 也按字符计（`check_instructions`）；`git::write::tests` |
+| 15（B7.2） | 提交遇到 `index.lock` 时被误报成 hook 失败，也不重试 | 新增 `CommitOutcome::Locked`，Core 重试两次后答 `busy`；`tests/writes.rs::commits_run_hooks_and_report_identity` |
+| 10（B2.5） | 提交者未设置时"在终端中运行"没有命令可复制却提示"已复制" | Core 的 `identity` 失败带上 `git config` 命令；没有命令时不提示"已复制" |
+| 11、4 | 推送被拒对话框对受保护分支也给强推；拣选与还原时显示"跳过"而 Core 无可跳过 | 受保护分支不显示强推按钮；"跳过"只在变基时显示 |
+| 7（B3.6） | 回退到会话模型时没有说明 | 生成结果下方写明"辅助模型不可用，已用会话模型 X 生成" |
+
+仍未满足（列入后续，不在本次交付）：
+
+| 条目 | 现状 |
+|---|---|
+| B5.6、B6.1 | 没有"有未解决冲突但无进行中操作"的状态（如智能检出 stash 还原冲突后）：冲突文件出现在提交视图的"冲突"组，但没有状态条 |
+| B6.2、B6.3 | 中止没有应用内确认；"标记为已解决"不检查冲突标记；冲突文件菜单没有"打开文件" |
+| B7.1 | 渲染进程不按运行中的会话预先禁用检出、拉取、回滚；Core 拒绝后提示只写会话数，不列标题 |
+| B8.1 | 未受信任时写入口只是禁用并说明原因，没有"信任此项目"入口（ADR-0064 的原生确认流程） |
+| B3.1、B3.7 | 没有可用模型时不预先禁用生成按钮并链接服务商设置（Core 答 `noModel` 后才提示）；生成提交信息不写审计 |
+| B2.5 | 提交前不在界面上预先检查提交者（Core 在提交前检查并答 `identity`） |
+| B4.3–B4.5 | 租约过期没有"获取"动作；推送目标对话框没有"设为上游"开关；没有上游时拉取只禁用，没有"设置上游" |
+| B5.1、B5.2 | 分支不按 `/` 分组折叠；分支弹窗的 → 不打开子菜单 |
+| A6.5 | 只读查询超过 20 s 时返回超时，不返回已取得的部分 |
+| A1.5 | 找不到 Git 时没有安装链接 |
+| 第 5.1 节的威胁测试 | `thr02_git_writes_wait_for_trust`、`thr11_git_rejects_option_like_args`、`thr04_git_output_strips_url_userinfo` 未按这些名字建立，`credential_leaks` 未扩展；THR-15 已映射，参数注入只有 `args.rs` 的单元测试 |
 
 ## 附录：评审裁决
 

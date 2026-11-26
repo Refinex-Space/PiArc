@@ -467,7 +467,7 @@ function StateBar({
         >
           {t('git.state.continue')}
         </button>
-        {state.kind === 'merging' ? null : (
+        {state.kind !== 'rebasing' ? null : (
           <button
             type="button"
             className="button button-small"
@@ -728,6 +728,8 @@ function MessageBox({
   const [generating, setGenerating] = useState<string | undefined>(undefined);
   const [generatedFor, setGeneratedFor] = useState<string | undefined>(undefined);
   const [withheld, setWithheld] = useState<readonly string[]>([]);
+  /** The model that wrote the message when it was not the chosen auxiliary model. */
+  const [fallbackModel, setFallbackModel] = useState<string | undefined>(undefined);
   const [confirmDetached, setConfirmDetached] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   const menu = useMenu();
@@ -794,6 +796,7 @@ function MessageBox({
       replaceText(reply.value.text);
       setGeneratedFor(startedFor);
       setWithheld(reply.value.withheld);
+      setFallbackModel(reply.value.fallback ? reply.value.model : undefined);
     } else {
       actions.report(reply.failure);
     }
@@ -824,6 +827,7 @@ function MessageBox({
     setAmend(false);
     setGeneratedFor(undefined);
     setWithheld([]);
+    setFallbackModel(undefined);
     pushNotice(sessionId, {
       tone: 'info',
       text: t('git.notice.committed', {
@@ -907,6 +911,11 @@ function MessageBox({
             </button>
           </span>
         ) : null}
+        {fallbackModel === undefined ? null : (
+          <span className="git-note" data-testid="git-generated-fallback">
+            {t('git.commit.fallbackModel', { model: fallbackModel })}
+          </span>
+        )}
         {withheld.length === 0 ? null : (
           <span
             className="git-note"
