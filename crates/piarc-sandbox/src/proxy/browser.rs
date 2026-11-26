@@ -9,11 +9,13 @@
 //!   `*.localhost` name or a configured local development name (`*.test`, `*.local`): a public
 //!   name that resolves to this machine is DNS rebinding, not a development server;
 //! - PiArc's own listening ports are refused on loopback whatever the name;
-//! - private addresses pass (intranet sites, LAN development servers), as for the sandbox.
+//! - a private address (RFC 1918, carrier-grade NAT, IPv6 unique local) is refused unless the
+//!   name is an IP literal, `localhost` or a configured local name: a public name resolving
+//!   into the LAN is DNS rebinding (intranet names go into `browser.localHostnames`).
 
 use std::net::{IpAddr, SocketAddr};
 
-use super::address::{blocked_reason, is_loopback};
+use super::address::{blocked_reason, is_loopback, is_private};
 use super::allowlist::Allowlist;
 
 /// What a browser proxy lets through beyond public and private addresses.
@@ -29,7 +31,12 @@ impl BrowserPolicy {
     /// Why `host` may not connect to `addr`, or `None` when it may.
     #[must_use]
     pub fn blocked_reason(&self, host: &str, addr: SocketAddr) -> Option<&'static str> {
-        let reason = blocked_reason(addr.ip())?;
+        let Some(reason) = blocked_reason(addr.ip()) else {
+            // A LAN address only behind a name that never leaves the local network: a public
+            // name resolving into it is DNS rebinding (ADR-0088 rule 5).
+            return (is_private(addr.ip()) && !self.local_name(host))
+                .then_some("private address behind a name that is not local");
+        };
         if !is_loopback(addr.ip()) {
             return Some(reason);
         }
@@ -68,13 +75,42 @@ mod tests {
     }
 
     #[test]
-    fn public_and_private_addresses_pass_for_any_name() {
+    fn public_addresses_pass_for_any_name() {
         let policy = policy();
         assert_eq!(
             policy.blocked_reason("docs.example", at("203.0.113.7", 443)),
             None
         );
-        assert_eq!(policy.blocked_reason("wiki.corp", at("10.0.0.5", 80)), None);
+    }
+
+    /// ADR-0088 rule 5, B1.7.3: a private address only behind an IP literal or a local name; a
+    /// public name that resolves into the LAN is DNS rebinding.
+    #[test]
+    fn thr16_private_addresses_need_a_local_name() {
+        let policy = policy();
+        for host in ["10.0.0.5", "nas.test", "localhost"] {
+            assert_eq!(
+                policy.blocked_reason(host, at("10.0.0.5", 80)),
+                None,
+                "{host}"
+            );
+        }
+        assert_eq!(
+            policy.blocked_reason("printer.test", at("fd12::1", 631)),
+            None
+        );
+        for (host, ip) in [
+            ("wiki.corp", "10.0.0.5"),
+            ("rebind.attacker.com", "192.168.1.1"),
+            ("evil.example", "172.16.0.9"),
+            ("evil.example", "fd12::1"),
+            ("evil.example", "::ffff:192.168.0.2"),
+        ] {
+            assert!(
+                policy.blocked_reason(host, at(ip, 80)).is_some(),
+                "{host} {ip}"
+            );
+        }
     }
 
     #[test]

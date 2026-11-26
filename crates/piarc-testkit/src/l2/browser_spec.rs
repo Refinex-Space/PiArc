@@ -145,6 +145,8 @@ impl AnswerStep {
                 code: e.code.clone(),
             }),
             blocked_hosts: self.blocked_hosts.clone(),
+            visited_hosts: None,
+            refused_methods: None,
         }
     }
 }

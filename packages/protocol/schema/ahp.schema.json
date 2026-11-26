@@ -1426,6 +1426,20 @@
         "output": {
           "description": "What the script printed, whole.",
           "type": "string"
+        },
+        "refusedMethods": {
+          "description": "DevTools methods the CDP proxy refused during the run (for the audit row only, B2.6.5).",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "visitedHosts": {
+          "description": "Hosts the run's pages reached (for the audit row only, B2.7.2).",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
         }
       },
       "required": ["output"],

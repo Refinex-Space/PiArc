@@ -186,3 +186,39 @@ async fn plan_mode_refuses_and_accept_edits_saves_inside_the_workspace() {
         .expect("saved without a card");
     assert_eq!(std::fs::read(f.work.join("a.csv")).expect("saved"), b"a,b");
 }
+
+/// THR-16, B1.6: a page in the built-in browser (the agent's, or one it can fetch from: they
+/// share the session's origin) gets no workspace file a `Read(…)` deny rule covers.
+#[tokio::test]
+async fn thr16_the_browser_serves_no_workspace_file_a_read_deny_rule_covers() {
+    let f = Fixture::new().await;
+    std::fs::write(
+        f.root.join("data/settings.json"),
+        json!({ "permissions": { "deny": ["Read(**/*.env)", "Read(./private/**)"] } }).to_string(),
+    )
+    .expect("settings");
+    for denied in ["app.env", "config/prod.env", "private/notes 笔记.html"] {
+        assert!(
+            f.io.browser_read_denied(SESSION, denied)
+                .await
+                .expect("decided"),
+            "{denied}"
+        );
+    }
+    for served in ["index.html", "src/app.js", "public/env.json"] {
+        assert!(
+            !f.io
+                .browser_read_denied(SESSION, served)
+                .await
+                .expect("decided"),
+            "{served}"
+        );
+    }
+    // A session that is not open has no agent driving its pages.
+    assert!(
+        !f.io
+            .browser_read_denied("not-open", "app.env")
+            .await
+            .expect("decided")
+    );
+}

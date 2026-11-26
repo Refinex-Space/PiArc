@@ -45,11 +45,39 @@ pub(crate) struct PortWatch {
     declared: HashMap<PathBuf, Declared>,
 }
 
+/// The ports PiArc's own process group listens on: Core's proxies and servers run in this
+/// process, Chromium's helpers in its group. The browser's proxies refuse them (ADR-0088 rule 5).
+async fn own_ports() -> Option<Vec<u16>> {
+    let tree = piarc_exec::listeners::Tree {
+        root: std::process::id(),
+        members: Vec::new(),
+    };
+    tokio::task::spawn_blocking(move || piarc_exec::listeners::listening(&[tree]))
+        .await
+        .ok()?
+        .inspect_err(|error| {
+            tracing::debug!(target: "piarc_core::ports", %error, "cannot list PiArc's own ports");
+        })
+        .ok()?
+        .into_iter()
+        .next()
+}
+
 /// Starts the scans; they end with `cancel`.
-pub(crate) fn spawn(tool_io: ToolIo, events: EventSender, cancel: CancellationToken) {
+pub(crate) fn spawn(
+    tool_io: ToolIo,
+    browser: std::sync::Arc<crate::browser::BrowserProxies>,
+    events: EventSender,
+    cancel: CancellationToken,
+) {
     tokio::spawn(async move {
         let mut watch = PortWatch::default();
         loop {
+            if browser.active().await
+                && let Some(ports) = own_ports().await
+            {
+                browser.set_own_ports(ports).await;
+            }
             if tool_io.browser_attached() {
                 for event in watch.scan(&tool_io).await {
                     if let Ok(event) = Event::from_json(RouteKey::browser(), &event)

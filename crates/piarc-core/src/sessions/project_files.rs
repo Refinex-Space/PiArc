@@ -34,6 +34,9 @@ enum Request {
         offset: u64,
         length: u32,
         revision: Option<String>,
+        /// The built-in browser serves the bytes (B1.6): the session's Read deny rules apply.
+        #[serde(default)]
+        browser: bool,
     },
     Export {
         path: String,
@@ -99,6 +102,7 @@ impl Request {
                 offset,
                 length,
                 revision,
+                ..
             } => project::chunk(scope, &path, offset, length, revision.as_deref()),
             Request::Export { path } => project::export(scope, &path),
             Request::Save {
@@ -189,6 +193,14 @@ impl Hub {
         } else {
             None
         };
+        if let Request::Chunk {
+            path,
+            browser: true,
+            ..
+        } = &request
+        {
+            self.browser_may_read(&id, path).await?;
+        }
         let result = self.run_file_request(&id, request, token.clone()).await;
         if let Some(key) = key {
             let mut routes = lock(&self.routes);
@@ -206,6 +218,24 @@ impl Hub {
             });
         }
         result
+    }
+
+    /// THR-16: a file a `Read(…)` deny rule covers stays out of the built-in browser.
+    async fn browser_may_read(&self, id: &str, path: &str) -> Result<()> {
+        let denied = self
+            .ctx
+            .tool_io
+            .browser_read_denied(id, path)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        if denied {
+            return Err(Error::feature(&piarc_protocol::ErrorObject::new(
+                piarc_protocol::ErrorKind::PermissionDenied,
+                "A permission rule keeps this file out of the browser.",
+                false,
+            )));
+        }
+        Ok(())
     }
 
     async fn run_file_request(

@@ -35,10 +35,19 @@ pub struct BrowserProxyRequest {
     pub denied_ports: Vec<u16>,
 }
 
+/// A partition's running proxy and the request that set its policy.
+struct Partition {
+    proxy: NetworkProxy,
+    request: BrowserProxyRequest,
+}
+
 /// The running proxies, keyed by partition.
 pub struct BrowserProxies {
     network: Arc<dyn Network>,
-    proxies: tokio::sync::Mutex<HashMap<String, NetworkProxy>>,
+    proxies: tokio::sync::Mutex<HashMap<String, Partition>>,
+    /// Ports PiArc's own process group listens on (the port scan, `ports.rs`): refused on
+    /// loopback by every partition's proxy, its own port included (ADR-0088 rule 5).
+    own_ports: std::sync::Mutex<Vec<u16>>,
 }
 
 impl std::fmt::Debug for BrowserProxies {
@@ -54,6 +63,7 @@ impl BrowserProxies {
         Self {
             network,
             proxies: tokio::sync::Mutex::default(),
+            own_ports: std::sync::Mutex::default(),
         }
     }
 
@@ -65,11 +75,12 @@ impl BrowserProxies {
     /// [`Error::InvalidArgument`] for a malformed request or too many partitions; the
     /// listening socket cannot be opened.
     pub async fn port(&self, request: BrowserProxyRequest) -> Result<u16> {
-        let policy = policy(&request)?;
+        let policy = with_ports(policy(&request)?, &self.own());
         let mut proxies = self.proxies.lock().await;
-        if let Some(proxy) = proxies.get(&request.partition) {
-            proxy.set_browser_policy(policy);
-            return Ok(proxy.port());
+        if let Some(partition) = proxies.get_mut(&request.partition) {
+            partition.proxy.set_browser_policy(policy);
+            partition.request = request;
+            return Ok(partition.proxy.port());
         }
         if proxies.len() >= MAX_PARTITIONS {
             return Err(Error::InvalidArgument {
@@ -88,8 +99,43 @@ impl BrowserProxies {
             reason: format!("cannot start the browser proxy: {error}"),
         })?;
         let port = proxy.port();
-        proxies.insert(request.partition, proxy);
+        proxies.insert(request.partition.clone(), Partition { proxy, request });
         Ok(port)
+    }
+
+    /// Whether any partition has a proxy (the port scan lists PiArc's own ports only then).
+    pub async fn active(&self) -> bool {
+        !self.proxies.lock().await.is_empty()
+    }
+
+    /// PiArc's own listening ports now: every proxy refuses them from its next connection.
+    pub async fn set_own_ports(&self, mut ports: Vec<u16>) {
+        ports.sort_unstable();
+        ports.dedup();
+        {
+            let mut own = self
+                .own_ports
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if *own == ports {
+                return;
+            }
+            own.clone_from(&ports);
+        }
+        for partition in self.proxies.lock().await.values() {
+            if let Ok(policy) = policy(&partition.request) {
+                partition
+                    .proxy
+                    .set_browser_policy(with_ports(policy, &ports));
+            }
+        }
+    }
+
+    fn own(&self) -> Vec<u16> {
+        self.own_ports
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// Stops the partition's proxy, if it has one (its data was cleared or it is no longer
@@ -97,6 +143,16 @@ impl BrowserProxies {
     pub async fn stop(&self, partition: &str) -> bool {
         self.proxies.lock().await.remove(partition).is_some()
     }
+}
+
+/// `policy` with `own` among its denied ports.
+fn with_ports(mut policy: BrowserPolicy, own: &[u16]) -> BrowserPolicy {
+    for port in own {
+        if !policy.denied_ports.contains(port) {
+            policy.denied_ports.push(*port);
+        }
+    }
+    policy
 }
 
 fn policy(request: &BrowserProxyRequest) -> Result<BrowserPolicy> {
@@ -185,6 +241,14 @@ mod tests {
         assert_ne!(first, other);
         assert!(proxies.stop("piarc-browser-a").await);
         assert!(!proxies.stop("piarc-browser-a").await);
+    }
+
+    /// ADR-0088 rule 5: PiArc's own listening ports join every partition's denied ports.
+    #[test]
+    fn thr16_own_ports_join_the_requested_ones() {
+        let requested = policy(&request("piarc-browser-a")).expect("valid");
+        let policy = with_ports(requested, &[4100, 51_234]);
+        assert_eq!(policy.denied_ports, vec![4100, 51_234]);
     }
 
     #[tokio::test]

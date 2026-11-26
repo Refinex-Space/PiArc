@@ -164,6 +164,12 @@ pub struct BrowserRunAnswer {
     /// Hosts the browser kept the page from reaching during the run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked_hosts: Option<Vec<String>>,
+    /// Hosts the run's pages reached (for the audit row only, B2.7.2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visited_hosts: Option<Vec<String>>,
+    /// DevTools methods the CDP proxy refused during the run (for the audit row only, B2.6.5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refused_methods: Option<Vec<String>>,
 }
 
 /// A screenshot of a run as the transcript shows it (ADR-0093): a session blob.

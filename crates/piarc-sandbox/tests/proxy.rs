@@ -519,6 +519,7 @@ async fn browser_proxy(denied_ports: Vec<u16>) -> NetworkProxy {
     let names = HashMap::from([
         ("docs.example", IpAddr::from(HTTP_IP)),
         ("wiki.corp", private),
+        ("nas.test", private),
         ("app.test", loopback),
         ("web.localhost", loopback),
         ("rebind.example", loopback),
@@ -544,12 +545,15 @@ async fn browser_proxy(denied_ports: Vec<u16>) -> NetworkProxy {
 }
 
 #[tokio::test]
-async fn thr16_a_browser_proxy_lets_any_public_or_private_name_through_without_asking() {
+async fn thr16_a_browser_proxy_lets_public_names_through_and_private_ones_only_when_local() {
     let proxy = browser_proxy(Vec::new()).await;
-    for host in ["docs.example", "wiki.corp", "203.0.113.10"] {
+    for host in ["docs.example", "203.0.113.10", "nas.test"] {
         let reply = http_get(&proxy, &format!("http://{host}/page"), host).await;
         assert_eq!(reply.status, 200, "{host}");
     }
+    // A name outside the local development names leading into the LAN is DNS rebinding.
+    let reply = http_get(&proxy, "http://wiki.corp/page", "wiki.corp").await;
+    assert_eq!(reply.status, 403);
 }
 
 #[tokio::test]

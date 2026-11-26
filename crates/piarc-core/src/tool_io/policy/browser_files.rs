@@ -101,6 +101,34 @@ impl ToolIo {
         Ok(s.tmp_dir.join("browser").join("downloads"))
     }
 
+    /// Whether a `Read(…)` deny rule covers `relative` (a path under the session's files root)
+    /// for the built-in browser (B1.6, THR-16). The workspace file scheme cannot tell the page
+    /// that asks, and the agent's pages share the session's origin with the user's, so every
+    /// page is held to the session's rules. A session that is not open has none to apply: no
+    /// agent drives its pages.
+    ///
+    /// # Errors
+    /// The settings cannot be read, or the path cannot be located.
+    pub async fn browser_read_denied(
+        &self,
+        session_id: &str,
+        relative: &str,
+    ) -> Result<bool, ErrorObject> {
+        let Ok(s) = self.session(session_id) else {
+            return Ok(false);
+        };
+        let services = self.services()?;
+        let settings = session_settings(services, &s).await?;
+        let rules = rules_of(&s, &settings);
+        let places = Places::new(&s.scope);
+        let path = s
+            .scope
+            .project_root()
+            .locate(relative)
+            .map_err(|e| e.to_error_object())?;
+        Ok(read_denied(&rules, &places, &path))
+    }
+
     /// Copies `paths` for an upload of the running `Browser` call `call`; answers the copies.
     pub(crate) async fn stage_browser_upload(
         &self,

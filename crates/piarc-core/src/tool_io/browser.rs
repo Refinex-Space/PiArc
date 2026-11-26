@@ -6,8 +6,8 @@
 //! the client's `answer_browser_run`. A turn interrupt, the connection closing or the timeout
 //! cancel the run (a `cancel` event tells the client). The output is cut to the inline budget
 //! and the whole text spilled to the session's temporary directory; every run writes one
-//! `browser` audit row (script hash, duration, outcome, blocked hosts), never the script or the
-//! page.
+//! `browser` audit row (script hash, duration, outcome, blocked and visited hosts, refused
+//! DevTools methods), never the script or the page.
 //!
 //! The client registers itself with [`ToolIo::attach_browser_client`] when the app starts;
 //! without it Core answers `hostUnavailable` at once and offers no `browser` capability.
@@ -39,6 +39,8 @@ pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 pub const MAX_TIMEOUT_MS: u64 = 600_000;
 /// The shortest run time a call may ask for.
 pub const MIN_TIMEOUT_MS: u64 = 1_000;
+/// The longest script a call may run, in bytes (design addendum §4.2).
+pub const MAX_SCRIPT_BYTES: usize = 256 * 1024;
 /// Extra time for the client to report a timed-out run before Core gives up on it.
 const ANSWER_GRACE: Duration = Duration::from_secs(2);
 /// Characters of output the model gets inline; the rest is in the spill file.
@@ -115,6 +117,7 @@ impl ToolIo {
         peer: Peer,
     ) -> Result<Value, ErrorObject> {
         let session = self.session(&p.session_id.0)?;
+        check_script(&p.script)?;
         if self.policy.is_some() {
             policy::claim_browser(&session, &p, &peer)?;
         }
@@ -145,6 +148,8 @@ impl ToolIo {
             .await_run(&events, &p, &owner, timeout_ms, &token, &peer)
             .await;
         lock(&session.running).remove(&key);
+        // Whatever still waits on this run (a site card, an upload or save card) ends with it.
+        token.cancel();
         let outcome = match &ended {
             Ended::Answered(answer) if answer.error.is_some() => "error",
             Ended::Answered(_) => "ok",
@@ -323,6 +328,18 @@ async fn emit(events: &crate::events::EventSender, event: &BrowserClientEvent) {
     }
 }
 
+/// Design addendum §4.2: a script is at most [`MAX_SCRIPT_BYTES`] of UTF-8.
+fn check_script(script: &str) -> Result<(), ErrorObject> {
+    if script.len() > MAX_SCRIPT_BYTES {
+        return Err(ErrorObject::new(
+            ErrorKind::InvalidParams,
+            "A Browser script is at most 256 KiB; split the work into smaller calls.",
+            false,
+        ));
+    }
+    Ok(())
+}
+
 fn audit_detail(p: &BrowserRunParams, ended: &Ended, outcome: &str, took: Duration) -> Value {
     let hash = Sha256::digest(p.script.as_bytes());
     let script_sha256: String = hash.iter().map(|b| format!("{b:02x}")).collect();
@@ -336,14 +353,32 @@ fn audit_detail(p: &BrowserRunParams, ended: &Ended, outcome: &str, took: Durati
     });
     if let Ended::Answered(answer) = ended {
         detail["images"] = json!(answer.images.as_ref().map_or(0, Vec::len));
-        if let Some(hosts) = &answer.blocked_hosts {
-            detail["blockedHosts"] = json!(hosts);
+        for (key, list) in [
+            ("blockedHosts", &answer.blocked_hosts),
+            ("visitedHosts", &answer.visited_hosts),
+            ("refusedMethods", &answer.refused_methods),
+        ] {
+            if let Some(list) = list.as_ref().filter(|list| !list.is_empty()) {
+                detail[key] = json!(audit_list(list));
+            }
         }
         if let Some(code) = answer.error.as_ref().and_then(|e| e.code.as_ref()) {
             detail["errorCode"] = json!(code);
         }
     }
     detail
+}
+
+/// Entries of a list in the audit row, and characters per entry: the client's lists are bounded
+/// before they reach the row.
+const AUDIT_LIST_ENTRIES: usize = 100;
+const AUDIT_ENTRY_CHARS: usize = 256;
+
+fn audit_list(list: &[String]) -> Vec<String> {
+    list.iter()
+        .take(AUDIT_LIST_ENTRIES)
+        .map(|entry| entry.chars().take(AUDIT_ENTRY_CHARS).collect())
+        .collect()
 }
 
 /// Keeps each image in the session's blobs under its SHA-256 (ADR-0093) and names the blob;
@@ -462,6 +497,8 @@ mod tests {
                 images: None,
                 error: None,
                 blocked_hosts: Some(Vec::new()),
+                visited_hosts: None,
+                refused_methods: None,
             },
             |_| panic!("nothing to spill"),
         );
@@ -483,6 +520,8 @@ mod tests {
                     code: None,
                 }),
                 blocked_hosts: None,
+                visited_hosts: None,
+                refused_methods: None,
             },
             |whole| {
                 assert_eq!(whole, output);
@@ -599,12 +638,67 @@ mod tests {
                 images: None,
                 error: None,
                 blocked_hosts: Some(vec!["cdn.example.com".into()]),
+                visited_hosts: None,
+                refused_methods: None,
             },
         );
         assert!(answered);
         let result = running.await.expect("task").expect("result");
         assert_eq!(result["output"], "1");
         assert_eq!(result["blockedHosts"], json!(["cdn.example.com"]));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// Design addendum §4.2: a script is at most 256 KiB; a longer one never reaches the client.
+    #[tokio::test]
+    async fn a_script_over_the_limit_is_refused_before_it_runs() {
+        let (io, _sink, root) = attached();
+        let (peer, _frames) = Peer::channel(4);
+        let script = format!("// {}", "長".repeat(MAX_SCRIPT_BYTES / 3));
+        assert!(script.len() > MAX_SCRIPT_BYTES && script.chars().count() < MAX_SCRIPT_BYTES);
+        let error = io
+            .dispatch("browser/run", run_params(&script), peer)
+            .await
+            .unwrap_err();
+        assert_eq!(error.data.kind, ErrorKind::InvalidParams);
+        assert!(lock(&io.session("s-1").expect("session").running).is_empty());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// B2.6.3: cards bound to a run (site, upload, save) go away when the run ends normally,
+    /// not only on an interrupt: the run's token is cancelled once the client answered.
+    #[tokio::test]
+    async fn an_answered_run_cancels_what_is_bound_to_it() {
+        let (io, sink, root) = attached();
+        let (peer, _frames) = Peer::channel(4);
+        let running = {
+            let io = io.clone();
+            tokio::spawn(async move {
+                io.dispatch("browser/run", run_params("print(1)"), peer)
+                    .await
+            })
+        };
+        let run = sink.next("run").await;
+        let session = io.session("s-1").expect("session");
+        let token = lock(&session.running)
+            .values()
+            .next()
+            .cloned()
+            .expect("the run's token");
+        assert!(!token.is_cancelled());
+        io.answer_browser_run(
+            run["runId"].as_str().expect("run id"),
+            BrowserRunAnswer {
+                output: String::new(),
+                images: None,
+                error: None,
+                blocked_hosts: None,
+                visited_hosts: None,
+                refused_methods: None,
+            },
+        );
+        running.await.expect("task").expect("result");
+        assert!(token.is_cancelled());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -647,6 +741,8 @@ mod tests {
             images: None,
             error: None,
             blocked_hosts: None,
+            visited_hosts: None,
+            refused_methods: None,
         };
         assert!(!io.answer_browser_run(run["runId"].as_str().expect("run id"), late));
         let _ = std::fs::remove_dir_all(root);
@@ -665,11 +761,53 @@ mod tests {
                 images: Some(images),
                 error: None,
                 blocked_hosts: None,
+                visited_hosts: None,
+                refused_methods: None,
             },
             |_| None,
         );
         let kept = result.images.expect("images");
         assert_eq!(kept.len(), MAX_IMAGES);
         assert!(kept.iter().all(|i| i.media_type == "image/jpeg"));
+    }
+
+    /// B2.6.5, B2.7.2: the audit row names the DevTools methods the proxy refused and the hosts
+    /// the pages reached; the model's result carries neither.
+    #[test]
+    fn the_audit_row_lists_refused_methods_and_visited_hosts() {
+        let params: BrowserRunParams =
+            serde_json::from_value(Value::Object(run_params("print(1)"))).expect("params");
+        let answer = BrowserRunAnswer {
+            output: "1".into(),
+            images: None,
+            error: None,
+            blocked_hosts: None,
+            visited_hosts: Some(vec!["localhost:5173".into(), "example.com".into()]),
+            refused_methods: Some(vec!["Network.getCookies".into()]),
+        };
+        let detail = audit_detail(
+            &params,
+            &Ended::Answered(answer.clone()),
+            "ok",
+            Duration::from_millis(5),
+        );
+        assert_eq!(
+            detail["visitedHosts"],
+            json!(["localhost:5173", "example.com"])
+        );
+        assert_eq!(detail["refusedMethods"], json!(["Network.getCookies"]));
+        let result = serde_json::to_value(shape_result(answer, |_| None)).expect("result");
+        assert!(result.get("visitedHosts").is_none());
+        assert!(result.get("refusedMethods").is_none());
+        let many: Vec<String> = (0..150)
+            .map(|n| format!("{n}.{}", "x".repeat(300)))
+            .collect();
+        let bounded = audit_list(&many);
+        assert_eq!(bounded.len(), AUDIT_LIST_ENTRIES);
+        assert!(
+            bounded
+                .iter()
+                .all(|entry| entry.chars().count() <= AUDIT_ENTRY_CHARS)
+        );
     }
 }

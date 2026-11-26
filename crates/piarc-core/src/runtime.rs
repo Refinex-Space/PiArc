@@ -45,6 +45,7 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use crate::browser::BrowserProxies;
 use crate::demo::{self, DemoReport, DemoSource, DemoSourceConfig};
 use crate::dirs::DataDirs;
 use crate::error::{Error, Result};
@@ -649,6 +650,7 @@ fn open_state(
         .with_secrets(secrets.clone());
     let worktrees = state_worktrees(config, handle, cancel, &storage, &tool_io, &snapshots);
     let ports_io = tool_io.clone();
+    let proxies = Arc::new(BrowserProxies::new(config.sandbox.network.clone()));
     let sessions = Hub::new(crate::sessions::Ctx {
         handle: handle.clone(),
         events: events.clone(),
@@ -670,9 +672,7 @@ fn open_state(
         diagnostics: crate::sessions::PreparedBundle::default(),
         proxy: Arc::new(crate::network::Proxy::starting(&data)),
         git: Arc::default(),
-        browser: Arc::new(crate::browser::BrowserProxies::new(
-            config.sandbox.network.clone(),
-        )),
+        browser: Arc::clone(&proxies),
         chrome: crate::browser::import::ChromeImports::new(
             storage.clone(),
             &config.chrome,
@@ -686,7 +686,8 @@ fn open_state(
     {
         let _entered = handle.enter();
         tasks.start(storage.clone(), events.clone(), cancel.child_token());
-        crate::ports::spawn(ports_io, events.clone(), cancel.child_token());
+        // The scan also tells the browser's proxies PiArc's own ports (ADR-0088 rule 5).
+        crate::ports::spawn(ports_io, proxies, events.clone(), cancel.child_token());
     }
     tracing::info!(target: "piarc_core", data = %storage.dirs().data().display(), "Core state opened");
     Ok(StateServices {

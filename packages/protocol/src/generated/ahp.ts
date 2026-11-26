@@ -11000,6 +11000,14 @@ export interface BrowserRunAnswer {
    * What the script printed, whole.
    */
   output: string;
+  /**
+   * DevTools methods the CDP proxy refused during the run (for the audit row only, B2.6.5).
+   */
+  refusedMethods?: string[] | null;
+  /**
+   * Hosts the run's pages reached (for the audit row only, B2.7.2).
+   */
+  visitedHosts?: string[] | null;
 }
 /**
  * What the desktop client asks Core about one host an agent's page wants to reach (Core API,
