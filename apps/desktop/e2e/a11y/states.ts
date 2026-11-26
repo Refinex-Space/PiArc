@@ -128,6 +128,7 @@ export const A11Y_STATES = [
   { id: 'row:reminder', area: 'row', row: 'reminder', note: 'a reminder in the detailed view' },
   { id: 'row:subagent', area: 'row', row: 'subagent', note: 'a subagent card' },
   { id: 'row:webSearch', area: 'row', row: 'webSearch', note: 'a web search with its sources' },
+  { id: 'row:browser', area: 'row', row: 'browser', note: 'a Browser call with its screenshot' },
   { id: 'row:todo', area: 'row', row: 'todo', note: 'the task card (TodoWrite)' },
   { id: 'row:plan', area: 'row', row: 'plan', note: 'a submitted plan (ExitPlanMode)' },
   {

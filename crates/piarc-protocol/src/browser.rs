@@ -42,6 +42,10 @@ pub struct BrowserImage {
     pub width: u64,
     /// Height in pixels.
     pub height: u64,
+    /// SHA-256 of the image bytes once Core kept them in the session's blobs (ADR-0093), so
+    /// the transcript can show what the model saw.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blob: Option<String>,
 }
 
 /// The error the script ended with.
@@ -133,4 +137,76 @@ pub struct BrowserRunAnswer {
     /// Hosts the browser kept the page from reaching during the run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked_hosts: Option<Vec<String>>,
+}
+
+/// A screenshot of a run as the transcript shows it (ADR-0093): a session blob.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserItemImage {
+    /// SHA-256 of the image, lowercase hex: its name in the session's blobs.
+    pub blob: String,
+    /// `image/png` or `image/jpeg`.
+    pub media_type: String,
+    /// Width in pixels.
+    pub width: u64,
+    /// Height in pixels.
+    pub height: u64,
+}
+
+/// A site card's subject (ADR-0089, design addendum B2.6.3): the address a page the agent
+/// drives asks for, and the other hosts its run is waiting on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSiteCard {
+    /// The full address the page asks for.
+    pub url: String,
+    /// Other hosts the same run was kept from reaching, which the answer covers too.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hosts: Vec<String>,
+}
+
+/// What the desktop client asks Core about one host an agent's page wants to reach (Core API,
+/// `browserSite`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSiteRequest {
+    /// The session of the running `Browser` call (a subagent's own id for a subagent).
+    pub session_id: SessionId,
+    /// The running `Browser` call; the card goes away with it.
+    pub tool_call_id: String,
+    /// The full address.
+    pub url: String,
+    /// The host the answer covers: `host` for a site, `host:port` for a local address.
+    pub host: String,
+    /// A loopback or local development address.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub local: bool,
+    /// A private network address or a site with imported sign-ins: every mode asks and the
+    /// answer is never saved as a rule.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sensitive: bool,
+    /// Other hosts the run was kept from reaching, shown on the card and covered by its answer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pending: Vec<String>,
+}
+
+/// How long an allowing answer holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum BrowserSiteScope {
+    /// For the rest of this run.
+    Run,
+    /// For the rest of the session.
+    Session,
+}
+
+/// Core's answer to a [`BrowserSiteRequest`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserSiteDecision {
+    /// Whether the page may reach the host (and the card's other hosts).
+    pub allowed: bool,
+    /// How long an allowing answer holds; absent when refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<BrowserSiteScope>,
 }

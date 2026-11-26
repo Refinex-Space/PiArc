@@ -435,6 +435,15 @@ test.describe('web search', () => {
   });
 });
 
+test('a Browser call with its screenshot', async ({ app, page, workspaces }) => {
+  await openSession(app, page, workspaces, 'browser 浏览器', 'browser-run', 'Check the browser');
+  await idle(page);
+  const card = page.getByTestId('browser-card');
+  await expect(card).toHaveAttribute('data-status', 'completed');
+  await expect(card.getByTestId('browser-shot')).toHaveAttribute('data-state', 'shown');
+  await checkState(page, 'row:browser');
+});
+
 test.describe('failures, compaction, reminders and model dialogs', () => {
   test.beforeEach(async ({ userDataDir }) => {
     // Keep almost nothing on compaction, so a short conversation has something to summarize;

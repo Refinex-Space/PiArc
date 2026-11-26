@@ -19,6 +19,7 @@ import {
 } from '../services.js';
 import { useDetail } from '../detail.js';
 import { ThinkingRow } from './messages.js';
+import { BrowserCard } from './browser.js';
 import { WebSearchCard } from './web-search.js';
 import { ProjectImage, useProjectImage } from '../markdown/ReplyImage.js';
 import { useElapsedText, useNow } from './common.js';
@@ -163,7 +164,7 @@ export function ToolGroupRow({
   const [expanded, setExpanded] = useExpanded(id, live);
   const only = members.length === 1 ? items[0] : undefined;
   const opens = only === undefined || hasBody(only);
-  if (only?.type === 'commandExecution' || only?.type === 'webSearch') {
+  if (only?.type === 'commandExecution' || only?.type === 'webSearch' || only?.type === 'browser') {
     return <ToolCall id={members[0] ?? ''} />;
   }
   return (
@@ -328,6 +329,8 @@ const ToolCall = memo(function ToolCall({ id }: { readonly id: string }) {
       return <BashCard id={id} item={item} startedAt={row.startedAt} />;
     case 'webSearch':
       return <WebSearchCard id={id} item={item} />;
+    case 'browser':
+      return <BrowserCard id={id} item={item} />;
     case 'reasoning':
       // The normal view shows no thinking (T29).
       return detail === 'normal' ? null : (

@@ -2,6 +2,7 @@
 // (history.ts): one canonical tool name maps to one item type, and item fields are bounded the
 // same way in both (architecture section 5.3).
 import type {
+  BrowserItemImage,
   CommandExecutionInfo,
   AutoCompactStop,
   CompactionReason,
@@ -42,6 +43,7 @@ export type ToolItemType =
   | 'subagent'
   | 'webFetch'
   | 'webSearch'
+  | 'browser'
   | 'dynamicToolCall';
 
 /** The Auto mode reviewer's decision on a call (T46: Core's `review`, or a `piarc.autoReview`
@@ -79,6 +81,7 @@ export function toolItemType(tool: string): ToolItemType {
     return 'subagent';
   }
   if (tool === 'WebSearch') return 'webSearch';
+  if (tool === 'Browser') return 'browser';
   return tool === 'WebFetch' ? 'webFetch' : 'dynamicToolCall';
 }
 
@@ -103,6 +106,41 @@ function resultSearch(details: unknown): { backend?: string; sources: WebSearchS
   return {
     ...(typeof search.backend === 'string' ? { backend: search.backend } : {}),
     sources,
+  };
+}
+
+/** A Browser run's screenshots, blocked hosts and error code (`details.browser`, ADR-0089). */
+function resultBrowser(details: unknown): {
+  images: BrowserItemImage[];
+  blockedHosts: string[];
+  errorCode?: string;
+} {
+  const browser = isObject(details) ? details.browser : undefined;
+  if (!isObject(browser)) return { images: [], blockedHosts: [] };
+  const images: BrowserItemImage[] = [];
+  if (Array.isArray(browser.shots)) {
+    for (const s of browser.shots as unknown[]) {
+      if (
+        isObject(s) &&
+        typeof s.blob === 'string' &&
+        /^[0-9a-f]{64}$/.test(s.blob) &&
+        (s.mediaType === 'image/png' || s.mediaType === 'image/jpeg') &&
+        typeof s.width === 'number' &&
+        typeof s.height === 'number'
+      ) {
+        images.push({ blob: s.blob, mediaType: s.mediaType, width: s.width, height: s.height });
+      }
+    }
+  }
+  const blockedHosts = Array.isArray(browser.blockedHosts)
+    ? (browser.blockedHosts as unknown[]).flatMap((h) =>
+        typeof h === 'string' ? [h.toWellFormed()] : [],
+      )
+    : [];
+  return {
+    images,
+    blockedHosts,
+    ...(typeof browser.errorCode === 'string' ? { errorCode: browser.errorCode } : {}),
   };
 }
 
@@ -188,6 +226,18 @@ export function toolItem(
         query: text('query'),
         ...(backend === undefined ? {} : { backend }),
         ...(sources.length === 0 ? {} : { sources }),
+      };
+    }
+    case 'browser': {
+      const description = text('description');
+      const { images, blockedHosts, errorCode } = resultBrowser(details);
+      return {
+        type: 'browser',
+        ...common,
+        ...(description === '' ? {} : { description }),
+        ...(images.length === 0 ? {} : { images }),
+        ...(blockedHosts.length === 0 ? {} : { blockedHosts }),
+        ...(errorCode === undefined ? {} : { errorCode }),
       };
     }
     case 'dynamicToolCall':

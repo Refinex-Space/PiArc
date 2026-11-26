@@ -8,7 +8,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { defineTool, type ToolDefinition } from '@earendil-works/pi-coding-agent';
-import type { BrowserRunResult } from '@piarc/protocol';
+import type { BrowserItemImage, BrowserRunResult } from '@piarc/protocol';
 import { Type } from 'typebox';
 
 import { AhpError } from '../protocol/errors.js';
@@ -48,6 +48,8 @@ export interface BrowserDetails {
   readonly description?: string;
   readonly outcome: 'ok' | 'error' | 'unavailable';
   readonly images: number;
+  /** The screenshots Core kept in the session's blobs (ADR-0093). */
+  readonly shots?: readonly BrowserItemImage[];
   readonly truncated?: boolean;
   readonly spill?: string;
   readonly blockedHosts?: readonly string[];
@@ -84,10 +86,23 @@ export function browserContent(result: BrowserRunResult, nonce: string): Block[]
 }
 
 function detailsOf(result: BrowserRunResult, description: string | undefined): BrowserDetails {
+  const shots = (result.images ?? []).flatMap((image) =>
+    image.blob == null
+      ? []
+      : [
+          {
+            blob: image.blob,
+            mediaType: image.mediaType,
+            width: image.width,
+            height: image.height,
+          },
+        ],
+  );
   return {
     ...(description === undefined ? {} : { description }),
     outcome: result.error == null ? 'ok' : 'error',
     images: result.images?.length ?? 0,
+    ...(shots.length === 0 ? {} : { shots }),
     ...(result.truncated === true ? { truncated: true } : {}),
     ...(result.spill == null ? {} : { spill: result.spill }),
     ...(result.blockedHosts == null || result.blockedHosts.length === 0

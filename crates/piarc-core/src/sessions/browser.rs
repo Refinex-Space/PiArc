@@ -32,6 +32,26 @@ impl Hub {
         Ok(self.ctx.tool_io.answer_browser_run(run_id, answer))
     }
 
+    /// Whether a page of a running `Browser` call may reach a host (site cards, ADR-0089).
+    pub async fn browser_site(&self, request_json: String) -> Result<serde_json::Value> {
+        let request: piarc_protocol::browser::BrowserSiteRequest =
+            serde_json::from_str(&request_json).map_err(|_| Error::InvalidArgument {
+                field: "request",
+                reason:
+                    "must be { sessionId, toolCallId, url, host, local?, sensitive?, pending? }"
+                        .into(),
+            })?;
+        let decision = self
+            .ctx
+            .tool_io
+            .browser_site(&request)
+            .await
+            .map_err(|e| Error::feature(&e))?;
+        serde_json::to_value(decision).map_err(|e| Error::Internal {
+            reason: e.to_string(),
+        })
+    }
+
     /// Stops a browser partition's proxy; `{ stopped }`.
     pub async fn stop_browser_proxy(&self, partition: String) -> Result<serde_json::Value> {
         let stopped = self.ctx.browser.stop(&partition).await;

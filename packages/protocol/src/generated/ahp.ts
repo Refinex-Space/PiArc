@@ -17,6 +17,8 @@ export type ProtocolValue =
   | UsageReport
   | BrowserClientEvent
   | BrowserRunAnswer
+  | BrowserSiteRequest
+  | BrowserSiteDecision
   | GitCall
   | GitStatus
   | GitProbe
@@ -729,6 +731,51 @@ export type Item =
         [k: string]: unknown;
       };
       /**
+       * Hosts the browser kept the run's pages from reaching, in `item/completed`.
+       */
+      blockedHosts?: string[];
+      /**
+       * The label the model gave the run.
+       */
+      description?: string | null;
+      /**
+       * The stable code of the error the script ended with, in `item/completed`.
+       */
+      errorCode?: string | null;
+      /**
+       * Screenshots the run attached, in `item/completed`.
+       */
+      images?: BrowserItemImage[];
+      /**
+       * The item's identifier: the tool call id.
+       */
+      itemId: ItemId;
+      /**
+       * The text the tool returned, in `item/completed`.
+       */
+      output?: string | null;
+      /**
+       * The reviewer model decided the call in Auto mode (T46).
+       */
+      review?: ToolReview | null;
+      /**
+       * Lifecycle state.
+       */
+      status: ItemStatus;
+      /**
+       * Canonical tool name.
+       */
+      tool: string;
+      type: 'browser';
+    }
+  | {
+      /**
+       * The arguments the tool was called with.
+       */
+      arguments: {
+        [k: string]: unknown;
+      };
+      /**
        * The item's identifier: the tool call id.
        */
       itemId: ItemId;
@@ -1306,6 +1353,10 @@ export type BrowserClientEvent =
       runId: string;
       type: 'cancel';
     };
+/**
+ * How long an allowing answer holds.
+ */
+export type BrowserSiteScope = 'run' | 'session';
 /**
  * A request of `gitRequest`.
  */
@@ -4465,6 +4516,27 @@ export interface WebSearchSource {
    * The page address.
    */
   url: string;
+}
+/**
+ * A screenshot of a run as the transcript shows it (ADR-0093): a session blob.
+ */
+export interface BrowserItemImage {
+  /**
+   * SHA-256 of the image, lowercase hex: its name in the session's blobs.
+   */
+  blob: string;
+  /**
+   * Height in pixels.
+   */
+  height: number;
+  /**
+   * `image/png` or `image/jpeg`.
+   */
+  mediaType: string;
+  /**
+   * Width in pixels.
+   */
+  width: number;
 }
 /**
  * One reminder of a reminder message: its type and where it came from.
@@ -7941,6 +8013,11 @@ export interface BrowserScriptError {
  */
 export interface BrowserImage {
   /**
+   * SHA-256 of the image bytes once Core kept them in the session's blobs (ADR-0093), so
+   * the transcript can show what the model saw.
+   */
+  blob?: string | null;
+  /**
    * Base64 of the image bytes.
    */
   data: string;
@@ -9975,6 +10052,14 @@ export interface ApprovalRequest {
    */
   sessionId: string;
   /**
+   * A site card (a `permissionExpansion` card for tool [`BROWSER_SITE_TOOL`], ADR-0089):
+   * the address a page the agent drives asks for, with `domain` the host the answer covers.
+   * `allowOnce` lets the running `Browser` call reach it, `allowSession` the session,
+   * `allowAlways` saves the card's `Browser(domain:…)` rule (only when `rules` offers it);
+   * `deny`, the run ending or no answer within the timeout refuse it.
+   */
+  site?: BrowserSiteCard | null;
+  /**
    * Set when a subagent made the call (T31): the card shows in its main session, which
    * lists it with its own approvals; the answer goes to `session_id` (the subagent).
    */
@@ -10004,6 +10089,20 @@ export interface ApprovalReview {
    * Reviewing, or back with the user.
    */
   state: ReviewState;
+}
+/**
+ * A site card's subject (ADR-0089, design addendum B2.6.3): the address a page the agent
+ * drives asks for, and the other hosts its run is waiting on.
+ */
+export interface BrowserSiteCard {
+  /**
+   * Other hosts the same run was kept from reaching, which the answer covers too.
+   */
+  hosts?: string[];
+  /**
+   * The full address the page asks for.
+   */
+  url: string;
 }
 /**
  * Where an approval of a subagent's call comes from: shown on the card in the main session.
@@ -10733,6 +10832,54 @@ export interface BrowserRunAnswer {
    * What the script printed, whole.
    */
   output: string;
+}
+/**
+ * What the desktop client asks Core about one host an agent's page wants to reach (Core API,
+ * `browserSite`).
+ */
+export interface BrowserSiteRequest {
+  /**
+   * The host the answer covers: `host` for a site, `host:port` for a local address.
+   */
+  host: string;
+  /**
+   * A loopback or local development address.
+   */
+  local?: boolean;
+  /**
+   * Other hosts the run was kept from reaching, shown on the card and covered by its answer.
+   */
+  pending?: string[];
+  /**
+   * A private network address or a site with imported sign-ins: every mode asks and the
+   * answer is never saved as a rule.
+   */
+  sensitive?: boolean;
+  /**
+   * The session of the running `Browser` call (a subagent's own id for a subagent).
+   */
+  sessionId: SessionId;
+  /**
+   * The running `Browser` call; the card goes away with it.
+   */
+  toolCallId: string;
+  /**
+   * The full address.
+   */
+  url: string;
+}
+/**
+ * Core's answer to a [`BrowserSiteRequest`].
+ */
+export interface BrowserSiteDecision {
+  /**
+   * Whether the page may reach the host (and the card's other hosts).
+   */
+  allowed: boolean;
+  /**
+   * How long an allowing answer holds; absent when refused.
+   */
+  scope?: BrowserSiteScope | null;
 }
 /**
  * One call of `gitRequest`: an optional operation id (for progress and cancel) and the

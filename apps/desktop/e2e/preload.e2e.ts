@@ -91,6 +91,7 @@ const PIARC_API_SNAPSHOT = [
   'searchFiles',
   'searchSessions',
   'sessionChanges',
+  'sessionImage',
   'sessionModels',
   'sessionUsage',
   'setAttentionCount',

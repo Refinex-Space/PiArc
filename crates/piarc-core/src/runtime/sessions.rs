@@ -378,6 +378,23 @@ impl CoreRuntime {
             .answer_browser_run(run_id, answer_json)
     }
 
+    /// Whether a page of a running `Browser` call may reach a host (ADR-0089, site cards):
+    /// JSON [`piarc_protocol::browser::BrowserSiteRequest`] in,
+    /// [`piarc_protocol::browser::BrowserSiteDecision`] out. Waits for the user's answer when
+    /// it shows a card.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`]; [`Error::InvalidArgument`] for a malformed request.
+    pub fn browser_site(
+        &self,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.browser_site(request_json).await
+        })
+    }
+
     /// Stops a browser partition's proxy (its data was cleared); answers `{ stopped }`.
     ///
     /// # Errors

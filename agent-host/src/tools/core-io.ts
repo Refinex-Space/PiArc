@@ -1097,7 +1097,16 @@ function parseBrowserImage(v: unknown): BrowserImage | undefined {
   ) {
     return undefined;
   }
-  return { mediaType: v.mediaType, data: v.data, width: v.width, height: v.height };
+  if (v.blob != null && (typeof v.blob !== 'string' || !/^[0-9a-f]{64}$/.test(v.blob))) {
+    return undefined;
+  }
+  return {
+    mediaType: v.mediaType,
+    data: v.data,
+    width: v.width,
+    height: v.height,
+    ...(typeof v.blob === 'string' ? { blob: v.blob } : {}),
+  };
 }
 
 function parseScriptError(v: unknown): BrowserScriptError | undefined {

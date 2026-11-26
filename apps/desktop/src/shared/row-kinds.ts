@@ -18,6 +18,7 @@ export const ROW_KINDS = [
   'reminder',
   'subagent',
   'webSearch',
+  'browser',
   'todo',
   'plan',
   'question',

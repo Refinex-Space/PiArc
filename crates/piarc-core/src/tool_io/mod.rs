@@ -210,6 +210,9 @@ struct SessionIo {
     /// The git remotes configured when the session was registered (T46: Auto mode trusts
     /// these, not ones added later); a subagent's are its main session's.
     remotes: Vec<piarc_protocol::policy::GitRemote>,
+    /// Hosts the user let the agent’s pages reach for this session (ADR-0089, site cards);
+    /// a subagent uses its main session’s.
+    browser_hosts: Mutex<Vec<String>>,
 }
 
 impl SessionIo {
@@ -561,6 +564,7 @@ impl ToolIo {
                 file_watch: Mutex::default(),
                 config_seen: tokio::sync::Mutex::default(),
                 remotes,
+                browser_hosts: Mutex::default(),
             }),
         );
         // The baseline `ConfigChange` compares with (T41); outside a runtime (some tests) the

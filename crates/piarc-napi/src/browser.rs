@@ -44,6 +44,20 @@ impl CoreRuntime {
         })
     }
 
+    /// Whether a page of a running `Browser` call may reach a host (site cards): JSON
+    /// `{ sessionId, toolCallId, url, host, local?, sensitive?, pending? }`. Answers
+    /// `{ allowed, scope? }` once Core decided, which may wait for the user.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn browser_site<'env>(
+        &self,
+        env: &'env Env,
+        request_json: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.browserSite", |core, done| {
+            core.browser_site(request_json, done)
+        })
+    }
+
     /// Stops a browser partition's proxy. Answers `{ stopped }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn stop_browser_proxy<'env>(

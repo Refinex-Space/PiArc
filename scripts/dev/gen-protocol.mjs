@@ -160,6 +160,8 @@ async function buildFiles() {
       'UsageReport',
       'BrowserClientEvent',
       'BrowserRunAnswer',
+      'BrowserSiteRequest',
+      'BrowserSiteDecision',
       'GitCall',
       'GitStatus',
       'GitProbe',

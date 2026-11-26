@@ -279,6 +279,37 @@ pub enum Item {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output: Option<String>,
     },
+    /// A run of the built-in browser (`Browser`, ADR-0089): the script's label, and once it
+    /// ended the screenshots it attached (session blobs, ADR-0093), the hosts its pages were
+    /// kept from and the error it ended with.
+    Browser {
+        /// The item's identifier: the tool call id.
+        item_id: ItemId,
+        /// Lifecycle state.
+        status: ItemStatus,
+        /// Canonical tool name.
+        tool: String,
+        /// The arguments the tool was called with.
+        arguments: Map<String, Value>,
+        /// The reviewer model decided the call in Auto mode (T46).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        review: Option<crate::policy::ToolReview>,
+        /// The label the model gave the run.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        /// Screenshots the run attached, in `item/completed`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        images: Vec<crate::browser::BrowserItemImage>,
+        /// Hosts the browser kept the run's pages from reaching, in `item/completed`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        blocked_hosts: Vec<String>,
+        /// The stable code of the error the script ended with, in `item/completed`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_code: Option<String>,
+        /// The text the tool returned, in `item/completed`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+    },
     /// A tool call without a specialised item type.
     DynamicToolCall {
         /// The item's identifier: the tool call id.
@@ -394,6 +425,7 @@ impl Item {
             | Self::Subagent { item_id, .. }
             | Self::WebFetch { item_id, .. }
             | Self::WebSearch { item_id, .. }
+            | Self::Browser { item_id, .. }
             | Self::DynamicToolCall { item_id, .. }
             | Self::PermissionModeChanged { item_id, .. }
             | Self::ContextCompaction { item_id, .. }
@@ -414,6 +446,7 @@ impl Item {
             | Self::Subagent { status, .. }
             | Self::WebFetch { status, .. }
             | Self::WebSearch { status, .. }
+            | Self::Browser { status, .. }
             | Self::DynamicToolCall { status, .. }
             | Self::PermissionModeChanged { status, .. }
             | Self::ContextCompaction { status, .. }

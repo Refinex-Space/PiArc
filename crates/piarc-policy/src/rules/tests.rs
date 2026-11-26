@@ -215,6 +215,33 @@ fn read_and_edit_rules_match_paths_of_their_tools() {
     );
 }
 
+/// ADR-0089: `Browser(domain:…)` names the sites the agent's pages may reach, with the same
+/// host rules as WebFetch; a Browser rule without `domain:` is invalid.
+#[test]
+fn browser_rules_match_hosts() {
+    let r = "Browser(domain:*.example.com)";
+    assert!(hits(
+        Behavior::Allow,
+        r,
+        "Browser",
+        Subject::Domain("app.example.com")
+    ));
+    assert!(!hits(
+        Behavior::Allow,
+        r,
+        "Browser",
+        Subject::Domain("example.org")
+    ));
+    assert!(!hits(
+        Behavior::Allow,
+        r,
+        "WebFetch",
+        Subject::Domain("app.example.com")
+    ));
+    assert!(parse("Browser(example.com)", Behavior::Allow).is_err());
+    assert!(parse("Browser(domain:a/b)", Behavior::Allow).is_err());
+}
+
 #[test]
 fn webfetch_rules_match_hosts() {
     let r = "WebFetch(domain:example.com)";

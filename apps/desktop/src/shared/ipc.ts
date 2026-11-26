@@ -80,6 +80,7 @@ export const IPC_CHANNELS = {
   queueDelete: 'piarc:session.queueDelete',
   attachmentStore: 'piarc:session.attachmentStore',
   markdownImage: 'piarc:files.markdownImage',
+  sessionImage: 'piarc:files.sessionImage',
   markdownImageSettings: 'piarc:files.markdownImageSettings',
   projectFileWatch: 'piarc:files.watch',
   projectFilePreview: 'piarc:files.preview',
@@ -864,6 +865,11 @@ export interface PiarcApi {
    * name, positions }], truncated }` as JSON.
    */
   markdownImage(sessionId: string, document: string, request: ImageInput): Promise<string>;
+  /**
+   * A short-lived URL of an image a tool returned in the session (ADR-0093: `blob` is its
+   * SHA-256 in the session's blobs); with `release`, gives that URL up and resolves `''`.
+   */
+  sessionImage(sessionId: string, blob: string, release?: string): Promise<string>;
   markdownImageSettings(request: ImageSettingsRequest): Promise<string>;
   watchProjectFiles(sessionId: string, paths: readonly string[]): Promise<void>;
   projectFilePreview(

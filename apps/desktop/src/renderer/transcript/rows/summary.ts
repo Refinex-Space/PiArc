@@ -13,6 +13,7 @@ export type ToolVerb =
   | 'edit'
   | 'fetch'
   | 'web'
+  | 'browser'
   | 'mcp'
   | 'agent'
   | 'memorySave'
@@ -44,6 +45,7 @@ const VERB_ORDER: readonly ToolVerb[] = [
   'command',
   'fetch',
   'web',
+  'browser',
   'mcp',
   'agent',
   'memorySave',
@@ -76,6 +78,8 @@ export function verbOf(item: Item): ToolVerb {
       return 'fetch';
     case 'webSearch':
       return 'web';
+    case 'browser':
+      return 'browser';
     case 'mcpToolCall':
       return 'mcp';
     case 'subagent':
@@ -141,6 +145,8 @@ export function targetOf(item: Item): string {
       return item.command.split('\n', 1)[0] ?? item.command;
     case 'webSearch':
       return item.query;
+    case 'browser':
+      return item.description ?? item.tool;
     default:
       break;
   }
@@ -208,6 +214,7 @@ export function summarize(items: readonly Item[]): GroupSummary {
 export const VERB_MESSAGE: Record<ToolVerb, MessageId> = {
   command: 'transcript.tool.command',
   web: 'transcript.tool.web',
+  browser: 'transcript.tool.browser',
   read: 'transcript.tool.read',
   search: 'transcript.tool.search',
   find: 'transcript.tool.find',

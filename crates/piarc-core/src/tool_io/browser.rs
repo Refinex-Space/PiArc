@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use piarc_protocol::browser::{
-    BrowserClientEvent, BrowserRunAnswer, BrowserRunParams, BrowserRunResult,
+    BrowserClientEvent, BrowserImage, BrowserRunAnswer, BrowserRunParams, BrowserRunResult,
 };
 use piarc_protocol::session::SessionId;
 use piarc_protocol::{ErrorKind, ErrorObject};
@@ -157,11 +157,21 @@ impl ToolIo {
         }
         match ended {
             Ended::Answered(answer) => {
-                let result = shape_result(answer, |text| {
+                let mut result = shape_result(answer, |text| {
                     piarc_fs::spill(&session.tmp_dir, &format!("browser-{call}"), text)
                         .ok()
                         .map(|spilled| piarc_fs::model_path(&spilled.path))
                 });
+                if let Some(images) = result.images.take() {
+                    let dir = session.blob_dir.clone();
+                    result.images = Some(
+                        tokio::task::spawn_blocking(move || keep_images(&dir, images))
+                            .await
+                            .map_err(|e| {
+                                ErrorObject::new(ErrorKind::InternalError, e.to_string(), false)
+                            })?,
+                    );
+                }
                 to_value(&result)
             }
             Ended::Cancelled => Err(ErrorObject::new(
@@ -225,16 +235,42 @@ impl ToolIo {
     }
 }
 
-/// `browser.agentEnabled` of the user's settings file; on when absent or unreadable.
-fn agent_enabled(data_dir: &std::path::Path) -> bool {
+/// How long a site card waits for the user by default (B2.6.3), and the range of the user's
+/// `browser.approvalTimeout` (seconds).
+const SITE_TIMEOUT: Duration = Duration::from_secs(120);
+const SITE_TIMEOUT_SECONDS: (u64, u64) = (10, 600);
+
+impl ToolIo {
+    /// `browserSite` (Core API): whether a page of the running `Browser` call may reach a
+    /// host; may show the user a site card (`policy/site.rs`).
+    ///
+    /// # Errors
+    /// `sessionNotFound` for an unknown session; a permission service failure.
+    pub async fn browser_site(
+        &self,
+        request: &piarc_protocol::browser::BrowserSiteRequest,
+    ) -> Result<piarc_protocol::browser::BrowserSiteDecision, ErrorObject> {
+        let timeout = user_setting(&self.config.data_dir, "/browser/approvalTimeout")
+            .and_then(|v| v.as_u64())
+            .map_or(SITE_TIMEOUT, |seconds| {
+                Duration::from_secs(seconds.clamp(SITE_TIMEOUT_SECONDS.0, SITE_TIMEOUT_SECONDS.1))
+            });
+        self.decide_site(request, timeout).await
+    }
+}
+
+/// A value of the user's settings file.
+fn user_setting(data_dir: &std::path::Path, pointer: &str) -> Option<Value> {
     std::fs::read_to_string(data_dir.join("settings.json"))
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .and_then(|value| {
-            value
-                .pointer("/browser/agentEnabled")
-                .and_then(Value::as_bool)
-        })
+        .and_then(|value| value.pointer(pointer).cloned())
+}
+
+/// `browser.agentEnabled` of the user's settings file; on when absent or unreadable.
+fn agent_enabled(data_dir: &std::path::Path) -> bool {
+    user_setting(data_dir, "/browser/agentEnabled")
+        .and_then(|value| value.as_bool())
         .unwrap_or(true)
 }
 
@@ -265,6 +301,35 @@ fn audit_detail(p: &BrowserRunParams, ended: &Ended, outcome: &str, took: Durati
         }
     }
     detail
+}
+
+/// Keeps each image in the session's blobs under its SHA-256 (ADR-0093) and names the blob;
+/// an image that cannot be decoded or written stays without one (the model still gets it).
+fn keep_images(dir: &std::path::Path, images: Vec<BrowserImage>) -> Vec<BrowserImage> {
+    use base64::Engine as _;
+    images
+        .into_iter()
+        .map(|mut image| {
+            let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&image.data) else {
+                return image;
+            };
+            let hash: String = Sha256::digest(&bytes)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect();
+            let path = dir.join(&hash);
+            let kept = path.is_file()
+                || std::fs::create_dir_all(dir).is_ok() && {
+                    let partial = dir.join(format!("{hash}.{}.partial", std::process::id()));
+                    std::fs::write(&partial, &bytes).is_ok()
+                        && std::fs::rename(&partial, &path).is_ok()
+                };
+            if kept {
+                image.blob = Some(hash);
+            }
+            image
+        })
+        .collect()
 }
 
 /// The result the model gets: output cut to the inline budget (the whole text spilled through
@@ -312,7 +377,38 @@ mod tests {
             data: "A".repeat(len),
             width: 10,
             height: 10,
+            blob: None,
         }
+    }
+
+    /// ADR-0093: each image the model gets is kept in the session's blobs under its hash.
+    #[test]
+    fn images_are_kept_as_session_blobs() {
+        use base64::Engine as _;
+        let dir = std::env::temp_dir().join(crate::sessions::new_session_id().expect("id"));
+        let bytes = b"\x89PNG\r\n\x1a\nnot really";
+        let images = keep_images(
+            &dir,
+            vec![
+                BrowserImage {
+                    media_type: "image/png".into(),
+                    data: base64::engine::general_purpose::STANDARD.encode(bytes),
+                    width: 2,
+                    height: 2,
+                    blob: None,
+                },
+                image("image/png", 3),
+            ],
+        );
+        let hash: String = Sha256::digest(bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(images[0].blob.as_deref(), Some(hash.as_str()));
+        assert_eq!(std::fs::read(dir.join(&hash)).expect("blob"), bytes);
+        // "AAA" is not valid base64 for a whole image: no blob, the model still gets it.
+        assert_eq!(images[1].blob, None);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

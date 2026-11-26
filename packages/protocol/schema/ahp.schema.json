@@ -696,6 +696,17 @@
           "description": "Owning session.",
           "type": "string"
         },
+        "site": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserSiteCard"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A site card (a `permissionExpansion` card for tool [`BROWSER_SITE_TOOL`], ADR-0089):\nthe address a page the agent drives asks for, with `domain` the host the answer covers.\n`allowOnce` lets the running `Browser` call reach it, `allowSession` the session,\n`allowAlways` saves the card's `Browser(domain:…)` rule (only when `rules` offers it);\n`deny`, the run ending or no answer within the timeout refuse it."
+        },
         "subagent": {
           "anyOf": [
             {
@@ -1193,6 +1204,10 @@
     "BrowserImage": {
       "description": "An image the script attached (`page.screenshot()`).",
       "properties": {
+        "blob": {
+          "description": "SHA-256 of the image bytes once Core kept them in the session's blobs (ADR-0093), so\nthe transcript can show what the model saw.",
+          "type": ["string", "null"]
+        },
         "data": {
           "description": "Base64 of the image bytes.",
           "type": "string"
@@ -1215,6 +1230,33 @@
         }
       },
       "required": ["mediaType", "data", "width", "height"],
+      "type": "object"
+    },
+    "BrowserItemImage": {
+      "description": "A screenshot of a run as the transcript shows it (ADR-0093): a session blob.",
+      "properties": {
+        "blob": {
+          "description": "SHA-256 of the image, lowercase hex: its name in the session's blobs.",
+          "type": "string"
+        },
+        "height": {
+          "description": "Height in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mediaType": {
+          "description": "`image/png` or `image/jpeg`.",
+          "type": "string"
+        },
+        "width": {
+          "description": "Width in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["blob", "mediaType", "width", "height"],
       "type": "object"
     },
     "BrowserRunAnswer": {
@@ -1377,6 +1419,99 @@
       },
       "required": ["name", "message"],
       "type": "object"
+    },
+    "BrowserSiteCard": {
+      "description": "A site card's subject (ADR-0089, design addendum B2.6.3): the address a page the agent\ndrives asks for, and the other hosts its run is waiting on.",
+      "properties": {
+        "hosts": {
+          "description": "Other hosts the same run was kept from reaching, which the answer covers too.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "url": {
+          "description": "The full address the page asks for.",
+          "type": "string"
+        }
+      },
+      "required": ["url"],
+      "type": "object"
+    },
+    "BrowserSiteDecision": {
+      "description": "Core's answer to a [`BrowserSiteRequest`].",
+      "properties": {
+        "allowed": {
+          "description": "Whether the page may reach the host (and the card's other hosts).",
+          "type": "boolean"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserSiteScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How long an allowing answer holds; absent when refused."
+        }
+      },
+      "required": ["allowed"],
+      "type": "object"
+    },
+    "BrowserSiteRequest": {
+      "description": "What the desktop client asks Core about one host an agent's page wants to reach (Core API,\n`browserSite`).",
+      "properties": {
+        "host": {
+          "description": "The host the answer covers: `host` for a site, `host:port` for a local address.",
+          "type": "string"
+        },
+        "local": {
+          "description": "A loopback or local development address.",
+          "type": "boolean"
+        },
+        "pending": {
+          "description": "Other hosts the run was kept from reaching, shown on the card and covered by its answer.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sensitive": {
+          "description": "A private network address or a site with imported sign-ins: every mode asks and the\nanswer is never saved as a rule.",
+          "type": "boolean"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session of the running `Browser` call (a subagent's own id for a subagent)."
+        },
+        "toolCallId": {
+          "description": "The running `Browser` call; the card goes away with it.",
+          "type": "string"
+        },
+        "url": {
+          "description": "The full address.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "url", "host"],
+      "type": "object"
+    },
+    "BrowserSiteScope": {
+      "description": "How long an allowing answer holds.",
+      "oneOf": [
+        {
+          "const": "run",
+          "description": "For the rest of this run.",
+          "type": "string"
+        },
+        {
+          "const": "session",
+          "description": "For the rest of the session.",
+          "type": "string"
+        }
+      ]
     },
     "Capability": {
       "description": "A named optional protocol feature, for example `planMode`.\n\nCapabilities are open strings rather than an enum: a peer must accept capability names\nit does not know, because that is how newer minor versions announce additions.",
@@ -8797,6 +8932,71 @@
             }
           },
           "required": ["type", "itemId", "status", "tool", "arguments", "query"],
+          "type": "object"
+        },
+        {
+          "description": "A run of the built-in browser (`Browser`, ADR-0089): the script's label, and once it\nended the screenshots it attached (session blobs, ADR-0093), the hosts its pages were\nkept from and the error it ended with.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "blockedHosts": {
+              "description": "Hosts the browser kept the run's pages from reaching, in `item/completed`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "description": "The label the model gave the run.",
+              "type": ["string", "null"]
+            },
+            "errorCode": {
+              "description": "The stable code of the error the script ended with, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "images": {
+              "description": "Screenshots the run attached, in `item/completed`.",
+              "items": {
+                "$ref": "#/$defs/BrowserItemImage"
+              },
+              "type": "array"
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The text the tool returned, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "browser",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments"],
           "type": "object"
         },
         {

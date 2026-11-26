@@ -231,6 +231,13 @@ pub struct ApprovalRequest {
     /// the user's allowlist; `deny` and no answer within the timeout refuse the connection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub domain: Option<String>,
+    /// A site card (a `permissionExpansion` card for tool [`BROWSER_SITE_TOOL`], ADR-0089):
+    /// the address a page the agent drives asks for, with `domain` the host the answer covers.
+    /// `allowOnce` lets the running `Browser` call reach it, `allowSession` the session,
+    /// `allowAlways` saves the card's `Browser(domain:…)` rule (only when `rules` offers it);
+    /// `deny`, the run ending or no answer within the timeout refuse it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site: Option<crate::browser::BrowserSiteCard>,
     /// The user may allow this call from a system notification (T42): an ordinary command or
     /// file change short enough to read there. False for critical deletions, commands outside
     /// the sandbox, protected paths and anything longer; their notification only opens the card.
@@ -353,6 +360,10 @@ pub enum AnswerVia {
 
 /// The tool name of a network-domain card (T39): no tool call asks, the sandbox's proxy does.
 pub const NETWORK_TOOL: &str = "SandboxNetwork";
+
+/// The tool name of a site card (ADR-0089): no tool call asks, a page the agent's `Browser`
+/// script drives does.
+pub const BROWSER_SITE_TOOL: &str = "BrowserSite";
 
 /// Where an approved command runs (T39).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

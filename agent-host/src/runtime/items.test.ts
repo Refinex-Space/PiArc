@@ -46,6 +46,54 @@ describe('boundArguments', () => {
   });
 });
 
+describe('browser items (ADR-0089, ADR-0093)', () => {
+  const blob = 'a'.repeat(64);
+
+  it('carry the label, the kept screenshots, the blocked hosts and the error code', () => {
+    const details = {
+      browser: {
+        description: 'Check the form',
+        outcome: 'error',
+        images: 2,
+        shots: [
+          { blob, mediaType: 'image/png', width: 800, height: 600 },
+          { blob: 'not-a-hash', mediaType: 'image/png', width: 1, height: 1 },
+          { blob, mediaType: 'image/gif', width: 1, height: 1 },
+        ],
+        blockedHosts: ['cdn.example.net'],
+        errorCode: 'PIARC_SITE_REFUSED',
+      },
+    };
+    const item = toolItem(
+      'b1',
+      'completed',
+      'Browser',
+      { script: 'await page.goto("x")', description: 'Check the form' },
+      'out',
+      details,
+    );
+    expect(item).toMatchObject({
+      type: 'browser',
+      description: 'Check the form',
+      images: [{ blob, mediaType: 'image/png', width: 800, height: 600 }],
+      blockedHosts: ['cdn.example.net'],
+      errorCode: 'PIARC_SITE_REFUSED',
+    });
+    if (item.type === 'browser') expect(item.images).toHaveLength(1);
+  });
+
+  it('start without results while the call runs', () => {
+    const item = toolItem('b2', 'inProgress', 'Browser', { script: 'x' }, undefined);
+    expect(item).toEqual({
+      type: 'browser',
+      itemId: 'b2',
+      status: 'inProgress',
+      tool: 'Browser',
+      arguments: { script: 'x' },
+    });
+  });
+});
+
 describe('file change diffs', () => {
   const diff: FileDiff = {
     path: 'src/a.ts',

@@ -18,6 +18,10 @@ export function approvalLabel(request: ApprovalRequest, t: Translate): string {
   if (request.tool === 'SandboxNetwork' && request.domain != null) {
     return t('a11y.approval', { kind: t('approval.network'), target: request.domain });
   }
+  // A site card (ADR-0089) asks about the address an agent's page wants to open.
+  if (request.tool === 'BrowserSite' && request.site != null) {
+    return t('a11y.approval', { kind: t('approval.site'), target: request.site.url });
+  }
   const target =
     request.kind === 'command'
       ? (request.command ?? request.tool)

@@ -17,6 +17,12 @@ export declare class CoreRuntime {
    * the run already ended.
    */
   answerBrowserRun(runId: string, answerJson: string): boolean;
+  /**
+   * Whether a page of a running `Browser` call may reach a host (site cards): JSON
+   * `{ sessionId, toolCallId, url, host, local?, sensitive?, pending? }`. Answers
+   * `{ allowed, scope? }` once Core decided, which may wait for the user.
+   */
+  browserSite(requestJson: string): Promise<string>;
   /** Stops a browser partition's proxy. Answers `{ stopped }`. */
   stopBrowserProxy(partition: string): Promise<string>;
   /**

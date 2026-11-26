@@ -438,6 +438,10 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.markdownImage, id, document, request)
       .then((s: unknown) => expectString(s)),
+  sessionImage: (id, blob, release) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionImage, id, blob, ...(release === undefined ? [] : [release]))
+      .then((s: unknown) => expectString(s)),
   markdownImageSettings: (req) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.markdownImageSettings, req)

@@ -58,6 +58,8 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     git_types(&mut generator);
     generator.subschema_for::<crate::browser::BrowserClientEvent>();
     generator.subschema_for::<crate::browser::BrowserRunAnswer>();
+    generator.subschema_for::<crate::browser::BrowserSiteRequest>();
+    generator.subschema_for::<crate::browser::BrowserSiteDecision>();
     let definitions = generator.take_definitions(true);
     let any_message: Vec<Value> = CONTRACTS
         .iter()

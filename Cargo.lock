@@ -1968,6 +1968,7 @@ dependencies = [
 name = "piarc-core"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "encoding_rs",
  "getrandom 0.4.3",
  "http",

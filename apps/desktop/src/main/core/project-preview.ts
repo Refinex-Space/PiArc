@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 import { projectChunk, readProjectRange } from './project-file-stream.js';
 import { DIAGRAM_PAGE } from './markdown-diagram.js';
 import { markdownImageResponse } from './markdown-images.js';
+import { sessionImageResponse } from './session-images.js';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { protocol, type WebContents, type CustomScheme } from 'electron';
@@ -184,7 +185,7 @@ export class ProjectPreviews {
   }
   async serve(req: Request): Promise<Response> {
     if (new URL(req.url).host === 'markdown-diagram' && this.diagram) return this.diagram(req);
-    const picture = markdownImageResponse(req);
+    const picture = markdownImageResponse(req) ?? sessionImageResponse(req);
     if (picture) return picture;
     const entry = this.entry(req.url);
     if (!entry || !['HEAD', 'GET'].includes(req.method)) return new Response(null, { status: 404 });

@@ -8,6 +8,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+base64.workspace = true
 getrandom.workspace = true
 http.workspace = true
 jsonschema.workspace = true
