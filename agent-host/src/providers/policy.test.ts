@@ -66,6 +66,10 @@ describe('the workspace model runtime', () => {
       workspace.modelRuntime,
       { requestTyped: vi.fn() } as unknown as CoreBridge,
       () => undefined,
+      {
+        deviceId: () => '00000000-0000-4000-8000-000000000000',
+        credentials: new InMemoryCredentialStore(),
+      },
     );
     await expect(logins.start('login-1', 'anthropic')).rejects.toMatchObject({
       kind: 'invalidParams',

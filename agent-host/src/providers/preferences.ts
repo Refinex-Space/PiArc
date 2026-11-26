@@ -97,7 +97,18 @@ export function parsePreferences(value: unknown): ModelPreferences {
       fail('auxiliary');
     auxiliary = { provider: aux.provider, id: aux.id };
   }
-  return { models, ...(auxiliary === undefined ? {} : { auxiliary }) };
+  let disabledProviders: string[] | undefined;
+  if (value.disabledProviders !== undefined) {
+    const list = value.disabledProviders;
+    if (!Array.isArray(list) || !list.every((id): id is string => typeof id === 'string'))
+      fail('disabledProviders');
+    disabledProviders = list;
+  }
+  return {
+    models,
+    ...(auxiliary === undefined ? {} : { auxiliary }),
+    ...(disabledProviders === undefined ? {} : { disabledProviders }),
+  };
 }
 
 type ModelKey = Pick<Model<Api>, 'provider' | 'id'>;

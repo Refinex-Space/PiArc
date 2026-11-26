@@ -219,10 +219,18 @@ export class CoreCredentialStore implements CredentialStore {
     return true;
   }
 
+  /** Providers the user turned off (ADR-0083): read and listed as if nothing were stored, so
+   * Pi treats them as unconfigured. Writes are unaffected. */
+  #hidden: ReadonlySet<string> = new Set();
+
+  hide(providers: Iterable<string>): void {
+    this.#hidden = new Set(providers);
+  }
+
   async read(providerId: string, options?: AuthOperationOptions): Promise<Credential | undefined> {
     options?.signal?.throwIfAborted();
     await this.#ready();
-    return this.#current(providerId);
+    return this.#hidden.has(providerId) ? undefined : this.#current(providerId);
   }
 
   async list(options?: AuthOperationOptions): Promise<readonly CredentialInfo[]> {
@@ -233,6 +241,7 @@ export class CoreCredentialStore implements CredentialStore {
       providers.add(key.slice(key.indexOf('/') + 1));
     }
     return [...providers].flatMap((providerId) => {
+      if (this.#hidden.has(providerId)) return [];
       const credential = this.#current(providerId);
       return credential === undefined ? [] : [{ providerId, type: credential.type }];
     });
