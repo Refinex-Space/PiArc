@@ -257,6 +257,13 @@ export declare class CoreRuntime {
   /** Local Markdown image storage choices and native directory grants. */
   markdownImageSettings(requestJson: string): Promise<string>;
   /**
+   * One Git panel request of session `sessionId` (ADR-0084, ADR-0085): `requestJson` is a
+   * `GitCall`; resolves with `{ result }` or `{ failure }` as JSON text.
+   */
+  gitRequest(sessionId: string, requestJson: string): Promise<string>;
+  /** Cancels Git panel operation `opId`; whether one was running. */
+  cancelGit(opId: string): boolean;
+  /**
    * Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; at most
    * `limit` matches. A newer search with the same `searchId` cancels this one, which then
    * rejects with kind `cancelled`. Resolves with `{ root, results: [{ path, name,

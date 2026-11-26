@@ -7,7 +7,11 @@ import type { CommitMessageAnswer, CommitMessageParams } from '@piarc/protocol';
 
 import type { ModelPreferencesStore } from '../providers/preferences.js';
 import type { AuxiliaryModel } from './auxiliary.js';
-import { AMEND_NOTE, COMMIT_MESSAGE_SYSTEM, LANGUAGE_REQUIREMENT } from './prompts/commit-message.js';
+import {
+  AMEND_NOTE,
+  COMMIT_MESSAGE_SYSTEM,
+  LANGUAGE_REQUIREMENT,
+} from './prompts/commit-message.js';
 
 /** How long the request may take. */
 export const COMMIT_MESSAGE_TIMEOUT_MS = 60_000;
@@ -40,7 +44,8 @@ function fileLine(file: CommitMessageParams['files'][number]): string {
 /** The user message: instructions, language, branch, style hints, files and diff. */
 export function commitMessagePrompt(params: CommitMessageParams): string {
   const parts: string[] = [];
-  if (params.instructions.trim() !== '') parts.push(block('instructions', params.instructions.trim()));
+  if (params.instructions.trim() !== '')
+    parts.push(block('instructions', params.instructions.trim()));
   parts.push(LANGUAGE_REQUIREMENT[params.language]);
   if (params.branch != null) parts.push(`Branch: ${params.branch}`);
   if (params.recentSubjects.length > 0) {

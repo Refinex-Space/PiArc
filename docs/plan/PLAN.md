@@ -340,7 +340,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 3. piarc-git 只读操作：status、diff、log、refs、文件全文、基础分支（`tests/panel.rs` 8 项）。
 - [x] 4. piarc-protocol `git.rs` 与 AHP `session/commitMessage`、契约样本（能力 `commitMessage`）。
 - [x] 5. piarc-core `git/` 只读路径、指纹、`core/git`；NAPI `gitRequest`/`cancelGit`（`sessions/git.rs`、`git/mod.rs`）。
-- [ ] 6. 主进程 `git-ipc.ts`、preload。
+- [x] 6. 主进程 `git-ipc.ts`、preload（单测 6 项；S10 报告与 preload 键快照已更新）。
 - [ ] 7. 渲染进程 G1：改动视图、标题行、范围、文件列、跳转、diff 升级、状态、评论范围、工具改名、右栏卡片。
 - [ ] 8. Git 设置：schema、写入白名单、偏好、设置页。
 - [x] 9. 写操作：index、hunk、回滚与快照、提交、分支、远端、进行中操作、信任、忙碌、锁、审计（`git/write.rs`、`git/restore.rs`；回滚撤销记录改为放在内存，ADR-0085 第 7 条已同步）。

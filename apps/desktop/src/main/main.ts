@@ -38,6 +38,7 @@ import { createIpcRegistrar } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
 import { registerMcpHandlers } from './core/mcp-ipc.js';
 import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
+import { registerGitHandlers } from './core/git-ipc.js';
 import { URL_SCHEME, launchTargets, parseLaunchUrl } from './launch.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { PreferenceStore } from './preferences.js';
@@ -345,6 +346,14 @@ function start(dirs: DataDirs): void {
       terminalOwners.mayObserve(windowId, route),
     );
     registerTerminalHandlers(registerHandler, core.runtime, terminalOwners, terminalStats);
+    registerGitHandlers(
+      registerHandler,
+      core.runtime,
+      () => appShell.t(),
+      nativeConfirm,
+      terminalOwners,
+      () => preferences.locale(),
+    );
     startTestHooks(core, terminalOwners, appShell);
     // The preferences come first: the window's language, theme and menu depend on them.
     void preferences.load().then(() => {

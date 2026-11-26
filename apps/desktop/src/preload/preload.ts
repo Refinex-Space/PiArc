@@ -405,6 +405,12 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionDiscardChange, id, request)
       .then((value: unknown) => expectString(value)),
+  git: (id, request, opId) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.gitRequest, id, request, opId)
+      .then((value: unknown) => expectString(value)),
+  cancelGit: (opId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.gitCancel, opId).then((value: unknown) => value === true),
   switchBranch: (id, entryId) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionSwitchBranch, id, entryId)

@@ -69,6 +69,8 @@ export const IPC_CHANNELS = {
   sessionUndoRewind: 'piarc:session.undoRewind',
   sessionChanges: 'piarc:session.changes',
   sessionDiscardChange: 'piarc:session.discardChange',
+  gitRequest: 'piarc:git.request',
+  gitCancel: 'piarc:git.cancel',
   sessionSwitchBranch: 'piarc:session.switchBranch',
   sessionFork: 'piarc:session.fork',
   queueEdit: 'piarc:session.queueEdit',
@@ -811,6 +813,14 @@ export interface PiarcApi {
   sessionChanges(id: string, path?: string): Promise<string>;
   /** Discards a file's change or one hunk; the file's `ChangesView` afterwards (T28). */
   discardChange(id: string, request: DiscardRequest): Promise<string>;
+  /**
+   * One Git panel request of session `id` (ADR-0084, ADR-0085): `{ result }` or `{ failure }`
+   * JSON. Writes need recent real input; destructive ones stop at a native confirmation.
+   * `opId` names the operation in `core/git` progress events and `cancelGit`.
+   */
+  git(id: string, request: Record<string, unknown>, opId?: string): Promise<string>;
+  /** Cancels Git operation `opId`; whether one was running. */
+  cancelGit(opId: string): Promise<boolean>;
   /** Continues the session on another branch (`SessionRewound` JSON, T28). */
   switchBranch(id: string, entryId: string): Promise<string>;
   /**

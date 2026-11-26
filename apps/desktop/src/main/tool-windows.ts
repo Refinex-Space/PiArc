@@ -136,7 +136,7 @@ export class ToolWindows {
       this.#open.set(ticket.token, { ticket, child });
       const contents = child.webContents;
       const unbind =
-        ticket.panel === 'terminal' || ticket.panel === 'files'
+        ticket.panel === 'terminal' || ticket.panel === 'files' || ticket.panel === 'changes'
           ? this.input.bindToolInput(contents, sender, ticket.session, ticket.panel)
           : undefined;
       // The initial load is the single allowed document. Renderer navigation, redirects and

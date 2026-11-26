@@ -128,7 +128,7 @@ export class TerminalOwners {
   /** Native terminal windows, bound by the main process to their opener and one session. */
   readonly #toolInputs = new Map<
     number,
-    { owner: number; session: string; panel: 'terminal' | 'files' }
+    { owner: number; session: string; panel: 'terminal' | 'files' | 'changes' }
   >();
   /** `window:terminal` pairs with a frame request in flight. */
   readonly #pulling = new Set<string>();
@@ -205,7 +205,7 @@ export class TerminalOwners {
     child: OwnerContents,
     owner: OwnerContents,
     session: string,
-    panel: 'terminal' | 'files' = 'terminal',
+    panel: 'terminal' | 'files' | 'changes' = 'terminal',
   ): () => void {
     this.watch(child);
     this.#toolInputs.set(child.id, { owner: owner.id, session, panel });
@@ -218,7 +218,7 @@ export class TerminalOwners {
   requireInput(
     contents: OwnerContents,
     target?: string | number,
-    panel: 'terminal' | 'files' = 'terminal',
+    panel: 'terminal' | 'files' | 'changes' = 'terminal',
   ): void {
     this.watch(contents);
     if (this.hasRecentInput(contents.id)) return;

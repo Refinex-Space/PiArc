@@ -2014,6 +2014,23 @@ export const en = {
   'proxy.problem.port': 'The port must be between 1 and 65535.',
   'proxy.problem.credentials': 'A user name or password cannot be saved here.',
   'proxy.problem.path': 'Use a host and a port only, without a path.',
+  'git.confirm.more': '{count, plural, one {…and # more file} other {…and # more files}}',
+  'git.confirm.rollback': '{count, plural, one {Roll back # file?} other {Roll back # files?}}',
+  'git.confirm.rollbackDetail': 'The files go back to their last commit, staged changes included. PiArc keeps their current content so you can undo this until it restarts.',
+  'git.confirm.rollbackHunk': 'Roll back this change in {path}?',
+  'git.confirm.rollbackButton': 'Roll Back',
+  'git.confirm.forceCheckout': 'Discard local changes and check out {target}?',
+  'git.confirm.forceCheckoutDetail': 'Uncommitted changes to these files are lost:',
+  'git.confirm.forceCheckoutButton': 'Discard and Check Out',
+  'git.confirm.deleteBranch': 'Delete branch {branch}?',
+  'git.confirm.deleteBranchDetail': "{count, plural, one {# commit is not in the current branch or the branch's upstream.} other {# commits are not in the current branch or the branch's upstream.}} You can restore the branch from the notice that follows.",
+  'git.confirm.deleteBranchButton': 'Delete',
+  'git.confirm.forcePush': 'Force push {branch} to {remote}?',
+  'git.confirm.forcePushDetail': 'The remote branch is replaced only while it still points at {remoteOid}. If someone pushed after your last fetch, the push is refused and their commits stay.\n\nRemote: {remoteOid}\nLocal: {localOid}',
+  'git.confirm.forcePushButton': 'Force Push',
+  'git.confirm.alwaysForcePush': 'Always force push?',
+  'git.confirm.alwaysForcePushDetail': 'Every push from the Git panel will use --force-with-lease and can replace commits on the remote branch. Protected branches are never force-pushed.',
+  'git.confirm.alwaysForcePushButton': 'Turn On',
 } as const;
 
 export type MessageId = keyof typeof en;
