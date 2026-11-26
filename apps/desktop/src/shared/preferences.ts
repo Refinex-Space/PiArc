@@ -54,6 +54,18 @@ export interface Preferences {
 export const PULL_MODES = ['config', 'merge', 'rebase', 'ffOnly'] as const;
 export type PullMode = (typeof PULL_MODES)[number];
 
+/** Minutes between automatic fetches; 0 is off (design addendum H5). */
+export const AUTO_FETCH_MINUTES = [0, 5, 15, 30, 60] as const;
+export type AutoFetchMinutes = (typeof AUTO_FETCH_MINUTES)[number];
+
+/** How a pull request is merged on GitHub (G5). */
+export const MERGE_METHODS = ['merge', 'squash', 'rebase'] as const;
+export type MergeMethod = (typeof MERGE_METHODS)[number];
+
+/** Where AI review findings appear (G5). */
+export const REVIEW_PRESENTATIONS = ['inline', 'separate'] as const;
+export type ReviewPresentation = (typeof REVIEW_PRESENTATIONS)[number];
+
 export interface GitPreferences {
   /** Prefilled when a branch is created; `''` when unset. */
   readonly branchPrefix: string;
@@ -63,6 +75,12 @@ export interface GitPreferences {
   readonly alwaysForcePush: boolean;
   /** `''`: the interface language's default instructions. */
   readonly commitInstructions: string;
+  readonly autoFetch: AutoFetchMinutes;
+  readonly mergeMethod: MergeMethod;
+  readonly draftPullRequests: boolean;
+  /** `''`: the interface language's default instructions. */
+  readonly prInstructions: string;
+  readonly reviewPresentation: ReviewPresentation;
 }
 
 /** Bounds of the Git settings (Core cuts the same values at its own limits). */
@@ -164,6 +182,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
     pullMode: 'config',
     alwaysForcePush: false,
     commitInstructions: '',
+    autoFetch: 0,
+    mergeMethod: 'squash',
+    draftPullRequests: false,
+    prInstructions: '',
+    reviewPresentation: 'inline',
   },
 };
 
@@ -263,6 +286,16 @@ function gitFrom(value: unknown): GitPreferences {
       typeof git.commitInstructions === 'string'
         ? git.commitInstructions
         : defaults.commitInstructions,
+    autoFetch: AUTO_FETCH_MINUTES.find((m) => m === git.autoFetch) ?? defaults.autoFetch,
+    mergeMethod: oneOf(MERGE_METHODS, git.mergeMethod, defaults.mergeMethod),
+    draftPullRequests: git.draftPullRequests === true,
+    prInstructions:
+      typeof git.prInstructions === 'string' ? git.prInstructions : defaults.prInstructions,
+    reviewPresentation: oneOf(
+      REVIEW_PRESENTATIONS,
+      git.reviewPresentation,
+      defaults.reviewPresentation,
+    ),
   };
 }
 
@@ -316,7 +349,13 @@ export type PreferenceChange =
   /** Turning it on needs the main process's native confirmation. */
   | { readonly key: 'git.alwaysForcePush'; readonly value: boolean }
   /** `null` (or the default text) restores the default instructions. */
-  | { readonly key: 'git.commitInstructions'; readonly value: string | null };
+  | { readonly key: 'git.commitInstructions'; readonly value: string | null }
+  | { readonly key: 'git.autoFetch'; readonly value: AutoFetchMinutes }
+  | { readonly key: 'git.mergeMethod'; readonly value: MergeMethod }
+  | { readonly key: 'git.draftPullRequests'; readonly value: boolean }
+  /** `null` (or the default text) restores the default instructions. */
+  | { readonly key: 'git.prInstructions'; readonly value: string | null }
+  | { readonly key: 'git.reviewPresentation'; readonly value: ReviewPresentation };
 
 /**
  * Validates a change received over IPC and returns the settings-file pointer and value to
@@ -417,6 +456,27 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
       if (value === null) return { pointer: '/git/commitInstructions', value: null };
       return typeof value === 'string' && value.length <= GIT_LIMITS.instructions
         ? { pointer: '/git/commitInstructions', value: value.trim() === '' ? null : value }
+        : undefined;
+    case 'git.autoFetch':
+      return AUTO_FETCH_MINUTES.some((m) => m === value)
+        ? { pointer: '/git/autoFetch', value: value === 0 ? null : value }
+        : undefined;
+    case 'git.mergeMethod':
+      return oneOf(MERGE_METHODS, value, 'squash') === value
+        ? { pointer: '/git/mergeMethod', value: value === 'squash' ? null : value }
+        : undefined;
+    case 'git.draftPullRequests':
+      return typeof value === 'boolean'
+        ? { pointer: '/git/draftPullRequests', value: value ? true : null }
+        : undefined;
+    case 'git.prInstructions':
+      if (value === null) return { pointer: '/git/prInstructions', value: null };
+      return typeof value === 'string' && value.length <= GIT_LIMITS.instructions
+        ? { pointer: '/git/prInstructions', value: value.trim() === '' ? null : value }
+        : undefined;
+    case 'git.reviewPresentation':
+      return oneOf(REVIEW_PRESENTATIONS, value, 'inline') === value
+        ? { pointer: '/git/reviewPresentation', value: value === 'inline' ? null : value }
         : undefined;
     default:
       return undefined;

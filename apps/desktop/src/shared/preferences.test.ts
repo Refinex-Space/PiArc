@@ -178,6 +178,11 @@ describe('the Git preferences (ADR-0085)', () => {
       pullMode: 'config',
       alwaysForcePush: false,
       commitInstructions: '',
+      autoFetch: 0,
+      mergeMethod: 'squash',
+      draftPullRequests: false,
+      prInstructions: '',
+      reviewPresentation: 'inline',
     });
     const git = preferencesFrom({
       git: {
@@ -194,6 +199,11 @@ describe('the Git preferences (ADR-0085)', () => {
       pullMode: 'rebase',
       alwaysForcePush: true,
       commitInstructions: 'Be brief.',
+      autoFetch: 0,
+      mergeMethod: 'squash',
+      draftPullRequests: false,
+      prInstructions: '',
+      reviewPresentation: 'inline',
     });
     // An empty list is a choice: nothing is protected.
     expect(preferencesFrom({ git: { protectedBranches: [] } }).git.protectedBranches).toEqual([]);
@@ -264,5 +274,37 @@ describe('the Git preferences (ADR-0085)', () => {
     expect(
       pointerOf({ key: 'git.commitInstructions', value: 'x'.repeat(8 * 1024 + 1) }),
     ).toBeUndefined();
+  });
+
+  it('reads and writes the G3 and G5 Git settings, defaults removing their keys', () => {
+    const git = preferencesFrom({
+      git: { autoFetch: 15, mergeMethod: 'rebase', draftPullRequests: true },
+    }).git;
+    expect([git.autoFetch, git.mergeMethod, git.draftPullRequests]).toEqual([15, 'rebase', true]);
+    expect(git.reviewPresentation).toBe('inline');
+    const fallback = preferencesFrom({ git: { autoFetch: 7, mergeMethod: 'octopus' } }).git;
+    expect([fallback.autoFetch, fallback.mergeMethod]).toEqual([0, 'squash']);
+    expect(pointerOf({ key: 'git.autoFetch', value: 30 })).toEqual({
+      pointer: '/git/autoFetch',
+      value: 30,
+    });
+    expect(pointerOf({ key: 'git.autoFetch', value: 0 })).toEqual({
+      pointer: '/git/autoFetch',
+      value: null,
+    });
+    expect(pointerOf({ key: 'git.autoFetch', value: 1 })).toBeUndefined();
+    expect(pointerOf({ key: 'git.mergeMethod', value: 'squash' })).toEqual({
+      pointer: '/git/mergeMethod',
+      value: null,
+    });
+    expect(pointerOf({ key: 'git.mergeMethod', value: 'ff' })).toBeUndefined();
+    expect(pointerOf({ key: 'git.reviewPresentation', value: 'separate' })).toEqual({
+      pointer: '/git/reviewPresentation',
+      value: 'separate',
+    });
+    expect(pointerOf({ key: 'git.prInstructions', value: 'x'.repeat(8 * 1024 + 1) })).toBe(
+      undefined,
+    );
+    expect(pointerOf({ key: 'git.draftPullRequests', value: 1 })).toBeUndefined();
   });
 });

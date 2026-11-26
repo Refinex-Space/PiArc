@@ -174,11 +174,22 @@ export interface DeletedBranch {
   readonly upstream?: string | undefined;
 }
 
+export interface DeletedRemoteBranch {
+  readonly remote: string;
+  readonly branch: string;
+  readonly oid: string;
+}
+
 export interface OpResult {
   readonly head?: string | undefined;
   readonly subject?: string | undefined;
   readonly restoreId?: string | undefined;
   readonly deleted?: DeletedBranch | undefined;
+  readonly deletedRemote?: DeletedRemoteBranch | undefined;
+  /** Applying a stash stopped with conflicts and git kept it. */
+  readonly stashKept?: boolean | undefined;
+  /** An automatic fetch did nothing: another operation held the repository. */
+  readonly skipped?: boolean | undefined;
   readonly keptStash?: string | undefined;
   readonly conflicts: readonly string[];
   readonly output?: string | undefined;
@@ -506,7 +517,17 @@ export function opResultOf(value: unknown): OpResult | undefined {
   const deleted = isRecord(value.deleted) ? value.deleted : undefined;
   const name = str(deleted?.name);
   const oid = str(deleted?.oid);
+  const gone = isRecord(value.deletedRemote) ? value.deletedRemote : undefined;
+  const remote = str(gone?.remote);
+  const branch = str(gone?.branch);
+  const remoteOid = str(gone?.oid);
   return defined({
+    deletedRemote:
+      remote === undefined || branch === undefined || remoteOid === undefined
+        ? undefined
+        : { remote, branch, oid: remoteOid },
+    stashKept: value.stashKept === true ? true : undefined,
+    skipped: value.skipped === true ? true : undefined,
     head: str(value.head),
     subject: str(value.subject),
     restoreId: str(value.restoreId),
@@ -517,6 +538,135 @@ export function opResultOf(value: unknown): OpResult | undefined {
     keptStash: str(value.keptStash),
     conflicts: strings(value.conflicts),
     output: str(value.output),
+  });
+}
+
+export type RefKind = 'head' | 'local' | 'remote' | 'tag';
+
+export interface RefLabel {
+  readonly kind: RefKind;
+  readonly name: string;
+  readonly current?: boolean | undefined;
+}
+
+export interface LogCommit {
+  readonly sha: string;
+  readonly parents: readonly string[];
+  readonly subject: string;
+  readonly author: string;
+  readonly email: string;
+  readonly time: number;
+  readonly refs: readonly RefLabel[];
+}
+
+export interface LogPage {
+  readonly commits: readonly LogCommit[];
+  readonly more: boolean;
+}
+
+export interface CommitDetail {
+  readonly sha: string;
+  readonly parents: readonly string[];
+  readonly author: string;
+  readonly authorEmail: string;
+  readonly authorTime: number;
+  readonly committer: string;
+  readonly committerEmail: string;
+  readonly commitTime: number;
+  readonly message: string;
+  readonly refs: readonly RefLabel[];
+  readonly inHead: boolean;
+  readonly pushed: boolean;
+}
+
+export interface StashEntry {
+  readonly index: number;
+  readonly oid: string;
+  readonly message: string;
+  readonly branch?: string | undefined;
+  readonly time: number;
+}
+
+export interface Blob {
+  readonly data?: string | undefined;
+  readonly size: number;
+  readonly tooLarge?: boolean | undefined;
+}
+
+const REF_KINDS: readonly RefKind[] = ['head', 'local', 'remote', 'tag'];
+
+function refOf(value: unknown): RefLabel | undefined {
+  if (!isRecord(value)) return undefined;
+  const kind = REF_KINDS.find((k) => k === value.kind);
+  const name = str(value.name);
+  if (kind === undefined || name === undefined) return undefined;
+  return defined({ kind, name, current: value.current === true ? true : undefined });
+}
+
+function logCommitOf(value: unknown): LogCommit | undefined {
+  if (!isRecord(value)) return undefined;
+  const sha = str(value.sha);
+  if (sha === undefined) return undefined;
+  return {
+    sha,
+    parents: strings(value.parents),
+    subject: str(value.subject) ?? '',
+    author: str(value.author) ?? '',
+    email: str(value.email) ?? '',
+    time: count(value.time),
+    refs: list(value.refs, refOf),
+  };
+}
+
+export function logOf(value: unknown): LogPage | undefined {
+  if (!isRecord(value) || !Array.isArray(value.commits)) return undefined;
+  return { commits: list(value.commits, logCommitOf), more: value.more === true };
+}
+
+export function commitDetailOf(value: unknown): CommitDetail | undefined {
+  if (!isRecord(value)) return undefined;
+  const sha = str(value.sha);
+  if (sha === undefined) return undefined;
+  return {
+    sha,
+    parents: strings(value.parents),
+    author: str(value.author) ?? '',
+    authorEmail: str(value.authorEmail) ?? '',
+    authorTime: count(value.authorTime),
+    committer: str(value.committer) ?? '',
+    committerEmail: str(value.committerEmail) ?? '',
+    commitTime: count(value.commitTime),
+    message: str(value.message) ?? '',
+    refs: list(value.refs, refOf),
+    inHead: value.inHead === true,
+    pushed: value.pushed === true,
+  };
+}
+
+function stashOf(value: unknown): StashEntry | undefined {
+  if (!isRecord(value)) return undefined;
+  const oid = str(value.oid);
+  const index = optCount(value.index);
+  if (oid === undefined || index === undefined) return undefined;
+  return defined({
+    index,
+    oid,
+    message: str(value.message) ?? '',
+    branch: str(value.branch),
+    time: count(value.time),
+  });
+}
+
+export function stashesOf(value: unknown): readonly StashEntry[] | undefined {
+  return isRecord(value) && Array.isArray(value.entries) ? list(value.entries, stashOf) : undefined;
+}
+
+export function blobOf(value: unknown): Blob | undefined {
+  if (!isRecord(value)) return undefined;
+  return defined({
+    data: str(value.data),
+    size: count(value.size),
+    tooLarge: value.tooLarge === true ? true : undefined,
   });
 }
 

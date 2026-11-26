@@ -66,6 +66,14 @@ export type ColorToken =
   | 'diff.addedText'
   | 'diff.removedBackground'
   | 'diff.removedText'
+  | 'graph.lane0'
+  | 'graph.lane1'
+  | 'graph.lane2'
+  | 'graph.lane3'
+  | 'graph.lane4'
+  | 'graph.lane5'
+  | 'graph.lane6'
+  | 'graph.lane7'
   | 'code.background'
   | 'code.text'
   | 'overlay.scrim'
@@ -290,6 +298,14 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'diff.addedText': '#1d7a43',
     'diff.removedBackground': '#feebeb',
     'diff.removedText': '#c0262d',
+    'graph.lane0': '#3b5bdb',
+    'graph.lane1': '#288e50',
+    'graph.lane2': '#a86f00',
+    'graph.lane3': '#d93d42',
+    'graph.lane4': '#7b808a',
+    'graph.lane5': '#3049b8',
+    'graph.lane6': '#1d7a43',
+    'graph.lane7': '#8d5a00',
     'code.background': '#f8f9fa',
     'code.text': '#1d2027',
     'overlay.scrim': '#1d202733',
@@ -359,6 +375,14 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'diff.addedText': '#6fd69a',
     'diff.removedBackground': '#3a1719',
     'diff.removedText': '#ff8c8c',
+    'graph.lane0': '#9db0ff',
+    'graph.lane1': '#3dbb72',
+    'graph.lane2': '#e2a336',
+    'graph.lane3': '#ec5d61',
+    'graph.lane4': '#6b707c',
+    'graph.lane5': '#4568e6',
+    'graph.lane6': '#6fd69a',
+    'graph.lane7': '#f1c164',
     'code.background': '#17181b',
     'code.text': '#eceef2',
     'overlay.scrim': '#00000080',
@@ -428,6 +452,14 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'diff.addedText': '#123d24',
     'diff.removedBackground': '#feebeb',
     'diff.removedText': '#5c1418',
+    'graph.lane0': '#3b5bdb',
+    'graph.lane1': '#288e50',
+    'graph.lane2': '#a86f00',
+    'graph.lane3': '#d93d42',
+    'graph.lane4': '#7b808a',
+    'graph.lane5': '#3049b8',
+    'graph.lane6': '#1d7a43',
+    'graph.lane7': '#8d5a00',
     'code.background': '#ffffff',
     'code.text': '#1d2027',
     'overlay.scrim': '#1d202733',
@@ -497,6 +529,14 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'diff.addedText': '#c8f2d8',
     'diff.removedBackground': '#3a1719',
     'diff.removedText': '#ffd1d1',
+    'graph.lane0': '#9db0ff',
+    'graph.lane1': '#3dbb72',
+    'graph.lane2': '#e2a336',
+    'graph.lane3': '#ec5d61',
+    'graph.lane4': '#6b707c',
+    'graph.lane5': '#4568e6',
+    'graph.lane6': '#6fd69a',
+    'graph.lane7': '#f1c164',
     'code.background': '#000000',
     'code.text': '#eceef2',
     'overlay.scrim': '#00000080',
@@ -569,6 +609,14 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'diff.addedText': '--piarc-diff-added-text',
   'diff.removedBackground': '--piarc-diff-removed-background',
   'diff.removedText': '--piarc-diff-removed-text',
+  'graph.lane0': '--piarc-graph-lane0',
+  'graph.lane1': '--piarc-graph-lane1',
+  'graph.lane2': '--piarc-graph-lane2',
+  'graph.lane3': '--piarc-graph-lane3',
+  'graph.lane4': '--piarc-graph-lane4',
+  'graph.lane5': '--piarc-graph-lane5',
+  'graph.lane6': '--piarc-graph-lane6',
+  'graph.lane7': '--piarc-graph-lane7',
   'code.background': '--piarc-code-background',
   'code.text': '--piarc-code-text',
   'overlay.scrim': '--piarc-overlay-scrim',

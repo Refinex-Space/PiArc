@@ -119,6 +119,16 @@
     "removedBackground": "danger.3",
     "removedText": { "light": "danger.11", "dark": "danger.11", "highContrast": "danger.12" }
   },
+  "graph": {
+    "lane0": { "light": "accent.9", "dark": "accent.11" },
+    "lane1": { "light": "success.10", "dark": "success.9" },
+    "lane2": { "light": "warning.10", "dark": "warning.9" },
+    "lane3": { "light": "danger.9", "dark": "danger.10" },
+    "lane4": { "light": "neutral.10", "dark": "neutral.9" },
+    "lane5": { "light": "accent.11", "dark": "accent.9" },
+    "lane6": { "light": "success.11", "dark": "success.11" },
+    "lane7": { "light": "warning.11", "dark": "warning.11" }
+  },
   "code": {
     "background": {
       "light": "neutral.2",

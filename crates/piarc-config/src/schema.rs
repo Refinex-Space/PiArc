@@ -734,6 +734,28 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
                 name: "commitInstructions",
                 shape: Shape::String,
             },
+            // G3: minutes between automatic fetches (0 or absent: off).
+            Field {
+                name: "autoFetch",
+                shape: Shape::Number,
+            },
+            // G5 (design addendum 9.3).
+            Field {
+                name: "mergeMethod",
+                shape: Shape::OneOf(&["merge", "squash", "rebase"]),
+            },
+            Field {
+                name: "draftPullRequests",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "prInstructions",
+                shape: Shape::String,
+            },
+            Field {
+                name: "reviewPresentation",
+                shape: Shape::OneOf(&["inline", "separate"]),
+            },
         ]),
     },
 ]);

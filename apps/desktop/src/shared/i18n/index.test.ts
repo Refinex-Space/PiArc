@@ -149,6 +149,9 @@ describe('i18n', () => {
             group: 'Changes',
             pattern: 'release/*',
             language: 'English',
+            leaving: 2,
+            pushed: 1,
+            oid: 'abc1234',
           }),
         ).not.toThrow();
       }
