@@ -360,6 +360,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [ ] 20. G5 的渲染进程：PR 条与对话框、审查两种呈现、设置。
 - [ ] 21. 文档同步、a11y 与 i18n、全量 verify。
 
+### 内置浏览器 B1–B5（计划外，ADR-0088–0093，设计增补 `docs/architecture/addenda/browser.md`，分支 `macos/preview`）
+
+- [x] 1. 设计增补、ADR-0088–0093（用户 2026-11-26 确认三份变更型）、架构 2.74（第 4 章、5.4、8.5、10.1 THR-13 措辞、10.3）、参考登记；spike 结论记在设计增补附录第 35 条。THR-16、THR-17 的行与映射随第一批测试补入（`check-threats` 要求每条威胁至少一个测试）。
+- [ ] 2. B1 底座：分区识别与 guest 守卫、浏览器代理、`BrowserService`、视图宿主与停车窗口、`browser-ipc`、测试钩子；`t45-browser-isolation`。
+- [ ] 3. B1 面板：标签与 Space 分组、导航与地址栏、提示条、DevTools、设备、console、查找、缩放、PDF、工作区协议、恢复、键位、设置基础项、a11y 与 i18n；L4 `browser-basic`、`browser-view-host`、`browser-files`。
+- [ ] 4. B2 Core 与协议：`browser/run`、`BrowserClient`、站点卡、端口所有权、`Browser` 规则、审计、L1 样本、L2 假客户端与 `browser-` 场景。
+- [ ] 5. B2 SDK 与宿主：SDK 移植与测试、宿主页面与绑定、CDP 代理、快照、请求闸门、控制权、截图、上传下载、transcript 图片（ADR-0093）；L4 `browser-agent`、`browser-nav-gate`、`t45-egress` 新用例；THR-16。
+- [ ] 6. B3：拾取、元素上下文与源码定位、标注、截图菜单、输入框桥接；L4 `browser-picker`、`browser-annotate`、`browser-screenshot`、`t45-xss`。
+- [ ] 7. B4：启动配置、`TaskKind::DevServer`、端口发现、起始页与失败卡、`autoVerify`；L2 `devserver-`、L4 `browser-devserver`。
+- [ ] 8. B5：`piarc-browser-import`、导入流程与记录、设置页补全、性能探针、Windows 交叉检查；THR-17。
+- [ ] 9. 收尾：全量 verify、`dev-flow:spec-reviewer` 复核、ego-browser 实操、交付说明（保留风险 R3、R4、R6）。
+
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。
