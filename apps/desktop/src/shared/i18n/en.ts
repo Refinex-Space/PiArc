@@ -648,8 +648,6 @@ export const en = {
   'files.tree.readAction': 'Read',
   'files.tree.openPath': 'Open {path} in Files',
   'files.tree.toggleDiff': 'Toggle changes for {path}',
-  'tiles.previewEmpty': 'Preview unavailable',
-  'tiles.previewHint': 'Web and app previews will appear here.',
   'md.table.rowActions': 'Row actions',
   'md.table.columnActions': 'Column actions',
   'md.table.tableActions': 'Table actions',

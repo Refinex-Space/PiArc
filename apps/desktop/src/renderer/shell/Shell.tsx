@@ -414,6 +414,9 @@ export function Shell() {
       case 'files.toggle':
         if (selected) togglePanel('files');
         break;
+      case 'preview.toggle':
+        if (selected) togglePanel('preview');
+        break;
       case 'files.quick':
       case 'files.tree':
         if (selected) {

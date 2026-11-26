@@ -18,7 +18,7 @@ import {
   GitBranchIcon,
   FolderIcon,
   MoreIcon,
-  PreviewIcon,
+  GlobeIcon,
   LayoutListIcon,
   SideChatIcon,
   TasksIcon,
@@ -234,7 +234,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
   const controls = [
     ['terminal', 'panel.terminal', <TerminalIcon />, bindings['terminal.toggle']],
     ['changes', 'panel.changes', <GitBranchIcon />, bindings['changes.toggle']],
-    ['preview', 'tiles.preview', <PreviewIcon />, ''],
+    ['preview', 'tiles.preview', <GlobeIcon />, bindings['preview.toggle']],
     ['files', 'tiles.files', <FolderIcon />, bindings['files.toggle']],
   ] as const;
   const names = [

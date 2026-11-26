@@ -30,6 +30,7 @@ import {
   type BrowserSpaceState,
 } from '../../shared/browser.js';
 import type { Translator } from '../../shared/i18n/index.js';
+import type { BrowserObservation } from '../../shared/test-hooks.js';
 import { APP_EVENT_CHANNEL, type AppEvent } from '../../shared/ipc.js';
 import { local, parseAddress, searchUrl, type SearchEngine } from './address.js';
 import { setUpGuestSession } from './guest-session.js';
@@ -129,6 +130,7 @@ export class BrowserService {
   readonly #downloads = new Map<string, Download>();
   readonly #views: ViewHost;
   #nextTab = 1;
+  #quitting = false;
 
   constructor(private readonly deps: BrowserDeps) {
     this.#views = new ViewHost(() => deps.createParking());
@@ -189,6 +191,45 @@ export class BrowserService {
     }
   }
 
+  /** What L4 checks (development builds' test hooks). */
+  async observe(sessionId: string): Promise<BrowserObservation> {
+    const model = await this.#model(sessionId);
+    const placement = model.placement;
+    return {
+      partition: model.partition,
+      active: model.active ?? null,
+      placement:
+        placement === undefined
+          ? null
+          : { bounds: { ...placement.bounds }, occluded: placement.occluded },
+      tabs: model.tabs.map((tab) => {
+        const view = tab.view;
+        const parent = view === undefined ? undefined : this.#views.parentOf(view);
+        return {
+          id: tab.id,
+          space: tab.space,
+          url: tab.url,
+          pageUrl: view === undefined ? '' : view.webContents.getURL(),
+          title: tab.title,
+          openedBy: tab.openedBy,
+          host:
+            parent === undefined
+              ? 'none'
+              : parent === placement?.window
+                ? 'panel'
+                : parent === this.#views.parking()
+                  ? 'parking'
+                  : 'none',
+          visible: view?.getVisible() ?? false,
+          bounds: view === undefined ? null : { ...view.getBounds() },
+          zoom: tab.zoom,
+          devtools: tab.devtools,
+          emulated: tab.emulation !== null,
+        };
+      }),
+    };
+  }
+
   /** Whether `contents` is a browser guest or the script host (ADR-0088 rule 2). */
   isBrowserContents(contents: WebContents): boolean {
     return this.partitions.kind(contents.session) !== undefined;
@@ -212,6 +253,15 @@ export class BrowserService {
         }
       }
     }
+  }
+
+  /**
+   * The app is quitting: from now on nothing is laid out or parked, so closing the
+   * workbench windows never creates the parking window (a window created during quit stops
+   * the quit).
+   */
+  quitting(): void {
+    this.#quitting = true;
   }
 
   /** Closes every page (app quit). */
@@ -398,6 +448,9 @@ export class BrowserService {
       }
       case 'contextMenu':
         this.#tabMenu(model, request.tab, sender);
+        return null;
+      case 'focus':
+        this.#tab(model, request.tab).view?.webContents.focus();
         return null;
       case 'download':
         this.#downloadAction(request.download, request.action);
@@ -595,6 +648,7 @@ export class BrowserService {
 
   /** Puts every tab's view where it belongs. */
   #layout(model: SessionModel): void {
+    if (this.#quitting) return;
     const active = model.tabs.find((t) => t.id === model.active);
     for (const tab of model.tabs) {
       if (tab !== active && tab.view !== undefined) this.#views.park(tab.view);
@@ -604,7 +658,8 @@ export class BrowserService {
     }
     if (active === undefined) return;
     const placement = model.placement;
-    if (placement === undefined || placement.window.isDestroyed()) {
+    // A tab without an address has no page: the panel shows its start card instead.
+    if (placement === undefined || placement.window.isDestroyed() || active.url === '') {
       if (active.view !== undefined) this.#views.park(active.view);
       const devtools = model.devtools.get(active.id);
       if (devtools !== undefined) this.#views.detach(devtools);
@@ -622,20 +677,11 @@ export class BrowserService {
       devtools.setVisible(!placement.occluded);
     }
     if (active.emulation === null) {
-      view.webContents.disableDeviceEmulation();
       view.setBounds(area);
     } else {
-      const { rect, scale } = fitDevice(area, active.emulation);
-      view.setBounds(rect);
-      view.webContents.enableDeviceEmulation({
-        screenPosition: active.emulation.mobile ? 'mobile' : 'desktop',
-        screenSize: { width: active.emulation.width, height: active.emulation.height },
-        viewPosition: { x: 0, y: 0 },
-        deviceScaleFactor: active.emulation.deviceScaleFactor,
-        viewSize: { width: active.emulation.width, height: active.emulation.height },
-        scale,
-      });
+      view.setBounds(fitDevice(area, active.emulation).rect);
     }
+    active.applyEmulation(area);
     view.setVisible(!placement.occluded);
   }
 

@@ -75,6 +75,19 @@ import {
   Sparkles,
   Tag,
   Undo2,
+  ArrowLeft,
+  Camera,
+  CodeXml,
+  Crop,
+  Lock,
+  LockOpen,
+  PenLine,
+  RotateCw,
+  ShieldAlert,
+  Smartphone,
+  SquareMousePointer,
+  ZoomIn,
+  ZoomOut,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -136,6 +149,20 @@ export const GripIcon = glyph(GripVertical);
 export const PreviewIcon = glyph(Play);
 export const PencilIcon = glyph(Pencil);
 export const GlobeIcon = glyph(Globe);
+// ---- Built-in browser (ADR-0088) ----
+export const BackIcon = glyph(ArrowLeft);
+export const ReloadIcon = glyph(RotateCw);
+export const LockIcon = glyph(Lock);
+export const UnlockIcon = glyph(LockOpen);
+export const ShieldAlertIcon = glyph(ShieldAlert);
+export const DeviceIcon = glyph(Smartphone);
+export const PickIcon = glyph(SquareMousePointer);
+export const AnnotateIcon = glyph(PenLine);
+export const ScreenshotIcon = glyph(Camera);
+export const RegionIcon = glyph(Crop);
+export const DevtoolsIcon = glyph(CodeXml);
+export const ZoomInIcon = glyph(ZoomIn);
+export const ZoomOutIcon = glyph(ZoomOut);
 export const ExpandIcon = glyph(Maximize2);
 export const RestoreIcon = glyph(Minimize2);
 export const MaximizeIcon = glyph(Maximize);

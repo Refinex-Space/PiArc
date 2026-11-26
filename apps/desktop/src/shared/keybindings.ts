@@ -33,6 +33,7 @@ export const COMMANDS = [
   { id: 'session.new', defaultKey: 'Mod+N', label: 'command.session.new', scope: 'app' },
   { id: 'session.close', defaultKey: 'Mod+W', label: 'command.session.close', scope: 'app' },
   { id: 'files.toggle', defaultKey: 'Mod+Shift+F', label: 'tiles.files', scope: 'app' },
+  { id: 'preview.toggle', defaultKey: 'Mod+Shift+B', label: 'tiles.preview', scope: 'app' },
   { id: 'files.quick', defaultKey: 'Mod+P', label: 'files.quick', scope: 'app' },
   { id: 'files.tree', defaultKey: 'Mod+Shift+Y', label: 'files.toggleTree', scope: 'app' },
   { id: 'session.sideChat', defaultKey: 'Mod+;', label: 'sideChat.title', scope: 'app' },

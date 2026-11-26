@@ -179,9 +179,9 @@ test('side chat keeps its unsent draft across sibling tools and maximization', a
   const preview = page.getByTestId('tile-preview');
   const files = page.getByTestId('tile-files');
   await expect(preview).toBeVisible();
-  const empty = await box(preview.getByTestId('preview-placeholder'));
-  const body = await box(preview.getByTestId('tile-body-preview'));
-  expect(Math.abs(body.y + body.height / 2 - (empty.y + empty.height / 2))).toBeLessThanOrEqual(1);
+  // A session without tabs shows the browser's start card in the viewport (B1.1.1).
+  await expect(preview.getByTestId('browser-start')).toBeVisible();
+  await expect(preview.getByTestId('browser-address')).toBeVisible();
   await expect(files).toBeVisible();
   await expect(input).toBeVisible();
   await page.getByTestId('tile-maximize-files').click();

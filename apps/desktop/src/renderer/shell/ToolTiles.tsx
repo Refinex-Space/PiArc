@@ -477,7 +477,7 @@ export function ToolTiles({
           const rect = geo.panes.get(id);
           const detached = current.detached.includes(id);
           const expanded = current.maximized === id;
-          const customHeader = ['terminal', 'side-chat', 'files', 'changes'].includes(id);
+          const customHeader = ['terminal', 'side-chat', 'files', 'changes', 'preview'].includes(id);
           const showPicker =
             geo.compact && !geo.single && !detached && !expanded && docked.length > 1;
           const dock = () => {

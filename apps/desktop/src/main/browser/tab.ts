@@ -13,6 +13,7 @@ import type {
 import { originForLog } from '../security/navigation.js';
 import { local } from './address.js';
 import { navigable, WORKSPACE_SCHEME } from './request-rules.js';
+import { fitDevice } from './view-host.js';
 
 /** What a tab tells its owner. */
 export interface TabHooks {
@@ -77,6 +78,8 @@ export class BrowserTab {
   /** When the tab was last on screen (for discarding hidden tabs). */
   lastShown = Date.now();
   view: WebContentsView | undefined;
+  /** The emulation last given to Chromium (`none`), or undefined for a fresh page. */
+  #emulationApplied: string | undefined;
 
   constructor(
     init: TabInit,
@@ -118,6 +121,7 @@ export class BrowserTab {
     view.setBackgroundColor('#00000000');
     this.view = view;
     this.crashed = false;
+    this.#emulationApplied = undefined;
     this.wire(view.webContents);
     if (this.url !== '' && this.url !== 'about:blank') {
       this.load(this.url);
@@ -148,6 +152,35 @@ export class BrowserTab {
     const view = this.view;
     this.view = undefined;
     if (view !== undefined) close(view);
+  }
+
+  /**
+   * Applies the tab's device emulation inside `area` when it changed. Chromium's emulation
+   * calls need a page that loaded something: before that they are skipped and run on the
+   * next layout.
+   */
+  applyEmulation(area: Electron.Rectangle): void {
+    const contents = this.view?.webContents;
+    if (contents === undefined || contents.isDestroyed() || contents.getURL() === '') return;
+    const emulation = this.emulation;
+    const key =
+      emulation === null ? 'none' : JSON.stringify([emulation, fitDevice(area, emulation).scale]);
+    if (key === this.#emulationApplied) return;
+    if (emulation === null) {
+      if (this.#emulationApplied !== undefined && this.#emulationApplied !== 'none') {
+        contents.disableDeviceEmulation();
+      }
+    } else {
+      contents.enableDeviceEmulation({
+        screenPosition: emulation.mobile ? 'mobile' : 'desktop',
+        screenSize: { width: emulation.width, height: emulation.height },
+        viewPosition: { x: 0, y: 0 },
+        deviceScaleFactor: emulation.deviceScaleFactor,
+        viewSize: { width: emulation.width, height: emulation.height },
+        scale: fitDevice(area, emulation).scale,
+      });
+    }
+    this.#emulationApplied = key;
   }
 
   stepZoom(step: 'in' | 'out' | 'reset'): void {

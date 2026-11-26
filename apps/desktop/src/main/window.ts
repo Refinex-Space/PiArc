@@ -2,7 +2,7 @@
 // ESLint), so every window gets `secureWebPreferences`.
 import { BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 
-import { secureWebPreferences } from './web-preferences.js';
+import { blankWebPreferences, secureWebPreferences } from './web-preferences.js';
 import { MAIN_WINDOW_DEFAULT } from './platform/window-state.js';
 
 /** The smallest main window. */
@@ -48,7 +48,7 @@ export function createParkingWindow(): BrowserWindow {
     skipTaskbar: true,
     // i18n-exempt: never shown.
     title: 'PiArc browser pages',
-    webPreferences: secureWebPreferences(''),
+    webPreferences: blankWebPreferences(),
   });
 }
 

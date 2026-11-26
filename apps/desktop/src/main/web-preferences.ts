@@ -2,10 +2,9 @@
 // checklist items 2-4, 6 and 8-11). Only the preload path varies.
 import type { WebPreferences } from 'electron';
 
-/** Secure web preferences with `preload` as the only variable. */
-export function secureWebPreferences(preload: string): WebPreferences {
+/** Secure web preferences of a window that loads nothing and has no preload. */
+export function blankWebPreferences(): WebPreferences {
   return {
-    preload,
     sandbox: true,
     contextIsolation: true,
     nodeIntegration: false,
@@ -17,4 +16,9 @@ export function secureWebPreferences(preload: string): WebPreferences {
     webviewTag: false,
     navigateOnDragDrop: false,
   };
+}
+
+/** Secure web preferences with `preload` as the only variable. */
+export function secureWebPreferences(preload: string): WebPreferences {
+  return { preload, ...blankWebPreferences() };
 }

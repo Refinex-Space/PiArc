@@ -207,6 +207,8 @@ export type BrowserRequest =
       readonly password?: string;
     }
   | { readonly op: 'openExternal'; readonly tab: string }
+  /** Gives the page keyboard focus (Enter on the viewport). */
+  | { readonly op: 'focus'; readonly tab: string }
   | { readonly op: 'contextMenu'; readonly tab: string }
   | { readonly op: 'download'; readonly download: string; readonly action: 'cancel' | 'show' }
   | { readonly op: 'clearData' };

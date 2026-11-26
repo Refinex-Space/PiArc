@@ -153,6 +153,10 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
       app.run('app.quit');
     },
     mainWindows: () => app.mainWindows().map((w) => w.webContents.id),
+    browser: (sessionId) => {
+      if (browser === undefined) return Promise.reject(new Error('The browser has not started'));
+      return browser.observe(sessionId);
+    },
     attention: () => app.attention.observed(),
     notificationAction: (index) => app.attention.pressAction(index),
     failNext: (channel, message) => {
@@ -204,6 +208,9 @@ function startBrowser(core: CoreHost, appShell: AppShell, dirs: DataDirs): Brows
     service.discardIdle();
   }, 60_000);
   sweep.unref();
+  app.on('before-quit', () => {
+    service.quitting();
+  });
   app.on('will-quit', () => {
     clearInterval(sweep);
     service.dispose();

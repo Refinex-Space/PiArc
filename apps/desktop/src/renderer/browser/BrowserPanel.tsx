@@ -1,0 +1,363 @@
+// The preview tool: the built-in browser of a session (ADR-0088, design addendum B1). The main
+// process owns the tabs and the page; this panel shows the chrome around the page and the
+// strips the page needs, and tells the main process where the page goes.
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import type { BrowserRequest } from '../../shared/browser.js';
+import { useT } from '../app/app-context.js';
+import { Button } from '../app/Button.js';
+import { reason } from '../shell/errors.js';
+import { GlobeIcon } from '../shell/icons.js';
+import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
+import { ToolHeaderContent } from '../shell/ToolHeaderSlot.js';
+import { useUi } from '../shell/ui.js';
+import { DeviceBar, Downloads, FindBar, PromptBar } from './bars.js';
+import { NavigationRow, TabStrip, type ChromeActions } from './chrome.js';
+import { browserCall, useBrowserState } from './use-browser.js';
+import { Viewport } from './Viewport.js';
+
+export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
+  const t = useT();
+  const ui = useUi();
+  const menu = useMenu();
+  const { state, failure } = useBrowserState(sessionId);
+  const [findOn, setFindOn] = useState(false);
+  const [deviceOn, setDeviceOn] = useState(false);
+  const [focusAddress, setFocusAddress] = useState(0);
+  const [claim, setClaim] = useState(false);
+  const tab = state?.tabs.find((candidate) => candidate.id === state.activeTab);
+
+  const report = useCallback(
+    (error: unknown) => {
+      ui.addToast({ sessionId, text: reason(error) });
+    },
+    [ui, sessionId],
+  );
+  const call = useCallback(
+    (request: BrowserRequest) => {
+      browserCall(sessionId, request, report);
+    },
+    [sessionId, report],
+  );
+
+  const actions = useMemo<ChromeActions>(
+    () => ({
+      newTab: () => {
+        call({ op: 'newTab' });
+        setFocusAddress((n) => n + 1);
+      },
+      select: (id) => {
+        call({ op: 'selectTab', tab: id });
+      },
+      close: (id) => {
+        call({ op: 'closeTab', tab: id });
+      },
+      move: (id, index) => {
+        call({ op: 'moveTab', tab: id, index });
+      },
+      tabMenu: (id) => {
+        call({ op: 'contextMenu', tab: id });
+      },
+      navigate: (input) => {
+        call(
+          tab === undefined ? { op: 'navigate', input } : { op: 'navigate', tab: tab.id, input },
+        );
+      },
+      back: () => {
+        if (tab !== undefined) call({ op: 'history', tab: tab.id, direction: 'back' });
+      },
+      forward: () => {
+        if (tab !== undefined) call({ op: 'history', tab: tab.id, direction: 'forward' });
+      },
+      reload: (hard) => {
+        if (tab !== undefined) call({ op: 'reload', tab: tab.id, hard });
+      },
+      stop: () => {
+        if (tab !== undefined) call({ op: 'stop', tab: tab.id });
+      },
+      toggleFind: () => {
+        setFindOn((on) => {
+          if (on && tab !== undefined) call({ op: 'stopFind', tab: tab.id });
+          return !on;
+        });
+      },
+      toggleDevice: () => {
+        setDeviceOn((on) => !on);
+      },
+      devtools: () => {
+        if (tab === undefined) return;
+        call({
+          op: 'devtools',
+          tab: tab.id,
+          mode: tab.devtools === 'closed' ? 'docked' : 'closed',
+        });
+      },
+      more: (anchor) => {
+        const rect = anchor.getBoundingClientRect();
+        menu.openAt(rect.left, rect.bottom + 4, anchor);
+      },
+    }),
+    [call, tab, menu],
+  );
+
+  // Keys pressed while the page had focus come back here (main/browser/keymap.ts).
+  useEffect(
+    () =>
+      window.piarc.onAppEvent((event) => {
+        if (event.type !== 'browserKey' || event.sessionId !== sessionId) return;
+        const current = event.tab;
+        switch (event.key) {
+          case 'address':
+            setFocusAddress((n) => n + 1);
+            break;
+          case 'reload':
+          case 'hardReload':
+            call({ op: 'reload', tab: current, hard: event.key === 'hardReload' });
+            break;
+          case 'back':
+          case 'forward':
+            call({ op: 'history', tab: current, direction: event.key });
+            break;
+          case 'newTab':
+            actions.newTab();
+            break;
+          case 'closeTab':
+            call({ op: 'closeTab', tab: current });
+            break;
+          case 'reopenTab':
+            call({ op: 'reopenClosed' });
+            break;
+          case 'find':
+            setFindOn(true);
+            break;
+          case 'zoomIn':
+          case 'zoomOut':
+          case 'zoomReset':
+            call({
+              op: 'zoom',
+              tab: current,
+              step: event.key === 'zoomIn' ? 'in' : event.key === 'zoomOut' ? 'out' : 'reset',
+            });
+            break;
+          case 'devtools':
+            actions.devtools();
+            break;
+          case 'device':
+            setDeviceOn((on) => !on);
+            break;
+          case 'nextTab':
+          case 'previousTab':
+          case 'lastTab':
+          default: {
+            const tabs = state?.tabs ?? [];
+            const at = tabs.findIndex((candidate) => candidate.id === current);
+            let target: number | undefined;
+            if (event.key === 'nextTab') target = (at + 1) % tabs.length;
+            else if (event.key === 'previousTab') target = (at - 1 + tabs.length) % tabs.length;
+            else if (event.key === 'lastTab') target = tabs.length - 1;
+            else if (/^tab[1-8]$/.test(event.key)) target = Number(event.key.slice(3)) - 1;
+            const chosen = target === undefined ? undefined : tabs[target];
+            if (chosen !== undefined) call({ op: 'selectTab', tab: chosen.id });
+          }
+        }
+      }),
+    [sessionId, call, actions, state?.tabs],
+  );
+
+  useEffect(() => {
+    if (state?.shownElsewhere === false) setClaim(false);
+  }, [state?.shownElsewhere]);
+
+  if (state === undefined) {
+    return failure === undefined ? (
+      <div className="browser-panel" data-testid="browser-loading" />
+    ) : (
+      <div className="browser-panel browser-card" data-testid="browser-unavailable">
+        <p>{reason(failure)}</p>
+      </div>
+    );
+  }
+
+  const moreItems: MenuItem[] = [
+    {
+      id: 'external',
+      label: t('browser.openExternal'),
+      disabled: tab === undefined || !/^https?:/.test(tab.url),
+      run: () => {
+        if (tab !== undefined) call({ op: 'openExternal', tab: tab.id });
+      },
+    },
+    {
+      id: 'copy',
+      label: t('browser.copyUrl'),
+      disabled: tab === undefined || tab.url === '',
+      run: () => {
+        if (tab !== undefined) void navigator.clipboard.writeText(tab.url);
+      },
+    },
+    {
+      id: 'zoom-in',
+      label: t('browser.zoom.in'),
+      disabled: tab === undefined,
+      shortcut: 'Mod+=',
+      run: () => {
+        if (tab !== undefined) call({ op: 'zoom', tab: tab.id, step: 'in' });
+      },
+    },
+    {
+      id: 'zoom-out',
+      label: t('browser.zoom.out'),
+      disabled: tab === undefined,
+      shortcut: 'Mod+-',
+      run: () => {
+        if (tab !== undefined) call({ op: 'zoom', tab: tab.id, step: 'out' });
+      },
+    },
+    {
+      id: 'devtools-window',
+      label: t('browser.devtools.window'),
+      disabled: tab === undefined,
+      run: () => {
+        if (tab !== undefined) call({ op: 'devtools', tab: tab.id, mode: 'window' });
+      },
+    },
+    {
+      id: 'clear',
+      label: t('browser.clearData'),
+      danger: true,
+      run: () => {
+        call({ op: 'clearData' });
+      },
+    },
+  ];
+
+  const prompts = state.prompts.filter((prompt) => prompt.tab === tab?.id);
+  const pageShown =
+    tab !== undefined && !tab.crashed && tab.failure === undefined && tab.url !== '';
+  return (
+    <div className="browser-panel" data-testid="browser-panel">
+      <ToolHeaderContent>
+        <TabStrip state={state} actions={actions} />
+      </ToolHeaderContent>
+      <NavigationRow
+        tab={tab}
+        actions={actions}
+        focusAddress={focusAddress}
+        deviceOn={deviceOn}
+        findOn={findOn}
+      />
+      {prompts.map((prompt) => (
+        <PromptBar
+          key={prompt.id}
+          prompt={prompt}
+          answer={(id, accept, fields) => {
+            call({ op: 'answer', prompt: id, accept, ...fields });
+          }}
+        />
+      ))}
+      {findOn && tab !== undefined && (
+        <FindBar
+          find={state.find?.tab === tab.id ? state.find : undefined}
+          onFind={(text, forward, next) => {
+            call({ op: 'find', tab: tab.id, text, forward, next });
+          }}
+          onClose={() => {
+            setFindOn(false);
+            call({ op: 'stopFind', tab: tab.id });
+          }}
+        />
+      )}
+      {deviceOn && tab !== undefined && (
+        <DeviceBar
+          emulation={tab.emulation}
+          media={tab.media}
+          onEmulate={(emulation) => {
+            call({ op: 'emulate', tab: tab.id, emulation });
+          }}
+          onMedia={(media) => {
+            call({ op: 'media', tab: tab.id, media });
+          }}
+        />
+      )}
+      {state.shownElsewhere && !claim ? (
+        <div className="browser-card" data-testid="browser-elsewhere">
+          <p>{t('browser.elsewhere.title')}</p>
+          <Button
+            onClick={() => {
+              setClaim(true);
+            }}
+          >
+            {t('browser.elsewhere.move')}
+          </Button>
+        </div>
+      ) : (
+        <Viewport
+          sessionId={sessionId}
+          active={pageShown}
+          claim={claim}
+          onEnter={() => {
+            if (tab !== undefined) call({ op: 'focus', tab: tab.id });
+          }}
+        >
+          {tab === undefined || tab.url === '' ? (
+            <div className="browser-card" data-testid="browser-start">
+              <GlobeIcon size={20} />
+              <p className="browser-card-title">{t('browser.start.title')}</p>
+              <p>{t('browser.start.hint')}</p>
+            </div>
+          ) : tab.crashed ? (
+            <div className="browser-card" data-testid="browser-crashed">
+              <p className="browser-card-title">{t('browser.crashed.title')}</p>
+              <Button
+                onClick={() => {
+                  call({ op: 'reload', tab: tab.id });
+                }}
+              >
+                {t('browser.crashed.reload')}
+              </Button>
+            </div>
+          ) : tab.failure !== undefined ? (
+            <div className="browser-card" data-testid="browser-error">
+              <p className="browser-card-title">{t('browser.error.title')}</p>
+              <p>
+                {t('browser.error.detail', {
+                  host: hostOf(tab.failure.url),
+                  name: tab.failure.name,
+                })}
+              </p>
+              <Button
+                onClick={() => {
+                  call({ op: 'navigate', tab: tab.id, input: tab.failure?.url ?? tab.url });
+                }}
+              >
+                {t('browser.error.retry')}
+              </Button>
+            </div>
+          ) : null}
+        </Viewport>
+      )}
+      <Downloads
+        downloads={state.downloads}
+        onAction={(id, action) => {
+          call({ op: 'download', download: id, action });
+        }}
+      />
+      {menu.open && (
+        <MenuPopup
+          at={menu.open}
+          items={moreItems}
+          label={t('browser.more')}
+          onClose={menu.close}
+        />
+      )}
+    </div>
+  );
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}

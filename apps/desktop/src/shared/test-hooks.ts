@@ -139,9 +139,39 @@ export interface NotificationProbeEvent {
   readonly detail?: string;
 }
 
+/** A browser tab as L4 sees it in the main process (ADR-0088). */
+export interface BrowserTabObservation {
+  readonly id: string;
+  readonly space: string;
+  readonly url: string;
+  /** The page's own URL (`webContents.getURL()`); empty while discarded. */
+  readonly pageUrl: string;
+  readonly title: string;
+  readonly openedBy: 'user' | 'agent';
+  /** Where the view is: the panel's window, the hidden parking window, or nowhere. */
+  readonly host: 'panel' | 'parking' | 'none';
+  readonly visible: boolean;
+  readonly bounds: { x: number; y: number; width: number; height: number } | null;
+  readonly zoom: number;
+  readonly devtools: 'closed' | 'docked' | 'window';
+  readonly emulated: boolean;
+}
+
+export interface BrowserObservation {
+  readonly partition: string;
+  readonly active: string | null;
+  readonly placement: {
+    readonly bounds: { x: number; y: number; width: number; height: number };
+    readonly occluded: boolean;
+  } | null;
+  readonly tabs: readonly BrowserTabObservation[];
+}
+
 export interface PiarcTestHooks {
   /** The loaded `.node` file. */
   readonly modulePath: string;
+  /** The built-in browser of a session (B1–B5 L4). */
+  browser(sessionId: string): Promise<BrowserObservation>;
   readonly core: TestCoreApi;
   routerStats(): RouterStats;
   /** Routes the window with this `webContents.id` receives. */

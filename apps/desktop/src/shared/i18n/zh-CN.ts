@@ -634,8 +634,6 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'files.tree.readAction': '读取',
   'files.tree.openPath': '在文件面板中打开 {path}',
   'files.tree.toggleDiff': '展开或收起 {path} 的改动',
-  'tiles.previewEmpty': '预览暂未开放',
-  'tiles.previewHint': '此处预留给网页和应用预览。',
   'md.table.rowActions': '行操作',
   'md.table.columnActions': '列操作',
   'md.table.tableActions': '表格操作',

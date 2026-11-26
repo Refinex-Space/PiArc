@@ -120,6 +120,7 @@ export function parseBrowserRequest(value: unknown): BrowserRequest {
     case 'stop':
     case 'stopFind':
     case 'openExternal':
+    case 'focus':
     case 'contextMenu':
       return { op: fields.op, tab: tab() };
     case 'moveTab': {
