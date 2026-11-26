@@ -112,6 +112,7 @@ export class ScriptHosts {
         allowedHosts: new Set(),
         proxies: new Map(),
         staged: new Set(),
+        downloads: new Map(),
         output: '',
         ended: false,
         finished: (result) => {

@@ -13,7 +13,13 @@ import type {
 
 import type { ImageInput, ImageSettingsRequest } from './markdown-images.js';
 import type { ProjectRequest } from './project-files.js';
-import type { BrowserPlacement, BrowserRequest, BrowserSessionState } from './browser.js';
+import type {
+  BrowserPick,
+  BrowserPickMode,
+  BrowserPlacement,
+  BrowserRequest,
+  BrowserSessionState,
+} from './browser.js';
 import type { CommandId } from './keybindings.js';
 import type { Locale } from './i18n/index.js';
 import type { PreferenceChange, Preferences } from './preferences.js';
@@ -164,6 +170,12 @@ export const IPC_CHANNELS = {
   mcpReconnect: 'piarc:mcp.reconnect',
   mcpSetEnabled: 'piarc:mcp.setEnabled',
   mcpLogin: 'piarc:mcp.login',
+  chromeProfiles: 'piarc:chrome.profiles',
+  chromeSites: 'piarc:chrome.sites',
+  chromeImport: 'piarc:chrome.import',
+  browserImports: 'piarc:browser.imports',
+  browserForgetImport: 'piarc:browser.forgetImport',
+  browserClearWorkspace: 'piarc:browser.clearWorkspace',
 } as const;
 
 /** The new-session form's worktree choice (T35). */
@@ -306,12 +318,34 @@ export type AppEvent =
   | { readonly type: 'browser'; readonly sessionId: string; readonly state: BrowserSessionState }
   /** A still frame of the session's page, shown while something covers the page (B1.5.2). */
   | { readonly type: 'browserStill'; readonly sessionId: string; readonly image: string }
+  /**
+   * A process tree of the session started listening on `port` (B4.4): the window shows a toast
+   * and a dot on the preview tool. Sent once per port and session.
+   */
+  | {
+      readonly type: 'browserService';
+      readonly sessionId: string;
+      readonly port: number;
+      readonly url: string;
+    }
+  /** A development server of the session exited or did not become ready (B4.5). */
+  | { readonly type: 'browserServerFailed'; readonly sessionId: string; readonly name: string }
   /** A preview key pressed while the page had focus (`main/browser/keymap.ts`). */
   | {
       readonly type: 'browserKey';
       readonly sessionId: string;
       readonly tab: string;
       readonly key: string;
+    }
+  /**
+   * The user picked an element in the page (B3.1: a real click while the picker is on, or the
+   * page menu's "Add to conversation"); `shot` asks for that element's screenshot only.
+   */
+  | {
+      readonly type: 'browserPick';
+      readonly sessionId: string;
+      readonly mode: BrowserPickMode;
+      readonly pick: BrowserPick;
     };
 
 /**
@@ -695,6 +729,25 @@ export interface PiarcApi {
 
   /** Shows the system folder picker; resolves with the chosen directory, or `null`. */
   chooseFolder(): Promise<string | null>;
+
+  /** Chrome's profiles (ADR-0090): `{ chrome, profiles: [{ id, name }] }` JSON. */
+  chromeProfiles(): Promise<string>;
+  /** The sites of a Chrome profile with cookie counts: `{ sites: [{ site, count }] }` JSON. */
+  chromeSites(profile: string): Promise<string>;
+  /**
+   * Imports the sign-ins of `sites` from Chrome profile `profile` into `workspace`'s browser
+   * partition after the main process's native confirmation (B5.1). Resolves with JSON
+   * `{ status: 'imported', sites: [{ site, imported, skipped: [{ reason, count }] }] }`,
+   * `{ status: 'cancelled' }` or `{ status: 'unavailable' }` (clear-on-quit mode); no cookie
+   * value ever reaches the page.
+   */
+  chromeImport(workspace: string, profile: string, sites: readonly string[]): Promise<string>;
+  /** The sites of `workspace` with imported sign-ins: `{ imports: [...] }` JSON (B5.3). */
+  browserImports(workspace: string): Promise<string>;
+  /** Removes an imported site: its cookies from the partition, then the record (B5.3). */
+  forgetBrowserImport(workspace: string, site: string): Promise<string>;
+  /** Clears `workspace`'s browsing data (B5.5). */
+  clearBrowserData(workspace: string): Promise<null>;
   /** Opens a directory as a workspace (starts its Agent Host); resolves with Core's JSON. */
   openWorkspace(path: string): Promise<string>;
   /** Creates a session in a workspace; resolves with `{ sessionId, ... }` as JSON. */

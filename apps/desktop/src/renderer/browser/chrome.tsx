@@ -7,9 +7,11 @@ import type {
   BrowserSpaceState,
   BrowserTabState,
 } from '../../shared/browser.js';
-import { useT } from '../app/app-context.js';
+import { useApp, useT } from '../app/app-context.js';
 import { IconButton } from '../app/IconButton.js';
 import { isImeComposing } from '../composer/ime-guard.js';
+import { MenuPopup, useMenu } from '../shell/Menu.js';
+import { SuggestionList, useSuggestions, type SuggestFetch } from './suggest.js';
 import {
   BackIcon,
   ChevronRightIcon,
@@ -17,10 +19,13 @@ import {
   DeviceIcon,
   DevtoolsIcon,
   GlobeIcon,
+  AnnotateIcon,
   LockIcon,
   MoreIcon,
+  PickIcon,
   PlusIcon,
   ReloadIcon,
+  ScreenshotIcon,
   SearchIcon,
   ShieldAlertIcon,
   StopIcon,
@@ -33,7 +38,10 @@ export interface ChromeActions {
   readonly close: (tab: string) => void;
   readonly move: (tab: string, index: number) => void;
   readonly tabMenu: (tab: string) => void;
-  readonly navigate: (input: string) => void;
+  /** Opens `input` in the shown tab, or in a new tab with `newTab` (Mod+Enter). */
+  readonly navigate: (input: string, newTab?: boolean) => void;
+  /** The address bar's suggestions (B1.2.3). */
+  readonly suggest?: SuggestFetch;
   readonly back: () => void;
   readonly forward: () => void;
   readonly reload: (hard: boolean) => void;
@@ -42,6 +50,14 @@ export interface ChromeActions {
   readonly toggleDevice: () => void;
   readonly devtools: () => void;
   readonly more: (anchor: HTMLElement) => void;
+  /** The element picker on or off (B3.1). */
+  readonly pick: () => void;
+  /** Freezes the page and annotates its screenshot (B3.3). */
+  readonly annotate: () => void;
+  /** The screenshot menu (B3.4). */
+  readonly screenshot: (anchor: HTMLElement) => void;
+  /** The site information menu's "Import this site's sign-ins from Chrome" (B5.1). */
+  readonly importSite?: (host: string) => void;
 }
 
 function spaceLabel(space: BrowserSpaceState, t: ReturnType<typeof useT>): string {
@@ -192,29 +208,90 @@ const SITE_LABELS = {
   internal: 'browser.site.internal',
 } as const;
 
-function SiteIcon({ tab }: { readonly tab: BrowserTabState | undefined }) {
+/** The host of an http(s) page, for the site information menu. */
+function webHost(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      ? parsed.hostname.replace(/^\[|\]$/g, '')
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function SiteIcon({
+  tab,
+  onImport,
+}: {
+  readonly tab: BrowserTabState | undefined;
+  readonly onImport?: (host: string) => void;
+}) {
   const t = useT();
+  const menu = useMenu();
   const security = tab?.security ?? 'internal';
   const label = t(SITE_LABELS[security]);
+  const icon =
+    security === 'secure' ? (
+      <LockIcon size={12} />
+    ) : security === 'insecure' ? (
+      <ShieldAlertIcon size={12} />
+    ) : security === 'internal' ? (
+      <SearchIcon size={12} />
+    ) : (
+      <UnlockIcon size={12} />
+    );
+  const host = webHost(tab?.url);
+  if (onImport === undefined || host === undefined) {
+    return (
+      <span
+        className="browser-site"
+        data-testid="browser-site"
+        data-security={security}
+        role="img"
+        aria-label={label}
+        data-tooltip={label}
+      >
+        {icon}
+      </span>
+    );
+  }
+  // The site information menu (B5.1): importing this site's sign-ins from Chrome.
   return (
-    <span
-      className="browser-site"
-      data-testid="browser-site"
-      data-security={security}
-      role="img"
-      aria-label={label}
-      data-tooltip={label}
-    >
-      {security === 'secure' ? (
-        <LockIcon size={12} />
-      ) : security === 'insecure' ? (
-        <ShieldAlertIcon size={12} />
-      ) : security === 'internal' ? (
-        <SearchIcon size={12} />
-      ) : (
-        <UnlockIcon size={12} />
+    <>
+      <button
+        type="button"
+        className="browser-site"
+        data-testid="browser-site"
+        data-security={security}
+        aria-label={label}
+        aria-haspopup="menu"
+        data-tooltip={label}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          menu.openAt(rect.left, rect.bottom + 4, event.currentTarget);
+        }}
+      >
+        {icon}
+      </button>
+      {menu.open && (
+        <MenuPopup
+          at={menu.open}
+          label={label}
+          onClose={menu.close}
+          items={[
+            {
+              id: 'chrome-import',
+              label: t('browserImport.siteMenu'),
+              run: () => {
+                onImport(host);
+              },
+            },
+          ]}
+        />
       )}
-    </span>
+    </>
   );
 }
 
@@ -224,6 +301,8 @@ export function NavigationRow({
   focusAddress,
   deviceOn,
   findOn,
+  picking = false,
+  annotating = false,
 }: {
   readonly tab: BrowserTabState | undefined;
   readonly actions: ChromeActions;
@@ -231,11 +310,22 @@ export function NavigationRow({
   readonly focusAddress: number;
   readonly deviceOn: boolean;
   readonly findOn: boolean;
+  readonly picking?: boolean;
+  readonly annotating?: boolean;
 }) {
+  const pageOpen = tab !== undefined && tab.url !== '' && !tab.crashed;
   const t = useT();
+  const { keyPlatform } = useApp();
   const input = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (tab?.url === 'about:blank' ? '' : (tab?.url ?? ''));
+  const suggestions = useSuggestions(actions.suggest);
+  const go = (value: string, newTab: boolean) => {
+    suggestions.close();
+    setDraft(null);
+    actions.navigate(value, newTab);
+    input.current?.blur();
+  };
 
   useEffect(() => {
     if (focusAddress === 0) return;
@@ -249,14 +339,18 @@ export function NavigationRow({
 
   const onKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (isImeComposing(event.nativeEvent)) return;
-    if (event.key === 'Enter') {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (suggestions.move(event.key === 'ArrowDown' ? 1 : -1)) event.preventDefault();
+    } else if (event.key === 'Enter') {
       event.preventDefault();
-      const value = event.currentTarget.value;
-      setDraft(null);
-      actions.navigate(value);
-      event.currentTarget.blur();
+      const mod = keyPlatform === 'mac' ? event.metaKey : event.ctrlKey;
+      go(suggestions.chosen()?.url ?? event.currentTarget.value, mod);
     } else if (event.key === 'Escape') {
       event.preventDefault();
+      if (suggestions.open) {
+        suggestions.close();
+        return;
+      }
       setDraft(null);
       event.currentTarget.blur();
     }
@@ -307,8 +401,8 @@ export function NavigationRow({
           <ReloadIcon />
         </IconButton>
       )}
-      <div className="browser-address">
-        <SiteIcon tab={tab} />
+      <div className="browser-address" data-suggesting={suggestions.open}>
+        <SiteIcon tab={tab} {...(actions.importSite ? { onImport: actions.importSite } : {})} />
         <input
           // The rounded field around it draws the one focus ring (accessibility.md, composite
           // fields): the input itself never shows the app's text-field outline.
@@ -321,17 +415,41 @@ export function NavigationRow({
           autoComplete="off"
           aria-label={t('browser.address.label')}
           placeholder={t('browser.address.placeholder')}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={suggestions.open}
+          aria-controls={suggestions.open ? suggestions.listId : undefined}
+          aria-activedescendant={
+            suggestions.open && suggestions.selected >= 0
+              ? suggestions.optionId(suggestions.selected)
+              : undefined
+          }
           value={shown}
           onChange={(event) => {
             setDraft(event.target.value);
+            // Composition text is not asked about; `compositionend` asks for the result.
+            const native = event.nativeEvent;
+            if (!(native instanceof InputEvent && native.isComposing)) {
+              suggestions.request(event.target.value);
+            }
+          }}
+          onCompositionEnd={(event) => {
+            suggestions.request(event.currentTarget.value);
           }}
           onFocus={(event) => {
             event.currentTarget.select();
           }}
           onBlur={() => {
             setDraft(null);
+            suggestions.close();
           }}
           onKeyDown={onKey}
+        />
+        <SuggestionList
+          suggestions={suggestions}
+          onPick={(item, newTab) => {
+            go(item.url, newTab);
+          }}
         />
         {tab !== undefined && tab.zoom !== 100 && (
           <span className="browser-zoom" data-testid="browser-zoom">
@@ -339,6 +457,40 @@ export function NavigationRow({
           </span>
         )}
       </div>
+      <IconButton
+        size="sm"
+        label={t('browser.pick')}
+        keys="Mod+Shift+S"
+        aria-pressed={picking}
+        disabled={!pageOpen || annotating}
+        data-testid="browser-pick-toggle"
+        onClick={actions.pick}
+      >
+        <PickIcon />
+      </IconButton>
+      <IconButton
+        size="sm"
+        label={t('browser.annotate')}
+        keys="Mod+Shift+X"
+        aria-pressed={annotating}
+        disabled={!pageOpen}
+        data-testid="browser-annotate-toggle"
+        onClick={actions.annotate}
+      >
+        <AnnotateIcon />
+      </IconButton>
+      <IconButton
+        size="sm"
+        label={t('browser.screenshot')}
+        aria-haspopup="menu"
+        disabled={!pageOpen || annotating}
+        data-testid="browser-screenshot"
+        onClick={(event) => {
+          actions.screenshot(event.currentTarget);
+        }}
+      >
+        <ScreenshotIcon />
+      </IconButton>
       <IconButton
         size="sm"
         label={t('browser.find')}

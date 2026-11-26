@@ -13,6 +13,14 @@ import { Fragment as ReactFragment, useEffect, useRef, useState, type ReactNode 
 import { fileMentionPath, type MentionScope } from '../files/file-path.js';
 import { onFileAttachment, droppedFiles, FILE_DRAG_TYPE } from '../files/navigation.js';
 import type { EditorDraft } from './session-draft.js';
+import {
+  onBrowserContext,
+  pendingContext,
+  takeBrowserContexts,
+  withContexts,
+  type PendingBrowserContext,
+} from './browser-context.js';
+import { revealBidi } from '../transcript/reveal.js';
 import { IconButton } from '../app/IconButton.js';
 import {
   CloseGlyph,
@@ -245,6 +253,13 @@ export function Composer({
     items: [],
   });
   const [pending, setPending] = useState<readonly PendingAttachment[]>(saved.current?.files ?? []);
+  // Browser context attachments (B3.5): page data the message carries after the typed text.
+  const [contexts, setContexts] = useState<readonly PendingBrowserContext[]>(
+    saved.current?.contexts ?? [],
+  );
+  const [openContext, setOpenContext] = useState<string>();
+  const currentContexts = useRef(contexts);
+  currentContexts.current = contexts;
   const [problems, setProblems] = useState<readonly AttachmentProblem[]>([]);
   const [empty, setEmpty] = useState(
     !saved.current?.doc?.content.size || saved.current.doc.content.size === 2,
@@ -308,6 +323,7 @@ export function Composer({
       disabled: locked,
       supportsImages: vision,
     } = latest.current;
+    const attachedContexts = currentContexts.current;
     if (!vision) {
       const refused = attachments
         .filter((a) => a.kind === 'image')
@@ -317,17 +333,23 @@ export function Composer({
         return;
       }
     }
-    const payload = serializeDoc(state.doc);
-    if (locked || (isBlank(payload) && attachments.length === 0)) return;
+    const typed = serializeDoc(state.doc);
+    if (locked || (isBlank(typed) && attachments.length === 0 && attachedContexts.length === 0)) {
+      return;
+    }
+    const payload = { ...typed, text: withContexts(typed.text, attachedContexts) };
     const clear = () => {
       if (savedDraft) {
         delete savedDraft.doc;
         delete savedDraft.files;
+        delete savedDraft.contexts;
       }
       if (!view || view.isDestroyed || view.state.doc !== state.doc) return;
       clearCommand()(view.state, view.dispatch.bind(view), view);
       currentFiles.current = [];
       setPending([]);
+      currentContexts.current = [];
+      setContexts([]);
       setProblems([]);
     };
     const result = current.submit(intent, { ...payload, attachments });
@@ -540,6 +562,8 @@ export function Composer({
         else savedDraft.doc = view.state.doc;
         if (currentFiles.current.length) savedDraft.files = currentFiles.current;
         else delete savedDraft.files;
+        if (currentContexts.current.length) savedDraft.contexts = currentContexts.current;
+        else delete savedDraft.contexts;
       }
       viewRef.current = null;
       view.destroy();
@@ -591,6 +615,24 @@ export function Composer({
         : undefined,
     [sessionId],
   );
+  // Picks, annotations and screenshots from the preview (B3.5): the images join the attachments,
+  // the context becomes one attachment, and the input takes the focus.
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    const take = () => {
+      for (const draft of takeBrowserContexts(sessionId)) {
+        addFilesRef.current(
+          draft.images.map(
+            (image) => new File([image.blob], image.name, { type: image.blob.type }),
+          ),
+        );
+        setContexts((list) => [...list, pendingContext(crypto.randomUUID(), draft)]);
+        viewRef.current?.focus();
+      }
+    };
+    take();
+    return onBrowserContext(sessionId, take);
+  }, [sessionId]);
   const insertNonce = insert?.nonce;
   const insertSnippets = insert?.snippets;
   useEffect(() => {
@@ -643,7 +685,7 @@ export function Composer({
   const queueKey = platform === 'darwin' ? '⌘↩' : 'Ctrl+Enter';
   // Running with nothing typed, the button stops the turn; a draft turns it back into send (a
   // steer). A press within SWAP_GUARD_MS of the swap is ignored: a double click does not do both.
-  const stopping = running && empty && pending.length === 0;
+  const stopping = running && empty && pending.length === 0 && contexts.length === 0;
   const swappedAt = useRef(Number.NEGATIVE_INFINITY);
   const shownStop = useRef(stopping);
   useEffect(() => {
@@ -897,6 +939,23 @@ export function Composer({
         </div>
       )}
       <div className={`composer-box${disabled ? ' is-disabled' : ''}`}>
+        {contexts.length === 0 ? null : (
+          <div className="composer-attachments" data-testid="composer-browser-contexts">
+            {contexts.map((context) => (
+              <BrowserContextChip
+                key={context.id}
+                context={context}
+                open={openContext === context.id}
+                onToggle={() => {
+                  setOpenContext((id) => (id === context.id ? undefined : context.id));
+                }}
+                onRemove={() => {
+                  setContexts((list) => list.filter((entry) => entry.id !== context.id));
+                }}
+              />
+            ))}
+          </div>
+        )}
         {pending.length === 0 ? null : (
           <div className="composer-attachments" data-testid="composer-attachments">
             {pending.map((attachment) => (
@@ -998,7 +1057,7 @@ export function Composer({
             size="sm"
             className="composer-send composer-swap"
             data-testid={firstTurn ? 'home-start' : 'composer-send'}
-            disabled={disabled || (empty && pending.length === 0)}
+            disabled={disabled || (empty && pending.length === 0 && contexts.length === 0)}
             onClick={() => {
               const editor = viewRef.current;
               if (editor && swapGuard()) {
@@ -1034,4 +1093,71 @@ const SOURCE_LABELS: Readonly<Record<string, MessageId>> = {
 export function sourceLabel(t: (id: MessageId) => string, source: string): string {
   const id = Object.hasOwn(SOURCE_LABELS, source) ? SOURCE_LABELS[source] : undefined;
   return id === undefined ? source : t(id);
+}
+
+/** A browser context attachment (B3.5): its page and item count, expandable to the items. */
+function BrowserContextChip({
+  context,
+  open,
+  onToggle,
+  onRemove,
+}: {
+  readonly context: PendingBrowserContext;
+  readonly open: boolean;
+  readonly onToggle: () => void;
+  readonly onRemove: () => void;
+}) {
+  const { t } = useApp();
+  const host = (() => {
+    try {
+      return new URL(context.url).host;
+    } catch {
+      return context.url;
+    }
+  })();
+  const label = t('composer.browserContext', {
+    host: revealBidi(host),
+    count: context.items.length,
+  });
+  const listId = `composer-browser-context-${context.id}`;
+  return (
+    <span className="attachment-chip is-browser" data-testid="pending-browser-context">
+      <button
+        type="button"
+        className="attachment-chip-text browser-context-toggle"
+        aria-expanded={open}
+        aria-controls={listId}
+        data-testid="pending-browser-context-toggle"
+        onClick={onToggle}
+      >
+        <span className="attachment-chip-name">{label}</span>
+      </button>
+      <button
+        type="button"
+        className="attachment-remove"
+        aria-label={t('composer.attachment.remove', { name: label })}
+        data-tooltip={t('composer.attachment.remove', { name: label })}
+        onClick={onRemove}
+      >
+        <CloseGlyph size={12} />
+      </button>
+      {open && (
+        <ol
+          id={listId}
+          className="browser-context-items"
+          data-testid="pending-browser-context-items"
+        >
+          {context.items.map((item) => (
+            <li key={item.n}>
+              <span className="browser-context-number">{item.n}</span>
+              <span className="browser-context-title">{revealBidi(item.title)}</span>
+              {item.comment.trim() === '' ? null : (
+                <span className="browser-context-comment">{item.comment}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </span>
+  );
 }

@@ -86,6 +86,7 @@ export const BROWSER_METHODS: ReadonlySet<string> = new Set([
   'Target.closeTarget',
   'Target.createTarget',
   'Browser.getVersion',
+  'Browser.cancelDownload',
 ]);
 
 export type CdpVerdict =

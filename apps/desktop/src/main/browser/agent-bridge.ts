@@ -2,11 +2,13 @@
 // that it runs `Browser` scripts (`attachBrowserClient`), then follows the `core/browser`
 // route: a `run` event starts a script host for the call, its answer goes back through
 // `answerBrowserRun`; a `cancel` event (interrupt, session closed, Core's timeout) ends the
-// host. The events come from Core; the bridge still checks their shape.
+// host. `ports` and `servers` (ADR-0092) go to the development servers' record
+// (dev-servers.ts). The events come from Core; the bridge still checks their shape.
 
-import type { BrowserRunAnswer } from '@piarc/protocol';
+import type { BrowserRunAnswer, DevServerState, ListeningPort } from '@piarc/protocol';
 
 import type { EventBatch } from '../../shared/ipc.js';
+import { parseDeclared, parsePorts, parseServers } from './dev-servers.js';
 import type { AgentRun } from './script-host.js';
 
 export const BROWSER_ROUTE = 'core/browser';
@@ -23,11 +25,35 @@ export interface BridgeHosts {
   cancel(runId: string): void;
 }
 
+/** Where the development servers' events go (dev-servers.ts). */
+export interface BridgeServices {
+  ports(
+    sessionId: string,
+    workspace: string,
+    ports: readonly ListeningPort[],
+    declared: readonly number[],
+  ): void;
+  servers(sessionId: string, workspace: string, servers: readonly DevServerState[]): void;
+}
+
 type ClientEvent =
   | { readonly type: 'run'; readonly run: AgentRun }
   | {
       readonly type: 'cancel';
       readonly runId: string;
+    }
+  | {
+      readonly type: 'ports';
+      readonly sessionId: string;
+      readonly workspace: string;
+      readonly ports: readonly ListeningPort[];
+      readonly declared: readonly number[];
+    }
+  | {
+      readonly type: 'servers';
+      readonly sessionId: string;
+      readonly workspace: string;
+      readonly servers: readonly DevServerState[];
     };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -36,7 +62,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** One `core/browser` event, or undefined when it is not one. */
 export function parseClientEvent(value: unknown): ClientEvent | undefined {
-  if (!isRecord(value) || typeof value.runId !== 'string') return undefined;
+  if (!isRecord(value)) return undefined;
+  if (value.type === 'ports' || value.type === 'servers') return parseServicesEvent(value);
+  if (typeof value.runId !== 'string') return undefined;
   if (value.type === 'cancel') return { type: 'cancel', runId: value.runId };
   if (
     value.type !== 'run' ||
@@ -67,12 +95,30 @@ export function parseClientEvent(value: unknown): ClientEvent | undefined {
   };
 }
 
+function parseServicesEvent(value: Record<string, unknown>): ClientEvent | undefined {
+  if (typeof value.sessionId !== 'string' || typeof value.workspace !== 'string') {
+    return undefined;
+  }
+  const head = { sessionId: value.sessionId, workspace: value.workspace };
+  if (value.type === 'ports') {
+    const ports = parsePorts(value.ports);
+    const declared = parseDeclared(value.declared);
+    if (ports === undefined || declared === undefined) return undefined;
+    return { type: 'ports', ...head, ports, declared };
+  }
+  const servers = parseServers(value.servers);
+  return servers === undefined ? undefined : { type: 'servers', ...head, servers };
+}
+
 export class AgentBridge {
   readonly #decoder = new TextDecoder();
 
   constructor(
     private readonly core: BridgeCore,
     private readonly hosts: BridgeHosts,
+    private readonly services?: BridgeServices,
+    /** A run of the main session ended, answered or not (state reminders, B2.7.3). */
+    private readonly ended?: (mainSessionId: string) => void,
   ) {}
 
   /** Tells Core the desktop client runs `Browser` scripts. */
@@ -96,6 +142,10 @@ export class AgentBridge {
         console.warn('[browser] ignored a malformed core/browser event');
       } else if (event.type === 'cancel') {
         this.hosts.cancel(event.runId);
+      } else if (event.type === 'ports') {
+        this.services?.ports(event.sessionId, event.workspace, event.ports, event.declared);
+      } else if (event.type === 'servers') {
+        this.services?.servers(event.sessionId, event.workspace, event.servers);
       } else {
         void this.#run(event.run);
       }
@@ -118,6 +168,7 @@ export class AgentBridge {
         },
       };
     }
+    this.ended?.(run.sessionId);
     // A cancelled run has no answer: Core already ended it.
     if (answer === undefined) return;
     try {

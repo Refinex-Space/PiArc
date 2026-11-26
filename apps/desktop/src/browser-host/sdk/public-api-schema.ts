@@ -1,7 +1,7 @@
 // Ported from ego-browser package/ego-browser/src/public-api-schema.ts (ego-lite commit 56589ea8,
 // MIT, see LICENSE). PiArc: summaries follow PiArc's behavior (screenshots attach to the tool
 // result, no file paths written, HTML paste refused, downloads saved through Core); adds
-// requestAccess (B2.6.4); typed for strict lint.
+// requestAccess (B2.6.4) and servers/startServer (ADR-0092); typed for strict lint.
 
 export type PublicApiOptionKind =
   | 'boolean'
@@ -92,6 +92,18 @@ export const PUBLIC_API_SCHEMA: readonly PublicApiEntry[] = [
     signature: 'await requestAccess(hosts, reason)',
     summary:
       'Ask the user to let this run reach hosts the site gate blocked (for example a sub-resource host); resolves true when the user allowed them.',
+  },
+  {
+    name: 'servers',
+    signature: 'await servers()',
+    summary:
+      "List the project's launch configurations (.piarc/launch.json, .claude/launch.json) with their state in this session ({ name, status: idle|starting|ready|failed|stopped, url, port, command, cwd, log? }), the local ports this session's commands, terminals and servers listen on ({ port, url, title, kind }), whether the project is trusted, and launch file problems. Pages may open these local ports without a site card.",
+  },
+  {
+    name: 'startServer',
+    signature: 'await startServer(name)',
+    summary:
+      'Start the launch configuration named name and wait until its port answers (up to 180 s) or it fails; resolves { name, status, url, port, failure?, exitCode?, log? } (log: last output lines on failure). The first start of a configuration in a session asks the user, and again after the configuration changes; it runs outside the sandbox as a background task. A refusal or an untrusted project throws PIARC_SERVER_REFUSED. Use page.goto(result.url) to open it.',
   },
   {
     name: 'TaskSpace.spaceId',

@@ -12,7 +12,7 @@ import {
 
 const AGENT: GatedPage = { sessionId: 's', space: 'agent-1', agentControlled: true };
 
-function fixture(answers: Record<string, unknown> = {}) {
+function fixture(answers: Record<string, unknown> = {}, ports: readonly number[] = []) {
   const asked: Record<string, unknown>[] = [];
   const run: GateRun = {
     callSessionId: 's',
@@ -29,7 +29,7 @@ function fixture(answers: Record<string, unknown> = {}) {
     pageOf: (id) => pages.get(id),
     agentPagesOn: (host) => (host === 'app.example.com' ? [AGENT] : []),
     runFor: () => current,
-    userPorts: () => new Set([5173]),
+    allowedPorts: () => new Set([5173, ...ports]),
     askCore: (json) => {
       const request = JSON.parse(json) as Record<string, unknown>;
       asked.push(request);
@@ -183,5 +183,20 @@ describe('AgentGate (B2.6)', () => {
     expect(await gate.requestAccess('s', run, ['cdn.example.net', 'fonts.example.org'])).toBe(true);
     expect(asked[0]).toMatchObject({ host: 'cdn.example.net', pending: ['fonts.example.org'] });
     expect([...run.allowedHosts].sort()).toEqual(['cdn.example.net', 'fonts.example.org']);
+  });
+
+  it('lets the session’s listening and declared ports through and asks for others (B2.6.2)', async () => {
+    // 4100 listens in a background task's tree, 3000 is declared by a launch configuration.
+    const { gate, asked } = fixture({}, [4100, 3000]);
+    expect(gate.check(request('http://127.0.0.1:4100/'))).toEqual({ allow: true });
+    expect(gate.check(request('http://localhost:3000/app.js', 'script'))).toEqual({ allow: true });
+    expect(gate.check(request('ws://[::1]:4100/hmr', 'webSocket'))).toEqual({ allow: true });
+    expect(asked).toEqual([]);
+    // A port nobody in the session owns: the document asks, a subresource is refused.
+    expect(await gate.check(request('http://localhost:9229/'))).toMatchObject({ allow: false });
+    expect(asked[0]).toMatchObject({ host: 'localhost:9229', local: true });
+    expect(gate.check(request('http://localhost:9230/x.js', 'script'))).toMatchObject({
+      allow: false,
+    });
   });
 });

@@ -10,6 +10,9 @@ import type {
   BrowserHostApi,
   BrowserHostFailure,
   BrowserHostRequest,
+  BrowserListeningPort,
+  BrowserServerInfo,
+  BrowserServersResult,
   SnapshotOptions,
   SnapshotResult,
   SnapshotRef,
@@ -253,6 +256,15 @@ export function createEgoBindings(api: BrowserHostApi, options: BindingsOptions 
         parseDecision,
       );
     },
+
+    async servers() {
+      return checked('servers', await request({ op: 'servers' }), parseServers);
+    },
+
+    async startServer(name: string) {
+      requireArgument(typeof name === 'string' && name.trim() !== '', 'startServer', 'name');
+      return checked('startServer', await request({ op: 'startServer', name }), parseServer);
+    },
   };
 
   function reportSendError(failure: EgoErrorResult): void {
@@ -386,6 +398,76 @@ function parseSnapshot(value: unknown): SnapshotResult | undefined {
   const refs: unknown[] = value.refs;
   if (!refs.every(isSnapshotRef)) return undefined;
   return { content: value.content, refs, truncated: value.truncated === true };
+}
+
+const SERVER_STATUSES = ['idle', 'starting', 'ready', 'failed', 'stopped'] as const;
+
+function parseServer(value: unknown): BrowserServerInfo | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== 'string' ||
+    !SERVER_STATUSES.some((status) => status === value.status) ||
+    typeof value.url !== 'string' ||
+    typeof value.port !== 'number'
+  ) {
+    return undefined;
+  }
+  const status = SERVER_STATUSES.find((candidate) => candidate === value.status) ?? 'idle';
+  const optional = (key: 'command' | 'cwd' | 'failure') =>
+    typeof value[key] === 'string' ? { [key]: value[key] } : {};
+  const log: unknown = value.log;
+  return {
+    name: value.name,
+    status,
+    url: value.url,
+    port: value.port,
+    ...optional('command'),
+    ...optional('cwd'),
+    ...optional('failure'),
+    ...(value.source === 'piarc' || value.source === 'claude' ? { source: value.source } : {}),
+    ...(value.startedBy === 'user' || value.startedBy === 'agent'
+      ? { startedBy: value.startedBy }
+      : {}),
+    ...(typeof value.exitCode === 'number' ? { exitCode: value.exitCode } : {}),
+    ...(Array.isArray(log) && log.every((line) => typeof line === 'string')
+      ? { log: log.map(String) }
+      : {}),
+  };
+}
+
+function parseListening(value: unknown): BrowserListeningPort | undefined {
+  return isRecord(value) &&
+    typeof value.port === 'number' &&
+    typeof value.url === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.kind === 'string'
+    ? { port: value.port, url: value.url, title: value.title, kind: value.kind }
+    : undefined;
+}
+
+function parseServers(value: unknown): BrowserServersResult | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.trusted !== 'boolean' ||
+    !Array.isArray(value.servers) ||
+    !Array.isArray(value.listening) ||
+    !Array.isArray(value.problems)
+  ) {
+    return undefined;
+  }
+  const serversList: readonly unknown[] = value.servers;
+  const listeningList: readonly unknown[] = value.listening;
+  const problemsList: readonly unknown[] = value.problems;
+  const servers = serversList.map(parseServer);
+  const listening = listeningList.map(parseListening);
+  if (servers.includes(undefined) || listening.includes(undefined)) return undefined;
+  if (!problemsList.every((problem) => typeof problem === 'string')) return undefined;
+  return {
+    trusted: value.trusted,
+    servers: servers.filter((server) => server !== undefined),
+    listening: listening.filter((port) => port !== undefined),
+    problems: problemsList.map(String),
+  };
 }
 
 function isProfile(value: unknown): value is EgoProfile {

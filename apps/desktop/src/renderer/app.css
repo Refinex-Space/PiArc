@@ -10,6 +10,7 @@
 @import './files/tree-style.css';
 @import './changes/git/git.css';
 @import './browser/browser.css';
+@import './settings/browser-page.css';
 @import './changes/git/history.css';
 
 /* PiArc's window styles. Colors, fonts and sizes come only from the design tokens

@@ -335,6 +335,28 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.folderDialog)
       .then((value: unknown) => expectStringOrNull(value)),
+  chromeProfiles: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.chromeProfiles).then((value: unknown) => expectString(value)),
+  chromeSites: (profile) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.chromeSites, profile)
+      .then((value: unknown) => expectString(value)),
+  chromeImport: (workspace, profile, sites) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.chromeImport, workspace, profile, sites)
+      .then((value: unknown) => expectString(value)),
+  browserImports: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.browserImports, workspace)
+      .then((value: unknown) => expectString(value)),
+  forgetBrowserImport: (workspace, site) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.browserForgetImport, workspace, site)
+      .then((value: unknown) => expectString(value)),
+  clearBrowserData: async (workspace) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.browserClearWorkspace, workspace);
+    return null;
+  },
   openWorkspace: (path) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.workspaceOpen, path)

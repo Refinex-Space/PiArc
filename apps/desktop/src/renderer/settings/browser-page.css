@@ -1,0 +1,62 @@
+/* The "Browser" settings page and its Chrome import dialog (design addendum B5.1, B5.5), and
+   the site information button of the preview's address bar that opens the import. */
+.browser-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+
+.browser-settings-row > .input {
+  min-width: 0;
+}
+
+.browser-settings-row code {
+  overflow-wrap: anywhere;
+}
+
+.chrome-import-sites {
+  display: grid;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+
+.chrome-import-list {
+  margin: 0;
+  padding: var(--piarc-space-2);
+  list-style: none;
+  max-block-size: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+
+.chrome-import-list > li + li {
+  margin-block-start: var(--piarc-space-1);
+}
+
+.chrome-import-list .checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+
+.chrome-import-list code {
+  overflow-wrap: anywhere;
+}
+
+button.browser-site {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--piarc-radius-sm);
+}
+
+button.browser-site:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}

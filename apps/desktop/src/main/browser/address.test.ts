@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { local, parseAddress, searchUrl } from './address.js';
+import { local, localRetryDelay, parseAddress, searchUrl } from './address.js';
 
 describe('parseAddress', () => {
   it.each([
@@ -88,5 +88,23 @@ describe('searchUrl', () => {
   it('encodes the query', () => {
     expect(searchUrl('google', 'a b&c')).toBe('https://www.google.com/search?q=a%20b%26c');
     expect(searchUrl('baidu', '中文')).toBe('https://www.baidu.com/s?wd=%E4%B8%AD%E6%96%87');
+  });
+});
+
+describe('localRetryDelay (B1.3.1)', () => {
+  it('backs off 1–16 s for a refused local server, five times', () => {
+    const url = 'http://localhost:5173/';
+    expect([0, 1, 2, 3, 4].map((n) => localRetryDelay(url, -102, n))).toEqual([
+      1000, 2000, 4000, 8000, 16000,
+    ]);
+    expect(localRetryDelay(url, -102, 5)).toBeUndefined();
+    expect(localRetryDelay('http://127.0.0.1:3000/', -102, 0)).toBe(1000);
+    expect(localRetryDelay('http://[::1]:8080/', -102, 0)).toBe(1000);
+  });
+
+  it('does not retry public hosts or other errors', () => {
+    expect(localRetryDelay('https://example.com/', -102, 0)).toBeUndefined();
+    expect(localRetryDelay('http://localhost:5173/', -105, 0)).toBeUndefined();
+    expect(localRetryDelay('not a url', -102, 0)).toBeUndefined();
   });
 });

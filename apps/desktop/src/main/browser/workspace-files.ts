@@ -54,6 +54,11 @@ const TYPES: Readonly<Record<string, string>> = {
   '.xml': 'application/xml',
 };
 
+/** The content type a file is served with. */
+export function contentType(relative: string): string {
+  return TYPES[path.posix.extname(relative).toLowerCase()] ?? 'application/octet-stream';
+}
+
 /** The session-relative path of a request path, or `undefined` when it is refused. */
 export function relativePath(urlPath: string): string | undefined {
   let decoded: string;
@@ -83,10 +88,19 @@ export function insideRoot(typed: string, root: string, home: string): string | 
   return relative.split(path.sep).join('/');
 }
 
+/** Serves the hosts of single files opened from outside the workspace (file-grants.ts). */
+export interface GrantServer {
+  /** The answer for a granted host, or undefined when `host` is not one. */
+  serve(host: string, urlPath: string, method: string): Promise<Response | undefined>;
+}
+
 /** One token per session: the host of its workspace URLs. */
 export class WorkspaceFiles {
   readonly #sessions = new Map<string, string>();
   readonly #tokens = new Map<string, string>();
+  /** Single files opened from outside the workspace (B1.6.2, file-grants.ts). */
+  #grants: GrantServer | undefined;
+  #served: ((sessionId: string, relative: string) => void) | undefined;
 
   constructor(private readonly core: Pick<CoreRuntime, 'projectFiles'>) {}
 
@@ -115,6 +129,29 @@ export class WorkspaceFiles {
     }
   }
 
+  /** Serves the hosts of `grants` too (B1.6.2). */
+  /** Hears every workspace file served to a page (live reload, B1.6.1). */
+  onServed(listener: (sessionId: string, relative: string) => void): void {
+    this.#served = listener;
+  }
+
+  /** The absolute path of a session-relative file, through Core (for watching only). */
+  async resolve(sessionId: string, relative: string): Promise<string | undefined> {
+    const item: unknown = JSON.parse(
+      await this.core.projectFiles(sessionId, JSON.stringify({ op: 'resolve', path: relative })),
+    );
+    return typeof item === 'object' &&
+      item !== null &&
+      'path' in item &&
+      typeof item.path === 'string'
+      ? item.path
+      : undefined;
+  }
+
+  setGrants(grants: GrantServer): void {
+    this.#grants = grants;
+  }
+
   /** Serves the scheme in a guest partition. */
   register(session: Session): void {
     session.protocol.handle(WORKSPACE_SCHEME, (request) => this.#serve(request));
@@ -127,6 +164,10 @@ export class WorkspaceFiles {
     const url = new URL(request.url);
     const sessionId = this.#tokens.get(url.hostname);
     const relative = relativePath(url.pathname);
+    if (sessionId === undefined) {
+      const granted = await this.#grants?.serve(url.hostname, url.pathname, request.method);
+      if (granted !== undefined) return granted;
+    }
     if (sessionId === undefined || relative === undefined) {
       return new Response('Not available in the browser', { status: 403 });
     }
@@ -145,7 +186,8 @@ export class WorkspaceFiles {
         );
         parts.push(next.bytes);
       }
-      const type = TYPES[path.posix.extname(relative).toLowerCase()] ?? 'application/octet-stream';
+      this.#served?.(sessionId, relative);
+      const type = contentType(relative);
       const body = request.method === 'HEAD' ? null : Buffer.concat(parts);
       return new Response(body, {
         status: 200,

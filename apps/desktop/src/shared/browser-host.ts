@@ -26,7 +26,8 @@ export type BrowserErrorCode =
   | 'PIARC_SITE_REFUSED'
   | 'PIARC_FILE_REFUSED'
   | 'PIARC_RUN_ENDED'
-  | 'PIARC_LIMIT';
+  | 'PIARC_LIMIT'
+  | 'PIARC_SERVER_REFUSED';
 
 /** A failed binding call answers this instead of throwing across IPC. */
 export interface BrowserHostFailure {
@@ -134,10 +135,52 @@ export type BrowserHostRequest =
     }
   /** Asks the user to let the agent reach `hosts` (B2.6.4). */
   | { readonly op: 'requestAccess'; readonly hosts: readonly string[]; readonly reason: string }
+  /** The project's launch configurations and the session's local services (ADR-0092). */
+  | { readonly op: 'servers' }
+  /** Starts a launch configuration; answers once it is ready or failed (ADR-0092). */
+  | { readonly op: 'startServer'; readonly name: string }
   /** Output printed so far (batched), kept in case the run never finishes (timeout, crash). */
   | { readonly op: 'print'; readonly text: string }
   /** The run ended (the preload sends `finish` as this op). */
   | { readonly op: 'finish'; readonly result: BrowserHostResult };
+
+/** A launch configuration or a server of the session, as `servers()` lists it (ADR-0092). */
+export interface BrowserServerInfo {
+  readonly name: string;
+  /** `idle` when the session has not started it. */
+  readonly status: 'idle' | 'starting' | 'ready' | 'failed' | 'stopped';
+  readonly url: string;
+  readonly port: number;
+  readonly command?: string;
+  readonly cwd?: string;
+  readonly source?: 'piarc' | 'claude';
+  readonly startedBy?: 'user' | 'agent';
+  /** Why it failed: `exited`, `timeout` or `spawn`. */
+  readonly failure?: string;
+  readonly exitCode?: number;
+  /** The last lines of its output when it failed. */
+  readonly log?: readonly string[];
+}
+
+/** A TCP port a process of the session listens on. */
+export interface BrowserListeningPort {
+  readonly port: number;
+  readonly url: string;
+  /** What runs it: the command, the terminal, the configuration. */
+  readonly title: string;
+  /** `command`, `monitor`, `terminal`, `devServer`. */
+  readonly kind: string;
+}
+
+/** What `servers()` answers. */
+export interface BrowserServersResult {
+  /** The project is trusted: its configurations may run. */
+  readonly trusted: boolean;
+  readonly servers: readonly BrowserServerInfo[];
+  readonly listening: readonly BrowserListeningPort[];
+  /** Problems of the launch files (`file:line:column message`). */
+  readonly problems: readonly string[];
+}
 
 /** What the main process sends to start a run. */
 export interface BrowserHostRun {

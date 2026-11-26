@@ -61,6 +61,8 @@ import { createMainWindow, createParkingWindow } from './window.js';
 import { BROWSER_ROUTE } from './browser/agent-bridge.js';
 import { startAgentRuntime, type AgentRuntime } from './browser/agent-runtime.js';
 import { registerBrowserHandlers } from './browser/browser-ipc.js';
+import { ChromeImports, persistentPartition } from './browser/chrome-import.js';
+import { registerChromeImportHandlers } from './browser/import-ipc.js';
 import { chromeUserAgent, refuseClientCertificates } from './browser/guest-session.js';
 import { HOST_PAGE } from './browser/host-session.js';
 import { HOST_SCHEME } from './browser/script-host.js';
@@ -230,6 +232,7 @@ function startBrowser(
   appShell: AppShell,
   dirs: DataDirs,
   toolWindows: ToolWindows,
+  preferences: PreferenceStore,
 ): BrowserService {
   const links = new LinkConfirmations();
   const devPort = devServer === undefined ? undefined : Number(new URL(devServer.origin).port);
@@ -248,11 +251,21 @@ function startBrowser(
     files: new WorkspaceFiles(core.runtime),
     home: app.getPath('home'),
     toolWindow: (token, owner) => toolWindows.previewWindow(token, owner),
-    preferences: () => ({
-      storage: 'persist',
-      searchEngine: 'google',
-      localHostnames: ['*.test', '*.local'],
-    }),
+    // The user's settings (B5.5, `browser.*` of the user's settings file).
+    preferences: () => {
+      const chosen = preferences.get().browser;
+      return {
+        storage: chosen.storage,
+        searchEngine: chosen.searchEngine,
+        localHostnames: chosen.localHostnames,
+        devtoolsDock: chosen.devtoolsDock,
+        downloadDirectory: chosen.downloadDirectory,
+      };
+    },
+  });
+  // A changed DevTools dock (or other browser setting) applies to the open views at once.
+  preferences.onChange(() => {
+    service.preferencesChanged();
   });
   const sweep = setInterval(() => {
     service.discardIdle();
@@ -272,7 +285,12 @@ function startBrowser(
  * The agent's side of the browser (ADR-0089): script hosts answer `core/browser` runs. Core
  * offers the `Browser` tool only after `attachBrowserClient`, so it comes last.
  */
-function startBrowserAgent(core: CoreHost, service: BrowserService): void {
+function startBrowserAgent(
+  core: CoreHost,
+  service: BrowserService,
+  preferences: PreferenceStore,
+  imports: ChromeImports,
+): void {
   const hostDevServer = import.meta.env.DEV ? BROWSER_HOST_VITE_DEV_SERVER_URL : undefined;
   const agent = startAgentRuntime({
     service,
@@ -282,7 +300,10 @@ function startBrowserAgent(core: CoreHost, service: BrowserService): void {
     devOrigin: hostDevServer === undefined ? undefined : new URL(hostDevServer).origin,
     preload: bundlePath('build', 'browser-host.cjs'),
     devTools: !__PIARC_RELEASE_BUILD__,
-    localNames: () => ['*.test', '*.local'],
+    localNames: () => preferences.get().browser.localHostnames,
+    // B5.4: hosts with imported Chrome sign-ins are sensitive for the agent.
+    importedHost: async (sessionId, host) =>
+      imports.covers((await service.agentModel(sessionId)).workspace, host),
     userAgent: chromeUserAgent(app.userAgentFallback),
     handedOff: () => {
       // The panel shows the hand-off from the Space's state (B2.5.3).
@@ -505,9 +526,20 @@ function start(dirs: DataDirs): void {
       terminalOwners,
       () => preferences.locale(),
     );
-    browser = startBrowser(core, appShell, dirs, toolWindows);
+    browser = startBrowser(core, appShell, dirs, toolWindows, preferences);
     registerBrowserHandlers(registerHandler, browser);
-    startBrowserAgent(core, browser);
+    // Chrome sign-in import (ADR-0090): native confirmation, then Core decrypts and the
+    // cookies go into the workspace's persistent partition.
+    const chromeImports = new ChromeImports({
+      core: core.runtime,
+      storage: () => preferences.get().browser.storage,
+      translator: () => appShell.t(),
+      confirm: nativeConfirm,
+      platform: process.platform,
+      partition: persistentPartition,
+    });
+    registerChromeImportHandlers(registerHandler, core.runtime, chromeImports);
+    startBrowserAgent(core, browser, preferences, chromeImports);
     startTestHooks(core, terminalOwners, appShell);
     // The preferences come first: the window's language, theme and menu depend on them.
     void preferences.load().then(() => {

@@ -2,7 +2,13 @@
 // for the `globalThis.ego` object (upstream tests build ad-hoc `FakeEgo` objects); `fakeCdp` turns
 // an untyped handler into the typed `services.cdp` the drivers take.
 
-import type { SnapshotResult, TabInfo, TaskSpaceInfo } from '../shared/browser-host.js';
+import type {
+  BrowserServerInfo,
+  BrowserServersResult,
+  SnapshotResult,
+  TabInfo,
+  TaskSpaceInfo,
+} from '../shared/browser-host.js';
 import type { CdpCall, CdpObject, CdpResult } from './sdk/cdp-types.js';
 import type { EgoBindings, EgoProfile, EgoResult, EgoSnapshotOptions } from './sdk/ego-bindings.js';
 
@@ -246,6 +252,22 @@ export class FakeBindings implements EgoBindings {
   requestAccess(hosts: readonly string[], reason: string): Promise<EgoResult<boolean>> {
     this.calls.push(['requestAccess', hosts, reason]);
     return this.#options.requestAccess?.(hosts, reason) ?? Promise.resolve(true);
+  }
+
+  servers(): Promise<EgoResult<BrowserServersResult>> {
+    this.calls.push(['servers']);
+    return (
+      this.#options.servers?.() ??
+      Promise.resolve({ trusted: true, servers: [], listening: [], problems: [] })
+    );
+  }
+
+  startServer(name: string): Promise<EgoResult<BrowserServerInfo>> {
+    this.calls.push(['startServer', name]);
+    return (
+      this.#options.startServer?.(name) ??
+      Promise.resolve({ name, status: 'ready', url: 'http://localhost:3000/', port: 3000 })
+    );
   }
 
   #status(

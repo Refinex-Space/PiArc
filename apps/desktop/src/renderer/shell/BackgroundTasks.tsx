@@ -43,6 +43,7 @@ const KIND_MESSAGE: Record<BackgroundTask['kind'], MessageId> = {
   subagent: 'bgTasks.kind.subagent',
   monitor: 'bgTasks.kind.monitor',
   terminal: 'bgTasks.kind.terminal',
+  devServer: 'bgTasks.kind.devServer',
 };
 
 /** The time now, every second while `active`. */

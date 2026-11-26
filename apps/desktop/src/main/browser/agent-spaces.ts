@@ -287,7 +287,11 @@ export class AgentSpaces {
   async proxySpace(
     caller: SpaceCaller,
     id: number,
-    run: { stagedFile(path: string): boolean; refused(method: string): void },
+    run: {
+      stagedFile(path: string): boolean;
+      refused(method: string): void;
+      cancelDownload(guid: string): boolean;
+    },
   ): Promise<ProxySpace> {
     const { model, space, data } = await this.#controlled(caller, id);
     // Tab id → what the proxy last told the SDK about it (a closed tab keeps its target id).
@@ -372,6 +376,7 @@ export class AgentSpaces {
           onEvent(event, listener);
         }),
       stagedFile: (path) => run.stagedFile(path),
+      cancelDownload: (guid) => run.cancelDownload(guid),
       refused: (method) => {
         run.refused(method);
       },
@@ -456,6 +461,10 @@ export class AgentSpaces {
   }
 
   /** The page's own CDP target id (its main frame's id). */
+  targetIdOf(contents: WebContents): Promise<string> {
+    return this.#targetId(contents);
+  }
+
   #targetId(contents: WebContents): Promise<string> {
     let pending = this.#targets.get(contents);
     if (pending === undefined) {

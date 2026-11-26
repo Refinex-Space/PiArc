@@ -1,31 +1,49 @@
 // The preview tool: the built-in browser of a session (ADR-0088, design addendum B1). The main
 // process owns the tabs and the page; this panel shows the chrome around the page and the
 // strips the page needs, and tells the main process where the page goes.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BrowserRequest } from '../../shared/browser.js';
 import { useT } from '../app/app-context.js';
 import { Button } from '../app/Button.js';
 import { reason } from '../shell/errors.js';
-import { GlobeIcon } from '../shell/icons.js';
 import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
 import { ToolHeaderContent } from '../shell/ToolHeaderSlot.js';
 import { useUi } from '../shell/ui.js';
 import { AgentBar, DeviceBar, Downloads, FindBar, PromptBar } from './bars.js';
 import { NavigationRow, TabStrip, type ChromeActions } from './chrome.js';
+import { ConsoleDrawer } from './console.js';
 import { browserCall, useBrowserState } from './use-browser.js';
+import { useCapture } from './use-capture.js';
+import { showPreview } from './attention.js';
+import { ServerFailed, StartPage } from './start.js';
+import { failureKey, failures, parseSuggestions } from './start-model.js';
 import { Viewport } from './Viewport.js';
+import { useSession } from '../store/hooks.js';
+import { openChromeImport } from './site-import.js';
 
 export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
   const t = useT();
   const ui = useUi();
   const menu = useMenu();
+  // The session's workspace: the Chrome import goes into its partition (B5.1).
+  const workspace = useSession(sessionId)?.workspace;
   const { state, failure } = useBrowserState(sessionId);
   const [findOn, setFindOn] = useState(false);
   const [deviceOn, setDeviceOn] = useState(false);
+  const [consoleOn, setConsoleOn] = useState(false);
   const [focusAddress, setFocusAddress] = useState(0);
   const [claim, setClaim] = useState(false);
+  /** Failed servers the user closed the card of (B4.5). */
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
   const tab = state?.tabs.find((candidate) => candidate.id === state.activeTab);
+  // B1.1.1: the start page takes the address bar's focus when it appears.
+  const blank = tab === undefined || tab.url === '';
+  useEffect(() => {
+    if (blank) setFocusAddress((n) => n + 1);
+  }, [blank, tab?.id]);
+  // The preview is on screen: its tool button's dot goes (B4.4).
+  useEffect(() => showPreview(sessionId), [sessionId]);
   // The Space of the shown tab: an agent's shows its control bar (B2.5).
   const space = state?.spaces.find((candidate) => candidate.id === tab?.space);
 
@@ -41,6 +59,10 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
     },
     [sessionId, report],
   );
+  // Picking, annotating and screenshots (B3).
+  const capture = useCapture({ sessionId, state, tab, call, report });
+  const captureRef = useRef(capture);
+  captureRef.current = capture;
 
   const actions = useMemo<ChromeActions>(
     () => ({
@@ -60,11 +82,17 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
       tabMenu: (id) => {
         call({ op: 'contextMenu', tab: id });
       },
-      navigate: (input) => {
+      navigate: (input, newTab) => {
         call(
-          tab === undefined ? { op: 'navigate', input } : { op: 'navigate', tab: tab.id, input },
+          newTab === true
+            ? { op: 'navigate', input, newTab: true }
+            : tab === undefined
+              ? { op: 'navigate', input }
+              : { op: 'navigate', tab: tab.id, input },
         );
       },
+      suggest: (input) =>
+        window.piarc.browser(sessionId, { op: 'suggest', input }).then(parseSuggestions),
       back: () => {
         if (tab !== undefined) call({ op: 'history', tab: tab.id, direction: 'back' });
       },
@@ -98,8 +126,20 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
         const rect = anchor.getBoundingClientRect();
         menu.openAt(rect.left, rect.bottom + 4, anchor);
       },
+      pick: () => {
+        captureRef.current.pick();
+      },
+      annotate: () => {
+        captureRef.current.annotate();
+      },
+      screenshot: (anchor) => {
+        captureRef.current.screenshot(anchor);
+      },
+      importSite: (host) => {
+        openChromeImport(host, workspace);
+      },
     }),
-    [call, tab, menu],
+    [call, tab, menu, sessionId, workspace],
   );
 
   // Keys pressed while the page had focus come back here (main/browser/keymap.ts).
@@ -146,6 +186,12 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
             break;
           case 'device':
             setDeviceOn((on) => !on);
+            break;
+          case 'pick':
+            captureRef.current.pick();
+            break;
+          case 'annotate':
+            captureRef.current.annotate();
             break;
           case 'nextTab':
           case 'previousTab':
@@ -216,6 +262,16 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
       },
     },
     {
+      id: 'console',
+      label: t('browser.console.toggle'),
+      disabled: tab === undefined,
+      selected: consoleOn,
+      testId: 'browser-console-toggle',
+      run: () => {
+        setConsoleOn((on) => !on);
+      },
+    },
+    {
       id: 'devtools-window',
       label: t('browser.devtools.window'),
       disabled: tab === undefined,
@@ -237,7 +293,7 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
   const pageShown =
     tab !== undefined && !tab.crashed && tab.failure === undefined && tab.url !== '';
   return (
-    <div className="browser-panel" data-testid="browser-panel">
+    <div className="browser-panel" data-testid="browser-panel" onKeyDown={capture.onKeyDown}>
       <ToolHeaderContent>
         <TabStrip state={state} actions={actions} />
       </ToolHeaderContent>
@@ -247,6 +303,8 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
         focusAddress={focusAddress}
         deviceOn={deviceOn}
         findOn={findOn}
+        picking={capture.picking}
+        annotating={capture.annotating}
       />
       {space !== undefined && (
         <AgentBar
@@ -266,6 +324,17 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
           prompt={prompt}
           answer={(id, accept, fields) => {
             call({ op: 'answer', prompt: id, accept, ...fields });
+          }}
+        />
+      ))}
+      {failures(state.services, dismissed).map((server) => (
+        <ServerFailed
+          key={failureKey(server)}
+          sessionId={sessionId}
+          server={server}
+          call={call}
+          onDismiss={() => {
+            setDismissed((closed) => new Set([...closed, failureKey(server)]));
           }}
         />
       ))}
@@ -309,16 +378,22 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
           sessionId={sessionId}
           active={pageShown}
           claim={claim}
+          frozen={capture.annotating}
           onEnter={() => {
             if (tab !== undefined) call({ op: 'focus', tab: tab.id });
           }}
         >
+          {capture.surface}
           {tab === undefined || tab.url === '' ? (
-            <div className="browser-card" data-testid="browser-start">
-              <GlobeIcon size={20} />
-              <p className="browser-card-title">{t('browser.start.title')}</p>
-              <p>{t('browser.start.hint')}</p>
-            </div>
+            <StartPage
+              sessionId={sessionId}
+              services={state.services}
+              call={call}
+              open={(input) => {
+                actions.navigate(input);
+              }}
+              report={report}
+            />
           ) : tab.crashed ? (
             <div className="browser-card" data-testid="browser-crashed">
               <p className="browser-card-title">{t('browser.crashed.title')}</p>
@@ -339,6 +414,11 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
                   name: tab.failure.name,
                 })}
               </p>
+              {tab.failure.retry !== undefined && (
+                <p role="status" data-testid="browser-error-waiting">
+                  {t('browser.error.waiting')}
+                </p>
+              )}
               <Button
                 onClick={() => {
                   call({ op: 'navigate', tab: tab.id, input: tab.failure?.url ?? tab.url });
@@ -350,12 +430,27 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
           ) : null}
         </Viewport>
       )}
+      {consoleOn && tab !== undefined && (
+        <ConsoleDrawer
+          sessionId={sessionId}
+          tab={tab}
+          onClose={() => {
+            setConsoleOn(false);
+          }}
+          onError={report}
+          onStatus={(text) => {
+            ui.addToast({ sessionId, text });
+          }}
+        />
+      )}
+      {capture.strips}
       <Downloads
         downloads={state.downloads}
         onAction={(id, action) => {
           call({ op: 'download', download: id, action });
         }}
       />
+      {capture.menu}
       {menu.open && (
         <MenuPopup
           at={menu.open}

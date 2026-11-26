@@ -18,6 +18,7 @@ export function Viewport({
   claim,
   children,
   onEnter,
+  frozen = false,
 }: {
   readonly sessionId: string;
   /** Whether the page should be shown here (a tab is open and nothing replaces it). */
@@ -26,6 +27,8 @@ export function Viewport({
   readonly claim: boolean;
   readonly children?: ReactNode;
   readonly onEnter: () => void;
+  /** Annotating (B3.3): the page's view is hidden and the panel draws its screenshot instead. */
+  readonly frozen?: boolean;
 }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -90,7 +93,7 @@ export function Viewport({
       const rect = element.getBoundingClientRect();
       const placement: BrowserPlacement = {
         bounds: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
-        occluded,
+        occluded: occluded || frozen,
         ...(toolWindow === undefined || toolWindow === '' ? {} : { toolWindow }),
         ...(claim ? { claim } : {}),
       };
@@ -119,7 +122,7 @@ export function Viewport({
       view?.removeEventListener('resize', settle);
       if (frame !== 0) view?.cancelAnimationFrame(frame);
     };
-  }, [sessionId, shown, occluded, claim, host]);
+  }, [sessionId, shown, occluded, frozen, claim, host]);
 
   useEffect(
     () => () => {
@@ -138,13 +141,16 @@ export function Viewport({
       aria-label={t('browser.viewport')}
       tabIndex={0}
       onKeyDown={(event) => {
+        // Only the placeholder itself: Enter in a control drawn over it (the annotation's text
+        // and comments, a start page button) stays with that control.
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
           event.preventDefault();
           onEnter();
         }
       }}
     >
-      {occluded && still !== undefined && (
+      {occluded && !frozen && still !== undefined && (
         <img className="browser-still" src={still} alt="" data-testid="browser-occlusion" />
       )}
       {children}

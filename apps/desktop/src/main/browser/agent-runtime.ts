@@ -6,7 +6,10 @@ import type { WebContents } from 'electron';
 
 import type { SnapshotOptions, SnapshotResult } from '../../shared/browser-host.js';
 import { AgentBridge, type BridgeCore } from './agent-bridge.js';
+import { AgentDownloads } from './agent-downloads.js';
 import { AgentGate } from './agent-gate.js';
+import { quarantine } from './quarantine.js';
+import { StateReminders } from './state-reminders.js';
 import { AgentSpaces, SpaceError } from './agent-spaces.js';
 import { showCursor } from './cursor.js';
 import { FrameTracker } from './frames.js';
@@ -15,12 +18,22 @@ import { setUpHostSession } from './host-session.js';
 import { ScriptHosts } from './script-host.js';
 import type { BrowserService } from './service.js';
 import { SnapshotError, takeSnapshot } from './snapshot.js';
+import { parseLaunchView } from './dev-servers.js';
+import { serverAnswer, serverInfo, serversResult, type StartPageCore } from './start-page.js';
 
 export interface AgentRuntimeDeps {
   readonly service: BrowserService;
-  readonly core: BridgeCore & { browserSite(requestJson: string): Promise<string> };
+  readonly core: BridgeCore &
+    Pick<StartPageCore, 'launchConfigs' | 'startDevServer'> & {
+      browserSite(requestJson: string): Promise<string>;
+      browserFiles(requestJson: string): Promise<string>;
+      browserDownloadsDir(sessionId: string): string;
+      browserState(requestJson: string): void;
+    };
   /** The user's local development names (`*.test`, `*.local`). */
   localNames(): readonly string[];
+  /** Whether `host` has sign-ins imported from Chrome in the session's workspace (B5.4). */
+  importedHost(sessionId: string, host: string): Promise<boolean>;
   /** The built host page's folder and the page URL (the dev server's under forge start). */
   readonly hostFolder: string;
   readonly hostPage: string;
@@ -32,6 +45,43 @@ export interface AgentRuntimeDeps {
   handedOff(sessionId: string, space: string, reason: string): void;
   /** The user gave a Space the agent had handed over back: tell the agent (B2.5.3). */
   handedBack(sessionId: string): void;
+}
+
+/** Core's `browserFiles`: Core's message reaches the script as the binding's error. */
+async function files(
+  core: { browserFiles(requestJson: string): Promise<string> },
+  request: Record<string, unknown>,
+): Promise<{ staged: string[]; saved?: string }> {
+  let answer: unknown;
+  try {
+    answer = JSON.parse(await core.browserFiles(JSON.stringify(request)));
+  } catch (error) {
+    throw new SpaceError(
+      'PIARC_FILE_REFUSED',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+  if (typeof answer !== 'object' || answer === null) {
+    throw new SpaceError('PIARC_FILE_REFUSED', 'Core did not answer the file request');
+  }
+  const staged =
+    'staged' in answer && Array.isArray(answer.staged)
+      ? (answer.staged as unknown[]).filter((p): p is string => typeof p === 'string')
+      : [];
+  const saved = 'saved' in answer && typeof answer.saved === 'string' ? answer.saved : undefined;
+  return { staged, ...(saved === undefined ? {} : { saved }) };
+}
+
+/** Runs a Core call for a binding; Core's message reaches the script under `code`. */
+async function coreAnswer<T>(
+  code: 'EGO_OPERATION_FAILED' | 'PIARC_SERVER_REFUSED',
+  call: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    throw new SpaceError(code, error instanceof Error ? error.message : String(error));
+  }
 }
 
 export interface AgentRuntime {
@@ -74,9 +124,14 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
     pageOf: (id) => deps.service.gatedPage(id),
     agentPagesOn: (host) => deps.service.agentPagesOn(host),
     runFor: (sessionId, space) => late.hosts?.runFor(sessionId, space),
-    userPorts: (sessionId) => deps.service.userPorts(sessionId),
+    allowedPorts: (sessionId) =>
+      new Set([
+        ...deps.service.userPorts(sessionId),
+        ...deps.service.devServers.allowedPorts(sessionId),
+      ]),
     askCore: (json) => deps.core.browserSite(json),
     localNames: () => deps.localNames(),
+    importedHost: (sessionId, host) => deps.importedHost(sessionId, host),
   });
   deps.service.setGate((details) =>
     gate.check({
@@ -88,21 +143,62 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
   );
   const ports: BindingPorts = {
     snapshot: (contents, options) => snapshotOf(frames, contents, options),
-    stageUpload: () =>
-      Promise.reject(
-        new SpaceError(
+    stageUpload: async (run, paths) => {
+      const answer = await files(deps.core, {
+        op: 'stage',
+        sessionId: run.callSessionId,
+        toolCallId: run.toolCallId,
+        paths,
+      });
+      for (const path of answer.staged) run.staged.add(path);
+      return answer.staged;
+    },
+    saveFile: async (run, source, path) => {
+      const download = run.downloads.get(source);
+      if (download?.state !== 'completed') {
+        throw new SpaceError(
           'PIARC_FILE_REFUSED',
-          'Uploading files from the agent is not available in this build',
-        ),
-      ),
-    saveFile: () =>
-      Promise.reject(
-        new SpaceError(
-          'PIARC_FILE_REFUSED',
-          'Saving downloads from the agent is not available in this build',
-        ),
-      ),
+          'Only a finished download of this call can be saved',
+        );
+      }
+      const answer = await files(deps.core, {
+        op: 'save',
+        sessionId: run.callSessionId,
+        toolCallId: run.toolCallId,
+        source: download.file,
+        path,
+      });
+      // Core copied the bytes; the copy is marked as from the internet like the user's.
+      if (answer.saved !== undefined) await quarantine(answer.saved, download.item.getURL());
+    },
     requestAccess: (run, hosts) => gate.requestAccess(run.caller.sessionId, run, hosts),
+    servers: async (run) => {
+      const sessionId = run.caller.sessionId;
+      const launch = await coreAnswer('EGO_OPERATION_FAILED', async () =>
+        parseLaunchView(JSON.parse(await deps.core.launchConfigs(sessionId))),
+      );
+      if (launch === undefined) {
+        throw new SpaceError('EGO_OPERATION_FAILED', 'Core answered invalid launch configurations');
+      }
+      return serversResult(launch, deps.service.devServers.services(sessionId));
+    },
+    // The first start of a configuration's fingerprint in the session asks the user (a card
+    // bound to this call); a refusal or an untrusted project fails the binding (ADR-0092).
+    startServer: async (run, name) => {
+      const state = await coreAnswer('PIARC_SERVER_REFUSED', async () =>
+        serverAnswer(
+          await deps.core.startDevServer(
+            JSON.stringify({
+              sessionId: run.caller.sessionId,
+              name,
+              agent: { sessionId: run.callSessionId, toolCallId: run.toolCallId },
+              wait: true,
+            }),
+          ),
+        ),
+      );
+      return serverInfo(undefined, state, name);
+    },
     highlight: (contents, x, y, label) => {
       showCursor(contents, x, y, label);
     },
@@ -126,6 +222,13 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
     devTools: deps.devTools,
   });
   late.hosts = hosts;
+  const downloads = new AgentDownloads({
+    pageOf: (id) => deps.service.gatedPage(id),
+    runFor: (sessionId, space) => hosts.runFor(sessionId, space),
+    directory: (sessionId) => deps.core.browserDownloadsDir(sessionId),
+    targetIdOf: (contents) => spaces.targetIdOf(contents),
+  });
+  deps.service.setAgentDownloads((contents, item) => downloads.take(contents, item));
   deps.service.setControl(async (sessionId, space, action) => {
     const run = hosts.runFor(sessionId, space);
     switch (action) {
@@ -140,5 +243,23 @@ export function startAgentRuntime(deps: AgentRuntimeDeps): AgentRuntime {
         return;
     }
   });
-  return { gate, spaces, hosts, bridge: new AgentBridge(deps.core, hosts) };
+  // B2.7.3: what the user changes between the agent's calls reaches its next request.
+  const states = new StateReminders({
+    summary: (sessionId) => deps.service.agentSummary(sessionId),
+    running: (sessionId) => deps.service.agentRunning(sessionId),
+    send: (sessionId, summary) => {
+      deps.core.browserState(JSON.stringify({ sessionId, ...summary }));
+    },
+  });
+  deps.service.setStateWatch((sessionId) => {
+    states.changed(sessionId);
+  });
+  return {
+    gate,
+    spaces,
+    hosts,
+    bridge: new AgentBridge(deps.core, hosts, deps.service.devServers, (sessionId) => {
+      states.runEnded(sessionId);
+    }),
+  };
 }

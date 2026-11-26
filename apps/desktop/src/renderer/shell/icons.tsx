@@ -88,6 +88,12 @@ import {
   SquareMousePointer,
   ZoomIn,
   ZoomOut,
+  Eraser,
+  EyeOff,
+  Hash,
+  MoveUpRight,
+  Redo2,
+  Square,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -160,6 +166,16 @@ export const PickIcon = glyph(SquareMousePointer);
 export const AnnotateIcon = glyph(PenLine);
 export const ScreenshotIcon = glyph(Camera);
 export const RegionIcon = glyph(Crop);
+// Annotation tools (B3.3).
+export const RectIcon = glyph(Square);
+export const EllipseIcon = glyph(Circle);
+export const ArrowToolIcon = glyph(MoveUpRight);
+export const TextToolIcon = glyph(Type);
+export const MarkerIcon = glyph(Hash);
+export const RedactIcon = glyph(EyeOff);
+export const UndoIcon = glyph(Undo2);
+export const RedoIcon = glyph(Redo2);
+export const ClearIcon = glyph(Eraser);
 export const DevtoolsIcon = glyph(CodeXml);
 export const ZoomInIcon = glyph(ZoomIn);
 export const ZoomOutIcon = glyph(ZoomOut);

@@ -12,9 +12,12 @@ import {
   type BrowserErrorCode,
   type BrowserHostFailure,
   type BrowserHostResult,
+  type BrowserServerInfo,
+  type BrowserServersResult,
   type SnapshotOptions,
   type SnapshotResult,
 } from '../../shared/browser-host.js';
+import type { AgentDownload } from './agent-downloads.js';
 import { SpaceError, type AgentSpaces, type SpaceCaller } from './agent-spaces.js';
 import { CdpProxy } from './cdp-proxy.js';
 
@@ -24,6 +27,7 @@ const LEDGER_CHARS = 1024 * 1024;
 const CDP_MESSAGE_CHARS = 8 * 1024 * 1024;
 const MAX_PATHS = 20;
 const REASON_CHARS = 500;
+const SERVER_NAME_CHARS = 200;
 
 /** One run in a host. */
 export interface HostRun {
@@ -41,6 +45,8 @@ export interface HostRun {
   readonly proxies: Map<number, CdpProxy>;
   /** Files staged for this run's uploads (absolute paths). */
   readonly staged: Set<string>;
+  /** Downloads this run's pages started, by guid (agent-downloads.ts). */
+  readonly downloads: Map<string, AgentDownload>;
   finished(result: BrowserHostResult): void;
 }
 
@@ -53,6 +59,10 @@ export interface BindingPorts {
   saveFile(run: HostRun, source: string, path: string): Promise<void>;
   /** Asks the user to let the agent reach `hosts`; whether they did. */
   requestAccess(run: HostRun, hosts: readonly string[], reason: string): Promise<boolean>;
+  /** The project's launch configurations and the session's local services (ADR-0092). */
+  servers(run: HostRun): Promise<BrowserServersResult>;
+  /** Starts configuration `name` for the agent; the first start of its fingerprint asks. */
+  startServer(run: HostRun, name: string): Promise<BrowserServerInfo>;
   /** Shows the agent's cursor and action label in a page (B2.5.1). */
   highlight(contents: WebContents, x: number, y: number, label: string | undefined): void;
   readonly browserVersion: Record<string, string>;
@@ -216,6 +226,10 @@ export class HostBindings {
         const hosts = paths(r.hosts);
         return this.ports.requestAccess(run, hosts, text(r.reason, REASON_CHARS) ?? '');
       }
+      case 'servers':
+        return this.ports.servers(run);
+      case 'startServer':
+        return this.ports.startServer(run, need(text(r.name, SERVER_NAME_CHARS), 'name'));
       case 'finish':
         this.#finish(run, r.result);
         return null;
@@ -247,6 +261,12 @@ export class HostBindings {
       const proxySpace = await this.spaces.proxySpace(run.caller, space, {
         stagedFile: (path) => run.staged.has(path),
         refused: (method) => run.refusedMethods.add(method),
+        cancelDownload: (guid) => {
+          const download = run.downloads.get(guid);
+          if (download === undefined) return false;
+          download.item.cancel();
+          return true;
+        },
       });
       proxy = new CdpProxy(
         proxySpace,

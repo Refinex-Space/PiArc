@@ -76,6 +76,29 @@ export function local(host: string): boolean {
   return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
 }
 
+/** Chromium's `ERR_CONNECTION_REFUSED`. */
+const CONNECTION_REFUSED = -102;
+/** Retries of a refused local page (B1.3.1): 1, 2, 4, 8, 16 s, never more than 30 s. */
+export const LOCAL_RETRY = { attempts: 5, firstMs: 1000, maxMs: 30_000 } as const;
+
+/**
+ * How long to wait before loading `url` again after its `attempt`-th refused connection
+ * (0-based), or undefined when the page should stay failed: only local servers that are not up
+ * yet are retried.
+ */
+export function localRetryDelay(url: string, code: number, attempt: number): number | undefined {
+  if (code !== CONNECTION_REFUSED || attempt >= LOCAL_RETRY.attempts) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+  if (!local(parsed.hostname)) return undefined;
+  return Math.min(LOCAL_RETRY.firstMs * 2 ** attempt, LOCAL_RETRY.maxMs);
+}
+
 function isPath(input: string): boolean {
   return (
     input.startsWith('/') ||

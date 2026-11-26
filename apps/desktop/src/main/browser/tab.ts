@@ -11,8 +11,10 @@ import type {
   TabOrigin,
 } from '../../shared/browser.js';
 import { originForLog } from '../security/navigation.js';
-import { local } from './address.js';
+import { local, LOCAL_RETRY, localRetryDelay } from './address.js';
 import { navigable, WORKSPACE_SCHEME } from './request-rules.js';
+import { ConsoleLog } from './console-log.js';
+import { nextZoom } from './site-zoom.js';
 import { fitDevice } from './view-host.js';
 
 /** What a tab tells its owner. */
@@ -43,6 +45,12 @@ export interface TabHooks {
   beforeUnload(tab: BrowserTab): boolean;
   /** A JavaScript dialog opened (CDP `Page.javascriptDialogOpening`). */
   dialog(tab: BrowserTab, type: string, message: string): void;
+  /** The remembered zoom of `url`'s site (B1.3.9). */
+  zoomFor(tab: BrowserTab, url: string): number;
+  /** The user zoomed the tab's site: remember it and apply it to the site's other tabs. */
+  zoomed(tab: BrowserTab, zoom: number): void;
+  /** The page logged to its console (B1.4.3); only the panel hears it, not the agent side. */
+  logged(tab: BrowserTab): void;
 }
 
 export interface TabInit {
@@ -54,7 +62,6 @@ export interface TabInit {
   readonly title?: string;
 }
 
-const ZOOM_STEPS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 const FAVICON_BYTES = 32 * 1024;
 
 export class BrowserTab {
@@ -79,9 +86,14 @@ export class BrowserTab {
   tainted = false;
   /** When the tab was last on screen (for discarding hidden tabs). */
   lastShown = Date.now();
+  /** The page's console messages and uncaught exceptions (B1.4.3). */
+  readonly console = new ConsoleLog();
   view: WebContentsView | undefined;
   /** The emulation last given to Chromium (`none`), or undefined for a fresh page. */
   #emulationApplied: string | undefined;
+  /** Refused loads of a local server in a row, and the pending retry (B1.3.1). */
+  #refused = 0;
+  #retryTimer: NodeJS.Timeout | undefined;
 
   constructor(
     init: TabInit,
@@ -134,6 +146,8 @@ export class BrowserTab {
   }
 
   load(url: string): void {
+    this.#cancelRetry();
+    this.#refused = 0;
     this.url = url;
     this.failure = undefined;
     const contents = this.view?.webContents;
@@ -145,6 +159,7 @@ export class BrowserTab {
 
   /** Drops the page, keeping its URL and title: it reloads when shown again. */
   discard(): void {
+    this.#cancelRetry();
     const view = this.view;
     this.view = undefined;
     if (view !== undefined) close(view);
@@ -153,6 +168,7 @@ export class BrowserTab {
   }
 
   destroy(): void {
+    this.#cancelRetry();
     const view = this.view;
     this.view = undefined;
     if (view !== undefined) close(view);
@@ -188,12 +204,15 @@ export class BrowserTab {
   }
 
   stepZoom(step: 'in' | 'out' | 'reset'): void {
-    const index = ZOOM_STEPS.indexOf(this.zoom);
-    const at = index === -1 ? ZOOM_STEPS.indexOf(100) : index;
-    if (step === 'reset') this.zoom = 100;
-    else if (step === 'in') this.zoom = ZOOM_STEPS[Math.min(at + 1, ZOOM_STEPS.length - 1)] ?? 100;
-    else this.zoom = ZOOM_STEPS[Math.max(at - 1, 0)] ?? 100;
-    this.view?.webContents.setZoomFactor(this.zoom / 100);
+    this.setZoom(nextZoom(this.zoom, step));
+    this.hooks.zoomed(this, this.zoom);
+  }
+
+  /** Shows the page at `zoom` percent (the site's value; the service keeps them in step). */
+  setZoom(zoom: number): void {
+    this.zoom = zoom;
+    const contents = this.view?.webContents;
+    if (contents !== undefined && !contents.isDestroyed()) contents.setZoomFactor(zoom / 100);
     this.hooks.changed(this);
   }
 
@@ -218,6 +237,7 @@ export class BrowserTab {
       ...(this.failure === undefined ? {} : { failure: this.failure }),
       crashed: this.crashed,
       ...(this.tainted ? { tainted: true } : {}),
+      console: this.console.summary(),
     };
   }
 
@@ -241,10 +261,12 @@ export class BrowserTab {
     });
     contents.on('did-navigate', (_event, url) => {
       this.url = url;
+      this.#refused = 0;
       this.tainted = false;
       this.failure = undefined;
       this.favicon = undefined;
       this.#history(contents);
+      this.zoom = this.hooks.zoomFor(this, url);
       contents.setZoomFactor(this.zoom / 100);
       changed();
     });
@@ -264,8 +286,17 @@ export class BrowserTab {
     contents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
       // -3 is an aborted load: a new navigation replaced it.
       if (!isMainFrame || code === -3) return;
-      this.failure = { url, code, name: description };
+      const delay = localRetryDelay(url, code, this.#refused);
+      this.failure = {
+        url,
+        code,
+        name: description,
+        ...(delay === undefined
+          ? {}
+          : { retry: { attempt: this.#refused + 1, max: LOCAL_RETRY.attempts } }),
+      };
       this.loading = false;
+      if (delay !== undefined) this.#retryIn(url, delay);
       changed();
     });
     contents.on('render-process-gone', (_event, details) => {
@@ -294,8 +325,33 @@ export class BrowserTab {
       this.devtools = 'closed';
       changed();
     });
+    // Uncaught exceptions arrive here too, as errors (`Uncaught TypeError: …`).
+    contents.on('console-message', (details) => {
+      this.console.add(details.level, details.message, details.sourceId, details.lineNumber);
+      this.hooks.logged(this);
+    });
     this.#guard(contents);
     this.#debugger(contents);
+  }
+
+  /** Loads `url` again after `delay` unless the user or the page went elsewhere meanwhile. */
+  #retryIn(url: string, delay: number): void {
+    this.#cancelRetry();
+    this.#refused += 1;
+    this.#retryTimer = setTimeout(() => {
+      this.#retryTimer = undefined;
+      const contents = this.view?.webContents;
+      if (this.failure?.url !== url || contents === undefined || contents.isDestroyed()) return;
+      // The card stays up ("waiting for the server") until the page loads or fails again.
+      contents.loadURL(url).catch(() => {
+        // Failures arrive as `did-fail-load`.
+      });
+    }, delay);
+  }
+
+  #cancelRetry(): void {
+    if (this.#retryTimer !== undefined) clearTimeout(this.#retryTimer);
+    this.#retryTimer = undefined;
   }
 
   /** The navigation, popup and prompt rules of a guest (ADR-0088 rule 4). */
@@ -401,8 +457,9 @@ function isDialog(value: unknown): value is { type: string; message: string } {
 }
 
 function close(view: WebContentsView): void {
-  const contents = view.webContents;
-  if (contents.isDestroyed()) return;
+  // A view whose page is gone has no `webContents` any more (Electron 45).
+  const contents = view.webContents as WebContents | undefined;
+  if (contents === undefined || contents.isDestroyed()) return;
   // Detach CDP before the page goes away (ZCode's use-after-free lesson).
   if (contents.debugger.isAttached()) contents.debugger.detach();
   contents.close();

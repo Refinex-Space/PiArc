@@ -50,6 +50,8 @@ export interface ProxySpace {
   refused(method: string): void;
   /** The agent ran script in the page of `targetId` (B2.5.4). */
   tainted(targetId: string): void;
+  /** Cancels a download of the run (`Browser.cancelDownload`); whether there was one. */
+  cancelDownload(guid: string): boolean;
 }
 
 export type TabChange =
@@ -158,6 +160,15 @@ export class CdpProxy {
     }
   }
 
+  /** An event of the page `targetId` that PiArc reports itself (downloads), to its sessions. */
+  emitPage(targetId: string, method: string, params: Record<string, unknown>): void {
+    for (const [sessionId, attached] of this.#sessions) {
+      if (attached.targetId === targetId && attached.child === undefined) {
+        this.#emit({ method, params, sessionId });
+      }
+    }
+  }
+
   /** Stops forwarding: the run ended. */
   dispose(): void {
     this.#closed = true;
@@ -210,6 +221,11 @@ export class CdpProxy {
     switch (message.method) {
       case 'Browser.getVersion':
         return this.browserVersion;
+      case 'Browser.cancelDownload':
+        if (typeof params.guid !== 'string' || !this.space.cancelDownload(params.guid)) {
+          throw new CdpFailure('No download with given guid');
+        }
+        return {};
       case 'Target.getTargets':
         return { targetInfos: this.space.tabs().map((tab) => this.#info(tab)) };
       case 'Target.getTargetInfo':

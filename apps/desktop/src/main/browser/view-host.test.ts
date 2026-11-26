@@ -38,4 +38,13 @@ describe('splitForDevtools', () => {
     expect(page).toEqual({ x: 0, y: 40, width: 500, height: 600 });
     expect(devtools).toEqual({ x: 0, y: 640, width: 500, height: 400 });
   });
+
+  it('docks DevTools to the right of the page (B1.4.1)', () => {
+    const { page, devtools } = splitForDevtools(
+      { x: 10, y: 40, width: 1000, height: 600 },
+      'right',
+    );
+    expect(page).toEqual({ x: 10, y: 40, width: 600, height: 600 });
+    expect(devtools).toEqual({ x: 610, y: 40, width: 400, height: 600 });
+  });
 });

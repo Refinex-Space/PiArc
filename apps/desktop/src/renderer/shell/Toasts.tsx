@@ -38,12 +38,14 @@ export function Toasts() {
           <button
             type="button"
             className="button button-small"
+            data-testid={toast.action === undefined ? undefined : 'toast-action'}
             onClick={() => {
               dismissToast(toast.id);
-              ui.show({ kind: 'session', id: toast.sessionId });
+              if (toast.action === undefined) ui.show({ kind: 'session', id: toast.sessionId });
+              else toast.action.run();
             }}
           >
-            {t('toast.open')}
+            {toast.action?.label ?? t('toast.open')}
           </button>
           <button
             type="button"

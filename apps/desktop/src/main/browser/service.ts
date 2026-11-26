@@ -3,13 +3,16 @@
 // panel's requests and sends each window the state it shows. Nothing here decides what the
 // agent may do: Core does (ADR-0089).
 import { randomUUID } from 'node:crypto';
+import { existsSync, watch } from 'node:fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
   clipboard,
+  ClipboardItem,
   dialog,
   Menu,
+  nativeImage,
   shell,
   type BrowserWindow,
   type ContextMenuParams,
@@ -30,6 +33,7 @@ import {
   type BrowserRequest,
   type BrowserSessionState,
   type BrowserSpaceState,
+  type DevtoolsDock,
 } from '../../shared/browser.js';
 import type { Translator } from '../../shared/i18n/index.js';
 import type { BrowserObservation } from '../../shared/test-hooks.js';
@@ -37,6 +41,7 @@ import { APP_EVENT_CHANNEL, type AppEvent } from '../../shared/ipc.js';
 import { local, parseAddress, searchUrl, type SearchEngine } from './address.js';
 import { setUpGuestSession } from './guest-session.js';
 import { previewKey } from './keymap.js';
+import { BrowserPicker } from './picker.js';
 import {
   BrowserPartitions,
   partitionKey,
@@ -44,17 +49,27 @@ import {
   SHIELD_PARTITION,
   type BrowserStorage,
 } from './partitions.js';
+import { freePath, spaceNumber } from './agent-downloads.js';
+import type { StateSummary } from './state-reminders.js';
+import { LiveReload } from './live-reload.js';
+import { quarantine } from './quarantine.js';
+import { SiteZoom, siteOf, type ZoomStore } from './site-zoom.js';
 import { BrowserTab } from './tab.js';
+import { applyThrottling } from './throttling.js';
 import { createDevtoolsView, fitDevice, splitForDevtools, toDips, ViewHost } from './view-host.js';
 import type { GatedPage } from './agent-gate.js';
-import { loopbackHost, portOf, type RequestVerdict } from './request-rules.js';
+import { loopbackHost, portOf, WORKSPACE_SCHEME, type RequestVerdict } from './request-rules.js';
 import { insideRoot, type WorkspaceFiles } from './workspace-files.js';
+import { DevServers } from './dev-servers.js';
+import { FileGrants } from './file-grants.js';
+import { BrowserRecents } from './recents.js';
+import { StartPage, type StartPageCore } from './start-page.js';
 import type { Placement } from './view-host.js';
 
 /** What the service needs from the rest of the main process. */
 export interface BrowserDeps {
   /** Core's NAPI calls the browser uses. */
-  readonly core: {
+  readonly core: StartPageCore & {
     browserProxy(requestJson: string): Promise<string>;
     stopBrowserProxy(partition: string): Promise<string>;
     sessionDeletionTarget(sessionId: string): Promise<string>;
@@ -84,6 +99,10 @@ export interface BrowserPreferences {
   readonly storage: BrowserStorage;
   readonly searchEngine: SearchEngine;
   readonly localHostnames: readonly string[];
+  /** Where docked DevTools sit (B1.4.1); the panel's switch changes it for every tab. */
+  readonly devtoolsDock: DevtoolsDock;
+  /** The user's downloads go straight here; null asks with the save dialog (B1.3.6). */
+  readonly downloadDirectory: string | null;
 }
 
 /** A Space of a session; agent-spaces.ts changes agent Spaces through `AgentModel`. */
@@ -176,8 +195,20 @@ export class BrowserService {
   readonly #loaded = new Map<string, SessionModel>();
   readonly #downloads = new Map<string, Download>();
   readonly #views: ViewHost;
+  /** The element picker and screenshots (B3). */
+  readonly #picker: BrowserPicker;
+  /** Development servers and listening ports Core reports (ADR-0092). */
+  readonly devServers: DevServers;
+  /** Recent pages per workspace (B1.1.1). */
+  readonly #recents: BrowserRecents;
+  readonly #start: StartPage;
+  /** Single HTML files opened from outside the workspace (B1.6.2). */
+  readonly #grants = new FileGrants();
   #nextTab = 1;
   #quitting = false;
+  #disposed = false;
+  /** Downloads of agent pages while a call runs (B2.6.6), installed with the agent side. */
+  #agentDownload: ((contents: WebContents, item: DownloadItem) => boolean) | undefined;
   /** The user's controls of agent Spaces (B2.5), installed once the agent side starts. */
   #control:
     ((sessionId: string, space: string, action: BrowserControl) => Promise<void>) | undefined;
@@ -188,8 +219,56 @@ export class BrowserService {
       ) => RequestVerdict | Promise<RequestVerdict>)
     | undefined;
 
+  /** Page zoom per partition and site (B1.3.9). */
+  readonly #zoom: SiteZoom;
+  readonly #zoomLoaded: Promise<void>;
+  /** Workspace pages follow their files (B1.6.1). */
+  readonly #live: LiveReload;
+  /** The agent side's watch of each session's browser (B2.7.3). */
+  #stateWatch: ((sessionId: string) => void) | undefined;
+
   constructor(private readonly deps: BrowserDeps) {
     this.#views = new ViewHost(() => deps.createParking());
+    this.devServers = new DevServers({
+      changed: (sessionId) => {
+        const model = this.#loaded.get(sessionId);
+        if (model !== undefined) this.#changed(model);
+      },
+      announce: (sessionId, port) => {
+        this.#tell({
+          type: 'browserService',
+          sessionId,
+          port,
+          url: `http://localhost:${String(port)}/`,
+        });
+      },
+      failed: (sessionId, server) => {
+        this.#tell({ type: 'browserServerFailed', sessionId, name: server.name });
+      },
+    });
+    this.#recents = new BrowserRecents(path.join(deps.dataDir, 'recents.json'));
+    this.#start = new StartPage(deps.core, this.#recents, this.devServers);
+    deps.files.setGrants(this.#grants);
+    this.#picker = this.#createPicker();
+    this.#zoom = new SiteZoom(fileStore(path.join(deps.dataDir, 'zoom.json')));
+    this.#zoomLoaded = this.#zoom.load();
+    this.#live = new LiveReload({
+      resolve: (sessionId, relative) => deps.files.resolve(sessionId, relative),
+      watch: (file, onChange) => {
+        const watcher = watch(file, { persistent: false }, onChange);
+        watcher.on('error', () => {
+          watcher.close();
+          onChange();
+        });
+        return watcher;
+      },
+      reload: (sessionId) => {
+        this.#reloadWorkspacePages(sessionId);
+      },
+    });
+    deps.files.onServed((sessionId, relative) => {
+      this.#live.served(sessionId, relative);
+    });
   }
 
   /** The session's state for the window of `viewer`, loading the session on first use. */
@@ -249,6 +328,66 @@ export class BrowserService {
         this.#changed(model);
       }
     }
+  }
+
+  /**
+   * Reloads the session's pages of workspace files after a file they loaded changed (B1.6.1);
+   * a page an agent's script is driving right now is left alone.
+   */
+  #reloadWorkspacePages(sessionId: string): void {
+    const model = this.#loaded.get(sessionId);
+    if (model === undefined) return;
+    for (const tab of model.tabs) {
+      if (!tab.url.startsWith(`${WORKSPACE_SCHEME}:`)) continue;
+      if (this.deps.files.sessionOf(tab.url) !== sessionId) continue;
+      if (model.spaces.find((space) => space.id === tab.space)?.running === true) continue;
+      const contents = tab.view?.webContents;
+      if (contents !== undefined && !contents.isDestroyed()) contents.reload();
+    }
+  }
+
+  /** Hears every change of a loaded session's browser (the agent's state reminders, B2.7.3). */
+  setStateWatch(watch: (sessionId: string) => void): void {
+    this.#stateWatch = watch;
+  }
+
+  /**
+   * The session's task spaces as the agent's `browserState` reminder lists them (B2.7.3):
+   * pages only of the Spaces the agent controls, the user's own tabs only counted.
+   */
+  agentSummary(sessionId: string): StateSummary {
+    const model = this.#loaded.get(sessionId);
+    if (model === undefined) return { spaces: [], userTabs: 0 };
+    const spaces = model.spaces
+      .filter((space) => space.kind === 'agent')
+      .map((space) => {
+        const tabs = model.tabs.filter((tab) => tab.space === space.id);
+        const agent = space.ownership === 'agent';
+        return {
+          id: spaceNumber(space.id) ?? 0,
+          name: space.name,
+          controlledBy: agent ? ('agent' as const) : ('user' as const),
+          tabs: agent ? tabs.map((tab) => ({ title: tab.title, url: tab.url })) : [],
+          tabCount: tabs.length,
+        };
+      });
+    const userTabs = model.tabs.filter((tab) => tab.space === USER_SPACE).length;
+    return { spaces, userTabs };
+  }
+
+  /** Whether an agent's script runs in one of the session's Spaces now. */
+  agentRunning(sessionId: string): boolean {
+    return this.#loaded.get(sessionId)?.spaces.some((space) => space.running) === true;
+  }
+
+  /** The user's browser preferences changed (B5.5): views follow the DevTools dock at once. */
+  preferencesChanged(): void {
+    for (const model of this.#loaded.values()) this.#layout(model);
+  }
+
+  /** Installs the handler of agent pages' downloads (B2.6.6); false leaves one to the user. */
+  setAgentDownloads(take: (contents: WebContents, item: DownloadItem) => boolean): void {
+    this.#agentDownload = take;
   }
 
   /** Installs what the panel's take over, hand back and stop do (B2.5). */
@@ -340,8 +479,18 @@ export class BrowserService {
         return contents;
       },
       changed: () => {
+        // The agent's work starting on the picked page ends the picker (B3.1).
+        const picking = this.#picker.picking(model.id);
+        if (picking !== undefined && this.#driven(model, picking.tab)) this.#picker.stop(model.id);
         // The agent's work starting or ending shows or lifts the shield.
         this.#layout(model);
+        // B5.6: hidden pages are throttled, except the agent's while its call runs.
+        applyThrottling(model.tabs, model.spaces, (tab, throttled) => {
+          const contents = tab.view?.webContents;
+          if (contents !== undefined && !contents.isDestroyed()) {
+            contents.setBackgroundThrottling(throttled);
+          }
+        });
         this.#changed(model);
       },
       watch: (listener) => {
@@ -427,10 +576,15 @@ export class BrowserService {
    */
   quitting(): void {
     this.#quitting = true;
+    void this.#recents.flush();
   }
 
   /** Closes every page (app quit). */
   dispose(): void {
+    // `will-quit` runs again after Core's shutdown (core-host.ts): close everything once. An
+    // exception here would make Electron show a modal error box and the quit would hang.
+    if (this.#disposed) return;
+    this.#disposed = true;
     for (const model of this.#loaded.values()) {
       for (const tab of model.tabs) tab.destroy();
       for (const view of model.devtools.values()) closeView(view);
@@ -452,6 +606,7 @@ export class BrowserService {
   /** Loads a session; `known` is its workspace when the caller has it (an agent's run). */
   async #load(sessionId: string, known?: string): Promise<SessionModel> {
     const workspace = known ?? (await this.#workspaceOf(sessionId));
+    await this.#zoomLoaded;
     const { storage, localHostnames } = this.deps.preferences();
     const key = partitionKey(workspace, storage);
     const partition = partitionName(key, storage);
@@ -549,7 +704,7 @@ export class BrowserService {
       case 'state':
         return this.#snapshot(model, sender);
       case 'navigate':
-        return this.#navigate(model, request.tab, request.input);
+        return this.#navigate(model, request.tab, request.input, request.newTab === true);
       case 'newTab':
         return this.#newTab(
           model,
@@ -634,9 +789,124 @@ export class BrowserService {
       case 'download':
         this.#downloadAction(request.download, request.action);
         return null;
+      case 'console':
+        return this.#tab(model, request.tab).console.after(request.after);
+      case 'consoleClear':
+        this.#tab(model, request.tab).console.clear();
+        this.#changed(model);
+        return null;
       case 'clearData':
         return this.#clearData(model);
+      case 'pick':
+        if (request.mode === 'off') {
+          this.#picker.stop(model.id);
+          return null;
+        }
+        this.#tab(model, request.tab);
+        return this.#picker.start(model.id, request.tab, request.mode).then(() => null);
+      case 'capture':
+        this.#tab(model, request.tab);
+        return this.#picker.capture(model.id, request.tab, request.kind);
+      case 'copyImage': {
+        const image = nativeImage.createFromDataURL(request.image);
+        if (image.isEmpty()) throw new Error('[piarc:browserCapture] The image is empty');
+        const png = new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' });
+        return clipboard.write([new ClipboardItem({ 'image/png': png })]).then(() => null);
+      }
+      case 'startPage':
+        return this.#start.page(model.id, model.workspace);
+      case 'startServer':
+        return this.#start.start(model.id, request.name);
+      case 'stopServer':
+        return this.#start.stop(model.id, request.name);
+      case 'suggest':
+        return this.#start.suggest(
+          model.id,
+          model.workspace,
+          request.input,
+          model.tabs.map((tab) => ({ url: tab.url, title: tab.title })),
+        );
+      case 'openHtmlFile':
+        return this.#openHtmlFile(model, sender);
     }
+  }
+
+  /** Tells every workbench window (a service's toast, a failed server, B4.4, B4.5). */
+  #tell(event: AppEvent): void {
+    for (const window of this.deps.windows()) {
+      if (!window.isDestroyed()) send(window.webContents, event);
+    }
+  }
+
+  /**
+   * "Open HTML file…" (B1.6.2): the native open dialog; a file inside the workspace opens as a
+   * workspace file, one outside it in a tab that may load that file's directory until it closes.
+   */
+  async #openHtmlFile(model: SessionModel, sender: WebContents): Promise<string | null> {
+    const t = this.deps.translator();
+    const options: Electron.OpenDialogOptions = {
+      title: t.t('browser.start.openHtml'),
+      properties: ['openFile'],
+      filters: [{ name: t.t('browser.start.htmlFiles'), extensions: ['html', 'htm'] }],
+    };
+    const window = windowOf(sender, this.deps.windows());
+    const chosen =
+      window === undefined
+        ? await dialog.showOpenDialog(options)
+        : await dialog.showOpenDialog(window, options);
+    const file = chosen.canceled ? undefined : chosen.filePaths[0];
+    if (file === undefined) return null;
+    if (!/\.html?$/i.test(file)) {
+      throw new Error('[piarc:browserFile] Only HTML files open from the dialog');
+    }
+    const active = model.tabs.find((t) => t.id === model.active);
+    const blank =
+      active?.space === USER_SPACE && (active.url === '' || active.url === 'about:blank')
+        ? active
+        : undefined;
+    const tab = blank ?? this.#newTab(model, '', false, 'user', USER_SPACE);
+    const relative = insideRoot(file, model.workspace, this.deps.home);
+    tab.load(
+      relative === undefined
+        ? await this.#grants.grant(tab.id, file)
+        : this.deps.files.url(model.id, relative),
+    );
+    if (model.active !== tab.id) this.#select(model, tab.id);
+    else this.#layout(model);
+    this.#changed(model);
+    return tab.id;
+  }
+
+  /** The picker's view of the sessions (B3.1). */
+  #createPicker(): BrowserPicker {
+    return new BrowserPicker({
+      page: (sessionId, tabId) => {
+        const tab = this.#loaded.get(sessionId)?.tabs.find((t) => t.id === tabId);
+        const contents = tab?.view?.webContents;
+        if (tab === undefined || contents === undefined || contents.isDestroyed()) return undefined;
+        return { contents, url: tab.url };
+      },
+      workspace: (sessionId) => this.#loaded.get(sessionId)?.workspace,
+      driven: (sessionId, tabId) => {
+        const model = this.#loaded.get(sessionId);
+        return model !== undefined && this.#driven(model, tabId);
+      },
+      deliver: (sessionId, mode, pick) => {
+        const owner = this.#loaded.get(sessionId)?.placement?.owner;
+        if (owner !== undefined) send(owner, { type: 'browserPick', sessionId, mode, pick });
+      },
+      changed: (sessionId) => {
+        const model = this.#loaded.get(sessionId);
+        if (model !== undefined) this.#changed(model);
+      },
+    });
+  }
+
+  /** Whether an agent's call drives the Space of `tabId` now (B2.5.1). */
+  #driven(model: SessionModel, tabId: string): boolean {
+    const tab = model.tabs.find((t) => t.id === tabId);
+    const space = model.spaces.find((s) => s.id === tab?.space);
+    return space?.kind === 'agent' && space.ownership === 'agent' && space.running;
   }
 
   #tab(model: SessionModel, id: string): BrowserTab {
@@ -668,6 +938,8 @@ export class BrowserService {
   }
 
   #select(model: SessionModel, id: string): void {
+    const picking = this.#picker.picking(model.id);
+    if (picking !== undefined && picking.tab !== id) this.#picker.stop(model.id);
     model.active = id;
     if (model.find !== undefined && model.find.tab !== id) model.find = undefined;
     this.#layout(model);
@@ -682,6 +954,7 @@ export class BrowserService {
   }
 
   #closeTab(model: SessionModel, id: string): void {
+    this.#picker.stopTab(model.id, id);
     const index = model.tabs.findIndex((t) => t.id === id);
     const tab = model.tabs[index];
     if (tab === undefined) return;
@@ -697,6 +970,7 @@ export class BrowserService {
       }
     }
     model.grants.delete(id);
+    this.#grants.revoke(id);
     if (tab.view !== undefined) this.#views.detach(tab.view);
     tab.destroy();
     model.tabs.splice(index, 1);
@@ -707,7 +981,12 @@ export class BrowserService {
     this.#layout(model);
   }
 
-  #navigate(model: SessionModel, tabId: string | undefined, input: string): string | null {
+  #navigate(
+    model: SessionModel,
+    tabId: string | undefined,
+    input: string,
+    fresh = false,
+  ): string | null {
     const parsed = parseAddress(input);
     let url: string;
     switch (parsed.kind) {
@@ -728,8 +1007,9 @@ export class BrowserService {
       case 'refused':
         throw new Error(`[piarc:browserAddress] ${parsed.reason}`);
     }
-    const tab =
-      tabId === undefined
+    const tab = fresh
+      ? this.#newTab(model, '', false, 'user', USER_SPACE)
+      : tabId === undefined
         ? (model.tabs.find((t) => t.id === model.active) ??
           this.#newTab(model, '', false, 'user', USER_SPACE))
         : this.#tab(model, tabId);
@@ -828,7 +1108,11 @@ export class BrowserService {
     await target.clearStorageData();
     await target.clearCache();
     await target.clearAuthCache();
-    for (const tab of model.tabs) tab.view?.webContents.reload();
+    this.#zoom.forget(model.key);
+    for (const tab of model.tabs) {
+      if (tab.zoom !== 100) tab.setZoom(100);
+      tab.view?.webContents.reload();
+    }
     return null;
   }
 
@@ -856,11 +1140,11 @@ export class BrowserService {
     active.lastShown = Date.now();
     this.#views.attach(view, placement.window);
     const devtools = model.devtools.get(active.id);
-    const area =
-      devtools === undefined ? placement.bounds : splitForDevtools(placement.bounds).page;
+    const split = splitForDevtools(placement.bounds, this.deps.preferences().devtoolsDock);
+    const area = devtools === undefined ? placement.bounds : split.page;
     if (devtools !== undefined) {
       this.#views.attach(devtools, placement.window);
-      devtools.setBounds(splitForDevtools(placement.bounds).devtools);
+      devtools.setBounds(split.devtools);
       devtools.setVisible(!placement.occluded);
     }
     if (active.emulation === null) {
@@ -916,6 +1200,7 @@ export class BrowserService {
         this.#changed(model);
         tabEvent(model, { kind: 'changed', tab });
         if (tab.space === USER_SPACE) rememberUserPort(model, tab.url);
+        if (tab.space === USER_SPACE) this.#recordRecent(model, tab);
       },
       openTab: (from: BrowserTab, url: string, background: boolean) => {
         try {
@@ -976,9 +1261,30 @@ export class BrowserService {
           },
         );
       },
-      beforeUnload: (tab: BrowserTab) => this.#confirmLeave(model, tab),
+      // Asking blocks the main process with a native dialog: never while the app quits (it
+      // would hang the quit) nor for a page of a Space the agent controls (nobody to answer).
+      beforeUnload: (tab: BrowserTab) =>
+        this.#quitting ||
+        model.spaces.find((space) => space.id === tab.space)?.ownership === 'agent' ||
+        this.#confirmLeave(model, tab),
       dialog: () => {
         // User tabs show Electron's dialog; the agent answers its own through CDP (B2).
+      },
+      logged: () => {
+        this.#changed(model);
+      },
+      zoomFor: (_tab: BrowserTab, url: string) => this.#zoom.get(model.key, url),
+      zoomed: (tab: BrowserTab, zoom: number) => {
+        this.#zoom.set(model.key, tab.url, zoom, model.storage === 'persist');
+        const site = siteOf(tab.url);
+        if (site === undefined) return;
+        // Chromium zooms the site's other tabs of the partition too; keep their state in step.
+        for (const other of this.#loaded.values()) {
+          if (other.key !== model.key) continue;
+          for (const each of other.tabs) {
+            if (each !== tab && each.zoom !== zoom && siteOf(each.url) === site) each.setZoom(zoom);
+          }
+        }
       },
     };
   }
@@ -1042,11 +1348,16 @@ export class BrowserService {
   }
 
   #download(contents: WebContents | undefined, item: DownloadItem): void {
+    if (contents !== undefined && this.#agentDownload?.(contents, item) === true) return;
     const found = contents === undefined ? undefined : this.#tabOf(contents);
     if (found === undefined) {
       item.cancel();
       return;
     }
+    // Without a path Chromium asks with the save dialog (the default); a chosen folder takes
+    // the file under a name no other file has.
+    const folder = this.deps.preferences().downloadDirectory;
+    if (folder !== null) item.setSavePath(freePath(folder, item.getFilename(), existsSync));
     const id = randomUUID();
     const download: Download = {
       item,
@@ -1078,6 +1389,7 @@ export class BrowserService {
     });
     item.once('done', (_event, state) => {
       download.state = { ...download.state, state };
+      if (state === 'completed') void quarantine(item.getSavePath(), item.getURL());
       update();
     });
     update();
@@ -1110,6 +1422,15 @@ export class BrowserService {
   }
 
   #key(model: SessionModel, tab: BrowserTab, input: Electron.Input): boolean {
+    // Esc in the page ends the picker (B3.1) before the page sees it.
+    if (
+      input.type === 'keyDown' &&
+      input.key === 'Escape' &&
+      this.#picker.picking(model.id)?.tab === tab.id
+    ) {
+      this.#picker.stop(model.id);
+      return true;
+    }
     const key = previewKey(input, this.deps.platform);
     if (key === undefined) return false;
     const owner = model.placement?.owner;
@@ -1194,6 +1515,19 @@ export class BrowserService {
       },
       { type: 'separator' },
       {
+        // The element under the pointer becomes a card in the panel's tray (B1.3.8, B3.1).
+        label: t.t('browser.menu.addToConversation'),
+        enabled: !this.#driven(model, tab.id),
+        click: () => {
+          const zoom = tab.zoom > 0 ? tab.zoom / 100 : 1;
+          this.#picker
+            .pickAt(model.id, tab.id, params.x / zoom, params.y / zoom)
+            .catch((error: unknown) => {
+              console.warn('[browser] adding the element failed', error);
+            });
+        },
+      },
+      {
         label: t.t('browser.menu.inspect'),
         click: () => {
           if (tab.devtools === 'closed') this.#devtools(model, tab.id, 'docked');
@@ -1253,6 +1587,7 @@ export class BrowserService {
   }
 
   #changed(model: SessionModel): void {
+    this.#stateWatch?.(model.id);
     model.emitTimer ??= setTimeout(() => {
       model.emitTimer = undefined;
       model.revision += 1;
@@ -1273,6 +1608,7 @@ export class BrowserService {
 
   #snapshot(model: SessionModel, viewer: WebContents): BrowserSessionState {
     const owner = model.placement?.owner;
+    const picking = this.#picker.picking(model.id);
     return {
       sessionId: model.id,
       revision: model.revision,
@@ -1293,7 +1629,22 @@ export class BrowserService {
         .map((download) => download.state),
       ...(model.find === undefined ? {} : { find: model.find }),
       shownElsewhere: owner !== undefined && !owner.isDestroyed() && owner !== viewer,
+      ...this.#services(model.id),
+      ...(picking === undefined ? {} : { picking }),
     };
+  }
+
+  /** The session's services for its panel (B4.2, B4.4), when it has any. */
+  #services(sessionId: string): Pick<BrowserSessionState, 'services'> {
+    const { ports, servers } = this.devServers.services(sessionId);
+    return ports.length === 0 && servers.length === 0 ? {} : { services: { ports, servers } };
+  }
+
+  /** A user tab's loaded page goes into the workspace's recent pages (B1.1.1). */
+  #recordRecent(model: SessionModel, tab: BrowserTab): void {
+    if (tab.loading || tab.failure !== undefined || tab.crashed) return;
+    const url = this.deps.files.sessionOf(tab.url) === model.id ? workspaceInput(tab.url) : tab.url;
+    if (url !== undefined) this.#recents.record(model.workspace, url, tab.title);
   }
 
   #file(model: SessionModel): string {
@@ -1367,7 +1718,19 @@ export class BrowserService {
       this.#loaded.delete(sessionId);
       this.#sessions.delete(sessionId);
     }
+    this.#live.forget(sessionId);
+    this.devServers.forget(sessionId);
     await rm(path.join(this.deps.dataDir, 'sessions', `${sessionId}.json`), { force: true });
+  }
+}
+
+/** A workspace URL as the address bar takes it (`./path`), for the recent pages. */
+function workspaceInput(url: string): string | undefined {
+  try {
+    const relative = decodeURIComponent(new URL(url).pathname).replace(/^\/+/, '');
+    return relative === '' ? undefined : `./${relative}`;
+  } catch {
+    return undefined;
   }
 }
 
@@ -1430,7 +1793,28 @@ function createShield(partitions: BrowserPartitions): Electron.WebContentsView {
 }
 
 function closeView(view: Electron.WebContentsView): void {
-  if (!view.webContents.isDestroyed()) view.webContents.close();
+  // A view whose page is gone has no `webContents` any more (Electron 45).
+  const contents = view.webContents as WebContents | undefined;
+  if (contents !== undefined && !contents.isDestroyed()) contents.close();
+}
+
+/** A JSON file written whole through a temporary file and a rename. */
+function fileStore(file: string): ZoomStore {
+  return {
+    read: async () => {
+      try {
+        return await readFile(file, 'utf8');
+      } catch {
+        return undefined;
+      }
+    },
+    write: async (text) => {
+      await mkdir(path.dirname(file), { recursive: true });
+      const temporary = `${file}.${randomUUID()}.tmp`;
+      await writeFile(temporary, text);
+      await rename(temporary, file);
+    },
+  };
 }
 
 async function cdp(contents: WebContents, method: string, params: object): Promise<void> {

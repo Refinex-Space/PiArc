@@ -1,10 +1,12 @@
 // Ported from ego-browser package/ego-browser/src/helpers.ts (ego-lite commit 56589ea8, MIT, see
 // LICENSE). PiArc: only the v2 surface of PUBLIC_API_SCHEMA (profiles, listTaskSpaces, taskSpace,
-// claimTaskSpace, takeOverTaskSpace, help) plus requestAccess (B2.6.4). The frozen v1 helpers
+// claimTaskSpace, takeOverTaskSpace, help) plus requestAccess (B2.6.4) and servers/startServer
+// (ADR-0092). The frozen v1 helpers
 // (global click/typeText/gotoUrl…, switchTaskSpace, newTaskSpace, useOrCreateTaskSpace,
 // completeTaskSpace, handOffTaskSpace, waitForAgentControl, cdp/js, fetch helpers), the learning
 // subsystem, agent_helpers.js and the egoBrowser stale-skill guard are not ported.
 
+import type { BrowserServerInfo, BrowserServersResult } from '../../shared/browser-host.js';
 import { isRecord } from './cdp-types.js';
 import type { EgoBindings, EgoProfile } from './ego-bindings.js';
 import { buildEgoError, invokeEgo } from './ego-errors.js';
@@ -322,6 +324,28 @@ export async function requestAccess(hosts: unknown, reason: unknown): Promise<bo
   return invokeEgo('requestAccess', () => ego.requestAccess(list, reason));
 }
 
+/**
+ * PiArc (ADR-0092): the project's launch configurations with their state in this session, the
+ * TCP ports the session's processes listen on, and problems of the launch files.
+ */
+export async function servers(): Promise<BrowserServersResult> {
+  const ego = bindings('servers', 'servers');
+  return invokeEgo('servers', () => ego.servers());
+}
+
+/**
+ * PiArc (ADR-0092): start launch configuration `name` and wait until its port answers or it
+ * fails. The first start of a configuration in a session asks the user; it runs outside the
+ * sandbox. A running one resolves at once.
+ */
+export async function startServer(name: unknown): Promise<BrowserServerInfo> {
+  if (typeof name !== 'string' || name.trim() === '') {
+    throw new TypeError('startServer expects the name of a launch configuration from servers()');
+  }
+  const ego = bindings('startServer', 'startServer');
+  return invokeEgo('startServer', () => ego.startServer(name));
+}
+
 function isHostList(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&
@@ -438,6 +462,8 @@ export function helperContext({
     claimTaskSpace,
     takeOverTaskSpace,
     requestAccess,
+    servers,
+    startServer,
     // help() prints its text and still returns it for scripts that log or inspect it.
     help: (...names: unknown[]) => {
       const result = helpRuntime(...names.map(String));

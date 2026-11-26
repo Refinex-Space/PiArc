@@ -1,6 +1,7 @@
 // The preview panel's IPC (ADR-0088): every argument is checked here before the service sees
 // it, and malformed ones throw `TypeError` (T45's hardening sweep calls each with garbage).
 import {
+  BROWSER_CONTEXT_LIMITS,
   BROWSER_LIMITS,
   EMULATION_LIMITS,
   type BrowserEmulation,
@@ -97,13 +98,27 @@ export function parseBrowserRequest(value: unknown): BrowserRequest {
     case 'state':
     case 'reopenClosed':
     case 'clearData':
+    case 'startPage':
+    case 'openHtmlFile':
       return { op: fields.op };
     case 'navigate': {
       const input = text(fields.input, BROWSER_LIMITS.input, 'address');
+      if (optionalFlag(fields.newTab, 'newTab') === true) {
+        if (fields.tab !== undefined) throw new TypeError('A new tab has no tab id');
+        return { op: 'navigate', input, newTab: true };
+      }
       return fields.tab === undefined
         ? { op: 'navigate', input }
         : { op: 'navigate', tab: tab(), input };
     }
+    case 'startServer':
+    case 'stopServer': {
+      const name = text(fields.name, BROWSER_LIMITS.serverName, 'server name');
+      if (name.trim() === '') throw new TypeError('Invalid server name');
+      return { op: fields.op, name };
+    }
+    case 'suggest':
+      return { op: 'suggest', input: text(fields.input, BROWSER_LIMITS.input, 'address') };
     case 'newTab': {
       const background = optionalFlag(fields.background, 'background');
       const url =
@@ -181,8 +196,55 @@ export function parseBrowserRequest(value: unknown): BrowserRequest {
         throw new TypeError('Invalid download action');
       }
       return { op: 'download', download: fields.download, action: fields.action };
+    case 'pick':
+    case 'capture':
+    case 'copyImage':
+      return parsePictureRequest(fields);
+    case 'console':
+      if (
+        typeof fields.after !== 'number' ||
+        !Number.isSafeInteger(fields.after) ||
+        fields.after < 0
+      ) {
+        throw new TypeError('Invalid console position');
+      }
+      return { op: 'console', tab: tab(), after: fields.after };
+    case 'consoleClear':
+      return { op: 'consoleClear', tab: tab() };
     default:
       throw new TypeError('Invalid browser request');
+  }
+}
+
+/** The PNG data URLs the panel may hand back (B3.4): base64 only, bounded. */
+const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/u;
+
+/** The picker, screenshot and clipboard requests (B3.1, B3.4). */
+function parsePictureRequest(fields: Fields): BrowserRequest {
+  switch (fields.op) {
+    case 'pick': {
+      const mode = fields.mode;
+      if (mode !== 'collect' && mode !== 'shot' && mode !== 'off') {
+        throw new TypeError('Invalid pick mode');
+      }
+      return { op: 'pick', tab: tabId(fields.tab), mode };
+    }
+    case 'capture':
+      if (fields.kind !== 'visible' && fields.kind !== 'full') {
+        throw new TypeError('Invalid capture kind');
+      }
+      return { op: 'capture', tab: tabId(fields.tab), kind: fields.kind };
+    default: {
+      const image = fields.image;
+      if (
+        typeof image !== 'string' ||
+        image.length > BROWSER_CONTEXT_LIMITS.image ||
+        !PNG_DATA_URL.test(image)
+      ) {
+        throw new TypeError('Invalid image');
+      }
+      return { op: 'copyImage', image };
+    }
   }
 }
 

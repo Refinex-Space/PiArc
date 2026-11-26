@@ -82,3 +82,54 @@ describe('parsePlacement', () => {
     expect(() => parsePlacement(placement)).toThrow(TypeError);
   });
 });
+
+describe('start page requests (B1.1.1, B1.2.3, B1.6.2, B4.2)', () => {
+  it.each([
+    [{ op: 'startPage' }],
+    [{ op: 'openHtmlFile' }],
+    [{ op: 'startServer', name: 'web' }],
+    [{ op: 'stopServer', name: 'API server' }],
+    [{ op: 'suggest', input: 'local' }],
+    [{ op: 'navigate', input: 'localhost:5173', newTab: true }],
+  ])('accepts %j', (request) => {
+    expect(parseBrowserRequest(request)).toEqual(request);
+  });
+
+  it('drops a newTab flag that is false', () => {
+    expect(parseBrowserRequest({ op: 'navigate', input: 'a.test', newTab: false })).toEqual({
+      op: 'navigate',
+      input: 'a.test',
+    });
+  });
+
+  it.each([
+    [{ op: 'startServer' }],
+    [{ op: 'startServer', name: '' }],
+    [{ op: 'startServer', name: '   ' }],
+    [{ op: 'stopServer', name: 'x'.repeat(201) }],
+    [{ op: 'suggest', input: 7 }],
+    [{ op: 'navigate', input: 'a', newTab: 'yes' }],
+    [{ op: 'navigate', tab: 'tab-1', input: 'a', newTab: true }],
+  ])('THR-11 rejects %j', (request) => {
+    expect(() => parseBrowserRequest(request)).toThrow(TypeError);
+  });
+});
+
+describe('console requests (B1.4.3)', () => {
+  it.each([
+    [{ op: 'console', tab: 'tab-1', after: 0 }],
+    [{ op: 'console', tab: 'tab-1', after: 1200 }],
+    [{ op: 'consoleClear', tab: 'tab-1' }],
+  ])('accepts %j', (request) => {
+    expect(parseBrowserRequest(request)).toEqual(request);
+  });
+
+  it.each([
+    [{ op: 'console', tab: 'tab-1' }],
+    [{ op: 'console', tab: 'tab-1', after: -1 }],
+    [{ op: 'console', tab: 'tab-1', after: 1.5 }],
+    [{ op: 'consoleClear', tab: '../x' }],
+  ])('THR-11 rejects %j', (request) => {
+    expect(() => parseBrowserRequest(request)).toThrow(TypeError);
+  });
+});

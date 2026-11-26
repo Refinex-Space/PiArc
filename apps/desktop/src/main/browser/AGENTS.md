@@ -10,16 +10,24 @@
 | `partitions.ts`、`guest-session.ts`、`request-rules.ts` | 分区命名与识别；guest 分区的代理、权限、下载、请求规则（协议、链路本地、PiArc 端口），再交给可选的请求闸门 |
 | `tab.ts`、`view-host.ts`、`keymap.ts` | 一个标签的 `WebContentsView`、导航守卫、设备模拟；视图挂载与停车窗口；页面内的键位 |
 | `workspace-files.ts`、`address.ts` | `piarc-browse:` 工作区文件；地址栏解析 |
+| `file-grants.ts` | "打开 HTML 文件…"选的工作区外文件（B1.6.2）：该文件所在目录以自己的 `piarc-browse://<令牌>/` 提供，解析链接后不出目录，标签关闭即撤销 |
+| `recents.ts`、`suggestions.ts`、`start-page.ts` | 每工作区的最近访问（`<userData>/browser/recents.json`，原子写）；地址栏建议的排序（历史、标签、本地服务）；起始页的请求（启动配置、用户点击运行与停止、建议）与 SDK `servers()` 的结果形状 |
+| `dev-servers.ts` | Core 的 `core/browser` `ports`/`servers` 快照（按主会话）：闸门放行的端口（监听中与启动配置声明的）、每会话每端口一次的就绪通知、失败通知（ADR-0092） |
 | `agent-runtime.ts` | 装配智能体侧：Space、闸门、绑定、脚本宿主、Core 桥；`main.ts` 注册宿主 IPC 与 `core/browser` 路由 |
 | `agent-bridge.ts` | 启动时 `attachBrowserClient`；`core/browser` 的 `run` 交给脚本宿主、答复经 `answerBrowserRun`，`cancel` 结束宿主 |
 | `script-host.ts`、`host-session.ts` | 每次调用一个新的沙箱宿主（预热一个），超时与崩溃结束运行并带回已打印的输出，用户可停止；宿主分区只服务自己的页面，其余请求全部取消 |
 | `host-bindings.ts` | 宿主每个绑定请求的校验与分派（脚本能直接调用 `window.piarcBrowserHost`，按不可信输入处理）；截图附件的数量与大小上限 |
 | `agent-spaces.ts` | ego 语义的 Space：数字 id、`agent` / `agentDelegatedToUser` / `user`、每会话至多 4 个、用户自己的标签只报数量；用户接管、交还；页面账本（按会话与 id，与 Space 的存续无关） |
 | `cdp-proxy.ts`、`cdp-policy.ts` | 给 SDK 的浏览器级 CDP：只答本 Space 的 `Target.*` 与 `Browser.getVersion`，页面命令经允许名单（B2.6.5）后转给标签的 debugger，OOPIF 子会话映射为虚拟 id |
-| `agent-gate.ts` | 请求闸门（B2.6.1–B2.6.4）：智能体控制的 Space 里每个请求按会话与本次调用的授权、用户打开过的本机端口判断，文档与框架问 Core（站点卡），其余拦截并记入本次调用的结果 |
+| `agent-gate.ts` | 请求闸门（B2.6.1–B2.6.4）：智能体控制的 Space 里每个请求按会话与本次调用的授权、本会话的本机端口（用户打开过的、会话进程树监听的、启动配置声明的）判断，文档与框架问 Core（站点卡），其余拦截并记入本次调用的结果 |
 | `snapshot.ts`、`frames.ts` | ego 规格的快照（DOMSnapshot + 无障碍树，OOPIF 拼接）；标签的 OOPIF 会话自动附着 |
 | `cursor.ts` | 智能体光标与动作标签（隔离 world、closed shadow root、`pointer-events: none`） |
 | `browser-ipc.ts` | 面板命令的校验（含 `control`：接管、交还、停止） |
+| `chrome-import.ts`、`import-ipc.ts` | 从 Chrome 导入登录（B5.1–B5.4，ADR-0090）：设置页的命令、原生确认（`NativeConfirm`）、经 Core 解密后写入工作区的持久分区（`cookies.set`），页面只拿到每站点的条数；移除先删分区里的 cookie 再删 Core 的记录；"退出即清空"模式下答 `unavailable`；导入站点（含子域名）给闸门的 `importedHost`，按工作区缓存 |
+| `throttling.ts` | B5.6：隐藏的页面节流（`setBackgroundThrottling`），只有调用正在运行的智能体 Space 不节流；`service.ts` 在 Space 状态变化时施加 |
+| `console-log.ts`、`site-zoom.ts`、`live-reload.ts`、`quarantine.ts` | 每个标签的 console（最近 1,000 条，按序号增量读）；按分区与站点记住缩放（持久分区写 `zoom.json`）；工作区页面跟随文件改动刷新（经 Core 解析路径、`fs.watch` 只作失效通知）；下载完成补 quarantine / `Zone.Identifier` |
+| `agent-downloads.ts`、`state-reminders.ts` | 运行中调用的标签下载写进会话的下载目录并以 CDP 事件报给 SDK，保存经 Core `browserFiles`（B2.6.6）；两次调用之间用户改动的 Space 经 Core `browserState` 成为下一次请求前的提醒（B2.7.3） |
+| `picker.ts`、`element-context.ts`、`source-map.ts`、`capture.ts` | B3：CDP Overlay 拾取（只认 `Overlay.inspectNodeRequested`，智能体驱动页面时拒绝）与右键"加入对话"；元素上下文（DOM 事实在隔离 world、框架事实在页面 world，主进程逐项校验与截断）；React 19 `_debugStack` 经同源 source map 定位，源码路径 realpath 后必须在工作区内；可见、整页、元素截图 |
 
 ## 不变量
 
@@ -28,6 +36,7 @@
 - CDP 方法的放行只改 `cdp-policy.ts`，每加一类在 `cdp-policy.test.ts` 加用例；被拒的方法进本次调用的审计。
 - 智能体控制的 Space 的标签不写进会话的恢复清单（`service.ts` 的 `#save`），用户接管或智能体完成后归用户的才写。
 - Core 的错误类别与主机字符串一律当数据显示（`revealBidi`），不拼进 HTML。
+- 导入的 cookie 值只在 `chrome-import.ts` 里从 Core 的答复写进分区，不进日志、错误与页面；`cookies.set` 失败只计数（Chromium 的错误可能引用值）。不要对浏览器分区调用 `partitions.guest(…, () => undefined)` 取 session：那会让分区以后不再装守卫与代理，用 `persistentPartition`（`session.fromPartition`）。
 
 ## 测试
 

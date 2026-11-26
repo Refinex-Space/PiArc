@@ -5,7 +5,10 @@
 // user did not allow:
 //
 // - hosts the user allowed for the session, or for the running call ("allow once"), pass;
-// - a local address passes when the user opened its port in their own tabs (B2.6.2);
+// - a local address passes when its port is the session's (B2.6.2): the user opened it in
+//   their own tabs, a process tree of the session (background task, terminal, development
+//   server) listens on it, or a launch configuration declares it (dev-servers.ts). PiArc's own
+//   ports never get here: the partition rules refuse them first (request-rules.ts);
 // - a document or frame of the running call that is not allowed asks Core, which may show a
 //   site card (and waits for it); the answer also covers the hosts the run is waiting on;
 // - anything else is refused and counted in the run's blocked hosts, which the model reads
@@ -43,12 +46,20 @@ export interface GateDeps {
   /** Pages of agent-controlled Spaces showing `host`, for requests no page can be named for. */
   agentPagesOn(host: string): readonly GatedPage[];
   runFor(sessionId: string, space: string): GateRun | undefined;
-  /** Loopback ports the user opened in their own tabs of the session (B2.6.2). */
-  userPorts(sessionId: string): ReadonlySet<number>;
+  /**
+   * Loopback ports of the session (B2.6.2): opened by the user in their own tabs, listened on
+   * by the session's process trees, or declared by its launch configurations.
+   */
+  allowedPorts(sessionId: string): ReadonlySet<number>;
   /** Core's `browserSite`. */
   askCore(requestJson: string): Promise<string>;
   /** Local names the user treats as their machine (`*.test`, `*.local`, B5.5). */
   localNames(): readonly string[];
+  /**
+   * Whether `host` gets cookies imported from Chrome into the session's workspace (B5.4,
+   * ADR-0090): such a host is sensitive like a private address. Core checks its records too.
+   */
+  importedHost?(sessionId: string, host: string): Promise<boolean>;
 }
 
 /** A request as the gate sees it (Electron's `onBeforeRequest` details). */
@@ -161,7 +172,7 @@ export class AgentGate {
   ): boolean {
     if (this.#session.get(sessionId)?.has(key) === true) return true;
     if (run?.allowedHosts.has(key) === true) return true;
-    return local && this.deps.userPorts(sessionId).has(portOf(url));
+    return local && this.deps.allowedPorts(sessionId).has(portOf(url));
   }
 
   /** A request without a page (a service worker's): judged as the agent's when an agent
@@ -204,6 +215,17 @@ export class AgentGate {
     return pending;
   }
 
+  /** Whether `host` has imported sign-ins; an unreadable record counts as imported. */
+  async #imported(sessionId: string, host: string): Promise<boolean> {
+    if (this.deps.importedHost === undefined) return false;
+    try {
+      return await this.deps.importedHost(sessionId, host.replace(/^\[|\]$/g, '').toLowerCase());
+    } catch (error) {
+      console.warn('[browser] the imported sites could not be read', error);
+      return true;
+    }
+  }
+
   async #question(
     sessionId: string,
     run: GateRun,
@@ -214,6 +236,8 @@ export class AgentGate {
     const waiting = [...run.blockedHosts].filter((host) => host !== key);
     let decision: Pick<BrowserSiteDecision, 'allowed' | 'scope'>;
     try {
+      const sensitive =
+        privateHost(url.hostname) || (await this.#imported(sessionId, url.hostname));
       const answer: unknown = JSON.parse(
         await this.deps.askCore(
           JSON.stringify({
@@ -222,7 +246,7 @@ export class AgentGate {
             url: url.href,
             host: key,
             ...(local ? { local: true } : {}),
-            ...(privateHost(url.hostname) ? { sensitive: true } : {}),
+            ...(sensitive ? { sensitive: true } : {}),
             ...(waiting.length === 0 ? {} : { pending: waiting }),
           }),
         ),

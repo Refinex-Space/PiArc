@@ -4,7 +4,7 @@
 // moved to the hidden parking window when no panel shows it.
 import { WebContentsView, type BrowserWindow, type Rectangle } from 'electron';
 
-import type { BrowserBounds, BrowserEmulation } from '../../shared/browser.js';
+import type { BrowserBounds, BrowserEmulation, DevtoolsDock } from '../../shared/browser.js';
 
 /** Where a panel wants its page, in the window's DIPs. */
 export interface Placement {
@@ -28,8 +28,23 @@ export function toDips(bounds: BrowserBounds, zoomFactor: number): Rectangle {
   };
 }
 
-/** The page's and DevTools' rectangles inside `area` (DevTools docked at the bottom). */
-export function splitForDevtools(area: Rectangle): { page: Rectangle; devtools: Rectangle } {
+/** The page's and DevTools' rectangles inside `area` (DevTools docked at the bottom or right). */
+export function splitForDevtools(
+  area: Rectangle,
+  dock: DevtoolsDock = 'bottom',
+): { page: Rectangle; devtools: Rectangle } {
+  if (dock === 'right') {
+    const devtoolsWidth = Math.round(area.width * DEVTOOLS_SHARE);
+    return {
+      page: { ...area, width: area.width - devtoolsWidth },
+      devtools: {
+        x: area.x + area.width - devtoolsWidth,
+        y: area.y,
+        width: devtoolsWidth,
+        height: area.height,
+      },
+    };
+  }
   const devtoolsHeight = Math.round(area.height * DEVTOOLS_SHARE);
   return {
     page: { ...area, height: area.height - devtoolsHeight },

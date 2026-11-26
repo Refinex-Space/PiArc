@@ -14,7 +14,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-const KINDS: readonly TaskKind[] = ['command', 'subagent', 'monitor', 'terminal'];
+const KINDS: readonly TaskKind[] = ['command', 'subagent', 'monitor', 'terminal', 'devServer'];
 const ORIGINS: readonly TerminalOrigin[] = ['agent', 'user'];
 const STATUSES: readonly TaskStatus[] = ['running', 'completed', 'failed', 'killed', 'interrupted'];
 

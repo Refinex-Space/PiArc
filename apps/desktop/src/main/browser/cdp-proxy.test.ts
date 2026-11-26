@@ -67,6 +67,7 @@ function fixture() {
     stagedFile: () => false,
     refused: (method) => refused.push(method),
     tainted: (targetId) => tainted.push(targetId),
+    cancelDownload: (guid) => guid === 'known',
   };
   const proxy = new CdpProxy(space, (m) => out.push(JSON.parse(m) as Record<string, unknown>), {
     protocolVersion: '1.3',
@@ -200,6 +201,32 @@ describe('CdpProxy', () => {
     });
     expect(closed).toEqual({ id: 3, result: { success: true } });
     expect(f.out.some((m) => m.method === 'Target.targetDestroyed')).toBe(true);
+  });
+
+  it('reports downloads to the page sessions and cancels only known ones (B2.6.6)', async () => {
+    const f = fixture();
+    const attach = await f.call({
+      id: 1,
+      method: 'Target.attachToTarget',
+      params: { targetId: 'T1' },
+    });
+    const sessionId = (attach?.result as { sessionId: string }).sessionId;
+    f.proxy.emitPage('T1', 'Page.downloadWillBegin', { guid: 'known', url: 'http://localhost/' });
+    f.proxy.emitPage('T9', 'Page.downloadWillBegin', { guid: 'other' });
+    expect(f.out.filter((m) => m.method === 'Page.downloadWillBegin')).toEqual([
+      {
+        method: 'Page.downloadWillBegin',
+        params: { guid: 'known', url: 'http://localhost/' },
+        sessionId,
+      },
+    ]);
+    expect(
+      await f.call({ id: 2, method: 'Browser.cancelDownload', params: { guid: 'known' } }),
+    ).toEqual({ id: 2, result: {} });
+    expect(
+      await f.call({ id: 3, method: 'Browser.cancelDownload', params: { guid: 'nope' } }),
+    ).toMatchObject({ id: 3, error: { message: 'No download with given guid' } });
+    expect(f.refused).toEqual([]);
   });
 
   it('stops sending after dispose', async () => {

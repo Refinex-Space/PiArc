@@ -47,7 +47,12 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
   // ADR-0089: a site card names the address the agent's page asks for; "once" covers this call,
   // "always" saves the card's own `Browser(domain:…)` rule (Core saves exactly that rule).
   const site = request.tool === 'BrowserSite' ? request.site : undefined;
-  const ownCard = network || site != null;
+  // B2.6.6: a page of the agent's browser uploads a file, or the agent saves a download.
+  const browserFile =
+    request.tool === 'BrowserUpload' || request.tool === 'BrowserSave' ? request.tool : undefined;
+  // ADR-0092: the agent's script starts a launch configuration; the card names it.
+  const ownCard =
+    network || site != null || browserFile !== undefined || request.tool === 'BrowserServer';
   const allowPersistent =
     !network && request.protectedPath !== true && (offered.length > 0 || request.directory != null);
   function answer(decision: ApprovalAnswer['decision']) {
@@ -102,11 +107,17 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
     ? t('approval.network')
     : site != null
       ? t('approval.site')
-      : request.kind === 'command'
-        ? t('approval.title.command')
-        : request.kind === 'fileChange' && request.path
-          ? t('approval.title.edit', { name: revealBidi(baseName(request.path)) })
-          : t(`approval.kind.${request.kind}`);
+      : browserFile === 'BrowserUpload'
+        ? t('approval.browserUpload')
+        : browserFile === 'BrowserSave'
+          ? t('approval.browserSave')
+          : request.tool === 'BrowserServer'
+            ? t('approval.browserServer')
+            : request.kind === 'command'
+              ? t('approval.title.command')
+              : request.kind === 'fileChange' && request.path
+                ? t('approval.title.edit', { name: revealBidi(baseName(request.path)) })
+                : t(`approval.kind.${request.kind}`);
   return (
     <section
       ref={card}

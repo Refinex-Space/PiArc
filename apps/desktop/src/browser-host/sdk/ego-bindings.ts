@@ -5,6 +5,8 @@
 // replace upstream's Node file system and the clipboard.
 
 import type {
+  BrowserServerInfo,
+  BrowserServersResult,
   SnapshotOptions,
   SnapshotResult,
   TabInfo,
@@ -76,6 +78,10 @@ export interface EgoBindings {
   }): Promise<EgoResult<number>>;
   /** Asks the user to let the agent reach `hosts`; answers whether they were allowed. */
   requestAccess(hosts: readonly string[], reason: string): Promise<EgoResult<boolean>>;
+  /** The project's launch configurations and the session's local services (ADR-0092). */
+  servers(): Promise<EgoResult<BrowserServersResult>>;
+  /** Starts a launch configuration; resolves once it is ready or failed (ADR-0092). */
+  startServer(name: string): Promise<EgoResult<BrowserServerInfo>>;
 }
 
 declare global {

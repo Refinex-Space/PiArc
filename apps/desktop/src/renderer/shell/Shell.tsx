@@ -34,6 +34,7 @@ import './SideChat.js';
 import '../changes/panels.js';
 import '../terminal/panels.js';
 import { requestFilesControl } from '../files/file-controls.js';
+import { requestPreviewCommand } from '../browser/preview-commands.js';
 import { toggleChangesPanel } from '../changes/panel-state.js';
 import { claimPanelCommand } from '../changes/git/focus.js';
 import { showPanel, togglePanel } from './registry.js';
@@ -45,6 +46,8 @@ import { WorkbenchHeader } from './WorkbenchHeader.js';
 import { useViewHistory } from './view-history.js';
 import { groupSessions } from './Sidebar.js';
 import { Toasts } from './Toasts.js';
+import { BrowserNotices } from '../browser/notices.js';
+import { AgentReveal } from '../browser/reveal.js';
 import { TooltipLayer } from '../app/Tooltip.js';
 import { TrustDialog, needsDecision, parseTrustView } from './TrustDialog.js';
 import { UiContext, type Toast, type TrustMode, type Ui, type View } from './ui.js';
@@ -417,6 +420,14 @@ export function Shell() {
       case 'preview.toggle':
         if (selected) togglePanel('preview');
         break;
+      case 'preview.pick':
+      case 'preview.annotate':
+        // B3: the preview opens if needed and its panel runs the command.
+        if (selected) {
+          showPanel('preview');
+          requestPreviewCommand(selected, command === 'preview.pick' ? 'pick' : 'annotate');
+        }
+        break;
       case 'files.quick':
       case 'files.tree':
         if (selected) {
@@ -635,6 +646,8 @@ export function Shell() {
           </div>
         </div>
         <Toasts />
+        <BrowserNotices />
+        <AgentReveal />
         <TooltipLayer />
         {paletteOpen && (
           <CommandPalette
