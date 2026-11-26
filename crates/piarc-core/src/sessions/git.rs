@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use piarc_git::{Git, Reader, args, commit, diff, index, log, refs, status};
+use piarc_git::{Git, Reader, args, commit, diff, history, index, log, refs, stash, status};
 use piarc_protocol::git::{
     GitCall, GitEvent, GitFailure, GitFailureKind, GitProbe, GitRequest, GitScope, GitTextSource,
 };
@@ -214,7 +214,7 @@ impl Hub {
             GitRequest::Branches => reply(&refs::branches(reader).await?),
             GitRequest::FileStages { path } => reply(&index::file_stages(reader, &path).await?),
             GitRequest::LastCommit => reply(&commit::last_commit(reader).await?),
-            _ => reply_failure(GitFailure::of(GitFailureKind::Invalid)),
+            other => answer_history(reader, other).await?,
         };
         Ok(value.unwrap_or(Value::Null))
     }
@@ -324,6 +324,41 @@ impl Hub {
     }
 }
 
+/// The G3 reads: history pages, one commit, stashes and file bytes.
+async fn answer_history(
+    reader: &Reader,
+    request: GitRequest,
+) -> std::result::Result<Result<Value>, piarc_git::GitError> {
+    Ok(match request {
+        GitRequest::Log {
+            revs,
+            skip,
+            limit,
+            text,
+            author,
+        } => reply(
+            &history::log(
+                reader,
+                &revs,
+                skip.unwrap_or(0),
+                limit.unwrap_or(history::PAGE),
+                text.as_deref(),
+                author.as_deref(),
+            )
+            .await?,
+        ),
+        GitRequest::CommitDetail { sha } => match history::commit_detail(reader, &sha).await? {
+            Some(detail) => reply(&detail),
+            None => reply_failure(GitFailure::new(GitFailureKind::Invalid, "no such commit")),
+        },
+        GitRequest::Stashes => reply(&stash::list(reader).await?),
+        GitRequest::FileBlob { source, path } => {
+            reply(&log::file_blob(reader, &source, &path).await?)
+        }
+        _ => reply_failure(GitFailure::of(GitFailureKind::Invalid)),
+    })
+}
+
 /// The base a branch's creation names (a worktree session's base, ADR-0084 rule 2).
 async fn session_base(reader: &Reader) -> Option<String> {
     let branch = piarc_git::worktree::head_branch(&reader.repo.root)?;
@@ -357,6 +392,33 @@ fn check_read(request: &GitRequest) -> std::result::Result<(), GitFailure> {
         }
         GitRequest::Commits { base: Some(base) } => args::check_revision(base).map_err(bad),
         GitRequest::FileStages { path } => args::check_path(path).map_err(bad),
+        GitRequest::Log {
+            revs, text, author, ..
+        } => {
+            if let piarc_protocol::git::GitLogRevs::Ref { name } = revs {
+                args::check_revision(name).map_err(bad)?;
+            }
+            check_filter(text.as_deref())?;
+            check_filter(author.as_deref())
+        }
+        GitRequest::CommitDetail { sha } => check_scope(&GitScope::Commit { sha: sha.clone() }),
+        GitRequest::FileBlob { source, path } => {
+            args::check_path(path).map_err(bad)?;
+            match source {
+                GitTextSource::Commit { rev } => args::check_revision(rev).map_err(bad),
+                GitTextSource::Index | GitTextSource::Worktree => Ok(()),
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+/// A log filter: at most 200 characters, no control characters.
+fn check_filter(text: Option<&str>) -> std::result::Result<(), GitFailure> {
+    match text {
+        Some(t) if t.chars().count() > 200 || t.chars().any(char::is_control) => Err(
+            GitFailure::new(GitFailureKind::Invalid, "filter too long or not printable"),
+        ),
         _ => Ok(()),
     }
 }
@@ -393,6 +455,10 @@ impl ReadOnly for GitRequest {
                 | Self::Branches
                 | Self::FileStages { .. }
                 | Self::LastCommit
+                | Self::Log { .. }
+                | Self::CommitDetail { .. }
+                | Self::Stashes
+                | Self::FileBlob { .. }
         )
     }
 }

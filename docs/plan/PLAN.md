@@ -352,7 +352,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ### Git 面板 G3–G5（计划外，ADR-0085、0087，设计增补第 9 节）
 
 - [x] 14. 设计增补第 9 节、ADR-0087、索引与 PLAN。
-- [ ] 15. G3 的 piarc-git、协议、Core、主进程。
+- [x] 15. G3 的 piarc-git、协议、Core、主进程（`tests/history.rs` 7 项、`sessions git::history_operations_guard_stale_state_and_protected_branches`、`git-ipc.test.ts` 10 项）。
 - [ ] 16. G3 的渲染进程：日志视图、提交图、详情与操作、stash、远程分支删除、自动获取、图片 diff、设置。
 - [ ] 17. G4 的 piarc-git、协议、Core、主进程。
 - [ ] 18. G4 的渲染进程：合并与变基入口、冲突对话框、三方合并视图、交互式变基、状态条补齐。

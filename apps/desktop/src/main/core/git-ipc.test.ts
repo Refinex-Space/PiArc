@@ -166,4 +166,74 @@ describe('Git panel IPC', () => {
     await call(['s1', { op: 'status' }]);
     expect(sent).toHaveLength(1);
   });
+
+  it('checks the history requests and refuses option-like or overlong values', () => {
+    expect(
+      gitRequest({ op: 'log', revs: { kind: 'ref', name: 'origin/main' }, skip: 200, extra: 1 }),
+    ).toEqual({ op: 'log', revs: { kind: 'ref', name: 'origin/main' }, skip: 200 });
+    expect(gitRequest({ op: 'fetch', background: true })).toEqual({
+      op: 'fetch',
+      background: true,
+    });
+    expect(gitRequest({ op: 'stashApply', index: 0, oid: 'a'.repeat(40), pop: true })).toEqual({
+      op: 'stashApply',
+      index: 0,
+      oid: 'a'.repeat(40),
+      pop: true,
+    });
+    expect(() => gitRequest({ op: 'log', revs: { kind: 'ref', name: '--all' } })).toThrow();
+    expect(() => gitRequest({ op: 'log', revs: { kind: 'head' }, limit: 201 })).toThrow();
+    expect(() =>
+      gitRequest({ op: 'log', revs: { kind: 'head' }, text: 'x'.repeat(201) }),
+    ).toThrow();
+    expect(() => gitRequest({ op: 'reset', sha: 'a', mode: 'merge', expect: 'b' })).toThrow();
+    expect(() => gitRequest({ op: 'stashDrop', index: -1, oid: 'a' })).toThrow();
+    expect(() => gitRequest({ op: 'deleteRemoteBranch', remote: '-o', branch: 'x' })).toThrow();
+  });
+
+  it('confirms a hard reset, a stash drop and a remote deletion natively', async () => {
+    expect(confirmationFor({ op: 'reset', sha: 'a', mode: 'soft', expect: 'b' })).toBeUndefined();
+    expect(confirmationFor({ op: 'reset', sha: 'a', mode: 'hard', expect: 'b' })).toEqual({
+      kind: 'reset',
+      sha: 'a',
+      mode: 'hard',
+    });
+    expect(confirmationFor({ op: 'stashDrop', index: 1, oid: 'c' })?.kind).toBe('stashDrop');
+    const facts = { branch: 'topic', remote: 'origin', remoteOid: 'e'.repeat(40) };
+    const { call, sent, confirm } = harness({ result: facts });
+    confirm.answerNext(true);
+    await call(['s1', { op: 'deleteRemoteBranch', remote: 'origin', branch: 'topic' }]);
+    expect(confirm.shown()[0]?.message).toBe('Delete topic on origin?');
+    expect(sent.at(-1)?.json.request).toEqual({
+      op: 'deleteRemoteBranch',
+      remote: 'origin',
+      branch: 'topic',
+      expect: 'e'.repeat(40),
+    });
+    const { text } = confirmationText(
+      new Translator('en'),
+      { kind: 'reset', sha: 'f'.repeat(40), mode: 'hard' },
+      { branch: 'main', leaving: 2, pushed: 1, paths: ['a.txt'] },
+    );
+    expect(text.message).toBe('Reset main to ffffffffffff and discard local changes?');
+    expect(text.detail).toContain('2 commits leave the branch (1 already pushed');
+    expect(text.detail).toContain('• a.txt');
+  });
+
+  it('lets an automatic fetch run without a click, and nothing else', async () => {
+    const { call, sent } = harness({ result: {} }, false);
+    await call(['s1', { op: 'fetch', background: true }]);
+    expect(sent.at(-1)?.json.request).toEqual({ op: 'fetch', background: true });
+    for (const request of [
+      { op: 'fetch' },
+      { op: 'stashPush' },
+      { op: 'cherryPick', sha: 'a'.repeat(40) },
+    ]) {
+      await expect(Promise.resolve().then(() => call(['s1', request]))).rejects.toThrow(
+        'no recent input',
+      );
+    }
+    await call(['s1', { op: 'log', revs: { kind: 'all' } }]);
+    expect(sent).toHaveLength(2);
+  });
 });

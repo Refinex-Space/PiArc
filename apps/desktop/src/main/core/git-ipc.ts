@@ -44,7 +44,16 @@ const READ_ONLY = new Set([
   'branches',
   'fileStages',
   'lastCommit',
+  'log',
+  'commitDetail',
+  'stashes',
+  'fileBlob',
 ]);
+
+/** The most characters of a log filter. */
+const MAX_FILTER = 200;
+/** The most commits one log page asks for. */
+const MAX_PAGE = 200;
 
 function isRecord(value: unknown): value is Json {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -146,6 +155,33 @@ function target(value: unknown): Json | undefined {
   };
 }
 
+function count(value: unknown, field: string, max = Number.MAX_SAFE_INTEGER): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > max) {
+    throw new TypeError(`${field} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function optionalCount(value: unknown, field: string, max?: number): number | undefined {
+  return value === undefined || value === null ? undefined : count(value, field, max);
+}
+
+function optionalText(value: unknown, field: string, max: number, control = false) {
+  return value === undefined || value === null ? undefined : text(value, field, max, control);
+}
+
+function source(value: unknown): Json {
+  if (!isRecord(value)) throw new TypeError('source must be an object');
+  const kind = oneOf(value.kind, 'source.kind', ['commit', 'index', 'worktree'] as const);
+  return kind === 'commit' ? { kind, rev: name(value.rev, 'source.rev') } : { kind };
+}
+
+function revs(value: unknown): Json {
+  if (!isRecord(value)) throw new TypeError('revs must be an object');
+  const kind = oneOf(value.kind, 'revs.kind', ['head', 'all', 'ref'] as const);
+  return kind === 'ref' ? { kind, name: name(value.name, 'revs.name') } : { kind };
+}
+
 function compact(fields: Json): Json {
   return Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
 }
@@ -159,7 +195,7 @@ export function gitRequest(raw: unknown): Json {
     case 'status':
     case 'branches':
     case 'lastCommit':
-    case 'fetch':
+    case 'stashes':
     case 'continue':
     case 'abort':
     case 'skip':
@@ -179,13 +215,11 @@ export function gitRequest(raw: unknown): Json {
           raw.oldPath === undefined || raw.oldPath === null ? undefined : filePath(raw.oldPath),
         ignoreWhitespace: flag(raw.ignoreWhitespace, 'ignoreWhitespace'),
       });
-    case 'fileText': {
-      if (!isRecord(raw.source)) throw new TypeError('source must be an object');
-      const kind = oneOf(raw.source.kind, 'source.kind', ['commit', 'index', 'worktree'] as const);
-      const source =
-        kind === 'commit' ? { kind, rev: name(raw.source.rev, 'source.rev') } : { kind };
-      return { op, source, path: filePath(raw.path) };
-    }
+    case 'fileText':
+    case 'fileBlob':
+      return { op, source: source(raw.source), path: filePath(raw.path) };
+    case 'fetch':
+      return compact({ op, background: flag(raw.background, 'background') });
     case 'commits':
       return compact({ op, base: optionalName(raw.base, 'base') });
     case 'fileStages':
@@ -258,6 +292,74 @@ export function gitRequest(raw: unknown): Json {
     case 'push':
       return compact({ op, target: target(raw.target), force: flag(raw.force, 'force') });
     default:
+      return historyRequest(op, raw);
+  }
+}
+
+/** The G3 requests (log, commit operations, stashes, remote branches). */
+function historyRequest(op: string, raw: Json): Json {
+  switch (op) {
+    case 'log':
+      return compact({
+        op,
+        revs: revs(raw.revs),
+        skip: optionalCount(raw.skip, 'skip'),
+        limit: optionalCount(raw.limit, 'limit', MAX_PAGE),
+        text: optionalText(raw.text, 'text', MAX_FILTER),
+        author: optionalText(raw.author, 'author', MAX_FILTER),
+      });
+    case 'commitDetail':
+    case 'cherryPick':
+    case 'revert':
+      return { op, sha: name(raw.sha, 'sha') };
+    case 'createTag':
+      return compact({
+        op,
+        name: name(raw.name, 'name'),
+        sha: name(raw.sha, 'sha'),
+        message: optionalText(raw.message, 'message', MAX_MESSAGE, true),
+      });
+    case 'reset':
+      return {
+        op,
+        sha: name(raw.sha, 'sha'),
+        mode: oneOf(raw.mode, 'mode', ['soft', 'mixed', 'hard', 'keep'] as const),
+        expect: name(raw.expect, 'expect'),
+      };
+    case 'undoCommit':
+      return { op, expect: name(raw.expect, 'expect') };
+    case 'stashPush':
+      return compact({
+        op,
+        message: optionalText(raw.message, 'message', MAX_NAME * 4),
+        includeUntracked: flag(raw.includeUntracked, 'includeUntracked'),
+      });
+    case 'stashApply':
+      return compact({
+        op,
+        index: count(raw.index, 'index'),
+        oid: name(raw.oid, 'oid'),
+        pop: flag(raw.pop, 'pop'),
+      });
+    case 'stashDrop':
+      return { op, index: count(raw.index, 'index'), oid: name(raw.oid, 'oid') };
+    case 'stashBranch':
+      return {
+        op,
+        index: count(raw.index, 'index'),
+        oid: name(raw.oid, 'oid'),
+        name: name(raw.name, 'name'),
+      };
+    case 'deleteRemoteBranch':
+      return { op, remote: name(raw.remote, 'remote'), branch: name(raw.branch, 'branch') };
+    case 'restoreRemoteBranch':
+      return {
+        op,
+        remote: name(raw.remote, 'remote'),
+        branch: name(raw.branch, 'branch'),
+        oid: name(raw.oid, 'oid'),
+      };
+    default:
       throw new TypeError(`unknown Git operation ${op}`);
   }
 }
@@ -279,6 +381,14 @@ export function confirmationFor(request: Json): Json | undefined {
         : undefined;
     case 'deleteBranch':
       return request.force === true ? { kind: 'deleteBranch', name: request.name } : undefined;
+    case 'reset':
+      return request.mode === 'hard'
+        ? { kind: 'reset', sha: request.sha, mode: 'hard' }
+        : undefined;
+    case 'stashDrop':
+      return { kind: 'stashDrop', index: request.index, oid: request.oid };
+    case 'deleteRemoteBranch':
+      return { kind: 'deleteRemoteBranch', remote: request.remote, branch: request.branch };
     default:
       return undefined;
   }
@@ -346,6 +456,40 @@ export function confirmationText(
         },
         button: message('git.confirm.deleteBranchButton'),
       };
+    case 'reset':
+      return {
+        text: {
+          message: message('git.confirm.resetHard', { branch, target: short(action.sha) }),
+          detail: `${message('git.confirm.resetHardDetail', {
+            leaving: typeof described.leaving === 'number' ? described.leaving : 0,
+            pushed: typeof described.pushed === 'number' ? described.pushed : 0,
+          })}${files.length > 0 ? `\n\n${listed(t, files)}` : ''}`,
+        },
+        button: message('git.confirm.resetHardButton'),
+      };
+    case 'stashDrop':
+      return {
+        text: {
+          message: message('git.confirm.stashDrop', {
+            message: reveal(typeof described.message === 'string' ? described.message : ''),
+          }),
+          detail: message('git.confirm.stashDropDetail', { oid: short(described.localOid) }),
+        },
+        button: message('git.confirm.stashDropButton'),
+      };
+    case 'deleteRemoteBranch':
+      return {
+        text: {
+          message: message('git.confirm.deleteRemoteBranch', {
+            branch,
+            remote: reveal(typeof described.remote === 'string' ? described.remote : ''),
+          }),
+          detail: message('git.confirm.deleteRemoteBranchDetail', {
+            oid: short(described.remoteOid),
+          }),
+        },
+        button: message('git.confirm.deleteRemoteBranchButton'),
+      };
     default:
       return {
         text: {
@@ -385,7 +529,11 @@ export function registerGitHandlers(
     const request = gitRequest(raw);
     const op =
       typeof opId === 'string' && opId.length <= MAX_OP_ID && !hasControl(opId) ? opId : undefined;
-    if (!READ_ONLY.has(String(request.op))) input.requireInput(event.sender, session, 'changes');
+    // An automatic fetch (H5) runs without a click; everything else that writes needs one.
+    const background = request.op === 'fetch' && request.background === true;
+    if (!READ_ONLY.has(String(request.op)) && !background) {
+      input.requireInput(event.sender, session, 'changes');
+    }
     if (request.op === 'commitMessage') request.language = locale() === 'zh-CN' ? 'zh-CN' : 'en';
     const action = confirmationFor(request);
     if (action !== undefined) {
@@ -399,7 +547,10 @@ export function registerGitHandlers(
       const { text: shown, button } = confirmationText(t, action, facts);
       const window = BrowserWindow.fromWebContents(event.sender);
       if (!(await confirm.ask(window, shown, [button, t.t('dialog.cancel')]))) return CANCELLED;
-      if (request.op === 'push' && typeof facts.remoteOid === 'string') {
+      if (
+        (request.op === 'push' || request.op === 'deleteRemoteBranch') &&
+        typeof facts.remoteOid === 'string'
+      ) {
         request.expect = facts.remoteOid;
       }
     }

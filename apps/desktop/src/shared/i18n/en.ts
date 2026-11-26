@@ -2036,6 +2036,17 @@ export const en = {
   'git.confirm.alwaysForcePushDetail':
     'Every push from the Git panel will use --force-with-lease and can replace commits on the remote branch. Protected branches are never force-pushed.',
   'git.confirm.alwaysForcePushButton': 'Turn On',
+  'git.confirm.resetHard': 'Reset {branch} to {target} and discard local changes?',
+  'git.confirm.resetHardDetail':
+    '{leaving, plural, =0 {No commits leave the branch.} one {# commit leaves the branch} other {# commits leave the branch}}{pushed, plural, =0 {} other { (# already pushed: you will need to force push)}}. Uncommitted changes are lost.',
+  'git.confirm.resetHardButton': 'Reset',
+  'git.confirm.stashDrop': 'Delete the stash “{message}”?',
+  'git.confirm.stashDropDetail': 'Its changes ({oid}) cannot be brought back from PiArc.',
+  'git.confirm.stashDropButton': 'Delete Stash',
+  'git.confirm.deleteRemoteBranch': 'Delete {branch} on {remote}?',
+  'git.confirm.deleteRemoteBranchDetail':
+    'It points at {oid}. Everyone using the remote loses the branch; you can push it back from the notice right after.',
+  'git.confirm.deleteRemoteBranchButton': 'Delete on Remote',
   'settings.git': 'Git',
   'usage.purpose.commitMessage': 'Commit messages',
   'diagnostics.reason.projectGit': 'Git settings apply from your user settings only',

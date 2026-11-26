@@ -1966,6 +1966,17 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'git.confirm.alwaysForcePushDetail':
     '从 Git 面板发起的每次推送都会使用 --force-with-lease，可能替换远端分支上的提交。受保护的分支不会被强制推送。',
   'git.confirm.alwaysForcePushButton': '开启',
+  'git.confirm.resetHard': '将 {branch} 重置到 {target} 并丢弃本地改动？',
+  'git.confirm.resetHardDetail':
+    '{leaving, plural, =0 {没有提交离开分支。} other {# 个提交将离开分支}}{pushed, plural, =0 {} other {（其中 # 个已推送，之后需要强制推送）}}。未提交的改动将丢失。',
+  'git.confirm.resetHardButton': '重置',
+  'git.confirm.stashDrop': '删除储藏“{message}”？',
+  'git.confirm.stashDropDetail': '其中的改动（{oid}）无法在 PiArc 中找回。',
+  'git.confirm.stashDropButton': '删除储藏',
+  'git.confirm.deleteRemoteBranch': '删除 {remote} 上的 {branch}？',
+  'git.confirm.deleteRemoteBranchDetail':
+    '它指向 {oid}。所有使用这个远端的人都会失去该分支；删除后可以从提示条里推送回去。',
+  'git.confirm.deleteRemoteBranchButton': '在远端删除',
   'settings.git': 'Git',
   'usage.purpose.commitMessage': '提交信息',
   'diagnostics.reason.projectGit': 'Git 设置只在用户级设置中生效',

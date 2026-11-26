@@ -23,9 +23,17 @@ fn commit_file(repo: &Path, name: &str, text: &str, message: &str) -> String {
     git(repo, &["rev-parse", "HEAD"])
 }
 
-#[tokio::test]
-async fn pages_carry_parents_references_and_filters() {
-    let root = temp_dir("history-log");
+/// main: initial → fix → merge of feature/x (one commit), tagged v1.0.
+struct Branched {
+    home: std::path::PathBuf,
+    repo: std::path::PathBuf,
+    base: String,
+    side: String,
+    merge: String,
+}
+
+fn branched(name: &str) -> Branched {
+    let root = temp_dir(name);
     let home = home(&root);
     let repo = repository(&root, "repo 仓库");
     let base = git(&repo, &["rev-parse", "HEAD"]);
@@ -47,6 +55,24 @@ async fn pages_carry_parents_references_and_filters() {
     git(&repo, &["tag", "v1.0"]);
     let merge = git(&repo, &["rev-parse", "HEAD"]);
 
+    Branched {
+        home,
+        repo,
+        base,
+        side,
+        merge,
+    }
+}
+
+#[tokio::test]
+async fn pages_carry_parents_and_references() {
+    let Branched {
+        home,
+        repo,
+        base,
+        merge,
+        ..
+    } = branched("history-log");
     let reader = reader(&home, &repo).await;
     let page = history::log(&reader, &GitLogRevs::Head, 0, 200, None, None)
         .await
@@ -89,7 +115,18 @@ async fn pages_carry_parents_references_and_filters() {
         .collect();
     let all: Vec<&str> = page.commits.iter().map(|c| c.sha.as_str()).collect();
     assert_eq!(ids, all);
+}
 
+#[tokio::test]
+async fn filters_branches_and_details() {
+    let Branched {
+        home,
+        repo,
+        base,
+        side,
+        ..
+    } = branched("history-filter");
+    let reader = reader(&home, &repo).await;
     // Message text in any case, and an id prefix.
     let found = history::log(&reader, &GitLogRevs::Head, 0, 200, Some("侧边"), None)
         .await
@@ -132,7 +169,7 @@ async fn pages_carry_parents_references_and_filters() {
     assert_eq!(detail.message, "feat: 侧边分支");
     assert!(detail.in_head);
     assert!(!detail.pushed);
-    assert_eq!(detail.parents, [base.clone()]);
+    assert_eq!(detail.parents, std::slice::from_ref(&base));
     assert!(
         history::commit_detail(&reader, &"f".repeat(40))
             .await

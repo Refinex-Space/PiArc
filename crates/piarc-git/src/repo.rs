@@ -174,6 +174,31 @@ impl Reader {
             .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned()))
     }
 
+    /// The commit `rev` names (built by the caller, never from the page unchecked); `None`
+    /// when it names none.
+    ///
+    /// # Errors
+    ///
+    /// The runner's errors.
+    pub async fn resolve(&self, rev: &str) -> Result<Option<String>, GitError> {
+        let object = format!("{rev}^{{commit}}");
+        let out = self
+            .run(
+                &[
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    "--end-of-options",
+                    &object,
+                ],
+                ExecOptions::default(),
+            )
+            .await?;
+        Ok(out
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned()))
+    }
+
     /// Which of `paths` `HEAD` has.
     ///
     /// # Errors

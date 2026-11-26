@@ -15,6 +15,7 @@ use piarc_protocol::git::{GitFailure, GitFailureKind, GitPullMode};
 use serde::Serialize;
 use serde_json::{Value, json};
 
+mod history;
 mod message;
 pub(crate) mod restore;
 pub(crate) mod write;

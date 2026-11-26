@@ -38,13 +38,13 @@ pub(crate) struct Context<'a> {
 type Seen = (Option<Instant>, String, Option<u64>);
 
 /// An operation's answer before it becomes a reply.
-type Answer = std::result::Result<GitOpResult, GitFailure>;
+pub(super) type Answer = std::result::Result<GitOpResult, GitFailure>;
 
-fn fail(kind: GitFailureKind, message: impl Into<String>) -> Answer {
+pub(super) fn fail(kind: GitFailureKind, message: impl Into<String>) -> Answer {
     Err(GitFailure::new(kind, clean(&message.into())))
 }
 
-fn bad(error: &args::ArgError) -> GitFailure {
+pub(super) fn bad(error: &args::ArgError) -> GitFailure {
     GitFailure::new(GitFailureKind::Invalid, error.to_string())
 }
 
@@ -87,8 +87,30 @@ impl Context<'_> {
             }
         }
         let lock = self.hub.git_state().lock_for(&self.reader.repo.common_dir);
-        let _held = lock.lock().await;
-        let writer = Writer::new(self.user.clone(), self.reader.repo.clone());
+        // An automatic fetch (H5) never waits for another operation and never prompts.
+        let background = matches!(
+            request,
+            GitRequest::Fetch {
+                background: Some(true)
+            }
+        );
+        let _held = if background {
+            let Ok(held) = lock.try_lock() else {
+                return reply(&GitOpResult {
+                    skipped: Some(true),
+                    ..GitOpResult::default()
+                });
+            };
+            held
+        } else {
+            lock.lock().await
+        };
+        let user = if background {
+            self.user.clone().with_env("GCM_INTERACTIVE", "never")
+        } else {
+            self.user.clone()
+        };
+        let writer = Writer::new(user, self.reader.repo.clone());
         let answer = match self.perform(&writer, request).await {
             Ok(answer) => answer,
             Err(error) => Err(failure_of(&error)),
@@ -173,7 +195,7 @@ impl Context<'_> {
                 branches::set_upstream(writer, &branch, upstream.as_deref()).await?;
                 Ok(Ok(GitOpResult::default()))
             }
-            GitRequest::Fetch => {
+            GitRequest::Fetch { .. } => {
                 let outcome = remote::fetch(writer, self.progress(), self.cancel.clone()).await?;
                 Ok(remote_answer(outcome, "git fetch --all --prune"))
             }
@@ -201,7 +223,7 @@ impl Context<'_> {
             GitRequest::Continue => self.sequence(writer, Sequencer::Continue).await,
             GitRequest::Abort => self.sequence(writer, Sequencer::Abort).await,
             GitRequest::Skip => self.sequence(writer, Sequencer::Skip).await,
-            _ => Ok(Err(GitFailure::of(GitFailureKind::Invalid))),
+            other => self.history(writer, other).await,
         }
     }
 
@@ -566,6 +588,11 @@ impl Context<'_> {
                 description.paths = self.reader.changed_tracked().await?;
                 description.branch = Some(target);
             }
+            GitDescribe::Reset { .. }
+            | GitDescribe::StashDrop { .. }
+            | GitDescribe::DeleteRemoteBranch { .. } => {
+                return self.describe_history(action).await;
+            }
             GitDescribe::ForcePush { target } => match self.push_spec(target).await? {
                 Err(failure) => description.refused = Some(failure),
                 Ok((local, spec)) => {
@@ -585,7 +612,7 @@ impl Context<'_> {
     }
 
     /// Progress events of this operation on `core/git`, at most ten a second.
-    fn progress(&self) -> Option<Progress> {
+    pub(super) fn progress(&self) -> Option<Progress> {
         let op_id = self.op_id.clone()?;
         let hub = self.hub.clone();
         let session = self.session.to_owned();
@@ -613,7 +640,7 @@ impl Context<'_> {
         }))
     }
 
-    async fn audit(&self, action: &str, detail: Value) {
+    pub(super) async fn audit(&self, action: &str, detail: Value) {
         let mut detail = detail;
         if let Some(object) = detail.as_object_mut() {
             object.insert("action".into(), Value::String(action.to_owned()));
@@ -629,7 +656,7 @@ impl Context<'_> {
 }
 
 /// A remote outcome as an answer; `command` is offered after a credential failure.
-fn remote_answer(outcome: RemoteOutcome, command: &str) -> Answer {
+pub(super) fn remote_answer(outcome: RemoteOutcome, command: &str) -> Answer {
     match outcome {
         RemoteOutcome::Done(_) => Ok(GitOpResult::default()),
         RemoteOutcome::Conflict(paths) => Ok(GitOpResult {
@@ -695,7 +722,7 @@ fn rewrites_files(request: &GitRequest) -> bool {
                 start: Some(_),
                 ..
             }
-    )
+    ) || super::history::rewrites_files(request)
 }
 
 /// A push's target and expected remote object.
@@ -800,8 +827,9 @@ fn check(request: &GitRequest) -> std::result::Result<(), GitFailure> {
             GitDescribe::ForcePush { target } => {
                 target.as_ref().map_or(Ok(()), |t| branch(&t.branch))
             }
+            other => super::history::check_describe(other),
         },
-        _ => Ok(()),
+        other => super::history::check(other),
     }
 }
 
