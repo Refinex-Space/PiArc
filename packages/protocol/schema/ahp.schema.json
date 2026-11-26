@@ -4822,7 +4822,7 @@
         {
           "description": "Progress git reported.",
           "properties": {
-            "op_id": {
+            "opId": {
               "description": "The operation ([`GitCall::op_id`]).",
               "type": "string"
             },
@@ -4836,7 +4836,7 @@
               "description": "What git is doing (`Receiving objects`).",
               "type": "string"
             },
-            "session_id": {
+            "sessionId": {
               "description": "The session.",
               "type": "string"
             },
@@ -4845,7 +4845,7 @@
               "type": "string"
             }
           },
-          "required": ["type", "session_id", "op_id", "phase"],
+          "required": ["type", "sessionId", "opId", "phase"],
           "type": "object"
         },
         {
@@ -5652,7 +5652,7 @@
         {
           "description": "The files and diffs of a scope ([`GitChanges`]).",
           "properties": {
-            "ignore_whitespace": {
+            "ignoreWhitespace": {
               "description": "Ignore whitespace (`-w`).",
               "type": ["boolean", "null"]
             },
@@ -5671,11 +5671,11 @@
         {
           "description": "One file's diff in a scope, when [`GitChanges::withheld`] left it out ([`GitFileChange`]).",
           "properties": {
-            "ignore_whitespace": {
+            "ignoreWhitespace": {
               "description": "Ignore whitespace.",
               "type": ["boolean", "null"]
             },
-            "old_path": {
+            "oldPath": {
               "description": "Its previous path, for a rename.",
               "type": ["string", "null"]
             },
@@ -5861,12 +5861,12 @@
               "const": "undoRollback",
               "type": "string"
             },
-            "restore_id": {
+            "restoreId": {
               "description": "The rollback.",
               "type": "string"
             }
           },
-          "required": ["op", "restore_id"],
+          "required": ["op", "restoreId"],
           "type": "object"
         },
         {

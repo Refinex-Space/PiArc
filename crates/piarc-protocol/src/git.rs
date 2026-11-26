@@ -27,7 +27,7 @@ pub struct GitCall {
 /// A range of changes the panel shows (ADR-0084 rule 1). The session scope is not a Git
 /// range: the client reads it from `sessionChanges`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum GitScope {
     /// From the merge base of `base` and `HEAD` to the working tree, untracked files included.
     Branch {
@@ -46,7 +46,7 @@ pub enum GitScope {
 
 /// Which content of a file to read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum GitTextSource {
     /// The file in a commit (a full id, or `HEAD`).
     Commit {
@@ -138,7 +138,7 @@ pub enum GitLanguage {
 
 /// What a native confirmation describes before a destructive operation (ADR-0085 rule 6).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum GitDescribe {
     /// Rolling back files to `HEAD`.
     Rollback {
@@ -170,7 +170,7 @@ pub enum GitDescribe {
 
 /// A request of `gitRequest`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "op", rename_all = "camelCase")]
+#[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum GitRequest {
     /// The repository's fingerprint: cheap, polled while the panel is visible.
     Probe,
@@ -390,7 +390,7 @@ pub enum GitFileStatus {
 
 /// What the repository is in the middle of.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum GitRepoState {
     /// Nothing.
     Clean,
@@ -919,7 +919,7 @@ impl GitFailure {
 
 /// A `core/git` event of a long operation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum GitEvent {
     /// Progress git reported.
     Progress {
@@ -938,4 +938,58 @@ pub enum GitEvent {
         /// The repository's top level.
         root: String,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn request_fields_are_camel_case_on_the_wire() {
+        let request: GitRequest = serde_json::from_value(json!({
+            "op": "undoRollback",
+            "restoreId": "r-1",
+        }))
+        .expect("undoRollback");
+        assert_eq!(request, GitRequest::UndoRollback { restore_id: "r-1".into() });
+        let request: GitRequest = serde_json::from_value(json!({
+            "op": "fileDiff",
+            "scope": { "kind": "uncommitted" },
+            "path": "b.txt",
+            "oldPath": "a.txt",
+            "ignoreWhitespace": true,
+        }))
+        .expect("fileDiff");
+        assert_eq!(
+            request,
+            GitRequest::FileDiff {
+                scope: GitScope::Uncommitted,
+                path: "b.txt".into(),
+                old_path: Some("a.txt".into()),
+                ignore_whitespace: Some(true),
+            }
+        );
+    }
+
+    #[test]
+    fn progress_events_are_camel_case_on_the_wire() {
+        let event = GitEvent::Progress {
+            session_id: "s".into(),
+            op_id: "op".into(),
+            phase: "Receiving objects".into(),
+            percent: Some(40),
+        };
+        assert_eq!(
+            serde_json::to_value(&event).expect("event"),
+            json!({
+                "type": "progress",
+                "sessionId": "s",
+                "opId": "op",
+                "phase": "Receiving objects",
+                "percent": 40,
+            })
+        );
+    }
 }

@@ -1266,7 +1266,7 @@ export type GitRequest =
       /**
        * Ignore whitespace (`-w`).
        */
-      ignore_whitespace?: boolean | null;
+      ignoreWhitespace?: boolean | null;
       op: 'changes';
       /**
        * The range.
@@ -1277,11 +1277,11 @@ export type GitRequest =
       /**
        * Ignore whitespace.
        */
-      ignore_whitespace?: boolean | null;
+      ignoreWhitespace?: boolean | null;
       /**
        * Its previous path, for a rename.
        */
-      old_path?: string | null;
+      oldPath?: string | null;
       op: 'fileDiff';
       /**
        * The file.
@@ -1367,7 +1367,7 @@ export type GitRequest =
       /**
        * The rollback.
        */
-      restore_id: string;
+      restoreId: string;
     }
   | {
       /**
@@ -1710,7 +1710,7 @@ export type GitEvent =
       /**
        * The operation ([`GitCall::op_id`]).
        */
-      op_id: string;
+      opId: string;
       /**
        * Percent done, when git reports it.
        */
@@ -1722,7 +1722,7 @@ export type GitEvent =
       /**
        * The session.
        */
-      session_id: string;
+      sessionId: string;
       type: 'progress';
     }
   | {
