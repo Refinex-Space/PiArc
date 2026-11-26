@@ -347,7 +347,18 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 10. 提交信息生成：Core 组装、AHP、Agent Host harness 与提示词、用量（`cargo test -p piarc-testkit --test sessions git::` 2 项；原创性检查 0 命中）。
 - [x] 11. 渲染进程 G2：提交视图、生成、同步栏、分支弹窗与对话框、状态条、原生确认。
 - [x] 12. L4（`git-panel.e2e.ts` 4 项通过）、a11y 登记与 T43 旅程、i18n、THR-15 映射；未覆盖的 L4 流程见设计增补第 8 节。
-- [ ] 13. 文档同步、全量 verify、对照设计增补复核。
+- [x] 13. 文档同步、对照设计增补复核（第 8.1 节）、全量 verify：`da5fc7d8` 上 16/17（cargo clippy 的 `too_many_lines` 由 rustfmt 2024 格式化引起，`a1ff9204` 修复后 `cargo clippy --workspace --all-targets -- -D warnings` 通过）。之前就有的失败（FileViewer 类型、WorkspaceSearch 的硬编码文字、焦点测试）已修，焦点改为轻样式（`b50a5a88`，用户决定）。
+
+### Git 面板 G3–G5（计划外，ADR-0085、0087，设计增补第 9 节）
+
+- [x] 14. 设计增补第 9 节、ADR-0087、索引与 PLAN。
+- [ ] 15. G3 的 piarc-git、协议、Core、主进程。
+- [ ] 16. G3 的渲染进程：日志视图、提交图、详情与操作、stash、远程分支删除、自动获取、图片 diff、设置。
+- [ ] 17. G4 的 piarc-git、协议、Core、主进程。
+- [ ] 18. G4 的渲染进程：合并与变基入口、冲突对话框、三方合并视图、交互式变基、状态条补齐。
+- [ ] 19. G5：`gh`、ADR-0087 的 AHP 与 Agent Host、Core、主进程。
+- [ ] 20. G5 的渲染进程：PR 条与对话框、审查两种呈现、设置。
+- [ ] 21. 文档同步、a11y 与 i18n、全量 verify。
 
 ## 登记事项
 

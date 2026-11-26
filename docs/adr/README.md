@@ -101,4 +101,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0084](0084-git-panel-scopes.md) | Git 面板的数据来源与范围：全部改动 / 未提交 / 单个提交 / 本会话，回滚只在未提交范围（取代 0044 第 8 条） | 已接受 |
 | [0085](0085-git-command-boundaries.md) | Git 命令的执行边界：只读模式命令行覆盖可执行键、写操作只在受信任项目、用户模式环境、参数约束、串行与忙碌、危险操作原生确认、回滚快照、输出脱敏、gh 约束 | 已接受（补充） |
 | [0086](0086-commit-message-generation.md) | 提交信息生成：会话级 `session/commitMessage`、Core 组装与扣下敏感文件、语言跟随界面、只填入输入框 | 已接受（补充） |
+| [0087](0087-pr-description-and-review.md) | PR 描述与 AI 审查的生成：会话级 `session/gitAssist`（任务 `prDescription`、`review`）、扣下与脱敏同 0086、审查发现由 Core 校验、只呈现不执行 | 已接受（补充） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |

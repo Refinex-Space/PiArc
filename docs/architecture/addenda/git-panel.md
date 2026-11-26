@@ -1,8 +1,8 @@
 # Git 面板（G1–G5）设计增补
 
 - 日期：2026-11-25
-- 状态：G1、G2 实施中；G3–G5 待排期
-- 决策：[ADR-0084](../../adr/0084-git-panel-scopes.md)（数据来源与范围，取代 ADR-0044 第 8 条）、[ADR-0085](../../adr/0085-git-command-boundaries.md)（Git 命令的执行边界）、[ADR-0086](../../adr/0086-commit-message-generation.md)（提交信息生成）
+- 状态：G1、G2 已交付；G3–G5 实施中（第 9 节）
+- 决策：[ADR-0084](../../adr/0084-git-panel-scopes.md)（数据来源与范围，取代 ADR-0044 第 8 条）、[ADR-0085](../../adr/0085-git-command-boundaries.md)（Git 命令的执行边界）、[ADR-0086](../../adr/0086-commit-message-generation.md)（提交信息生成）、[ADR-0087](../../adr/0087-pr-description-and-review.md)（PR 描述与 AI 审查）
 - 参考：Claude Desktop `next-4.16336.0`（ADR-0073，只研读行为与视觉）；Rebased / IntelliJ git4idea（只参考功能与 git 命令行，不移植代码、不照抄文案）
 
 ## 1. 背景与目标
@@ -23,9 +23,9 @@
 |---|---|---|
 | G1 | 改动视图对齐（四种范围、标题行、文件列、跳转到文件、diff 显示设置、提交区、大 diff、各状态）、Git 工具改名与图标、右栏卡片、Git 设置页（分支、推送与拉取、提交三节） | 本次 |
 | G2 | 提交视图（勾选即暂存、按 hunk 暂存与回滚、提交 / 修正 / 提交并推送、AI 生成提交信息）、分支弹窗（检出、新建、重命名、删除与恢复、跟踪、智能检出）、同步（获取、拉取、推送、被拒处理、安全强推、受保护分支）、仓库进行中状态条（冲突列表、标记已解决、继续、中止） | 本次 |
-| G3 | 日志（提交图、筛选、提交详情、cherry-pick、revert、reset、从提交新建分支或标签）、stash 管理、删除远程分支、自动获取、图片 diff | 待排期 |
-| G4 | 冲突解决（冲突对话框：用我的 / 用他们的 / 合并；三方合并视图）、合并与变基操作、交互式变基 | 待排期 |
-| G5 | GitHub PR（经用户的 `gh`：创建、草稿、状态与检查、合并方法）、AI 审查（结果内联或单独）、PR 指令；对应的设置项 | 待排期 |
+| G3 | 日志（提交图、筛选、提交详情、cherry-pick、revert、reset、从提交新建分支或标签）、stash 管理、删除远程分支、自动获取、图片 diff | 实施中（第 9.1 节） |
+| G4 | 冲突解决（冲突对话框：用我的 / 用他们的 / 合并；三方合并视图）、合并与变基操作、交互式变基 | 实施中（第 9.2 节） |
+| G5 | GitHub PR（经用户的 `gh`：创建、草稿、状态与检查、合并方法）、AI 审查（结果内联或单独）、PR 指令；对应的设置项（`gh pr ready` 不在 ADR-0085 第 9 条的白名单内，不做“标记为可审查”） | 实施中（第 9.3 节） |
 | W | Windows 实机对齐（GCM、Git Bash、`\\?\` 路径、CRLF） | 待排期 |
 
 ### 2.2 本次不做
@@ -393,6 +393,101 @@ GitPanel ─ window.piarc.git ─▶ 校验 · 近期输入 · 原生确认 ─�
 | A6.5 | 只读查询超过 20 s 时返回超时，不返回已取得的部分 |
 | A1.5 | 找不到 Git 时没有安装链接 |
 | 第 5.1 节的威胁测试 | `thr02_git_writes_wait_for_trust`、`thr11_git_rejects_option_like_args`、`thr04_git_output_strips_url_userinfo` 未按这些名字建立，`credential_leaks` 未扩展；THR-15 已映射，参数注入只有 `args.rs` 的单元测试 |
+
+## 9. G3–G5（2026-11-26 定稿）
+
+用户要求在 G1、G2 之后继续推进 G3–G5。本节沿用第 4 节的分层与 ADR-0085 的边界：读取经 `Reader`，写入经 `Writer` 且要求项目受信任、取仓库写锁、会改动工作区的操作要求同一文件根下没有运行中的会话；丢失工作或对外不可撤回的操作由主进程原生确认，确认框的事实取自 Core 的 `describe`。`gh` 遵守 ADR-0085 第 9 条（子命令白名单 `pr view/create/list/merge/checks`、`repo view`）。PR 描述与 AI 审查的生成见 [ADR-0087](../../adr/0087-pr-description-and-review.md)。
+
+### 9.1 G3：日志、提交操作、stash、远程分支、自动获取、图片 diff
+
+**H1 日志视图**（视图切换增加第三项"日志" `#git-view-log`）
+- H1.1 布局：左列是筛选栏与提交表，右列是选中提交的详情；分块宽度 < 560 时只显示提交表，选中后换成详情并有"返回"。筛选栏：文字（提交信息、作者、哈希前缀）、范围（当前分支 `HEAD` / 全部分支 / 某个分支）、"提交 / stash"切换。
+- H1.2 提交表每行：提交图、标题、引用标签（`HEAD`、本地分支、远程分支、标签，颜色区分）、作者、相对时间。按 `--topo-order` 每页 200 条，滚到底加载下一页；筛选非空时不画图（只列结果）。数据：只读请求 `log { revs, skip, limit, text?, author? }`，git `log -z --topo-order --format=%H%x1f%P%x1f%an%x1f%ae%x1f%ct%x1f%s%x1f%D`，`--all` 时为 `--branches --remotes --tags HEAD`；文字筛选用 `--grep --regexp-ignore-case --fixed-strings` 与 `--author`，形如哈希前缀（≥ 4 位十六进制）时另加一次精确查询合并结果。
+- H1.3 提交图在渲染进程由父提交计算（`graph.ts`：按拓扑序分配泳道、合并与分叉的连线），每行一个 SVG；泳道颜色循环取 8 个语义令牌。纯函数单测覆盖线性、分叉、合并、章鱼合并、并行分支与分页衔接。
+- H1.4 键盘：表格是 roving tabindex，↑/↓ 移动，Enter 打开详情，Shift+F10 或上下文菜单键打开行菜单，Mod+C 复制哈希。
+- H1.5 详情：完整提交信息、作者与提交者及时间、父提交（可点击跳转）、引用标签、改动文件列表与选中文件的 diff（复用改动视图的"单个提交"范围与 `GitDiff`）。数据：只读请求 `commitDetail { sha }`，另返回 `inHead`（是否是 `HEAD` 的祖先）与 `pushed`（是否是当前分支上游的祖先）。
+
+**H2 提交的操作**（行菜单与详情里的"…"）
+- H2.1 复制哈希；在改动视图中查看（切到"单个提交"范围）；检出此修订（分离 `HEAD`，应用内确认）；从此新建分支…（沿用 B5.4）；新建标签…（名称经 `check-ref-format`，可选附注信息，`git tag [-a -m] <名称> <提交>`）。
+- H2.2 拣选（`cherry-pick <提交>`）与还原（`revert --no-edit <提交>`）：合并提交、已在 `HEAD` 里的提交（拣选）不可用并写明原因；冲突时进入 B6 的状态与 M3 的冲突对话框。会改动工作区，要求没有运行中的会话（B7.1）。
+- H2.3 将当前分支重置到此…：对话框选 soft / mixed / hard / keep，写明会离开分支的提交数、其中已推送的数量；hard 经主进程原生确认（列出会被丢弃的改动文件数与前 10 个路径），执行前核对 `HEAD` 仍是对话框读取时的提交（否则 `stale`）。审计 `reset`（模式、旧新 oid）。
+- H2.4 撤销提交（只在 `HEAD` 提交上）：`reset --soft HEAD~1`，改动回到已暂存；提交已推送时对话框提示"撤销后需要强制推送"。空仓库的首个提交不可用。
+
+**H3 stash**
+- H3.1 提交视图同步栏的"…"菜单有"储藏改动…"：信息（可空）、"包括未跟踪文件"（默认关），执行 `stash push [-u] -m`；没有改动时不可用。
+- H3.2 日志视图切到"stash"列出 `stash list`：信息、所在分支、时间。详情显示 stash 的改动（`commit` 范围取 stash 提交对第一父提交，未跟踪部分不显示并写明），操作：应用、弹出、从此新建分支…、删除。请求带 stash 序号与 oid，Core 核对 `stash@{n}` 仍是该 oid（否则 `stale`）。
+- H3.3 删除 stash 经主进程原生确认（信息与 oid）；应用 / 弹出遇冲突时 git 保留 stash，界面提示并进入冲突状态。
+
+**H4 删除远程分支**：分支弹窗的远程分支子菜单"在远端删除"。受保护分支在确认前由 Core 拒绝；主进程原生确认（远端、分支、oid）后 `push --porcelain <远端> --delete refs/heads/<分支>`；审计 `deleteRemoteBranch`；toast 提供"恢复"（`push <远端> <oid>:refs/heads/<分支>`，不带强推，远端已有同名分支时失败）。
+
+**H5 自动获取**：设置 `git.autoFetch`（关闭 / 5 / 15 / 30 / 60 分钟，默认关闭）。开启后在 Git 工具或右栏卡片可见且窗口在前台时，距上次获取超过间隔就发 `fetch { background: true }`：主进程对它不要求近期真实输入；Core 以非交互方式运行（`GIT_TERMINAL_PROMPT=0`、`GCM_INTERACTIVE=never`），仓库写锁被占时跳过；失败不弹提示，只在同步栏的获取按钮提示里写明最近一次失败。
+
+**H6 图片 diff**：二进制文件扩展名为 png、jpg、jpeg、gif、webp、bmp、ico、svg 时，diff 区显示"之前 / 之后"两张图（尺寸与字节数，棋盘格底）。数据：只读请求 `fileBlob { source, path }`，上限 8 MiB，以 `data:` URL 显示（CSP 已允许，SVG 在 `<img>` 中不执行脚本）。
+
+### 9.2 G4：合并、变基、冲突解决、交互式变基
+
+**M1 合并**：分支弹窗的分支子菜单"合并到当前分支…"，对话框选"能快进则快进 / 总是创建合并提交（`--no-ff`）/ 压缩（`--squash`，只暂存不提交）"，执行 `merge --no-edit`。
+
+**M2 变基**：分支子菜单"将当前分支变基到此分支"，执行 `rebase <分支>`（编辑器不打开）。当前分支有已推送的提交时应用内确认"变基后需要强制推送"。
+
+**M3 冲突对话框** `#git-conflicts`：从状态条的"解决…"打开，操作因冲突停下时自动打开。每行：文件、你的一侧与对方一侧的改动（修改 / 删除 / 新增）、操作"用我的"、"用他们的"、"合并…"；可多选批量采用。"我的 / 他们的"的标签写明分支或提交：合并与拣选时"我的"是当前分支（git 的 ours）；变基时"我的"是正在应用的提交（git 的 theirs），由 Core 换算，界面不判断。
+- M3.1 采用一侧：Core 的 `resolveConflict { path, take }`：取该侧内容写入工作区并 `add`；该侧是删除时 `rm`。
+- M3.2 状态条补齐第 8.1 节未满足的 B6.1–B6.3：没有进行中操作但有未合并路径时显示"有未解决的冲突"；中止前应用内确认；"标记为已解决"在文件仍含冲突标记时应用内确认。
+
+**M4 三方合并视图**（`#git-merge-view`，在 Git 工具内全宽显示，Esc 或"关闭"回到上一视图）
+- M4.1 三栏：我的（只读）、结果（中间）、他们的（只读），每栏标题写明来源。数据：只读请求 `conflictSides { path }`，返回 base、我的、他们的三段文本（index 的 stage 1/2/3，经换算）、工作区当前文本与其 SHA-256；二进制或任一侧超过 5 MiB 时只能用 M3.1。
+- M4.2 渲染进程用 base 计算三方合并（`merge3.ts`，纯函数并有单测）：只有一侧改动的块自动采用，两侧都改且不同的块是冲突；顶栏有"上一个 / 下一个冲突"（F7 / Shift+F7）与剩余冲突数，"采用全部无冲突改动"。
+- M4.3 每个冲突块：采用我的、采用他们的、两者都要（我的在前 / 他们的在前）、忽略此侧；结果栏可切换为手工编辑整个文本。
+- M4.4 "应用"：结果仍含冲突块或冲突标记时应用内确认；Core 的 `saveResolution { path, content, expect }` 在写锁内核对工作区 SHA-256 仍为 `expect`（否则 `stale`），以原子替换写入并 `add`，经 `forget_paths` 让会话重新读取。
+
+**M5 交互式变基**（日志视图的行菜单"从此处交互式变基…"，只对当前分支第一父链上的提交，范围内有合并提交时不可用并说明）
+- M5.1 对话框列出所选提交到 `HEAD` 的提交（旧的在上）：每行动作选择 pick / reword / squash / fixup / drop、标题，reword 时出现信息输入框；拖动或 Alt+↑/↓ 调整顺序。第一行不能是 squash / fixup。范围内已推送的提交数写在底部："完成后需要强制推送"。
+- M5.2 开始：Core 的 `rebaseInteractive { base?, head, steps }` 核对 `HEAD` 仍为 `head`、`steps` 恰好是 `base..HEAD` 的全部提交（顺序可变），在数据目录的临时文件写好 todo，`GIT_SEQUENCE_EDITOR` 用 `cp <todo文件>` 写入 git 的 todo；reword 写成 `pick` 加一行 `exec git commit --amend --only --allow-empty --cleanup=strip -F <信息文件>`。squash 的合并信息用 git 的默认拼接（编辑器不打开）。冲突时停在 Rebasing 状态，沿用继续 / 跳过 / 中止。
+- M5.3 todo 与信息文件放在 `<数据目录>/tmp/git/`，操作结束（完成、冲突停下后的继续或中止）后删除。
+
+### 9.3 G5：GitHub PR 与 AI 审查
+
+**P1 PR 状态**：只读请求 `pullRequest`：Core 从工作区以外的 PATH 找 `gh`（规则同 git），以 `pr view --json number,title,state,isDraft,url,baseRefName,headRefName,reviewDecision,mergeable,statusCheckRollup --repo <主机/所有者/仓库>` 读取当前分支的 PR（`--repo` 由 Core 从上游远端的 URL 解析，只接受 `github.com` 与 `gh` 已知主机）。结果区分：没有 `gh`、未登录（失败信息里的认证错误，给出"在终端中运行 `gh auth login`"）、远端不是 GitHub、没有 PR、有 PR。环境按 ADR-0085 第 9 条。超时 30 s。
+
+**P2 PR 条**：提交视图同步栏下方。有 PR：`#编号 标题`、状态（草稿 / 打开 / 已合并 / 已关闭）、检查汇总（通过 / 失败 / 进行中计数）、审查结论；"在 GitHub 上打开"（`openExternal` 的原生确认）；打开状态的 PR 有"合并 ▾"（合并 / 压缩合并 / 变基合并，默认取设置 `git.mergeMethod`）。没有 PR、当前分支不是基础分支且有基础分支没有的提交时显示"创建 Pull Request"。
+
+**P3 创建 PR 对话框**：标题（一个提交时为其标题，否则为分支名）、正文（默认列出提交标题）、基础分支（远程分支下拉，默认推断的基础分支）、"创建为草稿"（默认取 `git.draftPullRequests`）、"生成"（按 PR 指令与界面语言生成标题与正文，ADR-0087）。提交时：分支没有上游或领先上游则先推送（没有上游时推到上游远端或唯一远端的同名分支并设为上游），再 `pr create --repo … --base … --head … --title … --body-file -`（正文经 stdin）`[--draft]`；成功后 toast 带链接。审计 `createPullRequest`（编号、基础与头分支，不含正文）。
+
+**P4 合并 PR**：主进程原生确认（编号、标题、合并方式、基础分支）后 `pr merge <编号> --repo … --merge|--squash|--rebase`；GitHub 拒绝（检查未过、需要审查、有冲突）时显示 `gh` 的原因。审计 `mergePullRequest`。
+
+**V1 AI 审查**：改动视图标题行的"审查"按钮（"全部改动"与"未提交"范围可用）。Core 组装该范围的 diff（预算 64 KiB、单文件 16 KiB，扣下规则与脱敏同 B3.3），经 ADR-0087 的 `session/gitAssist`（任务 `review`）生成，结果是至多 30 条发现：文件、新文件中的行号、严重程度（高 / 中 / 低）、标题、说明。Core 只保留文件在本次发送的 diff 中、行号落在该文件新内容行数内的发现。
+- V1.1 呈现方式取设置 `git.reviewPresentation`："内联"把发现显示在 diff 对应行下方（与评论区分的样式与严重程度标签），顶栏写明条数并可逐条跳转；"单独"在改动视图里打开审查结果列表（按文件分组，点击跳到该文件与行）。两种方式都可以"忽略"单条与"清除审查"。
+- V1.2 "交给 agent 修复"：把未忽略的发现拼成一条消息发给本会话（空闲时 `prompt`，运行中 `followUp`），格式只在 `review.ts` 的 `formatFindings`。
+- V1.3 审查结果按会话与范围存在内存里，范围的改动变化后标为"可能过期"。
+
+**P5 设置**（Git 设置页新增两节）："Pull Request"：合并方式（合并 / 压缩合并 / 变基合并，默认压缩合并）、创建为草稿（默认关闭）、PR 指令（预填默认指令，规则同 `commitInstructions`）；"审查"：结果呈现方式（内联 / 单独，默认内联）。"推送与拉取"一节加入自动获取。设置只读用户级（同 A8）。
+
+### 9.4 协议与分层
+
+- `GitRequest` 新增：只读 `log`、`commitDetail`、`stashes`、`fileBlob`、`conflictSides`、`rebasePlan`、`pullRequest`；写入 `createTag`、`cherryPick`、`revert`、`reset`、`stashPush`、`stashApply`（带 `pop`）、`stashDrop`、`stashBranch`、`deleteRemoteBranch`、`restoreRemoteBranch`、`merge`、`rebase`、`resolveConflict`、`saveResolution`、`rebaseInteractive`、`createPullRequest`、`mergePullRequest`；生成 `prDescription`、`review`（同 `commitMessage`，要求受信任项目与近期真实输入，不取写锁）。`fetch` 增加 `background`。`GitDescribe` 新增 `reset`、`stashDrop`、`deleteRemoteBranch`、`mergePullRequest`。
+- 会改动工作区（B7.1 忙碌检查）的新操作：`cherryPick`、`revert`、`reset`（soft 除外）、`stashPush`、`stashApply`、`stashBranch`、`merge`、`rebase`、`resolveConflict`、`saveResolution`、`rebaseInteractive`。
+- 主进程的原生确认新增：hard 重置、删除 stash、删除远程分支、合并 PR。
+- piarc-git 新模块：`history.rs`（log、详情、标签、拣选、还原、重置、交互式变基）、`stash.rs`、`merge.rs`（合并、变基、冲突三方、采用一侧、写回）、`gh.rs`（`gh` 的查找、环境、子命令白名单、JSON 解析）。新增的 git 参数一律经 `args.rs` 校验。
+
+### 9.5 测试计划
+
+- Rust：`cargo test -p piarc-git`（真实仓库夹具：图与分页、筛选、详情、标签、拣选与还原的冲突、四种重置、撤销提交、stash 全流程与过期核对、删除与恢复远程分支、合并三种方式与冲突、变基冲突、三方文本与变基换算、采用一侧含删除、交互式变基的重排 / reword / squash / fixup / drop 与核对失败、假 `gh` 程序的各种输出）；`cargo test -p piarc-core --lib git::`（检查与路由）；`cargo test -p piarc-testkit --test sessions git::`（信任、运行中会话、原生确认对应的 describe、PR 描述与审查经真实 Agent Host 与 mock 的请求内容与扣下规则、审查结果的过滤）。
+- Agent Host：`npx vitest run agent-host/src/harness/git-assist.test.ts`；原创性检查。
+- Vitest：`graph.ts`、`merge3.ts`、`review.ts`、`rebase-plan.ts`、协议校验、`git-ipc.test.ts`（新确认、`background` fetch 不要求输入、其余写入要求输入）、偏好。
+- L4（`PIARC_EVIDENCE_TASK=git npx playwright test -c apps/desktop/playwright.config.ts git- --project dev`）：日志与提交图、详情、拣选冲突后在三方视图解决并继续、hard 重置的确认、stash 储藏 / 弹出 / 删除、删除并恢复远程分支、合并冲突的"用我的"、交互式变基 squash 与 reword、自动获取开关、图片 diff、假 `gh` 下创建与合并 PR、审查内联与单独两种呈现及"交给 agent 修复"（mock 收到的消息）；a11y 状态登记并经 T43 旅程到达。
+
+### 9.6 实施步骤
+
+| # | 内容 | 验证 |
+|---|---|---|
+| 14 | 本节、ADR-0087、索引与 PLAN | `node scripts/plan/check-acceptance.mjs` |
+| 15 | G3 的 piarc-git、协议、Core、主进程 | `cargo test -p piarc-git`；`cargo test -p piarc-core --lib git::`；`npm run gen:protocol`；`npx vitest run apps/desktop/src/main/core/git-ipc.test.ts` |
+| 16 | G3 的渲染进程：日志视图、提交图、详情与操作、stash、远程分支删除、自动获取、图片 diff、设置 | Vitest；`npm run lint`；`npm run typecheck`；L4 |
+| 17 | G4 的 piarc-git、协议、Core、主进程 | 同 15 |
+| 18 | G4 的渲染进程：合并与变基入口、冲突对话框、三方合并视图、交互式变基、状态条补齐 | 同 16 |
+| 19 | G5：`gh`、ADR-0087 的 AHP 与 Agent Host、Core、主进程 | 同 15；`npx vitest run agent-host/src/harness/git-assist.test.ts`；`node scripts/dev/check-prompt-originality.mjs` |
+| 20 | G5 的渲染进程：PR 条与对话框、审查两种呈现、设置 | 同 16 |
+| 21 | 文档同步、a11y 与 i18n、全量 verify | `npm run verify` |
 
 ## 附录：评审裁决
 
