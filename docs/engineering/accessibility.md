@@ -33,7 +33,7 @@ PiArc 的界面要能只用键盘完成全部功能，在 VoiceOver、Narrator�
 - 设置次级操作以 OpenClaudeDesktop `next-4.16336.0` 账户页的 Refresh 和 Manage keys 为基准（`app/src/source-account-settings.jsx`、`source-settings-button.css`）。小号表面在舒适 / 紧凑密度下高 28 / 20 px、圆角 7 / 5 px、水平内距 10 / 6 px。普通号高 28 / 24 px。原生按钮热区至少高 24 px。
 - 软填充、内缘和阴影由装饰层绘制。悬停和按压按参考使用 60 ms 表面过渡，键盘操作继续使用 `:focus-visible` 单轮廓。等待时原标签保留在布局和无障碍树中，按钮暴露 `aria-busy`，阻止再次激活。强制颜色使用系统按钮色，减少动效时进度标记静止。
 
-设置搜索框把焦点画在带图标的外框上。内部输入使用 `data-focus-proxy`，排除通用文本框的指针和键盘轮廓。点击与 Tab 进入时外框都是 1 px，输入本身的边框、轮廓和阴影均为零。
+复合输入框（外框里除了输入还有图标、按钮或其他控件，例如设置搜索框、浏览器地址栏）只画一层焦点，画在外框上：内部输入加 `data-focus-proxy`，排除通用文本框的指针和键盘轮廓；外框加进 `app.css` 两组全局选择器（`:has(> input:focus-visible)` 与 `[data-pointer-focus] … :has(> input:focus)`）。点击与 Tab 进入时外框都是 1 px，输入本身的边框、轮廓和阴影均为零。不要在组件 CSS 里给内部输入写 `outline: none` 代替 `data-focus-proxy`：全局规则的优先级更高，结果是圆角外框里再出现一个直角框；也不要另用 `:focus-within` 改外框颜色，那是第二个指示。
 
 输入类表面更进一步，不画轮廓，指针与键盘聚焦表现相同：
 

@@ -186,3 +186,34 @@ test('workspace files open through the workspace scheme with their relative reso
     page.getByText('Only files inside this session’s workspace open in the browser.'),
   ).toBeVisible();
 });
+
+// accessibility.md, composite fields: the address bar shows one focus ring, on its rounded
+// field; the input inside never adds its own rectangular outline (pointer or keyboard focus).
+test('the address bar shows a single focus ring on its field', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(90_000);
+  await openSession(app, page, workspaces, 'Address focus', 't18-chat', 'Hello');
+  await idle(page);
+  await openPreview(page);
+  const input = page.getByTestId('browser-address');
+  const rings = () =>
+    input.evaluate((el) => {
+      const outline = (node: Element) => {
+        const style = getComputedStyle(node);
+        return style.outlineStyle === 'none' ? 0 : parseFloat(style.outlineWidth);
+      };
+      const field = el.closest('.browser-address');
+      return { input: outline(el), field: field === null ? -1 : outline(field) };
+    });
+  await input.click();
+  await expect.poll(rings).toEqual({ input: 0, field: 1 });
+  await page.getByTestId('browser-start').click();
+  await input.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(input).toBeFocused();
+  await expect.poll(rings).toEqual({ input: 0, field: 1 });
+});

@@ -310,6 +310,9 @@ export function NavigationRow({
       <div className="browser-address">
         <SiteIcon tab={tab} />
         <input
+          // The rounded field around it draws the one focus ring (accessibility.md, composite
+          // fields): the input itself never shows the app's text-field outline.
+          data-focus-proxy
           ref={input}
           className="browser-address-input"
           data-testid="browser-address"
