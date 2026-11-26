@@ -20,6 +20,8 @@ const settings: ProviderSettings = {
   auxiliary: null,
   auxiliaryAlias: null,
   aliases: {},
+  disabled: [],
+  accounts: [],
 };
 describe('provider settings', () => {
   const custom = {

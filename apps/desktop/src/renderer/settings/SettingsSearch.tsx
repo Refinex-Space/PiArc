@@ -30,7 +30,7 @@ const fields: Record<string, readonly (readonly [MessageId, string])[]> = {
   ],
   providers: [
     ['models.aliases.title', 'alias-section'],
-    ['providers.signIn.title', 'sign-in-section'],
+    ['providers.signIn.title', 'provider-connections'],
     ['providers.refresh', 'catalog-refresh'],
     ['models.settings.title', 'model-settings-section'],
     ['webSearch.title', 'web-search-section'],

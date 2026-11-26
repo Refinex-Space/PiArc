@@ -20,7 +20,7 @@ export async function addEndpoint(
   models: string,
 ) {
   await settings.getByTestId('provider-add').click();
-  await settings.getByTestId('provider-kind').selectOption('custom');
+  await settings.getByTestId('provider-choice-custom').click();
   await settings.getByTestId('provider-id').fill(id);
   await settings.getByTestId('provider-url').fill(url);
   await settings.getByTestId('provider-api').selectOption(api);

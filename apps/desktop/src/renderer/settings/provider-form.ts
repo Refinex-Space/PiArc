@@ -7,6 +7,8 @@ export const APIS = ['openai-completions', 'anthropic-messages', 'openai-respons
 export type Kind = (typeof KINDS)[number];
 type Api = (typeof APIS)[number];
 export type Auth = 'bearer' | 'profile' | 'apiKey' | 'adc' | 'serviceAccount';
+/** The built-in providers that are cloud platforms (kind `cloud`). */
+export const CLOUD_PROVIDERS: readonly string[] = ['amazon-bedrock', 'google-vertex'];
 
 export interface Provider {
   id: string;
@@ -29,6 +31,25 @@ export interface LoginProvider {
   label: string;
   subscription: boolean;
   signedIn: boolean;
+  /** Who is signed in (ADR-0083): an email or a user name, when the credential tells. */
+  account?: string;
+}
+
+/** A signed-in account of a provider (ADR-0083); one per provider is in use. */
+export interface Account {
+  provider: string;
+  id: string;
+  label?: string;
+  active: boolean;
+}
+
+/** The answer of a connection test (ADR-0083). */
+export interface TestResult {
+  ok: boolean;
+  model?: string;
+  latencyMs?: number;
+  message?: string;
+  network: boolean;
 }
 
 /** A configured model with the catalog's values (T29). */
@@ -71,6 +92,10 @@ export interface ProviderSettings {
   auxiliaryAlias: string | null;
   /** The user's model alias table: alias → `<provider>/<model id>` (T31). */
   aliases: Record<string, string>;
+  /** Providers turned off (ADR-0083). */
+  disabled: string[];
+  /** Signed-in accounts (ADR-0083). */
+  accounts: Account[];
 }
 
 /** The aliases in the order the settings page lists them (T31). */
@@ -142,7 +167,8 @@ export function parseSettings(text: string): ProviderSettings {
         typeof p.id === 'string' &&
         typeof p.name === 'string' &&
         typeof p.label === 'string' &&
-        typeof p.signedIn === 'boolean',
+        typeof p.signedIn === 'boolean' &&
+        (p.account === undefined || typeof p.account === 'string'),
     ) as LoginProvider[],
     catalogModels: list(
       'catalogModels',
@@ -167,6 +193,23 @@ export function parseSettings(text: string): ProviderSettings {
       (MODEL_ALIASES as readonly string[]).includes(extra.auxiliaryAlias)
         ? extra.auxiliaryAlias
         : null,
+    disabled: list('disabled', (id) => typeof id === 'string') as string[],
+    accounts: list(
+      'accounts',
+      (a) =>
+        record(a) &&
+        typeof a.provider === 'string' &&
+        typeof a.id === 'string' &&
+        (a.label === undefined || typeof a.label === 'string'),
+    ).map((a) => {
+      const account = a as Record<string, unknown>;
+      return {
+        provider: String(account.provider),
+        id: String(account.id),
+        ...(typeof account.label === 'string' ? { label: account.label } : {}),
+        active: account.active === true,
+      };
+    }),
     aliases: record(extra.aliases)
       ? Object.fromEntries(
           Object.entries(extra.aliases).filter(
@@ -310,4 +353,48 @@ export function configOf(form: Form): Omit<Provider, 'hasCredential'> {
   if (form.auth === 'adc' || form.auth === 'serviceAccount') config.project = form.project.trim();
   if (form.auth === 'serviceAccount') config.credentialPath = form.credentialPath.trim();
   return config;
+}
+
+/** Core's answer of `testProvider` (ADR-0083). */
+export function parseTestResult(text: string): TestResult {
+  const value: unknown = JSON.parse(text);
+  if (!record(value) || typeof value.ok !== 'boolean') throw new Error('Invalid test result');
+  return {
+    ok: value.ok,
+    ...(typeof value.model === 'string' ? { model: value.model } : {}),
+    ...(typeof value.latencyMs === 'number' ? { latencyMs: value.latencyMs } : {}),
+    ...(typeof value.message === 'string' ? { message: value.message } : {}),
+    network: value.network === true,
+  };
+}
+
+/** Core's answer of `discoverModels` (ADR-0083): the model ids. */
+export function parseDiscovered(text: string): string[] {
+  const value: unknown = JSON.parse(text);
+  if (!record(value) || !Array.isArray(value.models)) throw new Error('Invalid model list');
+  return value.models.filter((id): id is string => typeof id === 'string');
+}
+
+/** The model list text with `id` added (at the end) or removed. */
+export function withModel(models: string, id: string, on: boolean): string {
+  const ids = models
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const rest = ids.filter((existing) => existing !== id);
+  return (on ? [...rest, id] : rest).join('\n');
+}
+
+/** The accounts grouped by provider, the one in use first (ADR-0083). */
+export function accountsByProvider(accounts: readonly Account[]): Map<string, Account[]> {
+  const groups = new Map<string, Account[]>();
+  for (const account of accounts) {
+    const group = groups.get(account.provider) ?? [];
+    group.push(account);
+    groups.set(account.provider, group);
+  }
+  for (const group of groups.values()) {
+    group.sort((a, b) => Number(b.active) - Number(a.active));
+  }
+  return groups;
 }

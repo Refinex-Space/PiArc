@@ -36,6 +36,8 @@ describe('i18n', () => {
             model: 'chat',
             models: 'a, b',
             name: 'n',
+            account: 'a@example.com',
+            ms: '412',
             query: 'q',
             count: 2,
             reason: 'r',

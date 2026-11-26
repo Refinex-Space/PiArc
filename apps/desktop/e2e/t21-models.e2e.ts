@@ -17,6 +17,9 @@ import { idle, send } from './t19.js';
 
 test.use({ seedMockModel: false });
 
+/** A loopback port nothing listens on (the discard port; a local model server would use 11434). */
+const CLOSED_PORT = 9;
+
 test('two configured endpoints complete tool turns; a text-only model refuses an image', async ({
   app,
   page,
@@ -112,13 +115,17 @@ test('provider settings validate, edit, and remove built-in, cloud, and keyless 
     ['local', 'local-models'],
   ] as const) {
     await settings.getByTestId('provider-add').click();
-    await settings.getByTestId('provider-kind').selectOption(kind);
+    await settings.getByTestId(`provider-choice-${kind === 'local' ? kind : id}`).click();
     if (kind === 'local') {
       await settings.getByTestId('provider-id').fill(id);
-      await settings.getByTestId('provider-url').fill('http://127.0.0.1:11434/v1');
+      await settings.getByTestId('provider-url').fill(`http://127.0.0.1:${String(CLOSED_PORT)}/v1`);
       await settings.getByTestId('provider-models').fill('local-one');
+      // ADR-0083: nothing listens there, so the model list cannot be fetched.
+      await settings.getByTestId('provider-discover').click();
+      await expect(settings.getByTestId('provider-discover-failed')).toBeVisible({
+        timeout: 30_000,
+      });
     } else {
-      await settings.getByTestId('provider-id').selectOption(id);
       if (kind === 'cloud') await settings.getByTestId('provider-region').fill('us-east-1');
       await settings
         .getByTestId('provider-key')
@@ -136,6 +143,17 @@ test('provider settings validate, edit, and remove built-in, cloud, and keyless 
     else if (kind === 'cloud') await settings.getByTestId('provider-region').fill('us-west-2');
     else await settings.getByTestId('provider-key').fill(randomUUID());
     await settings.getByTestId('provider-save').click();
+    if (kind === 'local') {
+      // ADR-0083: the test reaches nothing and offers the proxy settings; turned off, the row
+      // stays listed and marked.
+      await settings.getByTestId(`provider-test-${id}`).click();
+      const result = settings.getByTestId(`provider-test-result-${id}`);
+      await expect(result).toHaveAttribute('data-ok', 'false', { timeout: 60_000 });
+      await settings.getByTestId(`provider-enabled-${id}`).uncheck();
+      await expect(settings.getByTestId(`provider-row-${id}`)).toHaveClass(/is-off/u);
+      await settings.screenshot({ path: testInfo.outputPath('local-off.png') });
+      await settings.getByTestId(`provider-enabled-${id}`).check();
+    }
     await settings.getByTestId(`provider-delete-${id}`).click();
     await expect(settings.getByTestId(`provider-edit-${id}`)).toHaveCount(0);
   }

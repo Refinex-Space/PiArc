@@ -70,6 +70,11 @@ export type SessionCore = Pick<
   | 'startLogin'
   | 'answerLogin'
   | 'logoutProvider'
+  | 'setProviderEnabled'
+  | 'testProvider'
+  | 'discoverModels'
+  | 'useProviderAccount'
+  | 'removeProviderAccount'
   | 'workspaceModels'
   | 'sessionModels'
   | 'previewModelSwitch'
@@ -212,6 +217,35 @@ function title(value: unknown): string | null {
 }
 
 /** Ids the renderer chooses (request keys, queue items, searches): Core's key alphabet. */
+/** The recorded name of `account` of `provider` in Core's provider settings (ADR-0083). */
+export function accountLabel(
+  settings: string,
+  provider: string,
+  account: string,
+): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(settings);
+    if (typeof parsed !== 'object' || parsed === null || !('accounts' in parsed)) return undefined;
+    const accounts = parsed.accounts;
+    if (!Array.isArray(accounts)) return undefined;
+    for (const entry of accounts as unknown[]) {
+      if (
+        typeof entry === 'object' &&
+        entry !== null &&
+        'provider' in entry &&
+        'id' in entry &&
+        entry.provider === provider &&
+        entry.id === account
+      ) {
+        return 'label' in entry && typeof entry.label === 'string' ? entry.label : undefined;
+      }
+    }
+  } catch {
+    // Not JSON: no name.
+  }
+  return undefined;
+}
+
 function token(value: unknown, name: string): string {
   if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/u.test(value)) {
     throw new TypeError(`${name} must be 1 to 128 letters, digits, '.', '_', ':' or '-'`);
@@ -697,7 +731,11 @@ export function registerSessionHandlers(
     return done;
   });
   registerHandler(IPC_CHANNELS.answerLogin, (_event, [loginId, value]) => {
-    core.answerLogin(token(loginId, 'loginId'), value === null ? null : text(value, 'answer'));
+    core.answerLogin(
+      token(loginId, 'loginId'),
+      // A question may be answered with nothing ("blank for the default").
+      value === null ? null : text(value, 'answer', true),
+    );
   });
   registerHandler(IPC_CHANNELS.logoutProvider, async (event, [value]) => {
     const provider = token(value, 'provider');
@@ -715,6 +753,46 @@ export function registerSessionHandlers(
         ? await dialog.showMessageBox(options)
         : await dialog.showMessageBox(window, options);
     return answer.response === 0 ? notifyProviders(await core.logoutProvider(provider)) : null;
+  });
+  // ADR-0083: turning a provider on or off, checks, and the signed-in accounts.
+  registerHandler(IPC_CHANNELS.setProviderEnabled, async (_event, [id, enabled]) =>
+    notifyProviders(await core.setProviderEnabled(token(id, 'provider'), flag(enabled, 'enabled'))),
+  );
+  registerHandler(IPC_CHANNELS.testProvider, (_event, [id]) =>
+    core.testProvider(token(id, 'provider')),
+  );
+  registerHandler(IPC_CHANNELS.discoverModels, (_event, [request, secret]) =>
+    core.discoverModels(
+      text(request, 'model list request'),
+      secret == null ? null : text(secret, 'credential'),
+    ),
+  );
+  registerHandler(IPC_CHANNELS.useProviderAccount, async (_event, [provider, account]) =>
+    notifyProviders(
+      await core.useProviderAccount(token(provider, 'provider'), token(account, 'account')),
+    ),
+  );
+  registerHandler(IPC_CHANNELS.removeProviderAccount, async (event, [value, accountValue]) => {
+    const provider = token(value, 'provider');
+    const account = token(accountValue, 'account');
+    // The dialog names the account as Core records it, not as the page says.
+    const label = accountLabel(await core.providerSettings(), provider, account) ?? account;
+    const t = translator();
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      message: t.t('providers.confirmRemoveAccount', { id: provider, account: label }),
+      buttons: [t.t('providers.account.remove'), t.t('dialog.cancel')],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const answer =
+      window === null
+        ? await dialog.showMessageBox(options)
+        : await dialog.showMessageBox(window, options);
+    return answer.response === 0
+      ? notifyProviders(await core.removeProviderAccount(provider, account))
+      : null;
   });
   registerHandler(IPC_CHANNELS.workspaceModels, (_event, [workspace]) =>
     core.workspaceModels(absolutePath(workspace)),
