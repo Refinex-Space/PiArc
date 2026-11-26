@@ -99,10 +99,11 @@ export function materialIconFile(
   return slash === -1 ? iconPath : iconPath.slice(slash + 1);
 }
 
-const iconUrls = import.meta.glob(
-  '../../../../../node_modules/material-icon-theme/icons/*.svg',
-  { eager: true, query: '?url&no-inline', import: 'default' },
-);
+const iconUrls = import.meta.glob('../../../../../node_modules/material-icon-theme/icons/*.svg', {
+  eager: true,
+  query: '?url&no-inline',
+  import: 'default',
+});
 
 const urlByFile = new Map<string, string>();
 for (const [file, url] of Object.entries(iconUrls)) {
