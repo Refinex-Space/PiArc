@@ -118,6 +118,8 @@ pub struct Settings {
     pub(crate) ignored_managed_only: Vec<(&'static str, String)>,
     /// Project layers that turned auto memory on, which only the user may do (T47).
     pub(crate) ignored_memory: Vec<&'static str>,
+    /// Project layers whose `git` object was removed (ADR-0085: user and managed only).
+    pub(crate) ignored_git: Vec<&'static str>,
     /// The extension packages in effect (T40), set by Core after the load
     /// ([`Settings::set_packages`]): the settings name them, Core's records say where they are.
     pub(crate) packages: crate::plugins::Packages,
@@ -146,6 +148,7 @@ impl Settings {
             ignored_auto: Vec::new(),
             ignored_managed_only: Vec::new(),
             ignored_memory: Vec::new(),
+            ignored_git: Vec::new(),
             packages: crate::plugins::Packages::default(),
         };
         settings.reload();
@@ -241,6 +244,7 @@ impl Settings {
         let mut ignored_auto = Vec::new();
         let mut ignored_managed_only = Vec::new();
         let mut ignored_memory = Vec::new();
+        let mut ignored_git = Vec::new();
         let managed = self.loaded(crate::layers::ids::ENTERPRISE);
         let effective: Vec<Option<Value>> = self
             .table
@@ -285,15 +289,11 @@ impl Settings {
                     }
                 }
                 if project {
-                    for pointer in crate::sandbox::loosening(&value) {
-                        remove_pointer(&mut value, pointer);
-                        ignored_sandbox.push((spec.id, pointer.to_owned()));
-                    }
-                    for pointer in crate::auto_mode::USER_ONLY {
-                        if value.pointer(pointer).is_some() {
-                            remove_pointer(&mut value, pointer);
-                            ignored_auto.push((spec.id, (*pointer).to_owned()));
-                        }
+                    let stripped = strip_project(&mut value);
+                    ignored_sandbox.extend(stripped.sandbox.into_iter().map(|p| (spec.id, p)));
+                    ignored_auto.extend(stripped.auto.into_iter().map(|p| (spec.id, p)));
+                    if stripped.git {
+                        ignored_git.push(spec.id);
                     }
                 }
                 Some(value)
@@ -309,6 +309,7 @@ impl Settings {
         self.ignored_auto = ignored_auto;
         self.ignored_managed_only = ignored_managed_only;
         self.ignored_memory = ignored_memory;
+        self.ignored_git = ignored_git;
         changed
     }
 
@@ -620,6 +621,33 @@ fn issue(
 }
 
 /// Removes the value at `pointer` (`/a/b`, unescaped tokens only).
+/// What a project file set and may not: values that loosen the sandbox (T39), Auto mode's
+/// user-only keys (T46) and the Git panel's settings (ADR-0085).
+struct Stripped {
+    sandbox: Vec<String>,
+    auto: Vec<String>,
+    git: bool,
+}
+
+/// Removes from a project layer's `value` what only the user's own files may set.
+fn strip_project(value: &mut Value) -> Stripped {
+    let mut sandbox = Vec::new();
+    for pointer in crate::sandbox::loosening(value) {
+        remove_pointer(value, pointer);
+        sandbox.push(pointer.to_owned());
+    }
+    let mut auto = Vec::new();
+    for pointer in crate::auto_mode::USER_ONLY {
+        if value.pointer(pointer).is_some() {
+            remove_pointer(value, pointer);
+            auto.push((*pointer).to_owned());
+        }
+    }
+    let git = value.pointer("/git").is_some();
+    remove_pointer(value, "/git");
+    Stripped { sandbox, auto, git }
+}
+
 fn remove_pointer(value: &mut Value, pointer: &str) {
     let Some((parent, last)) = pointer.rsplit_once('/') else {
         return;

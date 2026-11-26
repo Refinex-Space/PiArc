@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 
 use piarc_config::schema::Severity;
 use piarc_config::{
-    LayerSpec, LayerStatus, LayerTable, Scope, Settings, Source, TrustState, ids, precedence,
+    IgnoreReason, LayerSpec, LayerStatus, LayerTable, Scope, Settings, Source, TrustState, ids,
+    precedence,
     write_value,
 };
 use serde_json::json;
@@ -552,4 +553,40 @@ fn permission_lists_follow_precedence_and_trust() {
             (ids::PROJECT_LOCAL, "auto".to_owned())
         ]
     );
+}
+
+/// The Git panel's settings (ADR-0085) come from the user's file only: a project file's `git`
+/// object neither applies nor merges, and diagnostics say why.
+#[test]
+fn git_settings_apply_from_the_user_file_only() {
+    let f = Fixture::new("git-settings");
+    write(
+        &f.user(),
+        r#"{"git": {"branchPrefix": "me/", "protectedBranches": ["main"], "pullMode": "rebase",
+            "alwaysForcePush": false, "commitInstructions": "Use imperative mood."}}"#,
+    );
+    write(
+        &f.project(),
+        r#"{"git": {"protectedBranches": [], "alwaysForcePush": true}}"#,
+    );
+    let settings = Settings::load(f.table(), TrustState::Trusted);
+    assert!(settings.issues().is_empty(), "{:?}", settings.issues());
+    assert_eq!(settings.user_value("/git/alwaysForcePush"), Some(&json!(false)));
+    assert_eq!(settings.get("/git/alwaysForcePush"), Some(&json!(false)));
+    assert_eq!(settings.get("/git/protectedBranches"), Some(&json!(["main"])));
+    let report = settings.diagnostics();
+    let project = report
+        .iter()
+        .find(|r| r.layer == ids::PROJECT)
+        .expect("project report");
+    for pointer in ["/git/protectedBranches", "/git/alwaysForcePush"] {
+        assert!(
+            project
+                .ignored
+                .iter()
+                .any(|k| k.pointer == pointer && k.reason == IgnoreReason::ProjectGit),
+            "{pointer}: {:?}",
+            project.ignored
+        );
+    }
 }

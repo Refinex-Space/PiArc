@@ -109,6 +109,8 @@ pub enum IgnoreReason {
     /// Auto mode's switch, reviewer model and policy apply from the user's own files only
     /// (T46).
     ProjectAutoMode,
+    /// The Git panel's settings apply from the user's own file only (ADR-0085).
+    ProjectGit,
     /// The setting has no effect on this platform (the sandbox on Windows, requirement D7).
     Platform,
     /// PiArc does not support it (an MCP transport, a plugin component, a field).
@@ -319,6 +321,8 @@ impl Settings {
                 .iter()
                 .any(|(layer, removed)| *layer == spec.id && *removed == pointer);
             let memory = self.ignored_memory.contains(&spec.id) && pointer == "/autoMemoryEnabled";
+            let project_git = self.ignored_git.contains(&spec.id)
+                && (pointer == "/git" || pointer.starts_with("/git/"));
             let reason = if managed_only {
                 IgnoreReason::ManagedOnly
             } else if memory {
@@ -329,6 +333,8 @@ impl Settings {
                 IgnoreReason::ProjectSandbox
             } else if project_auto {
                 IgnoreReason::ProjectAutoMode
+            } else if project_git {
+                IgnoreReason::ProjectGit
             } else {
                 untrusted = true;
                 IgnoreReason::Untrusted

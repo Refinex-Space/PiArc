@@ -709,6 +709,33 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             shape: Shape::Bool,
         }]),
     },
+    // The Git panel (ADR-0085), read from the user's file and managed settings only: a project
+    // must not unprotect branches or turn on force pushes (`crate::settings` removes it there).
+    Field {
+        name: "git",
+        shape: Shape::Object(&[
+            Field {
+                name: "branchPrefix",
+                shape: Shape::String,
+            },
+            Field {
+                name: "protectedBranches",
+                shape: Shape::ListOf(&STRINGS),
+            },
+            Field {
+                name: "pullMode",
+                shape: Shape::OneOf(&["config", "merge", "rebase", "ffOnly"]),
+            },
+            Field {
+                name: "alwaysForcePush",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "commitInstructions",
+                shape: Shape::String,
+            },
+        ]),
+    },
 ]);
 
 #[cfg(test)]

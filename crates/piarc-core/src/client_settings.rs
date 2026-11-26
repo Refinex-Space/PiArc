@@ -15,6 +15,7 @@ use crate::error::{Error, Result};
 /// Top-level keys of the user's settings the client may write.
 /// `autoMode` (T46): the reviewer model and the user's review policy, user-level only.
 /// `proxy` (ADR-0082): the Agent Hosts' proxy, checked by `network::check_setting`.
+/// `git` (ADR-0085): the Git panel's settings, read by `git::settings_of`.
 pub const CLIENT_KEYS: &[&str] = &[
     "language",
     "appearance",
@@ -22,6 +23,7 @@ pub const CLIENT_KEYS: &[&str] = &[
     "notifications",
     "autoMode",
     "proxy",
+    "git",
 ];
 
 /// The user's settings file as a JSON object; `{}` when it does not exist.
