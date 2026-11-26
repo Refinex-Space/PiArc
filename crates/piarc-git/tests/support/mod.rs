@@ -140,6 +140,8 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
             "init.defaultBranch=main",
             "-c",
             "protocol.file.allow=always",
+            "-c",
+            "core.quotePath=false",
         ])
         .args(args)
         .current_dir(dir)

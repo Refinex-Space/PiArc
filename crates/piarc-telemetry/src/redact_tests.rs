@@ -89,6 +89,14 @@ fn secret_named_fields_and_url_passwords_are_replaced() {
         red("proxy https://user:hunter22@proxy.example:8080/"),
         "proxy https://user:[REDACTED:secret]@proxy.example:8080/"
     );
+    assert_eq!(
+        red("remote https://0123456789abcdefTOKEN@github.com/a/b.git rejected"),
+        "remote https://[REDACTED:secret]@github.com/a/b.git rejected"
+    );
+    assert_eq!(
+        red("fetch ssh://git@github.com/a/b.git"),
+        "fetch ssh://git@github.com/a/b.git"
+    );
     assert_eq!(red("password = s3cr3t-pw"), "password = [REDACTED:secret]");
 }
 

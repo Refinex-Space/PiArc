@@ -96,6 +96,12 @@ impl Git {
         }
     }
 
+    /// The git program this runner starts.
+    #[must_use]
+    pub fn program(&self) -> &Path {
+        &self.program
+    }
+
     /// The same runner with another timeout (tests).
     #[must_use]
     pub fn with_timeout(mut self, timeout: Duration) -> Self {

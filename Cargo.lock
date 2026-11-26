@@ -2078,6 +2078,7 @@ version = "0.0.0"
 dependencies = [
  "piarc-ports",
  "piarc-protocol",
+ "sha2",
  "thiserror 2.0.21",
  "tokio",
 ]

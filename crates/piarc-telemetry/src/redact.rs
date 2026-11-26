@@ -107,6 +107,13 @@ const PATTERNS: &[(Kind, &str, usize)] = &[
         r#"(?i)\b[a-z][a-z0-9+.-]*://[^/\s:@"']+:([^/\s@"']+)@"#,
         1,
     ),
+    // A token as the URL's whole user part (`https://<token>@github.com`, Git panel). Short
+    // user names such as `git@` stay.
+    (
+        Kind::SecretField,
+        r#"(?i)\b[a-z][a-z0-9+.-]*://([^/\s:@"']{12,})@"#,
+        1,
+    ),
     (
         Kind::SecretField,
         concat!(

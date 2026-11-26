@@ -354,6 +354,34 @@ pub async fn status(
     })
 }
 
+/// The branch `branch` was created from, read from its reflog ("branch: Created from main"):
+/// a worktree session's branch names its base this way (ADR-0084 rule 2). `None` when the
+/// reflog is gone or names `HEAD`.
+///
+/// # Errors
+///
+/// The reader's errors.
+pub async fn created_from(reader: &Reader, branch: &str) -> Result<Option<String>, GitError> {
+    let reference = format!("refs/heads/{branch}");
+    let out = reader
+        .run(
+            &["reflog", "show", "--format=%gs", "--end-of-options", &reference, "--"],
+            ExecOptions::default(),
+        )
+        .await?;
+    if !out.success() {
+        return Ok(None);
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    Ok(text
+        .lines()
+        .last()
+        .and_then(|line| line.strip_prefix("branch: Created from "))
+        .map(str::trim)
+        .filter(|base| !base.is_empty() && *base != "HEAD" && !base.contains(' '))
+        .map(|base| base.trim_start_matches("refs/heads/").to_owned()))
+}
+
 /// The base branch of the branch scope (ADR-0084 rule 2) with its merge base.
 ///
 /// # Errors

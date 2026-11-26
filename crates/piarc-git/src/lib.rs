@@ -12,7 +12,8 @@
 //! - Git panel (ADR-0084, ADR-0085): read-only queries with program-running configuration
 //!   overridden and the user's write operations ([`repo`], [`exec`], [`env`], [`args`]), status
 //!   ([`status`]), scope diffs ([`diff`]), commits and file texts ([`log`]), branches
-//!   ([`refs`]).
+//!   ([`refs`]); the index and hunks ([`index`]), commits ([`commit`]), branch operations
+//!   ([`branches`]), fetch, pull, push and the operation in progress ([`remote`]).
 //!
 //! # Not responsible for
 //!
@@ -29,14 +30,18 @@
 //! `scripts/ci/check-crate-deps.mjs` (architecture section 7.1).
 
 pub mod args;
+pub mod branches;
 pub mod checkout;
+pub mod commit;
 pub mod diff;
 pub mod env;
 pub mod exec;
 pub mod git;
+pub mod index;
 pub mod log;
 pub mod package;
 pub mod refs;
+pub mod remote;
 pub mod remotes;
 pub mod repo;
 pub mod status;
