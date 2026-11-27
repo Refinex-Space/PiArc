@@ -57,3 +57,50 @@ it('the shell owns the target after switching from a recent folder to a differen
     vi.unstubAllGlobals();
   }
 });
+
+it('the environment card names the chosen environment, not the menu', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('piarc', {
+    onAppEvent: () => () => undefined,
+    worktreeBranches: () =>
+      Promise.resolve(JSON.stringify({ repository: true, current: 'main', branches: ['main'] })),
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const environment = () =>
+    host.querySelector<HTMLButtonElement>('[data-testid="home-environment"]');
+  try {
+    act(() => {
+      root.render(
+        <AppProvider
+          initial={{
+            platform: 'darwin',
+            focused: true,
+            notificationsSupported: false,
+            locale: 'en',
+            preferences: DEFAULT_PREFERENCES,
+          }}
+        >
+          <Home workspace="/a" draft={undefined} failure={undefined} />
+        </AppProvider>,
+      );
+    });
+    expect(environment()?.textContent).toBe('This computer');
+    expect(environment()?.getAttribute('aria-label')).toContain('This computer');
+    expect(environment()?.title).toBe('Choose environment');
+
+    act(() => environment()?.click());
+    await act(async () => {
+      host.querySelector<HTMLElement>('[data-testid="menu-worktree"]')?.click();
+      await Promise.resolve();
+    });
+    expect(environment()?.textContent).toBe('Worktree');
+  } finally {
+    act(() => {
+      root.unmount();
+    });
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

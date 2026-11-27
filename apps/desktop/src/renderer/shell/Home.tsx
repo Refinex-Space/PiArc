@@ -280,12 +280,15 @@ function HomeForm({
             </ChoiceButton>
             <ChoiceButton
               label={t('workbench.environment')}
+              valueLabel={localLabel}
               className="environment-change"
               items={setupItems}
               above={false}
               disabled={busy}
+              testId="home-environment"
             >
-              {t('workbench.environment')} <ChevronDownIcon />
+              <span className="truncate">{localLabel}</span>
+              <ChevronDownIcon />
             </ChoiceButton>
             {configuring && tree.enabled && <WorktreeFields choice={tree} disabled={busy} />}
           </div>

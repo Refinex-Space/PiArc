@@ -66,9 +66,15 @@ test('starts a session in its own worktree and asks before archiving its changes
   git(ws, 'branch', 'release-1');
   await openFolder(page, app, ws);
 
-  await page.locator('.environment-change').click();
+  // The card names the chosen environment: this computer until the worktree is chosen.
+  const environment = page.getByTestId('home-environment');
+  await expect(environment).toHaveText('This computer');
+  await page.getByTestId('home').screenshot({ path: info.outputPath('environment-local.png') });
+  await environment.click();
   await page.getByTestId('menu-worktree').click();
   await expect(page.getByTestId('home-worktree')).toBeChecked();
+  await expect(environment).toHaveText('Worktree');
+  await page.getByTestId('home').screenshot({ path: info.outputPath('environment-worktree.png') });
   const base = page.getByTestId('home-worktree-base');
   await expect(base).toBeEnabled();
   await expect(base.locator('option')).toHaveText(['Current commit (main)', 'release-1']);
