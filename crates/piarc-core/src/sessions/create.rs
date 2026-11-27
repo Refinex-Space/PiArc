@@ -33,7 +33,10 @@ impl Hub {
         worktree: Option<WorktreeRequest>,
         draft: bool,
     ) -> Result<Value> {
+        let started = std::time::Instant::now();
         let workspace = self.workspace_opened_by_user(workspace).await?;
+        tracing::debug!(target: "piarc_core::sessions", draft,
+            workspace_ms = started.elapsed().as_millis(), "workspace ready for a new session");
         let id = new_session_id()?;
         let (cwd, created) = match (cwd, worktree) {
             (Some(_), Some(_)) => {

@@ -62,6 +62,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `node scripts/perf/run.mjs --lane pr --runs 3 [--machine <类别>]` | T44 性能 PR 冒烟（CI desktop 作业同款）：冷启动、工作区就绪、流式帧、会话切换、事件循环、事件转发、AHP 往返、权限裁决，与同平台、同机器类别、同流水线的基线比较（回归 > 10% 失败），报告 `tmp/perf/pr/report.json`；先打开发构建，在前台运行 |
 | `node scripts/perf/run.mjs --lane nightly --absolute --machine <类别>` | T44 第 11 章全部指标（内存、空闲 CPU、首 token、恢复、体积等，体积要先打发布安装包），`--absolute` 同时判第 11 章预算；`--only <指标,…>` 只测部分，方法与本机数据见 `docs/engineering/performance.md` |
 | `node scripts/perf/run.mjs --lane <lane> --machine <类别> --update-baseline "<原因>"` | 把这次测量记为该平台、机器类别、流水线的基线（`scripts/perf/baselines/`），提交说明写原因；`--from-report <report.json>` 改为判定或记录另一台机器（例如 CI 工件）的报告 |
+| `node scripts/perf/probe-home-tools.mjs --form packaged [--runs 5] [--settle 0]` | 新会话页首次打开工具（ADR-0099）：每次打开一个新项目、立即点"文件"，记从点击到工具分块出现、到文件树列出项目的时间（先打开发构建；第 11 章没有这一行，`run.mjs` 不判定） |
 | `npm run bench:s1 -- --form packaged` | S1 基准：transcript 流式 60 s、万条滚动、千条冷加载、渲染进程内存（CDP 追踪，先打开发构建） |
 | `cargo run -p piarc-sandbox --release --example s8-bench` | S8 测量：`sandbox-exec` 每条命令额外耗时、沙箱代理延迟与吞吐（macOS） |
 | `node scripts/ci/load-core.mjs --module <file.node>` | 在 Node 与 Electron 中加载一个 Core 模块并跑一次事件通道 |

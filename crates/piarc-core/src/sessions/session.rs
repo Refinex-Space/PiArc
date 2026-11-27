@@ -284,11 +284,14 @@ impl SessionHandle {
         model: Option<ModelRef>,
         mode: Option<piarc_protocol::policy::PermissionMode>,
     ) -> Result<Value> {
+        let started = std::time::Instant::now();
         self.io
             .capture_opening_memory(&self.id)
             .await
             .map_err(|e| Error::feature(&e))?;
+        let memory = started.elapsed();
         let supervisor = self.ws.acquire().await?;
+        let host_ready = started.elapsed();
         let (default_model, default_effort) = self.io.session_defaults(&self.workspace).await;
         let mut params = SessionCreateParams::new(path_text(&self.cwd)).with_model(model);
         params.session_id = Some(SessionId(self.id.clone()));
@@ -305,6 +308,10 @@ impl SessionHandle {
                 .map_err(host_error)?,
             Err(error) => return Err(host_error(error)),
         };
+        // Where a new session's time goes (the new-session view's first tool waits for it).
+        tracing::info!(target: "piarc_core::sessions", session = %self.id, draft = self.is_draft(),
+            memory_ms = memory.as_millis(), host_ready_ms = host_ready.as_millis(),
+            total_ms = started.elapsed().as_millis(), "session opened in the Agent Host");
         self.in_host.set();
         self.notices_waiting();
         if let Some(mode) = mode {
