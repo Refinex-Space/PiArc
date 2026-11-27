@@ -296,9 +296,15 @@ mod tests {
         reply.comments = vec![comment(3, 9, "Fix it")];
         assert!(check_answer(&plan, &reply).is_ok());
         let text = keep_planning(&reply);
-        assert!(text.contains("message comes right after this result"), "{text}");
+        assert!(
+            text.contains("message comes right after this result"),
+            "{text}"
+        );
         assert!(text.contains("Plan mode stays on"), "{text}");
-        assert!(text.contains(r#"1. On "Fix it" (offsets 3-9): Why?"#), "{text}");
+        assert!(
+            text.contains(r#"1. On "Fix it" (offsets 3-9): Why?"#),
+            "{text}"
+        );
         // The message is the feedback: a reply carries none of its own, and never approves.
         let mut with_feedback = reply.clone();
         with_feedback.feedback = Some("More".into());
