@@ -265,6 +265,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     'general',
     'appearance',
     'markdown',
+    'voice',
     'providers',
     'permissions',
     'sandbox',

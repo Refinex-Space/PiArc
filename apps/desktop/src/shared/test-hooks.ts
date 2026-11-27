@@ -255,6 +255,16 @@ export interface PiarcTestHooks {
   quit(): void;
   /** `webContents.id` of each open main window (T35). */
   mainWindows(): number[];
+  /**
+   * Replaces the system's microphone permission for voice dictation: `state` is what the
+   * system reports, `grant` whether its request would grant access; `null` restores the
+   * system's. Dictation then records from `PIARC_TEST_SPEECH_SOURCE`, never a microphone.
+   */
+  setMicrophone(state: 'granted' | 'denied' | 'not-determined' | null, grant?: boolean): void;
+  /** How many times dictation asked for the microphone since `setMicrophone`. */
+  microphoneRequests(): number;
+  /** Makes the open dictation input fail the way a removed microphone does. */
+  failDictationDevice(): void;
 }
 
 /** See `src/main/platform/tray.ts`. */

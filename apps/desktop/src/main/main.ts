@@ -40,6 +40,12 @@ import { registerWorktreeHandlers } from './core/worktree-ipc.js';
 import { registerMcpHandlers } from './core/mcp-ipc.js';
 import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
 import { registerGitHandlers } from './core/git-ipc.js';
+import {
+  mayObserveDictation,
+  registerDictationHandlers,
+  SYSTEM_MICROPHONE,
+  type MicrophonePermission,
+} from './core/dictation-ipc.js';
 import { URL_SCHEME, launchTargets, parseLaunchUrl } from './launch.js';
 import { applyDataDirs, type DataDirs } from './platform/data-dirs.js';
 import { PreferenceStore } from './preferences.js';
@@ -110,6 +116,9 @@ const terminalStats = { requests: 0, frames: 0, bytes: 0, errors: 0 };
 const faults = new FaultInjector();
 /** Native confirmations that development builds' test hooks may answer (T40). */
 const nativeConfirm = new NativeConfirm();
+// Development builds' test hooks replace the system's microphone permission (voice dictation).
+let testMicrophone: MicrophonePermission | undefined;
+let microphoneRequests = 0;
 
 function bundlePath(...segments: string[]): string {
   return path.join(app.getAppPath(), '.vite', ...segments);
@@ -217,6 +226,23 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
       nativeConfirm.answerNext(answer);
     },
     confirmations: () => nativeConfirm.shown(),
+    setMicrophone: (state, grant) => {
+      microphoneRequests = 0;
+      if (state === null) {
+        testMicrophone = undefined;
+        return;
+      }
+      let current: 'granted' | 'denied' | 'not-determined' = state;
+      testMicrophone = {
+        status: () => current,
+        request: () => {
+          microphoneRequests += 1;
+          if (current === 'not-determined') current = grant === true ? 'granted' : 'denied';
+          return Promise.resolve(current === 'granted');
+        },
+      };
+    },
+    microphoneRequests: () => microphoneRequests,
     modulePath: core.modulePath,
     core: core.runtime,
     router: eventRouter,
@@ -518,8 +544,20 @@ function start(dirs: DataDirs): void {
       if (browser?.isBrowserContents(contents) === true) return;
       terminalOwners.watch(contents);
     });
-    registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
-      terminalOwners.mayObserve(windowId, route),
+    // A dictation's events (recognized speech) reach only the window that started it.
+    registerEventHandlers(
+      registerHandler,
+      eventRouter,
+      (windowId, route) =>
+        terminalOwners.mayObserve(windowId, route) && mayObserveDictation(windowId, route),
+    );
+    registerDictationHandlers(
+      registerHandler,
+      core.runtime,
+      terminalOwners,
+      () => testMicrophone ?? SYSTEM_MICROPHONE,
+      nativeConfirm,
+      () => appShell.t(),
     );
     registerTerminalHandlers(registerHandler, core.runtime, terminalOwners, terminalStats);
     registerGitHandlers(

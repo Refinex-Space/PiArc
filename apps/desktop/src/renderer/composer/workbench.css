@@ -645,3 +645,116 @@
 .browser-context-comment {
   color: var(--piarc-text-secondary);
 }
+
+/* Voice dictation (ADR-0094, addendum V-2): the microphone sits between the editor and send (send
+   keeps its own place and look); the dictation strip is its own row between the shelf and the
+   editor row. */
+.composer .composer-box.has-mic {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'shelf shelf shelf shelf'
+    'voice voice voice voice'
+    'add editor mic send';
+}
+.composer-box > .composer-mic {
+  grid-area: mic;
+}
+.composer-box .composer-mic.is-recording {
+  color: var(--piarc-text-danger);
+  background: var(--piarc-state-danger-subtle);
+}
+.composer-box .composer-mic.is-busy {
+  color: var(--piarc-text-secondary);
+}
+.composer-box > .composer-dictation {
+  grid-area: voice;
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  min-height: var(--piarc-session-composer-row);
+  margin-block-end: var(--piarc-space-1);
+  padding-inline-end: var(--piarc-space-1);
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  cursor: default;
+}
+.composer-dictation.is-error {
+  color: var(--piarc-text-danger);
+}
+.composer-dictation .dictation-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  white-space: nowrap;
+}
+.composer-dictation.is-error .dictation-status {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composer-dictation .dictation-dot {
+  inline-size: var(--piarc-space-2);
+  block-size: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-state-danger);
+  animation: dictation-pulse 1.2s var(--piarc-motion-easing) infinite alternate;
+}
+@keyframes dictation-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+.composer-dictation .dictation-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+.composer-dictation .dictation-notice {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composer-dictation .dictation-action {
+  flex: none;
+  padding: 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-c-button-radius);
+  background: var(--piarc-session-fill-hover);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.composer-dictation .dictation-action:focus-visible {
+  outline: 2px solid var(--piarc-accent-solid);
+  outline-offset: 1px;
+}
+.composer-dictation .dictation-waveform {
+  flex: 1 1 auto;
+  min-width: 0;
+  block-size: calc(var(--piarc-session-composer-row) - var(--piarc-space-2));
+  color: var(--piarc-text-secondary);
+}
+.composer-dictation .dictation-waveform.is-live {
+  color: var(--piarc-text-accent);
+}
+/* The running hypothesis at the insertion point, and text still being checked. */
+.composer .dictation-partial {
+  color: var(--piarc-text-secondary);
+}
+.composer .dictation-provisional {
+  text-decoration: underline dotted var(--piarc-text-secondary);
+  text-underline-offset: 3px;
+}
+@media (forced-colors: active) {
+  .composer-box .composer-mic.is-recording {
+    forced-color-adjust: none;
+    color: Highlight;
+    border: 1px solid Highlight;
+  }
+  .composer-dictation .dictation-dot {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+}

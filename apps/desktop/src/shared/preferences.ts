@@ -50,6 +50,60 @@ export interface Preferences {
   readonly git: GitPreferences;
   /** B5.5: the built-in browser's settings (the user's file only; Core reads two of them). */
   readonly browser: BrowserSettings;
+  /** ADR-0094: voice dictation (the user's file only; Core reads the same keys). */
+  readonly voiceDictation: VoicePreferences;
+}
+
+/** Recognition modes: the bundled streaming model, or with the downloaded refiner. */
+export const VOICE_MODES = ['basic', 'enhanced'] as const;
+export type VoiceMode = (typeof VOICE_MODES)[number];
+
+export interface VoicePreferences {
+  readonly enabled: boolean;
+  /** Opaque input device id (16 hex digits from Core); `null` is the system default. */
+  readonly device: string | null;
+  readonly mode: VoiceMode;
+  readonly punctuation: boolean;
+  readonly techTerms: boolean;
+  readonly workspaceTerms: boolean;
+  readonly customTerms: readonly string[];
+}
+
+/** The user's dictionary: most terms, longest term in UTF-8 bytes (`piarc_speech::vocabulary`). */
+export const VOICE_TERM_LIMITS = { terms: 64, bytes: 64 } as const;
+
+export type VoiceTermProblem = 'empty' | 'tooLong' | 'forbidden' | 'notEncodable';
+
+/** Control, bidirectional and line-break characters, and the model's separators `/ : ,`. */
+const VOICE_TERM_FORBIDDEN =
+  // eslint-disable-next-line no-control-regex -- control characters are what this rejects
+  /[\u0000-\u001f\u007f-\u009f/:,\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069\u2028\u2029]/u;
+
+/**
+ * The problem with `text` as a dictionary term, the rule of Core's `check_term` without the
+ * model's alphabet (Core drops terms the model cannot spell when a dictation starts).
+ */
+export function voiceTermProblem(text: string): VoiceTermProblem | undefined {
+  const term = text.trim().split(/\s+/u).join(' ');
+  if (term === '') return 'empty';
+  if (utf8Length(term) > VOICE_TERM_LIMITS.bytes) return 'tooLong';
+  if (VOICE_TERM_FORBIDDEN.test(text)) return 'forbidden';
+  if (!/[\p{L}\p{N}]/u.test(term)) return 'notEncodable';
+  return undefined;
+}
+
+/** UTF-8 bytes of `text` (this module runs where `TextEncoder` is not declared). */
+function utf8Length(text: string): number {
+  let bytes = 0;
+  for (const char of text) {
+    const code = char.codePointAt(0) ?? 0;
+    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+}
+
+function isDeviceId(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{16}$/iu.test(value);
 }
 
 /** How a workspace's browsing data is kept: on disk, or until PiArc quits. */
@@ -255,6 +309,15 @@ export const DEFAULT_PREFERENCES: Preferences = {
     devtoolsDock: 'bottom',
     approvalTimeout: BROWSER_APPROVAL_TIMEOUT.default,
   },
+  voiceDictation: {
+    enabled: true,
+    device: null,
+    mode: 'basic',
+    punctuation: true,
+    techTerms: true,
+    workspaceTerms: true,
+    customTerms: [],
+  },
 };
 
 /** A `provider/model` reference as the reviewer setting takes it (no alias). */
@@ -331,6 +394,26 @@ export function preferencesFrom(settings: unknown): Preferences {
     },
     git: gitFrom(file.git),
     browser: browserFrom(file.browser),
+    voiceDictation: voiceFrom(file.voiceDictation),
+  };
+}
+
+function voiceFrom(value: unknown): VoicePreferences {
+  const voice = isRecord(value) ? value : {};
+  const defaults = DEFAULT_PREFERENCES.voiceDictation;
+  const flag = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
+  return {
+    enabled: flag(voice.enabled, defaults.enabled),
+    device: isDeviceId(voice.device) ? voice.device : null,
+    mode: oneOf(VOICE_MODES, voice.mode, defaults.mode),
+    punctuation: flag(voice.punctuation, defaults.punctuation),
+    techTerms: flag(voice.techTerms, defaults.techTerms),
+    workspaceTerms: flag(voice.workspaceTerms, defaults.workspaceTerms),
+    customTerms: Array.isArray(voice.customTerms)
+      ? voice.customTerms
+          .filter((t): t is string => typeof t === 'string')
+          .slice(0, VOICE_TERM_LIMITS.terms)
+      : defaults.customTerms,
   };
 }
 
@@ -463,7 +546,16 @@ export type PreferenceChange =
   /** `null`: ask where to save each download. */
   | { readonly key: 'browser.downloadDirectory'; readonly value: string | null }
   | { readonly key: 'browser.devtoolsDock'; readonly value: DevtoolsDock }
-  | { readonly key: 'browser.approvalTimeout'; readonly value: number };
+  | { readonly key: 'browser.approvalTimeout'; readonly value: number }
+  /** ADR-0094: voice dictation; defaults are written as removals. */
+  | { readonly key: 'voiceDictation.enabled'; readonly value: boolean }
+  /** `null`: the system's default input. */
+  | { readonly key: 'voiceDictation.device'; readonly value: string | null }
+  | { readonly key: 'voiceDictation.mode'; readonly value: VoiceMode }
+  | { readonly key: 'voiceDictation.punctuation'; readonly value: boolean }
+  | { readonly key: 'voiceDictation.techTerms'; readonly value: boolean }
+  | { readonly key: 'voiceDictation.workspaceTerms'; readonly value: boolean }
+  | { readonly key: 'voiceDictation.customTerms'; readonly value: readonly string[] };
 
 /**
  * Validates a change received over IPC and returns the settings-file pointer and value to
@@ -587,7 +679,57 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
         ? { pointer: '/git/reviewPresentation', value: value === 'inline' ? null : value }
         : undefined;
     default:
-      return browserPointer(key, value);
+      return browserPointer(key, value) ?? voicePointer(key, value);
+  }
+}
+
+/** The `voiceDictation.*` changes (ADR-0094); `undefined` for anything else. */
+function voicePointer(
+  key: string,
+  value: unknown,
+): { pointer: string; value: unknown } | undefined {
+  // Every switch defaults to on: `true` is written as a removal.
+  const flag = (pointer: string) =>
+    typeof value === 'boolean' ? { pointer, value: value ? null : false } : undefined;
+  switch (key) {
+    case 'voiceDictation.enabled':
+      return flag('/voiceDictation/enabled');
+    case 'voiceDictation.punctuation':
+      return flag('/voiceDictation/punctuation');
+    case 'voiceDictation.techTerms':
+      return flag('/voiceDictation/techTerms');
+    case 'voiceDictation.workspaceTerms':
+      return flag('/voiceDictation/workspaceTerms');
+    case 'voiceDictation.device':
+      if (value === null) return { pointer: '/voiceDictation/device', value: null };
+      return isDeviceId(value)
+        ? { pointer: '/voiceDictation/device', value: value.toLowerCase() }
+        : undefined;
+    case 'voiceDictation.mode':
+      return oneOf(VOICE_MODES, value, 'basic') === value
+        ? { pointer: '/voiceDictation/mode', value: value === 'basic' ? null : value }
+        : undefined;
+    case 'voiceDictation.customTerms': {
+      if (!Array.isArray(value) || value.length > VOICE_TERM_LIMITS.terms) return undefined;
+      const terms = value.map((t: unknown) =>
+        typeof t === 'string' ? t.trim().split(/\s+/u).join(' ') : '',
+      );
+      if (terms.some((t) => voiceTermProblem(t) !== undefined)) return undefined;
+      // The first spelling of a term wins, as the settings page keeps it.
+      const seen = new Set<string>();
+      const unique = terms.filter((t) => {
+        const folded = t.toLowerCase();
+        if (seen.has(folded)) return false;
+        seen.add(folded);
+        return true;
+      });
+      return {
+        pointer: '/voiceDictation/customTerms',
+        value: unique.length === 0 ? null : unique,
+      };
+    }
+    default:
+      return undefined;
   }
 }
 

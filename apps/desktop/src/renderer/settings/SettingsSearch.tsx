@@ -53,6 +53,13 @@ const fields: Record<string, readonly (readonly [MessageId, string])[]> = {
     ['skills.title', 'skill-list'],
     ['plugins.title', 'plugins-section'],
   ],
+  voice: [
+    ['settings.voice.device', 'voice-device'],
+    ['settings.voice.mode', 'voice-mode'],
+    ['settings.voice.modelEnhanced', 'voice-model-enhanced'],
+    ['settings.voice.punctuation', 'voice-punctuation'],
+    ['settings.voice.dictionary', 'voice-dictionary'],
+  ],
   diagnostics: [['diagnostics.bundle.title', 'diagnostic-bundle']],
   memory: [
     ['memory.userEnabled', 'memory-user-enabled'],

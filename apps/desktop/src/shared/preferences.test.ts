@@ -6,6 +6,7 @@ import {
   pointerOf,
   preferencesFrom,
   proxyUrlProblem,
+  voiceTermProblem,
 } from './preferences.js';
 
 describe('preferences', () => {
@@ -306,5 +307,90 @@ describe('the Git preferences (ADR-0085)', () => {
       undefined,
     );
     expect(pointerOf({ key: 'git.draftPullRequests', value: 1 })).toBeUndefined();
+  });
+});
+
+describe('the voice dictation preferences (ADR-0094)', () => {
+  it('defaults to on, basic, punctuation and both term sources', () => {
+    expect(preferencesFrom({}).voiceDictation).toEqual(DEFAULT_PREFERENCES.voiceDictation);
+    expect(DEFAULT_PREFERENCES.voiceDictation).toMatchObject({
+      enabled: true,
+      device: null,
+      mode: 'basic',
+      punctuation: true,
+    });
+  });
+
+  it('reads the file leniently, keeping only an opaque device id', () => {
+    const voice = preferencesFrom({
+      voiceDictation: {
+        enabled: false,
+        device: '0123456789abcdef',
+        mode: 'enhanced',
+        punctuation: 'no',
+        customTerms: ['PiArc', 3, 'Rust'],
+      },
+    }).voiceDictation;
+    expect(voice).toMatchObject({
+      enabled: false,
+      device: '0123456789abcdef',
+      mode: 'enhanced',
+      punctuation: true,
+      customTerms: ['PiArc', 'Rust'],
+    });
+    expect(preferencesFrom({ voiceDictation: { device: '../../dev' } }).voiceDictation.device).toBe(
+      null,
+    );
+    expect(preferencesFrom({ voiceDictation: { mode: 'cloud' } }).voiceDictation.mode).toBe(
+      'basic',
+    );
+  });
+
+  it('checks terms as Core does', () => {
+    expect(voiceTermProblem(' Kubernetes ')).toBeUndefined();
+    expect(voiceTermProblem('通义 千问')).toBeUndefined();
+    expect(voiceTermProblem('  ')).toBe('empty');
+    expect(voiceTermProblem('x'.repeat(65))).toBe('tooLong');
+    expect(voiceTermProblem('一'.repeat(22))).toBe('tooLong');
+    for (const bad of ['a/b', 'a:b', 'a,b', 'a\nb', 'a\u202eb', 'a\u2066b']) {
+      expect(voiceTermProblem(bad)).toBe('forbidden');
+    }
+    expect(voiceTermProblem('---')).toBe('notEncodable');
+  });
+
+  it('writes defaults as removals and refuses what Core would refuse', () => {
+    expect(pointerOf({ key: 'voiceDictation.enabled', value: false })).toEqual({
+      pointer: '/voiceDictation/enabled',
+      value: false,
+    });
+    expect(pointerOf({ key: 'voiceDictation.enabled', value: true })).toEqual({
+      pointer: '/voiceDictation/enabled',
+      value: null,
+    });
+    expect(pointerOf({ key: 'voiceDictation.mode', value: 'enhanced' })).toEqual({
+      pointer: '/voiceDictation/mode',
+      value: 'enhanced',
+    });
+    expect(pointerOf({ key: 'voiceDictation.mode', value: 'basic' })?.value).toBeNull();
+    expect(pointerOf({ key: 'voiceDictation.mode', value: 'cloud' })).toBeUndefined();
+    expect(pointerOf({ key: 'voiceDictation.device', value: 'ABCDEF0123456789' })).toEqual({
+      pointer: '/voiceDictation/device',
+      value: 'abcdef0123456789',
+    });
+    expect(pointerOf({ key: 'voiceDictation.device', value: 'Built-in Mic' })).toBeUndefined();
+    expect(
+      pointerOf({
+        key: 'voiceDictation.customTerms',
+        value: [' PiArc ', 'piarc', 'Rust  Analyzer'],
+      }),
+    ).toEqual({ pointer: '/voiceDictation/customTerms', value: ['PiArc', 'Rust Analyzer'] });
+    expect(pointerOf({ key: 'voiceDictation.customTerms', value: [] })?.value).toBeNull();
+    expect(pointerOf({ key: 'voiceDictation.customTerms', value: ['a/b'] })).toBeUndefined();
+    expect(
+      pointerOf({
+        key: 'voiceDictation.customTerms',
+        value: Array.from({ length: 65 }, (_, i) => `t${String(i)}`),
+      }),
+    ).toBeUndefined();
   });
 });

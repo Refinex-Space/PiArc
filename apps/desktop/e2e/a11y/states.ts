@@ -55,6 +55,12 @@ export const A11Y_STATES = [
     note: 'Local Markdown image handling and reference paths',
   },
   { id: 'settings:appearance', area: 'settings', page: 'appearance', note: 'Appearance' },
+  {
+    id: 'settings:voice',
+    area: 'settings',
+    page: 'voice',
+    note: 'Voice input (microphone, models, custom words)',
+  },
   { id: 'settings:providers', area: 'settings', page: 'providers', note: 'Models and providers' },
   { id: 'settings:permissions', area: 'settings', page: 'permissions', note: 'Permissions' },
   { id: 'settings:sandbox', area: 'settings', page: 'sandbox', note: 'Sandbox' },

@@ -37,6 +37,26 @@ export function agentHostOptions(location: {
 }
 
 /**
+ * Voice dictation's bundled assets (ADR-0094): `Resources/speech` in a packaged app; on the
+ * source tree what `node scripts/dev/fetch-speech-assets.mjs` lays out for this platform.
+ */
+export function speechDir(location: {
+  readonly isPackaged: boolean;
+  readonly appPath: string;
+  readonly resourcesPath: string;
+}): string {
+  if (location.isPackaged) return path.join(location.resourcesPath, 'speech');
+  return path.join(
+    location.appPath,
+    '..',
+    '..',
+    'target',
+    'speech-assets',
+    `${process.platform}-${process.arch}`,
+  );
+}
+
+/**
  * Loads Core and starts it on the data and cache directories (architecture section 9.1) with
  * every event batch going to `router`. Throws when the module cannot be loaded or Core does
  * not start.
@@ -49,7 +69,11 @@ export function startCore(
 ): CoreHost {
   const modulePath = resolveCoreModulePath(location);
   const { CoreRuntime } = loadCoreModule(modulePath);
-  const options = { ...dirs, agentHost: agentHostOptions(location) };
+  const options = {
+    ...dirs,
+    agentHost: agentHostOptions(location),
+    speechDir: speechDir(location),
+  };
   const onEvents = (batches: Parameters<typeof router.forward>[0]) => {
     router.forward(batches);
   };

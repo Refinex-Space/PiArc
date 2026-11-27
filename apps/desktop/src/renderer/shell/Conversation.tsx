@@ -568,6 +568,10 @@ export function Conversation({
           sessionId={id}
           fileScope={{ root: fileRoot, directory: fileDirectory }}
           savedDraft={store.editorDraft('session', id)}
+          dictation={{
+            composer: `session:${id}`,
+            ...(sessionWorkspace === undefined ? {} : { workspace: sessionWorkspace }),
+          }}
           running={turn.running}
           handlers={handlers}
           mentions={mentions}

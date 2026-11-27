@@ -176,6 +176,15 @@ export const IPC_CHANNELS = {
   browserImports: 'piarc:browser.imports',
   browserForgetImport: 'piarc:browser.forgetImport',
   browserClearWorkspace: 'piarc:browser.clearWorkspace',
+  dictationStart: 'piarc:dictation.start',
+  dictationStop: 'piarc:dictation.stop',
+  dictationCancel: 'piarc:dictation.cancel',
+  dictationStatus: 'piarc:dictation.status',
+  speechDevices: 'piarc:speech.devices',
+  speechModels: 'piarc:speech.models',
+  speechModelAction: 'piarc:speech.modelAction',
+  openMicrophoneSettings: 'piarc:dictation.openMicrophoneSettings',
+  focusDictationOwner: 'piarc:dictation.focusOwner',
 } as const;
 
 /** The new-session form's worktree choice (T35). */
@@ -889,6 +898,42 @@ export interface PiarcApi {
   git(id: string, request: Record<string, unknown>, opId?: string): Promise<string>;
   /** Cancels Git operation `opId`; whether one was running. */
   cancelGit(opId: string): Promise<boolean>;
+  /**
+   * Starts a dictation in this window (ADR-0094, ADR-0096): needs recent real input in the
+   * visible window; the main process asks for the microphone the first time. Resolves with
+   * `DictationStarted` JSON (`sessionId`, the window's `route`). Refusals read back as
+   * `speech:<code>` (`microphoneDenied`, `busy`, `disabled`, `modelMissing`…).
+   */
+  dictationStart(request: {
+    composer: string;
+    workspace?: string;
+    test?: boolean;
+  }): Promise<string>;
+  /** Stops this window's dictation `sessionId`, keeping its text or for sending. */
+  dictationStop(sessionId: string, mode: 'keep' | 'send'): Promise<void>;
+  /** Cancels this window's dictation `sessionId`; its text is dropped. */
+  dictationCancel(sessionId: string): Promise<void>;
+  /**
+   * The running dictation (`DictationStatus`) with this window's `route`, whether the running
+   * one is this window's (`mine`) and the microphone permission (`microphone`), as JSON.
+   */
+  dictationStatus(): Promise<string>;
+  /** The input devices (`InputDevice[]` JSON). */
+  speechDevices(): Promise<string>;
+  /** The speech models' state (`SpeechModels` JSON); also broadcast on `core/speech`. */
+  speechModels(): Promise<string>;
+  /**
+   * Downloads, cancels, deletes or verifies a speech model; `SpeechModels` JSON afterwards.
+   * Download and delete need recent real input; delete asks natively first.
+   */
+  speechModelAction(
+    modelId: string,
+    action: 'download' | 'cancel' | 'delete' | 'verify',
+  ): Promise<string>;
+  /** Opens the system's microphone privacy settings. */
+  openMicrophoneSettings(): Promise<void>;
+  /** Brings forward the window that is dictating. */
+  focusDictationOwner(): Promise<void>;
   /**
    * One request to the built-in browser of session `id` (ADR-0088): `state` answers the
    * session's state, `newTab` and `navigate` the tab id, the rest `null`.

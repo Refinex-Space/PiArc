@@ -71,6 +71,7 @@ import {
   GitMerge,
   GitPullRequest,
   List,
+  Mic,
   Minus,
   RefreshCw,
   ScanSearch,
@@ -208,6 +209,10 @@ export const RollbackIcon = glyph(Undo2);
 export const MinusIcon = glyph(Minus);
 export const TagIcon = glyph(Tag);
 export const AlertIcon = glyph(CircleAlert);
+// Voice dictation (ADR-0094): the composer's microphone, and stop while it records (an outline
+// square, apart from the filled square that stops a running turn).
+export const MicIcon = glyph(Mic);
+export const StopDictationIcon = glyph(Square);
 
 // ---- Filled marks Lucide lacks ----
 

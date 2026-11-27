@@ -46,6 +46,8 @@ export function installTestHooks(options: {
   readonly browser: (sessionId: string) => Promise<BrowserObservation>;
   readonly browserScript: PiarcTestHooks['browserScript'];
   readonly browserShare: PiarcTestHooks['browserShare'];
+  readonly setMicrophone: PiarcTestHooks['setMicrophone'];
+  readonly microphoneRequests: PiarcTestHooks['microphoneRequests'];
 }): void {
   const { router } = options;
   let histogram: ELDHistogram | undefined;
@@ -121,6 +123,11 @@ export function installTestHooks(options: {
     failNext: options.failNext,
     holdNext: options.holdNext,
     answerConfirm: options.answerConfirm,
+    setMicrophone: options.setMicrophone,
+    microphoneRequests: options.microphoneRequests,
+    failDictationDevice: () => {
+      options.core.dictationFailDevice();
+    },
     confirmations: options.confirmations,
     showNotification: (title, body, waitMs) =>
       new Promise((resolve) => {

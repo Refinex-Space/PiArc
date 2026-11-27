@@ -433,6 +433,32 @@ const api: PiarcApi = {
       .then((value: unknown) => expectString(value)),
   cancelGit: (opId) =>
     ipcRenderer.invoke(IPC_CHANNELS.gitCancel, opId).then((value: unknown) => value === true),
+  dictationStart: (request) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.dictationStart, request)
+      .then((value: unknown) => expectString(value)),
+  dictationStop: async (sessionId, mode) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.dictationStop, sessionId, mode);
+  },
+  dictationCancel: async (sessionId) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.dictationCancel, sessionId);
+  },
+  dictationStatus: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.dictationStatus).then((value: unknown) => expectString(value)),
+  speechDevices: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.speechDevices).then((value: unknown) => expectString(value)),
+  speechModels: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.speechModels).then((value: unknown) => expectString(value)),
+  speechModelAction: (modelId, action) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.speechModelAction, modelId, action)
+      .then((value: unknown) => expectString(value)),
+  openMicrophoneSettings: async () => {
+    await ipcRenderer.invoke(IPC_CHANNELS.openMicrophoneSettings);
+  },
+  focusDictationOwner: async () => {
+    await ipcRenderer.invoke(IPC_CHANNELS.focusDictationOwner);
+  },
   browser: (id, request) => ipcRenderer.invoke(IPC_CHANNELS.browserRequest, id, request),
   placeBrowser: (id, placement) =>
     ipcRenderer.invoke(IPC_CHANNELS.browserPlace, id, placement).then(() => undefined),

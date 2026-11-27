@@ -175,6 +175,9 @@ describe('i18n', () => {
             passed: 3,
             failed: 1,
             pending: 2,
+            // Voice dictation (ADR-0094).
+            disk: '1,066 MB',
+            term: 'PiArc',
           }),
         ).not.toThrow();
       }

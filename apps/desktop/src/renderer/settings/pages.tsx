@@ -29,6 +29,7 @@ import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { SandboxPage } from './SandboxPage.js';
 import { ProxyPage } from './ProxyPage.js';
+import { VoicePage } from './VoicePage.js';
 import { GitPage } from './GitPage.js';
 import { BrowserPage } from './BrowserPage.js';
 import { ProvidersPage } from './ProvidersPage.js';
@@ -548,6 +549,12 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.sandbox',
     order: 35,
     component: SandboxPage,
+  });
+  registerSettingsPage({
+    id: 'voice',
+    title: 'settings.voice',
+    order: 15,
+    component: VoicePage,
   });
   registerSettingsPage({
     id: 'proxy',

@@ -1,0 +1,48 @@
+/* The "Voice input" settings page (ADR-0094, addendum V-7). */
+.voice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+.voice-row > .input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.voice-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.voice-test .dictation-waveform {
+  flex: 1 1 8rem;
+  min-width: 0;
+  block-size: var(--piarc-space-5);
+  color: var(--piarc-text-accent);
+}
+.voice-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+  margin: 0 0 var(--piarc-space-2);
+  padding: 0;
+  list-style: none;
+}
+.voice-term {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding-inline-start: var(--piarc-space-2);
+  border: 1px solid var(--piarc-session-line);
+  border-radius: var(--piarc-radius-pill);
+}
+.voice-progress {
+  inline-size: 100%;
+  max-inline-size: 24rem;
+  accent-color: var(--piarc-accent-solid);
+}
+.voice-privacy {
+  margin-block-start: var(--piarc-space-4);
+}

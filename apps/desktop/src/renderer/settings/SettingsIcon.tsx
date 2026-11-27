@@ -26,6 +26,12 @@ const symbols: Record<string, ReactNode> = {
       <path d="M2.4 10h15.2 M10 2.4c2.1 2.2 3.2 4.7 3.2 7.6s-1.1 5.4-3.2 7.6c-2.1-2.2-3.2-4.7-3.2-7.6S7.9 4.6 10 2.4Z" />
     </>
   ),
+  voice: (
+    <>
+      <rect x="7" y="2.2" width="6" height="10" rx="3" />
+      <path d="M4.2 9.4a5.8 5.8 0 0 0 11.6 0 M10 15.2v2.6" />
+    </>
+  ),
   browser: (
     <>
       <rect x="2.5" y="3.5" width="15" height="13" rx="2" />

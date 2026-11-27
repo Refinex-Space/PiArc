@@ -48,6 +48,8 @@ export const COMMANDS = [
   },
   { id: 'session.model', defaultKey: 'Mod+Shift+I', label: 'models.label', scope: 'app' },
   { id: 'session.effort', defaultKey: 'Mod+Shift+E', label: 'models.effort', scope: 'app' },
+  // ADR-0094: start or stop voice dictation in the composer on screen; unbound by default.
+  { id: 'composer.dictation', defaultKey: '', label: 'command.composer.dictation', scope: 'app' },
   {
     id: 'session.next',
     defaultKey: 'Ctrl+Tab',

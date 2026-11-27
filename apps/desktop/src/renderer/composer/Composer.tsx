@@ -76,6 +76,13 @@ import {
 import { composerSchema, type MentionData, type SnippetData } from './schema.js';
 import { isBlank, serializeDoc, type ComposerPayload } from './serialize.js';
 import { failureKind } from '../shell/errors.js';
+import {
+  DictationBar,
+  MicButton,
+  useDictation,
+  type DictationTarget,
+} from './dictation/Dictation.js';
+import { dictationPlugin, dictationState } from './dictation/plugin.js';
 
 /** What the composer hands over on Enter / Mod+Enter. */
 export interface ComposerSubmission extends ComposerPayload {
@@ -118,6 +125,7 @@ function emptyState(doc?: EditorState['doc']): EditorState {
     plugins: [
       mentionPlugin(),
       commandPlugin(),
+      dictationPlugin(),
       history(),
       keymap({ 'Mod-z': undo, 'Mod-Shift-z': redo, 'Mod-y': redo }),
       keymap(baseKeymap),
@@ -215,6 +223,7 @@ export function Composer({
   error,
   fill,
   insert,
+  dictation,
 }: {
   running: boolean;
   savedDraft?: EditorDraft | undefined;
@@ -239,8 +248,10 @@ export function Composer({
   fill?: { readonly text: string; readonly nonce: number } | undefined;
   /** Chips to insert at the cursor (T34: terminal selections); a new `nonce` inserts again. */
   insert?: { readonly snippets: readonly SnippetData[]; readonly nonce: number } | undefined;
+  /** Voice dictation's owner and vocabulary source (ADR-0094); without it there is no microphone. */
+  dictation?: DictationTarget | undefined;
 }) {
-  const { t, platform } = useApp();
+  const { t, platform, preferences } = useApp();
   const add = useMenu();
   const fileInput = useRef<HTMLInputElement>(null);
   const saved = useRef(savedDraft);
@@ -266,8 +277,12 @@ export function Composer({
   );
   const currentFiles = useRef(pending);
   currentFiles.current = pending;
+  const voiceOn = dictation !== undefined && preferences.voiceDictation.enabled;
+  const voice = useDictation(viewRef, voiceOn ? dictation : undefined);
+  const dictating = voice.controller?.active === true;
   // The editor's callbacks are created once; they read the latest values through this ref.
   const latest = useRef({
+    voice: voice.controller,
     running,
     disabled,
     handlers,
@@ -281,6 +296,7 @@ export function Composer({
     pending,
   });
   latest.current = {
+    voice: voice.controller,
     running,
     disabled,
     handlers,
@@ -360,8 +376,22 @@ export function Composer({
         if (sent) clear();
       });
   };
-  const send = useRef(submitInput);
-  send.current = submitInput;
+  /**
+   * Sends `intent`; while dictating, stops first and waits (bounded) for the last segment, so
+   * the message is the editor as it stands once the words landed (addendum V-4.3).
+   */
+  const submitAfterDictation = (intent: 'send' | 'steer' | 'queue', view: EditorView): void => {
+    const controller = latest.current.voice;
+    if (!controller?.active) {
+      submitInput(intent, view.state, view);
+      return;
+    }
+    void controller.stopForSend().then((ready) => {
+      if (ready && !view.isDestroyed) submitInput(intent, view.state, view);
+    });
+  };
+  const send = useRef(submitAfterDictation);
+  send.current = submitAfterDictation;
   useEffect(() => {
     const element = mount.current;
     if (element === null) {
@@ -380,7 +410,7 @@ export function Composer({
           case 'send':
           case 'steer':
           case 'queue':
-            send.current(intent, state, view);
+            if (view) send.current(intent, view);
             return true;
           case null:
             return false;
@@ -424,7 +454,8 @@ export function Composer({
         setEmpty(
           next.doc.childCount === 1 &&
             next.doc.textContent === '' &&
-            next.doc.firstChild?.childCount === 0,
+            next.doc.firstChild?.childCount === 0 &&
+            dictationState(next).partial === null,
         );
       },
       handleDOMEvents: {
@@ -508,6 +539,11 @@ export function Composer({
               break;
           }
         }
+        // Escape while dictating stops it and keeps the text; only × cancels (addendum V-3.4).
+        if (event.key === 'Escape' && latest.current.voice?.active === true) {
+          latest.current.voice.stop();
+          return true;
+        }
         return keys(editor, event);
       },
       handleTextInput(editor, from, to, text) {
@@ -557,6 +593,8 @@ export function Composer({
     viewRef.current = view;
     if (firstTurn && !latest.current.disabled) view.focus();
     return () => {
+      // The hypothesis becomes text before the draft is kept; the dictation ends.
+      latest.current.voice?.detach();
       if (savedDraft) {
         if (isBlank(serializeDoc(view.state.doc))) delete savedDraft.doc;
         else savedDraft.doc = view.state.doc;
@@ -685,7 +723,8 @@ export function Composer({
   const queueKey = platform === 'darwin' ? '⌘↩' : 'Ctrl+Enter';
   // Running with nothing typed, the button stops the turn; a draft turns it back into send (a
   // steer). A press within SWAP_GUARD_MS of the swap is ignored: a double click does not do both.
-  const stopping = running && empty && pending.length === 0 && contexts.length === 0;
+  // While dictating the button stays send: the words being spoken are the message.
+  const stopping = running && empty && pending.length === 0 && contexts.length === 0 && !dictating;
   const swappedAt = useRef(Number.NEGATIVE_INFINITY);
   const shownStop = useRef(stopping);
   useEffect(() => {
@@ -938,7 +977,18 @@ export function Composer({
           {error === undefined ? null : <div>{error}</div>}
         </div>
       )}
-      <div className={`composer-box${disabled ? ' is-disabled' : ''}`}>
+      <div
+        className={`composer-box${disabled ? ' is-disabled' : ''}${voice.controller === undefined ? '' : ' has-mic'}`}
+      >
+        {voice.controller !== undefined && (
+          <DictationBar
+            controller={voice.controller}
+            ui={voice.ui}
+            notice={voice.notice}
+            announcement={voice.announcement}
+            reducedMotion={reducedMotion(preferences.appearance.reduceMotion)}
+          />
+        )}
         {contexts.length === 0 && pending.length === 0 ? null : (
           // One shelf for both kinds: two containers would share the grid's shelf area and
           // draw over each other.
@@ -1033,6 +1083,9 @@ export function Composer({
                 : t('composer.placeholder')
           }
         />
+        {voice.controller !== undefined && (
+          <MicButton controller={voice.controller} ui={voice.ui} disabled={disabled} />
+        )}
         {stopping ? (
           <IconButton
             key="stop"
@@ -1055,11 +1108,13 @@ export function Composer({
             size="sm"
             className="composer-send composer-swap"
             data-testid={firstTurn ? 'home-start' : 'composer-send'}
-            disabled={disabled || (empty && pending.length === 0 && contexts.length === 0)}
+            disabled={
+              disabled || (empty && pending.length === 0 && contexts.length === 0 && !dictating)
+            }
             onClick={() => {
               const editor = viewRef.current;
               if (editor && swapGuard()) {
-                send.current(running ? 'steer' : 'send', editor.state, editor);
+                send.current(running ? 'steer' : 'send', editor);
                 editor.focus();
               }
             }}
@@ -1072,6 +1127,14 @@ export function Composer({
         {running ? t('composer.hint.running', { queue: queueKey }) : t('composer.hint.idle')}
       </div>
     </div>
+  );
+}
+
+/** Whether motion is reduced: the user's choice, or the system's when it follows the system. */
+function reducedMotion(choice: 'system' | 'on' | 'off'): boolean {
+  return (
+    choice === 'on' ||
+    (choice === 'system' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   );
 }
 

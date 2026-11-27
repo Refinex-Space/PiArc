@@ -35,6 +35,7 @@ import '../changes/panels.js';
 import '../terminal/panels.js';
 import { requestFilesControl } from '../files/file-controls.js';
 import { requestPreviewCommand } from '../browser/preview-commands.js';
+import { requestDictationToggle } from '../composer/dictation/bus.js';
 import { toggleChangesPanel } from '../changes/panel-state.js';
 import { claimPanelCommand } from '../changes/git/focus.js';
 import { showPanel, togglePanel } from './registry.js';
@@ -447,6 +448,9 @@ export function Shell() {
         break;
       case 'session.effort':
         if (!shortcutsOpen) effortButton.current?.click();
+        break;
+      case 'composer.dictation':
+        if (!shortcutsOpen) requestDictationToggle();
         break;
       case 'session.permissionMode':
         if (!shortcutsOpen) modeButton.current?.click();

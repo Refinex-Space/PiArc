@@ -298,6 +298,9 @@ function HomeForm({
             workspace && draft === undefined ? store.editorDraft('workspace', workspace) : undefined
           }
           firstTurn
+          dictation={
+            workspace === undefined ? undefined : { composer: `workspace:${workspace}`, workspace }
+          }
           running={false}
           disabled={busy || !workspace || (tree.enabled && tree.branches === undefined)}
           limits={ui.composer?.limits}

@@ -22,6 +22,12 @@ const NO_PARAMETERS = new Set([
   'resendSnapshots',
   'takeLaunchTargets',
   'detectProxy',
+  // Voice dictation (ADR-0094).
+  'dictationStatus',
+  'speechDevices',
+  'speechModels',
+  'openMicrophoneSettings',
+  'focusDictationOwner',
 ]);
 
 /** Synchronous preload functions (no IPC round trip). */
