@@ -30,6 +30,8 @@ impl Hub {
             self.ctx.config.launch.as_ref().and_then(|l| l.node()),
             Arc::new(piarc_exec::ProcessTreeSpawner),
         )
+        .with_npm_lock(self.ctx.npm_lock.clone())
+        .with_proxy(self.ctx.proxy.effective(self.ctx.storage.dirs().data()))
     }
 
     /// Tells every running Agent Host to read its resources again.

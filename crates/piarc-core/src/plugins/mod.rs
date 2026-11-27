@@ -51,6 +51,10 @@ pub struct PluginManager {
     /// The bundled `node` (npm runs as `node npm-cli.js` next to it).
     node: Option<PathBuf>,
     spawner: Arc<dyn ProcessSpawner>,
+    /// The proxy npm uses (`network::Proxy::effective`), `None` for direct.
+    proxy: Option<String>,
+    /// Held by every install, update and uninstall: one npm operation at a time (ADR-0102).
+    npm_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl std::fmt::Debug for PluginManager {
@@ -104,6 +108,8 @@ struct Fetched {
     version: Option<String>,
     integrity: Option<String>,
     notes: Vec<String>,
+    /// The per-package npm prefix (removed again when registering fails).
+    prefix: Option<PathBuf>,
 }
 
 impl PluginManager {
@@ -123,7 +129,23 @@ impl PluginManager {
             tool_io,
             node,
             spawner,
+            proxy: None,
+            npm_lock: Arc::default(),
         }
+    }
+
+    /// The same manager sharing `lock` with the other managers of this Core.
+    #[must_use]
+    pub fn with_npm_lock(mut self, lock: Arc<tokio::sync::Mutex<()>>) -> Self {
+        self.npm_lock = lock;
+        self
+    }
+
+    /// The same manager with npm going through `proxy` (ADR-0082, ADR-0102).
+    #[must_use]
+    pub fn with_proxy(mut self, proxy: Option<String>) -> Self {
+        self.proxy = proxy;
+        self
     }
 
     fn data(&self) -> PathBuf {
@@ -175,11 +197,27 @@ impl PluginManager {
         }
     }
 
-    /// The environment npm runs in: the command environment with the bundled Node first.
+    /// The environment npm runs in: the command environment with the bundled Node first and,
+    /// with a proxy, its variables (npm reads `npm_config_*` before `HTTPS_PROXY`; a proxy in the
+    /// user's `.npmrc` still wins, ADR-0058 rule 4).
     async fn npm_env(&self, node: &Path) -> Vec<(OsString, OsString)> {
         let env = self.tool_io.command_environment().await;
         let mut env = fetch::with_path_first(env, node.parent().unwrap_or(node));
         env.push(("npm_config_update_notifier".into(), "false".into()));
+        if let Some(proxy) = &self.proxy {
+            let ours = crate::network::env_for(Some(proxy));
+            env.retain(|(k, _)| {
+                let k = k.to_string_lossy();
+                !ours
+                    .iter()
+                    .any(|(o, _)| o.to_string_lossy().eq_ignore_ascii_case(&k))
+            });
+            env.extend(ours);
+            for key in ["npm_config_https_proxy", "npm_config_proxy"] {
+                env.push((key.into(), proxy.into()));
+            }
+            env.push(("npm_config_noproxy".into(), crate::network::NO_PROXY.into()));
+        }
         env
     }
 
@@ -224,6 +262,7 @@ impl PluginManager {
     /// The source cannot be fetched or is not a package, a package of that id is installed
     /// already, or the settings cannot be written.
     pub async fn install(&self, request: PackageInstallRequest) -> Result<PackageInstallResult> {
+        let _npm = self.npm_lock.lock().await;
         let workspace = scope_workspace(request.scope, request.workspace.as_deref())?;
         let fetched = self.fetch(&request).await;
         let outcome = match fetched {
@@ -284,6 +323,7 @@ impl PluginManager {
                     version: None,
                     integrity: None,
                     notes: Vec::new(),
+                    prefix: None,
                 })
             }
             PackageSourceKind::Git => {
@@ -320,6 +360,7 @@ impl PluginManager {
                     version: None,
                     integrity: None,
                     notes,
+                    prefix: None,
                 })
             }
             PackageSourceKind::Npm => self.fetch_npm(&request.location).await,
@@ -345,36 +386,85 @@ impl PluginManager {
         Ok(notes)
     }
 
+    /// Installs `spec` into a prefix of its own (`<pi>/npm/pkgs/<key>`); refuses an npm name
+    /// that is installed already, leaving that installation as it is.
     async fn fetch_npm(&self, spec: &str) -> Result<Fetched> {
         fetch::check_npm_spec(spec)?;
-        let root = fetch::npm_root(&self.storage.dirs().pi())?;
-        let before = fetch::npm_dependencies(&root);
-        let spec_arg = OsString::from(spec);
-        let prefix = root.clone().into_os_string();
-        self.run_npm(
-            &root,
-            Self::npm_args(
-                &["install"],
-                &[&spec_arg, &OsString::from("--prefix"), &prefix],
-            ),
-        )
-        .await?;
-        let after = fetch::npm_dependencies(&root);
-        let name = fetch::installed_name(&before, &after, spec).ok_or_else(|| {
-            failed(
-                ErrorKind::IoError,
-                format!("npm did not record which package {spec:?} is"),
-            )
+        let pi = self.storage.dirs().pi();
+        let (staging, name) = self.stage_npm(spec).await?;
+        let prefix = fetch::pkgs_root(&pi)?.join(fetch::prefix_key(&name));
+        if prefix.exists() || self.npm_installed(&name).await? {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(failed(
+                ErrorKind::InvalidParams,
+                format!("{name} is installed already: update or uninstall it"),
+            ));
+        }
+        std::fs::rename(&staging, &prefix).map_err(|e| {
+            let _ = std::fs::remove_dir_all(&staging);
+            failed(ErrorKind::IoError, format!("{}: {e}", prefix.display()))
         })?;
-        let path = root.join("node_modules").join(&name);
-        let (version, integrity) = fetch::npm_lock_entry(&root, &name);
+        let path = npm_package_dir(&prefix, &name);
+        let (version, integrity) = fetch::npm_lock_entry(&prefix, &name);
         Ok(Fetched {
             notes: scripts_note(&path),
             path,
             commit: None,
             version,
             integrity,
+            prefix: Some(prefix),
         })
+    }
+
+    /// Runs `npm install <spec>` in a fresh staging prefix; answers the prefix and the one
+    /// package it installed (the staging prefix is gone when this fails).
+    async fn stage_npm(&self, spec: &str) -> Result<(PathBuf, String)> {
+        let staging = fetch::staging_prefix(&self.storage.dirs().pi())?;
+        let spec_arg = OsString::from(spec);
+        let prefix_arg = staging.clone().into_os_string();
+        let installed = self
+            .run_npm(
+                &staging,
+                Self::npm_args(
+                    &["install"],
+                    &[&spec_arg, &OsString::from("--prefix"), &prefix_arg],
+                ),
+            )
+            .await
+            .and_then(|()| {
+                fetch::prefix_dependency(&staging).ok_or_else(|| {
+                    failed(
+                        ErrorKind::IoError,
+                        format!("npm did not install exactly one package for {spec:?}"),
+                    )
+                })
+            });
+        match installed {
+            Ok(name) => Ok((staging, name)),
+            Err(error) => {
+                let _ = std::fs::remove_dir_all(&staging);
+                Err(error)
+            }
+        }
+    }
+
+    /// The npm name of an npm record: the only dependency of its prefix, or its directory in the
+    /// shared prefix of packages installed before ADR-0102.
+    fn npm_name_of(&self, record: &PackageRecord) -> Option<String> {
+        let pi = self.storage.dirs().pi();
+        let path = Path::new(&record.path);
+        match fetch::prefix_of(&pi, path) {
+            Some(prefix) => fetch::prefix_dependency(&prefix),
+            None => fetch::shared_prefix_name(&pi, path),
+        }
+    }
+
+    async fn npm_installed(&self, name: &str) -> Result<bool> {
+        Ok(self
+            .records()
+            .await?
+            .iter()
+            .any(|r| r.source_kind == "npm" && self.npm_name_of(r).as_deref() == Some(name)))
     }
 
     /// Reads the fetched package and writes its record (no item confirmed).
@@ -396,18 +486,32 @@ impl PluginManager {
         let manifest = match manifest {
             Ok(manifest) => manifest,
             Err(reason) => {
-                self.discard(request.kind, &fetched.path).await;
+                self.discard(request.kind, &fetched);
                 return Err(failed(ErrorKind::InvalidParams, reason));
             }
         };
-        if self.records().await?.iter().any(|r| r.id == manifest.id) {
-            if request.kind == PackageSourceKind::Git {
-                self.discard(request.kind, &fetched.path).await;
-            }
-            return Err(failed(
-                ErrorKind::InvalidParams,
-                format!("a package named {:?} is installed already", manifest.id),
-            ));
+        let records = self.records().await?;
+        let data = self.data();
+        let conflict = if records.iter().any(|r| r.id == manifest.id) {
+            Some(format!(
+                "a package named {:?} is installed already",
+                manifest.id
+            ))
+        } else {
+            let own = config::data_dir(&data, &manifest.id);
+            records
+                .iter()
+                .find(|r| config::data_dir(&data, &r.id) == own)
+                .map(|r| {
+                    format!(
+                        "{:?} would share its data directory with the installed {:?}",
+                        manifest.id, r.id
+                    )
+                })
+        };
+        if let Some(reason) = conflict {
+            self.discard(request.kind, &fetched);
+            return Err(failed(ErrorKind::InvalidParams, reason));
         }
         let now = now_ms();
         let record = PackageRecord {
@@ -427,10 +531,17 @@ impl PluginManager {
         Ok((record, fetched.notes))
     }
 
-    /// Removes what a failed install fetched (a clone; never a directory source).
-    async fn discard(&self, kind: PackageSourceKind, path: &Path) {
-        if kind == PackageSourceKind::Git {
-            let _ = std::fs::remove_dir_all(path);
+    /// Removes what a failed install fetched: a clone or an npm prefix, never a directory
+    /// source.
+    fn discard(&self, kind: PackageSourceKind, fetched: &Fetched) {
+        match (kind, &fetched.prefix) {
+            (PackageSourceKind::Git, _) => {
+                let _ = std::fs::remove_dir_all(&fetched.path);
+            }
+            (PackageSourceKind::Npm, Some(prefix)) => {
+                let _ = fetch::remove_prefix(&self.storage.dirs().pi(), prefix);
+            }
+            _ => {}
         }
     }
 
@@ -573,6 +684,7 @@ impl PluginManager {
     ///
     /// No such package, or fetching failed (the previous version stays).
     pub async fn update(&self, id: &str, workspace: Option<&Path>) -> Result<PackageInstallResult> {
+        let _npm = self.npm_lock.lock().await;
         let mut record = self.record(id).await?;
         let previous_commit = record.commit.clone();
         let previous_version = record.version.clone();
@@ -614,12 +726,7 @@ impl PluginManager {
                 record.version = self.manifest(record).await.ok().and_then(|m| m.version);
                 Ok(notes)
             }
-            "npm" => {
-                let fetched = self.fetch_npm(&record.location).await?;
-                record.version = fetched.version;
-                record.integrity = fetched.integrity;
-                Ok(fetched.notes)
-            }
+            "npm" => self.refetch_npm(record).await,
             _ => {
                 record.version = self.manifest(record).await.ok().and_then(|m| m.version);
                 Ok(Vec::new())
@@ -634,6 +741,7 @@ impl PluginManager {
     ///
     /// No such package, or the settings or the database failed.
     pub async fn uninstall(&self, id: &str, workspace: Option<&Path>) -> Result<PackagesList> {
+        let _npm = self.npm_lock.lock().await;
         let record = self.record(id).await?;
         self.declare(id, PackageScope::User, None, None).await?;
         if let Some(workspace) = workspace {
@@ -649,19 +757,7 @@ impl PluginManager {
                 }
             }
             "npm" => {
-                let root = fetch::npm_root(&self.storage.dirs().pi())?;
-                let prefix = root.clone().into_os_string();
-                let name = OsString::from(id);
-                if let Err(e) = self
-                    .run_npm(
-                        &root,
-                        Self::npm_args(
-                            &["uninstall"],
-                            &[&name, &OsString::from("--prefix"), &prefix],
-                        ),
-                    )
-                    .await
-                {
+                if let Err(e) = self.remove_npm(&record).await {
                     result = format!("uninstalled; npm could not remove it: {e}");
                 }
             }
@@ -676,6 +772,102 @@ impl PluginManager {
         )
         .await;
         self.list(workspace).await
+    }
+
+    /// An npm package's newest version for its spec, installed beside the current one and
+    /// swapped in once it reads as the same package; the old files go only after that.
+    async fn refetch_npm(&self, record: &mut PackageRecord) -> Result<Vec<String>> {
+        let pi = self.storage.dirs().pi();
+        let name = self.npm_name_of(record).ok_or_else(|| {
+            failed(
+                ErrorKind::NotFound,
+                format!("the npm files of {:?} are missing", record.id),
+            )
+        })?;
+        let (staging, installed) = self.stage_npm(&record.location).await?;
+        if installed != name {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(failed(
+                ErrorKind::InvalidParams,
+                format!("{:?} now installs {installed}, not {name}", record.location),
+            ));
+        }
+        let old_path = PathBuf::from(&record.path);
+        let prefix = fetch::pkgs_root(&pi)?.join(fetch::prefix_key(&name));
+        let aside = prefix.with_file_name(format!(".previous-{}", fetch::prefix_key(&name)));
+        let had = prefix.exists();
+        if had {
+            let _ = std::fs::remove_dir_all(&aside);
+            std::fs::rename(&prefix, &aside)
+                .map_err(|e| failed(ErrorKind::IoError, format!("{}: {e}", prefix.display())))?;
+        }
+        let restore = |error: Error| {
+            let _ = std::fs::remove_dir_all(&prefix);
+            if had {
+                let _ = std::fs::rename(&aside, &prefix);
+            }
+            error
+        };
+        std::fs::rename(&staging, &prefix).map_err(|e| {
+            let _ = std::fs::remove_dir_all(&staging);
+            restore(failed(
+                ErrorKind::IoError,
+                format!("{}: {e}", prefix.display()),
+            ))
+        })?;
+        let path = npm_package_dir(&prefix, &name);
+        let previous = std::mem::replace(&mut record.path, path.display().to_string());
+        match self.manifest(record).await {
+            Ok(manifest) if manifest.id == record.id => {}
+            other => {
+                record.path = previous;
+                let reason = match other {
+                    Ok(m) => format!("the new version is {:?}, not {:?}", m.id, record.id),
+                    Err(reason) => reason,
+                };
+                return Err(restore(failed(ErrorKind::InvalidParams, reason)));
+            }
+        }
+        let (version, integrity) = fetch::npm_lock_entry(&prefix, &name);
+        record.version = version;
+        record.integrity = integrity;
+        if had {
+            let _ = std::fs::remove_dir_all(&aside);
+        } else if fetch::shared_prefix_name(&pi, &old_path).is_some() {
+            // Installed before ADR-0102: it moved to a prefix of its own.
+            let _ = self.uninstall_shared(&name).await;
+        }
+        Ok(scripts_note(&path))
+    }
+
+    /// Removes an npm record's files: its prefix, or its entry in the shared prefix.
+    async fn remove_npm(&self, record: &PackageRecord) -> Result<()> {
+        let pi = self.storage.dirs().pi();
+        let path = Path::new(&record.path);
+        if let Some(prefix) = fetch::prefix_of(&pi, path) {
+            return fetch::remove_prefix(&pi, &prefix);
+        }
+        let name = fetch::shared_prefix_name(&pi, path).ok_or_else(|| {
+            failed(
+                ErrorKind::NotFound,
+                format!("{} is not inside PiArc's npm directory", path.display()),
+            )
+        })?;
+        self.uninstall_shared(&name).await
+    }
+
+    async fn uninstall_shared(&self, name: &str) -> Result<()> {
+        let root = fetch::npm_root(&self.storage.dirs().pi())?;
+        let prefix = root.clone().into_os_string();
+        let name = OsString::from(name);
+        self.run_npm(
+            &root,
+            Self::npm_args(
+                &["uninstall"],
+                &[&name, &OsString::from("--prefix"), &prefix],
+            ),
+        )
+        .await
     }
 
     async fn manifest(
@@ -712,6 +904,12 @@ pub(crate) async fn extensions(
         })
         .collect();
     Ok(PluginsExtensions { extensions })
+}
+
+/// `<prefix>/node_modules/<name>` (a scoped name is two directories).
+fn npm_package_dir(prefix: &Path, name: &str) -> PathBuf {
+    name.split('/')
+        .fold(prefix.join("node_modules"), |dir, part| dir.join(part))
 }
 
 /// The note about install scripts a package declares.

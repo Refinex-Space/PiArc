@@ -698,6 +698,7 @@ fn open_state(
         worktrees,
         diagnostics: crate::sessions::PreparedBundle::default(),
         proxy: Arc::new(crate::network::Proxy::starting(&data)),
+        npm_lock: Arc::default(),
         git: Arc::default(),
         browser: Arc::clone(&proxies),
         chrome: crate::browser::import::ChromeImports::new(

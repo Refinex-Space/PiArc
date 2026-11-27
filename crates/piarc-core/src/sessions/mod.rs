@@ -174,6 +174,8 @@ pub(crate) struct Ctx {
     pub diagnostics: diagnostics::PreparedBundle,
     /// The Agent Hosts' proxy (ADR-0082).
     pub proxy: Arc<crate::network::Proxy>,
+    /// One npm operation at a time across every package manager of this Core (ADR-0102).
+    pub npm_lock: Arc<tokio::sync::Mutex<()>>,
     /// The Git panel's locks and operations (ADR-0085).
     pub git: Arc<crate::git::GitState>,
     /// The built-in browser's partition proxies (ADR-0088).

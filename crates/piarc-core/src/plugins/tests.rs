@@ -742,3 +742,5 @@ async fn thr03_a_cloned_packages_npmrc_cannot_choose_what_npm_runs() {
         "the package's .npmrc is back"
     );
 }
+
+mod npm;
