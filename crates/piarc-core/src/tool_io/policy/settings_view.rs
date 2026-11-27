@@ -287,6 +287,9 @@ impl ToolIo {
                 .map(|p| display(&p))
                 .unwrap_or_else(|_| display(&w))
         });
+        // Packages belong to the computer (ADR-0102): user-level installs and uninstalls have no
+        // workspace, and every project's rows matter to every project.
+        let workspace = workspace.filter(|_| query.kind.as_deref() != Some("plugin"));
         let filter = piarc_store::AuditFilter {
             session_id: query.session_id,
             workspace,
@@ -302,6 +305,8 @@ impl ToolIo {
                 // Chrome imports (sites and counts only).
                 Some("browser") => "browser".into(),
                 Some("browserImport") => "browserImport".into(),
+                // ADR-0102: package installs, updates, switches and uninstalls.
+                Some("plugin") => "plugin".into(),
                 Some(other) => {
                     return Err(ErrorObject::new(
                         ErrorKind::InvalidParams,

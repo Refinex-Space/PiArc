@@ -103,6 +103,7 @@ const PIARC_API_SNAPSHOT = [
   'resendSnapshots',
   'resumeSession',
   'revealMemory',
+  'revealSkill',
   'rewind',
   'rewindPreview',
   'sandboxSettings',

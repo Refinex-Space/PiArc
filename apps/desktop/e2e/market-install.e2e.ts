@@ -98,4 +98,58 @@ test('installs off, turns on through the native confirmation and uninstalls in t
   await row.getByTestId('package-uninstall-start').click();
   await row.getByTestId('package-uninstall').click();
   await expect(row).toHaveCount(0, { timeout: 30_000 });
+
+  // M-22: the permissions page's audit lists the package rows.
+  await page.evaluate(() => {
+    window.location.hash = '#/settings/permissions?audit=plugin';
+  });
+  await expect(settings.getByTestId('audit-kind')).toHaveValue('plugin');
+  const audit = settings.getByTestId('permission-audit-table');
+  await expect(audit).toContainText('pi-lint-skills@1.2.0');
+  await expect(audit).toContainText('Market');
+  await expect(audit).toContainText('Uninstall');
+  await settings
+    .getByTestId('permission-audit')
+    .screenshot({ path: path.join(EVIDENCE, 'audit-packages-light-en.png') });
+});
+
+test('a skill shows its own file in Finder, and only a skill Core lists', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  await prefer(page, { key: 'language', value: 'en' });
+  const ws = await makeWorkspace(workspaces, 'skills 技能', {
+    '.claude/skills/tidy/SKILL.md': '---\nname: tidy\ndescription: Tidy up\n---\nTidy.\n',
+  });
+  await openFolder(page, app, ws);
+  await startSession(page, 'Hello', 't18-chat', 'trust');
+  await idle(page);
+  // The native reveal is replaced by a recorder (Playwright cannot see Finder).
+  await app.evaluate(({ shell }) => {
+    const shown: string[] = [];
+    Object.assign(globalThis, { __piarcShown: shown });
+    shell.showItemInFolder = (file: string) => {
+      shown.push(file);
+    };
+  });
+  const settings = await openMarket(page);
+  await settings.getByTestId('skills-view-installed').check({ force: true });
+  const row = settings.locator('[data-testid="skill-row"][data-name="tidy"]');
+  await row.getByTestId('skill-more-tidy').click();
+  await settings.getByTestId('skill-reveal').click();
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as { __piarcShown?: string[] }).__piarcShown ?? []))
+    .toEqual([path.join(ws, '.claude', 'skills', 'tidy', 'SKILL.md')]);
+  // A name Core does not list reveals nothing.
+  const refused = await page.evaluate(
+    (dir) =>
+      window.piarc.revealSkill(dir, 'not-a-skill').then(
+        () => 'revealed',
+        () => 'refused',
+      ),
+    ws,
+  );
+  expect(refused).toBe('refused');
 });

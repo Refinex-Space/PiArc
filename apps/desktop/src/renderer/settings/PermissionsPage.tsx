@@ -60,9 +60,32 @@ interface AuditRow {
   readonly ruleSource: string | undefined;
   /** An Auto mode review (T46): the reviewer and how long it took. */
   readonly review?: { readonly model: string; readonly durationMs: number | undefined };
+  /** A package row (ADR-0102): Core's result text, and whether it succeeded. */
+  readonly plugin?: { readonly result: string; readonly ok: boolean };
 }
 
-type AuditKind = 'permission' | 'sandbox' | 'autoReview';
+type AuditKind = 'permission' | 'sandbox' | 'autoReview' | 'plugin';
+const AUDIT_KINDS: readonly AuditKind[] = ['permission', 'sandbox', 'autoReview', 'plugin'];
+const isAuditKind = (value: string): value is AuditKind => AUDIT_KINDS.some((k) => k === value);
+
+function pluginAction(action: string | undefined, t: (id: MessageId) => string): string {
+  switch (action) {
+    case 'install':
+      return t('permissions.audit.plugin.install');
+    case 'update':
+      return t('permissions.audit.plugin.update');
+    case 'uninstall':
+      return t('permissions.audit.plugin.uninstall');
+    case 'enable':
+      return t('permissions.audit.plugin.enable');
+    case 'disable':
+      return t('permissions.audit.plugin.disable');
+    case 'confirm':
+      return t('permissions.audit.plugin.confirm');
+    default:
+      return action ?? '';
+  }
+}
 
 const REVIEW_OUTCOMES = [
   'allow',
@@ -147,6 +170,22 @@ export function parseAudit(raw: string): AuditRow[] {
           model: str(d.model) ?? '',
           durationMs: typeof d.durationMs === 'number' ? d.durationMs : undefined,
         },
+      };
+    }
+    if (typeof d.action === 'string' && typeof d.result !== 'object') {
+      // A package row (ADR-0102): what was done to which package, from where, and the result.
+      const result = str(d.result) ?? '';
+      const version = str(d.version);
+      const target = str(d.id) ?? str(d.location);
+      return {
+        at: typeof e.at === 'number' ? e.at : 0,
+        sessionId: undefined,
+        tool: d.action,
+        step: str(d.origin) ?? str(d.source),
+        conclusion: undefined,
+        rule: target === undefined ? undefined : version ? `${target}@${version}` : target,
+        ruleSource: str(d.scope),
+        plugin: { result, ok: !result.startsWith('failed') },
       };
     }
     if (typeof d.denial === 'string' || d.approval === 'network') {
@@ -475,8 +514,8 @@ type Since = keyof typeof SINCE | 'all';
 /** The audit kind a link asked for (`#/settings/permissions?audit=sandbox`, T39;
  * `audit=autoReview`, T46). */
 function initialKind(): AuditKind {
-  const asked = /[?&]audit=(sandbox|autoReview)(?:&|$)/u.exec(window.location.hash)?.[1];
-  return asked === 'sandbox' || asked === 'autoReview' ? asked : 'permission';
+  const asked = /[?&]audit=(sandbox|autoReview|plugin)(?:&|$)/u.exec(window.location.hash)?.[1];
+  return asked !== undefined && isAuditKind(asked) ? asked : 'permission';
 }
 
 function AuditSection({ workspace }: { readonly workspace: string }) {
@@ -542,12 +581,13 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
             data-testid="audit-kind"
             onChange={(e) => {
               const value = e.currentTarget.value;
-              setKind(value === 'sandbox' || value === 'autoReview' ? value : 'permission');
+              setKind(isAuditKind(value) ? value : 'permission');
             }}
           >
             <option value="permission">{t('permissions.audit.kind.permission')}</option>
             <option value="sandbox">{t('permissions.audit.kind.sandbox')}</option>
             <option value="autoReview">{t('permissions.audit.kind.autoReview')}</option>
+            <option value="plugin">{t('permissions.audit.kind.plugin')}</option>
           </select>
         </label>
         <label htmlFor={ids.session} className="settings-filter-field">
@@ -626,15 +666,21 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
             <tr>
               <th>{t('permissions.audit.time')}</th>
               <th>{t('permissions.audit.session')}</th>
-              <th>{t('permissions.audit.tool')}</th>
-              <th>{t('permissions.audit.step')}</th>
+              <th>
+                {t(kind === 'plugin' ? 'permissions.audit.action' : 'permissions.audit.tool')}
+              </th>
+              <th>
+                {t(kind === 'plugin' ? 'permissions.audit.origin' : 'permissions.audit.step')}
+              </th>
               <th>
                 {t(
                   kind === 'sandbox'
                     ? 'permissions.audit.target'
                     : kind === 'autoReview'
                       ? 'permissions.audit.review'
-                      : 'permissions.audit.rule',
+                      : kind === 'plugin'
+                        ? 'permissions.audit.package'
+                        : 'permissions.audit.rule',
                 )}
               </th>
               <th>{t('permissions.audit.conclusion')}</th>
@@ -648,10 +694,18 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
                   {r.sessionId?.slice(0, 8) ?? ''}
                 </td>
                 <td className="permission-nowrap">
-                  {kind === 'sandbox' ? sandboxKind(r.tool, r.step, t) : (r.tool ?? '')}
+                  {kind === 'sandbox'
+                    ? sandboxKind(r.tool, r.step, t)
+                    : r.plugin !== undefined
+                      ? pluginAction(r.tool, t)
+                      : (r.tool ?? '')}
                 </td>
                 <td className="permission-nowrap">
-                  {r.review === undefined ? (r.step ?? '') : outcomeLabel(r.step, t)}
+                  {r.review !== undefined
+                    ? outcomeLabel(r.step, t)
+                    : r.plugin !== undefined && r.step === 'market'
+                      ? t('permissions.audit.plugin.market')
+                      : (r.step ?? '')}
                 </td>
                 <td>
                   {r.review === undefined ? (
@@ -663,14 +717,23 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
                     <ReviewCell row={r} review={r.review} />
                   )}
                 </td>
-                <td className="permission-nowrap">
-                  {r.conclusion === 'allow'
-                    ? t('permissions.audit.allow')
-                    : r.conclusion === 'deny'
-                      ? t('permissions.audit.deny')
-                      : r.conclusion === 'ask'
-                        ? t('permissions.audit.ask')
-                        : ''}
+                <td
+                  className="permission-nowrap"
+                  data-tooltip={r.plugin === undefined || r.plugin.ok ? undefined : r.plugin.result}
+                >
+                  {r.plugin !== undefined
+                    ? t(
+                        r.plugin.ok
+                          ? 'permissions.audit.plugin.ok'
+                          : 'permissions.audit.plugin.failed',
+                      )
+                    : r.conclusion === 'allow'
+                      ? t('permissions.audit.allow')
+                      : r.conclusion === 'deny'
+                        ? t('permissions.audit.deny')
+                        : r.conclusion === 'ask'
+                          ? t('permissions.audit.ask')
+                          : ''}
                 </td>
               </tr>
             ))}

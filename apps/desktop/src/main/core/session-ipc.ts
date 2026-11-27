@@ -956,6 +956,30 @@ export function registerSessionHandlers(
     }
     shell.showItemInFolder(directory);
   });
+  registerHandler(IPC_CHANNELS.skillReveal, async (_event, [dir, name]) => {
+    if (typeof name !== 'string' || name.length === 0 || name.length > 128) {
+      throw new TypeError('name must be a skill name of 1-128 characters');
+    }
+    // The file Core lists for this skill in this workspace, never a path from the page.
+    const list: unknown = JSON.parse(await core.listSkills(absolutePath(dir), null));
+    const skills: unknown =
+      typeof list === 'object' && list !== null && 'skills' in list ? list.skills : undefined;
+    const skill = Array.isArray(skills)
+      ? skills.find(
+          (s: unknown): s is { path: string } =>
+            typeof s === 'object' &&
+            s !== null &&
+            'name' in s &&
+            s.name === name &&
+            'path' in s &&
+            typeof s.path === 'string',
+        )
+      : undefined;
+    if (skill === undefined || !path.isAbsolute(skill.path)) {
+      throw new Error('Core lists no such skill');
+    }
+    shell.showItemInFolder(skill.path);
+  });
   const backendId = (value: unknown): string => {
     if (typeof value !== 'string' || !/^[a-z][a-z0-9-]{0,31}$/u.test(value)) {
       throw new TypeError('backend must be a search backend id');

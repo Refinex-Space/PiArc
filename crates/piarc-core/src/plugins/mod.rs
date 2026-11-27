@@ -820,27 +820,44 @@ impl PluginManager {
             self.declare(id, PackageScope::Project, Some(workspace), None)
                 .await?;
         }
+        let mut declarations = vec!["user"];
+        if workspace.is_some() {
+            declarations.push("project");
+        }
         let path = PathBuf::from(&record.path);
         let mut result = "uninstalled".to_owned();
+        let mut removed = Vec::new();
         match record.source_kind.as_str() {
-            "git" => {
-                if let Err(e) = std::fs::remove_dir_all(&path) {
-                    result = format!("uninstalled; the clone could not be removed: {e}");
+            "git" => match std::fs::remove_dir_all(&path) {
+                Ok(()) => removed.push(path.display().to_string()),
+                Err(e) => result = format!("uninstalled; the clone could not be removed: {e}"),
+            },
+            "npm" => match self.remove_npm(&record).await {
+                Ok(()) => {
+                    let prefix = fetch::prefix_of(&self.storage.dirs().pi(), &path);
+                    removed.push(prefix.unwrap_or(path).display().to_string());
                 }
-            }
-            "npm" => {
-                if let Err(e) = self.remove_npm(&record).await {
-                    result = format!("uninstalled; npm could not remove it: {e}");
-                }
-            }
+                Err(e) => result = format!("uninstalled; npm could not remove it: {e}"),
+            },
             _ => {}
         }
-        let _ = std::fs::remove_dir_all(config::data_dir(&self.data(), id));
+        let data = config::data_dir(&self.data(), id);
+        if data.exists() && std::fs::remove_dir_all(&data).is_ok() {
+            removed.push(data.display().to_string());
+        }
         let key = id.to_owned();
         self.storage.run(move |s| s.remove_package(&key)).await??;
         self.audit(
             workspace,
-            json!({ "action": "uninstall", "id": id, "result": result }),
+            json!({
+                "action": "uninstall",
+                "id": id,
+                "version": record.version,
+                "source": record.source_kind,
+                "result": result,
+                "removed": removed,
+                "declarations": declarations,
+            }),
         )
         .await;
         self.list(workspace).await

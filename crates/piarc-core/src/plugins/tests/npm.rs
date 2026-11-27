@@ -183,6 +183,25 @@ async fn uninstalling_removes_the_packages_own_files_when_its_id_is_not_its_npm_
         .expect("uninstall");
     assert!(!path.exists(), "{} is still there", path.display());
     assert_eq!(f.npm_entries("npm-name"), Vec::<PathBuf>::new());
+    // M-22: the row names what went (the package's prefix) and the declarations cleared.
+    let audit = f.audit().await;
+    let row = audit
+        .iter()
+        .rfind(|r| r["action"] == "uninstall")
+        .expect("an uninstall row");
+    assert_eq!(row["id"], "plugin-id");
+    assert_eq!(row["declarations"], serde_json::json!(["user"]));
+    let removed: Vec<&str> = row["removed"]
+        .as_array()
+        .expect("removed")
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect();
+    assert!(
+        removed.iter().any(|r| path.starts_with(r)),
+        "{removed:?} does not cover {}",
+        path.display()
+    );
 }
 
 #[tokio::test]

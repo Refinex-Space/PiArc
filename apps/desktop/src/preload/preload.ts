@@ -770,6 +770,9 @@ const api: PiarcApi = {
   revealMemory: async (workspace) => {
     await ipcRenderer.invoke(IPC_CHANNELS.memoryReveal, workspace);
   },
+  revealSkill: async (workspace, name) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.skillReveal, workspace, name);
+  },
   resendSnapshots: async () => {
     await ipcRenderer.invoke(IPC_CHANNELS.snapshotsResend);
   },

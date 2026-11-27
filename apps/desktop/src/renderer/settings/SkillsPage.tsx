@@ -20,6 +20,7 @@ import { styleDescription } from '../shell/OutputStyleDialog.js';
 import { parseWorkspaces } from './AgentsPage.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { PluginsSection } from './PluginsSection.js';
+import { RowMenu } from './ConnectionList.js';
 import { reason } from '../shell/errors.js';
 import { ChevronDownIcon } from '../shell/icons.js';
 import { SegmentedControl } from '../app/SegmentedControl.js';
@@ -78,8 +79,9 @@ export function warningText(t: Translate, w: ResourceWarning): string {
   }
 }
 
-function SkillRow({ skill }: { readonly skill: SkillInfo }) {
-  const { t } = useApp();
+function SkillRow({ skill, workspace }: { readonly skill: SkillInfo; readonly workspace: string }) {
+  const { t, platform } = useApp();
+  const [revealError, setRevealError] = useState('');
   const who = skill.modelInvocable
     ? skill.userInvocable
       ? t('skills.who.both')
@@ -130,6 +132,31 @@ function SkillRow({ skill }: { readonly skill: SkillInfo }) {
           </ul>
         </div>
       </details>
+      <div className="package-actions">
+        <RowMenu
+          label={t('skills.more', { name: skill.name })}
+          testId={`skill-more-${skill.name}`}
+          disabled={false}
+          items={[
+            {
+              id: 'reveal',
+              testId: 'skill-reveal',
+              label: t(platform === 'win32' ? 'skills.revealWin' : 'skills.revealMac'),
+              run: () => {
+                setRevealError('');
+                window.piarc.revealSkill(workspace, skill.name).catch((e: unknown) => {
+                  setRevealError(reason(e));
+                });
+              },
+            },
+          ]}
+        />
+      </div>
+      {revealError !== '' && (
+        <p className="package-alert" role="alert">
+          {revealError}
+        </p>
+      )}
       {(skill.warnings ?? []).length === 0 ? null : (
         <ul className="package-warnings" data-testid="skill-warnings">
           {(skill.warnings ?? []).map((w, index) => (
@@ -144,7 +171,13 @@ function SkillRow({ skill }: { readonly skill: SkillInfo }) {
 /** How many skills show before "show more"; a filter appears above this many. */
 const SHOWN = 10;
 
-function SkillList({ skills }: { readonly skills: readonly SkillInfo[] }) {
+function SkillList({
+  skills,
+  workspace,
+}: {
+  readonly skills: readonly SkillInfo[];
+  readonly workspace: string;
+}) {
   const { t } = useApp();
   const [filter, setFilter] = useState('');
   const [shown, setShown] = useState(SHOWN);
@@ -174,7 +207,7 @@ function SkillList({ skills }: { readonly skills: readonly SkillInfo[] }) {
       )}
       <ul className="package-list" data-testid="skill-list">
         {matching.slice(0, shown).map((skill) => (
-          <SkillRow key={skill.name} skill={skill} />
+          <SkillRow key={skill.name} skill={skill} workspace={workspace} />
         ))}
       </ul>
       {matching.length > shown && (
@@ -414,7 +447,7 @@ export function SkillsPage() {
           {view.skills.length === 0 ? (
             <p className="settings-row-note package-empty">{t('skills.none')}</p>
           ) : (
-            <SkillList key={chosen ?? ''} skills={view.skills} />
+            <SkillList key={chosen ?? ''} skills={view.skills} workspace={chosen ?? ''} />
           )}
           {view.issues.length === 0 ? null : (
             <ul className="package-warnings" data-testid="skill-issues">

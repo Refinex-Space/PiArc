@@ -135,6 +135,7 @@ export const IPC_CHANNELS = {
   memoryView: 'piarc:memory.view',
   memoryEdit: 'piarc:memory.edit',
   memoryReveal: 'piarc:memory.reveal',
+  skillReveal: 'piarc:skills.reveal',
   webSearchBackendSet: 'piarc:webSearch.backend.set',
   webSearchKeySet: 'piarc:webSearch.key.set',
   snapshotsResend: 'piarc:snapshots.resend',
@@ -243,8 +244,9 @@ export interface PermissionRuleChange {
 export interface AuditQuery {
   readonly workspace?: string;
   /** `permission` (the default), `sandbox`: sandbox denials and network approvals (T39), or
-   * `autoReview`: the Auto mode reviewer's decisions (T46). */
-  readonly kind?: 'permission' | 'sandbox' | 'autoReview';
+   * `autoReview`: the Auto mode reviewer's decisions (T46), or `plugin`: package installs,
+   * updates, switches and uninstalls (ADR-0102). */
+  readonly kind?: 'permission' | 'sandbox' | 'autoReview' | 'plugin';
   readonly sessionId?: string;
   readonly tool?: string;
   readonly conclusion?: 'allow' | 'deny';
@@ -1160,6 +1162,9 @@ export interface PiarcApi {
   memoryEdit(workspace: string, edit: string): Promise<string>;
   /** Shows the workspace repository's memory folder in Finder or File Explorer (T47). */
   revealMemory(workspace: string): Promise<void>;
+  /** Shows skill `name`'s file in Finder or File Explorer: the file Core lists for the
+   * workspace, never a path from the page (ADR-0102). */
+  revealSkill(workspace: string, name: string): Promise<void>;
   /** Asks Core to send the workspace and session snapshots again. */
   resendSnapshots(): Promise<void>;
   /** The trust view of a directory as JSON (`TrustView`). */
