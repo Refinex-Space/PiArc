@@ -469,11 +469,15 @@ function approvalAnswer(value: unknown): ApprovalAnswer {
       ...(a.answers === undefined ? {} : { answers: questionAnswers(a.answers) }),
     };
   }
+  // ADR-0103: a message sent while a plan waits declines it `via: conversation` (Core checks
+  // that the card is a plan). Notification answers come from the main process only.
+  if (a.via !== undefined && a.via !== 'conversation') throw new TypeError('invalid answer origin');
   return decision === 'deny'
     ? {
         ...fields,
         ...(a.feedback === undefined ? {} : { feedback: text(a.feedback, 'feedback', true) }),
         ...(a.comments === undefined ? {} : { comments: planComments(a.comments) }),
+        ...(a.via === undefined ? {} : { via: 'conversation' as const }),
       }
     : fields;
 }

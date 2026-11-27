@@ -415,6 +415,14 @@ impl ToolIo {
                     ApprovalKind::Plan => plan::check_answer(request, &answer)?,
                     _ => {}
                 }
+                // Only a plan takes a reply in the conversation as its answer (ADR-0103).
+                if request.kind != ApprovalKind::Plan
+                    && answer.via == Some(piarc_protocol::policy::AnswerVia::Conversation)
+                {
+                    return Err(denied(
+                        "Only a plan card is answered by a reply in the conversation.",
+                    ));
+                }
                 if request.tool == piarc_protocol::policy::NETWORK_TOOL {
                     check_network(request, &answer)?;
                 } else if answer.decision == ApprovalDecision::AllowAlways {

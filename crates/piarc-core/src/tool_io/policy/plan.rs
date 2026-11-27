@@ -7,7 +7,11 @@
 //!   the mode menu), or declines it to keep planning: the feedback and the inline comments go
 //!   back to the model as the refusal ([`keep_planning`]) and the mode stays plan.
 //! - The Agent Host records every switch on the branch (`policy/evaluate` result `mode`).
+//! - A message the user sends while the card waits is a reply to the plan (ADR-0103): the
+//!   client steers it into the turn, then declines the card `via: conversation`, so the model
+//!   reads the refusal and then the message, in that order.
 use piarc_protocol::harness::PlanComment;
+use piarc_protocol::policy::AnswerVia;
 
 use super::*;
 
@@ -47,6 +51,13 @@ pub(super) fn check_answer(
     request: &ApprovalRequest,
     answer: &ApprovalAnswer,
 ) -> Result<(), ErrorObject> {
+    if answer.via == Some(AnswerVia::Conversation)
+        && (answer.decision != ApprovalDecision::Deny || answer.feedback.is_some())
+    {
+        return Err(denied(
+            "A reply in the conversation declines the plan; the message itself is the feedback.",
+        ));
+    }
     match answer.decision {
         ApprovalDecision::AllowOnce => match answer.mode {
             Some(PermissionMode::AcceptEdits | PermissionMode::Default) => Ok(()),
@@ -93,10 +104,16 @@ fn check_comments(plan: &str, comments: &[PlanComment]) -> Result<(), ErrorObjec
 /// What the model reads when the user keeps planning: the feedback, then each comment with
 /// the passage it is about (as a JSON string) and the passage's UTF-16 offsets in the plan.
 pub(super) fn keep_planning(answer: &ApprovalAnswer) -> String {
-    let mut text = String::from(
+    let mut text = String::from(if answer.via == Some(AnswerVia::Conversation) {
+        "The user did not approve the plan and wrote to you in the conversation instead; their \
+         message comes right after this result. Plan mode stays on. Act on the message: answer \
+         what it asks, investigate further with read-only tools if it needs that, and submit \
+         the revised plan in full with ExitPlanMode once it changes the plan. If the user asks \
+         you to stop, stop and wait."
+    } else {
         "The user did not approve the plan. Plan mode stays on: keep investigating with \
-         read-only tools as needed, revise the plan and submit it again with ExitPlanMode.",
-    );
+         read-only tools as needed, revise the plan and submit it again with ExitPlanMode."
+    });
     if let Some(feedback) = answer
         .feedback
         .as_deref()
@@ -269,6 +286,28 @@ mod tests {
             text.contains(r#"1. On "line\n\"two\"" (offsets 3-10): Use the cache"#),
             "{text}"
         );
+    }
+
+    #[test]
+    fn a_reply_in_the_conversation_declines_and_points_to_the_message() {
+        let plan = card("1. Fix it");
+        let mut reply = answer(ApprovalDecision::Deny);
+        reply.via = Some(AnswerVia::Conversation);
+        reply.comments = vec![comment(3, 9, "Fix it")];
+        assert!(check_answer(&plan, &reply).is_ok());
+        let text = keep_planning(&reply);
+        assert!(text.contains("message comes right after this result"), "{text}");
+        assert!(text.contains("Plan mode stays on"), "{text}");
+        assert!(text.contains(r#"1. On "Fix it" (offsets 3-9): Why?"#), "{text}");
+        // The message is the feedback: a reply carries none of its own, and never approves.
+        let mut with_feedback = reply.clone();
+        with_feedback.feedback = Some("More".into());
+        assert!(check_answer(&plan, &with_feedback).is_err());
+        let mut approve = reply.clone();
+        approve.decision = ApprovalDecision::AllowOnce;
+        approve.mode = Some(PermissionMode::AcceptEdits);
+        approve.comments.clear();
+        assert!(check_answer(&plan, &approve).is_err());
     }
 
     #[test]

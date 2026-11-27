@@ -392,6 +392,11 @@
           "const": "notification",
           "description": "A system notification's action: `allowOnce` (only on a card with\n`notificationAllow`) or `deny` without feedback.",
           "type": "string"
+        },
+        {
+          "const": "conversation",
+          "description": "The user replied in the conversation instead of answering a `plan` card (ADR-0103):\n`deny`, with the card's inline comments; the message itself reaches the model as a\nsteering message right after the refusal.",
+          "type": "string"
         }
       ]
     },

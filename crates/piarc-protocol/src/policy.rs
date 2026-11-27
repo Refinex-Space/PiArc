@@ -356,6 +356,10 @@ pub enum AnswerVia {
     /// A system notification's action: `allowOnce` (only on a card with
     /// `notificationAllow`) or `deny` without feedback.
     Notification,
+    /// The user replied in the conversation instead of answering a `plan` card (ADR-0103):
+    /// `deny`, with the card's inline comments; the message itself reaches the model as a
+    /// steering message right after the refusal.
+    Conversation,
 }
 
 /// The tool name of a network-domain card (T39): no tool call asks, the sandbox's proxy does.

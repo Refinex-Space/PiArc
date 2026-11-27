@@ -1302,7 +1302,7 @@ export type ApprovalDecision = 'allowOnce' | 'allowSession' | 'allowAlways' | 'd
 /**
  * Where an answer was given (T42); absent: on the approval card.
  */
-export type AnswerVia = 'notification';
+export type AnswerVia = 'notification' | 'conversation';
 /**
  * Result of answering the approval ledger.
  */
