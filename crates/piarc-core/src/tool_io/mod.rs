@@ -586,6 +586,18 @@ impl ToolIo {
         }
     }
 
+    /// Starts resolving the commands' environment (the user's login shell, T17) in the
+    /// background, so the first session, terminal, MCP configuration or Git panel finds it
+    /// ready instead of waiting for the shell's configuration files (VS Code warms it while its
+    /// window opens). It is resolved once; a later caller awaits the same resolution.
+    pub(crate) fn warm_command_environment(
+        &self,
+        handle: &tokio::runtime::Handle,
+        cancel: CancellationToken,
+    ) {
+        exec::Exec::warm(Arc::clone(&self.exec), handle, cancel);
+    }
+
     /// The environment commands inherit (the user's login shell, T17).
     pub(crate) async fn command_environment(&self) -> Vec<(OsString, OsString)> {
         self.exec.hook_launch().await.env

@@ -153,7 +153,7 @@ impl Exec {
                             .iter()
                             .find(|(k, _)| k == "HOME")
                             .map_or_else(std::env::temp_dir, |(_, v)| PathBuf::from(v));
-                        match login_shell_env(&self.runner, base, &home).await {
+                        match login_shell_env(base, &home).await {
                             Ok(env) => env,
                             Err(error) => {
                                 tracing::warn!(target: "piarc_core", %error,
@@ -182,6 +182,21 @@ impl Exec {
                 powershell = ?shells.powershell, "shells for commands");
             shells
         })
+    }
+
+    /// Resolves the base environment on `handle` now (Core's start), unless `cancel` fires
+    /// first; see [`super::ToolIo::warm_command_environment`].
+    pub(super) fn warm(
+        exec: Arc<Self>,
+        handle: &tokio::runtime::Handle,
+        cancel: CancellationToken,
+    ) {
+        handle.spawn(async move {
+            tokio::select! {
+                () = cancel.cancelled() => {}
+                _ = exec.base_env() => {}
+            }
+        });
     }
 
     /// What hook commands start with: the commands' inherited environment and shells.
@@ -821,6 +836,56 @@ mod tests {
         assert_eq!(notice["type"], "gitBashMissing");
         assert_eq!(notice["downloadUrl"], GIT_FOR_WINDOWS_URL);
         assert_eq!(notice["searched"][0], piarc_fs::display(&searched));
+    }
+
+    /// The login shell runs when Core starts (`warm`), before any command asks for it, and
+    /// its answer is the one commands then use.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn warming_resolves_the_login_shell_before_any_command() {
+        let home = std::env::temp_dir().join(format!("piarc-warm-env {}", std::process::id()));
+        std::fs::create_dir_all(&home).expect("home");
+        let marker = home.join("profile-ran");
+        std::fs::write(
+            home.join(".bash_profile"),
+            format!(
+                "touch '{}'\nexport FROM_PROFILE=warm\n",
+                marker.to_str().expect("utf-8")
+            ),
+        )
+        .expect("profile");
+        let base = vec![
+            (OsString::from("PATH"), OsString::from("/usr/bin:/bin")),
+            (OsString::from("HOME"), home.clone().into_os_string()),
+            (OsString::from("SHELL"), OsString::from("/bin/bash")),
+        ];
+        let exec = Arc::new(Exec::new(
+            ExecLimits::default(),
+            CommandEnv::LoginShell { base },
+            home.clone(),
+            None,
+        ));
+        assert!(exec.resolved.get().is_none());
+        Exec::warm(
+            Arc::clone(&exec),
+            &tokio::runtime::Handle::current(),
+            CancellationToken::new(),
+        );
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        while exec.resolved.get().is_none() {
+            assert!(std::time::Instant::now() < deadline, "not resolved");
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(marker.exists(), "the profile did not run");
+        let expansion = exec.expansion_env().await;
+        assert!(
+            expansion
+                .iter()
+                .any(|(k, v)| k == "FROM_PROFILE" && v == "warm"),
+            "{expansion:?}"
+        );
+        drop(exec);
+        std::fs::remove_dir_all(&home).expect("cleanup");
     }
 
     #[test]

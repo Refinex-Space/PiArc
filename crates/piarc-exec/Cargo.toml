@@ -24,7 +24,8 @@ libc.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # Job Objects for ProcessTreeSpawner (`job`), the listening sockets of process trees
-# (`tcp_table`); with `tty_processes` on macOS the crate's only unsafe code.
+# (`tcp_table`); with `tty_processes` on macOS and `session` on Unix the crate's only unsafe
+# code.
 windows-sys = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_NetworkManagement_IpHelper",

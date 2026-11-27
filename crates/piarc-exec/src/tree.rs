@@ -39,6 +39,28 @@ impl ProcessSpawner for ProcessTreeSpawner {
     }
 }
 
+/// [`ProcessTreeSpawner`] whose child also leaves PiArc's terminal session on Unix: it leads a
+/// new session (`setsid`) with no controlling terminal, and the new process group of that
+/// session, so kill and drop work as for [`ProcessTreeSpawner`]. For the login shell probe:
+/// an interactive shell in a background group of PiArc's session (PiArc started from a
+/// terminal) is stopped by `SIGTTIN` when it takes the terminal over. Windows has no
+/// controlling terminals; there it is [`ProcessTreeSpawner`].
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct DetachedTreeSpawner;
+
+impl ProcessSpawner for DetachedTreeSpawner {
+    fn spawn(&self, spec: SpawnSpec) -> io::Result<SpawnedProcess> {
+        let (mut child, tree) = platform::spawn_detached(&spec)?;
+        let (stdin, stdout, stderr) = take_stdio(&mut child)?;
+        Ok(SpawnedProcess {
+            stdin,
+            stdout,
+            stderr,
+            control: Box::new(TreeChild { child, tree }),
+        })
+    }
+}
+
 struct TreeChild {
     child: Child,
     tree: platform::Tree,
@@ -78,7 +100,17 @@ mod platform {
     pub(super) struct Tree(Pid);
 
     pub(super) fn spawn(spec: &SpawnSpec) -> io::Result<(Child, Tree)> {
-        let child = command(spec).process_group(0).spawn()?;
+        tree_of(command(spec).process_group(0).spawn()?)
+    }
+
+    /// The child leads a new session, and so a new process group whose id is its pid.
+    pub(super) fn spawn_detached(spec: &SpawnSpec) -> io::Result<(Child, Tree)> {
+        let mut command = command(spec);
+        crate::session::new_session(&mut command);
+        tree_of(command.spawn()?)
+    }
+
+    fn tree_of(child: Child) -> io::Result<(Child, Tree)> {
         let pid = child
             .id()
             .and_then(|id| i32::try_from(id).ok())
@@ -125,6 +157,11 @@ mod platform {
 
     /// The Job Object holding the child and everything it starts.
     pub(super) struct Tree(pub(super) Job);
+
+    /// No controlling terminals on Windows: the same as [`spawn`].
+    pub(super) fn spawn_detached(spec: &SpawnSpec) -> io::Result<(Child, Tree)> {
+        spawn(spec)
+    }
 
     pub(super) fn spawn(spec: &SpawnSpec) -> io::Result<(Child, Tree)> {
         let job = Job::new()?;

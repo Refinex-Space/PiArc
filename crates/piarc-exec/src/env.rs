@@ -7,6 +7,10 @@
 //!   (`-i -l -c`, the files a terminal reads), prints its environment between two markers and
 //!   returns it; Core caches the answer. It runs the user's configuration files, so it has a
 //!   timeout, and any failure leaves the caller with its own environment (and a warning to log).
+//!   The shell runs in a session of its own with no controlling terminal and EOF on its stdin,
+//!   as VS Code and Zed start it: when PiArc itself was started from a terminal, an interactive
+//!   zsh in a background group of that terminal's session is stopped by `SIGTTIN` and the
+//!   probe used to wait for its whole timeout.
 //!   Windows reads `PATH` from the registry for every process; there the process environment is
 //!   the base.
 //! - **PiArc's own variables are removed** ([`strip_internal`]): Electron's, Node's and the
@@ -18,12 +22,14 @@
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::command::{CommandRunner, CommandSpec, OutputChunk, Stream};
+use crate::tree::DetachedTreeSpawner;
 
 /// Name prefixes of variables that belong to PiArc's processes, never to the user's commands.
 pub const INTERNAL_PREFIXES: &[&str] = &["ELECTRON_", "PIARC_", "PI_"];
@@ -151,14 +157,14 @@ pub enum LoginEnvError {
 }
 
 /// The environment of the user's login shell (`SHELL` in `base`), started with `base` from
-/// `cwd` (the home directory). See the module documentation.
+/// `cwd` (the home directory), in a session of its own (no controlling terminal). See the
+/// module documentation.
 ///
 /// # Errors
 ///
 /// [`LoginEnvError`] when there is no known shell, it cannot start, takes longer than
 /// [`LOGIN_ENV_TIMEOUT`] or prints no environment.
 pub async fn login_shell_env(
-    runner: &CommandRunner,
     base: &[(OsString, OsString)],
     cwd: &Path,
 ) -> Result<Vec<(OsString, OsString)>, LoginEnvError> {
@@ -197,6 +203,7 @@ pub async fn login_shell_env(
         timeout: Some(LOGIN_ENV_TIMEOUT),
         kill_grace: Duration::from_millis(500),
     };
+    let runner = CommandRunner::new(Arc::new(DetachedTreeSpawner));
     let (tx, mut rx) = mpsc::channel::<OutputChunk>(16);
     let collect = async {
         let mut out = Vec::new();
@@ -325,8 +332,6 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn reads_the_login_shells_path() {
-        use crate::ProcessTreeSpawner;
-        use std::sync::Arc;
         // A home directory whose login file adds a directory to PATH, as `.bash_profile`
         // would for a toolchain.
         let home = std::env::temp_dir().join(format!("piarc-exec-login {}", std::process::id()));
@@ -342,10 +347,7 @@ mod tests {
             ("SHELL", "/bin/bash"),
             ("ELECTRON_RUN_AS_NODE", "1"),
         ]);
-        let runner = CommandRunner::new(Arc::new(ProcessTreeSpawner));
-        let env = login_shell_env(&runner, &base, &home)
-            .await
-            .expect("login env");
+        let env = login_shell_env(&base, &home).await.expect("login env");
         let get = |name: &str| {
             env.iter()
                 .find(|(k, _)| k == name)
@@ -364,18 +366,11 @@ mod tests {
 
     #[tokio::test]
     async fn an_unknown_shell_is_reported() {
-        use crate::ProcessTreeSpawner;
-        use std::sync::Arc;
-        let runner = CommandRunner::new(Arc::new(ProcessTreeSpawner));
-        let error = login_shell_env(
-            &runner,
-            &os(&[("SHELL", "/bin/tcsh")]),
-            &std::env::temp_dir(),
-        )
-        .await
-        .expect_err("tcsh is not supported");
+        let error = login_shell_env(&os(&[("SHELL", "/bin/tcsh")]), &std::env::temp_dir())
+            .await
+            .expect_err("tcsh is not supported");
         assert!(matches!(error, LoginEnvError::NoShell(Some(_))), "{error}");
-        let error = login_shell_env(&runner, &[], &std::env::temp_dir())
+        let error = login_shell_env(&[], &std::env::temp_dir())
             .await
             .expect_err("no SHELL");
         assert!(matches!(error, LoginEnvError::NoShell(None)), "{error}");

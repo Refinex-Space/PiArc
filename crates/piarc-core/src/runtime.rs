@@ -670,6 +670,11 @@ fn open_state(
         .with_tasks(tasks.clone())
         .with_terminals(terminals.clone())
         .with_secrets(secrets.clone());
+    if config.command_env.is_none() {
+        // The login shell runs the user's configuration files: start it with Core, not with
+        // the first tool a session opens.
+        tool_io.warm_command_environment(handle, cancel.child_token());
+    }
     let worktrees = state_worktrees(config, handle, cancel, &storage, &tool_io, &snapshots);
     let ports_io = tool_io.clone();
     let proxies = Arc::new(BrowserProxies::new(config.sandbox.network.clone()));

@@ -51,8 +51,9 @@
 //!
 //! The Windows `job` module (a safe wrapper over the Job Object calls and the process
 //! snapshot), the Windows `tcp_table` module (one `GetExtendedTcpTable` call per address
-//! family) and the macOS `tty_processes` module (one `proc_listpids` call) are the crate's only
-//! unsafe code (coding standards section 2.8).
+//! family), the macOS `tty_processes` module (one `proc_listpids` call) and the Unix `session`
+//! module (one `setsid` hook between `fork` and `exec`, for the login shell probe) are the
+//! crate's only unsafe code (coding standards section 2.8).
 
 pub mod capture;
 mod command;
@@ -68,6 +69,12 @@ mod job;
 pub mod limits;
 pub mod listeners;
 pub mod semantic;
+#[cfg(unix)]
+#[allow(
+    unsafe_code,
+    reason = "safe wrapper over one pre_exec setsid hook (coding standards section 2.8)"
+)]
+mod session;
 pub mod shells;
 mod spawner;
 pub mod task_log;

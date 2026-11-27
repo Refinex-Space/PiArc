@@ -8,6 +8,7 @@
 |---|---|
 | `cargo test -p piarc-exec` | 全部单元测试；`termination_tests` 是进程树（超时、取消、shell 退出后的后台进程、运行时关闭各自按 PID 确认子孙进程退出）、SIGTERM 先于 SIGKILL、注入时钟上的 2/10 分钟超时（`CommandRunner::with_clock`）、两个管道各 50 MB |
 | `cargo test -p piarc-exec termination -- --nocapture` | 只跑终止相关测试并打印 PID 与 100 MB 耗时 |
+| `cargo test -p piarc-exec --test login_env_tty` | 登录 shell 环境在带控制终端的进程里（macOS，经 `script` 重新运行自身，`/bin/zsh` 加临时 `HOME`）：探测进程脱离终端会话，不被 `SIGTTIN` 停住 |
 | `cargo test -p piarc-exec terminal_tree` | 终端进程树（T33）：挂断结束进程组、忽略挂断的进程在宽限后被杀（Unix）；Windows 上结束 Job 终止 shell 与子进程 |
 | `cargo clippy -p piarc-exec --all-targets -- -D warnings` | lint；Windows 代码在 macOS 上用根 `AGENTS.md` 的交叉 clippy 命令 |
 
@@ -62,6 +63,7 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 - 后台任务的 `TaskLog` 由 Core 以 `Arc<Mutex<_>>` 共享给消费者与快照：持锁只做一次写入或读尾部行，不要在锁里等待。
 - `ProcessControl::wait` 与 `kill`/`terminate` 都借用 `&mut self`：等待与停止分两步写（`watch` 的 `select!` 只决定原因，`stop_process` 再停）。
 - `OutputCapture::push` 在异步任务里同步写文件（`BufWriter`），只在输出超过内联预算后才写；不要在这里做阻塞更久的事。
+- 登录 shell 环境（`env::login_shell_env`）一律经 crate 私有的 `DetachedTreeSpawner` 启动：Unix 上子进程在 `fork` 与 `exec` 之间 `setsid`（`session` 模块，crate 第四处 `unsafe`），没有控制终端，进程组 id 仍是它的 pid，终止方式与 `ProcessTreeSpawner` 相同；stdin 照常是 EOF。PiArc 从终端启动时（`npm run start`）它持有那个终端，`ProcessTreeSpawner` 的 `process_group(0)` 只把子进程放进后台进程组，交互式 zsh 接管终端时被 `SIGTTIN` 停住，每个 Core 都要等满 `LOGIN_ENV_TIMEOUT`（10 s）。VS Code（`detached: true`）与 Zed（`setsid`）同样处理。其他命令没有改成新会话。
 - 登录 shell 会执行用户的配置文件：测试里用 `/bin/bash` 加临时 `HOME` 的 `.bash_profile`（`env.rs` 的测试、L2 运行器），不要依赖开发机自己的 shell 配置；macOS 的 `/etc/profile` 会经 `path_helper` 重排 `PATH`，断言写"包含"不写"等于"。
 - 不要用 tokio 的暂停时钟（`start_paused`）测命令超时：Windows 上子进程管道在阻塞线程池上读，进行中的阻塞任务会阻止暂停时钟自动前进，定时器永远不触发（CI 运行 44116918422 卡到作业超时）。超时走注入的 `Clock`（`CommandRunner::with_clock`），宽限与 `EXIT_GRACE` 仍用 tokio 计时。
 - Git Bash 在繁忙的 Windows 机器上启动可能超过几百毫秒：测试等第一段输出或文件出现再动作，不按固定延迟。
