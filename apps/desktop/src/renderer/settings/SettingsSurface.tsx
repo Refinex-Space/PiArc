@@ -11,7 +11,9 @@ import { SettingsIcon } from './SettingsIcon.js';
 import { searchSettings, SettingsResults, SettingsSearchField } from './SettingsSearch.js';
 
 function pageFromHash(): string | undefined {
-  return /^#\/settings\/([a-zA-Z0-9.-]+)(?:\?[a-zA-Z0-9=&.-]*)?$/.exec(window.location.hash)?.[1];
+  return /^#\/settings\/([a-zA-Z0-9.-]+)(?:\?[a-zA-Z0-9=&.%_~-]*)?$/.exec(
+    window.location.hash,
+  )?.[1];
 }
 
 /** Whether Escape belongs to something inside the page: a dialog, a menu or an open picker. */

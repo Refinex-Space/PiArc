@@ -2,7 +2,8 @@
 // whether the model or only the user may start it, its pre-approved tools and `paths`, the
 // fields PiArc ignores or does not support yet, and the files that are not valid skills. The
 // output style section sets the user's default style (a folder's `/output-style` and its
-// settings files come first). The extension packages (T40) are `PluginsSection`.
+// settings files come first). The extension packages (T40) are `PluginsSection`. The "Market"
+// view (ADR-0102, `#/settings/skills?view=market[&package=<npm name>]`) is `MarketView`.
 import { PageHeadActions } from './page-head.js';
 import { ScopePicker } from './ScopePicker.js';
 import { SettingsRow, SettingsSection } from './layout.js';
@@ -21,6 +22,8 @@ import { ManagedBadge, useIsManaged } from './managed.js';
 import { PluginsSection } from './PluginsSection.js';
 import { reason } from '../shell/errors.js';
 import { ChevronDownIcon } from '../shell/icons.js';
+import { SegmentedControl } from '../app/SegmentedControl.js';
+import { MarketView } from './market/MarketView.js';
 
 interface SkillsView {
   readonly skills: readonly SkillInfo[];
@@ -262,13 +265,76 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
   );
 }
 
+type PageView = 'installed' | 'market';
+const VIEWS: readonly PageView[] = ['installed', 'market'];
+
+/** The view and market package the address asks for. */
+export function routeOf(hash: string): { view: PageView; pkg?: string } {
+  const query = /\?(.*)$/u.exec(hash)?.[1] ?? '';
+  const params = new URLSearchParams(query);
+  if (params.get('view') !== 'market') return { view: 'installed' };
+  const pkg = params.get('package');
+  return pkg === null || pkg === '' ? { view: 'market' } : { view: 'market', pkg };
+}
+
+function writeRoute(view: PageView, pkg: string | null) {
+  let hash = '#/settings/skills';
+  if (view === 'market') {
+    hash += '?view=market';
+    if (pkg !== null) hash += '&package=' + encodeURIComponent(pkg);
+  }
+  window.history.replaceState(null, '', hash);
+}
+
 export function SkillsPage() {
   const { t } = useApp();
   const selectId = useId();
+  const [route] = useState(() => routeOf(window.location.hash));
+  const [mode, setMode] = useState<PageView>(route.view);
+  const [marketPackage, setMarketPackage] = useState<string | undefined>(route.pkg);
   const [workspaces, setWorkspaces] = useState<string[]>([]);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [trusted, setTrusted] = useState(false);
   const [view, setView] = useState<SkillsView | undefined>(undefined);
   const [error, setError] = useState('');
+  useEffect(() => {
+    // The address follows the page (`hashchange` brings a link here; this keeps it current).
+    const onHash = () => {
+      const next = routeOf(window.location.hash);
+      if (!/^#\/settings\/skills(?:\?|$)/u.test(window.location.hash)) return;
+      setMode(next.view);
+      setMarketPackage(next.pkg);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      window.removeEventListener('hashchange', onHash);
+    };
+  }, []);
+  useEffect(() => {
+    // Project-only installs need the project trusted; the diagnostics say whether it is.
+    if (chosen === null) {
+      setTrusted(false);
+      return;
+    }
+    let live = true;
+    window.piarc
+      .configDiagnostics(chosen)
+      .then((raw) => {
+        const value: unknown = JSON.parse(raw);
+        if (live) setTrusted(isRecord(value) && value.trusted === true);
+      })
+      .catch(() => {
+        if (live) setTrusted(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [chosen]);
+  const showMarket = useCallback((name: string | null) => {
+    setMode('market');
+    setMarketPackage(name ?? undefined);
+    writeRoute('market', name);
+  }, []);
   useEffect(() => {
     window.piarc
       .configDiagnostics(null)
@@ -301,7 +367,7 @@ export function SkillsPage() {
         <SettingsInfo text={t('skills.hint')} />
       </PageHeadActions>
       {chosen === null ? (
-        <p className="muted">{t('agents.noWorkspace')}</p>
+        mode === 'installed' && <p className="muted">{t('agents.noWorkspace')}</p>
       ) : (
         <PageHeadActions>
           <ScopePicker>
@@ -320,12 +386,26 @@ export function SkillsPage() {
           </ScopePicker>
         </PageHeadActions>
       )}
-      {error === '' ? null : (
+      <SegmentedControl<PageView>
+        className="skills-views"
+        aria-label={t('skills.view')}
+        name="skills-view"
+        options={VIEWS}
+        value={mode}
+        testIdPrefix="skills-view"
+        labelOf={(v) => t(v === 'market' ? 'skills.view.market' : 'skills.view.installed')}
+        onChange={(v) => {
+          setMode(v);
+          setMarketPackage(undefined);
+          writeRoute(v, null);
+        }}
+      />
+      {mode === 'installed' && error !== '' && (
         <p className="error-text" role="alert">
           {error}
         </p>
       )}
-      {view === undefined ? null : (
+      {mode === 'installed' && view !== undefined && (
         <SettingsSection
           title={t('skills.title')}
           testId="skills-section"
@@ -353,8 +433,25 @@ export function SkillsPage() {
           )}
         </SettingsSection>
       )}
-      <PluginsSection workspace={chosen} />
-      {chosen === null ? null : <StyleSection workspace={chosen} />}
+      {mode === 'installed' && (
+        <PluginsSection
+          workspace={chosen}
+          onMarket={(name) => {
+            showMarket(name);
+          }}
+        />
+      )}
+      {mode === 'installed' && chosen !== null && <StyleSection workspace={chosen} />}
+      {mode === 'market' && (
+        <MarketView
+          key={marketPackage ?? ''}
+          target={{ workspace: chosen, trusted }}
+          {...(marketPackage === undefined ? {} : { initialPackage: marketPackage })}
+          onPackage={(name) => {
+            writeRoute('market', name);
+          }}
+        />
+      )}
     </div>
   );
 }

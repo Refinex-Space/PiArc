@@ -48,10 +48,12 @@ pub struct MarketQuery {
     /// Words to search for (at most 200 characters); empty to browse.
     #[serde(default)]
     pub query: String,
-    #[serde(default)]
-    pub category: MarketCategory,
-    #[serde(default)]
-    pub sort: MarketSort,
+    /// Absent: `all`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<MarketCategory>,
+    /// Absent: `popular`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<MarketSort>,
     #[serde(default)]
     pub offset: u64,
     /// 1–100.

@@ -52,6 +52,9 @@ pub struct MarketLimits {
     pub pages: u64,
     /// An index older than this refreshes when the market opens.
     pub stale_after: Duration,
+    /// After a failed sync, opening or reading the market starts no new one for this long (a
+    /// refresh the user asks for always does): the page reads after every sync event.
+    pub failure_backoff: Duration,
     pub search_bytes: usize,
     pub version_bytes: usize,
     pub packument_bytes: usize,
@@ -72,6 +75,7 @@ impl Default for MarketLimits {
             page_size: 250,
             pages: 21,
             stale_after: Duration::from_secs(6 * 3600),
+            failure_backoff: Duration::from_secs(120),
             search_bytes: 4 << 20,
             version_bytes: 1 << 20,
             packument_bytes: 8 << 20,
@@ -268,8 +272,13 @@ impl Market {
         let sync = self.inner.storage.run(|s| s.market_sync()).await??;
         let stale_ms =
             i64::try_from(self.inner.config.limits.stale_after.as_millis()).unwrap_or(i64::MAX);
-        let fresh = sync.ok_ms > 0 && now_ms().saturating_sub(sync.ok_ms) < stale_ms;
-        if fresh && !force {
+        let now = now_ms();
+        let fresh = sync.ok_ms > 0 && now.saturating_sub(sync.ok_ms) < stale_ms;
+        let backoff_ms =
+            i64::try_from(self.inner.config.limits.failure_backoff.as_millis()).unwrap_or(i64::MAX);
+        let failed_lately =
+            sync.state == "failed" && now.saturating_sub(sync.finished_ms) < backoff_ms;
+        if (fresh || failed_lately) && !force {
             return Ok(false);
         }
         if self.inner.syncing.swap(true, Ordering::SeqCst) {
@@ -358,12 +367,12 @@ impl Market {
         }
         let exact = (words.len() == 1 && npm::valid_name(&words[0])).then(|| words[0].clone());
         let filter = MarketFilter {
-            kind: category_bit(query.category),
+            kind: category_bit(query.category.unwrap_or_default()),
             // A live answer already matched the words.
             words: if live { Vec::new() } else { words },
             names,
             deprecated_named: exact,
-            sort: match query.sort {
+            sort: match query.sort.unwrap_or_default() {
                 MarketSort::Popular => piarc_store::MarketSort::Popular,
                 MarketSort::Updated => piarc_store::MarketSort::Updated,
             },

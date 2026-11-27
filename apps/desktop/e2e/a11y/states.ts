@@ -84,6 +84,28 @@ export const A11Y_STATES = [
     note: 'Skills and plugins with an installed plugin (off)',
   },
   {
+    id: 'state:package-uninstall',
+    area: 'state',
+    note: 'Skills and plugins: an installed package asking once more before uninstalling',
+  },
+  {
+    id: 'state:market-list',
+    area: 'state',
+    note: 'Pi package market: search, categories with counts, sort and the list (ADR-0102)',
+  },
+  { id: 'state:market-detail', area: 'state', note: 'Pi package market: a package and its README' },
+  { id: 'state:market-empty', area: 'state', note: 'Pi package market: no package matches' },
+  {
+    id: 'state:market-offline',
+    area: 'state',
+    note: 'Pi package market: the cached catalog while the registry is unreachable',
+  },
+  {
+    id: 'state:market-error',
+    area: 'state',
+    note: 'Pi package market: no catalog yet and the registry unreachable',
+  },
+  {
     id: 'settings:memory',
     area: 'settings',
     page: 'memory',

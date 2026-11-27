@@ -1,0 +1,382 @@
+/* The Pi package market and the installed view's uninstall (ADR-0102). Borderless like the rest
+   of settings: rows divided by hairlines, quiet badges, one primary button per row. */
+
+/* The view switch belongs to what follows it: closer than the page's gap between sections. */
+.settings-surface .skills-views {
+  margin-block-end: calc(var(--piarc-space-4) - var(--piarc-space-5) - var(--piarc-space-3));
+}
+
+.market {
+  display: grid;
+  gap: var(--piarc-space-3);
+  min-width: 0;
+}
+.market-search {
+  width: 100%;
+}
+.market-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-2) var(--piarc-space-3);
+}
+.market-toolbar-end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .market-sort {
+  min-height: 28px;
+  padding: 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  cursor: pointer;
+  outline: none;
+}
+:root[data-app] .market-sort:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+:root[data-app]:not([data-pointer-focus]) .market-sort:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+
+.market-status,
+.market-notice,
+.market-note {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+.market-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  font-variant-numeric: tabular-nums;
+}
+.market-notice {
+  color: var(--piarc-text-primary);
+}
+.market-notice.is-failed {
+  color: var(--piarc-text-danger);
+}
+:root[data-app] .market-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-accent);
+  font: inherit;
+  cursor: pointer;
+}
+:root[data-app] .market-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---- the list ---- */
+.market-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--piarc-session-line);
+}
+.market-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--piarc-space-4);
+  position: relative;
+  margin-inline: calc(-1 * var(--piarc-space-2));
+  padding: var(--piarc-space-3) var(--piarc-space-2);
+  border-radius: var(--piarc-radius-lg);
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+/* The hairline stays straight under the row's rounded hover fill. */
+.market-row::after {
+  position: absolute;
+  inset: auto var(--piarc-space-2) 0;
+  height: 1px;
+  background: var(--piarc-session-line);
+  content: '';
+  pointer-events: none;
+}
+.market-row:has(.market-name:hover) {
+  background: var(--piarc-session-ghost-hover);
+}
+.market-row-text {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.market-row-name {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+:root[data-app] .market-name {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* The whole text column opens the details; the action column stays its own target. */
+:root[data-app] .market-name::after {
+  position: absolute;
+  inset: calc(-1 * var(--piarc-space-3)) 0 calc(-1 * var(--piarc-space-3))
+    calc(-1 * var(--piarc-space-2));
+  content: '';
+}
+:root[data-app]:not([data-pointer-focus]) .market-name:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--piarc-radius-sm);
+}
+.market-description {
+  margin: 0;
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-button);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.market-meta {
+  margin: 0;
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.market-kind {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  white-space: nowrap;
+}
+.market-kind.is-unknown {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+}
+.market-kind.is-danger {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.market-row-action {
+  display: flex;
+  justify-content: flex-end;
+}
+.market-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.market-state {
+  padding-inline: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-button);
+}
+
+.market-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: calc(var(--piarc-space-5) + var(--piarc-space-4)) var(--piarc-space-4);
+  color: var(--piarc-text-secondary);
+  text-align: center;
+}
+.market-empty > p {
+  margin: 0;
+}
+.market-empty-actions {
+  display: inline-flex;
+  gap: var(--piarc-space-2);
+}
+
+/* ---- one package ---- */
+.market-detail {
+  display: grid;
+  gap: var(--piarc-space-4);
+  min-width: 0;
+}
+:root[data-app] .market-back {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-height: 28px;
+  margin-inline-start: calc(-1 * var(--piarc-space-2));
+  padding: 0 var(--piarc-space-2) 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  cursor: pointer;
+}
+:root[data-app] .market-back:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+.market-back svg {
+  width: 16px;
+  height: 16px;
+}
+.market-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--piarc-space-3) var(--piarc-space-4);
+}
+.market-detail-title {
+  display: grid;
+  flex: 1 1 18rem;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+}
+.market-detail-title > h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-title);
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: 1.3;
+}
+.market-detail-title > p {
+  margin: 0;
+  color: var(--piarc-text-primary);
+  overflow-wrap: anywhere;
+}
+.market-detail-title > .market-meta {
+  color: var(--piarc-text-secondary);
+  white-space: normal;
+}
+.market-detail-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.market-warnings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+.market-warnings:empty {
+  display: none;
+}
+.market-warnings > li.is-danger {
+  color: var(--piarc-text-danger);
+}
+.market-warnings > li + li {
+  margin-block-start: var(--piarc-space-1);
+}
+.market-kinds,
+.market-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--piarc-space-1);
+}
+.market-fact {
+  color: var(--piarc-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.market-readme {
+  display: grid;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+.market-readme-body :is(h1, h2) {
+  font-size: var(--piarc-font-size-heading);
+}
+.market-readme-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.market-readme[data-open='false'] > .market-readme-body {
+  max-height: 28rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 75%, transparent);
+}
+.market-readme-toggle {
+  justify-self: start;
+}
+
+/* ---- uninstall (installed rows and package details) ---- */
+.settings-surface .package-uninstall.button-ghost {
+  --action-ink: var(--piarc-text-danger);
+  --action-hover: var(--piarc-state-danger-subtle);
+}
+.package-uninstall-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+.package-uninstall-hint {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--piarc-space-3);
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-session-footnote);
+}
+.package-missing {
+  margin: var(--piarc-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.package-missing > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-3);
+  min-height: 36px;
+  border-bottom: 1px solid var(--piarc-session-line);
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-session-footnote);
+}
+.package-missing-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-row {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .market-kind {
+    border: 1px solid CanvasText;
+  }
+}

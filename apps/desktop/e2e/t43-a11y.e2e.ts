@@ -18,6 +18,7 @@ import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from
 import { idle, killAgentHost, openSession, prefer, send } from './t19.js';
 import { conflictOnMain, fakeGh, git, githubRemote, makeRepository } from './git.js';
 import { clickInPage } from './browser-b3.js';
+import { marketEnv, marketRow, openMarket, test as marketTest } from './market.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -302,6 +303,13 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     await expect(settings.getByTestId(`settings-page-${id}`)).toBeVisible();
     await checkState(settings, `settings:${id}`);
   }
+  // ADR-0102: uninstalling asks once more in place.
+  await settings.getByTestId('settings-nav-skills').click();
+  const installed = settings.locator('[data-testid="package-row"][data-id="demo"]');
+  await installed.getByTestId('package-uninstall-start').click();
+  await expect(installed.getByTestId('package-uninstall')).toBeFocused();
+  await checkState(settings, 'state:package-uninstall');
+  await installed.getByTestId('package-uninstall-cancel').click();
   // ADR-0101: the add-server dialog of the MCP page.
   await settings.getByTestId('settings-nav-mcp').click();
   await settings.getByTestId('mcp-add').click();
@@ -698,6 +706,40 @@ test.describe('sign in', () => {
       auth.stop();
     }
   });
+});
+
+marketTest.describe('the Pi package market', () => {
+  // The file's `appEnv` (the fake `gh`) would replace the market's mock registry.
+  marketTest.use({ appEnv: marketEnv });
+  marketTest(
+    'the Pi package market: unreachable, list, no match, details and offline',
+    async ({ page, npm }) => {
+      marketTest.setTimeout(120_000);
+      await prefer(page, { key: 'language', value: 'en' });
+      await npm.control('offline');
+      const settings = await openMarket(page);
+      await expect(settings.getByTestId('market-error')).toBeVisible({ timeout: 30_000 });
+      await checkState(settings, 'state:market-error');
+      await npm.control('online');
+      await settings.getByTestId('market-error').getByRole('button', { name: 'Retry' }).click();
+      await expect(marketRow(settings, 'pi-lint-skills')).toBeVisible({ timeout: 30_000 });
+      await checkState(settings, 'state:market-list');
+      await settings.getByTestId('market-search').fill('nothing-matches-this');
+      await expect(settings.getByTestId('market-none')).toBeVisible({ timeout: 10_000 });
+      await checkState(settings, 'state:market-empty');
+      await settings.getByTestId('market-search').fill('');
+      await marketRow(settings, 'pi-lint-skills').getByTestId('market-open').click();
+      await expect(settings.getByTestId('market-readme')).toBeVisible();
+      await checkState(settings, 'state:market-detail');
+      await settings.getByTestId('market-back').click();
+      await npm.control('offline');
+      await settings.getByTestId('market-refresh').click();
+      await expect(settings.getByTestId('market-status')).toContainText('reach', {
+        timeout: 30_000,
+      });
+      await checkState(settings, 'state:market-offline');
+    },
+  );
 });
 
 test('MCP asks for a form and an external URL', async ({ app, page, workspaces }) => {

@@ -130,6 +130,22 @@ impl Hub {
         &self,
         request: &MarketInstallRequest,
     ) -> Result<piarc_protocol::plugins::PackageInstallResult> {
+        if request.scope == piarc_protocol::plugins::PackageScope::Project {
+            let workspace = request
+                .workspace
+                .as_deref()
+                .ok_or_else(|| refused("the project scope needs a workspace"))?;
+            let settings = self
+                .ctx
+                .trust
+                .permission_settings(std::path::Path::new(workspace))
+                .await?;
+            if settings.trust() != piarc_config::TrustState::Trusted {
+                return Err(refused(
+                    "trust this project before installing a package for it alone",
+                ));
+            }
+        }
         let market = &self.ctx.market;
         let row = market
             .row(&request.name)

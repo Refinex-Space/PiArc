@@ -11213,7 +11213,10 @@ export interface PackageInstallResult {
  * One page of the market.
  */
 export interface MarketQuery {
-  category?: MarketCategory & string;
+  /**
+   * Absent: `all`.
+   */
+  category?: MarketCategory | null;
   /**
    * 1–100.
    */
@@ -11223,7 +11226,10 @@ export interface MarketQuery {
    * Words to search for (at most 200 characters); empty to browse.
    */
   query?: string;
-  sort?: MarketSort & string;
+  /**
+   * Absent: `popular`.
+   */
+  sort?: MarketSort | null;
   /**
    * The workspace the installed state is reported for.
    */

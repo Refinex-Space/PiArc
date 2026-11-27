@@ -68,6 +68,29 @@ pub(crate) fn npm_cli(node: &Path) -> Option<PathBuf> {
         .map(piarc_git::strip_verbatim)
 }
 
+/// The node to run npm with and its `npm-cli.js`: the bundled node, or (source-tree runs, where
+/// the Agent Host's node is the bare `node`) the one on the command environment's `PATH`.
+pub(crate) fn locate_npm(node: &Path, env: &[(OsString, OsString)]) -> Option<(PathBuf, PathBuf)> {
+    let bare = node.parent().is_none_or(|p| p.as_os_str().is_empty());
+    if !bare {
+        return npm_cli(node).map(|cli| (node.to_owned(), cli));
+    }
+    let path = env
+        .iter()
+        .find(|(k, _)| k.to_string_lossy().eq_ignore_ascii_case("PATH"))
+        .map(|(_, v)| v)?;
+    let name = if cfg!(windows) && node.extension().is_none() {
+        node.with_extension("exe")
+    } else {
+        node.to_owned()
+    };
+    std::env::split_paths(path)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join(&name))
+        .filter(|candidate| candidate.is_file())
+        .find_map(|candidate| npm_cli(&candidate).map(|cli| (candidate, cli)))
+}
+
 /// A clone's `.npmrc`, renamed while the bundled npm runs in the clone so that none of the
 /// package's npm settings apply, and put back afterwards (the checkout stays as fetched).
 pub(crate) struct HiddenNpmrc {
@@ -114,7 +137,7 @@ pub(crate) async fn npm(
     env: Vec<(OsString, OsString)>,
     args: &[OsString],
 ) -> Result<Captured> {
-    let cli = npm_cli(node).ok_or_else(|| {
+    let (node, cli) = locate_npm(node, &env).ok_or_else(|| {
         failed(
             ErrorKind::NotFound,
             format!("the bundled npm was not found next to {}", node.display()),
@@ -123,7 +146,7 @@ pub(crate) async fn npm(
     let mut all = vec![cli.into_os_string()];
     all.extend(args.iter().cloned());
     let spec = SpawnSpec {
-        program: node.to_owned(),
+        program: node,
         args: all,
         cwd: cwd.to_owned(),
         env,
@@ -498,9 +521,46 @@ pub(crate) fn check_npm_spec(spec: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsString;
     use std::path::Path;
 
-    use super::{git_dir, prefix_key};
+    use super::{git_dir, locate_npm, prefix_key};
+
+    /// Source-tree runs start the Agent Host with the bare `node`: npm is the one next to the
+    /// `node` on the command environment's `PATH`.
+    #[test]
+    fn a_bare_node_finds_npm_through_the_command_path() {
+        let root = std::env::temp_dir().join(format!("piarc npm 路径 {}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bin = if cfg!(windows) {
+            root.clone()
+        } else {
+            root.join("bin")
+        };
+        let cli = if cfg!(windows) {
+            root.join("node_modules").join("npm").join("bin")
+        } else {
+            root.join("lib")
+                .join("node_modules")
+                .join("npm")
+                .join("bin")
+        };
+        std::fs::create_dir_all(&bin).expect("bin");
+        std::fs::create_dir_all(&cli).expect("cli");
+        let exe = bin.join(if cfg!(windows) { "node.exe" } else { "node" });
+        std::fs::write(&exe, b"").expect("node");
+        std::fs::write(cli.join("npm-cli.js"), b"").expect("npm-cli");
+        let path = std::env::join_paths([root.join("elsewhere"), bin.clone()]).expect("PATH");
+        let env = vec![(OsString::from("PATH"), path)];
+
+        let (node, found) = locate_npm(Path::new("node"), &env).expect("npm through PATH");
+        assert_eq!(node, exe);
+        assert!(found.ends_with(Path::new("npm").join("bin").join("npm-cli.js")));
+        // Without it on PATH there is none; a path with a directory is used as given.
+        assert!(locate_npm(Path::new("node"), &[]).is_none());
+        assert_eq!(locate_npm(&exe, &[]).map(|(n, _)| n), Some(exe.clone()));
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn git_urls_map_to_pi_layout_directories() {

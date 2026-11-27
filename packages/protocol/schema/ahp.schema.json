@@ -11737,8 +11737,15 @@
       "description": "One page of the market.",
       "properties": {
         "category": {
-          "$ref": "#/$defs/MarketCategory",
-          "default": "all"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarketCategory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Absent: `all`."
         },
         "limit": {
           "description": "1–100.",
@@ -11758,8 +11765,15 @@
           "type": "string"
         },
         "sort": {
-          "$ref": "#/$defs/MarketSort",
-          "default": "popular"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarketSort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Absent: `popular`."
         },
         "workspace": {
           "description": "The workspace the installed state is reported for.",

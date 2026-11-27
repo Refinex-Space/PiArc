@@ -138,6 +138,82 @@ interface RowProps {
   readonly workspace: string | null;
 }
 
+export const hintId = (name: string) => `uninstall-hint-${name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+/**
+ * A visible "Uninstall" that asks once more in place (M-20): the first click arms it, the
+ * second uninstalls; Escape, "Cancel" or leaving the controls disarms it. The caller shows
+ * `plugins.uninstallConfirmHint` (id from `hintId`) while it is armed.
+ */
+export function UninstallButton({
+  name,
+  sure,
+  busy,
+  onSure,
+  onUninstall,
+}: {
+  readonly name: string;
+  readonly sure: boolean;
+  readonly busy: boolean;
+  readonly onSure: (sure: boolean) => void;
+  readonly onUninstall: () => void;
+}) {
+  const { t } = useApp();
+  if (!sure) {
+    return (
+      <Button
+        variant="ghost"
+        size="small"
+        className="package-uninstall"
+        disabled={busy}
+        data-testid="package-uninstall-start"
+        aria-label={t('plugins.uninstallNamed', { id: name })}
+        onClick={() => {
+          onSure(true);
+        }}
+      >
+        {t('plugins.uninstall')}
+      </Button>
+    );
+  }
+  return (
+    <span
+      className="package-uninstall-confirm"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          onSure(false);
+        }
+      }}
+    >
+      <Button
+        variant="ghost"
+        size="small"
+        data-testid="package-uninstall-cancel"
+        onClick={() => {
+          onSure(false);
+        }}
+      >
+        {t('plugins.uninstallCancel')}
+      </Button>
+      <Button
+        variant="destructive"
+        size="small"
+        data-testid="package-uninstall"
+        disabled={busy}
+        aria-describedby={hintId(name)}
+        autoFocus
+        onClick={() => {
+          onSure(false);
+          onUninstall();
+        }}
+      >
+        {t('plugins.uninstallConfirm')}
+      </Button>
+    </span>
+  );
+}
+
 function PackageRow({ pkg, busy, act, workspace }: RowProps) {
   const { t } = useApp();
   const [sure, setSure] = useState(false);
@@ -217,20 +293,6 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
         </div>
       </details>
       <div className="package-actions">
-        {sure ? (
-          <Button
-            variant="destructive"
-            size="small"
-            data-testid="package-uninstall"
-            disabled={busy}
-            onClick={() => {
-              setSure(false);
-              act(pkg.id, () => window.piarc.uninstallPackage(pkg.id, workspace));
-            }}
-          >
-            {t('plugins.uninstallConfirm')}
-          </Button>
-        ) : null}
         {pending.length === 0 || !pkg.enabled ? null : (
           <Button
             size="small"
@@ -255,6 +317,15 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
             act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, on, scope, where));
           }}
         />
+        <UninstallButton
+          name={pkg.id}
+          sure={sure}
+          busy={busy}
+          onSure={setSure}
+          onUninstall={() => {
+            act(pkg.id, () => window.piarc.uninstallPackage(pkg.id, workspace));
+          }}
+        />
         <RowMenu
           label={t('plugins.more', { id: pkg.id })}
           testId={`package-more-${pkg.id}`}
@@ -268,18 +339,18 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
                 act(pkg.id, () => window.piarc.updatePackage(pkg.id, where));
               },
             },
-            {
-              id: 'uninstall',
-              testId: 'package-uninstall-start',
-              label: t('plugins.uninstall'),
-              danger: true,
-              run: () => {
-                setSure(true);
-              },
-            },
           ]}
         />
       </div>
+      {sure && (
+        <p
+          className="package-uninstall-hint"
+          id={hintId(pkg.id)}
+          data-testid="package-uninstall-hint"
+        >
+          {t('plugins.uninstallConfirmHint')}
+        </p>
+      )}
       {pending.length === 0 || !pkg.enabled ? null : (
         <p className="package-alert" data-testid="package-pending">
           {t('plugins.pending', { count: pending.length })}
@@ -435,7 +506,17 @@ function InstallDialog({
 }
 
 /** The extension packages of the page, for `workspace` (or the user settings when null). */
-export function PluginsSection({ workspace }: { readonly workspace: string | null }) {
+/** An npm package name (the ids the market can install). */
+const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+
+export function PluginsSection({
+  workspace,
+  onMarket,
+}: {
+  readonly workspace: string | null;
+  /** Shows a package in the market (a declared package that is not installed). */
+  readonly onMarket?: (name: string) => void;
+}) {
   const { t } = useApp();
   const [list, setList] = useState<PackagesList | undefined>(undefined);
   const [error, setError] = useState('');
@@ -543,9 +624,25 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
             </li>
           </ul>
           {(list.missing ?? []).length === 0 ? null : (
-            <p className="error-text small" data-testid="package-missing">
-              {t('plugins.missing', { list: (list.missing ?? []).join(', ') })}
-            </p>
+            <ul className="package-missing" data-testid="package-missing">
+              {(list.missing ?? []).map((id) => (
+                <li key={id} data-id={id}>
+                  <span className="package-missing-text">{t('plugins.missingOne', { id })}</span>
+                  {onMarket !== undefined && NPM_NAME.test(id) && (
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      data-testid="package-missing-market"
+                      onClick={() => {
+                        onMarket(id);
+                      }}
+                    >
+                      {t('plugins.installFromMarket')}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )}

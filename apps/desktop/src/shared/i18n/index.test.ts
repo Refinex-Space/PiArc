@@ -180,6 +180,8 @@ describe('i18n', () => {
             // Voice dictation (ADR-0094).
             disk: '1,066 MB',
             term: 'PiArc',
+            // The Pi package market (ADR-0102).
+            when: '2 hours ago',
           }),
         ).not.toThrow();
       }

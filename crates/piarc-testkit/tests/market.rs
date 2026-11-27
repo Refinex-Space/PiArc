@@ -426,3 +426,39 @@ async fn an_unreachable_registry_keeps_the_cached_catalog() {
     assert_eq!(names(&found), ["pi-demo"]);
     let _ = Path::new("");
 }
+
+/// A first sync that cannot reach the registry: reading the market again does not start another
+/// sync right away (the page reads after every sync event, which would otherwise retry in a
+/// loop), and a refresh once the registry is back fills the catalog.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_failed_first_sync_backs_off_and_a_refresh_recovers() {
+    let rig = rig("first sync offline", None).await;
+    rig.npm.set_offline(true);
+    let deadline = tokio::time::Instant::now() + WAIT;
+    loop {
+        let page = rig.query(json!({ "limit": 50 })).await;
+        if page["status"]["state"] == "failed" {
+            assert!(page["status"]["syncedAt"].is_null());
+            break;
+        }
+        assert!(tokio::time::Instant::now() < deadline, "{}", page["status"]);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    for _ in 0..5 {
+        let page = rig.query(json!({ "limit": 50 })).await;
+        assert_eq!(
+            page["status"]["state"], "failed",
+            "no new sync: {}",
+            page["status"]
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    rig.npm.set_offline(false);
+    rig.call(|core, done| core.market_refresh(done).expect("queued"))
+        .await
+        .expect("refresh starts");
+    let page = rig.settled().await;
+    assert_eq!(names(&page).len(), 5);
+    assert!(page["status"]["problem"].is_null(), "{}", page["status"]);
+}
