@@ -30,7 +30,11 @@ export function covered(viewport: HTMLElement): boolean {
       const x = rect.left + INSET + ((rect.width - INSET * 2) * column) / (GRID - 1);
       const y = rect.top + INSET + ((rect.height - INSET * 2) * row) / (GRID - 1);
       const hit = doc.elementFromPoint(x, y);
-      if (hit !== null && hit !== viewport && !viewport.contains(hit)) return true;
+      if (hit === null || hit === viewport || viewport.contains(hit)) continue;
+      // The grab strip of a divider between tiles reaches a few pixels into the page's edge:
+      // it is the frame around the page, not something over it.
+      if (hit.closest('[role="separator"]') !== null) continue;
+      return true;
     }
   }
   return false;

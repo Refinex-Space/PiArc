@@ -173,6 +173,28 @@ test('a menu over the page hides it behind a still frame', async ({ app, page, w
   await expect.poll(async () => (await observe(app, id)).tabs[0]?.visible).toBe(true);
 });
 
+test('a tool tiled under the preview leaves the page shown', async ({ app, page, workspaces }) => {
+  test.setTimeout(120_000);
+  const { id } = await openSession(app, page, workspaces, 'Browser tiled', 't18-chat', 'Hello');
+  await idle(page);
+  await openPreview(page);
+  await go(page, origin);
+  await expect(page.getByTestId('browser-tab')).toHaveText(['Fixture home']);
+  // The divider between the two tiles reaches a few pixels into the page's edge to be easy
+  // to grab; it is part of the frame, not something over the page.
+  await page.getByTestId('tool-more').click();
+  await page.getByTestId('tool-background-tasks').click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('tile-divider-tools')).toBeVisible();
+  // It stays shown: hiding it would take a moment after the tiles settle.
+  for (let i = 0; i < 10; i += 1) {
+    const seen = await observe(app, id);
+    expect(seen.placement?.occluded).toBe(false);
+    expect(seen.tabs[0]?.visible).toBe(true);
+    await page.waitForTimeout(150);
+  }
+});
+
 test('closing the tool parks the page and reopening shows it again', async ({
   app,
   page,
