@@ -849,6 +849,7 @@ export const en = {
   'tiles.switch': 'Switch panel',
   'tiles.dock': 'Dock panel',
   'panels.tools': 'Session tools',
+  'tools.preparing': 'Preparing the tools for this project…',
   'tools.worktreeWaits':
     'Available after the first message: the worktree is created when you send it',
   'panels.environment': 'Environment',

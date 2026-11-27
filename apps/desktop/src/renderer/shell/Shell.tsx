@@ -80,6 +80,8 @@ function usePanelContext(
   const openTool = sessionId === undefined ? home?.open : undefined;
   const prepare = sessionId === undefined ? home?.prepare : undefined;
   const toolsWaiting = sessionId === undefined && home?.waiting === true;
+  const openingTools = sessionId === undefined ? home?.opening : undefined;
+  const cancelTool = sessionId === undefined ? home?.cancel : undefined;
   return useMemo(
     () => ({
       sessionId,
@@ -89,8 +91,20 @@ function usePanelContext(
       ...(openTool ? { openTool } : {}),
       ...(prepare ? { prepare } : {}),
       ...(toolsWaiting ? { toolsWaiting } : {}),
+      ...(openingTools && openingTools.length > 0 ? { openingTools } : {}),
+      ...(cancelTool ? { cancelTool } : {}),
     }),
-    [sessionId, harness, pendingPlan, backgroundTasks, openTool, prepare, toolsWaiting],
+    [
+      sessionId,
+      harness,
+      pendingPlan,
+      backgroundTasks,
+      openTool,
+      prepare,
+      toolsWaiting,
+      openingTools,
+      cancelTool,
+    ],
   );
 }
 

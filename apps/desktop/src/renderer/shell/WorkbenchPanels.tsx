@@ -22,6 +22,7 @@ import {
   GlobeIcon,
   LayoutListIcon,
   SideChatIcon,
+  SpinnerGlyph,
   TasksIcon,
   TerminalIcon,
 } from './icons.js';
@@ -32,6 +33,7 @@ import {
   togglePanel,
   usePanels,
   type PanelContext,
+  type PanelSpec,
 } from './registry.js';
 import { ToolTiles } from './ToolTiles.js';
 import './planned-panels.js';
@@ -185,11 +187,33 @@ function SessionPanels({ context, children }: PanelProps) {
   );
 }
 
+/** The tools asked for on the new-session view while its draft session opens (ADR-0099). */
+function preparingTools(context: PanelContext, all: readonly PanelSpec[]): readonly string[] {
+  if (context.sessionId) return [];
+  return (context.openingTools ?? []).filter((id) =>
+    all.some((p) => p.id === id && p.area === 'tool'),
+  );
+}
+
+/** A tool's tile while the new-session view's draft session opens. */
+function PreparingTool() {
+  const t = useT();
+  return (
+    <div className="tool-empty" role="status" data-testid="tool-preparing">
+      <SpinnerGlyph />
+      <p>{t('tools.preparing')}</p>
+    </div>
+  );
+}
+
 export function SessionTileWorkspace({ context, children }: PanelProps) {
   const t = useT();
   const { openIds, closePanel, setCompact } = usePanelPresentation();
-  const specs = panelsFor(usePanels(), 'tool', context);
-  const visible = openIds.filter((id) => specs.some((p) => p.id === id));
+  const all = usePanels();
+  const specs = panelsFor(all, 'tool', context);
+  const preparing = preparingTools(context, all);
+  const visible =
+    preparing.length > 0 ? preparing : openIds.filter((id) => specs.some((p) => p.id === id));
   const primary = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const node = primary.current;
@@ -211,24 +235,32 @@ export function SessionTileWorkspace({ context, children }: PanelProps) {
     };
   }, [setCompact]);
   const specFor = (id: string) => specs.find((p) => p.id === id);
+  const titleOf = (id: string) => (all.find((p) => p.id === id) ?? specFor(id))?.title;
   return (
     <ToolTiles
       sessionId={context.sessionId}
       openIds={visible}
-      titleOf={(id) => t(specFor(id)?.title ?? 'tiles.chat')}
-      onClose={closePanel}
+      titleOf={(id) => t(titleOf(id) ?? 'tiles.chat')}
+      onClose={(id) => {
+        if (preparing.includes(id)) context.cancelTool?.(id);
+        else closePanel(id);
+      }}
       renderPanel={(id) =>
-        specFor(id)?.render(
-          id === 'side-chat'
-            ? {
-                ...context,
-                sideChat: {
-                  close: () => {
-                    closePanel(id);
+        preparing.includes(id) ? (
+          <PreparingTool />
+        ) : (
+          specFor(id)?.render(
+            id === 'side-chat'
+              ? {
+                  ...context,
+                  sideChat: {
+                    close: () => {
+                      closePanel(id);
+                    },
                   },
-                },
-              }
-            : context,
+                }
+              : context,
+          )
         )
       }
     >
@@ -247,6 +279,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
   // B4.4: a local service started, or a server failed, while the preview was not shown.
   const previewDot = usePreviewDot(context.sessionId);
   const { openTool, prepare, toolsWaiting } = context;
+  const preparing = preparingTools(context, usePanels());
   // The new-session view shows its tools before the first message (ADR-0099): they open a
   // draft session, or wait for the message in a worktree.
   if (!context.sessionId && !openTool && !toolsWaiting) return null;
@@ -254,8 +287,10 @@ export function SessionTools({ context }: { context: PanelContext }) {
   const toggle = (id: string) => {
     if (toolsWaiting) return;
     if (context.sessionId) togglePanel(id);
+    else if (preparing.includes(id)) context.cancelTool?.(id);
     else openTool?.(id);
   };
+  const shown = (id: string) => openIds.includes(id) || preparing.includes(id);
   const bindings = effectiveBindings(preferences.keybindings);
   const controls = [
     ['terminal', 'panel.terminal', <TerminalIcon />, bindings['terminal.toggle']],
@@ -273,7 +308,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
     testId: 'tool-' + id,
     label: t(label),
     icon,
-    selected: openIds.includes(id),
+    selected: shown(id),
     run: () => {
       toggle(id);
     },
@@ -310,7 +345,8 @@ export function SessionTools({ context }: { context: PanelContext }) {
           label={t(label)}
           {...(keys === '' ? {} : { keys })}
           data-testid={'tool-' + id}
-          aria-pressed={openIds.includes(id)}
+          aria-pressed={shown(id)}
+          {...(preparing.includes(id) ? { 'aria-busy': true } : {})}
           {...(id === 'preview' && previewDot ? { 'data-attention': true } : {})}
           {...(waitingHint ? { 'aria-disabled': true, 'data-tooltip': waitingHint } : {})}
           onClick={() => {

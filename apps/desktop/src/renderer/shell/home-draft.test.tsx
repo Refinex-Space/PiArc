@@ -123,6 +123,108 @@ describe('the new-session view’s draft session', () => {
     h.root.unmount();
   });
 
+  it('shows the tools asked for at once while the draft opens', async () => {
+    const h = harness();
+    let resolve: (text: string) => void = () => undefined;
+    h.api.createDraftSession = (workspace: string) => {
+      h.created.push(workspace);
+      return new Promise<string>((done) => {
+        resolve = done;
+      });
+    };
+    h.render(home);
+    act(() => {
+      h.current().report('/w', false);
+    });
+    expect(h.current().opening).toEqual([]);
+    act(() => {
+      h.current().open?.('terminal');
+      h.current().open?.('files');
+    });
+    // Preparing before Core answers: nothing is toggled yet.
+    expect(h.current().opening).toEqual(['terminal', 'files']);
+    expect(toggled).toEqual([]);
+    await act(async () => {
+      resolve(JSON.stringify({ sessionId: 'draft-1' }));
+      await Promise.resolve();
+    });
+    expect(toggled).toEqual(['terminal', 'files']);
+    expect(h.current().opening).toEqual([]);
+    h.root.unmount();
+  });
+
+  it('keeps a tool closed when its preparing tile closed, and clears a failed open', async () => {
+    const h = harness();
+    let resolve: (text: string) => void = () => undefined;
+    let fail: (error: Error) => void = () => undefined;
+    h.api.createDraftSession = (workspace: string) => {
+      h.created.push(workspace);
+      return new Promise<string>((done, reject) => {
+        resolve = done;
+        fail = reject;
+      });
+    };
+    h.render(home);
+    act(() => {
+      h.current().report('/w', false);
+    });
+    act(() => {
+      h.current().open?.('terminal');
+      h.current().open?.('files');
+    });
+    act(() => {
+      h.current().cancel('terminal');
+    });
+    expect(h.current().opening).toEqual(['files']);
+    await act(async () => {
+      resolve(JSON.stringify({ sessionId: 'draft-1' }));
+      await Promise.resolve();
+    });
+    expect(toggled).toEqual(['files']);
+    h.root.unmount();
+
+    const failed = harness();
+    failed.api.createDraftSession = () =>
+      new Promise<string>((_done, reject) => {
+        fail = reject;
+      });
+    failed.render(home);
+    act(() => {
+      failed.current().report('/w', false);
+    });
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    act(() => {
+      failed.current().open?.('changes');
+    });
+    expect(failed.current().opening).toEqual(['changes']);
+    await act(async () => {
+      fail(new Error('Core is gone'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(failed.current().opening).toEqual([]);
+    quiet.mockRestore();
+    failed.root.unmount();
+  });
+
+  it('drops the preparing tools when the view picks a worktree or another folder', () => {
+    const h = harness();
+    h.api.createDraftSession = () => new Promise<string>(() => undefined);
+    h.render(home);
+    act(() => {
+      h.current().report('/w', false);
+    });
+    act(() => {
+      h.current().open?.('terminal');
+    });
+    expect(h.current().opening).toEqual(['terminal']);
+    act(() => {
+      h.current().report('/other', false);
+    });
+    expect(h.current().opening).toEqual([]);
+    h.root.unmount();
+  });
+
   it('discards a draft that opened after the view moved on', async () => {
     const h = harness();
     let resolve: (text: string) => void = () => undefined;

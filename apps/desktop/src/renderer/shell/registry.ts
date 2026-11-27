@@ -20,6 +20,10 @@ export interface PanelContext {
   readonly prepare?: () => Promise<string | undefined>;
   /** On the new-session view in a worktree: the tools wait for the first message. */
   readonly toolsWaiting?: boolean;
+  /** On the new-session view while its draft opens: the tools asked for, shown preparing. */
+  readonly openingTools?: readonly string[];
+  /** Takes back a tool asked for while the draft opens (its preparing tile was closed). */
+  readonly cancelTool?: (id: string) => void;
   /** The selected session has a task list (T26). */
   readonly tasks?: boolean;
   /** The selected session has a plan, approved or waiting for review (T26). */

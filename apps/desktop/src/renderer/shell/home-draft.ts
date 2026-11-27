@@ -3,7 +3,9 @@
 // the shell opens a draft session in the view's folder; the first message then goes to it and
 // the tools stay as they are. A draft the view leaves without a message (another view, another
 // folder, a worktree chosen) is discarded with its terminals. In a worktree the tools wait for
-// the first message: the worktree is created when the message is sent.
+// the first message: the worktree is created when the message is sent. A tool asked for while
+// the draft opens shows at once as a preparing tile (`opening`), replaced by the tool itself
+// when the draft is there.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { PiarcApi } from '../../shared/ipc.js';
@@ -17,6 +19,10 @@ export interface HomeTools {
   readonly prepare: (() => Promise<string | undefined>) | undefined;
   /** Opens tool `id` of the draft, opening the draft first when needed. */
   readonly open: ((id: string) => void) | undefined;
+  /** Tools asked for while the draft opens: their tiles show at once, preparing. */
+  readonly opening: readonly string[];
+  /** Takes tool `id` back before the draft opened (its preparing tile was closed). */
+  readonly cancel: (id: string) => void;
   /** The view starts the session in a worktree: its tools wait for the first message. */
   readonly waiting: boolean;
   /** The new-session view reports its folder and whether it uses a worktree. */
@@ -34,6 +40,15 @@ interface Draft {
 }
 
 type DraftApi = Pick<PiarcApi, 'createDraftSession' | 'discardDraftSession'>;
+
+const NONE: readonly string[] = [];
+
+interface Opening {
+  readonly workspace: string | undefined;
+  readonly ids: readonly string[];
+}
+
+const NOTHING_ASKED: Opening = { workspace: undefined, ids: NONE };
 
 function sessionIdOf(text: string): string | undefined {
   const value: unknown = JSON.parse(text);
@@ -53,6 +68,21 @@ export function useHomeTools(view: View, api: DraftApi): HomeTools {
   const [env, setEnv] = useState<Environment>({ workspace: undefined, worktree: false });
   const [draft, setDraft] = useState<Draft>();
   const [pending, setPending] = useState<readonly string[]>([]);
+  // The tools asked for while the draft opens, and the folder they were asked in; the ref is
+  // what promise callbacks read.
+  const [opening, setOpening] = useState<Opening>(NOTHING_ASKED);
+  const asked = useRef<Opening>(NOTHING_ASKED);
+  const ask = useCallback((next: Opening) => {
+    asked.current = next;
+    setOpening(next);
+  }, []);
+  const without = useCallback(
+    (id: string): Opening => ({
+      ...asked.current,
+      ids: asked.current.ids.filter((other) => other !== id),
+    }),
+    [],
+  );
   const latest = useRef({ view, env, draft });
   useLayoutEffect(() => {
     latest.current = { view, env, draft };
@@ -81,12 +111,20 @@ export function useHomeTools(view: View, api: DraftApi): HomeTools {
     }
   }, [api, view, env, draft]);
 
+  // Preparing tiles belong to the view and folder they were asked in.
+  const leftView = view.kind !== 'home' || env.worktree || env.workspace !== opening.workspace;
+  useEffect(() => {
+    if (leftView && asked.current.ids.length > 0) ask(NOTHING_ASKED);
+  }, [ask, leftView]);
+
   // Tools asked for while the draft opened show once the panels know the draft.
   useEffect(() => {
     if (pending.length === 0 || draft === undefined) return;
     for (const id of pending) togglePanel(id);
     setPending([]);
-  }, [pending, draft]);
+    // The tools take the preparing tiles' places in the same commit.
+    ask({ ...asked.current, ids: asked.current.ids.filter((id) => !pending.includes(id)) });
+  }, [ask, pending, draft]);
 
   const prepare = useCallback((): Promise<string | undefined> => {
     const { view: shown, env: now, draft: ready } = latest.current;
@@ -124,29 +162,47 @@ export function useHomeTools(view: View, api: DraftApi): HomeTools {
         togglePanel(id);
         return;
       }
+      const before = asked.current;
+      if (before.workspace !== now.workspace) ask({ workspace: now.workspace, ids: [id] });
+      else if (!before.ids.includes(id)) ask({ ...before, ids: [...before.ids, id] });
       prepare().then(
         (opened) => {
+          // A tile closed while preparing stays closed.
+          if (!asked.current.ids.includes(id)) return;
           if (opened !== undefined) setPending((ids) => (ids.includes(id) ? ids : [...ids, id]));
+          else ask(without(id));
         },
         (error: unknown) => {
+          ask(without(id));
           console.error('[home] cannot open a draft session for the tools', error);
         },
       );
     },
-    [prepare],
+    [prepare, ask, without],
+  );
+
+  const cancel = useCallback(
+    (id: string) => {
+      ask(without(id));
+    },
+    [ask, without],
   );
 
   const home = view.kind === 'home';
   const usable = home && env.workspace !== undefined && !env.worktree;
   const sessionId = home && draft?.workspace === env.workspace ? draft?.id : undefined;
+  const shownOpening =
+    usable && sessionId === undefined && opening.workspace === env.workspace ? opening.ids : NONE;
   return useMemo(
     () => ({
       sessionId,
       prepare: usable ? prepare : undefined,
       open: usable ? open : undefined,
+      opening: shownOpening,
+      cancel,
       waiting: home && env.workspace !== undefined && env.worktree,
       report,
     }),
-    [sessionId, usable, prepare, open, home, env, report],
+    [sessionId, usable, prepare, open, shownOpening, cancel, home, env, report],
   );
 }

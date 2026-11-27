@@ -835,6 +835,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'tiles.switch': '切换面板',
   'tiles.dock': '停靠面板',
   'panels.tools': '会话工具',
+  'tools.preparing': '正在为这个项目准备工具…',
   'tools.worktreeWaits': '发送第一条消息后可用：worktree 在发送时才创建',
   'panels.environment': '环境',
   'panels.close': '关闭面板',
