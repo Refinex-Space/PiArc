@@ -122,6 +122,8 @@ pub struct Settings {
     pub(crate) ignored_git: Vec<&'static str>,
     /// Project layers whose `browser` object was removed (B5.5: user-level only).
     pub(crate) ignored_browser: Vec<&'static str>,
+    /// Project layers whose `voiceDictation` object was removed (ADR-0094: user-level only).
+    pub(crate) ignored_voice: Vec<&'static str>,
     /// The extension packages in effect (T40), set by Core after the load
     /// ([`Settings::set_packages`]): the settings name them, Core's records say where they are.
     pub(crate) packages: crate::plugins::Packages,
@@ -152,6 +154,7 @@ impl Settings {
             ignored_memory: Vec::new(),
             ignored_git: Vec::new(),
             ignored_browser: Vec::new(),
+            ignored_voice: Vec::new(),
             packages: crate::plugins::Packages::default(),
         };
         settings.reload();
@@ -243,12 +246,9 @@ impl Settings {
     fn remerge(&mut self) -> Vec<String> {
         let trusted = self.trust.is_trusted();
         let mut ignored = Vec::new();
-        let mut ignored_sandbox = Vec::new();
-        let mut ignored_auto = Vec::new();
         let mut ignored_managed_only = Vec::new();
         let mut ignored_memory = Vec::new();
-        let mut ignored_git = Vec::new();
-        let mut ignored_browser = Vec::new();
+        let mut stripped = Vec::new();
         let managed = self.loaded(crate::layers::ids::ENTERPRISE);
         let effective: Vec<Option<Value>> = self
             .table
@@ -293,15 +293,7 @@ impl Settings {
                     }
                 }
                 if project {
-                    let stripped = strip_project(&mut value);
-                    ignored_sandbox.extend(stripped.sandbox.into_iter().map(|p| (spec.id, p)));
-                    ignored_auto.extend(stripped.auto.into_iter().map(|p| (spec.id, p)));
-                    if stripped.git {
-                        ignored_git.push(spec.id);
-                    }
-                    if stripped.browser {
-                        ignored_browser.push(spec.id);
-                    }
+                    stripped.push((spec.id, strip_project(&mut value)));
                 }
                 Some(value)
             })
@@ -312,13 +304,34 @@ impl Settings {
         self.merged = merged;
         self.effective = effective;
         self.ignored_modes = ignored;
-        self.ignored_sandbox = ignored_sandbox;
-        self.ignored_auto = ignored_auto;
         self.ignored_managed_only = ignored_managed_only;
         self.ignored_memory = ignored_memory;
-        self.ignored_git = ignored_git;
-        self.ignored_browser = ignored_browser;
+        self.record_stripped(stripped);
         changed
+    }
+
+    /// Keeps what [`strip_project`] removed from each project layer, for diagnostics.
+    fn record_stripped(&mut self, stripped: Vec<(&'static str, Stripped)>) {
+        self.ignored_sandbox.clear();
+        self.ignored_auto.clear();
+        self.ignored_git.clear();
+        self.ignored_browser.clear();
+        self.ignored_voice.clear();
+        for (layer, removed) in stripped {
+            self.ignored_sandbox
+                .extend(removed.sandbox.into_iter().map(|p| (layer, p)));
+            self.ignored_auto
+                .extend(removed.auto.into_iter().map(|p| (layer, p)));
+            if removed.git {
+                self.ignored_git.push(layer);
+            }
+            if removed.browser {
+                self.ignored_browser.push(layer);
+            }
+            if removed.voice {
+                self.ignored_voice.push(layer);
+            }
+        }
     }
 
     /// The `enterprise` layer's value (T47), when managed settings set anything.
@@ -631,12 +644,13 @@ fn issue(
 /// Removes the value at `pointer` (`/a/b`, unescaped tokens only).
 /// What a project file set and may not: values that loosen the sandbox (T39), Auto mode's
 /// user-only keys (T46), the Git panel's settings (ADR-0085) and the built-in browser's
-/// settings (B5.5).
+/// settings (B5.5) and voice dictation (ADR-0094).
 struct Stripped {
     sandbox: Vec<String>,
     auto: Vec<String>,
     git: bool,
     browser: bool,
+    voice: bool,
 }
 
 /// Removes from a project layer's `value` what only the user's own files may set.
@@ -657,11 +671,14 @@ fn strip_project(value: &mut Value) -> Stripped {
     remove_pointer(value, "/git");
     let browser = value.pointer("/browser").is_some();
     remove_pointer(value, "/browser");
+    let voice = value.pointer("/voiceDictation").is_some();
+    remove_pointer(value, "/voiceDictation");
     Stripped {
         sandbox,
         auto,
         git,
         browser,
+        voice,
     }
 }
 

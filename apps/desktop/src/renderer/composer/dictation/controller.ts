@@ -67,6 +67,8 @@ export class DictationController {
   #composition: (() => void) | undefined;
   /** Events that arrived while the start's answer (the session id) was on its way. */
   #early: DictationEventMessage[] = [];
+  /** Cancelled before the start answered: the session it answers with is ended at once. */
+  #startCancelled = false;
 
   constructor(
     private readonly view: () => EditorView | null,
@@ -126,6 +128,7 @@ export class DictationController {
     if ((view === null && !levelsOnly) || this.active) return;
     this.#set({ kind: 'starting' });
     this.#early = [];
+    this.#startCancelled = false;
     this.levels.clear();
     try {
       await this.attach();
@@ -134,6 +137,12 @@ export class DictationController {
         composer: this.composer,
         ...(workspace === undefined ? {} : { workspace }),
       });
+      if (this.#cancelledWhileStarting()) {
+        // Cancelled (or sent) while the main process was asking for the microphone (V-4.4).
+        this.#early = [];
+        void this.api.cancel(started.sessionId).catch(() => undefined);
+        return;
+      }
       this.#session = started.sessionId;
       this.#sequence = 0;
       const current = this.view();
@@ -148,8 +157,13 @@ export class DictationController {
       for (const event of early) this.#receive(event);
     } catch (error: unknown) {
       this.#session = undefined;
-      this.#set({ kind: 'error', code: codeOf(error) });
+      if (!this.#cancelledWhileStarting()) this.#set({ kind: 'error', code: codeOf(error) });
     }
+  }
+
+  /** Read through a method: a `cancel()` during the start's `await` changes it. */
+  #cancelledWhileStarting(): boolean {
+    return this.#startCancelled;
   }
 
   /** Stop (button, Escape): keep the text, nothing is sent. */
@@ -165,6 +179,11 @@ export class DictationController {
   /** Cancel (×): removes what dictation still owns, one undo step. */
   cancel(): void {
     const session = this.#session;
+    if (session === undefined && this.#ui.kind === 'starting') {
+      this.#startCancelled = true;
+      this.#set({ kind: 'idle' });
+      return;
+    }
     if (session === undefined && this.#ui.kind !== 'error') return;
     this.#apply(() => {
       const view = this.view();
@@ -190,18 +209,27 @@ export class DictationController {
    */
   stopForSend(): Promise<boolean> {
     if (this.#sending !== undefined) return this.#sending;
-    const session = this.#session;
-    if (session === undefined || !this.active) return Promise.resolve(true);
     if (this.#ui.kind === 'starting' || this.#ui.kind === 'preparing') {
-      // No audio yet: the draft is sent as it is.
+      // No audio yet: the dictation is cancelled (also a start still on its way) and the
+      // draft is sent as it is (V-4.4).
       this.cancel();
       return Promise.resolve(true);
     }
+    const session = this.#session;
+    if (session === undefined || !this.active) return Promise.resolve(true);
     this.#sending = new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {
         this.#sending = undefined;
-        this.#fail('sendTimeout');
-        resolve(false);
+        // The words on screen go out as they stand (the hypothesis becomes text); with none,
+        // nothing is sent and the strip says why (V-4.3, V-4.5).
+        const view = this.view();
+        const partial = view === null ? null : dictationState(view.state).partial;
+        const words =
+          view !== null &&
+          (view.state.doc.textContent.trim() !== '' || (partial?.text.trim() ?? '') !== '');
+        resolve(words);
+        if (words) this.#settle();
+        else this.#fail('sendTimeout');
       }, SEND_WAIT_MS);
       this.#ended.push((state) => {
         clearTimeout(timer);
@@ -214,6 +242,48 @@ export class DictationController {
       this.#fail(codeOf(error));
     });
     return this.#sending;
+  }
+
+  /**
+   * The document was replaced (a message given back, an external draft): the session ends and
+   * nothing more is written; the hypothesis does not move into the new text (V-3.5).
+   */
+  abandon(): void {
+    if (this.#ui.kind === 'starting' && this.#session === undefined) {
+      this.cancel();
+      return;
+    }
+    const session = this.#session;
+    if (session === undefined) return;
+    const view = this.view();
+    if (view !== null) view.dispatch(endTransaction(view.state));
+    this.#detachSession();
+    void this.api.cancel(session).catch(() => undefined);
+    this.#set({ kind: 'idle' });
+  }
+
+  /** Ends the session keeping what is on screen, the hypothesis written as text. */
+  #settle(): void {
+    const session = this.#session;
+    const view = this.view();
+    if (view !== null) {
+      const partial = dictationState(view.state).partial;
+      if (partial !== null) {
+        const tr = commitTransaction(
+          view.state,
+          partial.segment,
+          Number.MAX_SAFE_INTEGER,
+          'final',
+          partial.text,
+        );
+        if (tr !== undefined) view.dispatch(tr);
+      }
+      view.dispatch(endTransaction(view.state));
+      view.dispatch(closeGroupTransaction(view.state));
+    }
+    this.#detachSession();
+    if (session !== undefined) void this.api.cancel(session).catch(() => undefined);
+    this.#set({ kind: 'idle' });
   }
 
   /** The composer goes away: the hypothesis becomes text, then the session ends. */

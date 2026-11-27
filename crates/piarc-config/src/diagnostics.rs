@@ -115,6 +115,9 @@ pub enum IgnoreReason {
     ProjectGit,
     /// The built-in browser's settings apply from the user's own file only (B5.5).
     ProjectBrowser,
+    /// A project layer set voice dictation (`voiceDictation`), which Core reads from the user's
+    /// file only (ADR-0094).
+    ProjectVoice,
     /// The setting has no effect on this platform (the sandbox on Windows, requirement D7).
     Platform,
     /// PiArc does not support it (an MCP transport, a plugin component, a field).
@@ -329,6 +332,8 @@ impl Settings {
                 && (pointer == "/git" || pointer.starts_with("/git/"));
             let project_browser = self.ignored_browser.contains(&spec.id)
                 && (pointer == "/browser" || pointer.starts_with("/browser/"));
+            let project_voice = self.ignored_voice.contains(&spec.id)
+                && (pointer == "/voiceDictation" || pointer.starts_with("/voiceDictation/"));
             let reason = if managed_only {
                 IgnoreReason::ManagedOnly
             } else if memory {
@@ -343,6 +348,8 @@ impl Settings {
                 IgnoreReason::ProjectGit
             } else if project_browser {
                 IgnoreReason::ProjectBrowser
+            } else if project_voice {
+                IgnoreReason::ProjectVoice
             } else {
                 untrusted = true;
                 IgnoreReason::Untrusted

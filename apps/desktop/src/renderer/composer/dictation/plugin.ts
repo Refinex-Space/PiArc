@@ -5,7 +5,13 @@
 // touches a range hands it to the user, and dictation never writes into it again. Only the
 // transactions built here (`DictationAction`) change the plugin's state; everything else maps.
 import { closeHistory } from 'prosemirror-history';
-import { Plugin, PluginKey, type EditorState, type Transaction } from 'prosemirror-state';
+import {
+  Plugin,
+  PluginKey,
+  TextSelection,
+  type EditorState,
+  type Transaction,
+} from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
 
 /** A segment of dictated text in the document. */
@@ -199,6 +205,25 @@ export function dictationState(state: EditorState): DictationPluginState {
   return dictationKey.getState(state) ?? IDLE;
 }
 
+/**
+ * Puts the user's selection back after an ASR change (V-3.6): `insertText` collapses a
+ * selection that ends where the text goes. A selection keeps exactly the text it covered (its
+ * start maps after, its end before inserted text); a cursor maps as typing would move it.
+ */
+function keepSelection(state: EditorState, tr: Transaction): Transaction {
+  const { selection } = state;
+  if (!(selection instanceof TextSelection)) return tr;
+  if (selection.empty) {
+    return tr.setSelection(TextSelection.create(tr.doc, tr.mapping.map(selection.head)));
+  }
+  const from = tr.mapping.map(selection.from, 1);
+  const to = Math.max(from, tr.mapping.map(selection.to, -1));
+  const backward = selection.head < selection.anchor;
+  return tr.setSelection(
+    backward ? TextSelection.create(tr.doc, to, from) : TextSelection.create(tr.doc, from, to),
+  );
+}
+
 /** A transaction that starts tracking at the selection's end (never over selected text). */
 export function beginTransaction(state: EditorState): Transaction {
   return state.tr
@@ -246,7 +271,7 @@ export function commitTransaction(
         } satisfies DictationAction)
         .setMeta('addToHistory', false);
     }
-    const tr = state.tr.insertText(text, existing.from, existing.to);
+    const tr = keepSelection(state, state.tr.insertText(text, existing.from, existing.to));
     return closeHistory(tr).setMeta(dictationKey, {
       type: 'commit',
       segment,
@@ -259,7 +284,7 @@ export function commitTransaction(
   if (text === '') return undefined;
   const at = Math.min(dictation.anchor, state.doc.content.size);
   // Inside an empty paragraph or after text: insertText keeps the paragraph structure.
-  const tr = state.tr.insertText(text, at);
+  const tr = keepSelection(state, state.tr.insertText(text, at));
   return closeHistory(tr).setMeta(dictationKey, {
     type: 'commit',
     segment,

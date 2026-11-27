@@ -2917,6 +2917,7 @@ export const en = {
   'error.kind.browserCapture': 'The page could not be captured.',
   'settings.browser': 'Browser',
   'diagnostics.reason.projectBrowser': 'Browser settings apply from your user settings only',
+  'diagnostics.reason.projectVoice': 'Voice input settings apply from your user settings only',
   'browserImport.siteMenu': 'Import this site’s sign-ins from Chrome…',
   'browserImport.title': 'Import sign-ins from Chrome',
   'browserImport.hint':
@@ -3048,10 +3049,14 @@ export const en = {
   'settings.voice.downloading': 'Downloading… {percent}%',
   'settings.voice.downloadProgress': 'Enhanced model download',
   'settings.voice.downloadFailed': 'Try again later or check the proxy settings.',
+  'settings.voice.verify': 'Verify',
+  'settings.voice.verified': 'Checked: the files match.',
+  'settings.voice.repairHint': 'If the built-in model stays damaged, reinstall PiArc.',
+  'settings.voice.downloadEnable': 'Download and Use',
   'settings.voice.download': 'Download',
   'settings.voice.retry': 'Retry',
   'settings.voice.delete': 'Delete',
-  'settings.voice.deleteActive': 'Switch to Basic before deleting the model in use.',
+  'settings.voice.deleteActive': 'Deleting the model in use switches back to Basic first.',
   'settings.voice.deleteConfirm': 'Delete the enhanced speech model?',
   'settings.voice.deleteConfirmDetail':
     'Its files are removed from this computer. Voice input keeps working with the built-in model; you can download it again later.',

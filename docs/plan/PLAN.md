@@ -635,6 +635,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I240 | 语音输入（计划外） | `e2e/t19-composer.e2e.ts` "a queued follow-up sent now steers the running turn" 在基线 Composer 上同样失败：审批卡在场时 Mod+Enter 后找不到排队项 | composer 的维护任务：复现并修正排队与审批卡的交互或用例 |
 | I241 | 语音输入（计划外） | `third-party/sources.json` 的 ONNX Runtime（sherpa-onnx 2.0.1 运行库包里带的 `libonnxruntime`、`onnxruntime.dll`，MIT）没有许可原文：运行库包里不带，写作时从 GitHub、npm 都取不到 | T50：生成 THIRD_PARTY_NOTICES 前补该版本的 LICENSE 与 ThirdPartyNotices，填 `licenseFile` |
 | I242 | 语音输入（计划外） | 空闲超时后模型已卸载（`engine_loaded` 为假），但进程 `phys_footprint` 仍比加载前高约 56–225 MiB（多次实测不等）：释放的内存留在系统分配器里没有归还（`voice-bench` 实测，`voice-idle-footprint` 预算 15 MiB 不达标）；不用语音时不加载，不受影响 | 语音输入后续：卸载后在 macOS 调 `malloc_zone_pressure_relief`（经登记的 FFI 封装）或让 ONNX Runtime 不用 arena，复测后再判 |
+| I243 | 语音输入（计划外） | 发布构建 arm64（2026-11-26）扣除 `speech/` 后安装后 462.8 MB，超出第 11 章 450 MB（11 月 22 日基线 447.6 MB）。语音改动只让 Core 模块（strip 后）从 39.01 MB 增至 40.57 MB；其余约 13.6 MB 来自此前合入的功能（推算：未单独测基线提交的安装包） | 体积治理：按 `probe-size` 的拆分逐项定位增长来源，裁剪或按 ADR 调整 |
 
 ## 技术债
 

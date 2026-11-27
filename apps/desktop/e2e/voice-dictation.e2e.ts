@@ -211,6 +211,9 @@ test('voice: the settings page shows the models, tests the microphone and saves 
   const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-voice').click();
   const voice = settings.getByTestId('voice-page');
+  // Verify checks every file of the built-in model now (V-8.2).
+  await voice.getByTestId('voice-verify-base').click();
+  await expect(voice.getByTestId('voice-verified-base')).toBeVisible({ timeout: 30_000 });
   // The microphone test draws levels and never writes text.
   await voice.getByTestId('voice-test-button').click();
   await expect(voice.getByTestId('dictation-waveform')).toBeVisible({ timeout: 30_000 });

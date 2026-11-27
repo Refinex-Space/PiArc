@@ -656,10 +656,11 @@ threats:
           - vitest:scripts/ci/check-app-layout.test.mjs::THR-18 only the main executable adds the microphone to the base list
           - ci:scripts/ci/check-app-layout.mjs
       - arch: 音频只在内存中处理、不写文件，识别文字与词汇不写日志
-        measure: 一次完整听写后引擎可写的目录里没有文件、内置资产不变；语音模块没有日志语句
+        measure: 一次完整听写后引擎可写的目录里没有文件、内置资产不变；语音模块没有日志语句；诊断包里的自定义词条只剩条数
         type: automated
         tests:
           - rust:crates/piarc-speech/tests/real_model.rs::thr18_a_session_writes_no_audio_to_disk
+          - rust:crates/piarc-telemetry/src/bundle_tests.rs::thr18_dictation_words_leave_the_bundle_as_a_count
       - arch: 未进沙箱的 Bash、hooks 与用户终端继承应用的麦克风授权，作为已接受的风险登记
         measure: 应用之外由用户批准运行的进程可能使用应用的麦克风授权
         type: accepted-risk

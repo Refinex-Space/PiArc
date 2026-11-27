@@ -36,6 +36,9 @@ pub enum Kind {
     SecretField,
     /// The user's home directory in a path (the diagnostic bundle only).
     HomePath,
+    /// Text the user wrote for their own use, such as dictation words (the diagnostic bundle
+    /// only; replaced with its count).
+    PersonalText,
 }
 
 impl Kind {
@@ -50,6 +53,7 @@ impl Kind {
             Self::Jwt => "jwt",
             Self::SecretField => "secret",
             Self::HomePath => "home",
+            Self::PersonalText => "personal-text",
         }
     }
 

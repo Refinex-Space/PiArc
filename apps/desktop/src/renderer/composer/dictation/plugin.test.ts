@@ -83,6 +83,33 @@ describe('dictation plugin', () => {
     view.dispatch(beginTransaction(view.state));
     commit(view, 0, 1, 'final', ' new');
     expect(text(view)).toBe('keep new this text');
+    // V-3.6: the user's selection still covers "keep", neither collapsed nor widened.
+    expect([view.state.selection.from, view.state.selection.to]).toEqual([1, 5]);
+    // A later revision of the same segment leaves it alone too.
+    commit(view, 0, 2, 'final', ' newer');
+    expect(text(view)).toBe('keep newer this text');
+    expect([view.state.selection.from, view.state.selection.to]).toEqual([1, 5]);
+  });
+
+  it('keeps a selection that starts at the insertion point on the same text', () => {
+    const view = editor('ab cd', 1);
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 4, 6)));
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3, 3)));
+    view.dispatch(beginTransaction(view.state));
+    view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 3, 6)));
+    commit(view, 0, 1, 'final', 'X');
+    expect(text(view)).toBe('abX cd');
+    expect(view.state.doc.textBetween(view.state.selection.from, view.state.selection.to)).toBe(
+      ' cd',
+    );
+  });
+
+  it('moves a cursor at the insertion point after the words, as typing would', () => {
+    const view = editor('ab', 3);
+    view.dispatch(beginTransaction(view.state));
+    commit(view, 0, 1, 'final', '你好');
+    expect(view.state.selection.empty).toBe(true);
+    expect(view.state.selection.from).toBe(5);
   });
 
   it('commits segments in order and clears the partial', () => {

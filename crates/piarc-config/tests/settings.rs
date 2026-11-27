@@ -637,3 +637,37 @@ fn browser_settings_apply_from_the_user_file_only() {
         );
     }
 }
+
+/// Voice dictation (ADR-0094): Core reads `voiceDictation` from the user's file only, so a
+/// project file's values do not take effect and diagnostics say why.
+#[test]
+fn voice_dictation_settings_apply_from_the_user_file_only() {
+    let f = Fixture::new("voice-settings");
+    write(
+        &f.user(),
+        r#"{"voiceDictation": {"enabled": false, "punctuation": true}}"#,
+    );
+    write(
+        &f.project(),
+        r#"{"voiceDictation": {"enabled": true, "customTerms": ["ProjectWord"]}}"#,
+    );
+    let settings = Settings::load(f.table(), TrustState::Trusted);
+    assert!(settings.issues().is_empty(), "{:?}", settings.issues());
+    assert_eq!(settings.get("/voiceDictation/enabled"), Some(&json!(false)));
+    assert_eq!(settings.get("/voiceDictation/customTerms"), None);
+    let report = settings.diagnostics();
+    let project = report
+        .iter()
+        .find(|r| r.layer == ids::PROJECT)
+        .expect("project report");
+    for pointer in ["/voiceDictation/enabled", "/voiceDictation/customTerms"] {
+        assert!(
+            project
+                .ignored
+                .iter()
+                .any(|k| k.pointer == pointer && k.reason == IgnoreReason::ProjectVoice),
+            "{pointer}: {:?}",
+            project.ignored
+        );
+    }
+}

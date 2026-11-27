@@ -214,6 +214,15 @@ export function VoicePage() {
   const [termError, setTermError] = useState('');
   const [error, setError] = useState('');
   const managed = useIsManaged('/voiceDictation/enabled');
+  // Managed settings may lock any of these (T47); a locked control shows why and stays put.
+  const locked = {
+    device: useIsManaged('/voiceDictation/device'),
+    mode: useIsManaged('/voiceDictation/mode'),
+    punctuation: useIsManaged('/voiceDictation/punctuation'),
+    techTerms: useIsManaged('/voiceDictation/techTerms'),
+    workspaceTerms: useIsManaged('/voiceDictation/workspaceTerms'),
+    customTerms: useIsManaged('/voiceDictation/customTerms'),
+  };
   const modeLabel = useId();
 
   const save = (change: PreferenceChange) => {
@@ -304,6 +313,7 @@ export function VoicePage() {
               className="input"
               data-testid="voice-device"
               value={voice.device ?? ''}
+              disabled={locked.device}
               onFocus={loadDevices}
               onChange={(event) => {
                 const value = event.currentTarget.value;
@@ -328,6 +338,7 @@ export function VoicePage() {
             >
               {t('settings.voice.refresh')}
             </Button>
+            {locked.device && <ManagedBadge />}
           </div>
           {chosenMissing && <p className="muted">{t('settings.voice.deviceMissingHint')}</p>}
         </div>
@@ -346,7 +357,7 @@ export function VoicePage() {
             testIdPrefix="voice-mode"
             aria-labelledby={modeLabel}
             // Enhanced needs its model; a user on enhanced can always go back to basic.
-            disabled={voice.mode === 'basic' && enhanced?.state !== 'ready'}
+            disabled={locked.mode || (voice.mode === 'basic' && enhanced?.state !== 'ready')}
             labelOf={(mode) =>
               t(mode === 'basic' ? 'settings.voice.modeBasic' : 'settings.voice.modeEnhanced')
             }
@@ -354,6 +365,7 @@ export function VoicePage() {
               save({ key: 'voiceDictation.mode', value });
             }}
           />
+          {locked.mode && <ManagedBadge />}
           <p className="muted">
             {t(
               enhanced?.state === 'ready'
@@ -373,13 +385,30 @@ export function VoicePage() {
           <p className="muted" data-testid="voice-model-base-state">
             {t(STATE_TEXT[base?.state ?? 'missing'])}
           </p>
+          {base !== undefined && <VerifyModel model={base} reload={loadModels} />}
+          {base !== undefined && base.state !== 'ready' && (
+            <p className="muted">{t('settings.voice.repairHint')}</p>
+          )}
         </div>
-        {enhanced !== undefined && <EnhancedModel model={enhanced} reload={loadModels} />}
+        {enhanced !== undefined && (
+          <EnhancedModel
+            model={enhanced}
+            reload={loadModels}
+            enable={(on) =>
+              window.piarc.setPreference({
+                key: 'voiceDictation.mode',
+                value: on ? 'enhanced' : 'basic',
+              })
+            }
+            canEnable={!locked.mode}
+          />
+        )}
       </Section>
 
       <Section title={t('settings.voice.recognition')} testId="voice-recognition">
         <Check
           checked={voice.punctuation}
+          disabled={locked.punctuation}
           label={t('settings.voice.punctuation')}
           hint={t('settings.voice.punctuationHint')}
           testId="voice-punctuation"
@@ -389,6 +418,7 @@ export function VoicePage() {
         />
         <Check
           checked={voice.techTerms}
+          disabled={locked.techTerms}
           label={t('settings.voice.techTerms')}
           hint={t('settings.voice.techTermsHint')}
           testId="voice-tech-terms"
@@ -398,6 +428,7 @@ export function VoicePage() {
         />
         <Check
           checked={voice.workspaceTerms}
+          disabled={locked.workspaceTerms}
           label={t('settings.voice.workspaceTerms')}
           hint={t('settings.voice.workspaceTermsHint')}
           testId="voice-workspace-terms"
@@ -406,7 +437,10 @@ export function VoicePage() {
           }}
         />
         <div className="setting" data-testid="voice-dictionary">
-          <span className="setting-label">{t('settings.voice.dictionary')}</span>
+          <span className="setting-label">
+            {t('settings.voice.dictionary')}
+            {locked.customTerms && <ManagedBadge />}
+          </span>
           <p className="muted">{t('settings.voice.dictionaryHint')}</p>
           {voice.customTerms.length > 0 && (
             <ul className="voice-terms" data-testid="voice-terms">
@@ -416,6 +450,7 @@ export function VoicePage() {
                   <Button
                     variant="ghost"
                     size="small"
+                    disabled={locked.customTerms}
                     aria-label={t('settings.voice.removeTerm', { term: entry })}
                     onClick={() => {
                       save({
@@ -442,13 +477,19 @@ export function VoicePage() {
               data-testid="voice-term-input"
               aria-label={t('settings.voice.addTerm')}
               maxLength={64}
+              disabled={locked.customTerms}
               value={term}
               onChange={(event) => {
                 setTerm(event.currentTarget.value);
                 setTermError('');
               }}
             />
-            <Button type="submit" size="small" data-testid="voice-term-add">
+            <Button
+              type="submit"
+              size="small"
+              disabled={locked.customTerms}
+              data-testid="voice-term-add"
+            >
               {t('settings.voice.add')}
             </Button>
           </form>
@@ -467,17 +508,90 @@ export function VoicePage() {
   );
 }
 
-/** The enhanced model: size, download, progress, cancel, retry, delete. */
-function EnhancedModel({
+/**
+ * "Verify": Core checks every file's size and SHA-256 now (V-8.2); the answer replaces the
+ * quick, size-only state.
+ */
+function VerifyModel({
   model,
   reload,
 }: {
   readonly model: SpeechModelView;
   readonly reload: () => void;
 }) {
+  const { t } = useApp();
+  const [state, setState] = useState<'idle' | 'busy' | 'ok'>('idle');
+  const [error, setError] = useState('');
+  return (
+    <div className="voice-row">
+      <Button
+        variant="ghost"
+        size="small"
+        loading={state === 'busy'}
+        data-testid={`voice-verify-${model.kind}`}
+        onClick={() => {
+          setState('busy');
+          setError('');
+          window.piarc
+            .speechModelAction(model.id, 'verify')
+            .then(() => {
+              setState('ok');
+              reload();
+            })
+            .catch((e: unknown) => {
+              setState('idle');
+              setError(reason(e));
+              reload();
+            });
+        }}
+      >
+        {t('settings.voice.verify')}
+      </Button>
+      {state === 'ok' && (
+        <span className="muted" role="status" data-testid={`voice-verified-${model.kind}`}>
+          {t('settings.voice.verified')}
+        </span>
+      )}
+      {error !== '' && (
+        <span className="error-text" role="alert">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The enhanced model: size, "download and use" (the mode switches to enhanced once the files
+ * are verified, V-7.1), progress, cancel, retry, verify, delete (the model in use is switched
+ * back to basic first, V-7.5).
+ */
+function EnhancedModel({
+  model,
+  reload,
+  enable,
+  canEnable,
+}: {
+  readonly model: SpeechModelView;
+  readonly reload: () => void;
+  readonly enable: (on: boolean) => Promise<unknown>;
+  /** False when managed settings lock the mode. */
+  readonly canEnable: boolean;
+}) {
   const { t, format } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Set by "download and use"; the switch happens when the download is verified.
+  const requested = useRef(false);
+  useEffect(() => {
+    if (!requested.current || model.state !== 'ready') return;
+    requested.current = false;
+    if (canEnable) {
+      enable(true).catch((e: unknown) => {
+        setError(reason(e));
+      });
+    }
+  }, [model.state, canEnable, enable]);
   const act = (op: 'download' | 'cancel' | 'delete' | 'verify') => {
     setBusy(true);
     setError('');
@@ -527,10 +641,15 @@ function EnhancedModel({
             disabled={busy}
             data-testid="voice-download"
             onClick={() => {
+              requested.current = true;
               act('download');
             }}
           >
-            {model.state === 'missing' ? t('settings.voice.download') : t('settings.voice.retry')}
+            {model.state !== 'missing'
+              ? t('settings.voice.retry')
+              : canEnable
+                ? t('settings.voice.downloadEnable')
+                : t('settings.voice.download')}
           </Button>
         ) : null}
         {downloading && (
@@ -545,14 +664,26 @@ function EnhancedModel({
             {t('dialog.cancel')}
           </Button>
         )}
+        {model.state === 'ready' && <VerifyModel model={model} reload={reload} />}
         {model.state === 'ready' && (
           <Button
             variant="destructive"
             size="small"
-            disabled={busy || model.active}
+            disabled={busy || (model.active && !canEnable)}
             data-testid="voice-model-delete"
             onClick={() => {
-              act('delete');
+              if (!model.active) {
+                act('delete');
+                return;
+              }
+              // In use: back to basic first, then Core frees the refiner and deletes.
+              enable(false)
+                .then(() => {
+                  act('delete');
+                })
+                .catch((e: unknown) => {
+                  setError(reason(e));
+                });
             }}
           >
             {t('settings.voice.delete')}

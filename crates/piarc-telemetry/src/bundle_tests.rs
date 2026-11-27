@@ -130,3 +130,34 @@ fn a_missing_log_directory_gives_a_bundle_without_logs() {
     assert_eq!(bundle.files[0].name, "versions.json");
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// THR-18 (addendum V-9.4): the user's dictation words are personal text; the bundle keeps
+/// how many there are, not the words.
+#[test]
+fn thr18_dictation_words_leave_the_bundle_as_a_count() {
+    let root = temp("dictation words");
+    let (mut input, _) = fixture(&root);
+    let settings = root.join("voice-settings.json");
+    std::fs::write(
+        &settings,
+        json!({
+            "voiceDictation": { "enabled": true, "customTerms": ["ZetaCorpInternal", "项目代号青鸟"] }
+        })
+        .to_string(),
+    )
+    .expect("settings");
+    input.settings = vec![("settings.json".into(), settings)];
+    let bundle = assemble(&input).expect("assembled");
+    let text: String = bundle
+        .files
+        .iter()
+        .filter(|f| f.name == "settings/settings.json")
+        .map(|f| String::from_utf8_lossy(&f.bytes).into_owned())
+        .collect();
+    assert!(!text.contains("ZetaCorpInternal"), "{text}");
+    assert!(!text.contains("项目代号青鸟"), "{text}");
+    assert!(text.contains("[REDACTED:personal-text] (2)"), "{text}");
+    assert!(text.contains("\"enabled\": true"), "the rest stays: {text}");
+    assert_eq!(bundle.redactions[&Kind::PersonalText], 1);
+    let _ = std::fs::remove_dir_all(&root);
+}

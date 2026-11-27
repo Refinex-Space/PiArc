@@ -638,6 +638,8 @@ export function Composer({
       .map((line) =>
         composerSchema.node('paragraph', null, line === '' ? [] : [composerSchema.text(line)]),
       );
+    // A dictation in progress ends first: nothing it hears belongs in the new text (V-3.5).
+    latest.current.voice?.abandon();
     view.dispatch(view.state.tr.replaceWith(0, view.state.doc.content.size, paragraphs));
     view.focus();
   }, [fillText, fillNonce]);

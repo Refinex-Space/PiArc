@@ -215,8 +215,13 @@ fn secret_key(key: &str) -> bool {
         || ["authorization", "cookie", "credentials", "credential"].contains(&k.as_str())
 }
 
+/// Settings keys whose lists are the user's own words (`voiceDictation.customTerms`): only
+/// their number goes into the bundle (THR-18, voice dictation addendum V-9.4).
+const PERSONAL_LISTS: &[&str] = &["customTerms"];
+
 /// Replaces the string values of secret-named keys, and every string value inside an `env` or
 /// `headers` map (`all`), except `${NAME}` references; counts them as [`Kind::SecretField`].
+/// The lists of [`PERSONAL_LISTS`] become their count ([`Kind::PersonalText`]).
 fn redact_json(value: &mut Value, all: bool, counts: &mut BTreeMap<Kind, usize>) {
     match value {
         Value::String(text) if all => hide(text, counts),
@@ -224,6 +229,15 @@ fn redact_json(value: &mut Value, all: bool, counts: &mut BTreeMap<Kind, usize>)
         Value::Object(map) => {
             for (key, entry) in map.iter_mut() {
                 let maps_of_secrets = matches!(key.as_str(), "env" | "headers");
+                if PERSONAL_LISTS.contains(&key.as_str())
+                    && let Value::Array(items) = entry
+                {
+                    let count = items.len();
+                    *entry =
+                        Value::String(format!("{} ({count})", Kind::PersonalText.placeholder()));
+                    *counts.entry(Kind::PersonalText).or_default() += 1;
+                    continue;
+                }
                 match entry {
                     Value::String(text) if all || secret_key(key) => hide(text, counts),
                     _ => redact_json(entry, all || maps_of_secrets, counts),

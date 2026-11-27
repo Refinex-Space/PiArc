@@ -170,6 +170,70 @@ describe('dictation controller', () => {
     expect(states.at(-1)).toEqual({ kind: 'error', code: 'sendTimeout' });
   });
 
+  it('sending after the wait with words on screen sends them, the hypothesis included (V-4.3, V-4.5)', async () => {
+    vi.useFakeTimers();
+    const view = editor();
+    const { api, emit, calls } = fakeApi();
+    const { controller, states } = controllerFor(view, api);
+    await controller.start();
+    emit({ type: 'state', state: 'recording' });
+    emit({ type: 'text', segmentId: 0, revision: 1, stage: 'final', text: '第一句。' });
+    emit({ type: 'text', segmentId: 1, revision: 1, stage: 'partial', text: '第二' });
+    const sent = controller.stopForSend();
+    vi.advanceTimersByTime(SEND_WAIT_MS);
+    await expect(sent).resolves.toBe(true);
+    expect(view.state.doc.textContent).toBe('第一句。第二');
+    expect(calls).toContain('cancel dictation-1');
+    expect(states.at(-1)).toEqual({ kind: 'idle' });
+    // Late results of the abandoned session are not written.
+    emit({ type: 'text', segmentId: 1, revision: 2, stage: 'final', text: '第二句。' });
+    expect(view.state.doc.textContent).toBe('第一句。第二');
+  });
+
+  it('cancelling while the start is on its way ends the session as soon as it answers (V-4.4)', async () => {
+    const view = editor('typed');
+    const { api, calls, emit } = fakeApi();
+    let answer: (() => void) | undefined;
+    const started = api.start;
+    api.start = (request) =>
+      new Promise((resolve) => {
+        answer = () => {
+          resolve(started(request));
+        };
+      });
+    const { controller, states } = controllerFor(view, api);
+    const starting = controller.start();
+    // The start request is out (the main process may be asking for the microphone).
+    await vi.waitFor(() => {
+      expect(answer).toBeDefined();
+    });
+    expect(controller.ui.kind).toBe('starting');
+    await expect(controller.stopForSend()).resolves.toBe(true);
+    answer?.();
+    await starting;
+    expect(calls).toContain('cancel dictation-1');
+    expect(states.at(-1)).toEqual({ kind: 'idle' });
+    emit({ type: 'state', state: 'recording' });
+    emit({ type: 'text', segmentId: 0, revision: 1, stage: 'final', text: '迟到' });
+    expect(view.state.doc.textContent).toBe('typed');
+    expect(controller.ui.kind).toBe('idle');
+  });
+
+  it('a replaced document ends the session without moving the hypothesis (V-3.5)', async () => {
+    const view = editor();
+    const { api, calls, emit } = fakeApi();
+    const { controller } = controllerFor(view, api);
+    await controller.start();
+    emit({ type: 'state', state: 'recording' });
+    emit({ type: 'text', segmentId: 0, revision: 1, stage: 'partial', text: '一半' });
+    controller.abandon();
+    view.dispatch(view.state.tr.insertText('given back', 1, view.state.doc.content.size - 1));
+    emit({ type: 'text', segmentId: 0, revision: 2, stage: 'final', text: '一半的话。' });
+    expect(view.state.doc.textContent).toBe('given back');
+    expect(calls).toContain('cancel dictation-1');
+    expect(controller.ui.kind).toBe('idle');
+  });
+
   it('sending while preparing cancels and sends at once', async () => {
     const view = editor('typed');
     const { api, calls } = fakeApi();

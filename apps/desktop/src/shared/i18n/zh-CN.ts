@@ -2816,6 +2816,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'error.kind.browserCapture': '无法截取这个页面。',
   'settings.browser': '浏览器',
   'diagnostics.reason.projectBrowser': '浏览器设置只在用户级设置中生效',
+  'diagnostics.reason.projectVoice': '语音输入设置只在用户级设置中生效',
   'browserImport.siteMenu': '从 Chrome 导入此站点的登录…',
   'browserImport.title': '从 Chrome 导入登录',
   'browserImport.hint':
@@ -2935,10 +2936,14 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'settings.voice.downloading': '下载中… {percent}%',
   'settings.voice.downloadProgress': '增强模型下载进度',
   'settings.voice.downloadFailed': '请稍后重试，或检查代理设置。',
+  'settings.voice.verify': '重新校验',
+  'settings.voice.verified': '校验通过：文件完整。',
+  'settings.voice.repairHint': '内置模型校验仍不通过时，请重新安装 PiArc。',
+  'settings.voice.downloadEnable': '下载并启用',
   'settings.voice.download': '下载',
   'settings.voice.retry': '重试',
   'settings.voice.delete': '删除',
-  'settings.voice.deleteActive': '正在使用这个模型，先切换到基础模式再删除。',
+  'settings.voice.deleteActive': '删除正在使用的模型时，会先切回基础模式。',
   'settings.voice.deleteConfirm': '删除增强语音模型？',
   'settings.voice.deleteConfirmDetail':
     '模型文件会从这台电脑上删除。语音输入继续使用内置模型，之后可以重新下载。',

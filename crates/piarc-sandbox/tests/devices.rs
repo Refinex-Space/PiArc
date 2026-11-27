@@ -79,10 +79,8 @@ struct Dirs {
 
 impl Dirs {
     fn new(name: &str) -> Self {
-        let root = std::env::temp_dir().join(format!(
-            "piarc devices {name} 中文 {}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("piarc devices {name} 中文 {}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for dir in ["ws", "data/sessions/s1/tmp"] {
             std::fs::create_dir_all(root.join(dir)).expect("directory");
@@ -122,11 +120,15 @@ fn thr18_the_sandboxed_commands_profile_denies_the_microphone_and_the_camera() {
     let dirs = Dirs::new("bash");
     let mut policy = SandboxPolicy::new(
         dirs.ws(),
-        dirs.root.join("data").join("sessions").join("s1").join("tmp"),
+        dirs.root
+            .join("data")
+            .join("sessions")
+            .join("s1")
+            .join("tmp"),
     );
     policy.protected = PROTECTED_PATHS.iter().map(|&p| p.to_owned()).collect();
-    let profile = SeatbeltProfile::build(&policy.resolve().expect("resolves"), 50_123)
-        .expect("profile");
+    let profile =
+        SeatbeltProfile::build(&policy.resolve().expect("resolves"), 50_123).expect("profile");
     assert_denied(&profile.args(), "sandboxed commands");
 }
 

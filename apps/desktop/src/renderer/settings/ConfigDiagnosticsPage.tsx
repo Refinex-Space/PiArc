@@ -38,6 +38,7 @@ const REASONS = [
   'projectAutoMode',
   'projectGit',
   'projectBrowser',
+  'projectVoice',
   'platform',
   'unsupported',
   'disabled',
