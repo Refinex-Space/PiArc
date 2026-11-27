@@ -393,7 +393,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 2. M1 现有包管理修复：npm 互斥锁、每包前缀、失败回滚、按路径卸载、代理变量、数据目录碰撞（先写失败测试）。
 - [x] 3. M2 `piarc-web` 连接层与有界 GET。
 - [x] 4. M3 缓存表（schema v16）。
-- [ ] 5. M8 前半：`piarc-mock-npm`、`piarc-mock-proxy`、测试证书。
+- [x] 5. M8 前半：`piarc-mock-npm`、`piarc-mock-proxy`、测试证书。
 - [ ] 6. M4 Core `market`、协议、NAPI。
 - [ ] 7. M5 主进程 IPC 与测试覆盖变量。
 - [ ] 8. M6 设置页：已安装与市场视图、详情、安装与卸载、i18n、a11y。

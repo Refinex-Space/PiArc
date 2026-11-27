@@ -19,6 +19,8 @@ T48 的 fork 场景用 `same_system_as`、`same_tools_as` 核对原始请求字�
 | `cargo test -p piarc-testkit --test ahp_round_trip -- --nocapture` | T07-A10：`fs/read` 的 AHP 往返计时（独立测试二进制，计时期间不跑别的测试） |
 | `cargo test -p piarc-testkit --test scenarios` | L2：`tests/scenarios/*.yaml` 每个文件一个测试（自定义 harness）；`-- <id> --exact` 只跑一个，`-- --results target/l2/results.json` 写 JSON 报告（相对路径按仓库根解析）。`test = false`：不在 `cargo test --workspace` 里，由 verify 第 14 步运行 |
 | `cargo test -p piarc-testkit --test l2_runner -- --nocapture` | 运行器自身：格式错误、可读差异、未用的审批应答、重复运行与临时目录清理 |
+| `cargo test -p piarc-testkit --test npm_registry` | Pi 包市场的测试设施（ADR-0102）：真实 npm 只经 CONNECT 代理从 mock registry 安装（`NODE_EXTRA_CA_CERTS` 信任测试 CA、空的 `npm_config_userconfig`、`--save-exact`），代理 407 时没有直连；搜索的过滤、排序与翻页上限；未知路径记为违规 |
+| `cargo run -q -p piarc-testkit --bin piarc-mock-npm -- --fixtures <packages.json> --work <目录>` 与 `--bin piarc-mock-proxy` | L4 用的独立进程：stdout 第一行是端口；stdin 每行一个控制（npm：`offline`、`online`、`status <路径> <码>`、`hold <路径>`、`release`、`requests`、`violations`；代理：`route <主机> <端口>`、`tunnel`、`refuse <状态>`、`drop`、`connects`），EOF 退出 |
 
 ## 两种运行形态
 
@@ -108,6 +110,8 @@ T48 的 fork 场景用 `same_system_as`、`same_tools_as` 核对原始请求字�
 - T47：顶层 `managed`（`files`：`PiArc/<文件>` 或 `ClaudeCode/<文件>` → 内容，按 `layout`（缺省为本平台）的目录布局放在运行根的 `admin 管理/` 下，经 `FixedPolicy` 交给 Core，轮询 `MANAGED_POLL` 100 ms）；动作 `write_managed`（写或删一个托管文件，等 Core 的配置诊断里托管来源的报告变化后才继续）；`expect.audit`（按 `kind` 取工作区审计，逐条做子集比较）。`managed-*.yaml` 覆盖优先级矩阵、只用托管 hooks、Claude Code 两种布局与运行中变化，`memory-auto-*.yaml` 覆盖写入、关闭、未信任与压缩后恢复。
 
 ## 易错点
+
+- 假 npm registry（`src/npm_registry.rs`）与 CONNECT 代理（`src/connect_proxy.rs`）：证书在 `fixtures/tls/`（`registry.npmjs.test`、`localhost`、`127.0.0.1`，CA 私钥已丢弃）。要证明经过了代理，registry 用 `registry.npmjs.test`（只有代理的路由表能把它映射到回环）；`network::NO_PROXY` 含 `127.0.0.1`，用回环地址时 npm 绕过代理。给 npm 的 `--prefix` 一律传真实路径（macOS 的 `/var` 链接会写坏锁文件），并加 `--save-exact`，否则装另一个包时会把 `^` 范围的包顺带升级。同步等子进程的测试用多线程运行时，否则 mock 与等待在同一线程上死锁。
 
 - Windows：不要把 `canonicalize` 的结果（`\\?\C:\…` 形式）交给 Node 运行脚本，Node 会 `lstat 'C:'` 失败；仓库根用 `CARGO_MANIFEST_DIR` 的上两级。Core 报告的路径不带 `\\?\`，比较时用 harness 的 `canonical()`（L2 运行器里是 `l2::fixtures::canonical`）。
 - Windows 的临时目录在用户主目录之下：从工作区向上找 skills、命令与子 agent 定义会读到本机真实的 `~/.claude/skills`。这时 L2 的临时根放到 `%PUBLIC%`（`runner.rs` 的 `scenario_base`），L4 的工作区同理（`apps/desktop/e2e/sessions.ts` 的 `workspaceBase`）；夹具仓库设 `core.autocrlf=false`（Git for Windows 的系统配置默认为 true，worktree 会检出 CRLF）。

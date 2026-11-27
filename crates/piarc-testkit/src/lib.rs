@@ -99,11 +99,13 @@
 mod anthropic;
 pub mod auth_server;
 mod body;
+pub mod connect_proxy;
 mod error;
 mod fragment;
 pub mod l2;
 pub mod l3;
 pub mod mcp_server;
+pub mod npm_registry;
 mod openai;
 pub mod plaintext;
 mod record;
