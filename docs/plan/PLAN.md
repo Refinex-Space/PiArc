@@ -372,6 +372,21 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 8. B5：`piarc-browser-import`、导入流程与记录、设置页补全、性能探针、Windows 交叉检查；THR-17。 进度：子 agent 交付（`piarc-browser-import` 25 项、cargo-deny 通过、Windows 交叉 Clippy 通过）；THR-17 映射与架构 2.75 已补。 完成：修了从站点菜单导入时对话框不出现（设置页首次渲染挂起，读完即删的 sessionStorage 被丢弃的渲染用掉）与本地名称输入被其他设置的更新冲掉；L4 `browser-import` 2 项、T43 17 项通过。
 - [ ] 9. 收尾：全量 verify、`dev-flow:spec-reviewer` 复核、ego-browser 实操、交付说明（保留风险 R3、R4、R6）。 进度：verify 17/17（`b05e3505`，工作区干净）；`dev-flow:spec-reviewer` 复核的 9 条与部分实现项已处理；全部 `browser-*` L4（39 项）与 T43（17 项）通过。ego-browser 实操未做：它是独立的 Chromium，驱动不了 Electron 应用和原生 `WebContentsView`，以 Playwright 驱动真实应用的 L4 与截图代替。
 
+### 语音输入 V1–V8（计划外，ADR-0094–0097，设计增补 `docs/architecture/addenda/voice-dictation.md`）
+
+- [x] 1. 原生 PoC（设计增补附录 A）、评审与裁决（附录 C）、ADR-0094–0097（用户 2026-11-26 确认基础模型、语音资产预算、麦克风安全取舍、Esc 语义）、设计增补。
+- [ ] 2. 语音资产锁文件与 `fetch-speech-assets.mjs`、`piarc-sherpa-sys`（生成的转发层）与 `[patch.crates-io]`、deny 与依赖规则。
+- [ ] 3. `piarc-speech` 纯模块：音频、词汇、文本规范化、状态机、分段协调器。
+- [ ] 4. 引擎线程、采集、在线识别、真实模型测试。
+- [ ] 5. 协议、Core `dictation`、NAPI、文件音源。
+- [ ] 6. 主进程 IPC、授权端口、路由授权、生命周期、Info.plist 与 entitlement、Seatbelt。
+- [ ] 7. 渲染进程：听写插件与控制器、麦克风按钮、听写条与波形、Composer 接入。
+- [ ] 8. 设置页"语音输入"与偏好 `voiceDictation`。
+- [ ] 9. 下载器、增强模型管理、精修与保守合并。
+- [ ] 10. 打包与布局检查、L4、a11y、截图。
+- [ ] 11. 性能探针、质量评测、体积。
+- [ ] 12. 文档同步（架构 2.76、威胁映射、egress、S10、AGENTS.md）、全量 verify、`dev-flow:spec-reviewer` 复核、交付说明。
+
 ## 登记事项
 
 任务执行中发现、但不属于本任务范围的问题，在这里登记：编号（I01 起）、发现于哪个任务、内容、建议由哪个任务处理。处理完成后在"建议处理"一列注明"已落地"与位置。

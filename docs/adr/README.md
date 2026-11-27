@@ -108,4 +108,8 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0091](0091-browser-sdk-from-ego-browser.md) | 浏览器 SDK 移植 ego-browser（MIT，上游 `56589ea8`）：保留布局、换绑定、删子系统、严格类型不加豁免 | 已接受（补充） |
 | [0092](0092-launch-configs-and-dev-servers.md) | 启动配置（`.piarc/launch.json`、`.claude/launch.json` 只读）、`TaskKind::DevServer`、进程树端口发现、`autoVerify` | 已接受（补充） |
 | [0093](0093-tool-result-images-in-transcript.md) | 工具结果图片写入会话 blob 并在 transcript 显示（关闭 I234） | 已接受（补充） |
+| [0094](0094-speech-engine-and-base-model.md) | 语音输入的识别引擎、基础模型与运行时按需加载：sherpa-onnx 2.0.1 经自有 `piarc-sherpa-sys` 转发到首次使用时加载的动态库，基础模型换为 X-ASR-zh-en 480 ms INT8，主进程内运行与改为隔离的条件 | 已接受 |
+| [0095](0095-bundled-speech-asset-budget.md) | 内置语音资产单列预算：第 11 章非语音预算不变，语音资产安装后 ≤ 230 MB、安装包增量 ≤ 190 MB | 已接受 |
+| [0096](0096-microphone-access-in-the-security-baseline.md) | 麦克风进入安全基线：usage description 与只给主程序的 audio-input entitlement（改 THR-14）、真实输入与按窗口路由、Seatbelt 拒绝 Agent Host 与沙箱命令录音、子进程继承授权的剩余风险（THR-18） | 已接受 |
+| [0097](0097-speech-model-downloads.md) | 增强语音模型的下载：`piarc_web::download`（HTTPS、逐跳白名单、代理 CONNECT、上限、续传、取消、边下边哈希），按文件从 ModelScope 锁定 revision 下载、不解包，加载前校验（THR-19） | 已接受（补充） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |
