@@ -76,17 +76,23 @@ interface PanelProps {
   readonly children: ReactNode;
 }
 
-export function WorkbenchPanels(props: PanelProps) {
-  return <SessionPanels key={props.context.sessionId ?? ''} {...props} />;
+/**
+ * `scope` is the selected session, or `home` for the new-session view: its draft session
+ * (ADR-0099) appears while the view stays, so the view is not rebuilt when the draft opens.
+ */
+export function WorkbenchPanels(props: PanelProps & { readonly scope: string }) {
+  return <SessionPanels key={props.scope} {...props} />;
 }
 
 function SessionPanels({ context, children }: PanelProps) {
   const registered = usePanels();
   const [ids, setIds] = useState(() => restoreOpenIds(context.sessionId));
   const open = useRef(ids);
+  const owner = useRef(context.sessionId);
   const origins = useRef(new Map<string, WeakRef<HTMLElement>>());
   const [compact, setCompactMode] = useState(false);
-  const [wideRail, setWideRail] = useState(true);
+  // The new-session view keeps its layout: the rail opens on request once a draft exists.
+  const [wideRail, setWideRail] = useState(context.sessionId !== undefined);
   const [overlayRail, setOverlayRail] = useState(false);
   const setCompact = useCallback((next: boolean) => {
     setCompactMode(next);
@@ -121,6 +127,14 @@ function SessionPanels({ context, children }: PanelProps) {
     if (guard) guard(proceed);
     else proceed();
   }, []);
+  // Within the new-session view the draft opens or goes: its own tools, none before it.
+  useLayoutEffect(() => {
+    if (owner.current === context.sessionId) return;
+    owner.current = context.sessionId;
+    const next = restoreOpenIds(context.sessionId);
+    open.current = next;
+    setIds(next);
+  }, [context.sessionId]);
   useEffect(() => {
     if (!context.sessionId) return;
     try {
@@ -232,7 +246,16 @@ export function SessionTools({ context }: { context: PanelContext }) {
   const { preferences } = useApp();
   // B4.4: a local service started, or a server failed, while the preview was not shown.
   const previewDot = usePreviewDot(context.sessionId);
-  if (!context.sessionId) return null;
+  const { openTool, prepare, toolsWaiting } = context;
+  // The new-session view shows its tools before the first message (ADR-0099): they open a
+  // draft session, or wait for the message in a worktree.
+  if (!context.sessionId && !openTool && !toolsWaiting) return null;
+  const waitingHint = toolsWaiting ? t('tools.worktreeWaits') : undefined;
+  const toggle = (id: string) => {
+    if (toolsWaiting) return;
+    if (context.sessionId) togglePanel(id);
+    else openTool?.(id);
+  };
   const bindings = effectiveBindings(preferences.keybindings);
   const controls = [
     ['terminal', 'panel.terminal', <TerminalIcon />, bindings['terminal.toggle']],
@@ -252,7 +275,7 @@ export function SessionTools({ context }: { context: PanelContext }) {
     icon,
     selected: openIds.includes(id),
     run: () => {
-      togglePanel(id);
+      toggle(id);
     },
   }));
   return (
@@ -262,8 +285,21 @@ export function SessionTools({ context }: { context: PanelContext }) {
         data-testid="tool-rail"
         aria-pressed={railOpen}
         aria-controls={railOpen ? 'session-rail' : undefined}
+        {...(waitingHint ? { 'aria-disabled': true, 'data-tooltip': waitingHint } : {})}
         onClick={() => {
-          setRailOpen(!railOpen);
+          if (toolsWaiting) return;
+          if (context.sessionId) {
+            setRailOpen(!railOpen);
+            return;
+          }
+          prepare?.().then(
+            (id) => {
+              if (id !== undefined) setRailOpen(true);
+            },
+            (error: unknown) => {
+              console.error('[tools] cannot open a draft session for the rail', error);
+            },
+          );
         }}
       >
         <LayoutListIcon />
@@ -276,8 +312,9 @@ export function SessionTools({ context }: { context: PanelContext }) {
           data-testid={'tool-' + id}
           aria-pressed={openIds.includes(id)}
           {...(id === 'preview' && previewDot ? { 'data-attention': true } : {})}
+          {...(waitingHint ? { 'aria-disabled': true, 'data-tooltip': waitingHint } : {})}
           onClick={() => {
-            togglePanel(id);
+            toggle(id);
           }}
         >
           {icon}
@@ -291,7 +328,9 @@ export function SessionTools({ context }: { context: PanelContext }) {
         label={t('nav.more')}
         aria-haspopup="menu"
         aria-expanded={menu.open !== null}
+        {...(waitingHint ? { 'aria-disabled': true, 'data-tooltip': waitingHint } : {})}
         onClick={(e) => {
+          if (toolsWaiting) return;
           const b = e.currentTarget.getBoundingClientRect();
           menu.openAt(b.left, b.bottom + 4);
         }}

@@ -68,3 +68,29 @@ it('drops a removed owner’s draft and preserves drafts of the remaining owners
   expect(store.editorDraft('workspace', '/one')).not.toBe(first);
   expect(store.editorDraft('workspace', '/two')).toBe(second);
 });
+
+describe('draft sessions', () => {
+  it('reaches a draft by id but leaves it out of the session list until it takes an input', () => {
+    const store = new AppStore();
+    store.applySessions({
+      revision: 1,
+      sessions: [
+        { id: 'kept', status: 'idle', workspace: '/w' },
+        { id: 'draft', status: 'idle', workspace: '/w', open: true, draft: true },
+      ],
+    });
+    expect(store.sessions().map((s) => s.id)).toEqual(['kept']);
+    expect(store.session('draft')?.draft).toBe(true);
+    expect(store.session('draft')?.workspace).toBe('/w');
+
+    store.applySessions({
+      revision: 2,
+      sessions: [
+        { id: 'kept', status: 'idle', workspace: '/w' },
+        { id: 'draft', status: 'running', workspace: '/w', open: true },
+      ],
+    });
+    expect(store.sessions().map((s) => s.id)).toEqual(['kept', 'draft']);
+    expect(store.session('draft')?.draft).toBe(false);
+  });
+});

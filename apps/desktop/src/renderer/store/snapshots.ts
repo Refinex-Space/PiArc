@@ -56,6 +56,11 @@ export interface SessionEntry {
    * `unavailable` + `disabled` after the settings turned Auto mode off. */
   readonly autoReviewState: 'ready' | 'unavailable' | 'paused' | undefined;
   readonly autoReviewReason: AutoReviewReason | undefined;
+  /**
+   * A draft (ADR-0099): opened for the new-session view's tools, no input taken yet. Session
+   * lists leave it out; its tools reach it by id.
+   */
+  readonly draft: boolean;
 }
 
 export const AUTO_REVIEW_REASONS = [
@@ -158,6 +163,7 @@ function sessionEntry(value: unknown): SessionEntry | undefined {
           )
         : NO_APPROVALS,
     pendingApprovals: optionalNumber(value.pendingApprovals) ?? 0,
+    draft: value.draft === true,
     ...worktreeFields(value.worktree),
     ...autoReviewFields(value.autoReview),
   };

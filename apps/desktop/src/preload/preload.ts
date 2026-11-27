@@ -369,6 +369,13 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionCreate, workspace, model, worktree)
       .then((value: unknown) => expectString(value)),
+  createDraftSession: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionCreateDraft, workspace)
+      .then((value: unknown) => expectString(value)),
+  discardDraftSession: async (id) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.sessionDiscardDraft, id);
+  },
   resumeSession: (id) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionResume, id)

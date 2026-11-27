@@ -196,6 +196,16 @@ export declare class CoreRuntime {
   /** Closes a workspace: its sessions and its Agent Host. Resolves with `null`. */
   closeWorkspace(path: string): Promise<string>;
   /**
+   * Creates a draft session in a workspace for the new-session view's tools: session lists
+   * leave it out until its first input. Resolves as `createSession` does.
+   */
+  createDraftSession(workspace: string): Promise<string>;
+  /**
+   * Discards a draft session that took no input, with its tasks; a session that took one
+   * is refused. Resolves with `null`.
+   */
+  discardDraftSession(id: string): Promise<string>;
+  /**
    * The sessions in a turn and the running background tasks of a workspace. Resolves with
    * `{ sessions, tasks }` (counts).
    */

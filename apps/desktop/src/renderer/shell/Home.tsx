@@ -71,6 +71,14 @@ function HomeForm({
     [workspace, ui.composer?.maxSearchResults],
   );
   const [configuring, setConfiguring] = useState(false);
+  // The shell opens a draft session for the tools in this folder; a worktree waits (ADR-0099).
+  const { report: reportTools, sessionId: draftId } = ui.homeTools;
+  useEffect(() => {
+    reportTools(workspace, tree.enabled);
+    return () => {
+      reportTools(undefined, false);
+    };
+  }, [reportTools, workspace, tree.enabled]);
 
   const chooseWorkspace = (path: string) => {
     if (workspace !== path) ui.show({ kind: 'home', workspace: path });
@@ -144,6 +152,7 @@ function HomeForm({
         api: window.piarc,
         store,
         workspace,
+        ...(draftId !== undefined && !tree.enabled ? { sessionId: draftId } : {}),
         text: message.text,
         draft: message,
         ...(model ? { model: { provider: model.provider, id: model.id } } : {}),
@@ -297,6 +306,7 @@ function HomeForm({
       <div className="conversation-composer">
         <NoticeBar />
         <Composer
+          {...(draftId === undefined ? {} : { sessionId: draftId })}
           savedDraft={
             workspace && draft === undefined ? store.editorDraft('workspace', workspace) : undefined
           }

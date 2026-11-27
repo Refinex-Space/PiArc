@@ -73,6 +73,32 @@ impl CoreRuntime {
         })
     }
 
+    /// Creates a draft session in a workspace for the new-session view's tools: session lists
+    /// leave it out until its first input. Resolves as `createSession` does.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn create_draft_session<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.createDraftSession", |core, done| {
+            core.create_draft_session(PathBuf::from(workspace), done)
+        })
+    }
+
+    /// Discards a draft session that took no input, with its tasks; a session that took one
+    /// is refused. Resolves with `null`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn discard_draft_session<'env>(
+        &self,
+        env: &'env Env,
+        id: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.discardDraftSession", |core, done| {
+            core.discard_draft_session(id, done)
+        })
+    }
+
     /// The sessions in a turn and the running background tasks of a workspace. Resolves with
     /// `{ sessions, tasks }` (counts).
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]

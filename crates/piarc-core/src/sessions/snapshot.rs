@@ -98,6 +98,8 @@ pub(crate) struct LiveSession {
     pub first_message: Option<String>,
     /// Its worktree directory and the branch checked out there when it opened (T35).
     pub worktree: Option<(String, Option<String>)>,
+    /// A draft session that has not taken its first input.
+    pub draft: bool,
 }
 
 /// A session's worktree in `core/sessions` (T35).
@@ -191,6 +193,10 @@ pub struct SessionView {
     /// Its worktree (T35).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub worktree: Option<WorktreeView>,
+    /// A draft: opened for the new-session view's tools, no input taken yet. Lists of sessions
+    /// leave it out; its tools reach it by id.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub draft: bool,
 }
 
 pub(crate) enum SnapshotMsg {
@@ -260,7 +266,7 @@ pub const ACTIVITY_LISTED: usize = 20;
 
 impl Activity {
     fn of(list: &[SessionView]) -> Self {
-        let active = list.iter().filter(|v| !v.archived);
+        let active = list.iter().filter(|v| !v.archived && !v.draft);
         let waiting: Vec<&SessionView> =
             active.clone().filter(|v| v.pending_approvals > 0).collect();
         Self {
@@ -621,6 +627,7 @@ fn indexed_view(record: &piarc_store::SessionRecord) -> SessionView {
             removed: w.removed_at.is_some(),
             ..WorktreeView::new(&w.path)
         }),
+        draft: false,
     }
 }
 
@@ -658,6 +665,7 @@ fn empty_view(id: &str) -> SessionView {
         parent_session: None,
         error: None,
         worktree: None,
+        draft: false,
     }
 }
 
@@ -666,6 +674,7 @@ fn empty_view(id: &str) -> SessionView {
 fn apply_live(view: &mut SessionView, live: &LiveSession, derived: Option<&String>) {
     view.workspace = Some(live.workspace.clone());
     view.cwd = Some(live.cwd.clone());
+    view.draft = live.draft;
     view.status = live.status;
     view.unread = live.unread;
     view.open = true;

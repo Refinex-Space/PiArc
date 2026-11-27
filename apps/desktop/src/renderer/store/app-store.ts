@@ -151,8 +151,10 @@ export class AppStore {
         changed.push(id);
       }
     }
-    if (first || !sameList(this.sessionList, next)) {
-      this.sessionList = next;
+    // Drafts stay reachable by id (their tools) but are no session of any list (ADR-0099).
+    const listed = next.some((entry) => entry.draft) ? next.filter((entry) => !entry.draft) : next;
+    if (first || !sameList(this.sessionList, listed)) {
+      this.sessionList = listed;
       emit(this.sessionListeners);
     }
     for (const id of changed) {

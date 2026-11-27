@@ -60,6 +60,8 @@ export const IPC_CHANNELS = {
   workspaceOpen: 'piarc:workspace.open',
   workspaceRemove: 'piarc:workspace.remove',
   sessionCreate: 'piarc:session.create',
+  sessionCreateDraft: 'piarc:session.createDraft',
+  sessionDiscardDraft: 'piarc:session.discardDraft',
   sessionResume: 'piarc:session.resume',
   sessionClose: 'piarc:session.close',
   sessionPrompt: 'piarc:session.prompt',
@@ -768,6 +770,14 @@ export interface PiarcApi {
   removeWorkspace(path: string): Promise<boolean>;
   /** Creates a session in a workspace; resolves with `{ sessionId, ... }` as JSON. */
   createSession(workspace: string, model?: ModelRef, worktree?: WorktreeOptions): Promise<string>;
+  /**
+   * Opens a draft session in a workspace for the new-session view's tools (ADR-0099): session
+   * lists leave it out until its first input; resolves as `createSession` does. The window owns
+   * it: its drafts are discarded when its page goes away.
+   */
+  createDraftSession(workspace: string): Promise<string>;
+  /** Discards a draft session that took no input (with its terminals); others are refused. */
+  discardDraftSession(id: string): Promise<void>;
   providerSettings(): Promise<string>;
   saveProvider(configJson: string, secretJson?: string): Promise<string>;
   deleteProvider(id: string): Promise<string | null>;

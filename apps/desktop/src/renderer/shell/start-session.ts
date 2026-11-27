@@ -57,9 +57,15 @@ export async function startSession(options: {
     | 'storeAttachment'
     | 'setSessionEffort'
     | 'setPermissionMode'
+    | 'setSessionModel'
   >;
   readonly store: AppStore;
   readonly workspace: string;
+  /**
+   * The draft session the new-session view opened for its tools (ADR-0099): the message goes
+   * to it instead of a new session, and it is kept when sending fails.
+   */
+  readonly sessionId?: string;
   readonly model?: ModelRef;
   /** Run the session in a worktree of its own (T35). */
   readonly worktree?: WorktreeOptions;
@@ -73,7 +79,11 @@ export async function startSession(options: {
 }): Promise<string> {
   const { api, store, workspace, text, clientId } = options;
   options.onStep({ kind: 'echo', clientId, text });
-  const created = await api.createSession(workspace, options.model, options.worktree);
+  const existing = options.sessionId;
+  const created =
+    existing === undefined
+      ? await api.createSession(workspace, options.model, options.worktree)
+      : JSON.stringify({ sessionId: existing });
   const sessionId = field(created, 'sessionId');
   if (sessionId === undefined) {
     throw new Error('Core did not return a session id');
@@ -92,6 +102,10 @@ export async function startSession(options: {
     ...(unignoredWorktree(created) ? { unignoredWorktree: true } : {}),
   });
   try {
+    // A draft opened with the default model; the one chosen since applies before the message.
+    if (existing !== undefined && options.model !== undefined) {
+      await api.setSessionModel(sessionId, options.model.provider, options.model.id);
+    }
     if (options.effort !== undefined) await api.setSessionEffort(sessionId, options.effort);
     if (options.mode !== undefined) await api.setPermissionMode(sessionId, options.mode);
     const input = await prepareOutgoing(api, sessionId, clientId, draft);
@@ -103,9 +117,13 @@ export async function startSession(options: {
   } catch (error) {
     transcript.rollback(clientId);
     unwatch();
-    api.closeSession(sessionId).catch((closeError: unknown) => {
-      console.error('[start] closing the session that did not start failed', closeError);
-    });
+    // A draft stays for the new-session view (its tools may hold a terminal); a session made
+    // for this message goes again.
+    if (existing === undefined) {
+      api.closeSession(sessionId).catch((closeError: unknown) => {
+        console.error('[start] closing the session that did not start failed', closeError);
+      });
+    }
     throw error;
   }
 }

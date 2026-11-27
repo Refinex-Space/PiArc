@@ -12,8 +12,14 @@ export type PanelArea = 'rail' | 'tool';
 
 /** What a panel shows about. */
 export interface PanelContext {
-  /** The selected session, if any. */
+  /** The selected session, if any; on the new-session view, its draft once opened (ADR-0099). */
   readonly sessionId: string | undefined;
+  /** On the new-session view without a draft yet: opens one, then tool `id` (ADR-0099). */
+  readonly openTool?: (id: string) => void;
+  /** On the new-session view without a draft yet: opens one and resolves its id. */
+  readonly prepare?: () => Promise<string | undefined>;
+  /** On the new-session view in a worktree: the tools wait for the first message. */
+  readonly toolsWaiting?: boolean;
   /** The selected session has a task list (T26). */
   readonly tasks?: boolean;
   /** The selected session has a plan, approved or waiting for review (T26). */

@@ -14,7 +14,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use piarc_host::{CallRecord, HostSupervisor};
 use piarc_protocol::context::SessionGetContextUsage;
@@ -135,7 +135,8 @@ pub(crate) enum SessionMsg {
     Notification(SessionEventNotification),
     Filled(Result<SessionEntries>),
     Op(Op, oneshot::Sender<Result<Value>>),
-    OpDone(OpKind),
+    /// A request ended; `took_input` when it was a prompt, steer or follow-up that Core accepted.
+    OpDone(OpKind, bool),
     Info(oneshot::Sender<Value>),
     Restored,
     RestoreFailed(Error),
@@ -178,6 +179,9 @@ pub(crate) struct SessionHandle {
     ws: WorkspaceHandle,
     /// Shared with the workspace's link: the session exists in the Agent Host.
     in_host: Arc<presence::InHost>,
+    /// Shared with the actor: a draft session (opened for the new-session view's tools) that
+    /// has not taken its first input yet.
+    draft: Arc<AtomicBool>,
     io: crate::tool_io::ToolIo,
 }
 
@@ -195,6 +199,18 @@ impl SessionHandle {
         id: String,
         cwd: PathBuf,
     ) -> Result<Self> {
+        Self::spawn_as(ctx, workspace, id, cwd, false)
+    }
+
+    /// [`Self::spawn`] for a draft session when `draft`: listed as one until its first input.
+    pub fn spawn_as(
+        ctx: &Arc<Ctx>,
+        workspace: &WorkspaceHandle,
+        id: String,
+        cwd: PathBuf,
+        draft: bool,
+    ) -> Result<Self> {
+        let draft = Arc::new(AtomicBool::new(draft));
         // A session in a worktree has the worktree's files and the workspace's settings (T35).
         let worktree = piarc_git::worktree::containing(&workspace.path, &cwd);
         let files = worktree.clone().unwrap_or_else(|| workspace.path.clone());
@@ -241,6 +257,7 @@ impl SessionHandle {
             notify_again: false,
             cancel: ctx.cancel.child_token(),
             in_host: Arc::clone(&in_host),
+            draft: Arc::clone(&draft),
         };
         actor.publish();
         ctx.handle.spawn(actor.run(rx));
@@ -251,8 +268,14 @@ impl SessionHandle {
             tx,
             ws: workspace.clone(),
             in_host,
+            draft,
             io: ctx.tool_io.clone(),
         })
+    }
+
+    /// Whether it is still a draft (no input taken yet).
+    pub fn is_draft(&self) -> bool {
+        self.draft.load(Ordering::SeqCst)
     }
 
     /// Opens the session as new in the Agent Host, under this id.
@@ -405,6 +428,8 @@ struct SessionActor {
     /// Cancelled when the session closes: its requests in flight stop waiting.
     cancel: CancellationToken,
     in_host: Arc<presence::InHost>,
+    /// A draft until its first input is accepted (shared with the handle).
+    draft: Arc<AtomicBool>,
 }
 
 impl SessionActor {
@@ -414,7 +439,11 @@ impl SessionActor {
                 SessionMsg::Notification(notification) => self.on_notification(notification).await,
                 SessionMsg::Filled(entries) => self.on_filled(entries).await,
                 SessionMsg::Op(op, reply) => self.start_op(op, reply),
-                SessionMsg::OpDone(kind) => {
+                SessionMsg::OpDone(kind, took_input) => {
+                    if took_input && self.draft.swap(false, Ordering::SeqCst) {
+                        // Its first message went out: it is an ordinary session from now on.
+                        self.publish();
+                    }
                     self.ops = self.ops.saturating_sub(1);
                     match kind {
                         OpKind::Starting => self.starting = self.starting.saturating_sub(1),
@@ -732,13 +761,15 @@ impl SessionActor {
             in_host: Arc::clone(&self.in_host),
         };
         let tx = self.tx.clone();
+        let input = matches!(op, Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_));
         self.ctx.handle.spawn(async move {
             let result = tokio::select! {
                 result = request.run(op) => result,
                 () = request.cancel.cancelled() => Err(Error::ShuttingDown),
             };
+            let took_input = input && result.is_ok();
             let _ = reply.send(result);
-            let _ = tx.send(SessionMsg::OpDone(kind)).await;
+            let _ = tx.send(SessionMsg::OpDone(kind, took_input)).await;
         });
     }
 
@@ -808,6 +839,7 @@ impl SessionActor {
             error: self.error.clone(),
             prefs: self.prefs.clone(),
             first_message: self.first_message.clone(),
+            draft: self.draft.load(Ordering::SeqCst),
             worktree: self
                 .worktree
                 .as_deref()

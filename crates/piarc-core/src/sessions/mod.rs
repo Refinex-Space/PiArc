@@ -37,6 +37,7 @@ mod browser_import;
 mod create;
 mod dev_servers;
 mod diagnostics;
+mod drafts;
 mod git;
 mod hooks;
 mod inbound;

@@ -57,6 +57,39 @@ impl CoreRuntime {
         })
     }
 
+    /// Creates a draft session in `workspace` for the new-session view's tools: lists of
+    /// sessions leave it out until its first input; the answer is [`Self::create_session`]'s.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn create_draft_session(
+        &self,
+        workspace: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.create_draft_session(workspace).await
+        })
+    }
+
+    /// Discards a draft session that took no input (deleted with its tasks); a session that
+    /// took one is refused.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn discard_draft_session(
+        &self,
+        id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.discard_draft_session(id).await?;
+            Ok(serde_json::Value::Null)
+        })
+    }
+
     /// The sessions in a turn and the running background tasks of a workspace:
     /// `{ sessions, tasks }` (asked before removing it from the list).
     ///

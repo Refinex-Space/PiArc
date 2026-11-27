@@ -19,6 +19,20 @@ impl Hub {
         mode: Option<piarc_protocol::policy::PermissionMode>,
         worktree: Option<WorktreeRequest>,
     ) -> Result<Value> {
+        self.create_session_as(workspace, cwd, model, mode, worktree, false)
+            .await
+    }
+
+    /// [`Self::create_session`], as a draft when `draft` (listed as one until its first input).
+    pub(super) async fn create_session_as(
+        &self,
+        workspace: PathBuf,
+        cwd: Option<PathBuf>,
+        model: Option<ModelRef>,
+        mode: Option<piarc_protocol::policy::PermissionMode>,
+        worktree: Option<WorktreeRequest>,
+        draft: bool,
+    ) -> Result<Value> {
         let workspace = self.workspace_opened_by_user(workspace).await?;
         let id = new_session_id()?;
         let (cwd, created) = match (cwd, worktree) {
@@ -41,7 +55,9 @@ impl Hub {
                 reason: "must be inside the workspace".into(),
             });
         }
-        let opened = match session::SessionHandle::spawn(&self.ctx, &workspace, id.clone(), cwd) {
+        let spawned =
+            session::SessionHandle::spawn_as(&self.ctx, &workspace, id.clone(), cwd, draft);
+        let opened = match spawned {
             Ok(handle) => match self.register(handle.clone()) {
                 Ok(()) => match handle.create(model, mode).await {
                     Ok(opened) => Ok(opened),

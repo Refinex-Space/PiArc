@@ -35,7 +35,7 @@
 //!   ([`state`]).
 //! - Sessions (T14): `CoreRuntime.create` takes `agentHost` (how Agent Hosts start) and
 //!   `idleTimeoutMs`; `openWorkspace`, `closeWorkspace`, `workspaceWork`, `removeWorkspace`,
-//!   `createSession`, `resumeSession`,
+//!   `createSession`, `createDraftSession`, `discardDraftSession`, `resumeSession`,
 //!   `forkSession`, `closeSession`, `prompt`, `steer`, `followUp`, `abort`, `editQueueItem`,
 //!   `deleteQueueItem`, `reorderQueue`, `markSessionRead`, `transcriptWindow` resolve with JSON;
 //!   `resendSnapshots` queues the list snapshots again ([`sessions`]).

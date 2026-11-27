@@ -36,7 +36,7 @@ it('keeps the selected plan across the gap between approval removal and publicat
   const update = (context: PanelContext) => {
     act(() => {
       root.render(
-        <WorkbenchPanels context={context}>
+        <WorkbenchPanels context={context} scope={context.sessionId ?? 'home'}>
           <ToolSelection context={context} />
         </WorkbenchPanels>,
       );

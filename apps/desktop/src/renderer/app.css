@@ -474,6 +474,7 @@ textarea.input {
 /* ...and a short divider, clear of the top and the bottom, separates the app's own buttons from
    the window's (138 px of caption buttons sit inside the 148 px kept for them). */
 :root[data-platform='windows'] .workbench-header.has-session::after,
+:root[data-platform='windows'] .workbench-header:has(.session-tools)::after,
 :root[data-platform='windows']
   .tool-tile-slot[data-overlay-edge='true']:not([data-compact-caption='true'])
   .tool-tile-header::after {

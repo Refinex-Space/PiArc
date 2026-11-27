@@ -28,6 +28,7 @@ import { LinkConfirmations, parseExternalUrl } from '../external-links.js';
 import type { RegisterHandler } from '../ipc/register.js';
 import type { CoreRuntime } from './native/piarc-core.js';
 import { registerSideChatHandlers } from './side-chat-ipc.js';
+import { DraftSessions } from './draft-sessions.js';
 import { removeWorkspace } from './workspace-removal.js';
 
 /** The part of Core these commands use. */
@@ -37,6 +38,8 @@ export type SessionCore = Pick<
   | 'workspaceWork'
   | 'removeWorkspace'
   | 'createSession'
+  | 'createDraftSession'
+  | 'discardDraftSession'
   | 'createWorktreeSession'
   | 'resumeSession'
   | 'closeSession'
@@ -532,6 +535,13 @@ export function registerSessionHandlers(
       return core.createWorktreeSession(dir, { ...worktreeOptions(tree), ...(model && { model }) });
     }
     return core.createSession(dir, model === undefined ? null : { model });
+  });
+  const drafts = new DraftSessions(core);
+  registerHandler(IPC_CHANNELS.sessionCreateDraft, (event, [workspace]) =>
+    drafts.create(event.sender, absolutePath(workspace)),
+  );
+  registerHandler(IPC_CHANNELS.sessionDiscardDraft, async (event, [id]) => {
+    await drafts.discard(event.sender, sessionId(id));
   });
   registerHandler(IPC_CHANNELS.sessionResume, (_event, [id]) => core.resumeSession(sessionId(id)));
   registerHandler(IPC_CHANNELS.sessionClose, (_event, [id]) => core.closeSession(sessionId(id)));

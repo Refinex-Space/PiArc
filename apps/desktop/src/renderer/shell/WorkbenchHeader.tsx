@@ -126,7 +126,8 @@ export function WorkbenchHeader({
       ) : (
         <h1 className="workbench-heading home-heading">{t('sidebar.newSession')}</h1>
       )}
-      {sessionId ? <div className="header-tools">{children}</div> : null}
+      {/* The new-session view has its tools too (ADR-0099); they render nothing without use. */}
+      <div className="header-tools">{children}</div>
     </header>
   );
 }

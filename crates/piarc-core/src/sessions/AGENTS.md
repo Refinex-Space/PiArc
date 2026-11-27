@@ -16,6 +16,10 @@
 - 客户端偏好（`client_settings`）：可写 `language`、`appearance`、`keybindings`、`notifications`，以及布尔偏好 `/memory/readBoth`，经 `piarc_config::write_value`；读取返回整份文件（不存在为 `{}`）。
 - I62 已接上：工作区 actor 打开时启动设置监听（`WorkspaceSettings`）。macOS 的首次 FSEvents 注册在阻塞线程池进行，与 Host 握手并行。注册完成后重新读取设置，显式 `open_settings` 仍等待监听就绪。回合结束时同步索引。信任变化重启（T18 起）：`CoreRuntime::trust_view`（决定）与 `revoke_trust` 在应答前调 `Hub::trust_changed`，同一主 checkout 的工作区 actor 先把状态置为 `Restarting`（之后的请求等新进程就绪）再调 `HostSupervisor::restart`，所以信任对话框之后立即创建的会话落在新进程上；`agent_host::restart_on_trust_change` 只剩监管器层面的测试使用。
 
+## 草稿会话（ADR-0099）
+
+- `sessions/drafts.rs`：`Hub::create_draft_session` 经 `create_session_as(.., draft: true)` 建会话；`discard_draft_session` 只对 `SessionHandle::is_draft()` 为真的会话走 `delete_session`，其余返回 `invalidParams`。草稿标记是句柄与 actor 共享的 `AtomicBool`，请求任务结束时以 `OpDone(kind, took_input)` 报告，prompt、steer、follow-up 成功才清除并重新发布。快照的 `SessionView.draft` 只在为真时序列化，`Activity` 不计草稿。端到端：`cargo test -p piarc-testkit --test sessions drafts::`。
+
 ## 移除项目（ADR-0098）
 
 - `sessions/removal.rs`：`Hub::workspace_work` 答该工作区运行中的会话与后台任务数；`Hub::remove_workspace` 先 `TaskManager::workspace_removed`，再 `close_open_workspace`，最后 `Store::remove_workspace` 并 `Reload`；文件夹已不存在时按给出的路径移除。移除期间路由表的 `removing` 让 `Hub::workspace` 拒绝打开该路径。

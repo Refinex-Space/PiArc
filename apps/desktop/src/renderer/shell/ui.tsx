@@ -4,6 +4,7 @@ import type { AppCommand } from '../../shared/ipc.js';
 import { createContext, useContext } from 'react';
 
 import type { ComposerInfo } from '../composer/attachments.js';
+import type { HomeTools } from './home-draft.js';
 import type { StoreConnection } from '../store/connection.js';
 import type { TranscriptServices } from '../transcript/services.js';
 
@@ -56,6 +57,8 @@ export interface Ui {
   readonly openShortcuts: () => void;
   /** Runs a registered command as its shortcut would (slash commands, the Mod+K palette). */
   readonly runCommand: (command: AppCommand) => void;
+  /** The new-session view's draft session for its tools (ADR-0099). */
+  readonly homeTools: HomeTools;
   readonly toasts: readonly Toast[];
   readonly addToast: (toast: Omit<Toast, 'id'>) => void;
   readonly dismissToast: (id: string) => void;

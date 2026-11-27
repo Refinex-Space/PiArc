@@ -6,10 +6,13 @@ import { DEFAULT_PREFERENCES } from '../../shared/preferences.js';
 import { AppProvider } from '../app/app-context.js';
 import { Home } from './Home.js';
 
-const { show } = vi.hoisted(() => ({ show: vi.fn() }));
+const { show, homeTools } = vi.hoisted(() => ({
+  show: vi.fn(),
+  homeTools: { sessionId: undefined, waiting: false, report: () => undefined },
+}));
 vi.mock('./ui.js', () => ({
   baseName: (path: string) => path,
-  useUi: () => ({ show }),
+  useUi: () => ({ show, homeTools }),
 }));
 vi.mock('../store/hooks.js', () => ({
   useStore: () => ({ editorDraft: () => ({}) }),

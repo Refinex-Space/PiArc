@@ -28,6 +28,7 @@ import { PageBoundary } from './PageBoundary.js';
 import { RailArea } from './PanelAreas.js';
 import { SessionTools, SessionTileWorkspace, WorkbenchPanels } from './WorkbenchPanels.js';
 import type { PanelContext } from './registry.js';
+import { useHomeTools, type HomeTools } from './home-draft.js';
 import './harness-panels.js';
 import './task-panels.js';
 import './SideChat.js';
@@ -64,21 +65,32 @@ interface TrustRequest {
 }
 
 /** What the panels show about: the selected session and whether it has a task list or a plan. */
-function usePanelContext(store: AppStore, sessionId: string | undefined): PanelContext {
+function usePanelContext(
+  store: AppStore,
+  sessionId: string | undefined,
+  home: HomeTools | undefined,
+): PanelContext {
   const harness = useHarnessOf(store, sessionId);
   const session = useSessionOf(store, sessionId);
   const pendingPlan = session?.approvals.some((r) => r.kind === 'plan');
   const tasks = useTasksOf(store);
   const backgroundTasks =
     sessionId !== undefined && tasks.some((t) => t.ownerSessionId === sessionId);
+  // The new-session view without a draft yet opens one for the tool asked for (ADR-0099).
+  const openTool = sessionId === undefined ? home?.open : undefined;
+  const prepare = sessionId === undefined ? home?.prepare : undefined;
+  const toolsWaiting = sessionId === undefined && home?.waiting === true;
   return useMemo(
     () => ({
       sessionId,
       tasks: (harness?.todos.length ?? 0) > 0,
       plan: harness?.plan !== undefined || pendingPlan === true,
       backgroundTasks,
+      ...(openTool ? { openTool } : {}),
+      ...(prepare ? { prepare } : {}),
+      ...(toolsWaiting ? { toolsWaiting } : {}),
     }),
-    [sessionId, harness, pendingPlan, backgroundTasks],
+    [sessionId, harness, pendingPlan, backgroundTasks, openTool, prepare, toolsWaiting],
   );
 }
 
@@ -148,6 +160,13 @@ export function Shell() {
     };
   }, []);
   const selected = view.kind === 'session' ? view.id : undefined;
+  const homeTools = useHomeTools(view, window.piarc);
+  // The tools' session: the selected one, or the new-session view's draft (ADR-0099).
+  const toolSession = selected ?? homeTools.sessionId;
+  const toggleTool = (id: string) => {
+    if (toolSession) togglePanel(id);
+    else homeTools.open?.(id);
+  };
   const [viewNonce, setViewNonce] = useState(0);
   const [layout, setLayout] = useState<Layout>(() => loadLayout(localStore()));
   const collapsed = narrow ? !sidebarPeek : layout.sidebarCollapsed;
@@ -354,6 +373,7 @@ export function Shell() {
       ensureTrust,
       openFolder,
       toggleSidebar,
+      homeTools,
       openShortcuts: () => {
         setShortcutsOpen(true);
       },
@@ -378,6 +398,7 @@ export function Shell() {
       ensureTrust,
       openFolder,
       toggleSidebar,
+      homeTools,
       toasts,
     ],
   );
@@ -416,32 +437,32 @@ export function Shell() {
         break;
       }
       case 'files.toggle':
-        if (selected) togglePanel('files');
+        toggleTool('files');
         break;
       case 'preview.toggle':
-        if (selected) togglePanel('preview');
+        toggleTool('preview');
         break;
       case 'preview.pick':
       case 'preview.annotate':
         // B3: the preview opens if needed and its panel runs the command.
-        if (selected) {
+        if (toolSession) {
           showPanel('preview');
-          requestPreviewCommand(selected, command === 'preview.pick' ? 'pick' : 'annotate');
+          requestPreviewCommand(toolSession, command === 'preview.pick' ? 'pick' : 'annotate');
         }
         break;
       case 'files.quick':
       case 'files.tree':
-        if (selected) {
+        if (toolSession) {
           // The Git panel takes them while it has focus (ADR-0084).
           if (claimPanelCommand(command)) break;
           showPanel('files');
-          requestFilesControl(selected, command === 'files.quick' ? 'search' : 'tree');
+          requestFilesControl(toolSession, command === 'files.quick' ? 'search' : 'tree');
         }
         break;
       case 'session.sideChat':
-        if (selected && !shortcutsOpen) {
-          showPanel('side-chat');
-        }
+        if (shortcutsOpen) break;
+        if (toolSession) showPanel('side-chat');
+        else homeTools.open?.('side-chat');
         break;
       case 'session.model':
         if (!shortcutsOpen) modelButton.current?.click();
@@ -485,10 +506,11 @@ export function Shell() {
         }
         break;
       case 'changes.toggle':
-        if (selected) toggleChangesPanel();
+        if (toolSession) toggleChangesPanel();
+        else homeTools.open?.('changes');
         break;
       case 'terminal.toggle':
-        if (selected) togglePanel('terminal');
+        toggleTool('terminal');
         break;
       case 'app.settings':
         void window.piarc.openSettings();
@@ -532,7 +554,7 @@ export function Shell() {
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
   };
-  const context = usePanelContext(store, selected);
+  const context = usePanelContext(store, toolSession, view.kind === 'home' ? homeTools : undefined);
   return (
     <StoreContext.Provider value={store}>
       <UiContext.Provider value={ui}>
@@ -607,7 +629,7 @@ export function Shell() {
             />
           )}
           <div className="workspace-area" inert={narrow && sidebarPeek}>
-            <WorkbenchPanels context={context}>
+            <WorkbenchPanels context={context} scope={selected ?? 'home'}>
               <SessionTileWorkspace context={context}>
                 <WorkbenchHeader sessionId={selected} collapsed={collapsed} history={history}>
                   <SessionTools context={context} />
