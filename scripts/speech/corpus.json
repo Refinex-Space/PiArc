@@ -1,0 +1,253 @@
+{
+  "about": "Voice dictation quality corpus (voice dictation addendum 5.4, appendix B). Synthesized locally with the macOS `say` voices named here; the audio is generated on the machine that runs scripts/speech/eval.mjs and never committed or distributed. Synthetic speech compares models and catches regressions; it does not replace recordings of real speakers.",
+  "source": "macOS say (local synthesis, not redistributed)",
+  "items": [
+    {
+      "id": "zh01",
+      "kind": "zh",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "今天下午三点开会讨论新版本的发布计划。",
+      "numbers": ["三"]
+    },
+    {
+      "id": "zh02",
+      "kind": "zh",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "请帮我检查一下这个函数为什么会返回空值。"
+    },
+    {
+      "id": "zh03",
+      "kind": "zh",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "不要删除数据库，不要修改生产环境的密码。",
+      "negations": ["不要", "不要"]
+    },
+    {
+      "id": "zh04",
+      "kind": "zh",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "我们需要在下周五之前完成所有的测试用例。",
+      "numbers": ["五"]
+    },
+    {
+      "id": "zh05",
+      "kind": "zh",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "这个页面加载太慢了，能不能优化一下性能。",
+      "negations": ["不能"]
+    },
+    {
+      "id": "zh06",
+      "kind": "zh",
+      "voice": "Sandy",
+      "locale": "zh_CN",
+      "text": "把日志里所有的错误信息整理成一份表格。"
+    },
+    {
+      "id": "zh07",
+      "kind": "zh",
+      "voice": "Reed",
+      "locale": "zh_CN",
+      "text": "先不要提交代码，等我确认以后再推送。",
+      "negations": ["不要"]
+    },
+    {
+      "id": "zh08",
+      "kind": "zh",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "请把第二十三行到第四十五行的代码重新写一遍。",
+      "numbers": ["二十三", "四十五"]
+    },
+    {
+      "id": "zh09",
+      "kind": "zh",
+      "voice": "Shelley",
+      "locale": "zh_CN",
+      "text": "用户反馈登录以后页面一直在转圈。"
+    },
+    {
+      "id": "zh10",
+      "kind": "zh",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "保留原来的接口，新增一个可选的参数。"
+    },
+    {
+      "id": "en01",
+      "kind": "en",
+      "voice": "Samantha",
+      "locale": "en_US",
+      "text": "Please refactor this function and add unit tests."
+    },
+    {
+      "id": "en02",
+      "kind": "en",
+      "voice": "Samantha",
+      "locale": "en_US",
+      "text": "Do not delete the production database.",
+      "negations": ["not"]
+    },
+    {
+      "id": "en03",
+      "kind": "en",
+      "voice": "Reed",
+      "locale": "en_US",
+      "text": "Compare the two branches and summarize the differences.",
+      "numbers": ["two"]
+    },
+    {
+      "id": "en04",
+      "kind": "en",
+      "voice": "Samantha",
+      "locale": "en_US",
+      "text": "Open the settings page and check the proxy configuration."
+    },
+    {
+      "id": "en05",
+      "kind": "en",
+      "voice": "Shelley",
+      "locale": "en_US",
+      "text": "Run the build again and show me the failing tests."
+    },
+    {
+      "id": "mx01",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "帮我使用 Claude Code 分析当前 PiArc 的 Agent Harness 架构。",
+      "terms": ["Claude Code", "PiArc", "Harness"]
+    },
+    {
+      "id": "mx02",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "在 Spring Boot 3 和 Java 17 的项目里检查 MyBatis-Plus 配置。",
+      "terms": ["Spring Boot", "MyBatis"],
+      "numbers": ["3", "17"]
+    },
+    {
+      "id": "mx03",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "不要删除数据库，不要修改生产环境的 Redis 密码。",
+      "terms": ["Redis"],
+      "negations": ["不要", "不要"]
+    },
+    {
+      "id": "mx04",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "请把 NAPI-RS 和 Electron IPC 的边界写清楚。",
+      "terms": ["NAPI-RS", "Electron", "IPC"]
+    },
+    {
+      "id": "mx05",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "使用 React、TypeScript 和 Rust 重新设计 MCP Server 的管理页面。",
+      "terms": ["React", "TypeScript", "Rust", "MCP"]
+    },
+    {
+      "id": "mx06",
+      "kind": "mix",
+      "voice": "Samantha",
+      "locale": "en_US",
+      "text": "Compare Codex and Claude Code, then inspect the current Git branch.",
+      "terms": ["Codex", "Claude Code", "Git"]
+    },
+    {
+      "id": "mx07",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "检查 src/main/core 的接口，保留 v1.2.3 的兼容逻辑。",
+      "versions": ["v1.2.3"],
+      "paths": ["src/main/core"]
+    },
+    {
+      "id": "mx08",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "把 PostgreSQL 换成 Elasticsearch 之前先做一下压测。",
+      "terms": ["PostgreSQL", "Elasticsearch"]
+    },
+    {
+      "id": "mx09",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "用 Kubernetes 部署这个服务，再配置一下 Redis 缓存。",
+      "terms": ["Kubernetes", "Redis"]
+    },
+    {
+      "id": "mx10",
+      "kind": "mix",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "在 Vue 项目里接入 Qwen 和 GLM 两个模型。",
+      "terms": ["Vue", "Qwen", "GLM"],
+      "numbers": ["两"]
+    },
+    {
+      "id": "ln01",
+      "kind": "long",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "首先打开项目的配置文件，然后找到数据库连接的部分，把超时时间改成三十秒，最后重新启动服务并观察日志。",
+      "numbers": ["三十"]
+    },
+    {
+      "id": "ln02",
+      "kind": "long",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "这个需求比较复杂。我们先拆成三个小任务。第一个任务是接口设计，第二个任务是前端页面，第三个任务是测试。",
+      "numbers": ["三", "一", "二", "三"]
+    },
+    {
+      "id": "ln03",
+      "kind": "long",
+      "voice": "Samantha",
+      "locale": "en_US",
+      "text": "First read the error message carefully. Then check the configuration file. Finally restart the server and watch the logs."
+    },
+    {
+      "id": "ln04",
+      "kind": "long",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "请使用 TypeScript 重写这个模块。注意不要改变已有的行为。完成以后跑一遍所有的单元测试。",
+      "terms": ["TypeScript"],
+      "negations": ["不要"]
+    },
+    {
+      "id": "ln05",
+      "kind": "long",
+      "voice": "Tingting",
+      "locale": "zh_CN",
+      "text": "我想在 AgentScope 里面接入 MCP，然后用 Claude Code 写一个简单的示例。",
+      "terms": ["AgentScope", "MCP", "Claude Code"]
+    }
+  ],
+  "special": [
+    { "id": "sp-silence", "kind": "silence", "seconds": 4, "expect": "no text" },
+    { "id": "sp-noise", "kind": "noise", "seconds": 4, "dbfs": -35, "expect": "no text" },
+    {
+      "id": "sp-long",
+      "kind": "concat",
+      "of": ["ln01", "ln02", "ln04", "ln05", "ln01", "ln02"],
+      "expect": "segments split under the 20 s limit, text kept"
+    }
+  ]
+}

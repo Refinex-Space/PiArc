@@ -24,6 +24,7 @@ Core（Rust）在这次会话里不发起连接：它的网络出口只有下表
 | 沙箱代理 | Core（`piarc-sandbox`） | 沙箱内命令自己的流量 | 沙箱命令联网 | 白名单外的主机询问 |
 | 内置浏览器（预览面板） | 浏览器 guest（每个工作区一个分区），经 Core 的浏览器代理（`piarc_core::browser`） | 用户与智能体打开的网页自己的流量；从 Chrome 导入的站点带导入的 cookie | 用户在面板里打开网页，或智能体的 `Browser` 脚本驱动它的 Space | 用户的标签不询问；智能体控制的 Space 经请求闸门，新主机问站点卡（ADR-0089，THR-16）；PiArc 自己的端口与链路本地地址拒绝；脚本宿主不能联网 |
 | 扩展包安装与更新 | Core（内置 npm、git） | 包名与版本 | 用户安装或更新 | 用户操作；`--ignore-scripts` |
+| 增强语音模型下载（ModelScope） | Core（`piarc_web::download`） | 固定修订的模型文件 URL，不含音频与文字 | 用户在设置的"语音输入"页点"下载"（ADR-0097） | 用户操作；只接受 https 与清单里的主机，直连时检查地址，有代理时经 CONNECT，逐文件核对大小与 SHA-256；基础模型内置，语音识别本身不联网 |
 | Pi 的远程模型目录 `https://pi.dev/api/models/providers/<id>` | Agent Host（Pi `ModelRuntime`） | 服务商 id，不含会话内容 | 只对配置了凭据的内置服务商，每个至多 4 小时一次 | 默认开启，`modelProviders.catalogRefresh: false` 关闭；mock 会话里没有内置服务商的凭据，不发生 |
 | Chromium 拼写检查词典 | Electron（Hunspell） | 语言代码 | Windows 与 Linux 首次需要某语言的词典时，从 Google 的 CDN（`redirector.gvt1.com`）下载 | 保留：只取词典文件，不含会话内容；macOS 用系统拼写检查，不下载。Windows 的 L4 允许这个主机 |
 | Chromium 的 IPv6/IPv4 可达性探测 | Electron（网络服务的主机解析器） | 不发数据：对 `[2001:4860:4860::8888]:443` 的 UDP `connect()` 只用来确定本机路由 | Chromium 的网络栈第一次解析主机名时 | 保留：没有数据包离开本机；`t45-egress` 只在该套接字没有发送字节时把它当作探测 |

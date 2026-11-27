@@ -46,7 +46,8 @@ describe('chapter 11 coverage', () => {
 
   it('names the design addendum section of every budget outside chapter 11', () => {
     for (const metric of METRICS) {
-      if (metric.row === null) expect(metric.source, metric.id).toMatch(/^[\w-]+\.md B\d/u);
+      if (metric.row === null)
+        expect(metric.source, metric.id).toMatch(/^[\w-]+\.md (B\d|\d+\.\d+)/u);
       else expect(metric.row, metric.id).not.toBe('');
     }
   });

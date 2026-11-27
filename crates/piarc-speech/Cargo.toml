@@ -25,3 +25,8 @@ thiserror.workspace = true
 
 [lints]
 workspace = true
+
+# Measurements through the production pipeline (scripts/speech/eval.mjs, scripts/perf/probe-voice.mjs).
+[[example]]
+name = "voice-bench"
+required-features = ["testing"]

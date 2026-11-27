@@ -383,8 +383,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 7. 渲染进程：听写插件与控制器、麦克风按钮、听写条与波形、Composer 接入。
 - [x] 8. 设置页"语音输入"与偏好 `voiceDictation`。
 - [x] 9. 下载器、增强模型管理、精修与保守合并。
-- [ ] 10. 打包与布局检查、L4、a11y、截图。
-- [ ] 11. 性能探针、质量评测、体积。
+- [x] 10. 打包与布局检查、L4、a11y、截图。
+- [x] 11. 性能探针、质量评测、体积。
 - [ ] 12. 文档同步（架构 2.76、威胁映射、egress、S10、AGENTS.md）、全量 verify、`dev-flow:spec-reviewer` 复核、交付说明。
 
 ## 登记事项
@@ -630,6 +630,11 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I235 | 会话主块对标 | `bench:t19` 回退的定位与修复在用户同时使用本机时完成，两次基线复测就相差 74.9 / 40.4 fps，最终数值不可作验收：对照实验（同一时段只切换渲染层产物）确认 `:has()` 规则是主因（去掉后滚动 36→65 fps、冷加载约 160→80 ms、切换约 95→35 ms、流式 p99 约 11→6.6 ms），已修；长消息折叠的逐行强制布局、格式器重建与 O(n) 查找一并修掉 | 在空闲桌面上前台运行 `npm run bench:t19` 与开工值对比（流式 p99 6.32 ms、滚动 59.6 fps、冷加载 61–94 ms、缓存切换 17–25 ms）；仍有差距时继续按提交二分 |
 | I236 | 会话主块遗留 | 渲染进程把 `window.piarc` 调用失败的 `Error.message`（Core 的英文错误）原样显示：未送达行"未送达：the app is offline"、模型菜单、设置页等都经 `shell/errors.ts` 的 `reason()` 拼接，中文界面夹英文 | 按 `ErrorObject.kind` 建本地化映射（主进程把 kind 随错误传给页面，`reason()` 先查目录，未知 kind 才显示原文），一次覆盖所有调用处；涉及 IPC 错误形状，按补充型处理；**已落地（会话主块遗留）**：`src/main/ipc/page-errors.ts` 在 `registerHandler` 里把 Core 错误写成 `[piarc:<kind>] <原文>`，`renderer/app/error-text.ts` 按 23 条 `error.kind.*` 目录取文案，直接显示 `error.message` 的 20 个文件改走 `reason()`；测试 `shared/ipc-error.test.ts`、`main/ipc/page-errors.test.ts`、`renderer/shell/errors.test.ts` 与 L4 `e2e/ipc-errors.e2e.ts` |
 | I237 | 会话主块遗留 | `t23-permissions` 第一个用例点击"Show full request"时带 `.catch`，命令不长时按钮不存在，白等 30 s 默认超时；整组连跑时该用例曾在后续点击超时一次（单独与再次连跑都通过） | 改为按卡片是否显示该按钮再点（`count()` 或 `isVisible()`），不等超时；**已落地（会话主块遗留）**：按 `count()` 判断，用例 36 s → 7 s |
+| I238 | 语音输入（计划外） | `e2e/preload.e2e.ts` 的 `window.piarc` 快照缺内置浏览器的 `browser`、`placeBrowser`（基线 6ae85e91 就缺），"exposes exactly the allowlisted functions" 失败 | 内置浏览器的维护任务：评审这两项后补进快照与 S10 报告 |
+| I239 | 语音输入（计划外） | `e2e/t45-ipc-hardening.e2e.ts` 的 `NO_PARAMETERS` 不含无参的 `chromeProfiles`（B5 加入），扫描判它"从不拒绝"而失败 | 内置浏览器的维护任务：把 `chromeProfiles` 加进 `NO_PARAMETERS` |
+| I240 | 语音输入（计划外） | `e2e/t19-composer.e2e.ts` "a queued follow-up sent now steers the running turn" 在基线 Composer 上同样失败：审批卡在场时 Mod+Enter 后找不到排队项 | composer 的维护任务：复现并修正排队与审批卡的交互或用例 |
+| I241 | 语音输入（计划外） | `third-party/sources.json` 的 ONNX Runtime（sherpa-onnx 2.0.1 运行库包里带的 `libonnxruntime`、`onnxruntime.dll`，MIT）没有许可原文：运行库包里不带，写作时从 GitHub、npm 都取不到 | T50：生成 THIRD_PARTY_NOTICES 前补该版本的 LICENSE 与 ThirdPartyNotices，填 `licenseFile` |
+| I242 | 语音输入（计划外） | 空闲超时后模型已卸载（`engine_loaded` 为假），但进程 `phys_footprint` 仍比加载前高约 56–225 MiB（多次实测不等）：释放的内存留在系统分配器里没有归还（`voice-bench` 实测，`voice-idle-footprint` 预算 15 MiB 不达标）；不用语音时不加载，不受影响 | 语音输入后续：卸载后在 macOS 调 `malloc_zone_pressure_relief`（经登记的 FFI 封装）或让 ONNX Runtime 不用 arena，复测后再判 |
 
 ## 技术债
 

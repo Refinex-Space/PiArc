@@ -247,6 +247,80 @@
       "usedBy": "apps/desktop/src/main/browser/source-map.ts (adapted; the file header names the upstream files): the element picker's React 19 source locations (design addendum B3.2)",
       "addedBy": "Built-in browser (B3)",
       "notes": "Only the V8 frame parsing, the React bottom-frame rule and the mapping segment lookup are adapted; the VLQ decoder is PiArc's own (no @jridgewell/sourcemap-codec), and nothing runs in the page."
+    },
+    {
+      "id": "sherpa-onnx-runtime",
+      "name": "sherpa-onnx C API shared library",
+      "version": "2.0.1",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/sherpa-onnx-2.0.1.LICENSE",
+      "copyright": "Copyright (c) Xiaomi Corporation and sherpa-onnx contributors",
+      "source": {
+        "repository": "https://github.com/k2-fsa/sherpa-onnx",
+        "tag": "v2.0.1",
+        "artefacts": "the *-shared-no-tts-lib release archives (locked in third-party/speech-assets.lock.json)"
+      },
+      "usedBy": "Resources/speech/runtime/ (libsherpa-onnx-c-api.dylib, sherpa-onnx-c-api.dll), loaded by crates/piarc-sherpa-sys at run time",
+      "addedBy": "voice dictation (ADR-0094)",
+      "notes": "The no-TTS build: no espeak-ng (GPL). crates/piarc-sherpa-sys is generated from sherpa-onnx-sys 2.0.1 under the same license (its NOTICE lists the changes)."
+    },
+    {
+      "id": "onnxruntime",
+      "name": "ONNX Runtime shared library",
+      "version": "as bundled by sherpa-onnx 2.0.1",
+      "license": "MIT",
+      "licenseFile": null,
+      "copyright": "Microsoft Corporation",
+      "source": {
+        "repository": "https://github.com/microsoft/onnxruntime",
+        "artefacts": "inside the sherpa-onnx 2.0.1 runtime archives (third-party/speech-assets.lock.json)"
+      },
+      "usedBy": "Resources/speech/runtime/ (libonnxruntime.dylib, onnxruntime.dll)",
+      "addedBy": "voice dictation (ADR-0094)",
+      "notes": "The license text and the version's third-party notices are not in the runtime archive and could not be fetched while this was written (I241); T50 adds them before the notices are generated."
+    },
+    {
+      "id": "x-asr-zh-en-480ms-int8",
+      "name": "X-ASR-zh-en streaming model (480 ms, INT8, with punctuation)",
+      "version": "2026-06-05",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/x-asr.LICENSE",
+      "copyright": "X-ASR authors (https://github.com/Gilgamesh-J/X-ASR)",
+      "source": {
+        "repository": "https://github.com/Gilgamesh-J/X-ASR",
+        "artefacts": "sherpa-onnx's asr-models release sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05 (third-party/speech-assets.lock.json)"
+      },
+      "usedBy": "Resources/speech/models/x-asr-zh-en-480ms-int8/",
+      "addedBy": "voice dictation (ADR-0094)",
+      "notes": "bpe.vocab is derived from the archive's bpe.model by scripts/dev/fetch-speech-assets.mjs; the archive's test WAVs are used by tests only and not packaged."
+    },
+    {
+      "id": "silero-vad",
+      "name": "Silero VAD",
+      "version": "silero_vad.onnx as published by sherpa-onnx (SHA-256 in third-party/speech-assets.lock.json)",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/silero-vad.LICENSE",
+      "copyright": "Copyright (c) 2020-present Silero Team",
+      "source": {
+        "repository": "https://github.com/snakers4/silero-vad",
+        "artefacts": "sherpa-onnx's asr-models release silero_vad.onnx"
+      },
+      "usedBy": "Resources/speech/models/silero-vad/",
+      "addedBy": "voice dictation (ADR-0094)"
+    },
+    {
+      "id": "qwen3-asr-0.6b-int8",
+      "name": "Qwen3-ASR 0.6B (ONNX, INT8)",
+      "version": "pinned ModelScope revisions (crates/piarc-speech/models/qwen3-asr-0.6b-int8.json)",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/qwen3-asr.LICENSE",
+      "copyright": "Copyright 2026 Alibaba Cloud",
+      "source": {
+        "repository": "https://github.com/QwenLM/Qwen3-ASR",
+        "artefacts": "ModelScope zengshuishui/Qwen3-ASR-onnx, file by file at pinned revisions"
+      },
+      "usedBy": "not in release artefacts: downloaded at the user's request into the cache directory (ADR-0097)",
+      "addedBy": "voice dictation (ADR-0097)"
     }
   ]
 }

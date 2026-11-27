@@ -365,6 +365,56 @@ export const METRICS = [
     floor: 100,
     how: 'renderer reload to the transcript visible while the mock turn goes on',
   },
+  // Voice dictation (voice dictation addendum 3.10), Nightly only.
+  ...[
+    [
+      'voice-first-partial',
+      'ms',
+      800,
+      20,
+      'p95 of the first partial after the first speech, ≥ 60 files at real-time pace',
+    ],
+    [
+      'voice-cold-load',
+      'ms',
+      2000,
+      50,
+      'p95 of 20 starts with the models freed, start to recording',
+    ],
+    ['voice-stop-to-final', 'ms', 500, 20, 'p95 of stop to the last final, ≥ 60 files'],
+    [
+      'voice-rtf',
+      'ratio',
+      0.5,
+      0.02,
+      'p95 of process CPU time over audio time per file (2 decoder threads)',
+    ],
+    [
+      'voice-active-footprint',
+      'MiB',
+      600,
+      10,
+      'phys_footprint while dictating minus before any model loaded',
+    ],
+    [
+      'voice-idle-footprint',
+      'MiB',
+      15,
+      5,
+      'phys_footprint after the idle timeout minus before any model loaded',
+    ],
+  ].map(([id, unit, budget, floor, how]) => ({
+    id: String(id),
+    row: null,
+    source: 'voice-dictation.md 3.10',
+    probe: 'voice',
+    unit: String(unit),
+    better: /** @type {const} */ ('lower'),
+    budget: Number(budget),
+    lanes: /** @type {('pr' | 'nightly' | 'long')[]} */ (['nightly']),
+    floor: Number(floor),
+    how: String(how),
+  })),
   // The built-in browser (design addendum B5.6), Nightly only.
   {
     id: 'browser-snapshot-1k',

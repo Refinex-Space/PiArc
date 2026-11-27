@@ -553,7 +553,8 @@ export function registerBuiltInSettingsPages(): void {
   registerSettingsPage({
     id: 'voice',
     title: 'settings.voice',
-    order: 15,
+    // Right after General (voice dictation addendum V-8.1).
+    order: 2,
     component: VoicePage,
   });
   registerSettingsPage({
