@@ -14,6 +14,7 @@
 // checksum below; `--check` regenerates into memory and fails when the committed files differ.
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -288,7 +289,9 @@ export async function generate() {
     const files = new Map();
     /** @type {Array<{ module: string, decls: Decl[] }>} */
     const modules = [];
-    const sources = (await readdir(path.join(crate, 'src'))).filter((f) => f.endsWith('.rs')).sort();
+    const sources = (await readdir(path.join(crate, 'src')))
+      .filter((f) => f.endsWith('.rs'))
+      .sort();
     for (const name of sources) {
       const source = await readFile(path.join(crate, 'src', name), 'utf8');
       const { text, decls } = rewriteSource(source);
@@ -302,10 +305,27 @@ export async function generate() {
       }
     }
     files.set('table.rs', tableSource(modules));
+    // As `cargo fmt` leaves them, so `--check` compares like with like.
+    for (const [name, content] of files) files.set(name, rustfmt(content));
     return files;
   } finally {
     await rm(path.dirname(crate), { recursive: true, force: true });
   }
+}
+
+/**
+ * `source` formatted by the workspace's rustfmt (the pinned toolchain, `rustfmt.toml`).
+ * @param {string} source
+ */
+function rustfmt(source) {
+  const result = spawnSync('rustfmt', ['--edition', '2024', '--emit', 'stdout'], {
+    cwd: CRATE_DIR,
+    input: source,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.status !== 0) throw new Error(`rustfmt failed: ${result.stderr}`);
+  return result.stdout;
 }
 
 /**
@@ -362,7 +382,9 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  console.log(values.check ? 'piarc-sherpa-sys is up to date' : `wrote ${String(files.size)} files`);
+  console.log(
+    values.check ? 'piarc-sherpa-sys is up to date' : `wrote ${String(files.size)} files`,
+  );
 }
 
 if (isMain(import.meta.url)) {

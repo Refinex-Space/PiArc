@@ -151,7 +151,9 @@ export function readSpeechLock() {
     }
     if (entry.derived !== undefined) {
       if (!isRecord(entry.derived)) throw new Error(`${SPEECH_LOCK}: ${where}.derived`);
-      for (const [file, derived] of Object.entries(lockedFiles(entry.derived, `${where}.derived`))) {
+      for (const [file, derived] of Object.entries(
+        lockedFiles(entry.derived, `${where}.derived`),
+      )) {
         /** @type {unknown} */
         const raw = entry.derived[file];
         const from = isRecord(raw) ? raw.from : undefined;
@@ -315,7 +317,11 @@ export async function stageSpeechAssets(platform, arch) {
   await mkdir(SPEECH_ASSETS, { recursive: true });
   const scratch = await mkdtemp(path.join(SPEECH_ASSETS, `.${target}-`));
   try {
-    const archive = await downloadVerified(runtime, path.join(SPEECH_CACHE, 'runtime'), SPEECH_LOCK);
+    const archive = await downloadVerified(
+      runtime,
+      path.join(SPEECH_CACHE, 'runtime'),
+      SPEECH_LOCK,
+    );
     await extract(archive, path.join(scratch, 'runtime'));
     for (const [member, entry] of Object.entries(runtime.files)) {
       const from = path.join(scratch, 'runtime', runtime.root, ...member.split('/'));
@@ -327,7 +333,11 @@ export async function stageSpeechAssets(platform, arch) {
         await place(file, path.join(out, ...model.file.to.split('/')), model.file, name);
       }
       if (model.archive === undefined) continue;
-      const file = await downloadVerified(model.archive, path.join(SPEECH_CACHE, name), SPEECH_LOCK);
+      const file = await downloadVerified(
+        model.archive,
+        path.join(SPEECH_CACHE, name),
+        SPEECH_LOCK,
+      );
       const into = path.join(scratch, name);
       await extract(file, into);
       const root = path.join(into, model.archive.root);
@@ -371,12 +381,16 @@ async function main() {
   if (values.all) {
     const lock = readSpeechLock();
     for (const [target, artefact] of Object.entries(lock.runtime)) {
-      console.log(`runtime ${target}: ${await downloadVerified(artefact, path.join(SPEECH_CACHE, 'runtime'), SPEECH_LOCK)}`);
+      console.log(
+        `runtime ${target}: ${await downloadVerified(artefact, path.join(SPEECH_CACHE, 'runtime'), SPEECH_LOCK)}`,
+      );
     }
     for (const [name, model] of Object.entries(lock.models)) {
       for (const item of [model.archive, model.file]) {
         if (item !== undefined) {
-          console.log(`${name}: ${await downloadVerified(item, path.join(SPEECH_CACHE, name), SPEECH_LOCK)}`);
+          console.log(
+            `${name}: ${await downloadVerified(item, path.join(SPEECH_CACHE, name), SPEECH_LOCK)}`,
+          );
         }
       }
     }

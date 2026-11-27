@@ -136,7 +136,9 @@ export async function downloadVerified(artefact, dir, lockFile) {
   const problem = await mismatch(partial, artefact);
   if (problem !== null) {
     await rm(partial);
-    throw new Error(`${artefact.url} does not match ${path.relative(repoRoot, lockFile)}: ${problem}`);
+    throw new Error(
+      `${artefact.url} does not match ${path.relative(repoRoot, lockFile)}: ${problem}`,
+    );
   }
   await rename(partial, file);
   return file;

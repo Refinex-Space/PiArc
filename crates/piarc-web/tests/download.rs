@@ -1,5 +1,5 @@
 //! Model downloads (ADR-0097) against a local HTTPS server with a test CA
-//! (`tests/fixtures/tls/`): verified files, redirects only to allowed hosts, the address check
+//! (`tests/fixtures/tls/`, `*.test.*`): verified files, redirects only to allowed hosts, the address check
 //! on direct connections, the proxy's `CONNECT`, `Range` resume, size and checksum failures,
 //! and cancellation.
 use std::collections::HashMap;
@@ -20,9 +20,9 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::sync::CancellationToken;
 
-const CA: &[u8] = include_bytes!("fixtures/tls/ca.pem");
-const SERVER_CERT: &[u8] = include_bytes!("fixtures/tls/server.pem");
-const SERVER_KEY: &[u8] = include_bytes!("fixtures/tls/server.key");
+const CA: &[u8] = include_bytes!("fixtures/tls/ca.test.crt");
+const SERVER_CERT: &[u8] = include_bytes!("fixtures/tls/server.test.crt");
+const SERVER_KEY: &[u8] = include_bytes!("fixtures/tls/server.test.key");
 
 /// Test names → loopback; anything else is unknown.
 struct Names(HashMap<String, IpAddr>);

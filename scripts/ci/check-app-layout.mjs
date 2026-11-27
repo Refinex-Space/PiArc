@@ -355,9 +355,7 @@ export function checkAppLayout({ app, platform, arch, flavor }) {
         .map((name) => path.join(frameworks, name))
     : [];
   const helperProblems = helpers.flatMap((helper) => {
-    const keys = entitlementKeys(
-      codesign(['-d', '--entitlements', '-', '--xml', helper]).output,
-    );
+    const keys = entitlementKeys(codesign(['-d', '--entitlements', '-', '--xml', helper]).output);
     return JSON.stringify(keys) === JSON.stringify(base)
       ? []
       : [`${path.basename(helper)}: ${keys.join(', ')}`];

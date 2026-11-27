@@ -25,7 +25,7 @@
 | THR-15 | 恶意仓库的 Git 配置 | 4 | 4 | 0 | 0 | 0 | 11 |
 | THR-16 | 浏览器外传与本机服务访问 | 5 | 5 | 0 | 0 | 0 | 34 |
 | THR-17 | 浏览器凭据 | 4 | 3 | 0 | 1 | 0 | 13 |
-| THR-18 | 麦克风与听写内容 | 5 | 4 | 0 | 1 | 0 | 10 |
+| THR-18 | 麦克风与听写内容 | 5 | 4 | 0 | 1 | 0 | 11 |
 | THR-19 | 语音模型篡改 | 3 | 3 | 0 | 0 | 0 | 8 |
 
 ## THR-01 提示注入导致破坏性操作
@@ -194,7 +194,7 @@
 | 页面不能静默开始录音；窗口号取自发送者；拒绝后不再请求 | 自动化 | Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 asks for the microphone once and not again after a refusal<br>Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 needs recent real input and a visible window<br>Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 takes the window id from the sender, never from the page |
 | 事件只在 `dictation/<发起窗口>`；其他窗口订阅该路由被主进程拒绝；全应用同一时刻一个听写 | 自动化 | Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 lets only the starting window observe its dictation<br>Rust `crates/piarc-core/src/dictation/service_tests.rs` · thr18_missing_assets_end_the_session_on_its_window_and_free_the_slot |
 | 真实 `sandbox-exec` 下两份配置的 `sandbox_check` 对 `device-microphone`、`device-camera` 答拒绝；打包产物只有主程序带麦克风 entitlement | 自动化 | Rust `crates/piarc-sandbox/tests/devices.rs` · thr18_the_agent_hosts_profile_denies_the_microphone_and_the_camera<br>Rust `crates/piarc-sandbox/tests/devices.rs` · thr18_the_sandboxed_commands_profile_denies_the_microphone_and_the_camera<br>Vitest `scripts/ci/check-app-layout.test.mjs` · THR-18 only the main executable adds the microphone to the base list<br>CI `scripts/ci/check-app-layout.mjs` |
-| 一次完整听写后引擎可写的目录里没有文件、内置资产不变；语音模块没有日志语句 | 自动化 | Rust `crates/piarc-speech/tests/real_model.rs` · thr18_a_session_writes_no_audio_to_disk |
+| 一次完整听写后引擎可写的目录里没有文件、内置资产不变；语音模块没有日志语句；诊断包里的自定义词条只剩条数 | 自动化 | Rust `crates/piarc-speech/tests/real_model.rs` · thr18_a_session_writes_no_audio_to_disk<br>Rust `crates/piarc-telemetry/src/bundle_tests.rs` · thr18_dictation_words_leave_the_bundle_as_a_count |
 | 应用之外由用户批准运行的进程可能使用应用的麦克风授权 | 已接受风险 | 理由：macOS 的 TCC 按负责进程归属授权，PiArc 启动的子进程继承它；放弃责任主体会让每个子进程访问文稿等目录时各自弹框。沙箱内的命令与 Agent Host 已被 Seatbelt 拒绝，剩余的是用户逐条批准或自己运行的进程（用户在 SPEC 评审中确认）<br>依据：ADR-0096 |
 
 ## THR-19 语音模型篡改
