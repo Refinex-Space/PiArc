@@ -385,7 +385,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 9. 下载器、增强模型管理、精修与保守合并。
 - [x] 10. 打包与布局检查、L4、a11y、截图。
 - [x] 11. 性能探针、质量评测、体积。
-- [ ] 12. 文档同步（架构 2.76、威胁映射、egress、S10、AGENTS.md）、全量 verify、`dev-flow:spec-reviewer` 复核、交付说明。
+- [x] 12. 文档同步（架构 2.76、威胁映射、egress、S10、AGENTS.md）、全量 verify、`dev-flow:spec-reviewer` 复核、交付说明。全量 `npm run verify` 在 addba517 上 17/17 通过（独立 worktree，避免覆盖用户正在运行的开发实例加载的 Core 与 Agent Host）；复核意见已修或记入设计增补 2.4。
 
 ## 登记事项
 
