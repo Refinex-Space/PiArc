@@ -65,12 +65,24 @@ pub fn normalize(text: &str, options: &Normalize<'_>) -> String {
     bounded(out.trim()).to_owned()
 }
 
-/// Puts one space between a CJK character and an adjacent ASCII letter or digit.
+/// Spacing of mixed text (addendum V-6.2): one space between a CJK character and an adjacent
+/// ASCII letter or digit; none between two CJK characters or next to Chinese punctuation
+/// (the model separates its pieces with spaces). Expects single spaces (`normalize` collapses
+/// whitespace first).
 #[must_use]
 pub fn space_cjk_and_latin(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len() + 8);
     let mut previous: Option<char> = None;
-    for c in text.chars() {
+    for (i, &c) in chars.iter().enumerate() {
+        if c == ' ' {
+            let next = chars.get(i + 1).copied();
+            let dropped = |x: Option<char>| x.is_some_and(|x| CJK_PUNCTUATION.contains(&x));
+            let between_cjk = previous.is_some_and(is_cjk) && next.is_some_and(is_cjk);
+            if dropped(previous) || dropped(next) || between_cjk {
+                continue;
+            }
+        }
         if let Some(p) = previous
             && ((is_cjk(p) && is_word(c)) || (is_word(p) && is_cjk(c)))
         {
@@ -352,6 +364,22 @@ mod tests {
         assert_eq!(normalized("接入 M C P 和 G L M"), "接入 MCP 和 GLM");
         assert_eq!(normalized("检查 S R C 斜杠"), "检查 S R C 斜杠");
         assert_eq!(normalized("electron I P C 的边界"), "Electron IPC 的边界");
+    }
+
+    /// The model puts spaces between its pieces; Chinese text and full-width punctuation take
+    /// none (measured on the real-speech test WAVs: `这是第一种， 第二种`).
+    #[test]
+    fn no_space_next_to_chinese_punctuation_or_between_chinese_characters() {
+        assert_eq!(
+            normalized("这是第一种， 第二种叫呃与 always， always 什么意思啊"),
+            "这是第一种，第二种叫呃与 always，always 什么意思啊"
+        );
+        assert_eq!(
+            normalized("今天是 礼拜二 ， the day after tomorrow 是星期三 。"),
+            "今天是礼拜二，the day after tomorrow 是星期三。"
+        );
+        assert_eq!(normalized("（ 可选 ） v1.2.3 发布"), "（可选）v1.2.3 发布");
+        assert_eq!(normalized("hello world， ok"), "hello world，ok");
     }
 
     #[test]
