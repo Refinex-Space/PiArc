@@ -1,80 +1,87 @@
-// The plan card (T26): an ExitPlanMode call waiting for the user. It shows the plan as
-// Markdown and, once there are any, the comment count; the plan panel takes inline comments.
-// Three answers: approve and accept edits (Mod+Enter), approve and review edits
-// (Mod+Shift+Enter), keep planning (Esc) with the feedback and the comments. The answer names
-// the card's revision and Agent Host connection, like every approval.
-import { approvalLabel } from './approval-label.js';
+// The plan card (T26, ADR-0103): an ExitPlanMode call waiting for the user, as a compact decision
+// bar under the plan's own row (which shows the plan; the plan panel shows it whole, with
+// comments). Approve and accept edits (Mod+Enter), approve and review edits (Mod+Shift+Enter),
+// revise (Esc: the composer takes the reply; a message sent while the card waits declines the
+// plan with that message), send the inline comments alone, or stop the turn. The answer names the
+// card's revision and Agent Host connection, like every approval.
 import type { ApprovalRequest } from '@piarc/protocol';
 import { useEffect, useRef, useState } from 'react';
 
 import { useApp } from '../app/app-context.js';
+import { IconButton } from '../app/IconButton.js';
 import { Keycaps } from '../app/Keycaps.js';
 import { reason } from '../shell/errors.js';
+import { CloseIcon, CommentIcon } from '../shell/icons.js';
 import { showPanel } from '../shell/registry.js';
-import { InfoGlyph } from '../shell/icons.js';
-import { PlanMarkdown } from '../transcript/rows/harness.js';
+import { approvalLabel } from './approval-label.js';
 import { answerRequest } from './answer.js';
-import { planComments, usePlanComments } from './plan-comments.js';
-import { useApprovalKeys } from './use-approval-keys.js';
 import { ApprovalOrigin } from './ApprovalOrigin.js';
+import { planComments, usePlanComments } from './plan-comments.js';
+import { commentsOf } from './plan-reply.js';
+import { useApprovalKeys } from './use-approval-keys.js';
 
-type Choice = 'acceptEdits' | 'default' | 'keepPlanning';
+type Choice = 'acceptEdits' | 'default' | 'comments' | 'stop';
+
+/** Puts the caret in the composer of the conversation `from` is in. */
+function focusComposer(from: HTMLElement | null): void {
+  const input = from
+    ?.closest('.conversation')
+    ?.querySelector<HTMLElement>('.composer [contenteditable="true"]');
+  input?.focus();
+}
 
 export function PlanApprovalCard({ request }: { readonly request: ApprovalRequest }) {
   const { t, keyPlatform } = useApp();
   const card = useRef<HTMLElement>(null);
   const comments = usePlanComments(request.requestId);
-  const [feedback, setFeedback] = useState('');
   const busy = useRef(false);
-  const [waiting, setWaiting] = useState(false);
+  const [waiting, setWaiting] = useState<Choice | undefined>(undefined);
   const [error, setError] = useState('');
-  const plan = request.plan ?? '';
-  // The whole plan is read in the panel: bring it forward when a plan arrives.
+  // The plan is read in the panel: bring it forward when a plan arrives.
   useEffect(() => {
     showPanel('plan');
   }, [request.requestId]);
 
-  function answer(choice: Choice) {
+  function settle(work: Promise<unknown>, choice: Choice) {
     if (busy.current) return;
     busy.current = true;
-    setWaiting(true);
+    setWaiting(choice);
     setError('');
-    const sent =
-      choice === 'keepPlanning'
-        ? {
-            decision: 'deny' as const,
-            ...(feedback.trim() ? { feedback: feedback.trim() } : {}),
-            ...(comments.length === 0
-              ? {}
-              : {
-                  comments: comments.map(({ start, end, quote, text }) => ({
-                    start,
-                    end,
-                    quote,
-                    text,
-                  })),
-                }),
-          }
-        : { decision: 'allowOnce' as const, mode: choice };
-    answerRequest(request, sent)
+    work
       .then((outcome) => {
-        if (outcome === 'applied') planComments.clear(request.requestId);
+        if (outcome === 'applied' && choice === 'comments') planComments.clear(request.requestId);
         if (outcome === 'handled') setError(t('approval.handled'));
-        if (outcome === 'cancelled') {
+        if (outcome === 'cancelled' || choice === 'stop') {
           busy.current = false;
-          setWaiting(false);
+          setWaiting(undefined);
         }
       })
       .catch((e: unknown) => {
         setError(reason(e));
         busy.current = false;
-        setWaiting(false);
+        setWaiting(undefined);
       });
   }
-  useApprovalKeys(card, (key) => {
-    answer(
-      key === 'allowOnce' ? 'acceptEdits' : key === 'allowSession' ? 'default' : 'keepPlanning',
+
+  function answer(choice: 'acceptEdits' | 'default' | 'comments') {
+    settle(
+      answerRequest(
+        request,
+        choice === 'comments'
+          ? { decision: 'deny', comments: commentsOf(request) }
+          : { decision: 'allowOnce', mode: choice },
+      ),
+      choice,
     );
+  }
+
+  const revise = () => {
+    focusComposer(card.current);
+  };
+  useApprovalKeys(card, (key) => {
+    if (key === 'allowOnce') answer('acceptEdits');
+    else if (key === 'allowSession') answer('default');
+    else revise();
   });
 
   return (
@@ -87,15 +94,10 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
       data-approval-card="plan"
       data-request-id={request.requestId}
     >
-      <div className="approval-box">
+      <div className="approval-box is-plan" aria-busy={waiting !== undefined}>
         <header className="approval-title">
           <strong>{t('approval.kind.plan')}</strong>
           <span className="approval-title-end">
-            {comments.length > 0 && (
-              <span className="approval-tool" data-testid="plan-comment-count">
-                {t('plan.comments', { count: comments.length })}
-              </span>
-            )}
             <button
               type="button"
               className="approval-link"
@@ -106,67 +108,117 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
             >
               {t('plan.openPanel')}
             </button>
-            <span
-              className="approval-hint"
-              role="img"
-              tabIndex={0}
-              aria-label={t('plan.commentsHint')}
-              data-tooltip={t('plan.commentsHint')}
-            >
-              <InfoGlyph />
-            </span>
           </span>
         </header>
         <ApprovalOrigin request={request} />
-        <PlanMarkdown id={request.requestId} plan={plan} scroll />
-        <label className="approval-field">
-          <span className="approval-field-label">{t('approval.feedback')}</span>
-          <textarea
-            rows={2}
-            value={feedback}
-            data-testid="plan-feedback"
-            onChange={(e) => {
-              setFeedback(e.target.value);
-            }}
-          />
-        </label>
-        <div className="approval-actions">
-          <button
-            type="button"
-            className="button"
-            disabled={waiting}
-            data-testid="plan-keep-planning"
-            onClick={() => {
-              answer('keepPlanning');
-            }}
+        <p className="approval-message plan-card-hint">{t('plan.card.hint')}</p>
+        {comments.length > 0 && (
+          <ul
+            className="plan-card-comments"
+            data-testid="plan-comments"
+            aria-label={t('plan.comments', { count: comments.length })}
           >
-            {t('plan.keepPlanning')}
-          </button>
-          <button
-            type="button"
-            className="button"
-            disabled={waiting}
-            data-testid="plan-approve-manual"
-            onClick={() => {
-              answer('default');
-            }}
-          >
-            {t('plan.approveManual')}
-          </button>
-          <button
-            type="button"
-            className="button button-primary"
-            disabled={waiting}
-            data-testid="plan-approve-auto"
-            onClick={() => {
-              answer('acceptEdits');
-            }}
-          >
-            {t('plan.approveAuto')}
-            <span className="approval-keys" aria-hidden="true">
-              <Keycaps binding="Mod+Enter" platform={keyPlatform} />
-            </span>
-          </button>
+            {comments.map((c) => (
+              <li key={c.id} data-testid="plan-comment">
+                <button
+                  type="button"
+                  className="plan-card-comment"
+                  onClick={() => {
+                    showPanel('plan');
+                    planComments.open(request.requestId, c.id);
+                  }}
+                >
+                  <span className="plan-card-quote">
+                    <CommentIcon />
+                    <span className="truncate">{c.quote}</span>
+                  </span>
+                  <span className="plan-card-text">{c.text}</span>
+                </button>
+                <IconButton
+                  size="xs"
+                  label={t('plan.comment.delete')}
+                  className="plan-card-remove"
+                  onClick={() => {
+                    planComments.remove(request.requestId, c.id);
+                  }}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="approval-actions plan-actions">
+          <div className="approval-persist">
+            <button
+              type="button"
+              className="button button-ghost"
+              disabled={waiting !== undefined}
+              data-testid="plan-stop"
+              data-tooltip={t('plan.stopHint')}
+              onClick={() => {
+                settle(window.piarc.abort(request.sessionId), 'stop');
+              }}
+            >
+              {t('plan.stop')}
+            </button>
+            {comments.length > 0 ? (
+              <button
+                type="button"
+                className="button"
+                disabled={waiting !== undefined}
+                data-testid="plan-send-comments"
+                onClick={() => {
+                  answer('comments');
+                }}
+              >
+                {t('plan.sendComments', { count: comments.length })}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="button"
+                disabled={waiting !== undefined}
+                data-testid="plan-revise"
+                data-tooltip={t('plan.reviseHint')}
+                aria-keyshortcuts="Escape"
+                onClick={revise}
+              >
+                {t('plan.revise')}
+              </button>
+            )}
+          </div>
+          <div className="approval-main">
+            <button
+              type="button"
+              className="button"
+              disabled={waiting !== undefined}
+              data-testid="plan-approve-manual"
+              data-tooltip={t('plan.approveManualHint')}
+              data-tooltip-keys="Mod+Shift+Enter"
+              aria-keyshortcuts={keyPlatform === 'mac' ? 'Meta+Shift+Enter' : 'Control+Shift+Enter'}
+              onClick={() => {
+                answer('default');
+              }}
+            >
+              {t('plan.approveManual')}
+            </button>
+            <button
+              type="button"
+              className="button button-primary"
+              disabled={waiting !== undefined}
+              data-testid="plan-approve-auto"
+              aria-keyshortcuts={keyPlatform === 'mac' ? 'Meta+Enter' : 'Control+Enter'}
+              onClick={() => {
+                answer('acceptEdits');
+              }}
+            >
+              {t('plan.approveAuto')}
+              <span className="approval-keys" aria-hidden="true">
+                <Keycaps binding="Mod+Enter" platform={keyPlatform} />
+              </span>
+            </button>
+          </div>
         </div>
         {error && (
           <p className="approval-error" role="alert">

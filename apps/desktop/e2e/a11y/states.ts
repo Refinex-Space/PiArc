@@ -190,6 +190,11 @@ export const A11Y_STATES = [
   { id: 'panel:tasks', area: 'panel', panel: 'tasks', note: 'task list card' },
   { id: 'panel:plan', area: 'panel', panel: 'plan', note: 'plan panel' },
   {
+    id: 'state:plan-comment',
+    area: 'state',
+    note: 'the comment field on a selected passage of the plan panel (ADR-0103)',
+  },
+  {
     id: 'panel:background-tasks-card',
     area: 'panel',
     panel: 'background-tasks-card',

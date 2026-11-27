@@ -2072,68 +2072,175 @@ textarea.input {
   font-size: var(--piarc-font-size-small);
 }
 
-/* T26: the plan panel (dock) and the task panel (rail). */
-:root[data-app] .plan-panel,
+/* T26: the task panel (rail). */
 :root[data-app] .task-panel {
   display: grid;
   gap: var(--piarc-space-2);
   padding: var(--piarc-space-3);
 }
-:root[data-app] .plan-panel-title {
-  margin: 0;
-  font-size: var(--piarc-font-size-body);
-  font-weight: var(--piarc-font-weight-semibold);
+
+/* T26, ADR-0103: the plan panel (dock). A status line (state, how to comment, copy) over the plan
+   rendered as prose in a reading column; comments are custom highlights on the rendered text. */
+:root[data-app] .plan-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  container-type: inline-size;
 }
-:root[data-app] .plan-text {
-  padding: var(--piarc-space-2);
+:root[data-app] .plan-panel-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: 32px;
+  padding: 0 var(--piarc-space-2) 0 var(--piarc-space-3);
+  border-bottom: 1px solid var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .plan-state {
+  flex: none;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: 20px;
+}
+:root[data-app] .plan-state[data-state='approved'] {
+  background: var(--piarc-surface-hover);
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .plan-panel-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+:root[data-app] .plan-panel-hint > .icon {
+  flex: none;
+}
+/* A narrow panel keeps the icon; its tooltip says the rest. */
+@container (max-width: 340px) {
+  :root[data-app] .plan-panel-hint-text {
+    display: none;
+  }
+}
+:root[data-app] .plan-panel-head > .icon-button {
+  flex: none;
+  margin-inline-start: auto;
+}
+:root[data-app] .plan-doc {
+  flex: 1;
+  min-height: 0;
+  padding: var(--piarc-space-4) var(--piarc-space-4) var(--piarc-space-5);
+  overflow-y: auto;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-prose-line);
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+:root[data-app] .plan-doc > * {
+  max-width: 72ch;
+  margin-inline: auto;
+}
+:root[data-app] .plan-doc .plan-block + .plan-block {
+  margin-top: var(--piarc-space-3);
+}
+:root[data-app] .plan-doc .md > :last-child {
+  margin-bottom: 0;
+}
+:root[data-app] .plan-doc .md :is(h1, h2, h3, h4) {
+  margin: var(--piarc-space-2) 0 0;
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: 1.3;
+}
+:root[data-app] .plan-doc .md h1 {
+  font-size: calc(var(--piarc-session-body) + 5px);
+}
+:root[data-app] .plan-doc .md h2 {
+  font-size: calc(var(--piarc-session-body) + 2px);
+}
+:root[data-app] .plan-doc .md :is(h3, h4) {
+  font-size: var(--piarc-session-body);
+}
+:root[data-app] .plan-doc .plan-block:first-child .md > :first-child {
+  margin-top: 0;
+}
+:root[data-app] .plan-plain {
+  margin: 0;
   font-family: var(--piarc-font-mono);
   font-size: var(--piarc-font-size-small);
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--piarc-code-text);
-  background: var(--piarc-code-background);
-  border-radius: var(--piarc-radius-sm);
-  user-select: text;
 }
-:root[data-app] .plan-comment-mark {
-  color: inherit;
-  background: var(--piarc-state-warning-subtle);
-  border-bottom: 1px solid var(--piarc-state-warning);
+::highlight(piarc-plan-comment) {
+  background-color: color-mix(in srgb, var(--piarc-accent-solid) 14%, transparent);
+  text-decoration: underline 2px color-mix(in srgb, var(--piarc-accent-solid) 70%, transparent);
+  text-underline-offset: 3px;
 }
-:root[data-app] .plan-comment-ref::after {
-  content: attr(data-index);
-  margin-left: 1px;
-  font-size: var(--piarc-font-size-caption);
-  color: var(--piarc-text-warning);
+::highlight(piarc-plan-comment-focus) {
+  background-color: color-mix(in srgb, var(--piarc-accent-solid) 26%, transparent);
 }
-:root[data-app] .plan-comment-editor,
-:root[data-app] .plan-comments li {
-  display: grid;
-  gap: var(--piarc-space-1);
-}
-:root[data-app] .plan-comment-editor textarea {
-  min-width: 0;
-  padding: var(--piarc-space-1) var(--piarc-space-2);
+
+/* The comment field (ADR-0103): a raised popover next to the passage, the field and its icon
+   buttons on one line. */
+.plan-comment-popover {
+  position: fixed;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-surface-raised);
+  box-shadow: var(--piarc-shadow-overlay);
   color: var(--piarc-text-primary);
-  background: var(--piarc-surface-panel);
-  border: 1px solid var(--piarc-border-default);
-  border-radius: var(--piarc-radius-sm);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-body);
+  line-height: 1.45;
 }
-:root[data-app] .plan-panel blockquote {
-  margin: 0;
-  padding-left: var(--piarc-space-2);
-  color: var(--piarc-text-secondary);
-  border-left: 2px solid var(--piarc-state-warning);
-  white-space: pre-wrap;
+.plan-comment-popover[data-placed='false'] {
+  visibility: hidden;
 }
-:root[data-app] .plan-comments {
-  display: grid;
+.plan-comment-row {
+  display: flex;
+  align-items: flex-end;
   gap: var(--piarc-space-2);
-  margin: 0;
-  padding-left: var(--piarc-space-4);
 }
-:root[data-app] .plan-comments .row-action {
-  justify-self: start;
+:root[data-app] .plan-comment-row textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 8lh;
+  padding: 2px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  resize: none;
+  field-sizing: content;
+}
+.plan-comment-row textarea::placeholder {
+  color: var(--piarc-text-secondary);
+}
+.plan-comment-buttons {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+:root[data-app] .plan-comment-delete:hover {
+  color: var(--piarc-text-danger);
+}
+.plan-comment-error {
+  margin: var(--piarc-space-1) 0 0;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-font-size-small);
 }
 
 /* T27: context usage, the environment bar's ring (75 % hint, 90 % warning) and the rail's

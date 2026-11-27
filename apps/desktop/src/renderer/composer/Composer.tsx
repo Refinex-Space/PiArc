@@ -227,6 +227,7 @@ export function Composer({
   fill,
   insert,
   dictation,
+  placeholder,
 }: {
   running: boolean;
   savedDraft?: EditorDraft | undefined;
@@ -259,6 +260,8 @@ export function Composer({
   insert?: { readonly snippets: readonly SnippetData[]; readonly nonce: number } | undefined;
   /** Voice dictation's owner and vocabulary source (ADR-0094); without it there is no microphone. */
   dictation?: DictationTarget | undefined;
+  /** What the empty input says in place of the usual hint (a plan waiting for a reply). */
+  placeholder?: string | undefined;
 }) {
   const { t, platform, preferences } = useApp();
   const add = useMenu();
@@ -1092,11 +1095,12 @@ export function Composer({
           className="composer-mount"
           data-empty={empty}
           data-placeholder={
-            firstTurn
+            placeholder ??
+            (firstTurn
               ? t('home.placeholder')
               : running
                 ? t('composer.placeholder.running', { queue: queueKey })
-                : t('composer.placeholder')
+                : t('composer.placeholder'))
           }
         />
         <div className="composer-lead">{leading}</div>

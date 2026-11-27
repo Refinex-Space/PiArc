@@ -257,6 +257,7 @@ PiArc/
 | [0040](../adr/0040-windows-automatic-permission-budget.md) | 无需用户参与的权限裁决按平台给预算：macOS p95 ≤ 2 ms，Windows p95 ≤ 10 ms | NTFS 与 Defender 下每次元数据调用约 50–150 µs，每次裁决都读最新磁盘状态（ADR-0031、0036），W1 实测 Windows p95 3.4–8.9 ms |
 | [0041](../adr/0041-windows-ahp-round-trip-budget.md) | 小文件 fs 操作的 AHP 往返按平台给预算：macOS p95 ≤ 5 ms，Windows p95 ≤ 15 ms | ADR-0036 的每次访问都从卷根逐级绑定目录，W1 实测 Windows p95 5.0–9.3 ms |
 | [0042](../adr/0042-plan-todo-ask-next-steps.md) | 计划模式、任务清单、提问与下一步是宿主工具：模式由 Core 持有，`ExitPlanMode` 在裁决中必问（PermissionRequest hook 不能代答）；计划卡与提问表单进同一审批账本，批准的计划存为会话 entry，任务清单在工具结果里；提醒只经 `reminders.ts` | 计划与清单随分支回溯、压缩后可重注入，工具集不变以保住缓存（第 6.5、6.15 节） |
+| [0103](../adr/0103-plan-review-in-the-conversation.md) | 计划审阅回到对话：等待审阅时输入框的消息先 steer、再以 `via: conversation` 退回计划；计划卡是决策栏（停止、修改、两种批准）；计划面板渲染 Markdown，评论仍锚定原文 UTF-16 偏移；窗口从会话快照接管错过的运行态 | 修订 ADR-0042 第 2、3 条，计划调整与主输入框一致 |
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
@@ -1938,6 +1939,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.74 | 2026-11-26 | 内置浏览器（ADR-0088–0093，[设计增补](addenda/browser.md)）：第 4 章新增六条 ADR；5.4、8.5、10.3 写明浏览器 guest 不属于应用窗口；10.1 THR-13 第一条改为"应用窗口"；ADR-0013 增加浏览器平台集成、ADR-0021 增加浏览器分区 cookie 的例外。THR-16、THR-17 与第 7.1、8.1 节的模块表随实现落地补入。 |
 | 2.79 | 2026-11-27 | Pi 包市场与卸载（ADR-0102，[设计增补](addenda/pi-package-market.md)）：6.7 节写明市场视图、目录来源、安装核对与每包一个 npm 前缀；9.2 节新增 `market_packages`、`market_sync`（schema v16）；10.1 节 THR-03 新增市场安装的核对；10.5 节外连含市场。 |
 | 2.78 | 2026-11-27 | 第 8.2 节：设置改为工作台里的一个视图，按组导航，搜索结果在主区（ADR-0101）。 |
+| 2.79 | 2026-11-27 | 第 4 章决策表：计划审阅回到对话，计划卡改为决策栏，计划面板渲染 Markdown 并保持原文偏移锚点，窗口从会话快照接管错过的运行态（ADR-0103，修订 ADR-0042 第 2、3 条）。 |
 | 2.77 | 2026-11-27 | 第 8.2 节：两层输入卡片与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏（ADR-0100）。 |
 | 2.76 | 2026-11-26 | 语音输入（ADR-0094–0097，[设计增补](addenda/voice-dictation.md)）：7.1 节新增 `piarc-speech` 与 `sherpa-onnx-sys`（目录 `piarc-sherpa-sys`）并列入依赖链与单向例外；8.2 节 composer 写明发送键左侧的语音输入；第 11 章安装包与安装后两行判定扣除内置语音资产，新增"内置语音资产"一行（安装后 ≤ 230 MB、安装包增量 ≤ 190 MB，ADR-0095）；10.1 节 THR-14 的 entitlements 写明主程序另有 `device.audio-input`，新增威胁"麦克风与听写内容"（THR-18）与"语音模型篡改"（THR-19），对策与测试见 `tests/security/threats.yaml`。 |
 | 2.75 | 2026-11-26 | 内置浏览器落地：7.1 节新增 `piarc-browser-import` 并列入依赖链；8.1 节新增"内置浏览器"（`src/main/browser/`）与"脚本宿主"（`src/browser-host/`）两行，渲染进程模块加 `browser`；10.1 节新增威胁"浏览器外传与本机服务访问"（THR-16）与"浏览器凭据"（THR-17），对策与测试见 `tests/security/threats.yaml`。 |

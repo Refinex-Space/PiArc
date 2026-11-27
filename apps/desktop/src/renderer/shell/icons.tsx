@@ -44,6 +44,8 @@ import {
   ListTodo,
   Maximize,
   Maximize2,
+  MessageSquare,
+  MessageSquarePlus,
   MessagesSquare,
   Minimize,
   Minimize2,
@@ -100,6 +102,7 @@ import {
   ZoomIn,
   ZoomOut,
   Eraser,
+  Trash2,
   EyeOff,
   Hash,
   MoveUpRight,
@@ -226,6 +229,10 @@ export const AlertIcon = glyph(CircleAlert);
 // square, apart from the filled square that stops a running turn).
 export const MicIcon = glyph(Mic);
 export const StopDictationIcon = glyph(Square);
+// Plan comments (ADR-0103): the hint and a comment, saving one, deleting one.
+export const CommentIcon = glyph(MessageSquare);
+export const CommentAddIcon = glyph(MessageSquarePlus);
+export const TrashIcon = glyph(Trash2);
 
 // ---- Filled marks Lucide lacks ----
 

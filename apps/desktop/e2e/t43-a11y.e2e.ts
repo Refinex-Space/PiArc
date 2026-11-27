@@ -390,9 +390,26 @@ test('plan mode: the plan card, the plan panel, mode changes and the approved pl
   await expect(page.getByTestId('plan-panel')).toHaveAttribute('data-state', 'pending');
   await checkState(page, 'approval:plan');
   await checkState(page, 'panel:plan');
-  await page.locator('[data-approval-card="plan"]').getByTestId('plan-keep-planning').click();
+  // ADR-0103: the comment field next to a selected passage of the rendered plan.
+  await page.getByTestId('plan-text').evaluate((container) => {
+    const item = container.querySelector('li');
+    if (item?.firstChild == null) throw new Error('no list item');
+    const range = document.createRange();
+    range.selectNodeContents(item);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    container.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+  });
+  await expect(page.getByTestId('plan-comment-popover')).toBeVisible();
+  await checkState(page, 'state:plan-comment');
+  await page.keyboard.press('Escape');
+  // A reply in the composer sends the plan back.
+  await send(page, 'Add a failing test first.');
   const second = page.locator('[data-approval-card="plan"]');
-  await expect(second).toContainText('Add a failing test for the loop bound', { timeout: 30_000 });
+  await expect(page.locator('[data-testid="plan-row"]').last()).toContainText(
+    'Add a failing test for the loop bound',
+    { timeout: 30_000 },
+  );
   await second.getByTestId('plan-approve-manual').click();
   await idle(page);
   await checkState(page, 'row:permissionModeChanged');

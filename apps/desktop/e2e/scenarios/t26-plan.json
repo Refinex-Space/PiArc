@@ -1,5 +1,10 @@
 {
   "id": "t26-plan",
+  "validation": {
+    "rules": {
+      "role_order": false
+    }
+  },
   "steps": [
     {
       "text": "I will plan this first.",

@@ -1,0 +1,48 @@
+{
+  "id": "plan-review",
+  "validation": {
+    "rules": {
+      "role_order": false
+    }
+  },
+  "steps": [
+    { "text": "Hello. Ready when you are." },
+    {
+      "text": "Here is the plan.",
+      "tool_calls": [
+        {
+          "id": "exit1",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Fix the parser bound\n\n## Steps\n\n1. Add a **failing test** for the loop bound\n2. Fix the off-by-one in `parse()`\n3. Run the tests\n\n## Check\n\n- `npm test` passes"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Understood: the test comes first, with a named case.",
+      "tool_calls": [
+        {
+          "id": "exit2",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Fix the parser bound\n\n1. Add the failing test `bound.test.ts`\n2. Fix the off-by-one in `parse()`\n3. Run the tests"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Taking the comment into account.",
+      "tool_calls": [
+        {
+          "id": "exit3",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Fix the parser bound\n\n1. Add the failing test `bound.test.ts` for `parse()`\n2. Fix the bound\n3. Run the tests"
+          }
+        }
+      ]
+    },
+    { "text": "Plan approved; starting with the test." }
+  ]
+}

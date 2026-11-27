@@ -11,11 +11,31 @@ const MODE_NAMES: Record<PermissionMode, string> = {
   auto: 'Auto review: workspace edits run without asking, and a reviewer model decides most other calls in place of the user',
 };
 
-/** Plan mode turned on. */
-export const PLAN_ON =
-  'Plan mode is on. Investigate and design, but change nothing: the permission check refuses ' +
-  'file writes and commands that are not read-only. When the plan is ready, submit it with ' +
-  "ExitPlanMode and wait for the user's decision.";
+/**
+ * Plan mode turned on (ADR-0103): what plan mode forbids, how to arrive at a plan, and how a plan
+ * reaches the user. PiArc's own wording (ADR-0006).
+ */
+export const PLAN_ON = [
+  'Plan mode is on. The user wants a plan before anything changes: investigate and design, ' +
+    'but change nothing. The permission check refuses file writes and commands that are not ' +
+    'read-only.',
+  '',
+  'Working toward the plan:',
+  '1. Learn what the request touches: read the relevant code, look for functions and patterns ' +
+    'to reuse, and find out how the result can be checked. With the Agent tool, Explore ' +
+    'subagents can survey separate areas in parallel.',
+  '2. When a choice depends on what the user wants and the code cannot settle it, ask with ' +
+    'AskUserQuestion instead of assuming.',
+  '3. Write the plan in Markdown: the goal, the one approach you recommend, the steps in order ' +
+    'with the files and functions they change, and how the result will be verified. Make it ' +
+    'short enough to review and exact enough to follow.',
+  "4. When it is ready, submit it with ExitPlanMode and wait for the user's decision; do not " +
+    'ask for approval in a message.',
+  '',
+  'Say in a sentence what you are looking into as you go, so the user can follow the work. ' +
+    'When the user answers a submitted plan with a message, act on it and submit the revised ' +
+    'plan in full.',
+].join('\n');
 
 /** Plan mode turned off; `mode` is the mode now. */
 export function planOff(mode: PermissionMode): string {

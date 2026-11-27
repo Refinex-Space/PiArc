@@ -53,6 +53,7 @@ import { openProjectFile, projectFileRoot } from '../files/navigation.js';
 import { onCommandRequest, takeCommand } from './command-requests.js';
 import { parseWindow } from '../store/history-window.js';
 import { rememberMemoryTarget } from '../settings/memory-target.js';
+import { replyToPlan } from '../approvals/plan-reply.js';
 
 /** The pane while its history loads: the shape of a message and a reply, gently breathing. */
 function ConversationSkeleton({ label }: { readonly label: string }) {
@@ -487,6 +488,10 @@ export function Conversation({
     },
     [runBuiltin],
   );
+  // ADR-0103: while a plan waits for review, a message the user sends is their reply to it.
+  const pendingPlan = session?.approvals.find((r) => r.kind === 'plan');
+  const planRequest = useRef(pendingPlan);
+  planRequest.current = pendingPlan;
   const handlers = useMemo<ComposerHandlers>(
     () => ({
       submit(intent, submission) {
@@ -502,6 +507,14 @@ export function Conversation({
         const focus = compactFocus(draft);
         if (focus !== undefined) {
           window.piarc.compact(id, focus === '' ? undefined : focus).catch((failure: unknown) => {
+            setError(t('composer.failed', { reason: reason(failure) }));
+          });
+          return true;
+        }
+        // Queueing (Mod+Enter) waits for the turn as always; sending or steering answers the plan.
+        const plan = planRequest.current;
+        if (plan !== undefined && intent !== 'queue') {
+          replyToPlan(plan, () => input.add('steer', draft)).catch((failure: unknown) => {
             setError(t('composer.failed', { reason: reason(failure) }));
           });
           return true;
@@ -574,6 +587,7 @@ export function Conversation({
             ...(sessionWorkspace === undefined ? {} : { workspace: sessionWorkspace }),
           }}
           running={turn.running}
+          placeholder={pendingPlan === undefined ? undefined : t('composer.placeholder.planReply')}
           handlers={handlers}
           mentions={mentions}
           commands={commandsList.commands}

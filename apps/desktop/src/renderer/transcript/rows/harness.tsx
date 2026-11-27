@@ -187,21 +187,22 @@ function TaskUpdate({
 }
 
 /**
- * A plan as Markdown. On the card waiting for review it scrolls (and takes focus then, so the
- * keyboard can scroll it); in the transcript it shows the start, faded, and the plan panel
- * holds the rest.
+ * A plan as Markdown in its transcript row: the start of it, faded, until the user shows the
+ * whole plan (ADR-0103); the plan panel holds it with comments. `onOverflow` hears whether the
+ * collapsed plan is cut.
  */
 export function PlanMarkdown({
   id,
   plan,
-  scroll,
+  expanded,
+  onOverflow,
 }: {
-  /** The call or request the plan belongs to: one parse per plan. */
+  /** The call the plan belongs to: one parse per plan. */
   readonly id: string;
   readonly plan: string;
-  readonly scroll: boolean;
+  readonly expanded: boolean;
+  readonly onOverflow: (cut: boolean) => void;
 }) {
-  const t = useT();
   const { services, transcript } = useTranscriptView();
   const docKey = transcript.cacheKey(`plan:${id}`);
   const parsed = useParsedDoc(docKey);
@@ -210,13 +211,17 @@ export function PlanMarkdown({
   }, [services, docKey, plan]);
   const box = useRef<HTMLDivElement>(null);
   const [overflows, setOverflows] = useState(false);
+  const report = useRef(onOverflow);
+  report.current = onOverflow;
   useEffect(() => {
     const element = box.current;
     const Observer = element?.ownerDocument.defaultView?.ResizeObserver;
     if (element === null || Observer === undefined) return;
     // The box stops growing at its cap: watch the content too.
     const observer = new Observer(() => {
-      setOverflows(element.scrollHeight > element.clientHeight + 1);
+      const cut = element.scrollHeight > element.clientHeight + 1;
+      setOverflows(cut);
+      report.current(cut);
     });
     observer.observe(element);
     if (element.firstElementChild !== null) observer.observe(element.firstElementChild);
@@ -224,15 +229,13 @@ export function PlanMarkdown({
       observer.disconnect();
     };
   }, [parsed]);
-  const focusable = scroll && overflows;
   return (
     <div
       ref={box}
       className="plan-preview"
       data-testid="plan-preview"
-      data-scroll={scroll}
+      data-expanded={expanded}
       data-overflows={overflows}
-      {...(focusable ? { tabIndex: 0, role: 'region', 'aria-label': t('plan.title') } : {})}
     >
       {parsed === undefined ? (
         <p className="md-fallback">{plan}</p>
@@ -258,6 +261,8 @@ function PlanCard({ item }: { readonly item: ToolItem }) {
   const t = useT();
   const plan = typeof item.arguments.plan === 'string' ? item.arguments.plan : '';
   const status = planStatus(item);
+  const [expanded, setExpanded] = useExpanded(`plan:${item.itemId}`, false);
+  const [cut, setCut] = useState(false);
   return (
     <section className="row harness-card plan-row" data-testid="plan-row" data-status={status}>
       <div className="harness-box">
@@ -276,7 +281,20 @@ function PlanCard({ item }: { readonly item: ToolItem }) {
             {t('plan.openPanel')}
           </button>
         </header>
-        <PlanMarkdown id={item.itemId} plan={plan} scroll={false} />
+        <PlanMarkdown id={item.itemId} plan={plan} expanded={expanded} onOverflow={setCut} />
+        {cut || expanded ? (
+          <button
+            type="button"
+            className="approval-link plan-expand"
+            data-testid="plan-expand"
+            aria-expanded={expanded}
+            onClick={() => {
+              setExpanded(!expanded);
+            }}
+          >
+            {expanded ? t('plan.collapse') : t('plan.expand')}
+          </button>
+        ) : null}
       </div>
     </section>
   );

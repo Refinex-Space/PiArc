@@ -41,6 +41,17 @@ export class PlanComments {
     return true;
   }
 
+  /** Changes a comment's text; false when the text is blank or the comment is gone. */
+  update(requestId: string, id: string, text: string): boolean {
+    const current = this.get(requestId);
+    if (!text.trim() || !current.some((c) => c.id === id)) return false;
+    this.set(
+      requestId,
+      current.map((c) => (c.id === id ? { ...c, text: text.trim() } : c)),
+    );
+    return true;
+  }
+
   remove(requestId: string, id: string): void {
     this.set(
       requestId,
@@ -56,6 +67,20 @@ export class PlanComments {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  private readonly openers = new Set<(requestId: string, id: string) => void>();
+
+  /** Asks the plan panel to open comment `id` for editing (the card's list of comments). */
+  open(requestId: string, id: string): void {
+    for (const opener of [...this.openers]) opener(requestId, id);
+  }
+
+  onOpen(listener: (requestId: string, id: string) => void): () => void {
+    this.openers.add(listener);
+    return () => {
+      this.openers.delete(listener);
     };
   }
 

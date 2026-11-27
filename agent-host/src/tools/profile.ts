@@ -268,10 +268,11 @@ export const DEFAULT_PROFILE: ToolProfile = {
     name: 'ExitPlanMode',
     description:
       "In plan mode, submit the plan for the user's approval. `plan` is the complete plan in " +
-      'Markdown: the steps in order, the files to change and how the result will be checked. ' +
-      'The user approves it, choosing how later edits are approved, or returns it with ' +
-      'feedback and comments on passages; then revise the plan and submit it again. Outside ' +
-      'plan mode there is nothing to submit.',
+      'Markdown: the goal, the steps in order with the files to change, and how the result ' +
+      'will be checked. The user approves it, choosing how later edits are approved, or ' +
+      'answers it: with feedback and comments on passages, or with a message in the ' +
+      'conversation. Then revise the plan and submit it again in full. Outside plan mode there ' +
+      'is nothing to submit.',
     ...TOOL_GUIDANCE.ExitPlanMode,
   },
   TodoWrite: {

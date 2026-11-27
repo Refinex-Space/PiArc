@@ -67,3 +67,7 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 ## 开发服务器的验证提醒（ADR-0092）
 
 `browserVerify` 提醒的文字在 `agent-host/src/harness/prompts/browser-notices.ts`（智能体改了运行中开发服务器的前端文件后，下一次请求前提醒它用 `Browser` 打开页面检查）。Core 只发服务器地址与改动的文件，措辞全在这里，按 ADR-0092 第 6 条自写，写作时没有打开参考仓库的提示词；脚本把它加进比对（`browserVerifyNotice`），2026-11-26 比对 0 个匹配窗口。
+
+## 计划模式的提醒与退回说明（ADR-0103）
+
+`PLAN_ON`（`agent-host/src/harness/prompts/notices.ts`）从一句话改为约束、四步方法与回复后的做法，`ExitPlanMode` 的描述（`agent-host/src/tools/profile.ts`）加了"用户可能以对话回复"。Core 给模型的退回说明在 `crates/piarc-core/src/tool_io/policy/plan.rs` 的 `keep_planning`，新增"用户在对话里回复"的一句。三处按 ADR-0103 自写；调研只记了 Claude Code 计划提醒的结构（约束、流程、提交协议），写作时没有打开参考仓库的提示词原文。2026-11-27 用上面的脚本做 10 词窗口比对，0 个匹配窗口。

@@ -27,7 +27,7 @@ async function selectInPlan(page: Page, quote: string): Promise<void> {
         const selection = window.getSelection();
         selection?.removeAllRanges();
         selection?.addRange(range);
-        container.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        container.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
         return;
       }
     }
@@ -57,33 +57,41 @@ test('plan card: inline comments with keep planning, then both approvals switch 
 }, info) => {
   await openSession(app, page, workspaces, 'plan mode', 't26-plan', 'Fix the parser bug');
   const card = page.locator('[data-approval-card="plan"]');
-  await expect(card).toContainText('Fix the off-by-one in the loop');
+  await expect(card).toHaveCount(1);
+  await expect(page.locator('[data-testid="plan-row"]').last()).toContainText(
+    'Fix the off-by-one in the loop',
+  );
   await expect(page.getByTestId('permission-mode')).toHaveText(/Plan/u);
   await expect(page.getByTestId('mode-change-row').first()).toContainText('Plan');
-  // The plan panel opens with the whole plan; comment on a passage there.
+  // The plan panel opens with the whole plan rendered; comment on a passage there (ADR-0103).
   const panel = page.getByTestId('plan-panel');
   await expect(panel).toHaveAttribute('data-state', 'pending');
   await selectInPlan(page, 'Fix the off-by-one in the loop');
   await page.getByTestId('plan-comment-input').fill('Which loop? Add a failing test first.');
   await page.getByTestId('plan-comment-add').click();
-  await expect(page.getByTestId('plan-mark')).toHaveText('Fix the off-by-one in the loop');
-  await expect(card.getByTestId('plan-comment-count')).toHaveText('1 comment');
-  await card.getByTestId('plan-feedback').fill('Start with the test.');
+  await expect(card.getByTestId('plan-comment')).toHaveCount(1);
+  await expect(card.getByTestId('plan-comment')).toContainText('Fix the off-by-one in the loop');
   await shoot(page, info, 'plan-card-with-comment');
-  await card.getByTestId('plan-keep-planning').click();
+  // The reply goes from the composer, with the comment.
+  await send(page, 'Start with the test.');
 
-  // The model hears the feedback and the comment with its UTF-16 anchor; plan mode stays on.
+  // The model hears the refusal with the comment and its UTF-16 anchor, then the reply; plan
+  // mode stays on.
+  await expect(page.locator('[data-testid="plan-row"]').last()).toContainText(
+    'Add a failing test for the loop bound',
+    { timeout: 30_000 },
+  );
   const second = page.locator('[data-approval-card="plan"]');
-  await expect(second).toContainText('Add a failing test for the loop bound');
   const start = PLAN1.indexOf('Fix the off-by-one in the loop');
   const end = start + 'Fix the off-by-one in the loop'.length;
   const sent = await requests(mock, 't26-plan');
   const revised = toolResults(sent[2]?.body ?? {}).join('\n');
   expect(revised).toContain('Plan mode stays on');
-  expect(revised).toContain('Feedback from the user:\nStart with the test.');
+  expect(revised).toContain('their message comes right after this result');
   expect(revised).toContain(
     `1. On "Fix the off-by-one in the loop" (offsets ${String(start)}-${String(end)}): Which loop? Add a failing test first.`,
   );
+  expect(JSON.stringify(lastUserBlocks(sent[2]?.body ?? {}))).toContain('Start with the test.');
   await expect(page.getByTestId('permission-mode')).toHaveText(/Plan/u);
   await expect(page.locator('[data-testid="plan-row"][data-status="declined"]')).toHaveCount(1);
 
@@ -99,7 +107,7 @@ test('plan card: inline comments with keep planning, then both approvals switch 
   // Plan again, then approve and accept edits.
   await send(page, 'Now plan the rename.');
   const third = page.locator('[data-approval-card="plan"]');
-  await expect(third).toContainText('Rename the helper');
+  await expect(page.locator('[data-testid="plan-row"]').last()).toContainText('Rename the helper');
   await expect(page.getByTestId('permission-mode')).toHaveText(/Plan/u);
   await third.getByTestId('plan-approve-auto').click();
   await idle(page);
