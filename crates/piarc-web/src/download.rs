@@ -6,12 +6,8 @@
 //! resumable with `Range`, and cancellable at any point. A file that does not match its size and SHA-256 is removed.
 
 use std::io;
-use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::Duration;
 
 use http::header::{CONNECTION, CONTENT_LENGTH, CONTENT_RANGE, HOST, LOCATION, RANGE, USER_AGENT};
 use http::{Request, StatusCode};
@@ -19,18 +15,15 @@ use http_body_util::{BodyExt, Empty};
 use hyper::body::Bytes;
 use hyper_util::rt::TokioIo;
 use sha2::{Digest, Sha256};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
-use tokio::net::TcpStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
-use url::{Host, Url};
 
+use crate::connect::{Connector, STALL, host_header, platform_tls, target};
 use crate::fetch::{Resolve, SystemResolver};
-use crate::ssrf::{self, Allowlist};
+use crate::ssrf::Allowlist;
 
 /// Most redirects one download follows.
 pub const MAX_REDIRECTS: u8 = 5;
-/// How long connecting, a proxy handshake or a stalled read may take.
-const STALL: Duration = Duration::from_secs(30);
 
 /// Why a download failed. Codes go to the client (`error` of a model status).
 #[derive(Debug, thiserror::Error)]
@@ -107,45 +100,9 @@ pub struct DownloadJob<'a> {
     pub proxy: Option<&'a str>,
 }
 
-/// Any byte stream a request can run over.
-trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
-impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
-
-/// A boxed [`Io`] that is itself `AsyncRead + AsyncWrite`.
-struct Stream(Box<dyn Io>);
-
-impl AsyncRead for Stream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        Pin::new(&mut *self.0).poll_read(cx, buf)
-    }
-}
-
-impl AsyncWrite for Stream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut *self.0).poll_write(cx, buf)
-    }
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut *self.0).poll_flush(cx)
-    }
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut *self.0).poll_shutdown(cx)
-    }
-}
-
 /// Downloads files.
 pub struct Downloader {
-    resolver: Arc<dyn Resolve>,
-    tls: Arc<rustls::ClientConfig>,
-    allow: Allowlist,
-    user_agent: String,
+    connector: Connector,
 }
 
 impl Downloader {
@@ -155,17 +112,9 @@ impl Downloader {
     ///
     /// [`DownloadError::Tls`] when the platform verifier cannot be set up.
     pub fn new() -> Result<Self, DownloadError> {
-        use rustls_platform_verifier::BuilderVerifierExt as _;
-        let provider = Arc::new(rustls::crypto::ring::default_provider());
-        let mut tls = rustls::ClientConfig::builder_with_provider(provider)
-            .with_safe_default_protocol_versions()
-            .and_then(|b| b.with_platform_verifier())
-            .map_err(|e| DownloadError::Tls(e.to_string()))?
-            .with_no_client_auth();
-        tls.alpn_protocols = vec![b"http/1.1".to_vec()];
         Ok(Self::with_parts(
             Arc::new(SystemResolver),
-            Arc::new(tls),
+            platform_tls().map_err(DownloadError::Tls)?,
             Allowlist::default(),
         ))
     }
@@ -179,10 +128,12 @@ impl Downloader {
         allow: Allowlist,
     ) -> Self {
         Self {
-            resolver,
-            tls,
-            allow,
-            user_agent: format!("PiArc-ModelDownload/{}", env!("CARGO_PKG_VERSION")),
+            connector: Connector {
+                resolver,
+                tls,
+                allow,
+                user_agent: format!("PiArc-ModelDownload/{}", env!("CARGO_PKG_VERSION")),
+            },
         }
     }
 
@@ -231,7 +182,7 @@ impl Downloader {
     ) -> Result<(), DownloadError> {
         let mut url = target(job.url, job.allows_host)?;
         for _ in 0..=MAX_REDIRECTS {
-            let stream = self.open(&url, job.proxy).await?;
+            let stream = self.connector.open(&url, job.proxy).await?;
             let (mut sender, conn) = hyper::client::conn::http1::handshake(TokioIo::new(stream))
                 .await
                 .map_err(|e| DownloadError::Network(e.to_string()))?;
@@ -243,7 +194,7 @@ impl Downloader {
             let mut request = Request::builder()
                 .uri(path)
                 .header(HOST, host_header(&url))
-                .header(USER_AGENT, &self.user_agent)
+                .header(USER_AGENT, &self.connector.user_agent)
                 .header(CONNECTION, "close");
             if have > 0 {
                 request = request.header(RANGE, format!("bytes={have}-"));
@@ -304,152 +255,6 @@ impl Downloader {
             return result;
         }
         Err(DownloadError::Redirects)
-    }
-
-    /// A connection to `url`'s host: through the proxy, or directly to a checked address;
-    /// then TLS.
-    async fn open(&self, url: &Url, proxy: Option<&str>) -> Result<Stream, DownloadError> {
-        let host = url.host_str().unwrap_or_default().to_owned();
-        let port = url.port_or_known_default().unwrap_or(443);
-        let tcp = match proxy {
-            Some(proxy) => self.tunnel(proxy, &host, port).await?,
-            None => self.direct(url, &host, port).await?,
-        };
-        let name = match url.host() {
-            Some(Host::Ipv4(ip)) => rustls::pki_types::ServerName::IpAddress(IpAddr::V4(ip).into()),
-            Some(Host::Ipv6(ip)) => rustls::pki_types::ServerName::IpAddress(IpAddr::V6(ip).into()),
-            _ => rustls::pki_types::ServerName::try_from(host.clone())
-                .map_err(|_| DownloadError::Refused("host name"))?,
-        };
-        let tls = tokio::time::timeout(
-            STALL,
-            tokio_rustls::TlsConnector::from(self.tls.clone()).connect(name, tcp),
-        )
-        .await
-        .map_err(|_| DownloadError::Network("TLS handshake timed out".into()))?
-        .map_err(|e| DownloadError::Tls(e.to_string()))?;
-        Ok(Stream(Box::new(tls)))
-    }
-
-    async fn direct(&self, url: &Url, host: &str, port: u16) -> Result<Stream, DownloadError> {
-        let addresses = match url.host() {
-            Some(Host::Ipv4(ip)) => vec![IpAddr::V4(ip)],
-            Some(Host::Ipv6(ip)) => vec![IpAddr::V6(ip)],
-            _ => self
-                .resolver
-                .resolve(host, port)
-                .await
-                .map_err(|e| DownloadError::Network(e.to_string()))?,
-        };
-        let checked =
-            ssrf::check(host, &addresses, &self.allow).map_err(|_| DownloadError::Blocked)?;
-        let mut last = None;
-        for ip in checked {
-            match tokio::time::timeout(STALL, TcpStream::connect(SocketAddr::new(ip, port))).await {
-                Ok(Ok(stream)) => return Ok(Stream(Box::new(stream))),
-                Ok(Err(e)) => last = Some(e.to_string()),
-                Err(_) => last = Some("timed out".into()),
-            }
-        }
-        Err(DownloadError::Network(
-            last.unwrap_or_else(|| "no address".into()),
-        ))
-    }
-
-    /// `CONNECT host:port` through the proxy (an address the user or system chose, so not
-    /// address-checked); an `https:` proxy is reached over TLS first.
-    async fn tunnel(&self, proxy: &str, host: &str, port: u16) -> Result<Stream, DownloadError> {
-        let proxy = Url::parse(proxy).map_err(|_| DownloadError::Refused("proxy"))?;
-        let proxy_host = proxy
-            .host_str()
-            .ok_or(DownloadError::Refused("proxy"))?
-            .to_owned();
-        let proxy_port = proxy
-            .port_or_known_default()
-            .ok_or(DownloadError::Refused("proxy"))?;
-        let tcp =
-            tokio::time::timeout(STALL, TcpStream::connect((proxy_host.as_str(), proxy_port)))
-                .await
-                .map_err(|_| DownloadError::Network("proxy timed out".into()))?
-                .map_err(|e| DownloadError::Network(e.to_string()))?;
-        let mut stream = if proxy.scheme() == "https" {
-            let name = rustls::pki_types::ServerName::try_from(proxy_host.clone())
-                .map_err(|_| DownloadError::Refused("proxy"))?;
-            let tls = tokio_rustls::TlsConnector::from(self.tls.clone())
-                .connect(name, tcp)
-                .await
-                .map_err(|e| DownloadError::Tls(e.to_string()))?;
-            Stream(Box::new(tls))
-        } else if proxy.scheme() == "http" {
-            Stream(Box::new(tcp))
-        } else {
-            return Err(DownloadError::Refused("proxy scheme"));
-        };
-        let authority = if host.contains(':') {
-            format!("[{host}]:{port}")
-        } else {
-            format!("{host}:{port}")
-        };
-        let request = format!(
-            "CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\nUser-Agent: {}\r\n\r\n",
-            self.user_agent
-        );
-        stream
-            .write_all(request.as_bytes())
-            .await
-            .map_err(|e| DownloadError::Network(e.to_string()))?;
-        let mut head = Vec::new();
-        let mut byte = [0_u8; 1];
-        while !head.ends_with(b"\r\n\r\n") {
-            if head.len() > 8192 {
-                return Err(DownloadError::Proxy(0));
-            }
-            let read = tokio::time::timeout(STALL, stream.read(&mut byte))
-                .await
-                .map_err(|_| DownloadError::Network("proxy timed out".into()))?
-                .map_err(|e| DownloadError::Network(e.to_string()))?;
-            if read == 0 {
-                return Err(DownloadError::Proxy(0));
-            }
-            head.push(byte[0]);
-        }
-        let status = String::from_utf8_lossy(&head)
-            .split_whitespace()
-            .nth(1)
-            .and_then(|s| s.parse::<u16>().ok())
-            .unwrap_or(0);
-        if status == 200 {
-            Ok(stream)
-        } else {
-            Err(DownloadError::Proxy(status))
-        }
-    }
-}
-
-/// `text` as a download target: `https:` to an allowed host, no credentials.
-fn target(
-    text: &str,
-    allows_host: &(dyn Fn(&str) -> bool + Send + Sync),
-) -> Result<Url, DownloadError> {
-    let url = Url::parse(text).map_err(|_| DownloadError::Refused("URL"))?;
-    if url.scheme() != "https" {
-        return Err(DownloadError::Refused("not https"));
-    }
-    if !url.username().is_empty() || url.password().is_some() {
-        return Err(DownloadError::Refused("credentials"));
-    }
-    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
-    if host.is_empty() || !allows_host(&host) {
-        return Err(DownloadError::Refused("host"));
-    }
-    Ok(url)
-}
-
-fn host_header(url: &Url) -> String {
-    let host = url.host_str().unwrap_or_default();
-    match url.port() {
-        Some(port) => format!("{host}:{port}"),
-        None => host.to_owned(),
     }
 }
 

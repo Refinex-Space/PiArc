@@ -391,7 +391,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 
 - [x] 1. 调研（pi.dev、npm 接口与翻页上限、官网旧源码）、四方评审与裁决（设计增补附录 A）、ADR-0102（用户 2026-11-27 确认）。
 - [x] 2. M1 现有包管理修复：npm 互斥锁、每包前缀、失败回滚、按路径卸载、代理变量、数据目录碰撞（先写失败测试）。
-- [ ] 3. M2 `piarc-web` 连接层与有界 GET。
+- [x] 3. M2 `piarc-web` 连接层与有界 GET。
 - [ ] 4. M3 缓存表（schema v16）。
 - [ ] 5. M8 前半：`piarc-mock-npm`、`piarc-mock-proxy`、测试证书。
 - [ ] 6. M4 Core `market`、协议、NAPI。

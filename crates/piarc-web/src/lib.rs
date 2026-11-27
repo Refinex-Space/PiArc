@@ -19,6 +19,9 @@
 //!   size bounds; no address check (the user wrote the address), no redirect.
 //! - Search backends ([`search`]): the adapter interface and Brave Search; results filtered by
 //!   domain.
+//! - Downloads ([`download`], ADR-0097) and small answers read into memory ([`get`], ADR-0102:
+//!   the Pi package market's catalog), both over one connection layer (`connect`): hosts checked
+//!   on every hop, `https:` only, the user's proxy through `CONNECT`, otherwise checked addresses.
 //!
 //! # Not responsible for
 //!
@@ -36,10 +39,12 @@
 
 use std::time::Duration;
 
+mod connect;
 pub mod convert;
 pub mod download;
 mod error;
 mod fetch;
+pub mod get;
 pub mod search;
 pub mod ssrf;
 
