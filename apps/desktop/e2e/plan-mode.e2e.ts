@@ -140,6 +140,15 @@ test('a reply in the composer revises the plan, and comments on the rendered pla
   const marked = await page.evaluate(() => CSS.highlights.get('piarc-plan-comment')?.size ?? 0);
   expect(marked).toBe(1);
   await shoot(page, info, 'plan-comment-marked');
+  // Review shots: the dark theme, then Chinese (contrast and overflow of the card and panel).
+  await prefer(page, { key: 'appearance.theme', value: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-color-mode', 'dark');
+  await shoot(page, info, 'plan-comment-marked-dark');
+  await prefer(page, { key: 'language', value: 'zh-CN' });
+  await expect(card.getByTestId('plan-approve-auto')).toHaveText(/批准并自动接受编辑/u);
+  await shoot(page, info, 'plan-comment-marked-dark-zh');
+  await prefer(page, { key: 'language', value: 'en' });
+  await prefer(page, { key: 'appearance.theme', value: 'light' });
   await card.getByTestId('plan-send-comments').click();
   await expect(page.locator('[data-testid="plan-row"]').last()).toContainText('for parse()', {
     timeout: 30_000,
