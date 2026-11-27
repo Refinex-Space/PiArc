@@ -10,7 +10,7 @@ PiArc 想把三件事放在一起：
 - **Pi 的多服务商模型层**：Anthropic、OpenAI、Google、DeepSeek、Kimi、Qwen、GLM、OpenRouter、本地模型等，换服务商不换 Harness 行为。
 - **一套代码覆盖 macOS 与 Windows**：界面用 Electron + React，Agent 控制面在 Rust 编写的 Core 中。Windows 与 macOS 共用代码，最多晚一个里程碑。
 
-> **当前状态：设计阶段。** 需求和架构已经确定，实现从 M0 技术验证开始，仓库里还没有可运行的代码。
+> **当前状态：预发布。** 应用可以从源码运行，也能在 macOS 与 Windows 上打包（见[本地开发与构建](#本地开发与构建)），还没有发布正式版本。
 
 ## 计划中的亮点
 
@@ -48,15 +48,71 @@ Agent Host（每个工作区一个 Node 进程）
 ## 仓库结构
 
 ```
-apps/desktop/     Electron 应用：主进程、preload、React 渲染进程（规划中）
-crates/           PiArc Core 的 Rust workspace，含 NAPI-RS 绑定（规划中）
-agent-host/       基于 Pi SDK 的 TypeScript Agent Host 与 Harness Kit（规划中）
-packages/         共享的 TypeScript 包，例如生成的协议类型（规划中）
-design/tokens/    设计令牌，生成 CSS 变量（规划中）
+apps/desktop/     Electron 应用：主进程、preload、React 渲染进程
+crates/           PiArc Core 的 Rust workspace，含 NAPI-RS 绑定
+agent-host/       基于 Pi SDK 的 TypeScript Agent Host 与 Harness Kit
+packages/         共享的 TypeScript 包，例如生成的协议类型
+design/tokens/    设计令牌，生成 CSS 变量
 design/brand/     应用图标与标记（打包、托盘、界面 logo 的单一来源）
 docs/             架构、ADR、需求、调研
 reference/        参考仓库的本地只读副本（已加入 gitignore）
 ```
+
+## 本地开发与构建
+
+所有命令都在仓库根目录执行。完整命令表见 [AGENTS.md](AGENTS.md#命令)。
+
+### 环境要求
+
+| | macOS | Windows |
+|---|---|---|
+| Node.js | 24（`.nvmrc`） | 24（`.nvmrc`） |
+| Rust | 安装 [rustup](https://rustup.rs)；版本由 `rust-toolchain.toml` 锁定，cargo 会自动安装 | 同左 |
+| 原生工具链 | Xcode Command Line Tools；打发布包需要完整的 Xcode（快捷指令扩展） | Visual Studio Build Tools（MSVC 与 Windows SDK） |
+| 其他 | | Git for Windows（Git Bash）；出安装包需要 .NET 8 SDK |
+
+第一次构建要联网：会下载 libghostty-vt 预编译产物和内置的 node、rg、fd，并校验哈希。
+
+### 安装依赖并从源码运行
+
+```bash
+npm ci --ignore-scripts                 # 按 lockfile 安装 npm 依赖（与 CI 相同）
+node node_modules/electron/install.js   # 下载 Electron 二进制（--ignore-scripts 不会下载）
+npm run build:core                      # 构建 Core 原生模块（开发版）
+npm run build:agent-host                # 构建 Agent Host bundle
+npm run start -w @piarc/desktop         # 启动应用（热更新）
+```
+
+改了 Rust 代码后重新运行 `npm run build:core`，改了 `agent-host/` 后重新运行 `npm run build:agent-host`。从源码运行时，Agent Host 用 PATH 上的 `node` 启动。
+
+### 检查
+
+```bash
+node scripts/dev/install-tools.mjs   # 首次：把 cargo-deny、cargo-audit、rg、fd 装进 .tools/
+npm run verify                       # 全部 17 项检查，结束时打印汇总表
+npm test                             # 只跑 Vitest；另有 npm run lint、npm run typecheck
+cargo test -p <crate>                # 只测一个 Rust crate
+```
+
+### 打包
+
+打包会先构建 Core 和 Agent Host bundle。`--flavor release`（默认）是给用户用的构建；`--flavor development` 保留端到端测试需要的测试钩子。
+
+**macOS**（DMG 与 ZIP 在 `apps/desktop/out/release/make/`）：
+
+```bash
+npm run package:desktop -- --flavor release --arch arm64 --make
+# Intel 版：先 rustup target add x86_64-apple-darwin，再用 --arch x64
+```
+
+**Windows**（`*-Setup.exe` 在 `apps/desktop/out/release/velopack/win32-x64/`）：
+
+```bash
+npm run package:desktop -- --flavor release --arch x64
+node scripts/release/pack-windows.mjs --arch x64 --flavor release --versions 0.1.0
+```
+
+第二步把锁定版本的 Velopack `vpk` 装进 `.tools/vpk/`，需要 .NET SDK。只要免安装的程序目录时，第一步的 `apps/desktop/out/release/PiArc-win32-x64/PiArc.exe` 就能直接运行。
 
 ## 路线图
 

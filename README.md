@@ -10,7 +10,7 @@ PiArc aims to combine three things:
 - **Pi's multi-provider model layer**: Anthropic, OpenAI, Google, DeepSeek, Kimi, Qwen, GLM, OpenRouter, local models, and more, with the same harness behavior across providers.
 - **One desktop app for macOS and Windows**: a single Electron + React codebase for the UI, with the agent control plane in a Rust core. Windows ships from the same code, at most one milestone behind macOS.
 
-> **Status: design phase.** The requirements and architecture are defined; implementation starts with the M0 technical spikes. There is no runnable code yet.
+> **Status: pre-release.** The app runs from source and packages on macOS and Windows (see [Development](#development)); there is no published release yet.
 
 ## Highlights (planned)
 
@@ -48,15 +48,71 @@ Read more:
 ## Repository layout
 
 ```
-apps/desktop/     Electron app: main process, preload, React renderer (planned)
-crates/           Rust workspace for PiArc Core, incl. the NAPI-RS binding (planned)
-agent-host/       TypeScript Agent Host and Harness Kit on the Pi SDK (planned)
-packages/         Shared TypeScript packages, e.g. generated protocol types (planned)
-design/tokens/    Design tokens, generated into CSS variables (planned)
+apps/desktop/     Electron app: main process, preload, React renderer
+crates/           Rust workspace for PiArc Core, incl. the NAPI-RS binding
+agent-host/       TypeScript Agent Host and Harness Kit on the Pi SDK
+packages/         Shared TypeScript packages, e.g. generated protocol types
+design/tokens/    Design tokens, generated into CSS variables
 design/brand/     App icon and mark (single source for packaging, tray and in-app logo)
 docs/             Architecture, ADRs, requirements, research
 reference/        Local read-only clones of reference repositories (git-ignored)
 ```
+
+## Development
+
+Run every command from the repository root. The full command list is in [AGENTS.md](AGENTS.md#命令) (Chinese).
+
+### Prerequisites
+
+| | macOS | Windows |
+|---|---|---|
+| Node.js | 24 (`.nvmrc`) | 24 (`.nvmrc`) |
+| Rust | [rustup](https://rustup.rs); `rust-toolchain.toml` pins the version and cargo installs it | same |
+| Native toolchain | Xcode Command Line Tools; full Xcode for release packages (the Shortcuts extension) | Visual Studio Build Tools with MSVC and the Windows SDK |
+| Other | | Git for Windows (Git Bash); .NET 8 SDK for the installer |
+
+The first build needs network access: it downloads the libghostty-vt prebuilt and the bundled node, rg and fd, and checks their hashes.
+
+### Set up and run from source
+
+```bash
+npm ci --ignore-scripts                 # npm dependencies, as CI installs them
+node node_modules/electron/install.js   # the Electron binary (skipped by --ignore-scripts)
+npm run build:core                      # Core native module, development build
+npm run build:agent-host                # Agent Host bundle
+npm run start -w @piarc/desktop         # the app with hot reload
+```
+
+Run `npm run build:core` again after changing Rust code, and `npm run build:agent-host` after changing `agent-host/`. From source, the Agent Host runs on the `node` found on PATH.
+
+### Checks
+
+```bash
+node scripts/dev/install-tools.mjs   # once: cargo-deny, cargo-audit, rg, fd into .tools/
+npm run verify                       # all 17 checks, with a summary table
+npm test                             # Vitest only; also npm run lint, npm run typecheck
+cargo test -p <crate>                # one Rust crate
+```
+
+### Build packages
+
+Packaging builds Core and the Agent Host bundle first. `--flavor release` (the default) is the build to hand out; `--flavor development` keeps the test hooks the end-to-end tests drive.
+
+**macOS** (DMG and ZIP in `apps/desktop/out/release/make/`):
+
+```bash
+npm run package:desktop -- --flavor release --arch arm64 --make
+# Intel: rustup target add x86_64-apple-darwin, then --arch x64
+```
+
+**Windows** (`*-Setup.exe` in `apps/desktop/out/release/velopack/win32-x64/`):
+
+```bash
+npm run package:desktop -- --flavor release --arch x64
+node scripts/release/pack-windows.mjs --arch x64 --flavor release --versions 0.1.0
+```
+
+The second step installs the locked Velopack `vpk` into `.tools/vpk/` and needs the .NET SDK. The app folder alone is `apps/desktop/out/release/PiArc-win32-x64/PiArc.exe`.
 
 ## Roadmap
 
