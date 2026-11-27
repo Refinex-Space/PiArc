@@ -7,12 +7,14 @@
 //    own reset only runs for arm64.
 // 2. Every other Mach-O file under Contents/Resources (the Core `.node`, rg, fd) gets its own
 //    ad-hoc signature, except the bundled Node, which keeps the Node.js Foundation's
-//    Developer ID signature: re-signing it would drop the notarisation it carries.
+//    Developer ID signature: re-signing it would drop the notarisation it carries; and the
+//    speech libraries (Resources/speech/runtime), which keep their upstream ad-hoc signatures
+//    because Core checks their bytes against the speech lock file before loading them.
 // 3. The app bundle is signed last without `--deep`, which seals Resources/ (including the
 //    Agent Host files) in CodeResources and leaves the nested signatures as they are.
 //
 // Hardened runtime: on, with `allow-jit` and `disable-library-validation` (S6 report section
-// 3). Ad-hoc signatures have no Team ID, so library validation would reject Electron Framework;
+// 3); the main executable also has `device.audio-input` for voice dictation (ADR-0096). Ad-hoc signatures have no Team ID, so library validation would reject Electron Framework;
 // the runtime still blocks DYLD_* injection and debugger attachment, which protects the
 // keychain grant that belongs to the app's code identity.
 import { open, readdir } from 'node:fs/promises';
@@ -95,6 +97,10 @@ export async function findMachOFiles(dir, exclude) {
 
 /** Entitlements of the app's own code under the hardened runtime. */
 export const ENTITLEMENTS = fileURLToPath(new URL('entitlements.mac.plist', import.meta.url));
+/** The main executable's entitlements: the base list plus the microphone (ADR-0096). */
+export const MAIN_ENTITLEMENTS = fileURLToPath(
+  new URL('entitlements.main.mac.plist', import.meta.url),
+);
 
 const HARDENED = ['--options', 'runtime', '--entitlements', ENTITLEMENTS];
 
@@ -129,5 +135,16 @@ export async function signResourcesAndBundle(appPath, { keepSigned }) {
  * @param {string} appPath
  */
 export async function signBundle(appPath) {
-  await codesign(['--sign', '-', '--force', ...HARDENED, appPath]);
+  // The bundle's main executable alone gets the microphone; the --deep pass of step 1 gave
+  // every helper the base list (ADR-0096).
+  await codesign([
+    '--sign',
+    '-',
+    '--force',
+    '--options',
+    'runtime',
+    '--entitlements',
+    MAIN_ENTITLEMENTS,
+    appPath,
+  ]);
 }

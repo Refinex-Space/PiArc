@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements of the app's main executable only: entitlements.mac.plist (see there) plus the
+  microphone for voice dictation (ADR-0094, ADR-0096). Core captures audio in the main process;
+  Electron's helpers (renderers, GPU, utility) keep the base list and cannot record. The Agent
+  Host and sandboxed commands are also denied the microphone by their Seatbelt profiles.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>

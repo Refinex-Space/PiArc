@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { ENTITLEMENTS } from '../../apps/desktop/packaging/macos-sign.mjs';
+import { ENTITLEMENTS, MAIN_ENTITLEMENTS } from '../../apps/desktop/packaging/macos-sign.mjs';
 import {
   entitlementKeys,
   findDevTools,
@@ -55,12 +55,20 @@ describe('entitlementKeys', () => {
     expect(entitlementKeys(xml)).toEqual(['com.a', 'com.b']);
   });
 
-  it('THR-14 the app asks for only JIT and disabled library validation', () => {
+  it('THR-14 the helpers ask for only JIT and disabled library validation', () => {
     // The layout check compares the signed app with this file, so the file itself must not
     // grow: get-task-allow or allow-dyld-environment-variables would undo the hardened runtime.
     expect(entitlementKeys(readFileSync(ENTITLEMENTS, 'utf8'))).toEqual([
       'com.apple.security.cs.allow-jit',
       'com.apple.security.cs.disable-library-validation',
+    ]);
+  });
+
+  it('THR-18 only the main executable adds the microphone to the base list', () => {
+    expect(entitlementKeys(readFileSync(MAIN_ENTITLEMENTS, 'utf8'))).toEqual([
+      'com.apple.security.cs.allow-jit',
+      'com.apple.security.cs.disable-library-validation',
+      'com.apple.security.device.audio-input',
     ]);
   });
 });

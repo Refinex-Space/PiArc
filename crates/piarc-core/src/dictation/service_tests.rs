@@ -158,7 +158,7 @@ async fn a_turned_off_feature_refuses_to_start() {
 /// A session's events reach only its window's route, and its terminal state frees the
 /// application-wide slot (THR-18: other windows never see the text).
 #[tokio::test]
-async fn missing_assets_end_the_session_on_its_window_and_free_the_slot() {
+async fn thr18_missing_assets_end_the_session_on_its_window_and_free_the_slot() {
     let f = Fixture::new("missing");
     let started = f
         .service

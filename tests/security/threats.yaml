@@ -491,13 +491,13 @@ threats:
   - id: THR-14
     title: 同一用户的进程向 PiArc 注入代码
     countermeasures:
-      - arch: macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）
-        measure: 应用开启 hardened runtime，entitlements 只有两项
+      - arch: macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`，主程序另给语音输入用的 `device.audio-input`，ADR-0096），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）
+        measure: 应用开启 hardened runtime；helper 的 entitlements 只有两项，主程序多一项麦克风，都不含 get-task-allow 与 DYLD 环境变量
         type: automated
         tests:
           - ci:scripts/ci/check-app-layout.mjs
           - vitest:scripts/ci/check-app-layout.test.mjs::reads an ad-hoc signature with the hardened runtime
-          - vitest:scripts/ci/check-app-layout.test.mjs::THR-14 the app asks for only JIT and disabled library validation
+          - vitest:scripts/ci/check-app-layout.test.mjs::THR-14 the helpers ask for only JIT and disabled library validation
       - arch: Core 以最小环境启动内置 node（不传 `DYLD_*`）
         measure: Agent Host 只收到白名单环境变量
         type: automated
@@ -630,3 +630,62 @@ threats:
         refs: [ADR-0090, ADR-0057]
         tests:
           - 'vitest:apps/desktop/src/main/browser/chrome-import.test.ts::removes a site: its cookies first, then the record'
+
+  - id: THR-18
+    title: 麦克风与听写内容
+    countermeasures:
+      - arch: 麦克风授权只由主进程在用户点击后请求：窗口可见且有近期真实输入，系统拒绝后不再弹出（ADR-0096）
+        measure: 页面不能静默开始录音；窗口号取自发送者；拒绝后不再请求
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/core/dictation-ipc.test.ts::THR-18 asks for the microphone once and not again after a refusal
+          - vitest:apps/desktop/src/main/core/dictation-ipc.test.ts::THR-18 needs recent real input and a visible window
+          - vitest:apps/desktop/src/main/core/dictation-ipc.test.ts::THR-18 takes the window id from the sender, never from the page
+      - arch: 听写事件只送到发起窗口的路由，其他窗口订阅被拒
+        measure: 事件只在 `dictation/<发起窗口>`；其他窗口订阅该路由被主进程拒绝；全应用同一时刻一个听写
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/main/core/dictation-ipc.test.ts::THR-18 lets only the starting window observe its dictation
+          - rust:crates/piarc-core/src/dictation/service_tests.rs::thr18_missing_assets_end_the_session_on_its_window_and_free_the_slot
+      - arch: Agent Host 及其后代与沙箱内命令的 Seatbelt 配置拒绝麦克风与摄像头，macOS 上只有主程序带 `device.audio-input`
+        measure: 真实 `sandbox-exec` 下两份配置的 `sandbox_check` 对 `device-microphone`、`device-camera` 答拒绝；打包产物只有主程序带麦克风 entitlement
+        type: automated
+        tests:
+          - rust:crates/piarc-sandbox/tests/devices.rs::thr18_the_agent_hosts_profile_denies_the_microphone_and_the_camera
+          - rust:crates/piarc-sandbox/tests/devices.rs::thr18_the_sandboxed_commands_profile_denies_the_microphone_and_the_camera
+          - vitest:scripts/ci/check-app-layout.test.mjs::THR-18 only the main executable adds the microphone to the base list
+          - ci:scripts/ci/check-app-layout.mjs
+      - arch: 音频只在内存中处理、不写文件，识别文字与词汇不写日志
+        measure: 一次完整听写后引擎可写的目录里没有文件、内置资产不变；语音模块没有日志语句
+        type: automated
+        tests:
+          - rust:crates/piarc-speech/tests/real_model.rs::thr18_a_session_writes_no_audio_to_disk
+      - arch: 未进沙箱的 Bash、hooks 与用户终端继承应用的麦克风授权，作为已接受的风险登记
+        measure: 应用之外由用户批准运行的进程可能使用应用的麦克风授权
+        type: accepted-risk
+        reason: macOS 的 TCC 按负责进程归属授权，PiArc 启动的子进程继承它；放弃责任主体会让每个子进程访问文稿等目录时各自弹框。沙箱内的命令与 Agent Host 已被 Seatbelt 拒绝，剩余的是用户逐条批准或自己运行的进程（用户在 SPEC 评审中确认）
+        refs: [ADR-0096]
+
+  - id: THR-19
+    title: 语音模型篡改
+    countermeasures:
+      - arch: 内置的运行库与模型由锁文件固定大小与 SHA-256，打包后的布局检查逐个核对（ADR-0095）
+        measure: 打包产物的 `speech/` 与锁文件逐个文件一致，没有多余文件，发布构建没有测试音源
+        type: automated
+        tests:
+          - ci:scripts/ci/check-app-layout.mjs
+      - arch: Core 加载前核对大小与 SHA-256，不符时不加载并提示修复（ADR-0094）
+        measure: 缺失或损坏的文件被识别，不加载
+        type: automated
+        tests:
+          - rust:crates/piarc-speech/src/models.rs::verification_reports_missing_and_damaged_files
+          - rust:crates/piarc-speech/src/models.rs::a_staged_download_that_fails_verification_is_removed
+      - arch: 增强模型只从固定修订的 ModelScope 地址经 HTTPS 下载，每一跳检查主机、直连时检查地址，核对大小与 SHA-256 后才启用（ADR-0097）
+        measure: 只接受 https 与清单里的主机；直连本地地址被拒；哈希不符或超长的文件删除；经用户代理时只发 CONNECT
+        type: automated
+        tests:
+          - rust:crates/piarc-speech/src/models.rs::enhanced_manifest_parses_and_pins_revisions
+          - rust:crates/piarc-web/tests/download.rs::redirects_follow_allowed_hosts_only
+          - rust:crates/piarc-web/tests/download.rs::a_direct_connection_to_a_local_address_is_refused
+          - rust:crates/piarc-web/tests/download.rs::a_wrong_checksum_or_extra_bytes_remove_the_file
+          - rust:crates/piarc-web/tests/download.rs::the_proxy_carries_the_download_through_connect

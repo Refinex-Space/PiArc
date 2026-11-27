@@ -23,6 +23,7 @@
     "../apps/desktop/packaging/agent-bundle.mjs",
     "../apps/desktop/packaging/agent-host-layout.mjs",
     "../apps/desktop/packaging/macos-sign.mjs",
+    "../apps/desktop/packaging/speech-layout.mjs",
     "../apps/desktop/packaging/trim.mjs"
   ]
 }

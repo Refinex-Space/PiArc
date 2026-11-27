@@ -261,6 +261,27 @@ export function sentencepieceVocab(model) {
 }
 
 /**
+ * The files a packaged app carries for `target` (`<platform>-<arch>`), with their paths under
+ * `Resources/speech/` (and under target/speech-assets/<target>/): the runtime libraries, the
+ * models' files and the derived files. Test files are never among them.
+ * @param {SpeechLock} lock
+ * @param {string} target
+ * @returns {LockedFile[]}
+ */
+export function bundledSpeechFiles(lock, target) {
+  const runtime = lock.runtime[target];
+  if (runtime === undefined) throw new Error(`${SPEECH_LOCK} has no runtime for ${target}`);
+  return [
+    ...Object.values(runtime.files),
+    ...Object.values(lock.models).flatMap((model) => [
+      ...(model.file === undefined ? [] : [model.file]),
+      ...Object.values(model.files),
+      ...Object.values(model.derived),
+    ]),
+  ].map(({ to, size, sha256 }) => ({ to, size, sha256 }));
+}
+
+/**
  * Copies `from` to `to` and checks the copy against its lock entry.
  * @param {string} from
  * @param {string} to

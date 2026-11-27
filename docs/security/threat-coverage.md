@@ -25,6 +25,8 @@
 | THR-15 | 恶意仓库的 Git 配置 | 4 | 4 | 0 | 0 | 0 | 11 |
 | THR-16 | 浏览器外传与本机服务访问 | 5 | 5 | 0 | 0 | 0 | 34 |
 | THR-17 | 浏览器凭据 | 4 | 3 | 0 | 1 | 0 | 13 |
+| THR-18 | 麦克风与听写内容 | 5 | 4 | 0 | 1 | 0 | 10 |
+| THR-19 | 语音模型篡改 | 3 | 3 | 0 | 0 | 0 | 8 |
 
 ## THR-01 提示注入导致破坏性操作
 
@@ -153,7 +155,7 @@
 
 | 对策 | 类型 | 测试与依据 |
 |---|---|---|
-| 应用开启 hardened runtime，entitlements 只有两项 | 自动化 | CI `scripts/ci/check-app-layout.mjs`<br>Vitest `scripts/ci/check-app-layout.test.mjs` · reads an ad-hoc signature with the hardened runtime<br>Vitest `scripts/ci/check-app-layout.test.mjs` · THR-14 the app asks for only JIT and disabled library validation |
+| 应用开启 hardened runtime；helper 的 entitlements 只有两项，主程序多一项麦克风，都不含 get-task-allow 与 DYLD 环境变量 | 自动化 | CI `scripts/ci/check-app-layout.mjs`<br>Vitest `scripts/ci/check-app-layout.test.mjs` · reads an ad-hoc signature with the hardened runtime<br>Vitest `scripts/ci/check-app-layout.test.mjs` · THR-14 the helpers ask for only JIT and disabled library validation |
 | Agent Host 只收到白名单环境变量 | 自动化 | Rust `crates/piarc-host/src/config.rs` · passes_only_named_variables_and_the_fixed_ones |
 | 同一用户的进程调试附加 Agent Host | 已接受风险 | 理由：去掉 get-task-allow 要对 node 重签，违背 ADR-0018 保留官方签名的决定；能调试附加的进程已以用户身份运行<br>依据：ADR-0018、I39 |
 
@@ -184,3 +186,21 @@
 | 默认不勾任何站点、没有"全部"；取消原生确认不导入；导入的站点及其子域名对智能体是敏感站点，allow 规则与跳过权限都不放行，读不到记录时也按敏感处理 | 自动化 | L4 `apps/desktop/e2e/browser-import.e2e.ts` · THR-17 imports chosen sites after the native confirmation; the page never sees a value<br>Vitest `apps/desktop/src/main/browser/agent-gate-imports.test.ts` · THR-17 marks the imported site and its subdomains sensitive, not other sites<br>Vitest `apps/desktop/src/main/browser/agent-gate-imports.test.ts` · THR-17 counts a host as imported when the records cannot be read<br>Rust `crates/piarc-core/src/tool_io/policy/tests/browser_import.rs` · thr17_an_allow_rule_does_not_cover_an_imported_site<br>Rust `crates/piarc-core/src/tool_io/policy/tests/browser_import.rs` · thr17_bypass_permissions_asks_for_an_imported_site |
 | 页面只拿到每站点的条数；值登记到日志脱敏、审计只记站点与条数；密钥不打印字节，明文缓冲用后清零 | 自动化 | Vitest `apps/desktop/src/main/browser/chrome-import.test.ts` · THR-17 the page gets counts only: confirms natively, imports through Core, writes the cookies<br>Rust `crates/piarc-core/src/browser/import.rs` · thr17_import_redacts_values_and_audits_sites_and_counts_only<br>Rust `crates/piarc-browser-import/src/crypto.rs` · thr17_keys_do_not_print_their_bytes<br>Rust `crates/piarc-browser-import/src/crypto.rs` · thr17_plaintext_buffers_are_zeroized<br>Rust `crates/piarc-browser-import/src/import.rs` · thr17_macos_v10_import_with_domain_hash_keeps_values_out_of_debug<br>Vitest `apps/desktop/src/main/browser/cdp-policy.test.ts` · THR-17 keeps cookies out of the network events the script sees |
 | Windows 上浏览器分区的 cookie 对沙箱外的同用户进程不保密 | 已接受风险 | Vitest `apps/desktop/src/main/browser/chrome-import.test.ts` · removes a site: its cookies first, then the record<br>理由：Windows 到 Beta 没有 OS 级沙箱（D7），经批准的命令与同用户进程可以用 DPAPI 解开分区里的 cookie；用户在听过风险后坚持保留导入功能，设置页可按站点移除导入、清除工作区浏览数据或改为退出即清空<br>依据：ADR-0090、ADR-0057 |
+
+## THR-18 麦克风与听写内容
+
+| 对策 | 类型 | 测试与依据 |
+|---|---|---|
+| 页面不能静默开始录音；窗口号取自发送者；拒绝后不再请求 | 自动化 | Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 asks for the microphone once and not again after a refusal<br>Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 needs recent real input and a visible window<br>Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 takes the window id from the sender, never from the page |
+| 事件只在 `dictation/<发起窗口>`；其他窗口订阅该路由被主进程拒绝；全应用同一时刻一个听写 | 自动化 | Vitest `apps/desktop/src/main/core/dictation-ipc.test.ts` · THR-18 lets only the starting window observe its dictation<br>Rust `crates/piarc-core/src/dictation/service_tests.rs` · thr18_missing_assets_end_the_session_on_its_window_and_free_the_slot |
+| 真实 `sandbox-exec` 下两份配置的 `sandbox_check` 对 `device-microphone`、`device-camera` 答拒绝；打包产物只有主程序带麦克风 entitlement | 自动化 | Rust `crates/piarc-sandbox/tests/devices.rs` · thr18_the_agent_hosts_profile_denies_the_microphone_and_the_camera<br>Rust `crates/piarc-sandbox/tests/devices.rs` · thr18_the_sandboxed_commands_profile_denies_the_microphone_and_the_camera<br>Vitest `scripts/ci/check-app-layout.test.mjs` · THR-18 only the main executable adds the microphone to the base list<br>CI `scripts/ci/check-app-layout.mjs` |
+| 一次完整听写后引擎可写的目录里没有文件、内置资产不变；语音模块没有日志语句 | 自动化 | Rust `crates/piarc-speech/tests/real_model.rs` · thr18_a_session_writes_no_audio_to_disk |
+| 应用之外由用户批准运行的进程可能使用应用的麦克风授权 | 已接受风险 | 理由：macOS 的 TCC 按负责进程归属授权，PiArc 启动的子进程继承它；放弃责任主体会让每个子进程访问文稿等目录时各自弹框。沙箱内的命令与 Agent Host 已被 Seatbelt 拒绝，剩余的是用户逐条批准或自己运行的进程（用户在 SPEC 评审中确认）<br>依据：ADR-0096 |
+
+## THR-19 语音模型篡改
+
+| 对策 | 类型 | 测试与依据 |
+|---|---|---|
+| 打包产物的 `speech/` 与锁文件逐个文件一致，没有多余文件，发布构建没有测试音源 | 自动化 | CI `scripts/ci/check-app-layout.mjs` |
+| 缺失或损坏的文件被识别，不加载 | 自动化 | Rust `crates/piarc-speech/src/models.rs` · verification_reports_missing_and_damaged_files<br>Rust `crates/piarc-speech/src/models.rs` · a_staged_download_that_fails_verification_is_removed |
+| 只接受 https 与清单里的主机；直连本地地址被拒；哈希不符或超长的文件删除；经用户代理时只发 CONNECT | 自动化 | Rust `crates/piarc-speech/src/models.rs` · enhanced_manifest_parses_and_pins_revisions<br>Rust `crates/piarc-web/tests/download.rs` · redirects_follow_allowed_hosts_only<br>Rust `crates/piarc-web/tests/download.rs` · a_direct_connection_to_a_local_address_is_refused<br>Rust `crates/piarc-web/tests/download.rs` · a_wrong_checksum_or_extra_bytes_remove_the_file<br>Rust `crates/piarc-web/tests/download.rs` · the_proxy_carries_the_download_through_connect |

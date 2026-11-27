@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.75（2026-11-26） |
+| 版本 | 2.76（2026-11-26） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -1052,6 +1052,8 @@ crates/
 ├── piarc-telemetry    # tracing、日志轮转、本地指标、诊断包导出
 ├── piarc-web          # WebFetch 的网络侧：SSRF 检查、钉住地址的抓取（hyper + rustls）、同站重定向、HTML 转 Markdown（T29，ADR-0045）
 ├── piarc-browser-import # 从 Chrome 导入登录：列配置与站点、读临时副本的 Cookies 库、解密选中站点（macOS 钥匙串、Windows DPAPI），明文只交给 Core（ADR-0090）
+├── piarc-speech       # 本地语音输入：麦克风采集（CPAL）、重采样与电平、分段、流式识别与可选精修（sherpa-onnx）、词汇与文本规范化；运行库与模型加载前核对哈希（ADR-0094）
+├── piarc-sherpa-sys   # 包名 sherpa-onnx-sys：生成的转发层，运行时加载已校验的 sherpa-onnx 动态库，构建期不下载、不链接（ADR-0094）
 ├── piarc-napi         # NAPI-RS 导出层（薄），产出各平台 .node 原生模块（ADR-0014）
 ├── piarc-testkit      # 严格校验的 mock provider、场景运行器、事件断言（仅测试）
 └── piarc-devcli       # 开发用无头驱动：不经 UI 运行 Core + Agent Host（不随应用发布）
@@ -1059,7 +1061,7 @@ crates/
 
 依赖规则：
 
-- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry, web, browser-import} → {piarc-protocol, piarc-ports}`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖。明确的单向例外逐条登记在 `crates/deps-rules.json` 并附理由，例如 `fs → checkpoint`、`term → ghostty-sys`。链外的 crate 按层放置：`piarc-napi` 除 `piarc-core` 外还可直接使用 `piarc-protocol`、`piarc-ports` 的类型；`piarc-testkit`（仅测试）可依赖 `piarc-core` 与这两个基础 crate，`piarc-devcli` 另可依赖 `piarc-testkit`，发布的 crate 不得依赖二者；`piarc-ghostty-sys` 不依赖任何 workspace crate，只有 `piarc-term` 可以依赖它。规则由 `scripts/ci/check-crate-deps.mjs` 在 `npm run verify` 中检查，对 normal、build、dev 三类依赖一视同仁。
+- 有向无环：`piarc-napi → piarc-core → {host, policy, hooks, config, fs, checkpoint, exec, term, sandbox, store, diff, git, secrets, telemetry, web, browser-import, speech} → {piarc-protocol, piarc-ports}`。功能 crate 之间需要协作时经 `piarc-core` 编排，不互相依赖。明确的单向例外逐条登记在 `crates/deps-rules.json` 并附理由，例如 `fs → checkpoint`、`term → ghostty-sys`、`speech → sherpa-onnx-sys`。链外的 crate 按层放置：`piarc-napi` 除 `piarc-core` 外还可直接使用 `piarc-protocol`、`piarc-ports` 的类型；`piarc-testkit`（仅测试）可依赖 `piarc-core` 与这两个基础 crate，`piarc-devcli` 另可依赖 `piarc-testkit`，发布的 crate 不得依赖二者；`piarc-ghostty-sys` 不依赖任何 workspace crate，只有 `piarc-term` 可以依赖它；`sherpa-onnx-sys`（目录 `crates/piarc-sherpa-sys`）同样只给 `piarc-speech`。规则由 `scripts/ci/check-crate-deps.mjs` 在 `npm run verify` 中检查，对 normal、build、dev 三类依赖一视同仁。
 - 进程启动统一经 `ProcessSpawner`：`piarc-exec` 提供实现（进程组 / Job Object），`piarc-core` 把它注入 `piarc-host`（启动 Agent Host）、`piarc-hooks`（hooks 命令）与沙箱包装后的命令执行，避免各处各写一套进程树管理。
 - 平台相关代码收敛在 trait 后面，按 `cfg(target_os)` 提供实现；新增平台假设必须经 CI 的 Windows 构建检查。
 - I/O 边界用窄 trait 隔离（`ProcessSpawner`、`FileSystem`、`Clock`、`SecretStore`、`AgentHostTransport`），测试用内存实现驱动。
@@ -1313,7 +1315,7 @@ T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新�
 
 - **侧栏**：按工作区分组；会话状态徽标优先级：错误 > 等待审批 > 运行中 > 未读 > 空闲；支持过滤、置顶、归档、重命名；宽度 200–420 px，可折叠。
 - **新建会话**：选择工作区与分支（可选独立 worktree）→ 先显示乐观的用户消息 → 创建会话 → 发送首条输入；首条消息失败时回滚并保留输入内容。
-- **composer**：基于 ProseMirror。多行输入；`@` 文件提及（Core 提供模糊匹配，提及以胶囊显示）；`/` 命令面板（句中词首也可唤起，选中的命令与 skill 是芯片，ADR-0080）；图片与 PDF 拖放 / 粘贴；运行中 Enter 为 steer、Mod+Enter 为排队、Esc 停止；排队项可编辑、删除。胶囊的存储数据、显示形态和发送时拼接的文本三者分开。
+- **composer**：基于 ProseMirror。多行输入；`@` 文件提及（Core 提供模糊匹配，提及以胶囊显示）；`/` 命令面板（句中词首也可唤起，选中的命令与 skill 是芯片，ADR-0080）；图片与 PDF 拖放 / 粘贴；运行中 Enter 为 steer、Mod+Enter 为排队、Esc 停止；排队项可编辑、删除。发送键左侧是语音输入：本机流式识别，文字边说边进入输入框，Esc 停止并保留文字，× 取消（ADR-0094–0097，[设计增补](addenda/voice-dictation.md)）。胶囊的存储数据、显示形态和发送时拼接的文本三者分开。
 - **环境栏**：权限模式菜单（Mod+Shift+M，数字键快选）、模型菜单与 effort 子菜单、上下文用量环（75%、90% 两级提示）。
 - **侧边对话**（T49，ADR-0070）：在会话中用可自定义的 Mod+; 或 `/btw` 打开停靠面板。首问取已完成的主会话历史。用户可停止侧边回答、复制文字或关闭面板。主转录与队列独立；关闭面板丢弃内容，用量归入当前会话的“侧边对话”。
 - **transcript 行类型**：用户消息、回复正文（Markdown）、思考块（默认折叠，生成中标签为"正在思考…"，结束后为"思考了 N 秒"）、工具组摘要（动词 + 对象 + 增删计数；同一回合里连续的工具调用与其间的思考合成一组，运行中展开、正文开始或回合结束后收起，ADR-0079）、bash 卡（语义状态，超过 10 秒显示计时，在组内显示）、文件改动卡、审批卡、子 agent 卡、压缩提示、错误卡（分类 + 重试）、计划卡、任务卡、下一步建议。回复里的 Mermaid 经隔离绘图文档画成图片，项目内的本地图片内联、远程图片只显示卡片，用户消息与回合末回复显示消息时间（ADR-0080）。三档视图：普通（工具折叠为摘要）/ 思考（加思考摘要）/ 详细（全部展开）。T29 落地：切换控件在会话标题栏（`transcript/DetailSwitch.tsx`），选择按会话记在渲染进程内存；普通档隐藏思考块，思考档为默认（保持 T19 起的显示），详细档展开工具组与思考块并显示 `reminder` 条目，展开状态与其他档分开保存。
@@ -1540,13 +1542,15 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 供应链 | npm / crates 依赖被投毒 | 精确版本锁定；`npm ci --ignore-scripts`；`cargo-deny`、`cargo-audit`、`npm audit`；新增依赖需评审 |
 | 更新通道被劫持 | 恶意更新包 | 没有平台签名可依赖（ADR-0018）：HTTPS；每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新；私钥只在需要维护者审批的发布环境中使用；不防发布账号本身被攻破 |
 | 应用文件被篡改 | 替换应用内的 asar、bundle 或 node | app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏；对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）；安装位置使用系统默认目录，依靠文件系统权限 |
-| 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）；Core 以最小环境启动内置 node（不传 `DYLD_*`）；内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`，同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
+| 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`，主程序另给语音输入用的 `device.audio-input`，ADR-0096），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）；Core 以最小环境启动内置 node（不传 `DYLD_*`）；内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`，同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
 | 应用被当作通用运行时滥用 | 攻击者借 PiArc 的可执行文件执行任意脚本（`ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port`） | 发布构建关闭对应 fuses（ADR-0018）；Agent Host 用独立的 node，不依赖这些开关；发布构建拒绝 Chromium 的远程调试开关（T45） |
 | 恶意链接与导航 | 诱导用户点击链接，或让应用窗口导航到外部页面 | 应用窗口禁止导航到应用自身协议以外的地址；仅允许绑定工作台的一次性工具窗口，其余新窗口拒绝；外部链接确认后交给系统浏览器，且只放行 `https:`、`http:`、`mailto:` |
 | 恶意仓库的 Git 配置 | 克隆的仓库在 `.git/config` 或 `.gitattributes` 里设置 `core.fsmonitor`、`core.hooksPath`、filter、外部 diff、textconv 与 pager，Git 面板一打开就读取状态与 diff | Git 面板的只读查询用命令行覆盖关闭 fsmonitor、hooks、外部 diff、textconv 与 pager，清空仓库配置的全部 filter，只带最小环境、不继承 `GIT_*` 变量（ADR-0085）；暂存、提交、检出、推送等写操作照常运行仓库的 hooks 与 filter，只在受信任的项目里执行；网络操作不弹终端或图形凭据提示，不继承带凭据的环境变量，远程地址里的用户信息在日志中脱敏；丢失工作的操作（回滚、强制检出、强制推送、删除未合并分支）经主进程原生确认并展示 Core 读到的事实，强制推送只用带期望提交的 `--force-with-lease`，受保护分支不强推 |
 | 浏览器外传与本机服务访问 | 智能体驱动的网页把会话里的数据发到外部站点，探测并访问本机与内网服务，或借上传与下载搬运文件 | 智能体控制的 Space 里每个请求经请求闸门：文档与框架的新主机经 Core 的站点卡并绑定正在运行的那次调用，未获准的子资源被拦截并写进本次结果（ADR-0089）；本机端口只放行用户打开过的、本会话进程树监听的与启动配置声明的，PiArc 自己的端口一律拒绝；全部 guest 的网络经 Core 的浏览器代理，协议与链路本地地址在主进程的请求规则里拒绝（ADR-0088）；脚本宿主是不能联网的沙箱页面，SDK 只经主进程的 CDP 代理访问本 Space 的标签，页面命令走允许名单（ADR-0091）；上传与保存下载经 Core 的读写裁决，工作区外与受保护路径询问，不覆盖已有文件，保存的文件带来自互联网的标记 |
 | 浏览器凭据 | 网页的登录态（含从 Chrome 导入的 cookie）被智能体拿来以用户身份操作，或在导入与存储时泄露 | 每个工作区一个浏览器分区，与应用窗口和其他工作区的会话数据分开（ADR-0088）；从 Chrome 导入只在用户逐站勾选并经主进程原生确认后进行，导入的站点在智能体访问时每个会话都经站点卡询问，规则与跳过权限都不放行（ADR-0090）；解密后的 cookie 只经 Core 交给主进程写进分区，不进渲染进程与日志，用后清零；Windows 上持久分区的 cookie 由 Chromium 以 DPAPI 保护，沙箱外同一用户的进程能解开 |
+| 麦克风与听写内容 | 智能体启动的进程或其他窗口借 PiArc 的麦克风授权录音，或读到听写的文字 | 麦克风授权只由主进程在用户点击后请求：窗口可见且有近期真实输入，系统拒绝后不再弹出（ADR-0096）；听写事件只送到发起窗口的路由，其他窗口订阅被拒；Agent Host 及其后代与沙箱内命令的 Seatbelt 配置拒绝麦克风与摄像头，macOS 上只有主程序带 `device.audio-input`；音频只在内存中处理、不写文件，识别文字与词汇不写日志；未进沙箱的 Bash、hooks 与用户终端继承应用的麦克风授权，作为已接受的风险登记 |
+| 语音模型篡改 | 被替换的语音运行库或模型在主进程里执行代码或给出错误的识别 | 内置的运行库与模型由锁文件固定大小与 SHA-256，打包后的布局检查逐个核对（ADR-0095）；Core 加载前核对大小与 SHA-256，不符时不加载并提示修复（ADR-0094）；增强模型只从固定修订的 ModelScope 地址经 HTTPS 下载，每一跳检查主机、直连时检查地址，核对大小与 SHA-256 后才启用（ADR-0097） |
 
 ### 10.2 项目信任
 
@@ -1642,8 +1646,9 @@ T44 起每一行都由 `scripts/perf/` 自动测量（方法、口径与本机�
 | AHP 往返（小文件 fs 操作） | macOS p95 ≤ 5 ms；Windows p95 ≤ 15 ms（ADR-0041，W1） | 0.19–0.22 ms；T44：0.25 ms | W0 ≤ 5 ms（数值未记录）；W1 在 ADR-0036 之后单独运行 5.04 ms、全量 `cargo test` 中 9.32 ms | 契约测试中计时 |
 | 无需用户参与的权限裁决 | macOS p95 ≤ 2 ms；Windows p95 ≤ 10 ms（ADR-0040，W1） | p95 0.526 ms，1,000 次（T20，含路径、配置、信任及 SQLite 审计）；T23 加入规则集、复合 Bash 分析与程序解析后 p95 0.70 ms（调试构建，1,000 次）；T44：p95 0.69 ms（release，1,000 次） | p95 3.35 ms（CI 运行 44453549786）；实机 8.4–8.9 ms（W1，Defender 实时保护开启；均为 T23 之前的代码） | Core 基准测试 `tool_io::policy::tests::automatic_decision_latency` |
 | 终端键入回显的额外延迟（相对直接写 PTY） | p95 ≤ 5 ms | 0.76 ms（逐对相减 0.79 ms）；T34 渲染器 0.67 ms（逐对相减 0.68 ms）；T44：0.67 ms | −0.85 ms（逐对相减 6.86 ms） | 两组样本各 ≥ 1,000 个，取"完整路径 p95 − 直接写 PTY p95"；逐对相减在 ConPTY 下会叠加两次独立往返的抖动 |
-| 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB | 168.8 MB；T44：176.2 MB（裁剪前 180.5 MB） | **超出**：225.3 MB（开发构建） | 构建产物 |
-| 安装后体积 | ≤ 450 MB | 449.0 MB（余约 1 MB）；T44：446.6 MB（裁剪前 466.3 MB：去掉 npm 文档与 man、Electron 中英文以外的语言包，strip Core 的本地符号，I41） | **超出**：521.3 MB | 构建产物 |
+| 安装包体积（macOS arm64 DMG / Windows x64 安装包） | ≤ 200 MB（判定扣除内置语音资产，ADR-0095） | 168.8 MB；T44：176.2 MB（裁剪前 180.5 MB） | **超出**：225.3 MB（开发构建） | 构建产物 |
+| 安装后体积 | ≤ 450 MB（判定扣除 `speech/`，ADR-0095） | 449.0 MB（余约 1 MB）；T44：446.6 MB（裁剪前 466.3 MB：去掉 npm 文档与 man、Electron 中英文以外的语言包，strip Core 的本地符号，I41） | **超出**：521.3 MB | 构建产物 |
+| 内置语音资产（`Resources/speech/`） | 安装后 ≤ 230 MB；安装包增量 ≤ 190 MB（ADR-0095） | 安装后 202 MB（运行库 31 MB，X-ASR 与 VAD 171 MB，开发构建） | 未测 | 构建产物：语音目录的文件合计；安装包增量取同一个 `.app` 有无语音目录两次出 DMG 之差 |
 | 空闲 CPU | 窗口可见与隐藏时，应用全部进程加 Agent Host 合计 ≤ 5%（一个核心的百分比，60 s 平均），无轮询；窗口隐藏时页面无 rAF 回调、终端无帧（原：接近 0%） | 未测（终端：空闲视图停拉、不跑 rAF，面板隐藏与窗口最小化时拉帧 0 次，T34 L4 计数）；T44：可见 3.6%、隐藏 3.5%（GPU 进程约 1.7–1.8%、渲染进程约 1.5%），隐藏时 rAF 回调 0、终端帧 0 | 未测 | 会话打开、终端面板显示 shell、什么都不运行，`getAppMetrics()` 的累计 CPU 时间加 Agent Host 的 `ps` / CIM 读数 |
 | Agent Host 崩溃后恢复 | ≤ 3 s | 未测（S9 验证了流程，首次退避 1 s）；T44：1.44 s（3 次中位） | 未测 | 故障注入：回合空闲时杀进程，到同一会话对新提示作答 |
 | 渲染进程崩溃或重载后恢复 | ≤ 2 s，会话不中断 | T44：重载 0.22 s、崩溃（主进程自动重载）0.21 s，回合继续、mock 请求数不变 | 未测 | 故障注入：流式回合中重载或使渲染进程崩溃，到新文档的 transcript 可见 |
@@ -1925,6 +1930,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.72 | 2026-11-26 | 第 5.4 节：同一服务商多个账号、连接测试、服务商启停与端点模型列表；保险箱新增只给 Core 的 `account/` 键（ADR-0083）。 |
 | 2.73 | 2026-11-25 | Git 工具（ADR-0084、ADR-0085、ADR-0086）：第 4 章新增三条 ADR，ADR-0044 第 8 条被 ADR-0084 取代；6.9 节说明 Changes 面板成为 Git 工具的"本会话"范围；7.6 节 `gitRequest`、`cancelGit` 与事件 `core/git`；7.7 节 Git diff 的来源、上限与按 hunk 暂存；8.2 节 Git 工具、提交视图、分支弹窗与设置页；10.1 节新增威胁"恶意仓库的 Git 配置"（THR-15）。 |
 | 2.74 | 2026-11-26 | 内置浏览器（ADR-0088–0093，[设计增补](addenda/browser.md)）：第 4 章新增六条 ADR；5.4、8.5、10.3 写明浏览器 guest 不属于应用窗口；10.1 THR-13 第一条改为"应用窗口"；ADR-0013 增加浏览器平台集成、ADR-0021 增加浏览器分区 cookie 的例外。THR-16、THR-17 与第 7.1、8.1 节的模块表随实现落地补入。 |
+| 2.76 | 2026-11-26 | 语音输入（ADR-0094–0097，[设计增补](addenda/voice-dictation.md)）：7.1 节新增 `piarc-speech` 与 `sherpa-onnx-sys`（目录 `piarc-sherpa-sys`）并列入依赖链与单向例外；8.2 节 composer 写明发送键左侧的语音输入；第 11 章安装包与安装后两行判定扣除内置语音资产，新增"内置语音资产"一行（安装后 ≤ 230 MB、安装包增量 ≤ 190 MB，ADR-0095）；10.1 节 THR-14 的 entitlements 写明主程序另有 `device.audio-input`，新增威胁"麦克风与听写内容"（THR-18）与"语音模型篡改"（THR-19），对策与测试见 `tests/security/threats.yaml`。 |
 | 2.75 | 2026-11-26 | 内置浏览器落地：7.1 节新增 `piarc-browser-import` 并列入依赖链；8.1 节新增"内置浏览器"（`src/main/browser/`）与"脚本宿主"（`src/browser-host/`）两行，渲染进程模块加 `browser`；10.1 节新增威胁"浏览器外传与本机服务访问"（THR-16）与"浏览器凭据"（THR-17），对策与测试见 `tests/security/threats.yaml`。 |
 | 2.70 | 2026-11-25 | 第 16 章：M3 的内存退出标准在 Windows 上按 ADR-0063 的口径复测达标（W3 收尾）。 |
 | 2.69 | 2026-11-25 | 第 8.2 节：会话状态徽标改用参考的安静小标记，等待为带细环的圆点以保留形状区分（ADR-0081）。 |

@@ -35,7 +35,7 @@ const { decodeIpcError } = await import('../../shared/ipc-error.js');
 type Handler = (event: { sender: unknown }, args: unknown[]) => unknown;
 
 describe('the dictation route', () => {
-  it('lets only the starting window observe its dictation (THR-18)', () => {
+  it('THR-18 lets only the starting window observe its dictation', () => {
     expect(mayObserveDictation(7, 'dictation/7')).toBe(true);
     expect(mayObserveDictation(8, 'dictation/7')).toBe(false);
     expect(mayObserveDictation(7, 'dictation/7/x')).toBe(false);
@@ -167,7 +167,7 @@ describe('the dictation commands', () => {
     return undefined;
   }
 
-  it('takes the window id from the sender, never from the page', async () => {
+  it('THR-18 takes the window id from the sender, never from the page', async () => {
     window = { visible: true, minimized: false };
     const s = setup({ microphone: 'granted' });
     await s.call(IPC_CHANNELS.dictationStart, { composer: 'session:a', windowId: 99 });
@@ -178,7 +178,7 @@ describe('the dictation commands', () => {
     });
   });
 
-  it('asks for the microphone once and not again after a refusal', async () => {
+  it('THR-18 asks for the microphone once and not again after a refusal', async () => {
     window = { visible: true, minimized: false };
     const s = setup({ microphone: 'not-determined', grant: false });
     expect(await code(s.call(IPC_CHANNELS.dictationStart, { composer: 'session:a' }))).toBe(
@@ -198,7 +198,7 @@ describe('the dictation commands', () => {
     expect(s.started).toHaveLength(1);
   });
 
-  it('needs recent real input and a visible window', async () => {
+  it('THR-18 needs recent real input and a visible window', async () => {
     window = { visible: true, minimized: false };
     const noInput = setup({ microphone: 'granted', input: false });
     expect(await code(noInput.call(IPC_CHANNELS.dictationStart, { composer: 'session:a' }))).toBe(

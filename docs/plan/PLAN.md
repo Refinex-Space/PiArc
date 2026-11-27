@@ -379,7 +379,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 3. `piarc-speech` 纯模块：音频、词汇、文本规范化、状态机、分段协调器。
 - [x] 4. 引擎线程、采集、在线识别、真实模型测试。
 - [x] 5. 协议、Core `dictation`、NAPI、文件音源。
-- [ ] 6. 主进程 IPC、授权端口、路由授权、生命周期、Info.plist 与 entitlement、Seatbelt。
+- [x] 6. 主进程 IPC、授权端口、路由授权、生命周期、Info.plist 与 entitlement、Seatbelt。
 - [x] 7. 渲染进程：听写插件与控制器、麦克风按钮、听写条与波形、Composer 接入。
 - [x] 8. 设置页"语音输入"与偏好 `voiceDictation`。
 - [x] 9. 下载器、增强模型管理、精修与保守合并。

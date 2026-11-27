@@ -5,7 +5,7 @@
 // app.asar (packaging/agent-host-layout.mjs) and, on macOS, redoes the ad-hoc signatures in
 // layers (packaging/macos-sign.mjs); `make` adds the DMG and ZIP.
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -24,6 +24,7 @@ import {
   resourcesDirOf,
 } from './packaging/agent-host-layout.mjs';
 import { embedAppIntents } from './packaging/app-intents.mjs';
+import { copySpeechAssets, SPEECH_DIR } from './packaging/speech-layout.mjs';
 import { MakerHdiutilDmg } from './packaging/maker-dmg.mjs';
 import { copyVelopackRuntime } from './packaging/velopack-runtime.mjs';
 import { resealElectron, signResourcesAndBundle } from './packaging/macos-sign.mjs';
@@ -81,14 +82,42 @@ async function finishPackage(outputPath: string, platform: string, arch: string)
     await embedAppIntents(repoRoot, app, arch);
   }
   const agentHost = await copyAgentHostResources({ repoRoot, resourcesDir, platform, arch });
+  const speechBytes = await copySpeechAssets({ repoRoot, resourcesDir, platform, arch });
+  console.log(
+    `copied ${String(Math.round(speechBytes / 1_000_000))} MB of speech assets to ${SPEECH_DIR}/`,
+  );
+  if (platform === 'darwin') await writeMicrophonePurposes(resourcesDir);
   if (platform === 'darwin') {
     const nodeDir = path.join(agentHost, 'node');
+    // The speech libraries keep their upstream ad-hoc signatures: re-signing rewrites their
+    // bytes, and Core loads them only when they hash to the lock file's values (ADR-0094).
+    const speechRuntime = path.join(resourcesDir, SPEECH_DIR, 'runtime');
     const signed = await signResourcesAndBundle(path.join(outputPath, `${appName}.app`), {
-      keepSigned: [nodeDir],
+      keepSigned: [nodeDir, speechRuntime],
     });
     console.log(
       `ad-hoc signed ${String(signed.length)} Mach-O files in Resources; ` +
-        `${path.join(AGENT_HOST_DIR, agentHostLayout(platform).node)} keeps its own signature`,
+        `${path.join(AGENT_HOST_DIR, agentHostLayout(platform).node)} and ` +
+        `${path.join(SPEECH_DIR, 'runtime')} keep their own signatures`,
+    );
+  }
+}
+
+/**
+ * The microphone permission's purpose in the app's other language (the English one is
+ * `NSMicrophoneUsageDescription` in Info.plist): macOS shows it in the system's request.
+ */
+async function writeMicrophonePurposes(resourcesDir: string): Promise<void> {
+  const purposes: Readonly<Record<string, string>> = {
+    zh_CN: 'PiArc 使用麦克风把你的语音在本机转成文字，录音不会保存或发送。',
+  };
+  for (const [locale, text] of Object.entries(purposes)) {
+    const dir = path.join(resourcesDir, `${locale}.lproj`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      path.join(dir, 'InfoPlist.strings'),
+      `"NSMicrophoneUsageDescription" = "${text}";\n`,
+      'utf8',
     );
   }
 }
@@ -117,6 +146,9 @@ const config: ForgeConfig = {
     // Velopack hooks (src/main/platform/windows-shell.ts, ADR-0052).
     protocols: [{ name: 'PiArc', schemes: ['piarc'] }],
     extendInfo: {
+      // Voice dictation (ADR-0096): the purpose macOS shows when it asks for the microphone.
+      NSMicrophoneUsageDescription:
+        'PiArc uses the microphone to turn your speech into text on this Mac. Recordings are not kept or sent.',
       CFBundleDocumentTypes: [
         {
           CFBundleTypeName: 'Folder',

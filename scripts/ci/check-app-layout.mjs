@@ -13,12 +13,18 @@
 // - Resources/agent-host/ holds node, npm, npx, the bundle, pi-assets/package.json, the
 //   bundle's external packages, rg and fd, as real files outside app.asar; app.asar holds none
 //   of them; the Core module is in app.asar.unpacked/native/.
+// - Resources/speech/ holds exactly the files of third-party/speech-assets.lock.json for the
+//   target, each with its size and SHA-256, and no test WAVs; only a development Core carries
+//   the WAV source that replaces the microphone in L4 (ADR-0094, ADR-0095).
 // - macOS: `codesign --verify --deep --strict` passes for the app; the app is ad-hoc signed
-//   with the hardened runtime and exactly the entitlements of entitlements.mac.plist; node
-//   keeps the Node.js Foundation's Developer ID signature; rg, fd and the Core module are
-//   ad-hoc signed.
+//   with the hardened runtime and exactly the entitlements of entitlements.main.mac.plist (the
+//   base list plus the microphone), every Electron helper exactly those of entitlements.mac.plist
+//   (no microphone, ADR-0096); Info.plist states why it needs the microphone; node keeps the
+//   Node.js Foundation's Developer ID signature; rg, fd and the Core module are ad-hoc signed;
+//   the speech libraries keep their upstream ad-hoc signatures (the hash check above).
 // Exit code 0 when every check passes.
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -34,7 +40,9 @@ import {
   AGENT_HOST_EXTERNALS,
   agentHostLayout,
 } from '../../apps/desktop/packaging/agent-host-layout.mjs';
-import { ENTITLEMENTS } from '../../apps/desktop/packaging/macos-sign.mjs';
+import { ENTITLEMENTS, MAIN_ENTITLEMENTS } from '../../apps/desktop/packaging/macos-sign.mjs';
+import { SPEECH_DIR } from '../../apps/desktop/packaging/speech-layout.mjs';
+import { bundledSpeechFiles, readSpeechLock } from '../dev/fetch-speech-assets.mjs';
 import {
   CHUNK_DIR,
   entrySource,
@@ -152,6 +160,40 @@ export function testPageChunks(paths) {
   return paths.filter((p) => /[\\/]test-pages-[^\\/]*\.js$/.test(p));
 }
 
+/** The marker of the development WAV source (`piarc_speech::wav_source::MARKER`). */
+export const WAV_SOURCE_MARKER = 'piarc-speech-test-wav-source';
+
+/**
+ * Checks `Resources/speech/` against the lock: every bundled file with its size and SHA-256,
+ * nothing else (no test WAVs).
+ * @param {string} resources
+ * @param {string} target `<platform>-<arch>`
+ * @returns {{ problems: string[], files: string[] }}
+ */
+export function checkSpeechAssets(resources, target) {
+  const dir = path.join(resources, SPEECH_DIR);
+  const expected = bundledSpeechFiles(readSpeechLock(), target);
+  const problems = [];
+  for (const entry of expected) {
+    const file = path.join(dir, ...entry.to.split('/'));
+    if (!existsSync(file)) {
+      problems.push(`${entry.to} missing`);
+      continue;
+    }
+    const bytes = readFileSync(file);
+    const sha = createHash('sha256').update(bytes).digest('hex');
+    if (bytes.length !== entry.size || sha !== entry.sha256) {
+      problems.push(`${entry.to}: ${String(bytes.length)} bytes, sha256 ${sha}`);
+    }
+  }
+  const listed = new Set(expected.map((e) => path.join(dir, ...e.to.split('/'))));
+  const files = existsSync(dir) ? walk(dir).filter((p) => lstatSync(p).isFile()) : [];
+  for (const file of files) {
+    if (!listed.has(file)) problems.push(`unexpected ${path.relative(dir, file)}`);
+  }
+  return { problems, files };
+}
+
 /**
  * Runs every check against one packaged app; with `flavor`, also whether its Core has the
  * testing exports that flavor should (or should not) have.
@@ -234,6 +276,23 @@ export function checkAppLayout({ app, platform, arch, flavor }) {
     }
   }
 
+  const speech = checkSpeechAssets(resources, `${platform}-${arch}`);
+  add(
+    'speech/ holds exactly the locked runtime and models (sizes, SHA-256, no test WAVs)',
+    speech.problems.length === 0,
+    speech.problems.join('; ') || `${String(speech.files.length)} files`,
+  );
+  if (flavor !== undefined && existsSync(core)) {
+    const marker = readFileSync(core).includes(WAV_SOURCE_MARKER);
+    add(
+      flavor === 'release'
+        ? 'release Core has no WAV source in place of the microphone'
+        : 'development Core has the WAV source for L4',
+      marker === (flavor !== 'release'),
+      `marker present: ${String(marker)}`,
+    );
+  }
+
   if (flavor !== undefined && existsSync(asar)) {
     // The renderer's test pages (event probe, transcript and terminal prototypes) are a chunk
     // of their own that only the development flavor emits (T45, I13, I24, I30).
@@ -281,12 +340,43 @@ export function checkAppLayout({ app, platform, arch, flavor }) {
   add('app: ad-hoc signature', appSig.info.adhoc, appSig.output.trim());
   add('app: hardened runtime', appSig.info.flags.includes('runtime'), appSig.info.flags.join(','));
   const entitlements = codesign(['-d', '--entitlements', '-', '--xml', app]);
-  const expected = entitlementKeys(readFileSync(ENTITLEMENTS, 'utf8'));
+  const expected = entitlementKeys(readFileSync(MAIN_ENTITLEMENTS, 'utf8'));
   const actual = entitlementKeys(entitlements.output);
   add(
-    'app: entitlements match entitlements.mac.plist',
+    'app: entitlements match entitlements.main.mac.plist (with the microphone)',
     JSON.stringify(actual) === JSON.stringify(expected),
     `actual: ${actual.join(', ')}; expected: ${expected.join(', ')}`,
+  );
+  const base = entitlementKeys(readFileSync(ENTITLEMENTS, 'utf8'));
+  const frameworks = path.join(app, 'Contents', 'Frameworks');
+  const helpers = existsSync(frameworks)
+    ? readdirSync(frameworks)
+        .filter((name) => name.endsWith('.app'))
+        .map((name) => path.join(frameworks, name))
+    : [];
+  const helperProblems = helpers.flatMap((helper) => {
+    const keys = entitlementKeys(
+      codesign(['-d', '--entitlements', '-', '--xml', helper]).output,
+    );
+    return JSON.stringify(keys) === JSON.stringify(base)
+      ? []
+      : [`${path.basename(helper)}: ${keys.join(', ')}`];
+  });
+  add(
+    'helpers: entitlements match entitlements.mac.plist (no microphone)',
+    helpers.length > 0 && helperProblems.length === 0,
+    helperProblems.join('; ') || `${String(helpers.length)} helpers`,
+  );
+  const info = readFileSync(path.join(app, 'Contents', 'Info.plist'), 'utf8');
+  const purpose = /<key>NSMicrophoneUsageDescription<\/key>\s*<string>([^<]+)<\/string>/.exec(info);
+  const localized = path.join(resources, 'zh_CN.lproj', 'InfoPlist.strings');
+  add(
+    'Info.plist: the microphone purpose (English, and Chinese in zh_CN.lproj)',
+    purpose !== null &&
+      purpose[1]?.includes('PiArc') === true &&
+      existsSync(localized) &&
+      readFileSync(localized, 'utf8').includes('NSMicrophoneUsageDescription'),
+    purpose?.[1] ?? 'missing',
   );
 
   const node = path.join(agentHost, layout.node);
@@ -307,6 +397,9 @@ export function checkAppLayout({ app, platform, arch, flavor }) {
     ['rg', path.join(agentHost, layout.rg)],
     ['fd', path.join(agentHost, layout.fd)],
     ['Core module', core],
+    ...speech.files
+      .filter((file) => file.endsWith('.dylib'))
+      .map((file) => /** @type {[string, string]} */ ([path.basename(file), file])),
   ])) {
     const sig = signatureOf(file);
     const ok =

@@ -5,12 +5,21 @@
 // directory Velopack installs on Windows), counted file by file without following links. MB is
 // 10^6 bytes.
 //
+// ADR-0095: the voice dictation assets (`speech/` under the resources) have a budget of their
+// own and the two existing rows are judged without them. Installed: the speech directory's
+// files. Installer (macOS): the same `.app` made into a DMG the way the DMG maker does (HFS+,
+// ULFO), once as it is and once without `speech/`; the difference is the speech share of the
+// installer. Windows: the speech files deflated at level 9 (Velopack packs deflate), an
+// estimate of the same share.
+//
 //   node scripts/perf/probe-size.mjs --out <file.json>
-import { lstat, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { deflateRawSync } from 'node:zlib';
 
-import { isMain, repoRoot } from '../lib/repo.mjs';
+import { isMain, repoRoot, run } from '../lib/repo.mjs';
 import { MB } from './lib.mjs';
 
 const OUT = path.join(repoRoot, 'apps', 'desktop', 'out', 'release');
@@ -47,6 +56,57 @@ async function find(dir, pattern) {
   return undefined;
 }
 
+/**
+ * Bytes of a DMG made like the DMG maker's from a copy of `app`, with or without `speech/`.
+ * @param {string} app the `.app`
+ * @param {boolean} withSpeech
+ * @returns {Promise<number>}
+ */
+async function dmgBytes(app, withSpeech) {
+  const staging = await mkdtemp(path.join(os.tmpdir(), 'piarc-size-'));
+  try {
+    const copy = path.join(staging, 'source', path.basename(app));
+    await mkdir(path.dirname(copy), { recursive: true });
+    if ((await run('ditto', [app, copy])) !== 0) throw new Error('ditto failed');
+    if (!withSpeech)
+      await rm(path.join(copy, 'Contents', 'Resources', 'speech'), { recursive: true });
+    const dmg = path.join(staging, 'probe.dmg');
+    const code = await run('hdiutil', [
+      'create',
+      '-quiet',
+      '-volname',
+      'PiArc',
+      '-srcfolder',
+      path.dirname(copy),
+      '-fs',
+      'HFS+',
+      '-format',
+      'ULFO',
+      '-ov',
+      dmg,
+    ]);
+    if (code !== 0) throw new Error('hdiutil create failed');
+    return (await lstat(dmg)).size;
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Bytes of the files under `dir` deflated at level 9.
+ * @param {string} dir
+ * @returns {Promise<number>}
+ */
+async function deflatedBytes(dir) {
+  let total = 0;
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) total += await deflatedBytes(full);
+    else total += deflateRawSync(await readFile(full), { level: 9 }).length;
+  }
+  return total;
+}
+
 export async function measure() {
   const arch = process.arch;
   const installer =
@@ -58,15 +118,31 @@ export async function measure() {
   }
   const appDir = path.join(OUT, `PiArc-${process.platform}-${arch}`);
   const installed = process.platform === 'darwin' ? path.join(appDir, 'PiArc.app') : appDir;
+  const speech =
+    process.platform === 'darwin'
+      ? path.join(installed, 'Contents', 'Resources', 'speech')
+      : path.join(installed, 'resources', 'speech');
+  const speechInstalled = await directoryBytes(speech);
+  const speechInstaller =
+    process.platform === 'darwin'
+      ? (await dmgBytes(installed, true)) - (await dmgBytes(installed, false))
+      : await deflatedBytes(speech);
+  const installerBytes = (await lstat(installer)).size;
+  const installedBytes = await directoryBytes(installed);
   return {
     values: {
-      'installer-size': (await lstat(installer)).size / MB,
-      'installed-size': (await directoryBytes(installed)) / MB,
+      'installer-size': (installerBytes - speechInstaller) / MB,
+      'installed-size': (installedBytes - speechInstalled) / MB,
+      'speech-installed-size': speechInstalled / MB,
+      'speech-installer-delta': speechInstaller / MB,
     },
     samples: 1,
     detail: {
       installer: path.relative(repoRoot, installer),
       installed: path.relative(repoRoot, installed),
+      installerTotal: installerBytes / MB,
+      installedTotal: installedBytes / MB,
+      speechInstallerMethod: process.platform === 'darwin' ? 'dmg difference' : 'deflate estimate',
     },
   };
 }
