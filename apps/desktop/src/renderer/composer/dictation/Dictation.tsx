@@ -134,6 +134,7 @@ export function MicButton({
     case 'recording':
       return (
         <IconButton
+          key="stop"
           label={t('dictation.stop')}
           keys="Escape"
           size="sm"
@@ -152,6 +153,7 @@ export function MicButton({
     case 'finalizing':
       return (
         <IconButton
+          key="busy"
           label={t(ui.kind === 'finalizing' ? 'dictation.finishing' : 'dictation.cancelPreparing')}
           size="sm"
           className="composer-mic is-busy"
@@ -169,6 +171,7 @@ export function MicButton({
     case 'error':
       return (
         <IconButton
+          key="start"
           label={t('dictation.start')}
           size="sm"
           className="composer-mic"

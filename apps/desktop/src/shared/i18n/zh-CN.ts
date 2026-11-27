@@ -2904,7 +2904,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'browserSettings.devtools.right': '右侧',
   'settings.voice': '语音输入',
   'settings.voice.intro': '在输入框中用语音输入文字。识别在本机完成，音频与文字不会离开这台电脑。',
-  'settings.voice.general': '语音输入',
+  'settings.voice.general': '基本设置',
+  'settings.voice.models': '模型',
   'settings.voice.enabled': '开启语音输入',
   'settings.voice.enabledHint':
     '在发送按钮旁显示麦克风按钮。关闭后会停止正在进行的听写并释放语音模型。',

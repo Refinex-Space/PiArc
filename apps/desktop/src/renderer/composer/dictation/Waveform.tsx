@@ -6,6 +6,16 @@ import { useEffect, useRef } from 'react';
 
 import type { Levels } from './levels.js';
 
+/** The quietest level drawn above the floor, in dBFS. */
+const FLOOR_DB = -55;
+
+/** A peak (0–1) as 0–1 on a decibel scale from `FLOOR_DB` to 0 dBFS. */
+export function loudness(peak: number): number {
+  if (!(peak > 0)) return 0;
+  const db = 20 * Math.log10(Math.min(1, peak));
+  return Math.max(0, Math.min(1, (db - FLOOR_DB) / -FLOOR_DB));
+}
+
 /** Bar width and gap in CSS px. */
 const BAR = 2;
 const GAP = 2;
@@ -62,8 +72,10 @@ export function Waveform({
       context.fillStyle = getComputedStyle(element).color;
       const middle = height / 2;
       for (let i = 0; i < values.length; i += 1) {
-        // A floor keeps silence visible as a flat line; speech scales up to the full height.
-        const amplitude = Math.min(1, Math.sqrt(values[i] ?? 0) * 1.4);
+        // Loudness on a decibel scale, as level meters draw it: a microphone's speech peaks
+        // around -30 to -10 dBFS, which a linear scale would flatten into the floor. A floor
+        // keeps silence visible as a flat line.
+        const amplitude = loudness(values[i] ?? 0);
         const bar = Math.max(BAR, amplitude * (height - 2));
         const x = i * (BAR + GAP);
         context.beginPath();

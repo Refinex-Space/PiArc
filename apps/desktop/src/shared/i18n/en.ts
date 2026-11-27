@@ -3014,7 +3014,8 @@ export const en = {
   'settings.voice': 'Voice input',
   'settings.voice.intro':
     'Dictate into the message box. Speech is recognized on this computer; audio and text never leave it.',
-  'settings.voice.general': 'Voice input',
+  'settings.voice.general': 'Basics',
+  'settings.voice.models': 'Models',
   'settings.voice.enabled': 'Turn on voice input',
   'settings.voice.enabledHint':
     'Shows the microphone button next to send. Turning it off stops any dictation and frees the speech models.',

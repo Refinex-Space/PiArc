@@ -334,7 +334,7 @@ export function VoicePage() {
         <MicrophoneTest disabled={!voice.enabled} />
       </Section>
 
-      <Section title={t('settings.voice.mode')} testId="voice-mode">
+      <Section title={t('settings.voice.models')} testId="voice-mode">
         <fieldset className="setting">
           <legend id={modeLabel} className="setting-label">
             {t('settings.voice.mode')}

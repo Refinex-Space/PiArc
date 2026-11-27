@@ -193,6 +193,19 @@ fn partials_arrive_before_the_end_and_the_last_words_are_kept() {
         "{:?}",
         partial.duration_since(recording)
     );
+    // The waveform shows speech: some 40 ms windows peak well above silence.
+    let peaks: Vec<f64> = recorder
+        .snapshot()
+        .into_iter()
+        .filter_map(|(_, e)| match e {
+            DictationEvent::Level { envelope, .. } => envelope.into_iter().reduce(f64::max),
+            _ => None,
+        })
+        .collect();
+    let loudest = peaks.iter().copied().fold(0.0, f64::max);
+    println!("0.wav: {} level windows, loudest {loudest:.3}", peaks.len());
+    assert!(peaks.len() > 200, "{} level windows", peaks.len());
+    assert!(loudest > 0.1, "levels stay near silence: {loudest}");
     let text = recorder.finals().concat().to_lowercase();
     println!("0.wav: {text}");
     for expected in ["昨天是", "monday", "星期三"] {
