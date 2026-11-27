@@ -1,16 +1,35 @@
 // The rail's Git card (SPEC A7.2): in a repository, the branch with ahead and behind and the
 // uncommitted files with their line counts; elsewhere the session's own changes as before.
-// "Open" shows the Git tool. The status is read when the card first shows and follows the
-// panel's refreshes (the same per-session state).
+// The heading's icon and the branch row show the Git tool. The status is read when the card
+// first shows and follows the panel's refreshes (the same per-session state).
 import { useEffect } from 'react';
 
-import { useApp } from '../../app/app-context.js';
-import { GitBranchIcon } from '../../shell/icons.js';
+import { useApp, useT } from '../../app/app-context.js';
+import { IconButton } from '../../app/IconButton.js';
+import { GitBranchIcon, OpenToolIcon } from '../../shell/icons.js';
 import { revealBidi } from '../../transcript/reveal.js';
 import { ChangesCard } from '../ChangesPanel.js';
 import { openChangesPanel } from '../panel-state.js';
 import { useAutoFetch } from './auto-fetch.js';
 import { gitSession, useGit } from './state.js';
+
+/** The card heading's action: shows the Git tool. */
+export function OpenGitAction() {
+  const t = useT();
+  return (
+    <IconButton
+      size="xs"
+      label={t('changes.open')}
+      keys="Mod+Shift+D"
+      data-testid="changes-open"
+      onClick={() => {
+        openChangesPanel();
+      }}
+    >
+      <OpenToolIcon size={12} />
+    </IconButton>
+  );
+}
 
 export function GitCard({ sessionId }: { readonly sessionId: string }) {
   const { t, preferences } = useApp();
@@ -34,7 +53,15 @@ export function GitCard({ sessionId }: { readonly sessionId: string }) {
   const branch = repo.detached ? `HEAD ${(repo.head ?? '').slice(0, 7)}` : (repo.branch ?? '');
   return (
     <div className="changes-card git-card" data-testid="git-card">
-      <div className="git-card-branch">
+      <button
+        type="button"
+        className="git-card-branch"
+        data-testid="git-card-branch"
+        data-tooltip={t('changes.open')}
+        onClick={() => {
+          openChangesPanel();
+        }}
+      >
         <GitBranchIcon size={12} />
         <span className="git-branch-name">{revealBidi(branch)}</span>
         {repo.upstream === undefined ? null : (
@@ -46,7 +73,7 @@ export function GitCard({ sessionId }: { readonly sessionId: string }) {
             {repo.behind > 0 ? ` ↓${String(repo.behind)}` : ''}
           </span>
         )}
-      </div>
+      </button>
       {status.files.length === 0 ? (
         <p className="muted">{t('git.card.clean')}</p>
       ) : (
@@ -58,16 +85,6 @@ export function GitCard({ sessionId }: { readonly sessionId: string }) {
           <span className="muted">{t('git.card.files', { count: status.files.length })}</span>
         </div>
       )}
-      <button
-        type="button"
-        className="button"
-        data-testid="changes-open"
-        onClick={() => {
-          openChangesPanel();
-        }}
-      >
-        {t('changes.open')}
-      </button>
     </div>
   );
 }

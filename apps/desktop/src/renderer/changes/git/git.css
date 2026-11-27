@@ -1185,10 +1185,24 @@
 .git-card-branch {
   display: flex;
   align-items: center;
+  justify-self: start;
   gap: var(--piarc-space-1);
   min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: var(--piarc-font-size-small);
   font-weight: var(--piarc-font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.git-card-branch:hover .git-branch-name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .git-settings {

@@ -7,7 +7,7 @@ import path from 'node:path';
 
 import type { Page, TestInfo } from '@playwright/test';
 
-import { expect, test } from './sessions.js';
+import { expect, row, test } from './sessions.js';
 import { idle, openSession, requests, send } from './t19.js';
 
 async function shoot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -64,8 +64,8 @@ test('usage ring levels, the context card and both ways to compact', async ({
   await expect(card).toContainText('Compacts automatically at 182,904 tokens');
   await shoot(page, info, 'ring-90-context-card');
 
-  // The card's button compacts like a bare /compact.
-  await card.getByTestId('context-compact').click();
+  // The card heading's icon compacts like a bare /compact.
+  await page.getByTestId('context-compact').click();
   await expect(page.getByTestId('compaction-row').last()).toHaveAttribute(
     'data-status',
     'completed',
@@ -97,4 +97,40 @@ test('usage ring levels, the context card and both ways to compact', async ({
   // The command is not a message to the model.
   expect(JSON.stringify(sent[5]?.body)).not.toContain('/compact Keep');
   await shoot(page, info, 'after-compact-focus');
+});
+
+test('a past session shows its context usage when opened, before any new message', async ({
+  page,
+  app,
+  workspaces,
+}, info) => {
+  const { id } = await openSession(app, page, workspaces, 'past usage', 't27-usage', 'First');
+  await idle(page);
+  const ring = page.getByTestId('usage-ring');
+  await expect(ring).toHaveAttribute('data-percent', '10');
+
+  // Archiving closes the session in Core; back in the list it is a past session, reopened as
+  // it is shown. (Not a restart: L4's in-memory keychain does not survive one.)
+  await page.getByTestId('new-session').click();
+  await page.evaluate(async (sid) => {
+    await window.piarc.setSessionArchived(sid, true);
+    await window.piarc.setSessionArchived(sid, false);
+  }, id);
+  await row(page, id).click();
+  await expect(ring).toHaveAttribute('data-percent', '10');
+  await ring.click();
+  const card = page.getByTestId('context-panel');
+  await expect(card.getByTestId('context-percent')).toHaveText('10% used');
+  await expect(card).toContainText('Reported by the provider');
+  // The heading's actions are icon buttons; the cards hold no buttons.
+  const compact = page.getByTestId('context-compact');
+  await expect(compact).toHaveAttribute('aria-label', 'Compact now');
+  await expect(compact).toBeEnabled();
+  await expect(card.locator('button')).toHaveCount(0);
+  await page.mouse.move(0, 0);
+  await expect(compact).toHaveCSS('opacity', '0');
+  await page.screenshot({ path: info.outputPath('past-session-rail.png') });
+  await page.locator('.rail-section[data-section="context"] .rail-heading').hover();
+  await expect(compact).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: info.outputPath('past-session-rail-hover.png') });
 });

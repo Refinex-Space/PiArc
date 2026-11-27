@@ -81,7 +81,7 @@ test('comments on diff lines go to the agent together, queued while it works', a
   await idle(page);
 
   await page.getByTestId('panel-tab-changes-card').click();
-  await page.getByTestId('changes-card').getByTestId('changes-open').click();
+  await page.getByTestId('changes-open').click();
   const notes = file(page, 'notes.ts');
   const made = file(page, 'src/made.ts');
   await expect(notes).toBeVisible();

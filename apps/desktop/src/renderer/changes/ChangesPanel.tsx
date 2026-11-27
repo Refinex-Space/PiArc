@@ -19,7 +19,6 @@ import { isSendKey } from './comments.js';
 import { DiffBody } from './DiffBody.js';
 import { CommentsBar, DiffCommentsProvider, useDiffCommentsState } from './DiffComments.js';
 import { languageOf } from './language.js';
-import { openChangesPanel } from './panel-state.js';
 import { revealBidi } from '../transcript/reveal.js';
 import { Button } from '../app/Button.js';
 import { PanelEmpty } from '../shell/PanelEmpty.js';
@@ -286,7 +285,7 @@ export function ChangesPanel({ sessionId }: { readonly sessionId: string }) {
   );
 }
 
-/** The rail's changes card: the totals and the way into the panel. */
+/** The rail's changes card: the totals (the heading's icon opens the panel). */
 export function ChangesCard({ sessionId }: { readonly sessionId: string }) {
   const t = useT();
   const state = useChanges(sessionId);
@@ -303,16 +302,6 @@ export function ChangesCard({ sessionId }: { readonly sessionId: string }) {
           <span className="muted">{t('changes.files', { count: view.files.length })}</span>
         </div>
       )}
-      <button
-        type="button"
-        className="button"
-        data-testid="changes-open"
-        onClick={() => {
-          openChangesPanel();
-        }}
-      >
-        {t('changes.open')}
-      </button>
     </div>
   );
 }

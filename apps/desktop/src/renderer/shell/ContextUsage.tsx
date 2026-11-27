@@ -1,12 +1,15 @@
 // The context usage of a session (T27, architecture section 8.2): the ring in the environment
-// bar (a hint at 75 %, a warning at 90 %) and the rail's context card with the percentage, the
-// breakdown by category and a button that compacts like `/compact` without a focus.
-import { useState } from 'react';
+// bar (a hint at 75 %, a warning at 90 %) and the rail's context card with the percentage and
+// the breakdown by category; the card's heading has an icon that compacts like `/compact`
+// without a focus (always shown from 75 %).
+import { useCallback, useSyncExternalStore } from 'react';
 import type { ContextUsage } from '@piarc/protocol';
 
 import { useApp, useT } from '../app/app-context.js';
+import { IconButton } from '../app/IconButton.js';
 import { CATEGORY_ORDER, levelOf, percentOf } from '../store/context-usage.js';
 import { useContextUsage, useTurnInfo } from '../store/hooks.js';
+import { CompactIcon, SpinnerGlyph } from './icons.js';
 import { showPanel } from './registry.js';
 import { reason } from './errors.js';
 
@@ -100,12 +103,61 @@ function AutoCompactLine({ usage }: { readonly usage: ContextUsage }) {
   );
 }
 
+/** Why the last compaction from the card's heading failed, per session: the heading's icon
+ * sets it, the card's body shows it. */
+const failures = new Map<string, string>();
+const failureListeners = new Set<() => void>();
+
+function setFailure(sessionId: string, failure: string | undefined): void {
+  if (failure === undefined) failures.delete(sessionId);
+  else failures.set(sessionId, failure);
+  for (const listener of [...failureListeners]) listener();
+}
+
+function useFailure(sessionId: string): string | undefined {
+  const subscribe = useCallback((listener: () => void) => {
+    failureListeners.add(listener);
+    return () => {
+      failureListeners.delete(listener);
+    };
+  }, []);
+  return useSyncExternalStore(
+    subscribe,
+    useCallback(() => failures.get(sessionId), [sessionId]),
+  );
+}
+
+/** The context card heading's action: compacts the conversation now. */
+export function CompactAction({ sessionId }: { readonly sessionId: string }) {
+  const t = useT();
+  const usage = useContextUsage(sessionId);
+  const turn = useTurnInfo(sessionId);
+  const level = levelOf(usage === undefined ? undefined : percentOf(usage));
+  return (
+    <IconButton
+      size="xs"
+      label={turn.compacting ? t('context.compacting') : t('context.compact')}
+      data-testid="context-compact"
+      data-attention={level === 'normal' ? undefined : level}
+      aria-busy={turn.compacting || undefined}
+      disabled={turn.running || usage === undefined}
+      onClick={() => {
+        setFailure(sessionId, undefined);
+        window.piarc.compact(sessionId).catch((error: unknown) => {
+          setFailure(sessionId, reason(error));
+        });
+      }}
+    >
+      {turn.compacting ? <SpinnerGlyph size={12} /> : <CompactIcon size={12} />}
+    </IconButton>
+  );
+}
+
 /** The rail's context card. */
 export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
   const { t, format } = useApp();
   const usage = useContextUsage(sessionId);
-  const turn = useTurnInfo(sessionId);
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const failure = useFailure(sessionId);
   const percent = usage === undefined ? undefined : percentOf(usage);
   const categories = usage
     ? CATEGORY_ORDER.filter((category) => usage.categories[category] > 0).sort(
@@ -184,20 +236,6 @@ export function ContextPanel({ sessionId }: { readonly sessionId: string }) {
           {usage.serverFallback === true && <p role="status">{t('context.serverFallback')}</p>}
         </>
       )}
-      <button
-        type="button"
-        className="button"
-        data-testid="context-compact"
-        disabled={turn.running || usage === undefined}
-        onClick={() => {
-          setFailure(undefined);
-          window.piarc.compact(sessionId).catch((error: unknown) => {
-            setFailure(reason(error));
-          });
-        }}
-      >
-        {turn.compacting ? t('context.compacting') : t('context.compact')}
-      </button>
       {failure === undefined ? null : (
         <p className="context-error" role="alert">
           {failure}

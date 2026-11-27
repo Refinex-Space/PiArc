@@ -42,6 +42,9 @@ export interface PanelSpec {
   /** Whether it applies now (for example only with a session selected); always by default. */
   readonly when?: (context: PanelContext) => boolean;
   readonly render: (context: PanelContext) => ReactNode;
+  /** Icon buttons at the end of its rail heading (`IconButton` size `xs`): shown on hover and
+   * focus like the heading's other controls; one marked `data-attention` stays visible. */
+  readonly actions?: (context: PanelContext) => ReactNode;
 }
 
 let panels: readonly PanelSpec[] = [];

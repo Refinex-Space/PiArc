@@ -4,7 +4,7 @@
 import { PlanPanel } from '../approvals/PlanPanel.js';
 import { TaskPanel } from '../transcript/TaskPanel.js';
 import { UsageCard } from '../usage/UsageCard.js';
-import { ContextPanel } from './ContextUsage.js';
+import { CompactAction, ContextPanel } from './ContextUsage.js';
 import { registerPanel } from './registry.js';
 
 // The usage ring reveals this section even when the user has closed the session rail.
@@ -17,6 +17,8 @@ registerPanel({
   when: (context) => context.sessionId !== undefined,
   render: (context) =>
     context.sessionId === undefined ? null : <ContextPanel sessionId={context.sessionId} />,
+  actions: (context) =>
+    context.sessionId === undefined ? null : <CompactAction sessionId={context.sessionId} />,
 });
 
 // T41: the session's tokens and estimated cost, after the context card.

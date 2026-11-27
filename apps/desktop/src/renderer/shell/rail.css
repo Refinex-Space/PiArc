@@ -52,8 +52,28 @@
   width: var(--piarc-space-4);
   height: var(--piarc-space-4);
 }
-.rail-heading:hover :is(.rail-grip, h2 svg),
-.rail-heading:focus-within :is(.rail-grip, h2 svg),
+.rail-heading .rail-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+.rail-heading .rail-actions > .icon-button {
+  opacity: 0;
+  color: var(--piarc-workbench-muted);
+  transition: opacity var(--piarc-motion-fast);
+}
+.rail-heading .rail-actions > .icon-button:is([data-attention], [aria-busy='true']) {
+  opacity: 1;
+}
+.rail-heading .rail-actions > .icon-button[data-attention] {
+  color: var(--piarc-text-warning);
+}
+.rail-heading .rail-actions > .icon-button[data-attention='critical'] {
+  color: var(--piarc-text-danger);
+}
+.rail-heading:hover :is(.rail-grip, h2 svg, .rail-actions > .icon-button),
+.rail-heading:focus-within :is(.rail-grip, h2 svg, .rail-actions > .icon-button),
 .rail-heading:has([aria-pressed='true']) .rail-grip {
   opacity: 1;
 }
@@ -125,6 +145,7 @@
 }
 @media (hover: none) {
   .rail-heading .rail-grip,
+  .rail-heading .rail-actions > .icon-button,
   .rail-heading h2 svg {
     opacity: 1;
   }

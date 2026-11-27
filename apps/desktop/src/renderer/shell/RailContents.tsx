@@ -208,6 +208,9 @@ export function RailContents({
                   <ChevronDownIcon />
                 </button>
               </h2>
+              {panel.actions === undefined ? null : (
+                <div className="rail-actions">{panel.actions(context)}</div>
+              )}
               <IconButton
                 className="rail-grip"
                 label={t('rail.reorder', { name: title })}

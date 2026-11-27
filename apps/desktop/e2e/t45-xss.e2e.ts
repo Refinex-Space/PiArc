@@ -181,7 +181,7 @@ test('THR-11 approval cards, the Changes diff and its comments show the payloads
   await idle(page);
 
   await page.getByTestId('panel-tab-changes-card').click();
-  await page.getByTestId('changes-card').getByTestId('changes-open').click();
+  await page.getByTestId('changes-open').click();
   const changed = page.locator(`[data-testid=changes-file][data-path="${MARKUP_NAME}"]`);
   await expect(changed).toBeVisible();
   await expectText(

@@ -75,7 +75,7 @@ test('the Changes panel shows, highlights and discards the session’s changes',
   await page.getByTestId('panel-tab-changes-card').click();
   const card = page.getByTestId('changes-card');
   await expect(card.getByTestId('changes-counts')).toHaveText('+5 −2');
-  await card.getByTestId('changes-open').click();
+  await page.getByTestId('changes-open').click();
   const panel = page.getByTestId('changes-panel');
   await expect(panel).toBeVisible();
   const files = panel.getByTestId('changes-file');
@@ -128,7 +128,7 @@ test('past the limits the Changes panel folds files and shows them as plain text
   await idle(page);
   await exchange(page, 'Write a large file.', 'Wrote a large file.');
   await page.getByTestId('panel-tab-changes-card').click();
-  await page.getByTestId('changes-card').getByTestId('changes-open').click();
+  await page.getByTestId('changes-open').click();
   const panel = page.getByTestId('changes-panel');
   await expect(panel.getByTestId('changes-degraded')).toBeVisible();
   const small = panel.locator('[data-testid="changes-file"][data-path="small.ts"]');

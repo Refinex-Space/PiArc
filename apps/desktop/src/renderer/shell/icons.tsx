@@ -23,6 +23,7 @@ import {
   Eye,
   ExternalLink,
   File as FileShape,
+  FoldVertical,
   FileCodeCorner,
   FileDiff,
   FileText,
@@ -63,6 +64,7 @@ import {
   X,
   ArrowDownToLine,
   ArrowRight,
+  ArrowUpRight,
   ArrowUpFromLine,
   CircleAlert,
   EllipsisVertical,
@@ -194,6 +196,10 @@ export const GitBranchIcon = glyph(GitBranch);
 export const GitCommitIcon = glyph(GitCommitHorizontal);
 export const GitMergeIcon = glyph(GitMerge);
 export const ArrowRightIcon = glyph(ArrowRight);
+/** Opens a tool from its rail card. */
+export const OpenToolIcon = glyph(ArrowUpRight);
+/** Compacts the conversation (the context card). */
+export const CompactIcon = glyph(FoldVertical);
 /** The changed files list toggle. */
 export const FileListIcon = glyph(List);
 export const MoreVerticalIcon = glyph(EllipsisVertical);
