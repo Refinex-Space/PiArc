@@ -128,11 +128,14 @@ export function useHarnessOf(
 export function useContextUsage(sessionId: string | undefined): ContextUsage | undefined {
   const store = useStore();
   const usage = sessionId === undefined ? undefined : store.transcript(sessionId).usage;
+  // A session from the list is reopened as it is shown; asked before Core has it, the request
+  // fails (`sessionNotFound`). So it waits for the session to be open, and runs again then.
+  const open = useSessionOf(store, sessionId)?.open === true;
   useEffect(() => {
-    if (usage !== undefined && sessionId !== undefined) {
+    if (usage !== undefined && sessionId !== undefined && open) {
       usage.request(() => window.piarc.contextUsage(sessionId));
     }
-  }, [usage, sessionId]);
+  }, [usage, sessionId, open]);
   const subscribe = useCallback(
     (l: () => void) => usage?.subscribe(l) ?? (() => undefined),
     [usage],

@@ -304,20 +304,29 @@ export class SessionCompaction {
 
   /** Before a run or a manual compaction: Core's settings, then the session's overrides. */
   async prepare(signal?: AbortSignal): Promise<void> {
-    const { bridge } = this.#o;
-    if (bridge !== undefined) {
-      try {
-        this.#settings = await bridge.requestTyped(
-          'context/settings',
-          { sessionId: this.#o.sessionId },
-          parseSettings,
-          signal === undefined ? {} : { signal },
-        );
-      } catch (error) {
-        this.#o.log(`context/settings failed, keeping the last settings: ${describeError(error)}`);
-      }
-    }
+    await this.#read(signal);
     this.apply();
+  }
+
+  /** Core's settings when no run has read them yet: a reopened session's usage measures
+   * against them before its first run. */
+  async readSettings(): Promise<void> {
+    if (this.#settings === undefined) await this.#read();
+  }
+
+  async #read(signal?: AbortSignal): Promise<void> {
+    const { bridge } = this.#o;
+    if (bridge === undefined) return;
+    try {
+      this.#settings = await bridge.requestTyped(
+        'context/settings',
+        { sessionId: this.#o.sessionId },
+        parseSettings,
+        signal === undefined ? {} : { signal },
+      );
+    } catch (error) {
+      this.#o.log(`context/settings failed, keeping the last settings: ${describeError(error)}`);
+    }
   }
 
   /** Applies the threshold, the switch and the retry setting to the session's settings. */

@@ -42,7 +42,7 @@ Harness Kit：PiArc 写的 Pi 扩展（system prompt 与 memory、权限预检�
 - **摘要**：`session_before_compact` 里自己发请求（`prompts/compaction.ts`，改文案后跑原创性检查）。失败时返回 `{ cancel: true }` 并记下原因（Pi 1.5.2 吞掉处理器异常、改用它自己的提示），压缩条目与 `/compact` 回合以该原因失败（`lastFailure`）。摘要请求不经 `before_provider_request`，不带缓存。
 - **重注入**：`reinjection.ts` 的 `RESTORE_LIMITS` 是全部上限；skill 正文读分支条目 `piarc.skillInvoked`（`{ name, content }`，T37 的 `Skill` 工具与用户的 `/名称` 写入，`invokedSkills`），最近文件读分支上 Read、Write、Edit 的 `path`（`recentFiles`），内容经 `CoreIo.restoreText`（`fs/read` 的 `restore`）。重注入消息在 `session_compact` 中直接 `appendCustomMessageEntry`：Pi 每次请求都从会话投影重建消息，所以紧接着的请求就带上它（含两步之间的自动压缩）。
 - **熔断**：`SessionCompaction.ended()` 在注册表 `#onEvent` 中先于投影器处理 `compaction_end`（`harness.observe`），压缩条目由此带上失败原因、压缩后估算与 `autoCompactStopped`；上限 `AUTO_COMPACT_FAILURE_LIMIT` = 3，状态在内存中：手动压缩成功、会话重开（回退、切换分支、Profile 变化、空闲回收）与新进程都复位（R3 维持不持久化，I107）。
-- **用量**：`context-usage.ts` 在 `context_with_system` 估算（Pi 在这之后才把 system 换成冻结的 `forceSystemPrompt`，所以 system 文本取 `SessionMemory.systemText`，工具取 `getCurrentTools`），回复的 `message_end` 以服务商报告为合计；估算函数只用 `tokens.ts`。`session/usage` 只在 Core 启用 `context` 时发。
+- **用量**：`context-usage.ts` 在 `context_with_system` 估算（Pi 在这之后才把 system 换成冻结的 `forceSystemPrompt`，所以 system 文本取 `SessionMemory.systemText`，工具取 `getCurrentTools`），回复的 `message_end` 以服务商报告为合计；估算函数只用 `tokens.ts`。恢复后还没发过请求的会话，`session/getContextUsage` 取分支上最后一条成功回复的报告值（覆盖其之前消息的估算），并先读一次 `context/settings`。`session/usage` 只在 Core 启用 `context` 时发。
 
 ## 回合不变量：Pi 已满足 / Harness Kit 补齐（架构第 6.15 节）
 

@@ -399,7 +399,8 @@ export class SessionHarness {
   }
 
   /** `session/getContextUsage`. */
-  contextUsage(): ContextUsage {
+  async contextUsage(): Promise<ContextUsage> {
+    await this.compaction.readSettings();
     return this.usage.current();
   }
 

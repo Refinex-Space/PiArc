@@ -1,0 +1,4 @@
+# One reply that reports its input: a resumed session shows the same context usage.
+id: context-usage
+steps:
+  - { text: 'First answer.', usage: { input_tokens: 1200, cache_read_tokens: 300 } }

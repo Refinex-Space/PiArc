@@ -331,6 +331,66 @@ describe('context usage', () => {
   });
 });
 
+describe('context usage of a reopened session', () => {
+  const limits: UsageLimits = {
+    contextWindow: 200_000,
+    autoCompactThreshold: 167_000,
+    autoCompact: 'on',
+  };
+  const tools = [{ name: 'Read', description: 'Reads a file.', parameters: { type: 'object' } }];
+  const reply = (input: number, stopReason = 'stop', cacheRead = 0) => ({
+    role: 'assistant',
+    content: [{ type: 'text', text: 'a'.repeat(40) }],
+    usage: { input, output: 10, cacheRead, cacheWrite: 0 },
+    stopReason,
+  });
+  const before = [
+    { role: 'system', content: 'ignored', toolsAdded: tools },
+    { role: 'user', content: 'u'.repeat(400) },
+  ];
+  const tracker = (messages: readonly unknown[], published: unknown[] = []) =>
+    new ContextUsageTracker({
+      sink: {
+        event: (_m, payload) => published.push(payload),
+        delta: () => undefined,
+        replaceable: () => undefined,
+      },
+      limits: () => limits,
+      mcpTools: () => new Set(),
+      messages: () => messages,
+      system: () => undefined,
+      tools: () => [],
+    });
+
+  it("shows the branch's last reported input over the estimate of the request it answered", () => {
+    const messages = [
+      ...before,
+      reply(1200, 'toolUse', 300),
+      { role: 'toolResult', content: [{ type: 'text', text: 'r'.repeat(800) }] },
+      // An interrupted turn: a failed reply and the Harness Kit's marker report nothing.
+      { role: 'user', content: 'next' },
+      reply(5000, 'error'),
+      reply(0, 'stop'),
+    ];
+    const published: unknown[] = [];
+    const usage = tracker(messages, published).current();
+    expect(usage.source).toBe('provider');
+    expect(usage.tokens).toBe(1500);
+    expect(totalOf(usage.categories)).toBe(1500);
+    // The categories are those of the messages before that reply: no tool results yet.
+    expect(usage.categories.toolResults).toBe(0);
+    expect(usage).toMatchObject({ contextWindow: 200_000, autoCompactThreshold: 167_000 });
+    // Reading it publishes nothing: `session/usage` stays for responses and compactions.
+    expect(published).toEqual([]);
+  });
+
+  it('estimates the context when no reply on the branch reported its input', () => {
+    const usage = tracker(before).current();
+    expect(usage.source).toBe('estimate');
+    expect(usage.categories).toEqual(estimateCategories(before, new Set(), { tools }));
+  });
+});
+
 describe('session settings overrides', () => {
   it("survive Pi's settings reload because they are applied before every run", async () => {
     const dir = path.join(os.tmpdir(), `piarc-t27-settings-${String(process.pid)}`);

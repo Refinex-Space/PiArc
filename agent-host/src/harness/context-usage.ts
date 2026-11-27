@@ -4,7 +4,9 @@
 // the response reports its input (`input + cacheRead + cacheWrite`), that is the total and the
 // difference to the estimate is "unclassified"; an estimate above the report is scaled down to
 // it. `session/usage` reports it after each response and each compaction;
-// `session/getContextUsage` returns the latest.
+// `session/getContextUsage` returns the latest; a session reopened from its file that has made no
+// request yet returns what it showed before: the branch's last reported input over the estimate
+// of the context that request was sent with.
 import { getCurrentTools, type SystemMessage } from '@earendil-works/pi-ai';
 import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
 import type {
@@ -211,6 +213,18 @@ export interface ContextUsageOptions {
   readonly tools: () => readonly unknown[];
 }
 
+/** What a model response reported as its request's input, 0 for none (failed, interrupted, or
+ * a marker the Harness Kit wrote). */
+function reportedInput(message: unknown): number {
+  if (!isObject(message) || message.role !== 'assistant' || !isObject(message.usage)) return 0;
+  if (message.stopReason === 'error' || message.stopReason === 'aborted') return 0;
+  const { input, cacheRead, cacheWrite } = message.usage;
+  return [input, cacheRead, cacheWrite].reduce<number>(
+    (sum, value) => sum + (typeof value === 'number' && value > 0 ? value : 0),
+    0,
+  );
+}
+
 /** One session's context usage. */
 export class ContextUsageTracker {
   readonly #o: ContextUsageOptions;
@@ -257,9 +271,19 @@ export class ContextUsageTracker {
     });
   }
 
-  /** The latest usage, or the estimate when no request was made yet. */
+  /** The latest usage; before this process made a request, the branch's last reported input
+   * (a reopened session shows what it showed before), else the estimate. */
   current(): ContextUsage {
-    return this.#last ?? this.estimate();
+    return this.#last ?? this.#restored() ?? this.estimate();
+  }
+
+  #restored(): ContextUsage | undefined {
+    const messages = this.#o.messages();
+    let last = messages.length - 1;
+    while (last >= 0 && reportedInput(messages[last]) === 0) last -= 1;
+    if (last < 0) return undefined;
+    const sent = this.#estimate(messages.slice(0, last));
+    return this.#usage(withReportedTotal(sent, reportedInput(messages[last])), 'provider');
   }
 
   /** A model response ended: its reported input is the total of the request's context. */

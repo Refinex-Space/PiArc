@@ -320,3 +320,54 @@ async fn a_new_session_is_listed_under_its_first_message_while_it_runs() {
     answer(rx).await.expect("aborted");
     shutdown(core).await;
 }
+
+/// A session reopened from its file shows the context usage it showed before it closed (the
+/// last reply's reported input), not a fresh estimate, before it makes a request.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_resumed_session_reports_the_context_usage_it_had() {
+    let env = Env::new("resumed-usage").await;
+    let (core, events) = env.start(env.config(&[]));
+    let id = open_session(&core, &env).await;
+    let turn = prompt(&core, &id, &prompt_text("Question one.", "context-usage")).await;
+    events.turn_completed(&id, &turn).await;
+    let live = apply(&core, &id, Op::ContextUsage)
+        .await
+        .expect("the open session's usage");
+    assert_eq!(live["tokens"], 1500, "{live}");
+    assert_eq!(live["source"], "provider");
+
+    let (done, rx) = reply();
+    core.close_session(id.clone(), done).expect("queued");
+    answer(rx).await.expect("closed");
+    let refused = apply(&core, &id, Op::ContextUsage)
+        .await
+        .expect_err("a closed session has no usage until it is reopened");
+    assert_eq!(
+        refused.to_error_object().data.kind,
+        piarc_protocol::ErrorKind::SessionNotFound
+    );
+    let (done, rx) = reply();
+    core.resume_session(id.clone(), done).expect("queued");
+    answer(rx).await.expect("resumed");
+
+    let resumed = apply(&core, &id, Op::ContextUsage)
+        .await
+        .expect("the resumed session's usage");
+    for field in [
+        "tokens",
+        "source",
+        "contextWindow",
+        "autoCompactThreshold",
+        "autoCompact",
+    ] {
+        assert_eq!(resumed[field], live[field], "{field}: {resumed} vs {live}");
+    }
+    let sum: u64 = resumed["categories"]
+        .as_object()
+        .expect("categories")
+        .values()
+        .filter_map(Value::as_u64)
+        .sum();
+    assert_eq!(sum, 1500, "the categories add up to the total: {resumed}");
+    shutdown(core).await;
+}
