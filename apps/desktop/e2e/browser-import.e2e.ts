@@ -225,13 +225,22 @@ test('THR-17 imports chosen sites after the native confirmation; the page never 
   await closeSettings(again);
 });
 
-test('the browser settings page saves user-level settings', async ({ app, page, workspaces }) => {
+test('the browser settings page saves user-level settings', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
   test.setTimeout(120_000);
   await openSession(app, page, workspaces, 'Browser settings', 't18-chat', 'Hello');
   await idle(page);
   const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-browser').click();
   await expect(settings.getByTestId('browser-page')).toBeVisible();
+  // The page for review: its top and, scrolled, its end.
+  await page.screenshot({ path: info.outputPath('browser-settings-top.png') });
+  await settings.getByTestId('browser-data-section').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('browser-settings-end.png') });
+  await settings.getByTestId('browser-pages-section').scrollIntoViewIfNeeded();
   // The box follows the saved preference, so it changes once the write comes back.
   await settings.getByTestId('browser-agent-enabled').click();
   await expect(settings.getByTestId('browser-agent-enabled')).not.toBeChecked();

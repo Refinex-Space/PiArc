@@ -2987,6 +2987,7 @@ export const en = {
   'browserSettings.storage.session': 'Clear when PiArc quits',
   'browserSettings.storageHint':
     'Each workspace has its own cookies, storage and cache. The choice applies to sessions opened from now on.',
+  'browserSettings.clearTitle': 'Browsing data of this workspace',
   'browserSettings.clear': 'Clear this workspace’s browsing data',
   'browserSettings.clearConfirm': 'Click again to clear',
   'browserSettings.cleared': 'Cleared.',

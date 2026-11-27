@@ -49,12 +49,48 @@ function Section({
   return (
     <section className="settings-subsection" data-testid={testId}>
       <h2 className="permission-heading">{title}</h2>
-      {children}
+      <div className="preference-rows">{children}</div>
     </section>
   );
 }
 
-function Check({
+/**
+ * One setting: its name and description at the start, its control at the trailing edge (the
+ * settings pages' row, `controls.css`). `labelFor` names the control the title labels.
+ */
+function Row({
+  title,
+  description,
+  titleId,
+  labelFor,
+  testId,
+  children,
+}: {
+  readonly title: string;
+  readonly description?: ReactNode;
+  readonly titleId?: string;
+  readonly labelFor?: string;
+  readonly testId?: string;
+  readonly children?: ReactNode;
+}) {
+  return (
+    <div className="preference-row" data-testid={testId}>
+      <span className="preference-copy">
+        {labelFor === undefined ? (
+          <span id={titleId}>{title}</span>
+        ) : (
+          <label id={titleId} htmlFor={labelFor}>
+            {title}
+          </label>
+        )}
+        {description !== undefined && <span className="preference-description">{description}</span>}
+      </span>
+      {children !== undefined && <span className="browser-settings-control">{children}</span>}
+    </div>
+  );
+}
+
+function Switch({
   checked,
   label,
   hint,
@@ -69,28 +105,31 @@ function Check({
   readonly onChange: (checked: boolean) => void;
   readonly disabled?: boolean;
 }) {
+  const labelId = useId();
   const hintId = useId();
   return (
-    <div className="setting">
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          data-testid={testId}
-          {...(hint === undefined ? {} : { 'aria-describedby': hintId })}
-          onChange={(e) => {
-            onChange(e.currentTarget.checked);
-          }}
-        />
-        {label}
-      </label>
-      {hint !== undefined && (
-        <p id={hintId} className="muted">
-          {hint}
-        </p>
-      )}
-    </div>
+    <label className="preference-row">
+      <span className="preference-copy">
+        <span id={labelId}>{label}</span>
+        {hint !== undefined && (
+          <span id={hintId} className="preference-description">
+            {hint}
+          </span>
+        )}
+      </span>
+      <input
+        type="checkbox"
+        className="preference-switch"
+        checked={checked}
+        disabled={disabled}
+        data-testid={testId}
+        aria-labelledby={labelId}
+        {...(hint === undefined ? {} : { 'aria-describedby': hintId })}
+        onChange={(e) => {
+          onChange(e.currentTarget.checked);
+        }}
+      />
+    </label>
   );
 }
 
@@ -122,37 +161,37 @@ function TimeoutField({
     }
   };
   return (
-    <div className="setting">
-      <label htmlFor={id} className="setting-label">
-        {t('browserSettings.timeout')}
-      </label>
-      <div className="browser-settings-row">
-        <input
-          id={id}
-          className="input"
-          type="number"
-          min={BROWSER_APPROVAL_TIMEOUT.min}
-          max={BROWSER_APPROVAL_TIMEOUT.max}
-          step={1}
-          value={draft}
-          aria-describedby={hintId}
-          data-testid="browser-approval-timeout"
-          onChange={(e) => {
-            setDraft(e.currentTarget.value);
-          }}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit();
-          }}
-        />
-      </div>
-      <p id={hintId} className="muted">
-        {t('browserSettings.timeoutHint', {
-          min: BROWSER_APPROVAL_TIMEOUT.min,
-          max: BROWSER_APPROVAL_TIMEOUT.max,
-        })}
-      </p>
-    </div>
+    <Row
+      title={t('browserSettings.timeout')}
+      labelFor={id}
+      description={
+        <span id={hintId}>
+          {t('browserSettings.timeoutHint', {
+            min: BROWSER_APPROVAL_TIMEOUT.min,
+            max: BROWSER_APPROVAL_TIMEOUT.max,
+          })}
+        </span>
+      }
+    >
+      <input
+        id={id}
+        className="input browser-settings-number"
+        type="number"
+        min={BROWSER_APPROVAL_TIMEOUT.min}
+        max={BROWSER_APPROVAL_TIMEOUT.max}
+        step={1}
+        value={draft}
+        aria-describedby={hintId}
+        data-testid="browser-approval-timeout"
+        onChange={(e) => {
+          setDraft(e.currentTarget.value);
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+        }}
+      />
+    </Row>
   );
 }
 
@@ -176,19 +215,22 @@ function LocalNames({
   }, [saved]);
   return (
     <form
-      className="setting"
+      className="preference-row browser-settings-stacked"
       onSubmit={(e) => {
         e.preventDefault();
         onSave(splitNames(draft));
       }}
     >
-      <label htmlFor={id} className="setting-label">
-        {t('browserSettings.localNames')}
-      </label>
-      <div className="browser-settings-row">
+      <span className="preference-copy">
+        <label htmlFor={id}>{t('browserSettings.localNames')}</label>
+        <span id={hintId} className="preference-description">
+          {t('browserSettings.localNamesHint')}
+        </span>
+      </span>
+      <span className="browser-settings-control">
         <input
           id={id}
-          className="input"
+          className="input browser-settings-names"
           value={draft}
           spellCheck={false}
           autoCapitalize="off"
@@ -211,10 +253,7 @@ function LocalNames({
         >
           {t('browserSettings.restoreDefaults')}
         </Button>
-      </div>
-      <p id={hintId} className="muted">
-        {t('browserSettings.localNamesHint')}
-      </p>
+      </span>
     </form>
   );
 }
@@ -376,8 +415,101 @@ export function BrowserPage() {
         </p>
       )}
 
+      <Section title={t('browserSettings.pages')} testId="browser-pages-section">
+        <Row title={t('browserSettings.searchEngine')} labelFor={engineId}>
+          <select
+            id={engineId}
+            className="input"
+            value={browser.searchEngine}
+            data-testid="browser-search-engine"
+            onChange={(e) => {
+              const value = BROWSER_SEARCH_ENGINES.find((v) => v === e.currentTarget.value);
+              if (value !== undefined) save({ key: 'browser.searchEngine', value });
+            }}
+          >
+            {BROWSER_SEARCH_ENGINES.map((engine) => (
+              <option key={engine} value={engine}>
+                {t(ENGINE_LABELS[engine])}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <Row
+          title={t('browserSettings.downloads')}
+          description={
+            <span data-testid="browser-download-location">
+              {browser.downloadDirectory === null ? (
+                t('browserSettings.downloadsAsk')
+              ) : (
+                <code>{browser.downloadDirectory}</code>
+              )}
+            </span>
+          }
+        >
+          {browser.downloadDirectory !== null && (
+            <Button
+              variant="ghost"
+              size="small"
+              data-testid="browser-download-ask"
+              onClick={() => {
+                save({ key: 'browser.downloadDirectory', value: null });
+              }}
+            >
+              {t('browserSettings.downloadsAskEach')}
+            </Button>
+          )}
+          <Button
+            size="small"
+            data-testid="browser-download-choose"
+            onClick={() => {
+              window.piarc
+                .chooseFolder()
+                .then((folder) => {
+                  if (folder !== null) save({ key: 'browser.downloadDirectory', value: folder });
+                })
+                .catch(fail);
+            }}
+          >
+            {t('browserSettings.downloadsChoose')}
+          </Button>
+        </Row>
+        <Row title={t('browserSettings.devtools')} titleId={dockLabel}>
+          <SegmentedControl
+            options={DEVTOOLS_DOCKS}
+            value={browser.devtoolsDock}
+            name="browser-devtools"
+            testIdPrefix="browser-devtools"
+            aria-labelledby={dockLabel}
+            labelOf={(option) =>
+              t(
+                option === 'bottom'
+                  ? 'browserSettings.devtools.bottom'
+                  : 'browserSettings.devtools.right',
+              )
+            }
+            onChange={(value) => {
+              save({ key: 'browser.devtoolsDock', value });
+            }}
+          />
+        </Row>
+        <Switch
+          checked={browser.openLocalLinks}
+          label={t('browserSettings.openLocalLinks')}
+          testId="browser-open-local-links"
+          onChange={(value) => {
+            save({ key: 'browser.openLocalLinks', value });
+          }}
+        />
+        <LocalNames
+          names={browser.localHostnames}
+          onSave={(value) => {
+            save({ key: 'browser.localHostnames', value });
+          }}
+        />
+      </Section>
+
       <Section title={t('browserSettings.agent')} testId="browser-agent-section">
-        <Check
+        <Switch
           checked={browser.agentEnabled}
           label={t('browserSettings.agentEnabled')}
           hint={t('browserSettings.agentEnabledHint')}
@@ -386,7 +518,7 @@ export function BrowserPage() {
             save({ key: 'browser.agentEnabled', value });
           }}
         />
-        <Check
+        <Switch
           checked={browser.revealOnAgentUse}
           label={t('browserSettings.reveal')}
           testId="browser-reveal"
@@ -400,9 +532,11 @@ export function BrowserPage() {
             save({ key: 'browser.approvalTimeout', value });
           }}
         />
-        <div className="setting">
-          <span className="setting-label">{t('browserSettings.agentSites')}</span>
-          <p className="muted">{t('browserSettings.agentSitesHint')}</p>
+        <Row
+          title={t('browserSettings.agentSites')}
+          description={t('browserSettings.agentSitesHint')}
+        />
+        <div className="browser-settings-list">
           {rules.length === 0 ? (
             <p className="muted" data-testid="browser-agent-sites-empty">
               {t('browserSettings.agentSitesEmpty')}
@@ -435,10 +569,11 @@ export function BrowserPage() {
       </Section>
 
       <Section title={t('browserSettings.data')} testId="browser-data-section">
-        <fieldset className="setting">
-          <legend id={storageLabel} className="setting-label">
-            {t('browserSettings.storage')}
-          </legend>
+        <Row
+          title={t('browserSettings.storage')}
+          titleId={storageLabel}
+          description={t('browserSettings.storageHint')}
+        >
           <SegmentedControl
             options={BROWSER_STORAGES}
             value={browser.storage}
@@ -456,16 +591,12 @@ export function BrowserPage() {
               save({ key: 'browser.storage', value });
             }}
           />
-          <p className="muted">{t('browserSettings.storageHint')}</p>
-        </fieldset>
+        </Row>
         {workspace === null ? (
           <p className="muted">{t('agents.noWorkspace')}</p>
         ) : (
           <>
-            <div className="setting">
-              <label htmlFor={workspaceId} className="setting-label">
-                {t('permissions.workspace')}
-              </label>
+            <Row title={t('permissions.workspace')} labelFor={workspaceId}>
               <select
                 id={workspaceId}
                 className="input"
@@ -478,148 +609,60 @@ export function BrowserPage() {
               >
                 <WorkspaceOptions workspaces={workspaces} />
               </select>
-            </div>
-            <div className="setting">
-              <div className="browser-settings-row">
-                <Button
-                  variant="destructive"
-                  loading={clearing === 'busy'}
-                  data-testid="browser-clear-data"
-                  onClick={clear}
-                >
-                  {clearing === 'confirm'
-                    ? t('browserSettings.clearConfirm')
-                    : t('browserSettings.clear')}
-                </Button>
-                {clearing === 'done' && (
-                  <span className="muted" role="status" data-testid="browser-clear-done">
-                    {t('browserSettings.cleared')}
-                  </span>
-                )}
-              </div>
-              <p className="muted">{t('browserSettings.clearHint')}</p>
-            </div>
-            <div className="setting">
-              <span className="setting-label">{t('browserSettings.imports')}</span>
-              <p className="muted">{t('browserSettings.importsHint')}</p>
-              <div className="browser-settings-row">
-                <Button
-                  disabled={sessionOnly}
-                  data-testid="browser-import-open"
-                  onClick={() => {
-                    setImporting({});
-                  }}
-                >
-                  {t('browserSettings.import')}
-                </Button>
-              </div>
-              {sessionOnly && (
-                <p className="muted" data-testid="browser-import-disabled">
-                  {t('browserImport.unavailable')}
-                </p>
-              )}
-              <ImportedSites imports={imports} onRemove={removeImport} />
-            </div>
-          </>
-        )}
-      </Section>
-
-      <Section title={t('browserSettings.pages')} testId="browser-pages-section">
-        <LocalNames
-          names={browser.localHostnames}
-          onSave={(value) => {
-            save({ key: 'browser.localHostnames', value });
-          }}
-        />
-        <Check
-          checked={browser.openLocalLinks}
-          label={t('browserSettings.openLocalLinks')}
-          testId="browser-open-local-links"
-          onChange={(value) => {
-            save({ key: 'browser.openLocalLinks', value });
-          }}
-        />
-        <div className="setting">
-          <label htmlFor={engineId} className="setting-label">
-            {t('browserSettings.searchEngine')}
-          </label>
-          <select
-            id={engineId}
-            className="input"
-            value={browser.searchEngine}
-            data-testid="browser-search-engine"
-            onChange={(e) => {
-              const value = BROWSER_SEARCH_ENGINES.find((v) => v === e.currentTarget.value);
-              if (value !== undefined) save({ key: 'browser.searchEngine', value });
-            }}
-          >
-            {BROWSER_SEARCH_ENGINES.map((engine) => (
-              <option key={engine} value={engine}>
-                {t(ENGINE_LABELS[engine])}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="setting">
-          <span className="setting-label">{t('browserSettings.downloads')}</span>
-          <div className="browser-settings-row">
-            <span data-testid="browser-download-location">
-              {browser.downloadDirectory === null ? (
-                t('browserSettings.downloadsAsk')
-              ) : (
-                <code>{browser.downloadDirectory}</code>
-              )}
-            </span>
-            <Button
-              size="small"
-              data-testid="browser-download-choose"
-              onClick={() => {
-                window.piarc
-                  .chooseFolder()
-                  .then((folder) => {
-                    if (folder !== null) save({ key: 'browser.downloadDirectory', value: folder });
-                  })
-                  .catch(fail);
-              }}
+            </Row>
+            <Row
+              title={t('browserSettings.imports')}
+              description={
+                <>
+                  {t('browserSettings.importsHint')}
+                  {sessionOnly && (
+                    <span className="browser-settings-note" data-testid="browser-import-disabled">
+                      {t('browserImport.unavailable')}
+                    </span>
+                  )}
+                </>
+              }
             >
-              {t('browserSettings.downloadsChoose')}
-            </Button>
-            {browser.downloadDirectory !== null && (
               <Button
-                variant="ghost"
                 size="small"
-                data-testid="browser-download-ask"
+                disabled={sessionOnly}
+                data-testid="browser-import-open"
                 onClick={() => {
-                  save({ key: 'browser.downloadDirectory', value: null });
+                  setImporting({});
                 }}
               >
-                {t('browserSettings.downloadsAskEach')}
+                {t('browserSettings.import')}
               </Button>
-            )}
-          </div>
-        </div>
-        <fieldset className="setting">
-          <legend id={dockLabel} className="setting-label">
-            {t('browserSettings.devtools')}
-          </legend>
-          <SegmentedControl
-            options={DEVTOOLS_DOCKS}
-            value={browser.devtoolsDock}
-            name="browser-devtools"
-            testIdPrefix="browser-devtools"
-            aria-labelledby={dockLabel}
-            labelOf={(option) =>
-              t(
-                option === 'bottom'
-                  ? 'browserSettings.devtools.bottom'
-                  : 'browserSettings.devtools.right',
-              )
-            }
-            onChange={(value) => {
-              save({ key: 'browser.devtoolsDock', value });
-            }}
-          />
-        </fieldset>
+            </Row>
+            <div className="browser-settings-list">
+              <ImportedSites imports={imports} onRemove={removeImport} />
+            </div>
+            <Row
+              title={t('browserSettings.clearTitle')}
+              description={
+                clearing === 'done' ? (
+                  <span role="status" data-testid="browser-clear-done">
+                    {t('browserSettings.cleared')}
+                  </span>
+                ) : (
+                  t('browserSettings.clearHint')
+                )
+              }
+            >
+              <Button
+                variant="destructive"
+                size="small"
+                loading={clearing === 'busy'}
+                data-testid="browser-clear-data"
+                onClick={clear}
+              >
+                {clearing === 'confirm'
+                  ? t('browserSettings.clearConfirm')
+                  : t('browserSettings.clear')}
+              </Button>
+            </Row>
+          </>
+        )}
       </Section>
 
       {importing !== null && workspace !== null && !sessionOnly && (

@@ -2878,6 +2878,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'browserSettings.storage.session': '退出即清空',
   'browserSettings.storageHint':
     '每个工作区有各自的 cookie、存储与缓存。选择对之后打开的会话生效。',
+  'browserSettings.clearTitle': '本工作区的浏览数据',
   'browserSettings.clear': '清除本工作区的浏览数据',
   'browserSettings.clearConfirm': '再点一次以清除',
   'browserSettings.cleared': '已清除。',
