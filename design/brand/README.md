@@ -6,26 +6,28 @@
 
 | 文件 | 用途 |
 |---|---|
-| `icon.svg` | 应用图标矢量源：白色圆角方底 + 黑色 Pi 字形，1024 × 1024 |
-| `icon.png` | 512 × 512 位图，用于界面内展示与需要 PNG 的场合 |
-| `icon.iconset/` | macOS 各尺寸位图（16 至 1024），`icon.icns` 由它生成 |
+| `icon.svg` | 应用图标矢量源：白色圆角方底 + 黑色 Pi 字形，1024 × 1024，方底铺满画布（Windows 与通用场合的造型） |
+| `icon.png` | 512 × 512 位图，与 `icon.svg` 同造型，用于需要 PNG 的场合 |
+| `icon.iconset/` | macOS 各尺寸位图（16 至 1024），按 macOS 图标网格留边，由 `mark.svg` 导出；`icon.icns` 由它生成，从源码运行时的 Dock 图标用其中的 1024 px 图 |
 | `icon.icns` | macOS 应用图标（Electron Forge `packagerConfig.icon`） |
-| `icon.ico` | Windows 应用图标，含 14 个尺寸（安装包与窗口图标） |
+| `icon.ico` | Windows 应用图标，含 14 个尺寸（安装包与窗口图标），与 `icon.svg` 同造型 |
 | `mark.svg` | 单独的 Pi 字形，跟随明暗模式反色；用于界面内 logo，以及菜单栏 / 托盘图标的源文件 |
 | `mark.LICENSE` | Pi 字形来源的 MIT 许可证（必须随资产保留） |
 | `trayTemplate.png`、`trayTemplate@2x.png`、`tray-light.ico`、`tray-dark.ico` | 菜单栏与托盘图标，由 `mark.svg` 导出（T35） |
 
-重新生成 `icon.icns`（只能在 macOS 上执行）：
+重新生成 macOS 图标（`icon.icns` 一步只能在 macOS 上执行，`--check` 比对已提交的文件）：
 
 ```bash
-iconutil -c icns design/brand/icon.iconset -o design/brand/icon.icns
+node scripts/dev/export-mac-icon.mjs [--check]
 ```
+
+macOS 的 Dock 与访达把每个图标画在 1024 画布上，圆角方底宽 824、四周各留 100 的透明边放阴影；铺满画布的方底在 Dock 里会比旁边的图标大一圈。所以 `icon.iconset/` 不从 `icon.svg` 缩放而来：脚本把 `icon.svg` 的造型以画布中心缩放到 824 / 1024（圆角 224 × 824 / 1024，字形 1.28 × 824 / 1024），再在下方加一层柔和阴影（向下 10、模糊 σ 10、不透明度 0.3，均按 1024 画布）。Windows 的 `.ico` 没有这层留边，保持铺满。
 
 ## 来源
 
 - 全部文件取自已废弃的 PiDeck 项目（`packages/shared/assets/`，2026-10-27）。只拷贝了资产，没有使用它的代码。
 - `icon.svg` 的 `<title>` 由 PiDeck 改为 PiArc，图形未改动；位图与 `.ico` 原样拷贝。
-- `icon.icns` 是 2026-11-14 用 `iconutil` 从 `icon.iconset/` 生成的。
+- `icon.icns` 最早是 2026-11-14 用 `iconutil` 从 PiDeck 的 `icon.iconset/` 生成的（铺满画布）；2026-11-26 起 `icon.iconset/` 与 `icon.icns` 改由 `scripts/dev/export-mac-icon.mjs` 按 macOS 网格导出。
 - Pi 字形来自 thesvg.org 的 Pi 图标（<https://thesvg.org/icon/pi>，源文件 <https://github.com/GLINCKER/thesvg/blob/main/public/icons/pi/default.svg>），按 MIT 许可证使用，许可证全文见 `mark.LICENSE`。
 
 ## 使用注意
