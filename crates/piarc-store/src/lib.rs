@@ -32,6 +32,7 @@ mod checkpoints;
 mod error;
 pub mod index;
 pub mod jsonl;
+pub mod market;
 mod mcp;
 mod memory_imports;
 pub mod migrate;
@@ -51,6 +52,7 @@ pub use error::{Error, Result};
 pub use index::{
     FileOutcome, IndexStatus, SessionPrefsChange, SessionRecord, SkippedLine, SyncReport,
 };
+pub use market::{MarketCounts, MarketFilter, MarketListing, MarketRow, MarketSort, MarketSync};
 pub use migrate::{MIGRATIONS, Migration};
 pub use packages::PackageRecord;
 pub use pi_session::{RequestUsage, SessionMeta, Usage};

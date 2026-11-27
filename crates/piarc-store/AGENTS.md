@@ -6,7 +6,7 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 
 | 命令 | 用途 |
 |---|---|
-| `cargo test -p piarc-store` | 单元测试 + `tests/usage.rs`（T41：用量行随会话文件增量写入、重建一致、删除会话一起删，目录价的存取）+ `tests/migrations.rs`（A01）+ `tests/index.rs`（A03、A05，T35 的 worktree 列）+ `tests/memory.rs`（A04）+ `tests/search.rs`（T35-A05：中文、英文、混排、增量、重建一致、短查询） |
+| `cargo test -p piarc-store` | 单元测试 + `tests/market.rs`（ADR-0102：清单只对当前版本生效、过滤与排序、计数、代次）+ `tests/usage.rs`（T41：用量行随会话文件增量写入、重建一致、删除会话一起删，目录价的存取）+ `tests/migrations.rs`（A01）+ `tests/index.rs`（A03、A05，T35 的 worktree 列）+ `tests/memory.rs`（A04）+ `tests/search.rs`（T35-A05：中文、英文、混排、增量、重建一致、短查询） |
 | `cargo test -p piarc-store --test memory -- --nocapture` | 打印 100 MiB 会话文件建索引的堆峰值与耗时 |
 
 ## 迁移的写法
@@ -58,5 +58,6 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 
 - 架构第 9.1–9.3 节；ADR-0011、ADR-0044；`docs/research/pi-v1.4.0-baseline.md` 第 4.3 节。
 - schema v13（T49）为 `usage_records` 加入 `ephemeral_workspace`。侧边对话的请求由 Core 直接记账，归入 `auxiliary/sideChat`。索引重建保留这些记录，即使主会话还没有 JSONL 也能按工作区查询用量。删除会话时一并清理。
+- schema v16（ADR-0102）：`market_packages`（npm 搜索给出的 Pi 包：版本、描述、关键词、发布者、下载量、链接、关键词判出的类型 `kw_kinds`、清单判出的类型 `manifest_kinds` 与其版本、已弃用、是否属于热门索引 `indexed` 与代次 `sync_gen`）与单行的 `market_sync`。读写与查询在 `src/market.rs`：类型只在 `manifest_version = version` 时用清单的，否则用关键词的；查询排除只含主题与已弃用的包（按名字指定时已弃用的也出现），`LIKE` 词按 `ESCAPE '\\'` 转义；`market_end_index` 只把旧代次的行移出索引，不删除。解析与同步在 `piarc-core::market`。
 - schema v15（ADR-0098）：`workspaces.removed` 标记从侧栏移除的项目。`workspaces()` 不列出已标记的行，`workspace(path)` 读任意状态的行（重新打开时取回默认模式与模型），`remove_workspace` 标记或插入已标记的行，`upsert_workspace` 清除标记，`removed_workspaces` 给快照过滤会话。
 - schema v14（ADR-0090）：`browser_imports(workspace, site, count, profile, imported_at)` 记从 Chrome 导入过登录的站点（`src/browser_imports.rs` 的 `put_browser_import`、`browser_imports`、`remove_browser_import`），cookie 本身在 Chromium 的分区里，不在这里。
