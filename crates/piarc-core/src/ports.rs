@@ -47,20 +47,35 @@ pub(crate) struct PortWatch {
 
 /// The ports PiArc's own process group listens on: Core's proxies and servers run in this
 /// process, Chromium's helpers in its group. The browser's proxies refuse them (ADR-0088 rule 5).
-async fn own_ports() -> Option<Vec<u16>> {
-    let tree = piarc_exec::listeners::Tree {
+/// The sessions' commands, terminals and development servers descend from this process as
+/// well; their ports are the sessions' (B2.6.2), so `tasks` (the running tasks' trees) are left
+/// out.
+async fn own_ports(tasks: Vec<piarc_exec::listeners::Tree>) -> Option<Vec<u16>> {
+    let mut trees = vec![piarc_exec::listeners::Tree {
         root: std::process::id(),
         members: Vec::new(),
-    };
-    tokio::task::spawn_blocking(move || piarc_exec::listeners::listening(&[tree]))
+    }];
+    trees.extend(tasks);
+    let found = tokio::task::spawn_blocking(move || piarc_exec::listeners::listening(&trees))
         .await
         .ok()?
         .inspect_err(|error| {
             tracing::debug!(target: "piarc_core::ports", %error, "cannot list PiArc's own ports");
         })
-        .ok()?
-        .into_iter()
-        .next()
+        .ok()?;
+    Some(own_only(found))
+}
+
+/// The first list (PiArc's process) without the ports of the others (the running tasks).
+fn own_only(found: Vec<Vec<u16>>) -> Vec<u16> {
+    let mut lists = found.into_iter();
+    let Some(own) = lists.next() else {
+        return Vec::new();
+    };
+    let tasks: Vec<u16> = lists.flatten().collect();
+    own.into_iter()
+        .filter(|port| !tasks.contains(port))
+        .collect()
 }
 
 /// Starts the scans; they end with `cancel`.
@@ -74,7 +89,15 @@ pub(crate) fn spawn(
         let mut watch = PortWatch::default();
         loop {
             if browser.active().await
-                && let Some(ports) = own_ports().await
+                && let Some(ports) = own_ports(
+                    tool_io
+                        .tasks()
+                        .running_trees()
+                        .into_iter()
+                        .map(|(_, tree)| tree)
+                        .collect(),
+                )
+                .await
             {
                 browser.set_own_ports(ports).await;
             }
@@ -220,6 +243,20 @@ mod tests {
             kind,
             title: format!("title {id}"),
         }
+    }
+
+    /// B2.6.2: a task's server is a descendant of PiArc's process too, but its port is the
+    /// session's, not PiArc's own: the browser's proxies must let the preview reach it.
+    #[test]
+    fn thr16_the_ports_of_running_tasks_are_not_piarc_own() {
+        let own = own_only(vec![
+            vec![3000, 4100, 5173, 9229],
+            vec![3000],
+            vec![5173, 8080],
+        ]);
+        assert_eq!(own, [4100, 9229]);
+        assert_eq!(own_only(vec![vec![4100]]), [4100]);
+        assert!(own_only(Vec::new()).is_empty());
     }
 
     #[test]

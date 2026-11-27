@@ -562,6 +562,7 @@ threats:
           - vitest:apps/desktop/src/main/browser/agent-gate.test.ts::lets the session’s listening and declared ports through and asks for others (B2.6.2)
           - rust:crates/piarc-sandbox/tests/proxy.rs::thr16_a_browser_proxy_refuses_piarc_ports_and_takes_a_new_policy
           - rust:crates/piarc-core/src/browser/proxies.rs::thr16_own_ports_join_the_requested_ones
+          - rust:crates/piarc-core/src/ports.rs::thr16_the_ports_of_running_tasks_are_not_piarc_own
           - l4:apps/desktop/e2e/browser-basic.e2e.ts::THR-16 guests send WebRTC and loopback traffic only through the proxy
       - arch: 全部 guest 的网络经 Core 的浏览器代理，协议与链路本地地址在主进程的请求规则里拒绝（ADR-0088）
         measure: 浏览器代理放行公网名，本机与私网地址只在 IP 字面量、localhost 与本地开发名称后可达（防 DNS 重绑定）；请求规则拒绝链路本地与不支持的协议；工作区协议拒绝越界路径，并经 Core 按会话的 Read deny 规则拒绝文件
