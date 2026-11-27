@@ -33,6 +33,7 @@ import {
   Image,
   Info,
   Laptop,
+  Layers,
   LayoutFreeform,
   LayoutList,
   ListTodo,
@@ -130,6 +131,7 @@ function glyph(Shape: LucideIcon) {
 export const PlusIcon = glyph(Plus);
 export const GearIcon = glyph(Settings);
 export const FolderIcon = glyph(Folder);
+export const LayersIcon = glyph(Layers);
 export const PinIcon = glyph(Pin);
 export const ArrowUpIcon = glyph(ArrowUp);
 /** The return mark on a selected search row, and the composer's send. */

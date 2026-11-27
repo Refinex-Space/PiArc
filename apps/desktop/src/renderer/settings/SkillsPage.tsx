@@ -3,6 +3,11 @@
 // fields PiArc ignores or does not support yet, and the files that are not valid skills. The
 // output style section sets the user's default style (a folder's `/output-style` and its
 // settings files come first). The extension packages (T40) are `PluginsSection`.
+import { PageHeadActions } from './page-head.js';
+import { ScopePicker } from './ScopePicker.js';
+import { SettingsRow, SettingsSection } from './layout.js';
+import { WorkspaceOptions } from './WorkspaceOptions.js';
+import { SettingsInfo } from './layout.js';
 import type { ResourceIssue, ResourceWarning, SkillInfo } from '@piarc/protocol';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -15,6 +20,7 @@ import { parseWorkspaces } from './AgentsPage.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { PluginsSection } from './PluginsSection.js';
 import { reason } from '../shell/errors.js';
+import { ChevronDownIcon } from '../shell/icons.js';
 
 interface SkillsView {
   readonly skills: readonly SkillInfo[];
@@ -79,45 +85,108 @@ function SkillRow({ skill }: { readonly skill: SkillInfo }) {
       ? t('skills.who.user')
       : t('skills.who.none');
   return (
-    <li className="agent-row" data-testid="skill-row" data-name={skill.name}>
-      <div className="agent-row-head">
-        <strong>{skill.name}</strong>
-        <span className="muted small" data-testid="skill-source">
-          {sourceLabel(t, skill.source)}
-        </span>
-      </div>
-      <p className="small">{skill.description}</p>
-      <div className="muted small" data-testid="skill-who">
-        {who}
-        {skill.argumentHint == null ? null : ` · ${skill.argumentHint}`}
-      </div>
-      {(skill.allowedTools ?? []).length === 0 ? null : (
-        <div className="muted small" data-testid="skill-allowed">
-          {t('skills.allowed', { tools: (skill.allowedTools ?? []).join(', ') })}
+    <li className="package-row" data-testid="skill-row" data-name={skill.name}>
+      <details className="package-details">
+        <summary className="package-summary">
+          <span className="package-text">
+            <span className="package-name">
+              <span className="mono-text">{skill.name}</span>
+              <span className="settings-badge" data-testid="skill-source">
+                {sourceLabel(t, skill.source)}
+              </span>
+            </span>
+            {skill.description === '' ? null : (
+              <span className="package-description">{skill.description}</span>
+            )}
+            <span className="package-meta" data-testid="skill-who">
+              {who}
+              {skill.argumentHint == null ? null : ` · ${skill.argumentHint}`}
+            </span>
+          </span>
+          <span className="diagnostics-chevron">
+            <ChevronDownIcon />
+          </span>
+        </summary>
+        <div className="package-body">
+          <p className="mono-text package-source">{skill.path}</p>
+          <ul className="package-components">
+            {(skill.allowedTools ?? []).length === 0 ? null : (
+              <li data-testid="skill-allowed">
+                {t('skills.allowed', { tools: (skill.allowedTools ?? []).join(', ') })}
+              </li>
+            )}
+            {(skill.paths ?? []).length === 0 ? null : (
+              <li>{t('skills.paths', { paths: (skill.paths ?? []).join(', ') })}</li>
+            )}
+            {skill.hooks === true ? <li>{t('skills.hooks')}</li> : null}
+            {(skill.overrides ?? []).map((path) => (
+              <li key={path} data-testid="skill-override">
+                {t('agents.overrides', { path })}
+              </li>
+            ))}
+          </ul>
         </div>
-      )}
-      {(skill.paths ?? []).length === 0 ? null : (
-        <div className="muted small">
-          {t('skills.paths', { paths: (skill.paths ?? []).join(', ') })}
-        </div>
-      )}
-      {skill.hooks === true ? <div className="muted small">{t('skills.hooks')}</div> : null}
-      <div className="muted small diagnostics-code">{skill.path}</div>
-      {(skill.overrides ?? []).map((path) => (
-        <div key={path} className="muted small" data-testid="skill-override">
-          {t('agents.overrides', { path })}
-        </div>
-      ))}
+      </details>
       {(skill.warnings ?? []).length === 0 ? null : (
-        <ul className="subagent-warnings" data-testid="skill-warnings">
+        <ul className="package-warnings" data-testid="skill-warnings">
           {(skill.warnings ?? []).map((w, index) => (
-            <li key={`${w.kind}-${String(index)}`} className="muted">
-              {warningText(t, w)}
-            </li>
+            <li key={`${w.kind}-${String(index)}`}>{warningText(t, w)}</li>
           ))}
         </ul>
       )}
     </li>
+  );
+}
+
+/** How many skills show before "show more"; a filter appears above this many. */
+const SHOWN = 10;
+
+function SkillList({ skills }: { readonly skills: readonly SkillInfo[] }) {
+  const { t } = useApp();
+  const [filter, setFilter] = useState('');
+  const [shown, setShown] = useState(SHOWN);
+  const needle = filter.trim().toLowerCase();
+  const matching =
+    needle === ''
+      ? skills
+      : skills.filter(
+          (s) =>
+            s.name.toLowerCase().includes(needle) || s.description.toLowerCase().includes(needle),
+        );
+  return (
+    <>
+      {skills.length > SHOWN && (
+        <input
+          className="input diagnostics-filter"
+          type="search"
+          value={filter}
+          aria-label={t('skills.filter')}
+          placeholder={t('skills.filter')}
+          data-testid="skill-filter"
+          onChange={(e) => {
+            setFilter(e.currentTarget.value);
+            setShown(SHOWN);
+          }}
+        />
+      )}
+      <ul className="package-list" data-testid="skill-list">
+        {matching.slice(0, shown).map((skill) => (
+          <SkillRow key={skill.name} skill={skill} />
+        ))}
+      </ul>
+      {matching.length > shown && (
+        <button
+          type="button"
+          className="settings-add-link"
+          data-testid="skill-more"
+          onClick={() => {
+            setShown((n) => n + SHOWN * 2);
+          }}
+        >
+          {t('usage.sessions.more', { count: Math.min(SHOWN * 2, matching.length - shown) })}
+        </button>
+      )}
+    </>
   );
 }
 
@@ -146,47 +215,50 @@ function StyleSection({ workspace }: { readonly workspace: string }) {
       </p>
     );
   return (
-    <section data-testid="output-style-section">
-      <h2 className="settings-heading">{t('outputStyle.title')}</h2>
-      <p className="muted small" data-testid="output-style-current">
-        {t('skills.style.current', { name: list.style })}
-      </p>
-      <label htmlFor={selectId} className="permission-filter-label">
-        {t('skills.style.default')}
-        {managed && <ManagedBadge testId="managed-output-style" />}
-      </label>
-      <select
-        id={selectId}
-        className="input"
-        disabled={managed}
-        data-testid="output-style-select"
-        value={userStyle}
-        onChange={(e) => {
-          const name = e.currentTarget.value;
-          window.piarc
-            .setOutputStyle(null, name === '' ? null : name)
-            .then(() => {
-              setUserStyle(name);
-              load();
-            })
-            .catch((failure: unknown) => {
-              setError(reason(failure));
-            });
-        }}
+    <SettingsSection title={t('outputStyle.title')} testId="output-style-section">
+      <SettingsRow
+        label={t('skills.style.default')}
+        htmlFor={selectId}
+        badge={managed && <ManagedBadge testId="managed-output-style" />}
+        description={
+          <span data-testid="output-style-current">
+            {t('skills.style.current', { name: list.style })}
+          </span>
+        }
       >
-        <option value="">{t('skills.style.unset')}</option>
-        {list.styles.map((style) => (
-          <option key={style.name} value={style.name}>
-            {`${style.name} — ${styleDescription(t, style)}`}
-          </option>
-        ))}
-      </select>
+        <select
+          id={selectId}
+          className="input"
+          disabled={managed}
+          data-testid="output-style-select"
+          value={userStyle}
+          onChange={(e) => {
+            const name = e.currentTarget.value;
+            window.piarc
+              .setOutputStyle(null, name === '' ? null : name)
+              .then(() => {
+                setUserStyle(name);
+                load();
+              })
+              .catch((failure: unknown) => {
+                setError(reason(failure));
+              });
+          }}
+        >
+          <option value="">{t('skills.style.unset')}</option>
+          {list.styles.map((style) => (
+            <option key={style.name} value={style.name}>
+              {`${style.name} — ${styleDescription(t, style)}`}
+            </option>
+          ))}
+        </select>
+      </SettingsRow>
       {error === '' ? null : (
         <p className="error-text" role="alert">
           {error}
         </p>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -224,68 +296,65 @@ export function SkillsPage() {
   }, [chosen, t]);
   useEffect(load, [load]);
   return (
-    <div className="agents-page settings-detail-page" data-testid="skills-page">
-      <p className="muted">{t('skills.hint')}</p>
+    <div className="settings-detail-page" data-testid="skills-page">
+      <PageHeadActions>
+        <SettingsInfo text={t('skills.hint')} />
+      </PageHeadActions>
       {chosen === null ? (
         <p className="muted">{t('agents.noWorkspace')}</p>
       ) : (
-        <div className="permission-filters">
-          <label htmlFor={selectId} className="permission-filter-label">
-            {t('permissions.workspace')}
-          </label>
-          <select
-            id={selectId}
-            className="input"
-            value={chosen}
-            data-testid="skills-workspace"
-            onChange={(e) => {
-              setChosen(e.currentTarget.value);
-            }}
-          >
-            {workspaces.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PageHeadActions>
+          <ScopePicker>
+            <select
+              id={selectId}
+              aria-label={t('permissions.workspace')}
+              className="settings-scope-select"
+              value={chosen}
+              data-testid="skills-workspace"
+              onChange={(e) => {
+                setChosen(e.currentTarget.value);
+              }}
+            >
+              <WorkspaceOptions workspaces={workspaces} />
+            </select>
+          </ScopePicker>
+        </PageHeadActions>
       )}
       {error === '' ? null : (
         <p className="error-text" role="alert">
           {error}
         </p>
       )}
-      {chosen === null ? null : <StyleSection workspace={chosen} />}
-      <PluginsSection workspace={chosen} />
       {view === undefined ? null : (
-        <>
-          <h2 className="settings-heading">{t('skills.title')}</h2>
-          {view.skills.length === 0 ? <p className="muted">{t('skills.none')}</p> : null}
-          <ul className="agent-list" data-testid="skill-list">
-            {view.skills.map((skill) => (
-              <SkillRow key={skill.name} skill={skill} />
-            ))}
-          </ul>
-          {view.issues.length === 0 ? null : (
-            <section data-testid="skill-issues">
-              <h2 className="settings-heading">{t('skills.issues')}</h2>
-              <ul>
-                {view.issues.map((issue) => (
-                  <li key={`${issue.path}:${String(issue.line ?? 0)}`} className="error-text">
-                    {issue.line == null
-                      ? t('agents.issueNoLine', { path: issue.path, message: issue.message })
-                      : t('agents.issue', {
-                          path: issue.path,
-                          line: issue.line,
-                          message: issue.message,
-                        })}
-                  </li>
-                ))}
-              </ul>
-            </section>
+        <SettingsSection
+          title={t('skills.title')}
+          testId="skills-section"
+          aside={<span className="settings-block-count">{view.skills.length}</span>}
+        >
+          {view.skills.length === 0 ? (
+            <p className="settings-row-note package-empty">{t('skills.none')}</p>
+          ) : (
+            <SkillList key={chosen ?? ''} skills={view.skills} />
           )}
-        </>
+          {view.issues.length === 0 ? null : (
+            <ul className="package-warnings" data-testid="skill-issues">
+              {view.issues.map((issue) => (
+                <li key={`${issue.path}:${String(issue.line ?? 0)}`}>
+                  {issue.line == null
+                    ? t('agents.issueNoLine', { path: issue.path, message: issue.message })
+                    : t('agents.issue', {
+                        path: issue.path,
+                        line: issue.line,
+                        message: issue.message,
+                      })}
+                </li>
+              ))}
+            </ul>
+          )}
+        </SettingsSection>
       )}
+      <PluginsSection workspace={chosen} />
+      {chosen === null ? null : <StyleSection workspace={chosen} />}
     </div>
   );
 }

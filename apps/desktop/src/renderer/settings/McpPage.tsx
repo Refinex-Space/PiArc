@@ -2,9 +2,15 @@
 // is reached, its state in the workspace's pool, how many tools it offers and its last error,
 // with reconnect, turn on, turn off and sign in. Core stores the on/off choice per workspace;
 // the pool's state arrives on `core/mcp`, a sign-in's steps on `core/login`.
+import { PageHeadActions } from './page-head.js';
+import { ScopePicker } from './ScopePicker.js';
+import { SettingsInfo, SettingsSection } from './layout.js';
+import { McpAddDialog } from './McpAddDialog.js';
+import { SegmentedControl } from '../app/SegmentedControl.js';
+import { PlusIcon, ReloadIcon } from '../shell/icons.js';
 import type { McpServerStatus, McpStatus } from '@piarc/protocol';
 import { WorkspaceOptions } from './WorkspaceOptions.js';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useState } from 'react';
 
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
@@ -108,7 +114,20 @@ function updatesFor(payload: Uint8Array, workspace: string): McpStatus[] {
   }
 }
 
+/** Which servers the list shows: every one, the ones every project gets, or this project's. */
+type Filter = 'all' | 'allProjects' | 'thisProject';
+const FILTERS: readonly Filter[] = ['all', 'allProjects', 'thisProject'];
+/** Scopes that apply only to this project; the others (user, managed, plugin) apply to all. */
+const PROJECT_SCOPES = new Set(['project', 'local', 'subagent']);
+
+function shownBy(filter: Filter, server: McpServerStatus): boolean {
+  if (filter === 'all') return true;
+  return PROJECT_SCOPES.has(server.scope) === (filter === 'thisProject');
+}
+
 const RUNNING = new Set(['connected', 'connecting', 'idle', 'needsAuth', 'failed']);
+/** States that need the user's eye: named next to the server instead of in its details. */
+const FLAGGED = new Set(['needsAuth', 'failed', 'unsupported', 'untrusted']);
 
 function ServerRow({
   server,
@@ -125,72 +144,89 @@ function ServerRow({
 }) {
   const { t } = useApp();
   const running = RUNNING.has(server.state);
+  const flagged = FLAGGED.has(server.state);
+  const state = (
+    <span
+      className={flagged ? `settings-badge mcp-state is-${server.state}` : 'mcp-state'}
+      data-testid="mcp-state"
+    >
+      {t(`mcp.state.${server.state}`)}
+    </span>
+  );
+  const signIn =
+    server.state === 'needsAuth' || (server.oauth === true && server.state === 'failed');
+  const switchable = running || server.state === 'disabled';
   return (
     <li
-      className="agent-row"
+      className="mcp-server"
       data-testid="mcp-server"
       data-name={server.name}
       data-state={server.state}
     >
-      <div className="agent-row-head">
-        <strong>{server.name}</strong>
-        <span className={`mcp-state is-${server.state}`} data-testid="mcp-state">
-          {t(`mcp.state.${server.state}`)}
-        </span>
-      </div>
-      <div className="muted small">
-        {t(`mcp.transport.${server.transport}`)}
-        {' · '}
-        {t(`mcp.scope.${server.scope}`)}
-        {server.state === 'unsupported' ? null : (
-          <>
-            {' · '}
-            <span data-testid="mcp-tools">{t('mcp.tools', { count: server.tools })}</span>
-          </>
+      <span className={`mcp-dot is-${server.state}`} aria-hidden="true" />
+      <div className="mcp-server-text">
+        <div className="mcp-server-name">
+          <span className="mono-text">{server.name}</span>
+          {flagged ? state : null}
+        </div>
+        <div className="mcp-server-meta">
+          {[
+            <span
+              key="scope"
+              data-tooltip={server.source}
+              data-testid="mcp-source"
+              data-source={server.source}
+            >
+              {t(`mcp.scope.${server.scope}`)}
+            </span>,
+            <span key="transport">{t(`mcp.transport.${server.transport}`)}</span>,
+            server.state === 'unsupported' ? null : (
+              <span key="tools" data-testid="mcp-tools">
+                {t('mcp.tools', { count: server.tools })}
+              </span>
+            ),
+            server.sessions > 0 ? (
+              <span key="sessions">{t('mcp.sessions', { count: server.sessions })}</span>
+            ) : null,
+            flagged ? null : <Fragment key="state">{state}</Fragment>,
+          ]
+            .filter((part) => part !== null)
+            .flatMap((part, i) => (i === 0 ? [part] : [' · ', part]))}
+        </div>
+        {server.error == null ? null : (
+          <p className="mcp-error" data-testid="mcp-error" data-tooltip={server.error}>
+            {server.error}
+          </p>
         )}
-        {server.sessions > 0 ? ` · ${t('mcp.sessions', { count: server.sessions })}` : ''}
       </div>
-      <div className="muted small diagnostics-code" data-testid="mcp-source">
-        {server.source}
-      </div>
-      {server.error == null ? null : (
-        <pre className="mcp-error small" data-testid="mcp-error">
-          {server.error}
-        </pre>
-      )}
-      <div className="dialog-actions mcp-actions">
-        {server.state === 'needsAuth' || (server.oauth === true && server.state === 'failed') ? (
-          <Button variant="primary" data-testid="mcp-sign-in" disabled={busy} onClick={onSignIn}>
+      <div className="mcp-server-actions">
+        {signIn ? (
+          <Button size="small" data-testid="mcp-sign-in" disabled={busy} onClick={onSignIn}>
             {t('mcp.signIn')}
           </Button>
-        ) : null}
-        {running ? (
-          <Button size="small" data-testid="mcp-reconnect" disabled={busy} onClick={onReconnect}>
+        ) : running ? (
+          <Button
+            variant="ghost"
+            size="small"
+            data-testid="mcp-reconnect"
+            disabled={busy}
+            onClick={onReconnect}
+          >
             {t('mcp.reconnect')}
           </Button>
         ) : null}
-        {running ? (
-          <Button
-            size="small"
-            data-testid="mcp-disable"
+        {switchable ? (
+          <input
+            type="checkbox"
+            className="preference-switch"
+            checked={running}
             disabled={busy}
-            onClick={() => {
-              onEnabled(false);
+            aria-label={t('mcp.enabledNamed', { name: server.name })}
+            data-testid={running ? 'mcp-disable' : 'mcp-enable'}
+            onChange={(e) => {
+              onEnabled(e.currentTarget.checked);
             }}
-          >
-            {t('mcp.disable')}
-          </Button>
-        ) : server.state === 'disabled' ? (
-          <Button
-            size="small"
-            data-testid="mcp-enable"
-            disabled={busy}
-            onClick={() => {
-              onEnabled(true);
-            }}
-          >
-            {t('mcp.enable')}
-          </Button>
+          />
         ) : null}
       </div>
     </li>
@@ -204,6 +240,8 @@ export function McpPage() {
   const [chosen, setChosen] = useState<string | null>(null);
   const [status, setStatus] = useState<McpStatus | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [filter, setFilter] = useState<Filter>('all');
   const [error, setError] = useState('');
   useEffect(() => {
     window.piarc
@@ -266,27 +304,29 @@ export function McpPage() {
       });
   };
   return (
-    <div className="agents-page settings-detail-page" data-testid="mcp-page">
-      <p className="muted">{t('mcp.hint')}</p>
+    <div className="settings-detail-page mcp-page" data-testid="mcp-page">
+      <PageHeadActions>
+        <SettingsInfo text={t('mcp.hint')} />
+      </PageHeadActions>
       {chosen === null ? (
         <p className="muted">{t('mcp.noWorkspace')}</p>
       ) : (
-        <div className="permission-filters">
-          <label htmlFor={selectId} className="permission-filter-label">
-            {t('permissions.workspace')}
-          </label>
-          <select
-            id={selectId}
-            className="input"
-            value={chosen}
-            data-testid="mcp-workspace"
-            onChange={(e) => {
-              setChosen(e.currentTarget.value);
-            }}
-          >
-            <WorkspaceOptions workspaces={workspaces} />
-          </select>
-        </div>
+        <PageHeadActions>
+          <ScopePicker>
+            <select
+              id={selectId}
+              aria-label={t('permissions.workspace')}
+              className="settings-scope-select"
+              value={chosen}
+              data-testid="mcp-workspace"
+              onChange={(e) => {
+                setChosen(e.currentTarget.value);
+              }}
+            >
+              <WorkspaceOptions workspaces={workspaces} />
+            </select>
+          </ScopePicker>
+        </PageHeadActions>
       )}
       {error === '' ? null : (
         <p className="error-text" role="alert">
@@ -304,71 +344,148 @@ export function McpPage() {
         )
       ) : (
         <>
-          <h2 className="settings-heading">{t('mcp.title')}</h2>
-          {status.servers.length === 0 ? (
-            <p className="muted" data-testid="mcp-empty">
-              {t('mcp.empty')}
-            </p>
-          ) : (
-            <ul className="agent-list" data-testid="mcp-servers">
-              {status.servers.map((server) => (
-                <ServerRow
-                  key={server.name}
-                  server={server}
-                  busy={busy || signIn.open}
-                  onReconnect={() => {
-                    act(() => window.piarc.mcpReconnect(chosen ?? '', server.name));
+          <SettingsSection
+            title={t('mcp.servers')}
+            testId="mcp-servers-section"
+            aside={
+              <>
+                {status.servers.length === 0 ? null : (
+                  <SegmentedControl<Filter>
+                    aria-label={t('mcp.filter')}
+                    name="mcp-filter"
+                    options={FILTERS}
+                    value={filter}
+                    labelOf={(f) => t(`mcp.filter.${f}`)}
+                    onChange={setFilter}
+                    testIdPrefix="mcp-filter"
+                  />
+                )}
+                {status.servers.some((s) => RUNNING.has(s.state)) ? (
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    data-testid="mcp-reconnect-all"
+                    disabled={busy || signIn.open}
+                    onClick={() => {
+                      const workspace = chosen ?? '';
+                      act(async () => {
+                        let last = '';
+                        for (const s of status.servers.filter((s) => RUNNING.has(s.state))) {
+                          last = await window.piarc.mcpReconnect(workspace, s.name);
+                        }
+                        return last;
+                      });
+                    }}
+                  >
+                    <ReloadIcon />
+                    {t('mcp.reconnectAll')}
+                  </Button>
+                ) : null}
+              </>
+            }
+          >
+            <ul className="mcp-servers" data-testid="mcp-servers">
+              {status.servers.length === 0 ? (
+                <li className="mcp-empty muted" data-testid="mcp-empty">
+                  {t('mcp.empty')}
+                </li>
+              ) : null}
+              {status.servers.length > 0 &&
+              !status.servers.some((server) => shownBy(filter, server)) ? (
+                <li className="mcp-empty muted" data-testid="mcp-filter-empty">
+                  {t('mcp.filter.empty')}
+                </li>
+              ) : null}
+              {status.servers
+                .filter((server) => shownBy(filter, server))
+                .map((server) => (
+                  <ServerRow
+                    key={server.name}
+                    server={server}
+                    busy={busy || signIn.open}
+                    onReconnect={() => {
+                      act(() => window.piarc.mcpReconnect(chosen ?? '', server.name));
+                    }}
+                    onEnabled={(enabled) => {
+                      act(() => window.piarc.mcpSetEnabled(chosen ?? '', server.name, enabled));
+                    }}
+                    onSignIn={() => {
+                      const workspace = chosen ?? '';
+                      signIn.start(
+                        {
+                          id: `mcp:${server.name}`,
+                          name: server.name,
+                          label: '',
+                          subscription: false,
+                          signedIn: false,
+                        },
+                        () => window.piarc.mcpLogin(workspace, server.name),
+                      );
+                    }}
+                  />
+                ))}
+              <li className="mcp-add-row">
+                <button
+                  type="button"
+                  className="settings-add-link"
+                  data-testid="mcp-add"
+                  disabled={busy || chosen === null}
+                  onClick={() => {
+                    setAdding(true);
                   }}
-                  onEnabled={(enabled) => {
-                    act(() => window.piarc.mcpSetEnabled(chosen ?? '', server.name, enabled));
-                  }}
-                  onSignIn={() => {
-                    const workspace = chosen ?? '';
-                    signIn.start(
-                      {
-                        id: `mcp:${server.name}`,
-                        name: server.name,
-                        label: '',
-                        subscription: false,
-                        signedIn: false,
-                      },
-                      () => window.piarc.mcpLogin(workspace, server.name),
-                    );
-                  }}
-                />
-              ))}
+                >
+                  <PlusIcon />
+                  {t('mcp.add')}
+                </button>
+              </li>
             </ul>
-          )}
+          </SettingsSection>
           {(status.overridden ?? []).length === 0 ? null : (
-            <section data-testid="mcp-overridden">
-              <h2 className="settings-heading">{t('mcp.overridden')}</h2>
-              <ul>
+            <SettingsSection title={t('mcp.overridden')} testId="mcp-overridden">
+              <ul className="mcp-notes">
                 {(status.overridden ?? []).map((o) => (
-                  <li key={`${o.name}:${o.source}`} className="muted small">
+                  <li key={`${o.name}:${o.source}`}>
                     {t('mcp.overriddenBy', { name: o.name, source: o.source, by: o.by })}
                   </li>
                 ))}
               </ul>
-            </section>
+            </SettingsSection>
           )}
           {(status.issues ?? []).length === 0 ? null : (
-            <section data-testid="mcp-issues">
-              <h2 className="settings-heading">{t('mcp.issues')}</h2>
-              <ul>
+            <SettingsSection title={t('mcp.issues')} testId="mcp-issues">
+              <ul className="mcp-notes">
                 {(status.issues ?? []).map((i, index) => (
-                  <li key={`${i.source}${i.pointer}${String(index)}`} className="error-text">
-                    <span className="diagnostics-code">
-                      {i.source} {i.pointer}
+                  <li key={`${i.source}${i.pointer}${String(index)}`}>
+                    <span className="mono-text" data-tooltip={i.source}>
+                      {i.pointer || i.source}
                     </span>{' '}
                     {i.message}
                   </li>
                 ))}
               </ul>
-            </section>
+            </SettingsSection>
           )}
         </>
       )}
       {signIn.dialog}
+      {adding && chosen !== null ? (
+        <McpAddDialog
+          workspace={chosen}
+          taken={[
+            ...(status?.servers ?? []).map((s) => s.name),
+            ...(status?.overridden ?? []).map((o) => o.name),
+          ]}
+          onClose={() => {
+            setAdding(false);
+          }}
+          onAdded={(raw) => {
+            setAdding(false);
+            const next = parseStatus(JSON.parse(raw));
+            if (next !== undefined) setStatus(next);
+            else load();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

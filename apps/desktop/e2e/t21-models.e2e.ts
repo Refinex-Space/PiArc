@@ -136,6 +136,8 @@ test('provider settings validate, edit, and remove built-in, cloud, and keyless 
       await settings.getByTestId('provider-key').fill(randomUUID());
     }
     await settings.getByTestId('provider-save').click();
+    // Edit and remove sit in the row's "…" menu (ADR-0101).
+    await settings.getByTestId(`provider-more-${id}`).click();
     await settings.getByTestId(`provider-edit-${id}`).click();
     await expect(settings.getByTestId('provider-key')).toHaveValue('');
     if (kind === 'local')
@@ -154,7 +156,8 @@ test('provider settings validate, edit, and remove built-in, cloud, and keyless 
       await settings.screenshot({ path: testInfo.outputPath('local-off.png') });
       await settings.getByTestId(`provider-enabled-${id}`).check();
     }
+    await settings.getByTestId(`provider-more-${id}`).click();
     await settings.getByTestId(`provider-delete-${id}`).click();
-    await expect(settings.getByTestId(`provider-edit-${id}`)).toHaveCount(0);
+    await expect(settings.getByTestId(`provider-row-${id}`)).toHaveCount(0);
   }
 });

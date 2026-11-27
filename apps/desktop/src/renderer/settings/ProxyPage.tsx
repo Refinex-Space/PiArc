@@ -11,6 +11,7 @@ import {
   type ProxyUrlProblem,
 } from '../../shared/preferences.js';
 import { Button } from '../app/Button.js';
+import { SettingsRow, SettingsSection } from './layout.js';
 import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
@@ -75,93 +76,100 @@ export function ProxyPage() {
   };
   const saved = mode === 'manual' && draft.trim() === url;
   return (
-    <div className="preference-rows proxy-settings" data-testid="proxy-settings">
-      <div className="preference-row">
-        <div className="preference-copy">
-          <span id={modeLabel} className="proxy-label">
-            {t('proxy.mode')}
-            <span
-              className="proxy-info"
-              role="img"
-              tabIndex={0}
-              aria-label={t('proxy.info')}
-              data-tooltip={t('proxy.info')}
-            >
-              <InfoGlyph size={12} />
-            </span>
-            {managed && <ManagedBadge testId="managed-proxy" />}
-          </span>
-        </div>
-        <SegmentedControl
-          options={PROXY_MODES}
-          value={chosen}
-          onChange={choose}
-          disabled={managed}
-          name="proxy-mode"
-          testIdPrefix="proxy-mode"
-          aria-labelledby={modeLabel}
-          labelOf={(option) => t(option === 'auto' ? 'proxy.mode.auto' : 'proxy.mode.manual')}
-        />
-      </div>
-      {chosen === 'auto' ? (
-        <div className="preference-row proxy-detected">
-          <div className="preference-copy">
-            <span className="proxy-system-label">{t('proxy.system')}</span>
-            <span className="proxy-value" data-testid="proxy-system" aria-live="polite">
-              {system === undefined
-                ? t('proxy.system.detecting')
-                : (system ?? t('proxy.system.none'))}
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            data-testid="proxy-detect"
-            loading={system === undefined}
-            onClick={detect}
+    <div className="proxy-settings" data-testid="proxy-settings">
+      <SettingsSection
+        title={t('proxy.mode')}
+        aside={
+          <span
+            className="settings-info proxy-info"
+            role="img"
+            tabIndex={0}
+            aria-label={t('proxy.info')}
+            data-tooltip={t('proxy.info')}
           >
-            {t('proxy.detect')}
-          </Button>
-        </div>
-      ) : (
-        <form
-          className="preference-row proxy-address"
-          onSubmit={(event) => {
-            event.preventDefault();
-            saveAddress();
-          }}
-        >
-          <label className="preference-copy" htmlFor={addressId}>
-            {t('proxy.address')}
-          </label>
-          <span className="proxy-field">
-            <input
-              id={addressId}
-              className="input"
-              data-testid="proxy-url"
-              value={draft}
-              disabled={managed}
-              placeholder={t('proxy.address.example')}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              aria-invalid={error !== undefined}
-              aria-describedby={error === undefined ? undefined : errorId}
-              onChange={(event) => {
-                setDraft(event.currentTarget.value);
-                setError(undefined);
-              }}
-            />
-            <Button
-              type="submit"
-              variant="primary"
-              data-testid="proxy-save"
-              disabled={managed || saved || draft.trim() === ''}
-            >
-              {saved ? t('proxy.saved') : t('proxy.save')}
-            </Button>
+            <InfoGlyph size={12} />
           </span>
-        </form>
-      )}
+        }
+      >
+        <SettingsRow
+          label={t('settings.proxy')}
+          labelId={modeLabel}
+          description={t('proxy.mode.hint')}
+          badge={managed && <ManagedBadge testId="managed-proxy" />}
+        >
+          <SegmentedControl
+            options={PROXY_MODES}
+            value={chosen}
+            onChange={choose}
+            disabled={managed}
+            name="proxy-mode"
+            testIdPrefix="proxy-mode"
+            aria-labelledby={modeLabel}
+            labelOf={(option) => t(option === 'auto' ? 'proxy.mode.auto' : 'proxy.mode.manual')}
+          />
+        </SettingsRow>
+        {chosen === 'auto' ? (
+          <SettingsRow
+            testId="proxy-detected"
+            label={<span className="proxy-system-label">{t('proxy.system')}</span>}
+            description={
+              <span className="proxy-value" data-testid="proxy-system" aria-live="polite">
+                {system === undefined
+                  ? t('proxy.system.detecting')
+                  : (system ?? t('proxy.system.none'))}
+              </span>
+            }
+          >
+            <Button
+              variant="ghost"
+              data-testid="proxy-detect"
+              loading={system === undefined}
+              onClick={detect}
+            >
+              {t('proxy.detect')}
+            </Button>
+          </SettingsRow>
+        ) : (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveAddress();
+            }}
+          >
+            <SettingsRow
+              label={t('proxy.address')}
+              htmlFor={addressId}
+              description={t('proxy.address.hint')}
+            >
+              <input
+                id={addressId}
+                className="input mono-input proxy-address-input"
+                data-testid="proxy-url"
+                value={draft}
+                disabled={managed}
+                placeholder={t('proxy.address.example')}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                aria-invalid={error !== undefined}
+                aria-describedby={error === undefined ? undefined : errorId}
+                onChange={(event) => {
+                  setDraft(event.currentTarget.value);
+                  setError(undefined);
+                }}
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                data-testid="proxy-save"
+                disabled={managed || saved || draft.trim() === ''}
+              >
+                {saved ? t('proxy.saved') : t('proxy.save')}
+              </Button>
+            </SettingsRow>
+          </form>
+        )}
+      </SettingsSection>
       {error !== undefined && (
         <p id={errorId} className="error-text" role="alert" data-testid="proxy-error">
           {error}

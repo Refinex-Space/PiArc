@@ -44,6 +44,7 @@ import { UsagePage } from '../usage/UsagePage.js';
 import { Keycaps } from '../app/Keycaps.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { Button } from '../app/Button.js';
+import { SettingsRow, SettingsSection } from './layout.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
   const { t } = useApp();
@@ -61,34 +62,6 @@ function useSave(): { save: (change: PreferenceChange) => void; error: string | 
       });
     },
   };
-}
-
-function themeIcon(theme: (typeof THEMES)[number]) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {theme === 'system' ? (
-        <>
-          <rect x="2.75" y="4" width="18.5" height="13.25" rx="2" />
-          <path d="M12 17.25v3M8.5 20.25h7" />
-        </>
-      ) : theme === 'light' ? (
-        <>
-          <circle cx="12" cy="12" r="4.25" />
-          <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-        </>
-      ) : (
-        <path d="M20.8 14.7a9.25 9.25 0 0 1-11.5-11.5A9.25 9.25 0 1 0 20.8 14.7Z" />
-      )}
-    </svg>
-  );
 }
 
 function Choice<T extends string>({
@@ -186,161 +159,226 @@ function GeneralPage() {
   }, []);
   const { save, error } = useSave();
   const languageId = useId();
-  const notificationDescription = useId();
+  const readBothId = useId();
+  const readBothLabel = useId();
+  const notifyId = useId();
   const notificationLabel = useId();
+  const notificationDescription = useId();
   const managedLanguage = useIsManaged('/language');
   const managedNotifications = useIsManaged('/notifications/enabled');
   const managedReadBoth = useIsManaged('/memory/readBoth');
   return (
-    <div className="preference-rows">
-      <div className="preference-row">
-        <label htmlFor={languageId} className="preference-copy">
-          {t('settings.language')}
-          {managedLanguage && <ManagedBadge testId="managed-language" />}
-        </label>
-        <select
-          id={languageId}
-          className="input preference-language"
-          value={preferences.language}
-          disabled={managedLanguage}
-          data-testid="setting-language"
-          onChange={(event) => {
-            const value = LANGUAGES.find((l) => l === event.currentTarget.value);
-            if (value !== undefined) save({ key: 'language', value });
-          }}
+    <>
+      <SettingsSection title={t('settings.general.basics')}>
+        <SettingsRow
+          label={t('settings.language')}
+          htmlFor={languageId}
+          badge={managedLanguage && <ManagedBadge testId="managed-language" />}
         >
-          {LANGUAGES.map((language) => (
-            <option key={language} value={language}>
-              {t(`settings.language.${language}`)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="preference-row">
-        <span className="preference-copy">
-          <span>
-            {t('settings.notifications')}
-            {managedNotifications && <ManagedBadge testId="managed-notifications" />}
-          </span>
-          <span className="preference-description" id={notificationLabel}>
-            {t('settings.notifications.enabled')}
-          </span>
-          <span
-            className="preference-description"
-            id={notificationDescription}
-            data-testid="setting-notifications-note"
+          <select
+            id={languageId}
+            className="input preference-language"
+            value={preferences.language}
+            disabled={managedLanguage}
+            data-testid="setting-language"
+            onChange={(event) => {
+              const value = LANGUAGES.find((l) => l === event.currentTarget.value);
+              if (value !== undefined) save({ key: 'language', value });
+            }}
           >
-            {typeof notificationInfo === 'string'
+            {LANGUAGES.map((language) => (
+              <option key={language} value={language}>
+                {t(`settings.language.${language}`)}
+              </option>
+            ))}
+          </select>
+        </SettingsRow>
+        <SettingsRow
+          label={t('settings.memory')}
+          description={t('settings.memory.readBoth')}
+          descriptionId={readBothLabel}
+          htmlFor={readBothId}
+          badge={managedReadBoth && <ManagedBadge testId="managed-read-both" />}
+        >
+          <input
+            id={readBothId}
+            type="checkbox"
+            className="preference-switch"
+            checked={preferences.memory.readBoth}
+            disabled={managedReadBoth}
+            aria-labelledby={readBothLabel}
+            data-testid="setting-memory-read-both"
+            onChange={(event) => {
+              save({ key: 'memory.readBoth', value: event.currentTarget.checked });
+            }}
+          />
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection title={t('settings.notifications')}>
+        <SettingsRow
+          label={t('settings.notifications.background')}
+          description={t('settings.notifications.enabled')}
+          descriptionId={notificationLabel}
+          htmlFor={notifyId}
+          badge={managedNotifications && <ManagedBadge testId="managed-notifications" />}
+        >
+          <input
+            id={notifyId}
+            type="checkbox"
+            className="preference-switch"
+            checked={preferences.notifications.enabled}
+            disabled={managedNotifications}
+            aria-describedby={`${notificationLabel} ${notificationDescription}`}
+            data-testid="setting-notifications"
+            onChange={(event) => {
+              save({ key: 'notifications.enabled', value: event.currentTarget.checked });
+            }}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={t(
+            notificationInfo === true
+              ? 'settings.notifications.approvals'
+              : 'settings.notifications.unavailable',
+          )}
+          description={
+            typeof notificationInfo === 'string'
               ? notificationInfo
               : t(
                   notificationInfo
                     ? 'settings.notifications.actions'
                     : 'settings.notifications.unsupported',
-                )}
-          </span>
-        </span>
-        <input
-          type="checkbox"
-          className="preference-switch"
-          checked={preferences.notifications.enabled}
-          disabled={managedNotifications}
-          aria-labelledby={notificationLabel}
-          aria-describedby={notificationDescription}
-          data-testid="setting-notifications"
-          onChange={(event) => {
-            save({ key: 'notifications.enabled', value: event.currentTarget.checked });
-          }}
+                )
+          }
+          descriptionId={notificationDescription}
+          descriptionTestId="setting-notifications-note"
         />
-      </label>
-      <label className="preference-row">
-        <span className="preference-copy">
-          <span>
-            {t('settings.memory')}
-            {managedReadBoth && <ManagedBadge testId="managed-read-both" />}
-          </span>
-          <span className="preference-description">{t('settings.memory.readBoth')}</span>
-        </span>
-        <input
-          type="checkbox"
-          className="preference-switch"
-          checked={preferences.memory.readBoth}
-          disabled={managedReadBoth}
-          data-testid="setting-memory-read-both"
-          onChange={(event) => {
-            save({ key: 'memory.readBoth', value: event.currentTarget.checked });
-          }}
-        />
-      </label>
+      </SettingsSection>
       {error !== undefined && (
         <p className="error-text" role="alert">
           {error}
         </p>
       )}
-    </div>
+    </>
+  );
+}
+
+/** The colour mode as three pictures of the app (system shows both halves). */
+function ThemeCards({
+  value,
+  onChange,
+}: {
+  readonly value: (typeof THEMES)[number];
+  readonly onChange: (theme: (typeof THEMES)[number]) => void;
+}) {
+  const { t } = useApp();
+  const name = useId();
+  const labelId = useId();
+  const hintId = useId();
+  const managed = useIsManaged('/appearance/theme');
+  return (
+    <SettingsRow
+      testId="setting-theme"
+      label={t('settings.theme.title')}
+      labelId={labelId}
+      description={t('settings.theme.hint')}
+      descriptionId={hintId}
+      badge={managed && <ManagedBadge testId="managed-theme" />}
+    >
+      <div
+        className="theme-cards"
+        role="radiogroup"
+        aria-labelledby={labelId}
+        aria-describedby={hintId}
+      >
+        {THEMES.map((theme) => (
+          <label key={theme} className="theme-card">
+            <input
+              type="radio"
+              className="theme-card-input"
+              name={name}
+              value={theme}
+              checked={value === theme}
+              disabled={managed}
+              data-testid={`theme-${theme}`}
+              onChange={() => {
+                onChange(theme);
+              }}
+            />
+            <span className="theme-shot" aria-hidden="true">
+              {theme !== 'dark' && <span className="theme-shot-pane is-light" />}
+              {theme !== 'light' && (
+                <span
+                  className={`theme-shot-pane is-dark${theme === 'system' ? ' is-half' : ''}`}
+                />
+              )}
+            </span>
+            <span className="theme-card-name">{t(`settings.theme.${theme}`)}</span>
+          </label>
+        ))}
+      </div>
+    </SettingsRow>
   );
 }
 
 function AppearancePage() {
-  const { preferences } = useApp();
+  const { t, preferences } = useApp();
   const { save, error } = useSave();
   const { appearance } = preferences;
   return (
-    <div className="preference-rows">
-      <Choice
-        label="settings.theme"
-        name="theme"
-        pointer="/appearance/theme"
-        options={THEMES}
-        value={appearance.theme}
-        iconOf={themeIcon}
-        labelOf={(o) => `settings.theme.${o}`}
-        onChange={(value) => {
-          save({ key: 'appearance.theme', value });
-        }}
-      />
-      <Choice
-        label="settings.reduceMotion"
-        name="reduceMotion"
-        pointer="/appearance/reduceMotion"
-        options={MOTIONS}
-        value={appearance.reduceMotion}
-        menu
-        labelOf={(o) => `settings.reduceMotion.${o}`}
-        onChange={(value) => {
-          save({ key: 'appearance.reduceMotion', value });
-        }}
-      />
-      <Choice
-        label="settings.contrast"
-        name="contrast"
-        pointer="/appearance/contrast"
-        hint="settings.contrast.hint"
-        options={CONTRASTS}
-        value={appearance.contrast}
-        menu
-        labelOf={(o) => `settings.contrast.${o}`}
-        onChange={(value) => {
-          save({ key: 'appearance.contrast', value });
-        }}
-      />
-      <Choice
-        label="settings.density"
-        name="density"
-        pointer="/appearance/density"
-        hint="settings.density.hint"
-        options={DENSITY_PREFERENCES}
-        value={appearance.density}
-        labelOf={(o) => `settings.density.${o}`}
-        onChange={(value) => {
-          save({ key: 'appearance.density', value });
-        }}
-      />
+    <>
+      <SettingsSection title={t('settings.appearance.look')}>
+        <ThemeCards
+          value={appearance.theme}
+          onChange={(value) => {
+            save({ key: 'appearance.theme', value });
+          }}
+        />
+        <Choice
+          label="settings.contrast"
+          name="contrast"
+          pointer="/appearance/contrast"
+          hint="settings.contrast.hint"
+          options={CONTRASTS}
+          value={appearance.contrast}
+          labelOf={(o) => `settings.contrast.${o}`}
+          onChange={(value) => {
+            save({ key: 'appearance.contrast', value });
+          }}
+        />
+        <Choice
+          label="settings.density"
+          name="density"
+          pointer="/appearance/density"
+          hint="settings.density.hint"
+          options={DENSITY_PREFERENCES}
+          value={appearance.density}
+          labelOf={(o) => `settings.density.${o}`}
+          onChange={(value) => {
+            save({ key: 'appearance.density', value });
+          }}
+        />
+      </SettingsSection>
+      <SettingsSection title={t('settings.appearance.motion')}>
+        <Choice
+          label="settings.reduceMotion"
+          name="reduceMotion"
+          pointer="/appearance/reduceMotion"
+          hint="settings.reduceMotion.hint"
+          options={MOTIONS}
+          value={appearance.reduceMotion}
+          labelOf={(o) => `settings.reduceMotion.${o}`}
+          onChange={(value) => {
+            save({ key: 'appearance.reduceMotion', value });
+          }}
+        />
+      </SettingsSection>
       {error !== undefined && (
         <p className="error-text" role="alert">
           {error}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
@@ -398,7 +436,6 @@ function ShortcutsPage() {
   };
   return (
     <div className="shortcut-preferences">
-      <p className="shortcut-help muted">{t('settings.shortcuts.hint')}</p>
       <table className="shortcut-table shortcut-editor">
         <thead>
           <tr>
@@ -516,42 +553,58 @@ function ShortcutsPage() {
 export function registerBuiltInSettingsPages(): void {
   registerSettingsPage({
     id: 'markdown',
+    group: 'app',
+    description: 'settings.description.markdown',
     title: 'files.images.markdown',
     order: 12,
     component: MarkdownPage,
   });
   registerSettingsPage({
     id: 'general',
+    group: 'app',
+    description: 'settings.description.general',
     title: 'settings.general',
     order: 0,
     component: GeneralPage,
   });
   registerSettingsPage({
     id: 'appearance',
+    group: 'app',
+    description: 'settings.description.appearance',
     title: 'settings.appearance',
     order: 10,
     component: AppearancePage,
   });
   registerSettingsPage({
     id: 'providers',
+    group: 'models',
+    description: 'settings.description.providers',
     title: 'settings.providers',
     order: 20,
     component: ProvidersPage,
   });
   registerSettingsPage({
     id: 'permissions',
+    group: 'security',
+    description: 'settings.description.permissions',
+    scoped: true,
     title: 'settings.permissions',
     order: 30,
     component: PermissionsPage,
   });
   registerSettingsPage({
     id: 'sandbox',
+    group: 'security',
+    description: 'settings.description.sandbox',
+    scoped: true,
     title: 'settings.sandbox',
     order: 35,
     component: SandboxPage,
   });
   registerSettingsPage({
     id: 'voice',
+    group: 'app',
+    description: 'settings.description.voice',
     title: 'settings.voice',
     // Right after General (voice dictation addendum V-8.1).
     order: 2,
@@ -559,60 +612,85 @@ export function registerBuiltInSettingsPages(): void {
   });
   registerSettingsPage({
     id: 'proxy',
+    group: 'security',
+    description: 'settings.description.proxy',
     title: 'settings.proxy',
     order: 37,
     component: ProxyPage,
   });
   registerSettingsPage({
     id: 'git',
+    group: 'tools',
+    description: 'settings.description.git',
     title: 'settings.git',
     order: 38,
     component: GitPage,
   });
   registerSettingsPage({
     id: 'browser',
+    group: 'tools',
+    description: 'settings.description.browser',
     title: 'settings.browser',
     order: 39,
     component: BrowserPage,
   });
   registerSettingsPage({
     id: 'agents',
+    group: 'agents',
+    description: 'settings.description.agents',
+    scoped: true,
     title: 'settings.agents',
     order: 40,
     component: AgentsPage,
   });
   registerSettingsPage({
     id: 'skills',
+    group: 'agents',
+    description: 'settings.description.skills',
+    scoped: true,
     title: 'settings.skills',
     order: 45,
     component: SkillsPage,
   });
   registerSettingsPage({
     id: 'memory',
+    group: 'agents',
+    description: 'settings.description.memory',
+    scoped: true,
     title: 'settings.autoMemory',
     order: 47,
     component: MemoryPage,
   });
   registerSettingsPage({
     id: 'mcp',
+    group: 'agents',
+    description: 'settings.description.mcp',
+    scoped: true,
     title: 'settings.mcp',
     order: 50,
     component: McpPage,
   });
   registerSettingsPage({
     id: 'usage',
+    group: 'models',
+    description: 'settings.description.usage',
     title: 'settings.usage',
-    order: 5,
+    order: 25,
     component: UsagePage,
   });
   registerSettingsPage({
     id: 'diagnostics',
+    group: 'support',
+    description: 'settings.description.diagnostics',
+    scoped: true,
     title: 'settings.configDiagnostics',
     order: 80,
     component: ConfigDiagnosticsPage,
   });
   registerSettingsPage({
     id: 'shortcuts',
+    group: 'app',
+    description: 'settings.description.shortcuts',
     title: 'settings.shortcuts',
     order: 90,
     component: ShortcutsPage,

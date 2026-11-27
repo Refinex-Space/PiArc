@@ -26,6 +26,7 @@ import {
   type SpeechModelView,
 } from './voice-settings.js';
 import { useIsManaged, ManagedBadge } from './managed.js';
+import { SettingsInfo, SettingsRow, SettingsSection } from './layout.js';
 
 const STATE_TEXT: Readonly<Record<SpeechModelState, MessageId>> = {
   ready: 'settings.voice.state.ready',
@@ -76,17 +77,18 @@ function parseDevices(raw: string): readonly Device[] {
 function Section({
   title,
   testId,
+  aside,
   children,
 }: {
   readonly title: string;
   readonly testId: string;
+  readonly aside?: ReactNode;
   readonly children: ReactNode;
 }) {
   return (
-    <section className="settings-subsection" data-testid={testId}>
-      <h2 className="permission-heading">{title}</h2>
+    <SettingsSection title={title} testId={testId} aside={aside}>
       {children}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -97,6 +99,7 @@ function Check({
   testId,
   onChange,
   disabled = false,
+  badge,
 }: {
   readonly checked: boolean;
   readonly label: string;
@@ -104,29 +107,31 @@ function Check({
   readonly testId: string;
   readonly onChange: (checked: boolean) => void;
   readonly disabled?: boolean;
+  readonly badge?: ReactNode;
 }) {
   const hintId = useId();
+  const inputId = useId();
   return (
-    <div className="setting">
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          data-testid={testId}
-          {...(hint === undefined ? {} : { 'aria-describedby': hintId })}
-          onChange={(e) => {
-            onChange(e.currentTarget.checked);
-          }}
-        />
-        {label}
-      </label>
-      {hint !== undefined && (
-        <p id={hintId} className="muted">
-          {hint}
-        </p>
-      )}
-    </div>
+    <SettingsRow
+      label={label}
+      description={hint}
+      descriptionId={hintId}
+      htmlFor={inputId}
+      badge={badge}
+    >
+      <input
+        id={inputId}
+        type="checkbox"
+        className="preference-switch"
+        checked={checked}
+        disabled={disabled}
+        data-testid={testId}
+        {...(hint === undefined ? {} : { 'aria-describedby': hintId })}
+        onChange={(e) => {
+          onChange(e.currentTarget.checked);
+        }}
+      />
+    </SettingsRow>
   );
 }
 
@@ -173,7 +178,28 @@ function MicrophoneTest({ disabled }: { readonly disabled: boolean }) {
     motion === 'on' ||
     (motion === 'system' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   return (
-    <div className="setting voice-test" data-testid="voice-test">
+    <SettingsRow
+      testId="voice-test"
+      label={t('settings.voice.test')}
+      description={
+        ui.kind === 'error' ? (
+          <span className="error-text" role="alert" data-testid="voice-test-error">
+            {t(
+              ui.code === 'microphoneDenied'
+                ? 'dictation.error.microphoneDenied'
+                : 'dictation.error.microphoneUnavailable',
+            )}
+          </span>
+        ) : undefined
+      }
+    >
+      {testing && (
+        <Waveform
+          levels={controller.current.levels}
+          live={ui.kind === 'recording'}
+          reducedMotion={reduced}
+        />
+      )}
       <Button
         size="small"
         disabled={disabled && !testing}
@@ -183,25 +209,9 @@ function MicrophoneTest({ disabled }: { readonly disabled: boolean }) {
           else void controller.current?.start(true);
         }}
       >
-        {testing ? t('settings.voice.testStop') : t('settings.voice.test')}
+        {testing ? t('settings.voice.testStop') : t('settings.voice.testRun')}
       </Button>
-      {testing && (
-        <Waveform
-          levels={controller.current.levels}
-          live={ui.kind === 'recording'}
-          reducedMotion={reduced}
-        />
-      )}
-      {ui.kind === 'error' && (
-        <p className="error-text" role="alert" data-testid="voice-test-error">
-          {t(
-            ui.code === 'microphoneDenied'
-              ? 'dictation.error.microphoneDenied'
-              : 'dictation.error.microphoneUnavailable',
-          )}
-        </p>
-      )}
-    </div>
+    </SettingsRow>
   );
 }
 
@@ -284,7 +294,6 @@ export function VoicePage() {
 
   return (
     <div className="settings-section settings-detail-page" data-testid="voice-page">
-      <p className="muted">{t('settings.voice.intro')}</p>
       {error !== '' && (
         <p className="error-text" role="alert" data-testid="voice-settings-error">
           {error}
@@ -298,54 +307,56 @@ export function VoicePage() {
           label={t('settings.voice.enabled')}
           hint={t('settings.voice.enabledHint')}
           testId="voice-enabled"
+          badge={managed && <ManagedBadge />}
           onChange={(value) => {
             save({ key: 'voiceDictation.enabled', value });
           }}
         />
-        {managed && <ManagedBadge />}
-        <div className="setting">
-          <label className="setting-label" htmlFor="voice-device">
-            {t('settings.voice.device')}
-          </label>
-          <div className="voice-row">
-            <select
-              id="voice-device"
-              className="input"
-              data-testid="voice-device"
-              value={voice.device ?? ''}
-              disabled={locked.device}
-              onFocus={loadDevices}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                save({ key: 'voiceDictation.device', value: value === '' ? null : value });
-              }}
-            >
-              <option value="">{t('settings.voice.deviceDefault')}</option>
-              {devices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {device.name}
-                </option>
-              ))}
-              {chosenMissing && (
-                <option value={voice.device}>{t('settings.voice.deviceMissing')}</option>
-              )}
-            </select>
-            <Button
-              variant="ghost"
-              size="small"
-              data-testid="voice-device-refresh"
-              onClick={loadDevices}
-            >
-              {t('settings.voice.refresh')}
-            </Button>
-            {locked.device && <ManagedBadge />}
-          </div>
-          {chosenMissing && <p className="muted">{t('settings.voice.deviceMissingHint')}</p>}
-        </div>
+        <SettingsRow
+          label={t('settings.voice.device')}
+          htmlFor="voice-device"
+          badge={locked.device && <ManagedBadge />}
+          description={chosenMissing ? t('settings.voice.deviceMissingHint') : undefined}
+        >
+          <select
+            id="voice-device"
+            className="input"
+            data-testid="voice-device"
+            value={voice.device ?? ''}
+            disabled={locked.device}
+            onFocus={loadDevices}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              save({ key: 'voiceDictation.device', value: value === '' ? null : value });
+            }}
+          >
+            <option value="">{t('settings.voice.deviceDefault')}</option>
+            {devices.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.name}
+              </option>
+            ))}
+            {chosenMissing && (
+              <option value={voice.device}>{t('settings.voice.deviceMissing')}</option>
+            )}
+          </select>
+          <Button
+            variant="ghost"
+            size="small"
+            data-testid="voice-device-refresh"
+            onClick={loadDevices}
+          >
+            {t('settings.voice.refresh')}
+          </Button>
+        </SettingsRow>
         <MicrophoneTest disabled={!voice.enabled} />
       </Section>
 
-      <Section title={t('settings.voice.models')} testId="voice-mode">
+      <Section
+        title={t('settings.voice.models')}
+        testId="voice-mode"
+        aside={<SettingsInfo text={t('settings.voice.privacy')} testId="voice-privacy" />}
+      >
         <div className="preference-rows voice-models">
           <div className="preference-row">
             <span className="preference-copy">
@@ -425,12 +436,13 @@ export function VoicePage() {
             save({ key: 'voiceDictation.workspaceTerms', value });
           }}
         />
-        <div className="setting" data-testid="voice-dictionary">
-          <span className="setting-label">
-            {t('settings.voice.dictionary')}
-            {locked.customTerms && <ManagedBadge />}
-          </span>
-          <p className="muted">{t('settings.voice.dictionaryHint')}</p>
+        <SettingsRow
+          wide
+          testId="voice-dictionary"
+          label={t('settings.voice.dictionary')}
+          badge={locked.customTerms && <ManagedBadge />}
+          description={t('settings.voice.dictionaryHint')}
+        >
           {voice.customTerms.length > 0 && (
             <ul className="voice-terms" data-testid="voice-terms">
               {voice.customTerms.map((entry) => (
@@ -487,12 +499,8 @@ export function VoicePage() {
               {termError}
             </p>
           )}
-        </div>
+        </SettingsRow>
       </Section>
-
-      <p className="voice-privacy muted" data-testid="voice-privacy">
-        {t('settings.voice.privacy')}
-      </p>
     </div>
   );
 }

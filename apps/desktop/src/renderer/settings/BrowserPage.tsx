@@ -3,6 +3,8 @@
 // names, links, search, downloads, DevTools and the site card timeout. Every value is the
 // user's own (`browser.*` of the user settings file through the preference channel); a project
 // file's `browser` keys are ignored and listed in configuration diagnostics.
+import { PageHeadActions } from './page-head.js';
+import { SettingsInfo, SettingsSection } from './layout.js';
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react';
 
 import {
@@ -47,10 +49,9 @@ function Section({
   readonly children: ReactNode;
 }) {
   return (
-    <section className="settings-subsection" data-testid={testId}>
-      <h2 className="permission-heading">{title}</h2>
+    <SettingsSection title={title} testId={testId}>
       <div className="preference-rows">{children}</div>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -408,7 +409,9 @@ export function BrowserPage() {
   const sessionOnly = browser.storage === 'session';
   return (
     <div className="settings-section settings-detail-page" data-testid="browser-page">
-      <p className="muted">{t('browserSettings.intro')}</p>
+      <PageHeadActions>
+        <SettingsInfo text={t('browserSettings.intro')} />
+      </PageHeadActions>
       {error !== '' && (
         <p className="error-text" role="alert" data-testid="browser-settings-error">
           {error}

@@ -1,0 +1,1686 @@
+/* Settings as a workbench view (ADR-0101) and the borderless page system of the visual guide
+   (docs/engineering/visual-design.md). */
+
+/* ---- the morph: the workbench leaves, settings arrive ---- */
+.shell > .sidebar,
+.shell > .workspace-area {
+  transition:
+    transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    opacity var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    visibility 0s linear 0s;
+}
+.shell[data-settings='open'] > .sidebar,
+.shell[data-settings='open'] > .workspace-area {
+  visibility: hidden;
+  transition:
+    transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    opacity var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    visibility 0s linear var(--piarc-motion-view);
+}
+.shell[data-settings='open'] > .sidebar {
+  transform: translateX(-100%);
+}
+.shell[data-settings='open'] > .workspace-area {
+  opacity: 0;
+  transform: scale(0.985);
+}
+
+.settings-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+.settings-layer[data-open='false'] {
+  pointer-events: none;
+}
+.settings-surface {
+  --settings-divider: var(--piarc-session-line);
+  --settings-row: var(--piarc-settings-row-height);
+  display: grid;
+  grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
+  height: 100%;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+:root[data-density='compact'] .settings-surface {
+  --settings-row: calc(var(--piarc-settings-row-height) - var(--piarc-space-2));
+}
+.settings-sidebar-clip {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.settings-surface .settings-sidebar {
+  height: 100%;
+  box-shadow: inset -1px 0 var(--piarc-session-line);
+  transition: transform var(--piarc-motion-view) var(--piarc-motion-curve-out);
+}
+.settings-layer[data-phase='out'] .settings-sidebar {
+  transform: translateX(100%);
+}
+.settings-view {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--piarc-workbench-canvas);
+  transition:
+    opacity var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    transform var(--piarc-motion-view) var(--piarc-motion-curve-out);
+}
+.settings-layer[data-phase='out'] .settings-view {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.settings-surface.is-loading {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ---- navigation ---- */
+.settings-sidebar-head {
+  display: grid;
+  gap: var(--piarc-space-3);
+  padding: 0 var(--piarc-space-3) var(--piarc-space-2);
+}
+.settings-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  height: var(--piarc-session-row-small);
+  margin-inline-start: calc(-1 * var(--piarc-space-1));
+  padding: 0 var(--piarc-space-2) 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+.settings-back:hover {
+  background: var(--piarc-c-sidebar-row-hover);
+  color: var(--piarc-text-primary);
+}
+.settings-back svg {
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+/* The same quiet keycap as the shortcuts page (a fill with a soft lower edge, no outline); it
+   has to outrank the element rule for kbd. */
+:root[data-app] .settings-back-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  margin-inline-start: var(--piarc-space-1);
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--piarc-session-fill);
+  box-shadow: inset 0 -1px 0 var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  line-height: 1;
+}
+.settings-search {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  height: calc(var(--piarc-session-composer-row) + var(--piarc-space-1) + 2px);
+  padding: 0 var(--piarc-space-3);
+  border: 0;
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-workbench-canvas);
+  box-shadow: 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+}
+.settings-search svg {
+  flex: none;
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+:root[data-app] .settings-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+}
+:root[data-app] .settings-search input:focus {
+  outline: none;
+}
+.settings-search input::placeholder {
+  color: var(--piarc-text-secondary);
+}
+.settings-nav-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--piarc-space-2) var(--piarc-space-4);
+}
+.settings-nav-group {
+  padding: var(--piarc-space-4) var(--piarc-space-3) var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: var(--piarc-session-footnote-line);
+}
+.settings-nav-list ul {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  width: 100%;
+  min-height: var(--piarc-c-sidebar-row-height);
+  padding: 0 var(--piarc-space-3);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: transparent;
+  color: var(--piarc-workbench-ink);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  text-align: start;
+}
+.settings-nav-item svg {
+  flex: none;
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+  color: var(--piarc-text-secondary);
+}
+.settings-nav-item:hover {
+  background: var(--piarc-c-sidebar-row-hover);
+}
+.settings-nav-item.is-active {
+  background: var(--piarc-surface-active);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-nav-item.is-active svg {
+  color: var(--piarc-workbench-ink);
+}
+.settings-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-nav-scope {
+  flex: none;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-regular);
+}
+.settings-nav-count {
+  flex: none;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the page ---- */
+.settings-titlebar {
+  gap: var(--piarc-space-2);
+  padding-inline-start: var(--piarc-space-5);
+}
+.settings-crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.settings-crumb svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+.settings-crumb strong {
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-surface .settings-page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--piarc-space-5) var(--piarc-settings-gutter) calc(4 * var(--piarc-space-5));
+  scroll-padding-block: var(--piarc-space-5);
+}
+.settings-column {
+  width: min(var(--piarc-settings-measure), 100%);
+  margin-inline: auto;
+}
+.settings-page-body {
+  animation: settings-page-in var(--piarc-motion-normal) var(--piarc-motion-curve-out) both;
+}
+/* Opacity only: a page's geometry is final from its first frame. */
+@keyframes settings-page-in {
+  from {
+    opacity: 0;
+  }
+}
+.settings-page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--piarc-space-4);
+  margin-block-end: calc(var(--piarc-space-5) + var(--piarc-space-2));
+}
+.settings-page-heading {
+  flex: 1;
+  min-width: 0;
+}
+.settings-surface .settings-title {
+  margin: 0;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-settings-heading);
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+.settings-page-heading > p {
+  margin: var(--piarc-space-1) 0 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-button);
+}
+.settings-page-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.settings-page-actions:empty {
+  display: none;
+}
+
+/* A setting reached from search or a link marks itself for a moment. */
+.settings-surface .is-located {
+  border-radius: var(--piarc-radius-lg);
+  animation: settings-located 1.6s var(--piarc-motion-curve-out) both;
+}
+@keyframes settings-located {
+  0%,
+  55% {
+    background: var(--piarc-accent-subtle);
+    box-shadow: 0 0 0 var(--piarc-space-2) var(--piarc-accent-subtle);
+  }
+}
+
+/* ---- search results ---- */
+.settings-results {
+  display: grid;
+}
+.settings-results-group {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin-block-start: var(--piarc-space-5);
+  padding-block-end: var(--piarc-space-2);
+  border-block-end: 1px solid var(--settings-divider);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-results-group:first-child {
+  margin-block-start: 0;
+}
+.settings-results-group svg {
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+.settings-result {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  min-height: calc(var(--settings-row) - var(--piarc-space-2));
+  padding: 0 var(--piarc-space-3);
+  margin-inline: calc(-1 * var(--piarc-space-3));
+  border-radius: var(--piarc-radius-lg);
+  cursor: default;
+}
+.settings-result + .settings-result {
+  box-shadow: 0 -1px 0 var(--settings-divider);
+}
+.settings-result[aria-selected='true'] {
+  background: var(--piarc-session-ghost-hover);
+  box-shadow: none;
+}
+.settings-result[aria-selected='true'] + .settings-result {
+  box-shadow: none;
+}
+.settings-result-label {
+  flex: 1;
+  min-width: 0;
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-result svg {
+  width: 14px;
+  height: 14px;
+  color: var(--piarc-text-secondary);
+}
+.settings-surface mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--piarc-accent-solid) 22%, transparent);
+  color: inherit;
+}
+
+/* ---- scrollbars: a thumb only, shown while the pointer is over the scroller ---- */
+.settings-surface ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+.settings-surface ::-webkit-scrollbar-track,
+.settings-surface ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.settings-surface ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--piarc-radius-pill);
+  background: transparent padding-box;
+}
+.settings-surface :hover::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--piarc-text-primary) 16%, transparent);
+}
+.settings-surface ::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--piarc-text-primary) 30%, transparent);
+}
+
+@media (forced-colors: active) {
+  .settings-nav-item.is-active,
+  .settings-result[aria-selected='true'] {
+    outline: 1px solid Highlight;
+  }
+  .settings-search {
+    border: 1px solid CanvasText;
+  }
+  .settings-surface .settings-sidebar {
+    border-inline-end: 1px solid CanvasText;
+  }
+}
+
+/* ---- the page system: sections of rows, records as rows (settings/layout.tsx) ---- */
+.settings-page-body
+  > :is(.settings-block, .settings-detail-page, .preference-rows)
+  + .settings-block,
+.settings-block + .settings-block {
+  margin-block-start: calc(var(--piarc-space-5) + var(--piarc-space-3));
+}
+.settings-block-head,
+.settings-surface :is(.settings-heading, .permission-heading) {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  min-height: var(--piarc-session-composer-row);
+  margin: 0;
+  padding-block-end: var(--piarc-space-2);
+  border-block-end: 1px solid var(--settings-divider);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-button);
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: var(--piarc-session-body-line);
+}
+.settings-block-head > h3 {
+  margin: 0;
+  font: inherit;
+}
+.settings-block-aside {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin-inline-start: auto;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-regular);
+}
+.settings-row,
+.settings-surface .preference-row {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-5);
+  min-height: var(--settings-row);
+  margin: 0;
+  padding-block: var(--piarc-space-3);
+  border: 0;
+  border-block-end: 1px solid var(--settings-divider);
+  font-size: inherit;
+  line-height: inherit;
+}
+.settings-surface .preference-row + .preference-row {
+  border-block-start: 0;
+}
+.settings-row.is-wide {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--piarc-space-2);
+}
+.settings-row-copy,
+.settings-surface .preference-copy {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+.settings-row-name,
+.settings-surface .preference-copy > :first-child:not(p) {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-row-description,
+.settings-surface :is(.preference-copy > p, .preference-description) {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+.settings-row-control {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  max-width: 62%;
+}
+/* A segmented control or a switch keeps its full width; the description wraps instead. */
+.settings-row-control:has(> :is(.segmented, .preference-switch)) {
+  flex-shrink: 0;
+  max-width: none;
+}
+.settings-row.is-wide > .settings-row-control {
+  justify-content: flex-start;
+  max-width: none;
+}
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  min-height: var(--settings-row);
+  padding-block: var(--piarc-space-2);
+  border-block-end: 1px solid var(--settings-divider);
+}
+.settings-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.settings-item-name {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  font-weight: var(--piarc-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+.settings-item-detail {
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-item-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+
+/* Older page structures read as the same system: no cards, no stroked boxes. */
+.settings-surface .settings-detail-page {
+  gap: calc(var(--piarc-space-5) + var(--piarc-space-3));
+}
+.settings-surface .settings-detail-page :is(h2.settings-heading, .permission-heading) {
+  margin: 0;
+}
+.settings-surface .settings-subsection {
+  gap: 0;
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+.settings-surface
+  :is(
+    .settings-connection-box,
+    .provider-list,
+    .agent-list,
+    .provider-form,
+    .permission-source,
+    .settings-install-form
+  ) {
+  padding-inline: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.settings-surface :is(.provider-list, .agent-list) > li,
+.settings-surface .settings-connection-box > *,
+.settings-surface .permission-rule {
+  border: 0;
+  border-block-end: 1px solid var(--settings-divider);
+}
+.settings-surface .settings-detail-page .setting:has(> .setting-label):has(> .input) {
+  min-height: var(--settings-row);
+  padding-block: var(--piarc-space-3);
+}
+
+/* Controls: fills instead of strokes. */
+.settings-surface
+  .settings-page
+  :is(select.input, input.input:not([type='checkbox'], [type='radio']), textarea.input) {
+  border-color: transparent;
+  border-radius: calc(var(--piarc-c-button-radius) + 1px);
+  background-color: var(--piarc-session-fill);
+  box-shadow: none;
+}
+.settings-surface .settings-page select.input:hover:enabled,
+.settings-surface .settings-page input.input:hover:enabled:not(:focus) {
+  border-color: transparent;
+  background-color: var(--piarc-session-fill-hover);
+}
+.settings-surface .settings-page :is(input.input, textarea.input):focus {
+  background-color: var(--piarc-workbench-canvas);
+}
+.settings-surface .settings-page select.preference-select-ghost {
+  background-color: transparent;
+}
+.settings-surface .button:not(.button-ghost, .button-primary, .button-destructive) {
+  --action-fill: var(--piarc-session-fill);
+  --action-hover: var(--piarc-session-fill-hover);
+  --action-shadow: none;
+}
+.settings-info {
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--piarc-radius-sm);
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-regular);
+  cursor: help;
+}
+.settings-info:hover {
+  color: var(--piarc-text-primary);
+}
+.settings-surface .mono-text,
+.settings-surface .mono-input {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-footnote);
+  overflow-wrap: anywhere;
+}
+.settings-surface .settings-row-control > .input:not(select) {
+  width: min(16rem, 100%);
+}
+.settings-row-note {
+  margin: 0;
+  padding-block: var(--piarc-space-2);
+  border-block-end: 1px solid var(--settings-divider);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.settings-surface .settings-row-control > select.input {
+  width: auto;
+  min-width: 9rem;
+  max-width: 100%;
+  field-sizing: content;
+}
+/* A page that is already a column with gaps does not add margins between its sections. */
+.settings-surface .settings-detail-page > .settings-block + .settings-block {
+  margin-block-start: 0;
+}
+/* Auto review's policy lists: entries as quiet chips, the add field on its own line. */
+.settings-surface .auto-review-entries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+}
+.settings-surface .auto-review-entries li {
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding-inline-start: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+}
+.settings-surface .auto-review-entries:empty {
+  display: none;
+}
+.settings-surface .auto-review-add {
+  margin: 0;
+  padding: 0;
+}
+.settings-surface .auto-review-add .input {
+  max-width: 24rem;
+}
+/* Git's rows: the name and its line of explanation on the left, the control on the right; a
+   list or an instructions editor takes the full width under the name. */
+.settings-surface .setting.git-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--piarc-space-5);
+  min-height: var(--settings-row);
+  margin: 0;
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+.settings-surface .git-setting > .git-setting-label {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-surface .git-setting > p {
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+.settings-surface .git-setting > :not(.git-setting-label, p) {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+}
+.settings-surface .setting.git-setting:has(> ul, > textarea) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--piarc-space-2);
+}
+.settings-surface .setting.git-setting:has(> ul, > textarea) > * {
+  grid-column: 1;
+  grid-row: auto;
+  justify-self: stretch;
+}
+.settings-surface .git-setting > .git-setting-actions {
+  justify-self: start;
+}
+.settings-surface .git-setting-field {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+.settings-surface textarea.git-instructions {
+  min-height: 9rem;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+/* Rule-like records: a hairline list with a badge, the value in mono, actions at the end. */
+.settings-surface .permission-rules {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-surface .permission-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: calc(var(--settings-row) - var(--piarc-space-3));
+  padding-block: var(--piarc-space-1);
+}
+.settings-surface .permission-rule > code {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  background: none;
+  font-size: var(--piarc-session-footnote);
+}
+.settings-surface .permission-actions {
+  display: flex;
+  gap: var(--piarc-space-1);
+  margin-inline-start: auto;
+}
+.settings-surface .permission-editor {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-2);
+}
+.settings-surface .permission-editor > .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.settings-surface .permission-editor {
+  width: 100%;
+}
+
+/* Long file paths stay on one line; the whole path is the tooltip. */
+.settings-surface .approval-path {
+  overflow: hidden;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-surface .permission-source,
+.settings-surface .diagnostics-file {
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+.settings-surface .permission-source-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-surface .permission-source > p.muted {
+  margin: 0;
+  font-size: var(--piarc-session-footnote);
+}
+.settings-surface .settings-row-control > .segmented,
+.settings-surface .preference-row > .segmented {
+  flex: none;
+  white-space: nowrap;
+}
+.settings-page-heading {
+  min-width: min(14rem, 100%);
+}
+.settings-surface .settings-page-actions .input {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-surface .usage-metrics > div {
+  background: var(--piarc-session-fill);
+}
+.settings-surface .preference-row.browser-settings-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--piarc-space-2);
+}
+.settings-surface .browser-settings-control {
+  max-width: 62%;
+}
+.settings-surface .browser-settings-stacked > .browser-settings-control {
+  max-width: none;
+}
+.settings-subhead {
+  margin: var(--piarc-space-4) 0 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-medium);
+}
+/* A heading directly in a page column sits on the rows it heads. */
+.settings-surface .settings-detail-page > :is(h2.settings-heading, .permission-heading) + * {
+  margin-block-start: calc(-1 * (var(--piarc-space-5) + var(--piarc-space-3)));
+}
+.settings-row-description > .approval-path {
+  display: block;
+}
+
+/* Colour mode: three pictures of the app; the chosen one wears the accent ring. */
+.theme-cards {
+  display: flex;
+  gap: var(--piarc-space-3);
+}
+.theme-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--piarc-space-2);
+  padding: 2px;
+  border-radius: calc(var(--piarc-radius-lg) + 2px);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+.theme-card-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+}
+.theme-card:has(.theme-card-input:disabled) {
+  opacity: 0.55;
+}
+.theme-shot {
+  position: relative;
+  display: block;
+  width: 92px;
+  height: 60px;
+  overflow: hidden;
+  border-radius: var(--piarc-radius-lg);
+  box-shadow: 0 0 0 1px var(--piarc-session-line);
+  transition: box-shadow var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.theme-card:hover .theme-shot {
+  box-shadow: 0 0 0 1px var(--piarc-border-strong);
+}
+.theme-card:has(.theme-card-input:checked) {
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.theme-card:has(.theme-card-input:checked) .theme-shot {
+  box-shadow:
+    0 0 0 2px var(--piarc-accent-solid),
+    0 0 0 5px color-mix(in srgb, var(--piarc-accent-solid) 18%, transparent);
+}
+:root[data-app] .theme-card:has(.theme-card-input:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 2px;
+}
+:root[data-app][data-pointer-focus] .theme-card:has(.theme-card-input:focus-visible) {
+  outline: none;
+}
+.theme-shot-pane {
+  --shot-nav: color-mix(
+    in srgb,
+    var(--piarc-theme-preview-light-ink) 9%,
+    var(--piarc-theme-preview-light-canvas)
+  );
+  --shot-canvas: var(--piarc-theme-preview-light-canvas);
+  --shot-card: var(--piarc-theme-preview-light-canvas);
+  --shot-line: var(--piarc-theme-preview-light-line);
+  --shot-ink: var(--piarc-theme-preview-light-ink);
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, var(--shot-nav) 0 26px, var(--shot-canvas) 26px);
+}
+.theme-shot-pane.is-dark {
+  --shot-nav: var(--piarc-theme-preview-dark-navigation);
+  --shot-canvas: var(--piarc-theme-preview-dark-canvas);
+  --shot-card: var(--piarc-theme-preview-dark-card);
+  --shot-line: var(--piarc-theme-preview-dark-line);
+  --shot-ink: var(--piarc-theme-preview-dark-ink);
+}
+.theme-shot-pane.is-half {
+  clip-path: inset(0 0 0 50%);
+}
+/* Three lines of text and the input card of the reading column. */
+.theme-shot-pane::before {
+  position: absolute;
+  top: 11px;
+  right: 10px;
+  left: 35px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--shot-ink);
+  box-shadow:
+    0 9px 0 var(--shot-ink),
+    0 18px 0 var(--shot-ink);
+  opacity: 0.3;
+  content: '';
+}
+.theme-shot-pane::after {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  left: 33px;
+  height: 11px;
+  border-radius: 6px;
+  background: var(--shot-card);
+  box-shadow: 0 0 0 1px var(--shot-line);
+  content: '';
+}
+@media (forced-colors: active) {
+  .theme-card:has(.theme-card-input:checked) .theme-shot {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* Shortcuts: rows on hairlines, quiet keycaps (a fill with a soft lower edge, no outline). */
+.settings-surface .shortcut-table th,
+.settings-surface .shortcut-table td {
+  padding: var(--piarc-space-3) 0;
+  border-bottom-color: var(--settings-divider);
+  vertical-align: middle;
+}
+.settings-surface .shortcut-table thead th {
+  padding-block: 0 var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-surface .shortcut-table tbody th {
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-surface .shortcut-table td:last-child,
+.settings-surface .shortcut-table thead th:last-child {
+  text-align: end;
+}
+.settings-surface .shortcut-recorder {
+  min-height: var(--piarc-session-composer-row);
+  padding: 2px;
+  border-radius: var(--piarc-radius-button);
+}
+.settings-surface .shortcut-recorder:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+:root[data-app] .settings-surface .keycaps-visual {
+  gap: 4px;
+}
+:root[data-app] .settings-surface .keycaps-visual kbd {
+  height: 20px;
+  min-width: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--piarc-session-fill);
+  box-shadow: inset 0 -1px 0 var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+.settings-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  white-space: nowrap;
+}
+.settings-item-note {
+  margin-block-start: 2px;
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+.settings-surface .agent-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-surface .agent-list > .settings-item {
+  border-block-start: 0;
+}
+.settings-surface .subagent-warnings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.settings-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--piarc-space-1);
+  padding-block: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.settings-pager-range {
+  margin-inline-end: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Usage: one row per model (share, tokens, cost, price) and a bounded list of sessions. */
+.usage-model,
+.usage-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5rem 4.5rem 5.5rem auto;
+  align-items: center;
+  column-gap: var(--piarc-space-4);
+  min-height: var(--settings-row);
+  padding-block: var(--piarc-space-2);
+  border-block-end: 1px solid var(--settings-divider);
+}
+.usage-session {
+  grid-template-columns: minmax(0, 1fr) 4.5rem 5.5rem;
+}
+.usage-model-name,
+.usage-session-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.usage-session-title {
+  overflow: hidden;
+  font-weight: var(--piarc-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-model-detail {
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-share {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill-hover);
+}
+.usage-share > span {
+  display: block;
+  min-inline-size: 6px;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--piarc-accent-solid);
+}
+.usage-model-tokens,
+.usage-model-cost {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+.usage-model-cost {
+  color: var(--piarc-text-secondary);
+}
+.usage-model-block > .usage-price-form {
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+.usage-session-filter {
+  width: 100%;
+  margin-block: var(--piarc-space-2);
+}
+.usage-session-more {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--piarc-space-2);
+}
+
+/* The page's scope: "All" (when the page has it) and the project, one pill each in a track. */
+.settings-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: calc(var(--piarc-radius-lg) + 2px);
+  background: var(--piarc-session-fill);
+}
+.settings-scope:not([data-has-all='true']) {
+  background: transparent;
+  padding: 0;
+}
+.settings-scope-all,
+.settings-scope-project {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  height: calc(var(--piarc-session-composer-row) + 2px);
+  padding: 0 var(--piarc-space-3);
+  border: 0;
+  border-radius: var(--piarc-radius-lg);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  white-space: nowrap;
+}
+.settings-scope-all svg,
+.settings-scope-project svg {
+  flex: none;
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+.settings-scope-all[aria-pressed='true'],
+.settings-scope-project[data-selected='true'] {
+  background: var(--piarc-workbench-canvas);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+  color: var(--piarc-text-primary);
+}
+.settings-scope:not([data-has-all='true']) .settings-scope-project {
+  background: var(--piarc-session-fill);
+  box-shadow: none;
+}
+.settings-scope:not([data-has-all='true']) .settings-scope-project:hover {
+  background: var(--piarc-session-fill-hover);
+}
+.settings-scope-all:hover:not([aria-pressed='true']),
+.settings-scope-project[data-selected='false']:hover {
+  color: var(--piarc-text-primary);
+}
+/* The native select covers the pill so the whole pill opens it; its own chrome is hidden. */
+:root[data-app] .settings-scope-select {
+  max-width: 12rem;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-overflow: ellipsis;
+  appearance: none;
+  outline: none;
+}
+:root[data-app]:not([data-pointer-focus])
+  .settings-scope-project:has(.settings-scope-select:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+.settings-scope-project > svg:last-child {
+  width: 14px;
+  height: 14px;
+  margin-inline-start: calc(-1 * var(--piarc-space-1));
+  pointer-events: none;
+}
+
+/* Destructive actions in settings are quiet: danger ink without a fill, a faint danger fill
+   under the pointer. The native confirmation or the second click carries the weight. */
+.settings-surface .button-destructive {
+  --action-fill: transparent;
+  --action-hover: var(--piarc-state-danger-subtle);
+  --action-down: var(--piarc-state-danger-subtle);
+  --action-ink: var(--piarc-text-danger);
+  --action-shadow: none;
+}
+/* Removing one entry of a list: a small grey cross that turns danger under the pointer. */
+:root[data-app] .settings-surface .settings-remove {
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .settings-surface .settings-remove:enabled:hover {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+
+/* MCP servers (ADR-0101): a status dot, the name with a flag when it needs the user, one line of
+   details, then the row's one action and its switch. The add entry closes the list. */
+.mcp-servers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mcp-server {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--piarc-space-3);
+  min-height: var(--piarc-settings-row-height);
+  padding-block: var(--piarc-space-3);
+  border-bottom: 1px solid var(--piarc-session-line);
+}
+.mcp-dot {
+  width: 8px;
+  height: 8px;
+  /* Centred on the name's line. */
+  margin-block-start: calc((var(--piarc-session-body-line) - 8px) / 2);
+  border-radius: 50%;
+  background: var(--piarc-text-disabled);
+}
+.mcp-dot:is(.is-connected) {
+  background: var(--piarc-state-success);
+}
+.mcp-dot:is(.is-connecting, .is-idle) {
+  background: var(--piarc-text-secondary);
+}
+.mcp-dot:is(.is-needsAuth, .is-untrusted) {
+  background: var(--piarc-state-warning);
+}
+.mcp-dot.is-failed {
+  background: var(--piarc-state-danger);
+}
+.mcp-server-text {
+  min-width: 0;
+}
+.mcp-server-name {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.mcp-server-name > .mono-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mcp-server-meta {
+  margin-block-start: 2px;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.settings-badge.mcp-state:is(.is-needsAuth, .is-untrusted) {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+.settings-badge.mcp-state.is-failed {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.mcp-error {
+  display: -webkit-box;
+  margin: var(--piarc-space-1) 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-session-footnote);
+  overflow-wrap: anywhere;
+}
+.mcp-server-actions {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: var(--piarc-space-3);
+}
+.mcp-empty {
+  padding-block: var(--piarc-space-4);
+  border-bottom: 1px solid var(--piarc-session-line);
+}
+.mcp-add-row {
+  border-bottom: 1px solid var(--piarc-session-line);
+}
+/* "Add …" closing a list: accent text with its icon, no button surface. */
+:root[data-app] .settings-add-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: 44px;
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: transparent;
+  color: var(--piarc-text-accent);
+  font: inherit;
+  cursor: pointer;
+}
+:root[data-app] .settings-add-link:enabled:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+:root[data-app] .settings-add-link:disabled {
+  color: var(--piarc-text-disabled);
+  cursor: default;
+}
+.settings-add-link svg {
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+.mcp-notes {
+  margin: 0;
+  padding: var(--piarc-space-3) 0 0;
+  list-style: none;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.mcp-notes > li + li {
+  margin-block-start: var(--piarc-space-2);
+}
+
+/* The add-server dialog: labels above their fields, one hint line each. */
+.mcp-add .mcp-add-fields {
+  display: grid;
+  gap: var(--piarc-space-4);
+  margin: var(--piarc-space-4) 0 0;
+  padding: 0;
+  border: 0;
+}
+.mcp-add-field {
+  display: grid;
+  justify-items: start;
+  gap: var(--piarc-space-1);
+}
+.mcp-add-field > .input {
+  justify-self: stretch;
+}
+.mcp-add-field > textarea.input {
+  resize: vertical;
+}
+.mcp-add-label {
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-button);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.mcp-add-hint {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.mcp-add .dialog-actions {
+  margin-block-start: var(--piarc-space-5);
+}
+
+/* Configuration diagnostics (ADR-0101): one tab per kind of source, each source one row (name,
+   state, counts) that opens to its path and keys; problems stay visible under their row. */
+.diagnostics-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+  padding-block: var(--piarc-space-3) var(--piarc-space-2);
+}
+:root[data-app] .diagnostics-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  height: 28px;
+  padding: 0 var(--piarc-space-3);
+  border: 0;
+  border-radius: var(--piarc-radius-pill);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+:root[data-app] .diagnostics-tab:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+:root[data-app] .diagnostics-tab[aria-selected='true'] {
+  background: var(--piarc-session-fill-hover);
+  color: var(--piarc-text-primary);
+}
+.diagnostics-tab-count {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+.diagnostics-tab[data-attention]::after {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--piarc-state-danger);
+  content: '';
+}
+.diagnostics-filter {
+  width: 100%;
+  margin-block: var(--piarc-space-1) var(--piarc-space-2);
+}
+.settings-surface .diagnostics-files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--piarc-session-line);
+}
+.settings-surface .diagnostics-files > .diagnostics-file {
+  display: block;
+  padding: 0;
+  border-bottom: 1px solid var(--piarc-session-line);
+}
+.settings-surface .diagnostics-row {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  min-height: 56px;
+  padding-block: var(--piarc-space-2);
+  list-style: none;
+}
+.settings-surface summary.diagnostics-row {
+  margin-inline: calc(-1 * var(--piarc-space-2));
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-lg);
+  color: inherit;
+  cursor: pointer;
+}
+.settings-surface summary.diagnostics-row::-webkit-details-marker {
+  display: none;
+}
+.settings-surface summary.diagnostics-row:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+.diagnostics-row-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.diagnostics-row-name {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+.diagnostics-name {
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-surface .diagnostics-status {
+  flex: none;
+  margin: 0;
+}
+.settings-surface .diagnostics-status.is-loaded {
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+}
+.settings-surface
+  .diagnostics-status:is(.is-missing, .is-notConfigured, .is-ignored, .is-platform) {
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  padding-inline: 0;
+}
+.diagnostics-meta {
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diagnostics-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--piarc-text-secondary);
+  transition: transform var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+.diagnostics-details[open] .diagnostics-chevron {
+  transform: rotate(180deg);
+}
+.settings-surface .diagnostics-body {
+  padding: 0 0 var(--piarc-space-4);
+}
+.diagnostics-path {
+  margin: 0 0 var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.settings-surface .diagnostics-body h4 {
+  margin: var(--piarc-space-3) 0 var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.settings-surface .diagnostics-table th,
+.settings-surface .diagnostics-table td {
+  border-bottom-color: var(--piarc-session-line);
+}
+.settings-surface .diagnostics-files .diagnostics-issues {
+  margin: 0 0 var(--piarc-space-3);
+  padding: 0;
+  list-style: none;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-session-footnote);
+}
+.diagnostics-notes {
+  margin: 0;
+  padding: var(--piarc-space-3) 0 0;
+  list-style: none;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.diagnostics-notes > li + li {
+  margin-block-start: var(--piarc-space-2);
+}
+.settings-surface .diagnostics-trust.is-untrusted {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
+/* Records that open to their details (skills, extension packages): name with its kind, one line
+   of description, one of state; the row's controls stay outside the disclosure. */
+.settings-surface .package-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--piarc-session-line);
+}
+.settings-surface .package-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--piarc-space-3);
+  border-bottom: 1px solid var(--piarc-session-line);
+}
+.settings-surface .package-row > .package-details {
+  grid-column: 1;
+  min-width: 0;
+}
+.settings-surface .package-row > .package-actions {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: var(--piarc-settings-row-height);
+}
+.settings-surface .package-row > :is(.package-warnings, .package-alert) {
+  grid-column: 1 / -1;
+}
+.settings-surface .package-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  min-height: var(--piarc-settings-row-height);
+  margin-inline: calc(-1 * var(--piarc-space-2));
+  padding: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-lg);
+  list-style: none;
+  cursor: pointer;
+}
+.settings-surface .package-summary::-webkit-details-marker {
+  display: none;
+}
+.settings-surface .package-summary:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+.package-details[open] .diagnostics-chevron {
+  transform: rotate(180deg);
+}
+.package-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.package-name {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.package-name > .mono-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.package-description {
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-button);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.package-meta {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.package-body {
+  padding: 0 0 var(--piarc-space-3);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.package-body .package-source {
+  margin: 0 0 var(--piarc-space-1);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.package-components {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.package-components > li + li {
+  margin-block-start: 2px;
+}
+.package-note {
+  margin: var(--piarc-space-1) 0 0;
+}
+.settings-surface .package-warnings {
+  margin: 0 0 var(--piarc-space-3);
+  padding: 0;
+  list-style: none;
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-session-footnote);
+}
+.settings-surface .package-alert {
+  margin: 0 0 var(--piarc-space-3);
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-session-footnote);
+}
+.package-empty {
+  padding-block: var(--piarc-space-3);
+}
+.package-location-row {
+  display: flex;
+  justify-self: stretch;
+  gap: var(--piarc-space-2);
+}
+.package-location-row > .input {
+  flex: 1;
+  min-width: 0;
+}
+.settings-block-count {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A state that needs nothing from the user is plain text in the server's details. */
+.mcp-server-meta > .mcp-state {
+  color: inherit;
+}
+.mcp-env {
+  display: grid;
+  justify-self: stretch;
+  gap: var(--piarc-space-2);
+}
+.mcp-env-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .mcp-env-add {
+  justify-self: start;
+  min-height: 28px;
+}

@@ -2,13 +2,17 @@
 // project's; read-only when the organization manages them), the notes of the chosen workspace's
 // repository (view, edit, delete), deleting them all and importing Claude Code's memory once.
 // Core does every change (`memoryEdit`) and answers the page anew; it audits each edit.
+import { PageHeadActions } from './page-head.js';
+import { ScopePicker } from './ScopePicker.js';
+import { SettingsRow, SettingsSection } from './layout.js';
+import { SettingsInfo } from './layout.js';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { WorkspaceOptions } from './WorkspaceOptions.js';
 
 import { useApp } from '../app/app-context.js';
 import { parseWorkspaces } from './AgentsPage.js';
 import { ManagedBadge, useManaged } from './managed.js';
-import { takeMemoryTarget } from './memory-target.js';
+import { clearMemoryTarget, peekMemoryTarget } from './memory-target.js';
 import { Button } from '../app/Button.js';
 import { reason } from '../shell/errors.js';
 
@@ -277,8 +281,11 @@ export function MemoryPage() {
   const [confirmAll, setConfirmAll] = useState(false);
   const [filter, setFilter] = useState<MemoryType | 'all'>('all');
   // `/memory` or a transcript row named the workspace (and note) to show.
-  const [target] = useState(takeMemoryTarget);
+  const [target] = useState(peekMemoryTarget);
+  useEffect(clearMemoryTarget, []);
   const filterId = useId();
+  const userId = useId();
+  const projectId = useId();
   const fail = useCallback((e: unknown) => {
     setError(reason(e));
   }, []);
@@ -328,26 +335,28 @@ export function MemoryPage() {
   const locked = view?.locked === true || managed.locked.includes('/autoMemoryEnabled');
   return (
     <div className="settings-section settings-detail-page" data-testid="memory-page">
-      <p className="muted">{t('memory.hint')}</p>
+      <PageHeadActions>
+        <SettingsInfo text={t('memory.hint')} />
+      </PageHeadActions>
       {chosen === null ? (
         <p className="muted">{t('agents.noWorkspace')}</p>
       ) : (
-        <div className="permission-filters">
-          <label htmlFor={selectId} className="permission-filter-label">
-            {t('permissions.workspace')}
-          </label>
-          <select
-            id={selectId}
-            className="input"
-            value={chosen}
-            data-testid="memory-workspace"
-            onChange={(e) => {
-              setChosen(e.currentTarget.value);
-            }}
-          >
-            <WorkspaceOptions workspaces={workspaces} />
-          </select>
-        </div>
+        <PageHeadActions>
+          <ScopePicker>
+            <select
+              id={selectId}
+              aria-label={t('permissions.workspace')}
+              className="settings-scope-select"
+              value={chosen}
+              data-testid="memory-workspace"
+              onChange={(e) => {
+                setChosen(e.currentTarget.value);
+              }}
+            >
+              <WorkspaceOptions workspaces={workspaces} />
+            </select>
+          </ScopePicker>
+        </PageHeadActions>
       )}
       {error === '' ? null : (
         <p className="error-text" role="alert">
@@ -356,14 +365,42 @@ export function MemoryPage() {
       )}
       {view === undefined ? null : (
         <>
-          <div className="setting" data-testid="memory-switches">
-            <span className="setting-label">
-              {t('memory.switches')}
-              {locked && <ManagedBadge testId="memory-managed" />}
-            </span>
-            <label className="checkbox">
+          <SettingsSection
+            testId="memory-switches"
+            title={
+              <>
+                {t('memory.switches')}
+                {locked && <ManagedBadge testId="memory-managed" />}
+              </>
+            }
+            aside={
+              view.memories.length > 0 ? (
+                <Button
+                  size="small"
+                  variant="ghost"
+                  data-testid="memory-reveal"
+                  onClick={() => {
+                    if (chosen !== null) window.piarc.revealMemory(chosen).catch(fail);
+                  }}
+                >
+                  {t('memory.reveal')}
+                </Button>
+              ) : undefined
+            }
+          >
+            <SettingsRow
+              label={t('memory.userEnabled')}
+              htmlFor={userId}
+              description={
+                <span className="approval-path" title={view.directory}>
+                  {t('memory.directory', { path: view.directory })}
+                </span>
+              }
+            >
               <input
+                id={userId}
                 type="checkbox"
+                className="preference-switch"
                 // Locked: both show what the organization decided.
                 checked={locked ? view.enabled : view.userEnabled}
                 disabled={locked || busy}
@@ -372,11 +409,26 @@ export function MemoryPage() {
                   edit({ op: 'setEnabled', scope: 'user', enabled: e.currentTarget.checked });
                 }}
               />
-              {t('memory.userEnabled')}
-            </label>
-            <label className="checkbox">
+            </SettingsRow>
+            <SettingsRow
+              label={t('memory.projectEnabled')}
+              htmlFor={projectId}
+              description={
+                <span data-testid="memory-state">
+                  {t(
+                    !view.enabled
+                      ? 'memory.state.off'
+                      : view.trusted
+                        ? 'memory.state.on'
+                        : 'memory.state.untrusted',
+                  )}
+                </span>
+              }
+            >
               <input
+                id={projectId}
                 type="checkbox"
+                className="preference-switch"
                 checked={locked ? view.enabled : view.projectEnabled}
                 disabled={locked || busy}
                 data-testid="memory-project-enabled"
@@ -384,50 +436,32 @@ export function MemoryPage() {
                   edit({ op: 'setEnabled', scope: 'project', enabled: e.currentTarget.checked });
                 }}
               />
-              {t('memory.projectEnabled')}
-            </label>
-            <p className="muted small" data-testid="memory-state">
-              {t(
-                !view.enabled
-                  ? 'memory.state.off'
-                  : view.trusted
-                    ? 'memory.state.on'
-                    : 'memory.state.untrusted',
-              )}
-            </p>
-            <p className="muted small">{t('memory.directory', { path: view.directory })}</p>
-            {view.memories.length > 0 && (
-              <Button
-                size="small"
-                className="memory-start"
-                data-testid="memory-reveal"
-                onClick={() => {
-                  if (chosen !== null) window.piarc.revealMemory(chosen).catch(fail);
-                }}
+            </SettingsRow>
+            {view.claude !== null && view.claude.count > 0 && (
+              <SettingsRow
+                testId="memory-import"
+                label={t('memory.import.button')}
+                description={t('memory.import.found', {
+                  count: view.claude.count,
+                  path: view.claude.path,
+                })}
               >
-                {t('memory.reveal')}
-              </Button>
+                <Button
+                  size="small"
+                  disabled={busy}
+                  data-testid="memory-import-button"
+                  onClick={() => {
+                    edit({ op: 'import' });
+                  }}
+                >
+                  {t('memory.import.action')}
+                </Button>
+              </SettingsRow>
             )}
-          </div>
-          {view.claude !== null && view.claude.count > 0 && (
-            <div className="setting" data-testid="memory-import">
-              <p className="muted">
-                {t('memory.import.found', { count: view.claude.count, path: view.claude.path })}
-              </p>
-              <Button
-                size="small"
-                className="memory-start"
-                disabled={busy}
-                data-testid="memory-import-button"
-                onClick={() => {
-                  edit({ op: 'import' });
-                }}
-              >
-                {t('memory.import.button')}
-              </Button>
-            </div>
-          )}
-          <h2 className="settings-heading">{t('memory.notes')}</h2>
+          </SettingsSection>
+          <header className="settings-block-head">
+            <h3>{t('memory.notes')}</h3>
+          </header>
           {view.memories.length === 0 ? (
             <p className="muted" data-testid="memory-empty">
               {t('memory.empty')}

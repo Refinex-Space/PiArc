@@ -41,40 +41,53 @@ test('every configuration source is listed with its state and follows an edit', 
   const diagnostics = settings.getByTestId('config-diagnostics');
   await diagnostics.waitFor();
 
+  // Each kind of source is one tab of the page (ADR-0101).
+  const tab = (kind: string) => settings.getByTestId(`diagnostics-tab-${kind}`).click();
+  await tab('mcpJson');
   const mcp = settings.getByTestId('diagnostics-kind-mcpJson');
   await expect(mcp.getByTestId('diagnostics-status')).toHaveText('Untrusted, not in effect');
+  await tab('memory');
   const memory = settings.getByTestId('diagnostics-kind-memory');
   await memory.getByTestId('diagnostics-details').first().locator('summary').click();
   await expect(memory.getByTestId('diagnostics-key').first()).toContainText('style.md');
+  await tab('rule');
   const rules = settings.getByTestId('diagnostics-kind-rule');
   await rules.getByTestId('diagnostics-details').first().locator('summary').click();
   await expect(rules.getByTestId('diagnostics-ignored-key')).toHaveText([
     '/paths Loaded once a matching file is read or written (src/**/*.ts)',
   ]);
+  await tab('agent');
   const agents = settings.getByTestId('diagnostics-kind-agent');
   await agents.getByTestId('diagnostics-details').first().locator('summary').click();
   await expect(agents.getByTestId('diagnostics-key')).toHaveText(['/reviewer']);
   await expect(agents.getByTestId('diagnostics-ignored-key')).toContainText([
     '/favourite PiArc does not use this setting',
   ]);
+  await tab('skill');
   const skills = settings.getByTestId('diagnostics-kind-skill');
   await skills.getByTestId('diagnostics-details').first().locator('summary').click();
   await expect(skills.getByTestId('diagnostics-ignored-key')).toContainText([
     /Waits until you trust this project/u,
   ]);
+  await tab('command');
   await expect(settings.getByTestId('diagnostics-kind-command')).toContainText('fix.md');
+  await tab('outputStyle');
   await expect(settings.getByTestId('diagnostics-kind-outputStyle')).toContainText('terse.md');
+  await tab('enterprise');
   const enterprise = settings.getByTestId('diagnostics-kind-enterprise');
   await expect(enterprise.getByTestId('diagnostics-status')).toHaveText('Not configured');
   await expect(enterprise).toContainText('Reserved for enterprise policy');
 
+  await tab('mcpJson');
   await mcp.scrollIntoViewIfNeeded();
   await settings.screenshot({ path: path.join(EVIDENCE, 'diagnostics-sources-light.png') });
   await prefer(page, { key: 'appearance.theme', value: 'dark' });
   await settings.screenshot({ path: path.join(EVIDENCE, 'diagnostics-sources-dark.png') });
   await prefer(page, { key: 'language', value: 'zh-CN' });
   await expect(mcp.getByTestId('diagnostics-status')).toHaveText('未信任，未生效');
+  await tab('enterprise');
   await expect(enterprise.getByTestId('diagnostics-status')).toHaveText('未配置');
+  await tab('rule');
   await rules.scrollIntoViewIfNeeded();
   await settings.screenshot({ path: path.join(EVIDENCE, 'diagnostics-sources-zh-CN-dark.png') });
   await prefer(page, { key: 'appearance.theme', value: 'light' });

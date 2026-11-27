@@ -3,6 +3,7 @@
 // set on their own. Saved with the other model preferences (`setModelPreferences`), as the
 // user's `modelAliases`; a workspace's `.piarc/settings.json` can set its own.
 import { useApp } from '../app/app-context.js';
+import { SettingsInfo, SettingsRow, SettingsSection } from './layout.js';
 import {
   ALIAS_FOLLOWS,
   MODEL_ALIASES,
@@ -50,53 +51,56 @@ export function AliasSection({
           efforts: model.efforts.join(' / ') || '-',
         });
   return (
-    <section className="settings-subsection" data-testid="alias-section">
-      <h2 className="settings-heading">{t('models.aliases.title')}</h2>
-      <p className="muted small">{t('models.aliases.hint')}</p>
-      <ul className="provider-list">
-        {MODEL_ALIASES.map((alias) => {
-          const own = settings.aliases[alias];
-          const tier = ALIAS_FOLLOWS[alias];
-          const effective = own ?? (tier === undefined ? undefined : settings.aliases[tier]);
-          const model = models.find((m) => keyOf(m) === effective);
-          return (
-            <li key={alias} data-testid={`alias-row-${alias}`}>
-              <div>
-                <strong>{t(`models.aliases.${alias}`)}</strong>
-                <div className="muted small" data-testid={`alias-summary-${alias}`}>
-                  {model === undefined
-                    ? (effective ?? t('models.aliases.unset'))
-                    : `${model.name} · ${summary(model) ?? ''}`}
-                </div>
-              </div>
-              <select
-                className="input"
-                aria-label={t(`models.aliases.${alias}`)}
-                data-testid={`alias-select-${alias}`}
-                disabled={busy}
-                value={own ?? ''}
-                onChange={(e) => {
-                  choose(alias, e.currentTarget.value);
-                }}
-              >
-                <option value="">
-                  {tier === undefined
-                    ? t('models.aliases.unset')
-                    : t('models.aliases.follows', { tier })}
+    <SettingsSection
+      title={t('models.aliases.title')}
+      testId="alias-section"
+      aside={<SettingsInfo text={t('models.aliases.hint')} />}
+    >
+      {MODEL_ALIASES.map((alias) => {
+        const own = settings.aliases[alias];
+        const tier = ALIAS_FOLLOWS[alias];
+        const effective = own ?? (tier === undefined ? undefined : settings.aliases[tier]);
+        const model = models.find((m) => keyOf(m) === effective);
+        return (
+          <SettingsRow
+            key={alias}
+            testId={`alias-row-${alias}`}
+            label={t(`models.aliases.${alias}`)}
+            description={
+              effective === undefined ? undefined : (
+                <span data-testid={`alias-summary-${alias}`}>
+                  {model === undefined ? effective : `${model.name} · ${summary(model) ?? ''}`}
+                </span>
+              )
+            }
+          >
+            <select
+              className="input"
+              aria-label={t(`models.aliases.${alias}`)}
+              data-testid={`alias-select-${alias}`}
+              disabled={busy}
+              value={own ?? ''}
+              onChange={(e) => {
+                choose(alias, e.currentTarget.value);
+              }}
+            >
+              <option value="">
+                {tier === undefined
+                  ? t('models.aliases.unset')
+                  : t('models.aliases.follows', { tier })}
+              </option>
+              {own !== undefined && !models.some((m) => keyOf(m) === own) ? (
+                <option value={own}>{own}</option>
+              ) : null}
+              {models.map((m) => (
+                <option key={keyOf(m)} value={keyOf(m)}>
+                  {settings.models[keyOf(m)]?.displayName ?? m.name} ({keyOf(m)})
                 </option>
-                {own !== undefined && !models.some((m) => keyOf(m) === own) ? (
-                  <option value={own}>{own}</option>
-                ) : null}
-                {models.map((m) => (
-                  <option key={keyOf(m)} value={keyOf(m)}>
-                    {settings.models[keyOf(m)]?.displayName ?? m.name} ({keyOf(m)})
-                  </option>
-                ))}
-              </select>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+              ))}
+            </select>
+          </SettingsRow>
+        );
+      })}
+    </SettingsSection>
   );
 }

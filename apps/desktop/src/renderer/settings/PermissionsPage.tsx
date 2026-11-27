@@ -4,6 +4,9 @@
 // shows the native confirmation for new or changed allow rules.
 import { useCallback, useEffect, useId, useState } from 'react';
 import { WorkspaceOptions } from './WorkspaceOptions.js';
+import { SettingsRow, SettingsSection } from './layout.js';
+import { PageHeadActions } from './page-head.js';
+import { ScopePicker } from './ScopePicker.js';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import {
@@ -354,7 +357,11 @@ function SourceSection({
           <ManagedBadge testId={`managed-rules-${source.id}`} />
         )}
       </h3>
-      {source.file !== undefined && <div className="muted approval-path">{source.file}</div>}
+      {source.file !== undefined && (
+        <div className="muted approval-path" title={source.file}>
+          {source.file}
+        </div>
+      )}
       {source.rules.length === 0 && <p className="muted">{t('permissions.empty')}</p>}
       {source.rules.length > 0 && (
         <ul className="permission-rules">
@@ -460,6 +467,9 @@ function SourceSection({
 }
 
 const SINCE = { hour: 3_600_000, day: 86_400_000, week: 604_800_000 } as const;
+/** Rows read per query (the most recent first) and rows shown per page. */
+const AUDIT_LOADED = 200;
+const AUDIT_PAGE = 20;
 type Since = keyof typeof SINCE | 'all';
 
 /** The audit kind a link asked for (`#/settings/permissions?audit=sandbox`, T39;
@@ -478,6 +488,7 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
   const [conclusion, setConclusion] = useState<'' | 'allow' | 'deny'>('');
   const [since, setSince] = useState<Since>('all');
   const [error, setError] = useState('');
+  const [page, setPage] = useState(0);
   const ids = {
     kind: useId(),
     session: useId(),
@@ -502,13 +513,14 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
       ...(tool.trim() === '' ? {} : { tool: tool.trim() }),
       ...(conclusion === '' ? {} : { conclusion }),
       ...(since === 'all' ? {} : { since: Date.now() - SINCE[since] }),
-      limit: 200,
+      limit: AUDIT_LOADED,
     };
     window.piarc
       .auditEvents(query)
       .then((raw) => {
         setError('');
         setRows(parseAudit(raw));
+        setPage(0);
       })
       .catch((e: unknown) => {
         setError(reason(e));
@@ -516,8 +528,10 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
   }, [workspace, kind, session, tool, conclusion, since]);
   useEffect(load, [load]);
   return (
-    <section className="permission-audit" data-testid="permission-audit">
-      <h2 className="permission-heading">{t('permissions.audit')}</h2>
+    <section className="permission-audit settings-block" data-testid="permission-audit">
+      <header className="settings-block-head">
+        <h3>{t('permissions.audit')}</h3>
+      </header>
       <div className="settings-audit-filters">
         <label htmlFor={ids.kind} className="settings-filter-field">
           <span>{t('permissions.audit.kind')}</span>
@@ -607,7 +621,7 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
       {rows.length === 0 ? (
         <p className="muted">{t('permissions.audit.empty')}</p>
       ) : (
-        <table className="permission-audit-table">
+        <table className="permission-audit-table" data-testid="permission-audit-table">
           <thead>
             <tr>
               <th>{t('permissions.audit.time')}</th>
@@ -627,7 +641,7 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
+            {rows.slice(page * AUDIT_PAGE, (page + 1) * AUDIT_PAGE).map((r, i) => (
               <tr key={`${String(r.at)}-${String(i)}`} data-testid="audit-row">
                 <td className="permission-nowrap">{format.dateTime(r.at)}</td>
                 <td className="permission-nowrap" title={r.sessionId}>
@@ -662,6 +676,40 @@ function AuditSection({ workspace }: { readonly workspace: string }) {
             ))}
           </tbody>
         </table>
+      )}
+      {rows.length > AUDIT_PAGE && (
+        <div className="settings-pager" data-testid="audit-pager">
+          <span className="settings-pager-range">
+            {t('permissions.audit.range', {
+              from: page * AUDIT_PAGE + 1,
+              to: Math.min(rows.length, (page + 1) * AUDIT_PAGE),
+              total: rows.length,
+            })}
+            {rows.length >= AUDIT_LOADED ? ` · ${t('permissions.audit.capped')}` : ''}
+          </span>
+          <Button
+            size="small"
+            variant="ghost"
+            disabled={page === 0}
+            data-testid="audit-previous"
+            onClick={() => {
+              setPage((n) => n - 1);
+            }}
+          >
+            {t('permissions.audit.previous')}
+          </Button>
+          <Button
+            size="small"
+            variant="ghost"
+            disabled={(page + 1) * AUDIT_PAGE >= rows.length}
+            data-testid="audit-next"
+            onClick={() => {
+              setPage((n) => n + 1);
+            }}
+          >
+            {t('permissions.audit.next')}
+          </Button>
+        </div>
       )}
     </section>
   );
@@ -718,6 +766,7 @@ export function PermissionsPage() {
   const [view, setView] = useState<PermissionView | undefined>(undefined);
   const [error, setError] = useState('');
   const workspaceId = useId();
+  const bypassId = useId();
   const managedBypass = useIsManaged('/permissions/enableBypassPermissions');
   const report = (e: unknown) => {
     setError(reason(e));
@@ -735,14 +784,35 @@ export function PermissionsPage() {
   const workspace = view?.workspace ?? null;
   return (
     <div className="settings-section settings-detail-page" data-testid="permissions-page">
-      <div className="setting">
-        <span className="setting-label">
-          {t('approval.modeMenu')}
-          {managedBypass && <ManagedBadge testId="managed-bypass" />}
-        </span>
-        <label className="checkbox">
+      {view !== undefined && view.workspaces.length > 0 && (
+        <PageHeadActions>
+          <ScopePicker>
+            <select
+              id={workspaceId}
+              aria-label={t('permissions.workspace')}
+              className="settings-scope-select"
+              value={workspace ?? ''}
+              data-testid="permission-workspace"
+              onChange={(e) => {
+                load(e.currentTarget.value);
+              }}
+            >
+              <WorkspaceOptions workspaces={view.workspaces} />
+            </select>
+          </ScopePicker>
+        </PageHeadActions>
+      )}
+      <SettingsSection title={t('approval.modeMenu')}>
+        <SettingsRow
+          label={t('permissions.bypass.enable')}
+          description={t('permissions.bypass.hint')}
+          htmlFor={bypassId}
+          badge={managedBypass && <ManagedBadge testId="managed-bypass" />}
+        >
           <input
+            id={bypassId}
             type="checkbox"
+            className="preference-switch"
             checked={preferences.permissions.enableBypassPermissions}
             disabled={managedBypass}
             data-testid="setting-enable-bypass"
@@ -755,29 +825,9 @@ export function PermissionsPage() {
                 .catch(report);
             }}
           />
-          {t('permissions.bypass.enable')}
-        </label>
-        <p className="muted">{t('permissions.bypass.hint')}</p>
-      </div>
+        </SettingsRow>
+      </SettingsSection>
       <AutoReviewSection onError={report} />
-      {view !== undefined && view.workspaces.length > 0 && (
-        <div className="setting">
-          <label htmlFor={workspaceId} className="setting-label">
-            {t('permissions.workspace')}
-          </label>
-          <select
-            id={workspaceId}
-            className="input"
-            value={workspace ?? ''}
-            data-testid="permission-workspace"
-            onChange={(e) => {
-              load(e.currentTarget.value);
-            }}
-          >
-            <WorkspaceOptions workspaces={view.workspaces} />
-          </select>
-        </div>
-      )}
       {error !== '' && (
         <p className="error-text" role="alert">
           {error}
@@ -788,16 +838,17 @@ export function PermissionsPage() {
       )}
       {view !== undefined && workspace !== null && (
         <>
-          <h2 className="permission-heading">{t('permissions.rules')}</h2>
-          {view.sources.map((source) => (
-            <SourceSection
-              key={`${source.id}:${source.sessionId ?? ''}`}
-              source={source}
-              workspace={workspace}
-              onChanged={show}
-              onError={report}
-            />
-          ))}
+          <SettingsSection title={t('permissions.rules')} testId="permission-rules">
+            {view.sources.map((source) => (
+              <SourceSection
+                key={`${source.id}:${source.sessionId ?? ''}`}
+                source={source}
+                workspace={workspace}
+                onChanged={show}
+                onError={report}
+              />
+            ))}
+          </SettingsSection>
           <AuditSection workspace={workspace} />
         </>
       )}

@@ -8,6 +8,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import { Button } from '../app/Button.js';
+import { SettingsInfo, SettingsSection } from './layout.js';
 
 /** The redaction kinds Core reports (`piarc_telemetry::redact::Kind::label`), in display order. */
 const REDACTION_KINDS = {
@@ -114,26 +115,26 @@ export function DiagnosticBundleSection({ workspace }: { readonly workspace: str
       : [];
 
   return (
-    <section
-      className="diagnostic-bundle"
-      data-testid="diagnostic-bundle"
-      aria-labelledby="diagnostic-bundle-title"
+    <SettingsSection
+      title={t('diagnostics.bundle.title')}
+      testId="diagnostic-bundle"
+      aside={
+        <>
+          <SettingsInfo text={t('diagnostics.bundle.intro')} />
+          {state.kind !== 'preview' && (
+            <Button
+              size="small"
+              loading={state.kind === 'busy'}
+              aria-label={state.kind === 'busy' ? t('diagnostics.bundle.preparing') : undefined}
+              onClick={prepare}
+              data-testid="diagnostic-bundle-prepare"
+            >
+              {t('diagnostics.bundle.prepare')}
+            </Button>
+          )}
+        </>
+      }
     >
-      <h2 className="settings-heading" id="diagnostic-bundle-title">
-        {t('diagnostics.bundle.title')}
-      </h2>
-      <p className="muted">{t('diagnostics.bundle.intro')}</p>
-      {state.kind !== 'preview' && (
-        <Button
-          size="small"
-          loading={state.kind === 'busy'}
-          aria-label={state.kind === 'busy' ? t('diagnostics.bundle.preparing') : undefined}
-          onClick={prepare}
-          data-testid="diagnostic-bundle-prepare"
-        >
-          {t('diagnostics.bundle.prepare')}
-        </Button>
-      )}
       {state.kind === 'preview' && (
         <div className="diagnostic-bundle-preview" data-testid="diagnostic-bundle-preview">
           <h3 className="permission-source-title">{t('diagnostics.bundle.files')}</h3>
@@ -188,6 +189,6 @@ export function DiagnosticBundleSection({ workspace }: { readonly workspace: str
           {state.message}
         </p>
       )}
-    </section>
+    </SettingsSection>
   );
 }

@@ -504,5 +504,8 @@ pub fn uses_oauth(http: &piarc_protocol::mcp::McpHttp) -> bool {
         .any(|k| k.eq_ignore_ascii_case("authorization"))
 }
 
+mod add;
+pub use add::AddScope;
+
 #[cfg(test)]
 mod tests;

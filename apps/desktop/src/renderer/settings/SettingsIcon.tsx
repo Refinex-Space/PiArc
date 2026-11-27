@@ -89,6 +89,8 @@ const symbols: Record<string, ReactNode> = {
     </>
   ),
   close: <path d="m4.8 4.8 10.4 10.4m0-10.4L4.8 15.2" />,
+  chevron: <path d="m8 5 5 5-5 5" />,
+  back: <path d="m12 5-5 5 5 5" />,
 };
 
 export function SettingsIcon({ name }: { readonly name: string }) {

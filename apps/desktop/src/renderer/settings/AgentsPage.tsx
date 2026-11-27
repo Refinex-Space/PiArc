@@ -1,7 +1,10 @@
 // The subagent types of a workspace (T31): the definition files Core found and the built-in
 // types, with where each came from, what it replaces, the model it resolves to, ignored and
 // inactive fields, and the files that are not valid definitions (with their line).
-import type { AgentDefinition, AgentIssue, AgentWarning } from '@piarc/protocol';
+import { PageHeadActions } from './page-head.js';
+import { ScopePicker } from './ScopePicker.js';
+import { SettingsInfo, SettingsSection } from './layout.js';
+import type { AgentDefinition, AgentIssue, AgentSource, AgentWarning } from '@piarc/protocol';
 import { WorkspaceOptions } from './WorkspaceOptions.js';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -86,45 +89,73 @@ function warningText(
   }
 }
 
-function AgentRow({ agent }: { readonly agent: AgentDefinition }) {
+/** Subagent types by where they come from, in the order a name is looked up. */
+const AGENT_GROUPS: readonly {
+  readonly group: 'project' | 'user' | 'plugin' | 'builtIn';
+  readonly sources: readonly AgentSource[];
+}[] = [
+  { group: 'project', sources: ['projectPiarc', 'projectClaude'] },
+  { group: 'user', sources: ['user', 'userClaude'] },
+  { group: 'plugin', sources: ['plugin'] },
+  { group: 'builtIn', sources: ['builtIn'] },
+];
+
+function AgentRow({
+  agent,
+  badge,
+}: {
+  readonly agent: AgentDefinition;
+  /** Name the file's place (the group holds more than one). */
+  readonly badge: boolean;
+}) {
   const { t } = useApp();
   const model = agent.model ?? 'inherit';
   const resolved = agent.resolvedModel ?? undefined;
+  const notes = [
+    ...(agent.denied === true ? [t('agents.denied', { name: agent.name })] : []),
+    ...(agent.overrides ?? []).map((path) => t('agents.overrides', { path })),
+  ];
   return (
-    <li className="agent-row" data-testid="agent-row" data-name={agent.name}>
-      <div className="agent-row-head">
-        <strong>{agent.name}</strong>
-        <span className="muted small" data-testid="agent-source">
-          {t(`agents.source.${agent.source}`)}
-        </span>
-      </div>
-      <p className="small">{agent.description}</p>
-      <div className="muted small">
-        {resolved === undefined
-          ? t('agents.model', { model })
-          : t('agents.modelResolved', { model, target: `${resolved.provider}/${resolved.id}` })}
-        {' · '}
-        {agent.tools == null
-          ? t('agents.allTools')
-          : t('agents.tools', { tools: agent.tools.join(', ') })}
-      </div>
-      {agent.path == null ? null : <div className="muted small diagnostics-code">{agent.path}</div>}
-      {agent.denied === true ? (
-        <div className="row-status is-warning">{t('agents.denied', { name: agent.name })}</div>
-      ) : null}
-      {(agent.overrides ?? []).map((path) => (
-        <div key={path} className="muted small">
-          {t('agents.overrides', { path })}
+    <li className="settings-item" data-testid="agent-row" data-name={agent.name}>
+      <div className="settings-item-body">
+        <div className="settings-item-name">
+          <span className="mono-text" data-tooltip={agent.path ?? undefined}>
+            {agent.name}
+          </span>
+          {badge ? (
+            <span className="settings-badge" data-testid="agent-source">
+              {t(`agents.source.${agent.source}`)}
+            </span>
+          ) : null}
         </div>
-      ))}
-      {(agent.warnings ?? []).length === 0 ? null : (
-        <ul className="subagent-warnings" data-testid="agent-warnings">
-          {(agent.warnings ?? []).map((w, index) => (
-            <li key={`${w.kind}-${String(index)}`} className="muted">
-              {warningText(t, w)}
-            </li>
-          ))}
-        </ul>
+        <div className="settings-item-detail">
+          {resolved === undefined
+            ? t('agents.model', { model })
+            : t('agents.modelResolved', { model, target: `${resolved.provider}/${resolved.id}` })}
+          {' · '}
+          {agent.tools == null
+            ? t('agents.allTools')
+            : t('agents.tools', { tools: agent.tools.join(', ') })}
+        </div>
+        {notes.map((note) => (
+          <div key={note} className="settings-item-note">
+            {note}
+          </div>
+        ))}
+        {(agent.warnings ?? []).length === 0 ? null : (
+          <ul className="subagent-warnings" data-testid="agent-warnings">
+            {(agent.warnings ?? []).map((w, index) => (
+              <li key={`${w.kind}-${String(index)}`} className="settings-item-note">
+                {warningText(t, w)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {agent.description === '' ? null : (
+        <div className="settings-item-actions">
+          <SettingsInfo text={agent.description} />
+        </div>
       )}
     </li>
   );
@@ -165,26 +196,38 @@ export function AgentsPage() {
   useEffect(load, [load]);
   return (
     <div className="agents-page settings-detail-page" data-testid="agents-page">
-      <p className="muted">{t('agents.hint')}</p>
+      <PageHeadActions>
+        <SettingsInfo
+          text={
+            view === undefined
+              ? t('agents.hint')
+              : `${t('agents.hint')} ${t('agents.limits', {
+                  depth: view.limits.maxDepth,
+                  concurrent: view.limits.maxConcurrent,
+                })}`
+          }
+          testId="agents-limits"
+        />
+      </PageHeadActions>
       {chosen === null ? (
         <p className="muted">{t('agents.noWorkspace')}</p>
       ) : (
-        <div className="permission-filters">
-          <label htmlFor={selectId} className="permission-filter-label">
-            {t('permissions.workspace')}
-          </label>
-          <select
-            id={selectId}
-            className="input"
-            value={chosen}
-            data-testid="agents-workspace"
-            onChange={(e) => {
-              setChosen(e.currentTarget.value);
-            }}
-          >
-            <WorkspaceOptions workspaces={workspaces} />
-          </select>
-        </div>
+        <PageHeadActions>
+          <ScopePicker>
+            <select
+              id={selectId}
+              aria-label={t('permissions.workspace')}
+              className="settings-scope-select"
+              value={chosen}
+              data-testid="agents-workspace"
+              onChange={(e) => {
+                setChosen(e.currentTarget.value);
+              }}
+            >
+              <WorkspaceOptions workspaces={workspaces} />
+            </select>
+          </ScopePicker>
+        </PageHeadActions>
       )}
       {error === '' ? null : (
         <p className="error-text" role="alert">
@@ -197,18 +240,26 @@ export function AgentsPage() {
         )
       ) : (
         <>
-          <h2 className="settings-heading">{t('agents.title')}</h2>
-          <p className="muted small" data-testid="agents-limits">
-            {t('agents.limits', {
-              depth: view.limits.maxDepth,
-              concurrent: view.limits.maxConcurrent,
+          <div className="settings-groups" data-testid="agent-list">
+            {AGENT_GROUPS.map(({ group, sources }) => {
+              const agents = view.agents.filter((a) => sources.includes(a.source));
+              if (agents.length === 0) return null;
+              return (
+                <SettingsSection
+                  key={group}
+                  title={t(`agents.group.${group}`)}
+                  testId={`agent-group-${group}`}
+                  aside={<span className="settings-block-count">{agents.length}</span>}
+                >
+                  <ul className="agent-list">
+                    {agents.map((agent) => (
+                      <AgentRow key={agent.name} agent={agent} badge={sources.length > 1} />
+                    ))}
+                  </ul>
+                </SettingsSection>
+              );
             })}
-          </p>
-          <ul className="agent-list" data-testid="agent-list">
-            {view.agents.map((agent) => (
-              <AgentRow key={agent.name} agent={agent} />
-            ))}
-          </ul>
+          </div>
           {view.issues.length === 0 ? null : (
             <section data-testid="agent-issues">
               <h2 className="settings-heading">{t('agents.issues')}</h2>

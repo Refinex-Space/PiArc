@@ -30,13 +30,30 @@ function parse(raw: string | null): MemoryTarget | undefined {
   }
 }
 
-/** The target named for this page, once: reading it clears it. */
-export function takeMemoryTarget(): MemoryTarget | undefined {
+/**
+ * The target named for this page. Reading does not clear it: a render can be discarded and
+ * repeated, so the page clears it with `clearMemoryTarget` once it has committed.
+ */
+export function peekMemoryTarget(): MemoryTarget | undefined {
   try {
-    const target = parse(window.sessionStorage.getItem(KEY));
-    window.sessionStorage.removeItem(KEY);
-    return target;
+    return parse(window.sessionStorage.getItem(KEY));
   } catch {
     return undefined;
   }
+}
+
+/** Forgets the target after the page that shows it has committed. */
+export function clearMemoryTarget(): void {
+  try {
+    window.sessionStorage.removeItem(KEY);
+  } catch {
+    // Storage unavailable: nothing was kept.
+  }
+}
+
+/** The target named for this page, once: reading it clears it. */
+export function takeMemoryTarget(): MemoryTarget | undefined {
+  const target = peekMemoryTarget();
+  clearMemoryTarget();
+  return target;
 }

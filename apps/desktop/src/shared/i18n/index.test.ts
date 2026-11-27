@@ -116,6 +116,8 @@ describe('i18n', () => {
             type: 'Explore',
             depth: 3,
             concurrent: 8,
+            share: 42,
+            names: 'TOKEN',
             alias: 'fast',
             tier: 'fast',
             context: '200,000',

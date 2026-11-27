@@ -338,3 +338,68 @@ async fn the_diagnostics_list_unsupported_servers_without_expanding_variables() 
         "no value of the environment reaches the report"
     );
 }
+
+#[tokio::test]
+async fn added_servers_are_written_where_chosen_and_keep_the_projects_trust() {
+    let f = Fixture::new();
+    f.trust_now().await;
+    f.source
+        .add_server(
+            &f.workspace,
+            AddScope::User,
+            "docs",
+            json!({ "type": "http", "url": "https://docs.example/mcp" }),
+        )
+        .await
+        .expect("user server");
+    let user: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(f.root.join("data").join("settings.json")).expect("user settings"),
+    )
+    .expect("json");
+    assert_eq!(
+        user["mcpServers"]["docs"]["url"],
+        "https://docs.example/mcp"
+    );
+
+    f.source
+        .add_server(
+            &f.workspace,
+            AddScope::ProjectLocal,
+            "repo",
+            json!({ "type": "stdio", "command": "repo-mcp", "args": ["--stdio"] }),
+        )
+        .await
+        .expect("project server");
+    assert!(
+        f.workspace
+            .join(".piarc")
+            .join("settings.local.json")
+            .is_file()
+    );
+    // The user confirmed it natively: the project stays trusted and the server is ready.
+    let result = f.servers().await;
+    assert_eq!(
+        by_name(&result, "repo").availability,
+        McpAvailability::Ready
+    );
+    assert_eq!(by_name(&result, "repo").scope, McpScope::Project);
+    assert_eq!(
+        by_name(&result, "docs").availability,
+        McpAvailability::Ready
+    );
+
+    // A name any source uses is refused, in either scope.
+    for scope in [AddScope::User, AddScope::ProjectLocal] {
+        let error = f
+            .source
+            .add_server(
+                &f.workspace,
+                scope,
+                "docs",
+                json!({ "type": "stdio", "command": "other" }),
+            )
+            .await
+            .expect_err("taken");
+        assert_eq!(error.kind(), piarc_protocol::ErrorKind::InvalidParams);
+    }
+}

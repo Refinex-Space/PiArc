@@ -499,7 +499,7 @@ function start(dirs: DataDirs): void {
       systemProxy.focused();
     });
     registerProxyHandlers(registerHandler, systemProxy);
-    registerMcpHandlers(registerHandler, core.runtime);
+    registerMcpHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerWorktreeHandlers(
       registerHandler,

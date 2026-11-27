@@ -246,6 +246,7 @@ managedTest.describe('managed settings', () => {
 
       // The diagnostics list both documents; Claude Code's unsupported key is ignored.
       await settings.getByTestId('settings-nav-diagnostics').click();
+      await settings.getByTestId('diagnostics-tab-enterprise').click();
       const managed = settings.getByTestId('diagnostics-kind-enterprise');
       await expect(managed).toContainText('managed-settings.json');
       await managed.getByTestId('diagnostics-details').last().locator('summary').click();

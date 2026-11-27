@@ -7,13 +7,17 @@
 // regular expressions reject) are listed after the files (T25). T41 adds every other source
 // (`.mcp.json`, memory files and imports, rules, subagent definitions, skills, commands, output
 // styles, extension packages, the enterprise place), grouped by kind after the settings files.
+import { PageHeadActions } from './page-head.js';
+import { ScopePicker } from './ScopePicker.js';
+import { SettingsInfo, SettingsSection } from './layout.js';
+import { ChevronDownIcon, ReloadIcon } from '../shell/icons.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { WorkspaceOptions } from './WorkspaceOptions.js';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { DiagnosticBundleSection } from './DiagnosticBundleSection.js';
-import { Button } from '../app/Button.js';
+import { IconButton } from '../app/IconButton.js';
 import { reason } from '../shell/errors.js';
 
 const STATUSES = [
@@ -60,6 +64,8 @@ const LAYERS = [
 ] as const;
 
 /** The kinds of sources besides settings files (T41), in the page's order. */
+type Kind = 'settings' | (typeof SOURCE_KINDS)[number];
+
 const SOURCE_KINDS = [
   'mcpJson',
   'memory',
@@ -334,45 +340,127 @@ function ItemList({ rows, kind }: { rows: readonly KeyRow[]; kind: 'effective' |
   );
 }
 
+/** A file's short name: a settings layer's title, a skill's folder, otherwise the file name. */
+function fileName(t: ReturnType<typeof useApp>['t'], file: FileView): string {
+  if (isSettings(file)) {
+    const title = layerTitle(file.layer);
+    return title === undefined ? file.layer : t(title);
+  }
+  if (file.file === '') return t(`diagnostics.kind.${file.kind as (typeof SOURCE_KINDS)[number]}`);
+  const parts = file.file.split(/[\\/]/u).filter((p) => p !== '');
+  const base = parts.at(-1) ?? file.file;
+  return base.toUpperCase() === 'SKILL.MD' && parts.length > 1 ? (parts.at(-2) ?? base) : base;
+}
+
 function FileSection({ file }: { file: FileView }) {
   const { t } = useApp();
   const settings = isSettings(file);
-  const title = settings ? layerTitle(file.layer) : undefined;
-  const counts = {
-    effective: file.effective.length,
-    overridden: file.overridden.length,
-    ignored: file.ignored.length,
-    issues: file.issues.length,
-  };
+  const counts = [
+    ['diagnostics.count.effective', file.effective.length],
+    ['diagnostics.count.overridden', file.overridden.length],
+    ['diagnostics.count.ignored', file.ignored.length],
+    ['diagnostics.count.issues', file.issues.length],
+  ] as const;
+  const meta = [
+    ...(settings ? [t(file.writable ? 'diagnostics.writable' : 'diagnostics.readOnly')] : []),
+    ...(file.file === '' ? [t('diagnostics.enterpriseNone')] : []),
+    ...counts.filter(([, n]) => n > 0).map(([id, count]) => t(id, { count })),
+  ];
+  const bad = file.status === 'invalid' || file.status === 'stale' || file.issues.length > 0;
+  const head = (
+    <>
+      <span className="diagnostics-row-text">
+        <span className="diagnostics-row-name">
+          <span
+            className="diagnostics-name"
+            data-tooltip={file.file === '' ? undefined : file.file}
+          >
+            {fileName(t, file)}
+          </span>
+          <span
+            className={`settings-badge diagnostics-status is-${file.status}`}
+            data-testid="diagnostics-status"
+          >
+            {!settings && file.status === 'untrusted'
+              ? t('diagnostics.status.untrustedSource')
+              : t(`diagnostics.status.${file.status}`)}
+          </span>
+        </span>
+        {meta.length === 0 ? null : <span className="diagnostics-meta">{meta.join(' · ')}</span>}
+      </span>
+    </>
+  );
+  const open = file.status !== 'missing' && file.status !== 'notConfigured';
   return (
-    <section
+    <li
       className="diagnostics-file"
       data-testid={`diagnostics-file-${file.layer}`}
       data-kind={file.kind}
       data-file={file.file}
       data-status={file.status}
+      data-attention={bad || undefined}
     >
-      <h3 className="permission-source-title">
-        {settings ? (title === undefined ? file.layer : t(title)) : null}
-        <span className={`diagnostics-status is-${file.status}`} data-testid="diagnostics-status">
-          {!settings && file.status === 'untrusted'
-            ? t('diagnostics.status.untrustedSource')
-            : t(`diagnostics.status.${file.status}`)}
-        </span>
-        {settings ? (
-          <span className="muted">
-            {' '}
-            · {t(file.writable ? 'diagnostics.writable' : 'diagnostics.readOnly')}
-          </span>
-        ) : null}
-      </h3>
-      <div className="muted approval-path">
-        {file.file === '' ? t('diagnostics.enterpriseNone') : file.file}
-      </div>
+      {open ? (
+        <details className="diagnostics-details" data-testid="diagnostics-details">
+          <summary className="diagnostics-row">
+            {head}
+            <span className="diagnostics-chevron">
+              <ChevronDownIcon />
+            </span>
+          </summary>
+          <div className="diagnostics-body">
+            <p className="diagnostics-path mono-text">{file.file}</p>
+            {/* `~/.claude.json` is not a settings layer, but its MCP servers apply (T36). */}
+            {(file.merged || file.effective.length > 0) && (
+              <>
+                <h4>{t('diagnostics.effective')}</h4>
+                {file.effective.length === 0 ? (
+                  <p className="muted">{t('diagnostics.none')}</p>
+                ) : settings ? (
+                  <KeyTable rows={file.effective} kind="effective" />
+                ) : (
+                  <ItemList rows={file.effective} kind="effective" />
+                )}
+              </>
+            )}
+            {file.merged && file.overridden.length > 0 && (
+              <>
+                <h4>{t('diagnostics.overridden')}</h4>
+                <KeyTable rows={file.overridden} kind="overridden" />
+              </>
+            )}
+            {!settings && file.overridden.length > 0 && (
+              <>
+                <h4>{t('diagnostics.replaced')}</h4>
+                <ItemList rows={file.overridden} kind="overridden" />
+              </>
+            )}
+            {file.ignored.length > 0 && (
+              <>
+                <h4>{t('diagnostics.ignored')}</h4>
+                <ul className="diagnostics-ignored" data-testid="diagnostics-ignored">
+                  {file.ignored.map((row) => (
+                    <li
+                      key={row.pointer}
+                      data-testid="diagnostics-ignored-key"
+                      data-pointer={row.pointer}
+                    >
+                      <span className="diagnostics-code">{row.pointer}</span>{' '}
+                      <span className="muted">{reasonText(t, row)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        </details>
+      ) : (
+        <div className="diagnostics-row">{head}</div>
+      )}
       {file.issues.length > 0 && (
         <ul className="diagnostics-issues" data-testid="diagnostics-issues">
           {file.issues.map((issue, index) => (
-            <li key={index} className="error-text">
+            <li key={index}>
               {issue.line !== undefined && issue.column !== undefined && (
                 <span>
                   {t('diagnostics.position', { line: issue.line, column: issue.column })}{' '}
@@ -387,67 +475,67 @@ function FileSection({ file }: { file: FileView }) {
           ))}
         </ul>
       )}
-      {file.status !== 'missing' && file.status !== 'notConfigured' && (
-        <details className="diagnostics-details" data-testid="diagnostics-details">
-          <summary>{t('diagnostics.summary', counts)}</summary>
-          {/* `~/.claude.json` is not a settings layer, but its MCP servers apply (T36). */}
-          {(file.merged || file.effective.length > 0) && (
-            <>
-              <h4>{t('diagnostics.effective')}</h4>
-              {file.effective.length === 0 ? (
-                <p className="muted">{t('diagnostics.none')}</p>
-              ) : settings ? (
-                <KeyTable rows={file.effective} kind="effective" />
-              ) : (
-                <ItemList rows={file.effective} kind="effective" />
-              )}
-            </>
-          )}
-          {file.merged && (
-            <>
-              <h4>{t('diagnostics.overridden')}</h4>
-              {file.overridden.length === 0 ? (
-                <p className="muted">{t('diagnostics.none')}</p>
-              ) : (
-                <KeyTable rows={file.overridden} kind="overridden" />
-              )}
-            </>
-          )}
-          {!settings && file.overridden.length > 0 && (
-            <>
-              <h4>{t('diagnostics.replaced')}</h4>
-              <ItemList rows={file.overridden} kind="overridden" />
-            </>
-          )}
-          <h4>{t('diagnostics.ignored')}</h4>
-          {file.ignored.length === 0 ? (
-            <p className="muted">{t('diagnostics.none')}</p>
-          ) : (
-            <ul className="diagnostics-ignored" data-testid="diagnostics-ignored">
-              {file.ignored.map((row) => (
-                <li
-                  key={row.pointer}
-                  data-testid="diagnostics-ignored-key"
-                  data-pointer={row.pointer}
-                >
-                  <span className="diagnostics-code">{row.pointer}</span>{' '}
-                  <span className="muted">{reasonText(t, row)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </details>
+    </li>
+  );
+}
+
+/** How many rows a source kind shows before "show more"; a filter appears above this many. */
+const SHOWN = 12;
+
+/** One kind's files: a filter when there are many, the first few, then more on request. */
+function FileList({ kind, files }: { kind: string; files: readonly FileView[] }) {
+  const { t } = useApp();
+  const [filter, setFilter] = useState('');
+  const [shown, setShown] = useState(SHOWN);
+  const needle = filter.trim().toLowerCase();
+  const matching =
+    needle === '' ? files : files.filter((f) => f.file.toLowerCase().includes(needle));
+  // Files that need the user's eye come first.
+  const ordered = [...matching].sort(
+    (a, b) => Number(b.issues.length > 0) - Number(a.issues.length > 0),
+  );
+  return (
+    <div data-testid={`diagnostics-kind-${kind}`}>
+      {files.length > SHOWN && (
+        <input
+          className="input diagnostics-filter"
+          type="search"
+          value={filter}
+          aria-label={t('diagnostics.filter')}
+          placeholder={t('diagnostics.filter')}
+          data-testid="diagnostics-filter"
+          onChange={(e) => {
+            setFilter(e.currentTarget.value);
+            setShown(SHOWN);
+          }}
+        />
       )}
-    </section>
+      <ul className="diagnostics-files">
+        {ordered.slice(0, shown).map((file) => (
+          <FileSection key={`${file.kind}:${file.layer}:${file.file}`} file={file} />
+        ))}
+      </ul>
+      {ordered.length > shown && (
+        <button
+          type="button"
+          className="settings-add-link"
+          data-testid="diagnostics-more"
+          onClick={() => {
+            setShown((n) => n + SHOWN * 2);
+          }}
+        >
+          {t('usage.sessions.more', { count: Math.min(SHOWN * 2, ordered.length - shown) })}
+        </button>
+      )}
+    </div>
   );
 }
 
 function HookIssues({ issues }: { issues: readonly HookIssue[] }) {
   const { t } = useApp();
   return (
-    <section className="diagnostics-file" data-testid="diagnostics-hooks">
-      <h3 className="permission-source-title">{t('diagnostics.hooks')}</h3>
-      <ul className="diagnostics-issues">
+    <SettingsSection title={t('diagnostics.hooks')} testId="diagnostics-hooks">
+      <ul className="diagnostics-notes">
         {issues.map((issue) => {
           const title = layerTitle(issue.layer);
           return (
@@ -463,16 +551,15 @@ function HookIssues({ issues }: { issues: readonly HookIssue[] }) {
           );
         })}
       </ul>
-    </section>
+    </SettingsSection>
   );
 }
 
 function McpIssues({ issues }: { issues: readonly McpIssue[] }) {
   const { t } = useApp();
   return (
-    <section className="diagnostics-file" data-testid="diagnostics-mcp">
-      <h3 className="permission-source-title">{t('diagnostics.mcp')}</h3>
-      <ul className="diagnostics-issues">
+    <SettingsSection title={t('diagnostics.mcp')} testId="diagnostics-mcp">
+      <ul className="diagnostics-notes">
         {issues.map((issue, index) => (
           <li
             key={`${issue.source}${issue.pointer ?? issue.name ?? ''}${String(index)}`}
@@ -488,15 +575,15 @@ function McpIssues({ issues }: { issues: readonly McpIssue[] }) {
                 })}{' '}
               </strong>
             )}
-            <span className="diagnostics-code">
-              {issue.source}
+            <span className="diagnostics-code" data-tooltip={issue.source}>
+              {issue.source.split(/[\\/]/u).at(-1) ?? issue.source}
               {issue.pointer === undefined || issue.pointer === '' ? '' : ` ${issue.pointer}`}{' '}
             </span>
             {issue.message}
           </li>
         ))}
       </ul>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -510,6 +597,8 @@ export function ConfigDiagnosticsPage() {
   const [view, setView] = useState<DiagnosticsView | undefined>(undefined);
   const [chosen, setChosen] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const tabsId = useId();
+  const [kind, setKind] = useState<Kind>('settings');
   useEffect(() => {
     let active = true;
     let loading = false;
@@ -565,6 +654,15 @@ export function ConfigDiagnosticsPage() {
       void window.piarc.unsubscribeEvents(route);
     };
   }, [chosen]);
+  const kinds = [
+    { kind: 'settings' as Kind, files: view?.files.filter(isSettings) ?? [] },
+    ...SOURCE_KINDS.map((k) => ({
+      kind: k,
+      files: view?.files.filter((f) => f.kind === k) ?? [],
+    })),
+  ].filter((k) => k.files.length > 0);
+  const active = kinds.find((k) => k.kind === kind) ?? kinds[0];
+  const activeKind = active?.kind ?? 'settings';
   if (view === undefined) {
     return error === '' ? null : (
       <p className="error-text" role="alert">
@@ -574,60 +672,103 @@ export function ConfigDiagnosticsPage() {
   }
   return (
     <div className="diagnostics-page settings-detail-page" data-testid="config-diagnostics">
-      <p className="muted">{t('diagnostics.intro')}</p>
+      <PageHeadActions>
+        <SettingsInfo text={t('diagnostics.intro')} />
+      </PageHeadActions>
       {view.workspace === null ? (
         <p className="muted">{t('permissions.noWorkspace')}</p>
       ) : (
         <>
-          <div className="permission-filters">
-            <label htmlFor={selectId} className="permission-filter-label">
-              {t('permissions.workspace')}
-            </label>
-            <select
-              id={selectId}
-              className="input"
-              value={view.workspace}
-              data-testid="diagnostics-workspace"
-              onChange={(e) => {
-                setChosen(e.currentTarget.value);
-              }}
-            >
-              <WorkspaceOptions workspaces={view.workspaces} />
-            </select>
-            <Button
-              size="small"
+          <PageHeadActions>
+            <ScopePicker>
+              <select
+                id={selectId}
+                aria-label={t('permissions.workspace')}
+                className="settings-scope-select"
+                value={view.workspace}
+                data-testid="diagnostics-workspace"
+                onChange={(e) => {
+                  setChosen(e.currentTarget.value);
+                }}
+              >
+                <WorkspaceOptions workspaces={view.workspaces} />
+              </select>
+            </ScopePicker>
+            <IconButton
+              size="sm"
+              label={t('permissions.audit.refresh')}
               onClick={() => refresh.current?.()}
               data-testid="diagnostics-refresh"
             >
-              {t('permissions.audit.refresh')}
-            </Button>
-          </div>
-          <p className="muted" data-testid="diagnostics-trust">
-            {t(view.trusted ? 'diagnostics.trusted' : 'diagnostics.untrusted')}
-          </p>
+              <ReloadIcon />
+            </IconButton>
+          </PageHeadActions>
           {error !== '' && (
             <p className="error-text" role="alert">
               {error}
             </p>
           )}
-          <section data-testid="diagnostics-kind-settings">
-            <h2 className="settings-heading">{t('diagnostics.kind.settings')}</h2>
-            {view.files.filter(isSettings).map((file) => (
-              <FileSection key={`${file.kind}:${file.layer}`} file={file} />
-            ))}
-          </section>
-          {SOURCE_KINDS.map((kind) => {
-            const files = view.files.filter((f) => f.kind === kind);
-            if (files.length === 0) return null;
-            return (
-              <section key={kind} data-testid={`diagnostics-kind-${kind}`}>
-                <h2 className="settings-heading">{t(`diagnostics.kind.${kind}`)}</h2>
-                {files.map((file) => (
-                  <FileSection key={`${file.kind}:${file.file}`} file={file} />
-                ))}
-              </section>
-            );
-          })}
+          <SettingsSection
+            title={t('diagnostics.sources')}
+            aside={
+              <span
+                className={`settings-badge diagnostics-trust is-${view.trusted ? 'trusted' : 'untrusted'}`}
+                data-testid="diagnostics-trust"
+                data-tooltip={t(view.trusted ? 'diagnostics.trusted' : 'diagnostics.untrusted')}
+                aria-label={t(view.trusted ? 'diagnostics.trusted' : 'diagnostics.untrusted')}
+              >
+                {t(view.trusted ? 'diagnostics.trustedShort' : 'diagnostics.untrustedShort')}
+              </span>
+            }
+          >
+            <div className="diagnostics-tabs" role="tablist" aria-label={t('diagnostics.sources')}>
+              {kinds.map(({ kind, files }) => {
+                const attention = files.some((f) => f.issues.length > 0 || f.status === 'invalid');
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    role="tab"
+                    id={`${tabsId}-${kind}`}
+                    aria-selected={kind === activeKind}
+                    aria-controls={`${tabsId}-panel`}
+                    className="diagnostics-tab"
+                    data-testid={`diagnostics-tab-${kind}`}
+                    data-attention={attention || undefined}
+                    onClick={() => {
+                      setKind(kind);
+                    }}
+                    onKeyDown={(event) => {
+                      const step =
+                        event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+                      if (step === 0) return;
+                      event.preventDefault();
+                      const at = kinds.findIndex((k) => k.kind === kind);
+                      const next = kinds[(at + step + kinds.length) % kinds.length];
+                      if (next === undefined) return;
+                      setKind(next.kind);
+                      document.getElementById(`${tabsId}-${next.kind}`)?.focus();
+                    }}
+                    tabIndex={kind === activeKind ? 0 : -1}
+                  >
+                    {kind === 'settings'
+                      ? t('diagnostics.kind.settings')
+                      : t(`diagnostics.kind.${kind}`)}
+                    <span className="diagnostics-tab-count">{files.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div role="tabpanel" id={`${tabsId}-panel`} aria-labelledby={`${tabsId}-${activeKind}`}>
+              {active === undefined ? null : (
+                <FileList
+                  key={`${view.workspace}:${active.kind}`}
+                  kind={active.kind}
+                  files={active.files}
+                />
+              )}
+            </div>
+          </SettingsSection>
           {view.hooks.length > 0 && <HookIssues issues={view.hooks} />}
           {view.mcp.length > 0 && <McpIssues issues={view.mcp} />}
         </>

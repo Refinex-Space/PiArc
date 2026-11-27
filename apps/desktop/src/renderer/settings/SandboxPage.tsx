@@ -5,6 +5,9 @@
 // are listed read-only with their source. Core validates and saves; the main process confirms
 // turning auto-approval on and adding domains natively. On Windows the switch is disabled and
 // says why (requirement D7).
+import { PageHeadActions } from './page-head.js';
+import { ScopePicker } from './ScopePicker.js';
+import { SettingsInfo, SettingsRow, SettingsSection } from './layout.js';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { WorkspaceOptions } from './WorkspaceOptions.js';
 
@@ -15,6 +18,8 @@ import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import { ManagedBadge, useIsManaged } from './managed.js';
 import { Button } from '../app/Button.js';
+import { IconButton } from '../app/IconButton.js';
+import { CloseIcon } from '../shell/icons.js';
 
 type Origin = 'user' | 'claudeUser' | 'project' | 'enterprise';
 
@@ -143,30 +148,34 @@ function EntryList({
   // The user's file as written (`~/.ssh`), not as resolved: that is what gets saved back.
   const ownRows = own;
   return (
-    <section className="settings-subsection" data-testid={testId}>
-      <h2 className="permission-heading">
-        {t(title)}
-        {managed && <ManagedBadge testId={`${testId}-managed`} />}
-      </h2>
-      <p className="muted">{t(hint)}</p>
+    <SettingsSection
+      testId={testId}
+      title={
+        <>
+          {t(title)}
+          {managed && <ManagedBadge testId={`${testId}-managed`} />}
+        </>
+      }
+      aside={<SettingsInfo text={t(hint)} />}
+    >
       <ul className="permission-rules">
         {ownRows.map((value) => (
           <li key={`own:${value}`} className="permission-rule" data-testid={`${testId}-entry`}>
             <code>{value}</code>
             <span className="permission-badge">{t('sandbox.origin.user')}</span>
             <span className="permission-actions">
-              <Button
-                variant="destructive"
-                size="small"
+              <IconButton
+                size="xs"
+                className="settings-remove"
                 disabled={disabled}
-                aria-label={t('sandbox.remove', { value })}
+                label={t('sandbox.remove', { value })}
                 data-testid={`${testId}-remove`}
                 onClick={() => {
                   onSave(ownRows.filter((v) => v !== value));
                 }}
               >
-                ×
-              </Button>
+                <CloseIcon />
+              </IconButton>
             </span>
           </li>
         ))}
@@ -193,12 +202,11 @@ function EntryList({
           setDraft('');
         }}
       >
-        <label htmlFor={inputId} className="permission-filter-label">
-          {t(placeholder)}
-        </label>
         <input
           id={inputId}
+          aria-label={t(placeholder)}
           className="input"
+          placeholder={t(placeholder)}
           value={draft}
           disabled={disabled}
           data-testid={`${testId}-input`}
@@ -210,7 +218,7 @@ function EntryList({
           {t('sandbox.add')}
         </Button>
       </form>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -223,6 +231,7 @@ export function SandboxPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const workspaceId = useId();
+  const enabledId = useId();
   // T47: settings the organization manages stay read-only here.
   const managedEnabled = useIsManaged('/sandbox/enabled');
   const managedMode = useIsManaged('/sandbox/autoAllowBashIfSandboxed');
@@ -270,31 +279,65 @@ export function SandboxPage() {
   const off = !view.supported;
   return (
     <div className="settings-section settings-detail-page" data-testid="sandbox-page">
-      <p className="muted">{t('sandbox.intro')}</p>
+      <PageHeadActions>
+        <SettingsInfo text={t('sandbox.intro')} />
+      </PageHeadActions>
       {view.workspaces.length > 0 && (
-        <div className="setting">
-          <label htmlFor={workspaceId} className="setting-label">
-            {t('sandbox.workspace')}
-          </label>
-          <select
-            id={workspaceId}
-            className="input"
-            value={view.workspace ?? ''}
-            data-testid="sandbox-workspace"
-            onChange={(e) => {
-              load(e.currentTarget.value);
-            }}
-          >
-            <WorkspaceOptions workspaces={view.workspaces} />
-          </select>
-        </div>
+        <PageHeadActions>
+          <ScopePicker>
+            <select
+              id={workspaceId}
+              aria-label={t('sandbox.workspace')}
+              className="settings-scope-select"
+              value={view.workspace ?? ''}
+              data-testid="sandbox-workspace"
+              onChange={(e) => {
+                load(e.currentTarget.value);
+              }}
+            >
+              <WorkspaceOptions workspaces={view.workspaces} />
+            </select>
+          </ScopePicker>
+        </PageHeadActions>
       )}
       {view.workspace === null && <p className="muted">{t('sandbox.noWorkspace')}</p>}
-      <div className="setting">
-        {managedEnabled && <ManagedBadge testId="managed-sandbox-enabled" />}
-        <label className="checkbox">
+      <SettingsSection
+        title={t('settings.sandbox')}
+        aside={
+          <Button
+            size="small"
+            variant="ghost"
+            data-testid="sandbox-audit"
+            onClick={() => {
+              window.location.hash = '#/settings/permissions?audit=sandbox';
+            }}
+          >
+            {t('sandbox.audit')}
+          </Button>
+        }
+      >
+        <SettingsRow
+          label={t('sandbox.enabled')}
+          htmlFor={enabledId}
+          badge={managedEnabled && <ManagedBadge testId="managed-sandbox-enabled" />}
+          description={
+            <>
+              <span id="sandbox-enabled-hint" data-testid="sandbox-enabled-hint">
+                {off ? t('sandbox.unsupported') : t('sandbox.enabledHint')}
+              </span>
+              {view.supported && !view.available && (
+                <span className="error-text" data-testid="sandbox-unavailable">
+                  {' '}
+                  {t('sandbox.unavailable')}
+                </span>
+              )}
+            </>
+          }
+        >
           <input
+            id={enabledId}
             type="checkbox"
+            className="preference-switch"
             checked={view.supported && view.enabled}
             disabled={off || busy || managedEnabled}
             aria-describedby="sandbox-enabled-hint"
@@ -303,39 +346,28 @@ export function SandboxPage() {
               save({ enabled: e.currentTarget.checked });
             }}
           />
-          {t('sandbox.enabled')}
-        </label>
-        <p id="sandbox-enabled-hint" className="muted" data-testid="sandbox-enabled-hint">
-          {off ? t('sandbox.unsupported') : t('sandbox.enabledHint')}
-        </p>
-        {view.supported && !view.available && (
-          <p className="error-text" data-testid="sandbox-unavailable">
-            {t('sandbox.unavailable')}
-          </p>
-        )}
-      </div>
-      <fieldset
-        className="setting"
-        data-testid="sandbox-mode"
-        disabled={off || busy || managedMode}
-      >
-        <legend id={modeLabel} className="setting-label">
-          {t('sandbox.mode')}
-          {managedMode && <ManagedBadge testId="managed-sandbox-mode" />}
-        </legend>
-        <SegmentedControl
-          options={SANDBOX_MODES}
-          value={view.autoAllow ? 'auto' : 'ask'}
-          name="sandbox-mode"
-          testIdPrefix="sandbox-mode"
-          aria-labelledby={modeLabel}
-          labelOf={(mode) => t(mode === 'auto' ? 'sandbox.mode.auto' : 'sandbox.mode.ask')}
-          onChange={(mode) => {
-            save({ autoAllow: mode === 'auto' });
-          }}
-        />
-        <p className="muted">{t('sandbox.modeHint')}</p>
-      </fieldset>
+        </SettingsRow>
+        <SettingsRow
+          testId="sandbox-mode"
+          label={t('sandbox.mode')}
+          labelId={modeLabel}
+          badge={managedMode && <ManagedBadge testId="managed-sandbox-mode" />}
+          description={t('sandbox.modeHint')}
+        >
+          <SegmentedControl
+            options={SANDBOX_MODES}
+            value={view.autoAllow ? 'auto' : 'ask'}
+            name="sandbox-mode"
+            testIdPrefix="sandbox-mode"
+            aria-labelledby={modeLabel}
+            disabled={off || busy || managedMode}
+            labelOf={(mode) => t(mode === 'auto' ? 'sandbox.mode.auto' : 'sandbox.mode.ask')}
+            onChange={(mode) => {
+              save({ autoAllow: mode === 'auto' });
+            }}
+          />
+        </SettingsRow>
+      </SettingsSection>
       {error !== '' && (
         <p className="error-text" role="alert">
           {error}
@@ -367,8 +399,11 @@ export function SandboxPage() {
           save({ denyRead: list });
         }}
       />
-      <section className="settings-subsection" data-testid="sandbox-writable">
-        <h2 className="permission-heading">{t('sandbox.writable')}</h2>
+      <SettingsSection
+        testId="sandbox-writable"
+        title={t('sandbox.writable')}
+        aside={<SettingsInfo text={t('sandbox.limits')} />}
+      >
         <ul className="permission-rules">
           {view.writable.map((w) => (
             <li key={`${w.kind}:${w.path}`} className="permission-rule">
@@ -377,11 +412,9 @@ export function SandboxPage() {
             </li>
           ))}
         </ul>
-        <p className="muted">{t('sandbox.limits')}</p>
-      </section>
+      </SettingsSection>
       {view.ignored.length > 0 && (
-        <section className="settings-subsection" data-testid="sandbox-ignored">
-          <h2 className="permission-heading">{t('sandbox.ignored')}</h2>
+        <SettingsSection testId="sandbox-ignored" title={t('sandbox.ignored')}>
           <ul className="permission-rules">
             {view.ignored.map((i) => (
               <li key={`${i.layer}:${i.pointer}`} className="permission-rule">
@@ -397,19 +430,8 @@ export function SandboxPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </SettingsSection>
       )}
-      <div className="setting">
-        <Button
-          size="small"
-          data-testid="sandbox-audit"
-          onClick={() => {
-            window.location.hash = '#/settings/permissions?audit=sandbox';
-          }}
-        >
-          {t('sandbox.audit')}
-        </Button>
-      </div>
     </div>
   );
 }

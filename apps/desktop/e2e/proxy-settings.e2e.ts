@@ -23,14 +23,17 @@ test('the proxy page detects, refuses a bad address, saves a manual one and goes
   // Auto by default: the detected proxy (or none) shows once resolved.
   await expect(panel.getByTestId('proxy-mode-auto')).toBeChecked();
   await expect(panel.getByTestId('proxy-system')).not.toHaveText(/Detecting|正在检测/u);
-  const systemLabel = panel.locator('.proxy-system-label');
+  // The detected proxy is a settings row: name and address on the left, the action centred on
+  // the row's right edge (ADR-0101).
+  const systemRow = panel.getByTestId('proxy-detected');
   const detect = panel.getByTestId('proxy-detect');
-  const labelBox = await systemLabel.boundingBox();
+  const rowBox = await systemRow.boundingBox();
   const detectBox = await detect.boundingBox();
-  if (labelBox === null || detectBox === null) throw new Error('proxy row is not visible');
+  if (rowBox === null || detectBox === null) throw new Error('proxy row is not visible');
   expect(
-    Math.abs(labelBox.y + labelBox.height / 2 - (detectBox.y + detectBox.height / 2)),
+    Math.abs(rowBox.y + rowBox.height / 2 - (detectBox.y + detectBox.height / 2)),
   ).toBeLessThan(2);
+  expect(Math.abs(rowBox.x + rowBox.width - (detectBox.x + detectBox.width))).toBeLessThan(2);
   await panel.locator('.proxy-info').hover();
   const tip = page.locator('.tooltip[data-placed="true"]');
   await expect(tip).toContainText(/connect directly|直接连接/u);
@@ -55,7 +58,7 @@ test('the proxy page detects, refuses a bad address, saves a manual one and goes
     .toEqual({ mode: 'manual', url: 'http://127.0.0.1:7897' });
   await page.screenshot({ path: testInfo.outputPath('proxy-manual.png') });
 
-  await panel.getByText(/Detect automatically|自动检测/u).click();
+  await panel.getByText(/^(Detect automatically|自动检测)$/u).click();
   await expect
     .poll(() => proxySetting(userDataDir))
     .toEqual({ mode: 'auto', url: 'http://127.0.0.1:7897' });

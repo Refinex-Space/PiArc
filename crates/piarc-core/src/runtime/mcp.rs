@@ -55,6 +55,25 @@ impl CoreRuntime {
         })
     }
 
+    /// Adds server `name` to `workspace`'s configuration in `scope` (`user` or
+    /// `projectLocal`); answers the workspace's status (`McpStatus`).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn mcp_add_server(
+        &self,
+        workspace: PathBuf,
+        scope: String,
+        name: String,
+        definition: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.mcp_add_server(workspace, scope, name, definition).await
+        })
+    }
+
     /// Signs in to OAuth server `name` of `workspace`; steps on `core/login`, answered with
     /// `answer_login`. Resolves with the server's state and the sign-in's `loginId`.
     ///

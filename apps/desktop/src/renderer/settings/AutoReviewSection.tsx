@@ -16,6 +16,7 @@ import { ManagedBadge, useIsManaged } from './managed.js';
 import { parseDiagnostics } from './ConfigDiagnosticsPage.js';
 import { parseSettings, type CatalogEntry } from './provider-form.js';
 import { Button } from '../app/Button.js';
+import { SettingsInfo, SettingsRow, SettingsSection } from './layout.js';
 
 const LIST_LABEL: Readonly<Record<AutoModeList, MessageId>> = {
   environment: 'permissions.auto.list.environment',
@@ -57,6 +58,7 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
   const [models, setModels] = useState<CatalogEntry[] | undefined>(undefined);
   const [claude, setClaude] = useState<Record<AutoModeList, string[]> | undefined>(undefined);
   const modelId = useId();
+  const switchId = useId();
   useEffect(() => {
     window.piarc
       .providerSettings()
@@ -78,14 +80,21 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
   const managedModel = useIsManaged('/autoMode/model');
   const chosenKnown = choices.some((m) => `${m.provider}/${m.id}` === auto.model);
   return (
-    <section className="auto-review" data-testid="auto-review-section">
-      <h2 className="permission-heading">{t('permissions.auto.title')}</h2>
-      <p className="muted">{t('permissions.auto.intro')}</p>
-      <div className="setting">
-        <label htmlFor={modelId} className="setting-label">
-          {t('permissions.auto.model')}
-          {managedModel && <ManagedBadge testId="managed-auto-model" />}
-        </label>
+    <SettingsSection
+      title={t('permissions.auto.title')}
+      testId="auto-review-section"
+      aside={<SettingsInfo text={t('permissions.auto.intro')} />}
+    >
+      <SettingsRow
+        label={t('permissions.auto.model')}
+        htmlFor={modelId}
+        badge={managedModel && <ManagedBadge testId="managed-auto-model" />}
+        description={
+          models !== undefined && choices.length === 0 ? (
+            <span data-testid="auto-review-no-models">{t('permissions.auto.noReviewer')}</span>
+          ) : undefined
+        }
+      >
         <select
           id={modelId}
           className="input"
@@ -111,37 +120,32 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
             </option>
           ))}
         </select>
-        {models !== undefined && choices.length === 0 && (
-          <p className="muted" data-testid="auto-review-no-models">
-            {t('permissions.auto.noReviewer')}
-          </p>
+      </SettingsRow>
+      <SettingsRow
+        label={t('permissions.auto.enableToggle')}
+        htmlFor={switchId}
+        badge={managedSwitch && <ManagedBadge testId="managed-auto-switch" />}
+        description={t(
+          auto.model === '' && !enabled ? 'permissions.auto.needModel' : 'permissions.auto.hint',
         )}
-      </div>
-      <div className="setting">
-        {managedSwitch && <ManagedBadge testId="managed-auto-switch" />}
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={enabled}
-            disabled={managedSwitch || (!enabled && auto.model === '')}
-            data-testid="setting-enable-auto"
-            onChange={(event) => {
-              window.piarc
-                .setPreference({
-                  key: 'permissions.enableAutoMode',
-                  value: event.currentTarget.checked,
-                })
-                .catch(onError);
-            }}
-          />
-          {t('permissions.auto.enableToggle')}
-        </label>
-        <p className="muted">
-          {t(
-            auto.model === '' && !enabled ? 'permissions.auto.needModel' : 'permissions.auto.hint',
-          )}
-        </p>
-      </div>
+      >
+        <input
+          id={switchId}
+          type="checkbox"
+          className="preference-switch"
+          checked={enabled}
+          disabled={managedSwitch || (!enabled && auto.model === '')}
+          data-testid="setting-enable-auto"
+          onChange={(event) => {
+            window.piarc
+              .setPreference({
+                key: 'permissions.enableAutoMode',
+                value: event.currentTarget.checked,
+              })
+              .catch(onError);
+          }}
+        />
+      </SettingsRow>
       {AUTO_MODE_LISTS.map((list) => (
         <PolicyList
           key={list}
@@ -151,7 +155,7 @@ export function AutoReviewSection({ onError }: { readonly onError: (e: unknown) 
           onError={onError}
         />
       ))}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -175,12 +179,14 @@ function PolicyList({
   };
   const entry = draft.trim();
   return (
-    <div className="setting auto-review-list" data-testid={`auto-review-list-${list}`}>
-      <label htmlFor={inputId} className="setting-label">
-        {t(LIST_LABEL[list])}
-        {managed && <ManagedBadge testId={`managed-auto-list-${list}`} />}
-      </label>
-      <p className="muted">{t(LIST_HINT[list])}</p>
+    <SettingsRow
+      wide
+      testId={`auto-review-list-${list}`}
+      label={t(LIST_LABEL[list])}
+      htmlFor={inputId}
+      badge={managed && <ManagedBadge testId={`managed-auto-list-${list}`} />}
+      description={t(LIST_HINT[list])}
+    >
       <ul className="auto-review-entries">
         {entries.map((value, index) => (
           <li key={`${String(index)}:${value}`}>
@@ -230,6 +236,6 @@ function PolicyList({
           {t('permissions.auto.add')}
         </Button>
       </form>
-    </div>
+    </SettingsRow>
   );
 }

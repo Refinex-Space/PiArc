@@ -8,6 +8,7 @@ import { useT } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
 import type { ProviderSettings } from './provider-form.js';
 import { Button } from '../app/Button.js';
+import { SettingsInfo, SettingsRow, SettingsSection } from './layout.js';
 
 interface Backend {
   readonly id: string;
@@ -92,16 +93,20 @@ export function WebSearchSection({ settings }: { readonly settings: ProviderSett
           ? t('webSearch.status.unavailable')
           : t('webSearch.status.noKey', { name: chosen.name });
   return (
-    <section className="settings-subsection" data-testid="web-search-section">
-      <h2 className="settings-heading">{t('webSearch.title')}</h2>
-      <p className="muted small">{t('webSearch.hint')}</p>
-      <p data-testid="web-search-status" role="status">
-        {status}
-      </p>
-      <div className="setting">
-        <label className="setting-label" htmlFor={`${id}-backend`}>
-          {t('webSearch.backend')}
-        </label>
+    <SettingsSection
+      title={t('webSearch.title')}
+      testId="web-search-section"
+      aside={<SettingsInfo text={t('webSearch.hint')} />}
+    >
+      <SettingsRow
+        label={t('webSearch.backend')}
+        htmlFor={`${id}-backend`}
+        description={
+          <span data-testid="web-search-status" role="status">
+            {status}
+          </span>
+        }
+      >
         <select
           id={`${id}-backend`}
           className="input"
@@ -120,10 +125,9 @@ export function WebSearchSection({ settings }: { readonly settings: ProviderSett
             </option>
           ))}
         </select>
-      </div>
+      </SettingsRow>
       {chosen === undefined ? null : (
         <form
-          className="setting"
           autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
@@ -131,22 +135,19 @@ export function WebSearchSection({ settings }: { readonly settings: ProviderSett
             run(() => window.piarc.setWebSearchKey(chosen.id, key.trim()));
           }}
         >
-          <label className="setting-label" htmlFor={`${id}-key`}>
-            {t('webSearch.key', { name: chosen.name })}
-          </label>
-          <input
-            id={`${id}-key`}
-            className="input"
-            type="password"
-            data-testid="web-search-key"
-            placeholder={t(chosen.hasKey ? 'webSearch.key.saved' : 'webSearch.key.placeholder')}
-            value={key}
-            disabled={busy}
-            onChange={(e) => {
-              setKey(e.currentTarget.value);
-            }}
-          />
-          <div>
+          <SettingsRow label={t('webSearch.key', { name: chosen.name })} htmlFor={`${id}-key`}>
+            <input
+              id={`${id}-key`}
+              className="input"
+              type="password"
+              data-testid="web-search-key"
+              placeholder={t(chosen.hasKey ? 'webSearch.key.saved' : 'webSearch.key.placeholder')}
+              value={key}
+              disabled={busy}
+              onChange={(e) => {
+                setKey(e.currentTarget.value);
+              }}
+            />
             <Button
               type="submit"
               variant="primary"
@@ -168,7 +169,7 @@ export function WebSearchSection({ settings }: { readonly settings: ProviderSett
                 {t('webSearch.key.remove')}
               </Button>
             ) : null}
-          </div>
+          </SettingsRow>
         </form>
       )}
       {failure === '' ? null : (
@@ -176,6 +177,6 @@ export function WebSearchSection({ settings }: { readonly settings: ProviderSett
           {t('webSearch.failed', { reason: failure })}
         </p>
       )}
-    </section>
+    </SettingsSection>
   );
 }

@@ -19,6 +19,9 @@ import {
 } from '../../shared/preferences.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { Button } from '../app/Button.js';
+import { IconButton } from '../app/IconButton.js';
+import { CloseIcon } from '../shell/icons.js';
+import { SettingsRow, SettingsSection } from './layout.js';
 import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
@@ -41,46 +44,31 @@ export function GitPage() {
           {error}
         </p>
       )}
-      <section className="settings-subsection" aria-labelledby="git-settings-branches">
-        <h2 id="git-settings-branches" className="permission-heading">
-          {t('gitSettings.branches')}
-        </h2>
+      <SettingsSection title={t('gitSettings.branches')} id="git-settings-branches">
         <PrefixField value={git.branchPrefix} onSave={save} />
         <ProtectedList patterns={git.protectedBranches} onSave={save} />
-      </section>
-      <section className="settings-subsection" aria-labelledby="git-settings-sync">
-        <h2 id="git-settings-sync" className="permission-heading">
-          {t('gitSettings.sync')}
-        </h2>
+      </SettingsSection>
+      <SettingsSection title={t('gitSettings.sync')} id="git-settings-sync">
         <PullModeRow value={git.pullMode} onSave={save} />
         <ForcePushRow value={git.alwaysForcePush} onSave={save} />
         <AutoFetchRow value={git.autoFetch} onSave={save} />
-      </section>
-      <section className="settings-subsection" aria-labelledby="git-settings-commits">
-        <h2 id="git-settings-commits" className="permission-heading">
-          {t('gitSettings.commits')}
-        </h2>
+      </SettingsSection>
+      <SettingsSection title={t('gitSettings.commits')} id="git-settings-commits">
         <InstructionsField
           kind="commit"
           value={git.commitInstructions}
           language={locale}
           onSave={save}
         />
-      </section>
-      <section className="settings-subsection" aria-labelledby="git-settings-prs">
-        <h2 id="git-settings-prs" className="permission-heading">
-          {t('gitSettings.pullRequests')}
-        </h2>
+      </SettingsSection>
+      <SettingsSection title={t('gitSettings.pullRequests')} id="git-settings-prs">
         <MergeMethodRow value={git.mergeMethod} onSave={save} />
         <DraftRow value={git.draftPullRequests} onSave={save} />
         <InstructionsField kind="pr" value={git.prInstructions} language={locale} onSave={save} />
-      </section>
-      <section className="settings-subsection" aria-labelledby="git-settings-review">
-        <h2 id="git-settings-review" className="permission-heading">
-          {t('gitSettings.review')}
-        </h2>
+      </SettingsSection>
+      <SettingsSection title={t('gitSettings.review')} id="git-settings-review">
         <ReviewPresentationRow value={git.reviewPresentation} onSave={save} />
-      </section>
+      </SettingsSection>
     </div>
   );
 }
@@ -173,11 +161,11 @@ function ProtectedList({
           <li key={pattern} className="permission-rule" data-testid="git-setting-protected-entry">
             <code>{pattern}</code>
             <span className="permission-actions">
-              <Button
-                variant="destructive"
-                size="small"
+              <IconButton
+                size="xs"
+                className="settings-remove"
                 disabled={managed}
-                aria-label={t('gitSettings.protectedRemove', { pattern })}
+                label={t('gitSettings.protectedRemove', { pattern })}
                 onClick={() => {
                   onSave({
                     key: 'git.protectedBranches',
@@ -185,8 +173,8 @@ function ProtectedList({
                   });
                 }}
               >
-                ×
-              </Button>
+                <CloseIcon />
+              </IconButton>
             </span>
           </li>
         ))}
@@ -201,11 +189,9 @@ function ProtectedList({
           setDraft('');
         }}
       >
-        <label htmlFor={id} className="permission-filter-label">
-          {t('gitSettings.protectedAdd')}
-        </label>
         <input
           id={id}
+          aria-label={t('gitSettings.protectedAdd')}
           className="input"
           value={draft}
           disabled={managed || full}
@@ -283,23 +269,26 @@ function ForcePushRow({
 }) {
   const { t } = useApp();
   const managed = useIsManaged('/git/alwaysForcePush');
+  const id = useId();
   return (
-    <div className="setting git-setting">
-      {managed && <ManagedBadge testId="managed-git-force" />}
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={value}
-          disabled={managed}
-          data-testid="git-setting-force-push"
-          onChange={(event) => {
-            onSave({ key: 'git.alwaysForcePush', value: event.currentTarget.checked });
-          }}
-        />
-        {t('gitSettings.forcePush')}
-      </label>
-      <p className="muted">{t('gitSettings.forcePushHint')}</p>
-    </div>
+    <SettingsRow
+      label={t('gitSettings.forcePush')}
+      description={t('gitSettings.forcePushHint')}
+      htmlFor={id}
+      badge={managed && <ManagedBadge testId="managed-git-force" />}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        className="preference-switch"
+        checked={value}
+        disabled={managed}
+        data-testid="git-setting-force-push"
+        onChange={(event) => {
+          onSave({ key: 'git.alwaysForcePush', value: event.currentTarget.checked });
+        }}
+      />
+    </SettingsRow>
   );
 }
 
@@ -491,22 +480,25 @@ function DraftRow({
 }) {
   const { t } = useApp();
   const managed = useIsManaged('/git/draftPullRequests');
+  const id = useId();
   return (
-    <div className="setting git-setting">
-      {managed && <ManagedBadge testId="managed-git-draft" />}
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={value}
-          disabled={managed}
-          data-testid="git-setting-draft"
-          onChange={(event) => {
-            onSave({ key: 'git.draftPullRequests', value: event.currentTarget.checked });
-          }}
-        />
-        {t('gitSettings.draft')}
-      </label>
-    </div>
+    <SettingsRow
+      label={t('gitSettings.draft')}
+      htmlFor={id}
+      badge={managed && <ManagedBadge testId="managed-git-draft" />}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        className="preference-switch"
+        checked={value}
+        disabled={managed}
+        data-testid="git-setting-draft"
+        onChange={(event) => {
+          onSave({ key: 'git.draftPullRequests', value: event.currentTarget.checked });
+        }}
+      />
+    </SettingsRow>
   );
 }
 

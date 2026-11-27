@@ -11,8 +11,8 @@
     "panel": "neutral.2",
     "raised": { "light": "base.white", "dark": "neutral.3" },
     "input": { "light": "base.white", "dark": "neutral.2" },
-    "hover": "neutral.3",
-    "active": "neutral.4",
+    "hover": { "light": "neutral.3", "dark": "neutral.5" },
+    "active": { "light": "neutral.4", "dark": "neutral.6" },
     "selected": "accent.4"
   },
   "workbench": {
@@ -59,7 +59,7 @@
     "subtle": "neutral.6",
     "default": { "light": "neutral.7", "dark": "neutral.7", "highContrast": "neutral.9" },
     "strong": { "light": "neutral.9", "dark": "neutral.9", "highContrast": "neutral.11" },
-    "focus": { "light": "neutral.11", "dark": "neutral.10", "highContrast": "neutral.12" }
+    "focus": { "light": "neutral.11", "dark": "neutral.11", "highContrast": "neutral.12" }
   },
   "action": {
     "surface": { "light": "base.black5", "dark": "base.white15" },
@@ -155,7 +155,27 @@
     },
     "tooltipInk": { "light": "base.white", "dark": "neutral.12", "darkHighContrast": "base.white" }
   },
+  "themePreview": {
+    "lightCanvas": "base.white",
+    "lightNavigation": "base.sidebarLight",
+    "lightLine": "base.black8",
+    "lightInk": "base.chromeMuted",
+    "darkCanvas": "base.canvasDark",
+    "darkNavigation": "base.sidebarDark",
+    "darkCard": "base.controlDark",
+    "darkLine": "base.white10",
+    "darkInk": "base.chromeLightMuted"
+  },
   "forcedColors": {
+    "themePreview.lightCanvas": "Canvas",
+    "themePreview.lightNavigation": "Canvas",
+    "themePreview.lightLine": "CanvasText",
+    "themePreview.lightInk": "CanvasText",
+    "themePreview.darkCanvas": "Canvas",
+    "themePreview.darkNavigation": "Canvas",
+    "themePreview.darkCard": "Canvas",
+    "themePreview.darkLine": "CanvasText",
+    "themePreview.darkInk": "CanvasText",
     "workbench.canvas": "Canvas",
     "workbench.navigation": "Canvas",
     "workbench.editor": "Field",

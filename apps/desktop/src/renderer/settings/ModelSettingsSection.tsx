@@ -1,7 +1,7 @@
 // Per-model settings and the auxiliary model in the settings window (T29, architecture section
 // 8.2): display name, context window, image input, default effort and Tool Profile replace the
 // catalog's values; Core saves them in the user's settings and sends them to every Agent Host.
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import { useApp, useT } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
@@ -12,6 +12,7 @@ import {
   type ProviderSettings,
 } from './provider-form.js';
 import { Button } from '../app/Button.js';
+import { SettingsInfo, SettingsRow, SettingsSection } from './layout.js';
 
 const keyOf = (m: { provider: string; id: string }) => `${m.provider}/${m.id}`;
 
@@ -287,10 +288,13 @@ function ModelForm({
 
 /** The auxiliary model and the per-model settings. */
 export function ModelSettingsSection({
+  catalogRow,
   settings,
   busy,
   save,
 }: {
+  /** The catalog's own setting (refresh online), first in the section. */
+  readonly catalogRow?: ReactNode;
   readonly settings: ProviderSettings;
   readonly busy: boolean;
   /** Saves the preferences (`setModelPreferences`). */
@@ -313,12 +317,17 @@ export function ModelSettingsSection({
   const models = settings.catalogModels;
   const chosen = models.find((m) => editing === keyOf(m));
   return (
-    <section className="settings-subsection" data-testid="model-settings-section">
-      <h2 className="settings-heading">{t('models.settings.title')}</h2>
-      <div className="setting">
-        <label className="setting-label" htmlFor={auxId}>
-          {t('models.auxiliary')}
-        </label>
+    <SettingsSection
+      title={t('models.settings.title')}
+      testId="model-settings-section"
+      aside={<SettingsInfo text={t('models.settings.hint')} />}
+    >
+      {catalogRow}
+      <SettingsRow
+        label={t('models.auxiliary')}
+        htmlFor={auxId}
+        description={t('models.auxiliary.hint')}
+      >
         <select
           id={auxId}
           className="input"
@@ -359,11 +368,9 @@ export function ModelSettingsSection({
             </option>
           ))}
         </select>
-        <span className="muted small">{t('models.auxiliary.hint')}</span>
-      </div>
-      <p className="muted small">{t('models.settings.hint')}</p>
+      </SettingsRow>
       {models.length === 0 ? (
-        <p className="muted">{t('models.settings.none')}</p>
+        <p className="settings-row-note">{t('models.settings.none')}</p>
       ) : chosen === undefined ? (
         <ul className="provider-list">
           {models.map((m) => {
@@ -409,6 +416,6 @@ export function ModelSettingsSection({
           }}
         />
       )}
-    </section>
+    </SettingsSection>
   );
 }

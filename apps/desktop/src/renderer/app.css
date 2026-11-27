@@ -99,15 +99,20 @@ body,
   outline-offset: 1px;
 }
 
-/* A pointer-focused text field still shows its insertion point and a single fine edge.
-   This also covers implicit text inputs, multiline editors, and native selects. */
+/* A pointer-focused text field still shows its insertion point and a single quiet edge (the
+   keyboard ring is the strong one; visual-design.md section 4). A native select clicked with the
+   pointer opens its list, which is indication enough: no edge. */
 :root[data-app][data-pointer-focus]
-  :is(input:read-write, input[readonly], textarea, select):focus:not(:where([data-focus-proxy])),
+  :is(input:read-write, input[readonly], textarea):focus:not(:where([data-focus-proxy])),
 :root[data-app][data-pointer-focus] .settings-search:has(input:focus),
 :root[data-app][data-pointer-focus] .browser-address:has(> input:focus) {
-  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline: var(--piarc-c-focus-width) solid var(--piarc-border-default);
   outline-offset: calc(-1 * var(--piarc-c-focus-width));
   transition: outline-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+:root[data-app][data-pointer-focus] select:focus:not(:where([data-focus-proxy])),
+:root[data-app][data-pointer-focus] .settings-scope-project:has(select:focus) {
+  outline: none;
 }
 
 /* The focused terminal draws its own cursor on the canvas. */
@@ -1176,212 +1181,6 @@ textarea.input {
   font-weight: var(--piarc-font-weight-medium);
 }
 
-/* ---- settings window ---- */
-
-.settings-dialog {
-  width: min(var(--piarc-settings-width), calc(100vw - clamp(32px, 8vw, 96px)));
-  height: min(var(--piarc-settings-height), calc(100dvh - clamp(32px, 10dvh, 96px)));
-  max-width: none;
-  max-height: none;
-  padding: 0;
-  border: 0;
-  border-radius: var(--piarc-settings-radius);
-  overflow: hidden;
-  color: var(--piarc-text-primary);
-  background: var(--piarc-surface-raised);
-  box-shadow:
-    0 0 0 1px var(--piarc-border-subtle),
-    var(--piarc-shadow-overlay);
-  -webkit-app-region: no-drag;
-}
-.settings-dialog::backdrop {
-  background: color-mix(in srgb, black 40%, transparent);
-}
-.settings {
-  --settings-divider: color-mix(in srgb, var(--piarc-text-primary) 10%, transparent);
-  display: grid;
-  grid-template: var(--piarc-settings-header) minmax(0, 1fr) / var(--piarc-settings-rail) minmax(
-      0,
-      1fr
-    );
-  height: 100%;
-  background: var(--piarc-surface-raised);
-  color: var(--piarc-text-primary);
-  font-size: var(--piarc-segment-font-size);
-  line-height: var(--piarc-segment-line-height);
-}
-.settings-header {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px 0 22px;
-  border-bottom: 1px solid var(--settings-divider);
-}
-.settings-header h1 {
-  margin: 0;
-  font-size: var(--piarc-settings-header-text);
-  font-weight: var(--piarc-font-weight-medium);
-}
-.settings-close {
-  width: 32px;
-  height: 32px;
-}
-.settings-nav {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-  padding: 16px 12px 12px;
-  border-right: 1px solid var(--settings-divider);
-}
-.settings-nav ul {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  list-style: none;
-  margin: 0 -2px;
-  padding: 0 2px;
-}
-.settings-nav .settings-group-start:not(:first-child) {
-  padding-top: 8px;
-}
-.settings-group-start:not(:first-child)::before {
-  display: block;
-  margin: 0 12px 8px;
-  height: 1px;
-  background: var(--settings-divider);
-  content: '';
-}
-.settings-nav-item {
-  width: 100%;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  text-align: start;
-}
-:root[data-app] .settings-nav-item {
-  font-size: var(--piarc-settings-nav-text);
-}
-.settings-nav-item > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-nav-item svg,
-.settings-search svg {
-  flex: none;
-  color: var(--piarc-text-secondary);
-}
-.settings-nav-item:hover,
-.settings-results [role='option']:hover {
-  background: var(--piarc-action-hover);
-}
-.settings-nav-item.is-active,
-.settings-results [aria-selected='true'] {
-  background: var(--piarc-action-pressed);
-}
-.settings-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--settings-divider);
-  border-radius: 8px;
-  padding: 0 10px;
-  min-height: 34px;
-}
-:root[data-app] .settings-search input {
-  min-width: 0;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-:root[data-app] .settings-search input:focus {
-  outline: none;
-}
-
-.settings-results {
-  position: absolute;
-  inset: calc(100% + 4px) auto auto -1px;
-  z-index: 4;
-  width: min(280px, 80vw);
-  max-height: min(45vh, 360px);
-  overflow: auto;
-  padding: 4px;
-  border: 1px solid var(--settings-divider);
-  border-radius: var(--piarc-radius-lg);
-  background: var(--piarc-surface-raised);
-  box-shadow: var(--piarc-shadow-overlay);
-}
-.settings-results [role='option'] {
-  padding: 6px 10px;
-  border-radius: var(--piarc-radius-md);
-  cursor: default;
-}
-.settings-page {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: 24px var(--piarc-settings-gutter) 40px;
-  scrollbar-gutter: stable;
-}
-.settings-title {
-  margin: 0 0 18px;
-  font-size: var(--piarc-settings-page-title);
-  line-height: 1.4;
-  font-weight: var(--piarc-font-weight-medium);
-}
-@media (max-width: 767px) {
-  .settings {
-    grid-template: 48px auto minmax(0, 1fr) / minmax(0, 1fr);
-  }
-  .settings-nav {
-    border-right: 0;
-    border-bottom: 1px solid var(--settings-divider);
-    gap: 6px;
-    padding: 8px 12px;
-  }
-  .settings-nav .interactive-list {
-    display: flex;
-    overflow-x: auto;
-    gap: 4px;
-  }
-  .settings-nav li {
-    flex: none;
-  }
-  .settings-nav .settings-group-start:not(:first-child) {
-    padding-top: 0;
-  }
-  .settings-group-start::before {
-    display: none !important;
-  }
-  .settings-page {
-    padding: 16px;
-  }
-}
-@media (forced-colors: active) {
-  .settings-nav-item.is-active,
-  .settings-results [aria-selected='true'] {
-    outline: 1px solid Highlight;
-    text-decoration: underline;
-  }
-  .settings-search,
-  .settings-dialog,
-  .settings-header,
-  .settings-nav,
-  .settings-results {
-    border: 1px solid CanvasText;
-  }
-}
-
 .settings-section {
   display: flex;
   flex-direction: column;
@@ -1660,43 +1459,6 @@ textarea.input {
   display: flex;
   align-items: baseline;
   gap: var(--piarc-space-2);
-}
-
-/* MCP servers (T36) */
-
-.mcp-state {
-  padding-inline: var(--piarc-space-2);
-  border-radius: var(--piarc-radius-pill);
-  font-size: var(--piarc-font-size-caption);
-  font-weight: var(--piarc-font-weight-medium);
-  background: var(--piarc-accent-subtle);
-}
-.mcp-state.is-connected {
-  background: var(--piarc-state-success-subtle);
-  color: var(--piarc-text-success);
-}
-.mcp-state.is-failed {
-  background: var(--piarc-state-danger-subtle);
-  color: var(--piarc-text-danger);
-}
-.mcp-state.is-needsAuth,
-.mcp-state.is-unsupported,
-.mcp-state.is-untrusted {
-  background: var(--piarc-state-warning-subtle);
-  color: var(--piarc-text-warning);
-}
-.mcp-state.is-disabled,
-.mcp-state.is-idle {
-  color: var(--piarc-text-secondary);
-}
-.mcp-error {
-  margin: 0;
-  font-family: var(--piarc-font-mono);
-  color: var(--piarc-text-danger);
-  white-space: pre-wrap;
-}
-.mcp-actions {
-  justify-content: flex-start;
 }
 
 /* sign-in and model settings (T29) */

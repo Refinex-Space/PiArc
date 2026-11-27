@@ -27,5 +27,5 @@ export async function addEndpoint(
   await settings.getByTestId('provider-models').fill(models);
   await settings.getByTestId('provider-key').fill(randomUUID());
   await settings.getByTestId('provider-save').click();
-  await expect(settings.getByTestId(`provider-edit-${id}`)).toBeVisible();
+  await expect(settings.getByTestId(`provider-row-${id}`)).toBeVisible();
 }

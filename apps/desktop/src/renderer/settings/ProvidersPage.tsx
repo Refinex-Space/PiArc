@@ -25,6 +25,7 @@ import {
   type ProviderSettings,
 } from './provider-form.js';
 import { Button } from '../app/Button.js';
+import { SettingsRow, SettingsSection } from './layout.js';
 
 const AUTH_LABEL: Record<Auth, MessageId> = {
   bearer: 'providers.bearer',
@@ -178,9 +179,21 @@ export function ProvidersPage() {
   const nameOf = (id: string): string =>
     settings.builtinProviders.find((p) => p.id === id)?.name ?? id;
   const header = (
-    <label className="checkbox">
+    <SettingsRow
+      label={t('providers.refresh')}
+      htmlFor="provider-catalog-refresh"
+      description={
+        refreshing === undefined ? undefined : (
+          <span role="status" data-testid="catalog-refresh-saving">
+            {t('providers.refreshing')}
+          </span>
+        )
+      }
+    >
       <input
+        id="provider-catalog-refresh"
         type="checkbox"
+        className="preference-switch"
         data-testid="catalog-refresh"
         checked={refreshing ?? settings.catalogRefresh}
         disabled={busy}
@@ -193,13 +206,7 @@ export function ProvidersPage() {
           });
         }}
       />
-      {t('providers.refresh')}
-      {refreshing === undefined ? null : (
-        <span className="muted small" role="status" data-testid="catalog-refresh-saving">
-          {t('providers.refreshing')}
-        </span>
-      )}
-    </label>
+    </SettingsRow>
   );
   const useAccount = (account: Account) => {
     void mutate(() => window.piarc.useProviderAccount(account.provider, account.id), false);
@@ -210,43 +217,39 @@ export function ProvidersPage() {
   if (!form)
     return (
       <div className="settings-section settings-detail-page">
-        <section className="settings-connection-section" data-testid="provider-connections">
-          <h2 className="settings-heading">{t('providers.connections')}</h2>
-          <div className="settings-connection-box">
-            <div className="settings-connect-row">
-              <div>
-                <strong>{t('providers.connectTitle')}</strong>
-                <p className="muted">{t('providers.connectHint')}</p>
-              </div>
-              <Button
-                size="small"
-                data-testid="provider-add"
-                disabled={busy || signIn.open}
-                onClick={() => {
-                  setChoosing(true);
-                }}
-              >
-                {t('providers.add')}
-              </Button>
-            </div>
-            <ConnectionList
-              settings={settings}
-              busy={busy}
-              signingIn={signIn.open}
-              onEdit={edit}
-              onDelete={(id) => {
-                void mutate(() => window.piarc.deleteProvider(id), false);
+        <SettingsSection
+          title={t('providers.connections')}
+          testId="provider-connections"
+          aside={
+            <Button
+              size="small"
+              variant="primary"
+              data-testid="provider-add"
+              disabled={busy || signIn.open}
+              onClick={() => {
+                setChoosing(true);
               }}
-              onSetEnabled={(id, enabled) => {
-                void mutate(() => window.piarc.setProviderEnabled(id, enabled), false);
-              }}
-              onSignOut={signOut}
-              onUseAccount={useAccount}
-              onRemoveAccount={removeAccount}
-            />
-          </div>
-          {header}
-        </section>
+            >
+              {t('providers.add')}
+            </Button>
+          }
+        >
+          <ConnectionList
+            settings={settings}
+            busy={busy}
+            signingIn={signIn.open}
+            onEdit={edit}
+            onDelete={(id) => {
+              void mutate(() => window.piarc.deleteProvider(id), false);
+            }}
+            onSetEnabled={(id, enabled) => {
+              void mutate(() => window.piarc.setProviderEnabled(id, enabled), false);
+            }}
+            onSignOut={signOut}
+            onUseAccount={useAccount}
+            onRemoveAccount={removeAccount}
+          />
+        </SettingsSection>
         {failed}
         {signIn.failure === '' ? null : (
           <p className="error-text" role="alert">
@@ -254,6 +257,7 @@ export function ProvidersPage() {
           </p>
         )}
         <ModelSettingsSection
+          catalogRow={header}
           settings={settings}
           busy={busy}
           save={(preferences) => {

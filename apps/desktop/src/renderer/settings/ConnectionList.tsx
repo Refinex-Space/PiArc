@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react';
 
 import { useApp, useT } from '../app/app-context.js';
 import { Button } from '../app/Button.js';
+import { IconButton } from '../app/IconButton.js';
+import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
+import { MoreIcon } from '../shell/icons.js';
 import { reason } from '../shell/errors.js';
 import {
   accountsByProvider,
@@ -127,6 +130,41 @@ function EnabledSwitch({
   );
 }
 
+/** A record's less frequent actions behind "…" (edit, remove, sign out). */
+export function RowMenu({
+  label,
+  testId,
+  disabled,
+  items,
+}: {
+  readonly label: string;
+  readonly testId: string;
+  readonly disabled: boolean;
+  readonly items: readonly MenuItem[];
+}) {
+  const menu = useMenu();
+  return (
+    <>
+      <IconButton
+        label={label}
+        size="sm"
+        data-testid={testId}
+        aria-haspopup="menu"
+        aria-expanded={menu.open !== null}
+        disabled={disabled}
+        onClick={(event) => {
+          menu.openBelowEnd(event.currentTarget);
+        }}
+      >
+        <MoreIcon />
+      </IconButton>
+      {menu.open !== null && (
+        <MenuPopup at={menu.open} label={label} items={items} onClose={menu.close} />
+      )}
+    </>
+  );
+}
+
 export function ConnectionList({
   settings,
   busy,
@@ -201,16 +239,6 @@ export function ConnectionList({
         {account.active ? (
           <>
             {testButton(id)}
-            <Button
-              size="small"
-              data-testid={`logout-${id}`}
-              disabled={busy || signingIn}
-              onClick={() => {
-                onSignOut(login);
-              }}
-            >
-              {t('providers.logout')}
-            </Button>
             <EnabledSwitch
               id={id}
               name={login.name}
@@ -219,6 +247,22 @@ export function ConnectionList({
               onChange={(enabled) => {
                 onSetEnabled(id, enabled);
               }}
+            />
+            <RowMenu
+              label={t('providers.more', { name: login.name })}
+              testId={`account-more-${id}`}
+              disabled={busy || signingIn}
+              items={[
+                {
+                  id: 'logout',
+                  testId: `logout-${id}`,
+                  label: t('providers.logout'),
+                  danger: true,
+                  run: () => {
+                    onSignOut(login);
+                  },
+                },
+              ]}
             />
           </>
         ) : (
@@ -233,17 +277,22 @@ export function ConnectionList({
             >
               {t('providers.account.use')}
             </Button>
-            <Button
-              size="small"
-              variant="ghost"
-              data-testid={`account-remove-${id}-${account.id}`}
+            <RowMenu
+              label={t('providers.more', { name: login.name })}
+              testId={`account-more-${id}-${account.id}`}
               disabled={busy || signingIn}
-              onClick={() => {
-                onRemoveAccount(account);
-              }}
-            >
-              {t('providers.account.remove')}
-            </Button>
+              items={[
+                {
+                  id: 'remove',
+                  testId: `account-remove-${id}-${account.id}`,
+                  label: t('providers.account.remove'),
+                  danger: true,
+                  run: () => {
+                    onRemoveAccount(account);
+                  },
+                },
+              ]}
+            />
           </>
         )}
         {account.active ? <TestLine id={id} test={tests[id]} /> : null}
@@ -270,27 +319,6 @@ export function ConnectionList({
           <div className="muted small">{detail}</div>
         </div>
         {testButton(p.id)}
-        <Button
-          size="small"
-          data-testid={`provider-edit-${p.id}`}
-          disabled={busy}
-          onClick={() => {
-            onEdit(p);
-          }}
-        >
-          {t('providers.edit')}
-        </Button>
-        <Button
-          variant="destructive"
-          size="small"
-          data-testid={`provider-delete-${p.id}`}
-          disabled={busy}
-          onClick={() => {
-            onDelete(p.id);
-          }}
-        >
-          {t('providers.remove')}
-        </Button>
         <EnabledSwitch
           id={p.id}
           name={name}
@@ -299,6 +327,30 @@ export function ConnectionList({
           onChange={(enabled) => {
             onSetEnabled(p.id, enabled);
           }}
+        />
+        <RowMenu
+          label={t('providers.more', { name })}
+          testId={`provider-more-${p.id}`}
+          disabled={busy}
+          items={[
+            {
+              id: 'edit',
+              testId: `provider-edit-${p.id}`,
+              label: t('providers.edit'),
+              run: () => {
+                onEdit(p);
+              },
+            },
+            {
+              id: 'remove',
+              testId: `provider-delete-${p.id}`,
+              label: t('providers.remove'),
+              danger: true,
+              run: () => {
+                onDelete(p.id);
+              },
+            },
+          ]}
         />
         <TestLine id={p.id} test={tests[p.id]} />
       </li>

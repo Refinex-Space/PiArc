@@ -125,6 +125,12 @@ export declare class CoreRuntime {
   /** Turns MCP server `name` of `workspace` on or off; its state as JSON text. */
   mcpSetEnabled(workspace: string, name: string, enabled: boolean): Promise<string>;
   /**
+   * Adds MCP server `name` (definition as JSON text) to `workspace` in `scope` (`user` or
+   * `projectLocal`); the main process confirms it natively first. The workspace's status as
+   * JSON text.
+   */
+  mcpAddServer(workspace: string, scope: string, name: string, definition: string): Promise<string>;
+  /**
    * Signs in to OAuth MCP server `name` of `workspace`; its state and `loginId` as JSON
    * text once the tokens are stored.
    */

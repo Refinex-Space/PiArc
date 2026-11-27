@@ -679,6 +679,10 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.mcpLogin, workspace, name)
       .then((value: unknown) => expectString(value)),
+  mcpAddServer: (workspace, server) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.mcpAddServer, workspace, server)
+      .then((value: unknown) => expectString(value)),
   listAgents: (workspace) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.agentsList, workspace)

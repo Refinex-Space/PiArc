@@ -158,7 +158,7 @@ test('the sandbox page edits the user values, the next command follows, denials 
   await sandbox.getByTestId('sandbox-enabled').click();
   await expect(sandbox.getByTestId('sandbox-enabled')).toBeChecked();
   // The radio is styled away; its label takes the click, as a user's would.
-  await sandbox.getByText('Still ask before sandboxed commands').click();
+  await sandbox.getByText('Still ask', { exact: true }).click();
   await expect(sandbox.getByTestId('sandbox-mode-ask')).toBeChecked();
   expect((await userSettings(userDataDir)).sandbox).toMatchObject({
     enabled: true,

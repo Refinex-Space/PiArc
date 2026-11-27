@@ -35,17 +35,16 @@ export const A11Y_STATES = [
     area: 'window',
     note: 'indexed message results in the search dialog',
   },
-  // Workbench settings: the native modal, its search popup and each registered page.
+  // Workbench settings: the settings view, its search results and each registered page.
   {
-    id: 'dialog:settings',
-    area: 'dialog',
-    source: 'settings/SettingsModal.tsx',
-    note: 'modal settings in the originating workbench',
+    id: 'window:settings',
+    area: 'window',
+    note: 'settings as a view of the workbench (ADR-0101)',
   },
   {
     id: 'state:settings-search',
     area: 'state',
-    note: 'settings search results with a keyboard-selected option',
+    note: 'settings search results in the page area with a keyboard-selected option',
   },
   { id: 'settings:general', area: 'settings', page: 'general', note: 'General' },
   {
@@ -354,6 +353,18 @@ export const A11Y_STATES = [
     area: 'dialog',
     source: 'settings/ServiceChooser.tsx',
     note: 'add a model service',
+  },
+  {
+    id: 'dialog:mcp-add',
+    area: 'dialog',
+    source: 'settings/McpAddDialog.tsx',
+    note: 'add an MCP server',
+  },
+  {
+    id: 'dialog:package-install',
+    area: 'dialog',
+    source: 'settings/PluginsSection.tsx',
+    note: 'install an extension package',
   },
   {
     id: 'dialog:chrome-import',

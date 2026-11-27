@@ -15,7 +15,12 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { ManagedBadge, pointerToken, useIsManaged } from './managed.js';
 import { Button } from '../app/Button.js';
+import { SettingsInfo, SettingsSection } from './layout.js';
 import { reason } from '../shell/errors.js';
+import { Dialog } from '../shell/Dialog.js';
+import { ChevronDownIcon, PlusIcon } from '../shell/icons.js';
+import { SegmentedControl } from '../app/SegmentedControl.js';
+import { RowMenu } from './ConnectionList.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -129,7 +134,7 @@ function shortCommit(commit: string | undefined): string {
 interface RowProps {
   readonly pkg: PackageInfo;
   readonly busy: boolean;
-  readonly act: (label: string, run: () => Promise<string>) => void;
+  readonly act: (label: string, run: () => Promise<string>, done?: (ok: boolean) => void) => void;
   readonly workspace: string | null;
 }
 
@@ -157,76 +162,75 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
   // T47: a package the organization's settings switch on or off stays as they say.
   const managed = useIsManaged(`/plugins/${pointerToken(pkg.id)}`);
   return (
-    <li className="agent-row" data-testid="package-row" data-id={pkg.id}>
-      <div className="agent-row-head">
-        <strong>{pkg.id}</strong>
-        <span className="muted small" data-testid="package-type">
-          {t(`plugins.type.${pkg.kind}`)}
-        </span>
-        <span className="muted small" data-testid="package-state">
-          {state}
-        </span>
-      </div>
-      {pkg.description == null ? null : <p className="small">{pkg.description}</p>}
-      <div className="muted small diagnostics-code package-source" data-testid="package-source">
-        {source}
-      </div>
-      <div className="muted small">
-        {t('plugins.scope')}:{' '}
-        {t(scope === 'project' ? 'plugins.scope.project' : 'plugins.scope.user')}
-      </div>
-      <ul className="subagent-warnings" data-testid="package-components">
-        {COMPONENT_LABELS.flatMap(([key, label]) => {
-          const names = pkg.components[key] ?? [];
-          return names.length === 0
-            ? []
-            : [
-                <li key={key} className="muted small">
-                  {t(label)}: {names.join(', ')}
-                </li>,
-              ];
-        })}
-      </ul>
-      {(pkg.unsupported ?? []).length === 0 ? null : (
-        <div className="muted small" data-testid="package-unsupported">
-          {t('plugins.unsupported', { list: (pkg.unsupported ?? []).join(', ') })}
+    <li
+      className="package-row"
+      data-testid="package-row"
+      data-id={pkg.id}
+      data-active={pkg.active || undefined}
+    >
+      <details className="package-details">
+        <summary className="package-summary">
+          <span className="package-text">
+            <span className="package-name">
+              <span className="mono-text">{pkg.id}</span>
+              <span className="settings-badge" data-testid="package-type">
+                {t(`plugins.type.${pkg.kind}`)}
+              </span>
+              {managed && <ManagedBadge testId="managed-package" />}
+            </span>
+            {pkg.description == null ? null : (
+              <span className="package-description">{pkg.description}</span>
+            )}
+            <span className="package-meta">
+              <span data-testid="package-state">{state}</span>
+              {' · '}
+              {t(scope === 'project' ? 'plugins.scope.project' : 'plugins.scope.user')}
+              {' · '}
+              {t(`plugins.kind.${pkg.source.kind}`)}
+            </span>
+          </span>
+          <span className="diagnostics-chevron">
+            <ChevronDownIcon />
+          </span>
+        </summary>
+        <div className="package-body">
+          <p className="mono-text package-source" data-testid="package-source">
+            {source}
+          </p>
+          <ul className="package-components" data-testid="package-components">
+            {COMPONENT_LABELS.flatMap(([key, label]) => {
+              const names = pkg.components[key] ?? [];
+              return names.length === 0
+                ? []
+                : [
+                    <li key={key}>
+                      {t(label)}: {names.join(', ')}
+                    </li>,
+                  ];
+            })}
+          </ul>
+          {(pkg.unsupported ?? []).length === 0 ? null : (
+            <p className="package-note" data-testid="package-unsupported">
+              {t('plugins.unsupported', { list: (pkg.unsupported ?? []).join(', ') })}
+            </p>
+          )}
         </div>
-      )}
-      {pending.length === 0 || !pkg.enabled ? null : (
-        <div className="error-text small" data-testid="package-pending">
-          {t('plugins.pending', { count: pending.length })}
-        </div>
-      )}
-      {(pkg.issues ?? []).map((issue) => (
-        <div key={issue} className="error-text small">
-          {issue}
-        </div>
-      ))}
-      <div className="dialog-actions mcp-actions">
-        {managed && <ManagedBadge testId="managed-package" />}
-        {pkg.enabled ? (
+      </details>
+      <div className="package-actions">
+        {sure ? (
           <Button
+            variant="destructive"
             size="small"
-            data-testid="package-off"
-            disabled={busy || managed}
+            data-testid="package-uninstall"
+            disabled={busy}
             onClick={() => {
-              act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, false, scope, where));
+              setSure(false);
+              act(pkg.id, () => window.piarc.uninstallPackage(pkg.id, workspace));
             }}
           >
-            {t('plugins.turnOff')}
+            {t('plugins.uninstallConfirm')}
           </Button>
-        ) : (
-          <Button
-            variant="primary"
-            data-testid="package-on"
-            disabled={busy || managed}
-            onClick={() => {
-              act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, true, scope, where));
-            }}
-          >
-            {t('plugins.turnOn')}
-          </Button>
-        )}
+        ) : null}
         {pending.length === 0 || !pkg.enabled ? null : (
           <Button
             size="small"
@@ -239,148 +243,194 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
             {t('plugins.review')}
           </Button>
         )}
-        <Button
-          size="small"
-          data-testid="package-update"
-          disabled={busy}
-          onClick={() => {
-            act(pkg.id, () => window.piarc.updatePackage(pkg.id, where));
+        <input
+          type="checkbox"
+          className="preference-switch"
+          checked={pkg.enabled}
+          disabled={busy || managed}
+          aria-label={t('plugins.enabledNamed', { id: pkg.id })}
+          data-testid={pkg.enabled ? 'package-off' : 'package-on'}
+          onChange={(e) => {
+            const on = e.currentTarget.checked;
+            act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, on, scope, where));
           }}
-        >
-          {t('plugins.update')}
-        </Button>
-        <Button
-          variant="destructive"
-          size="small"
-          data-testid="package-uninstall"
+        />
+        <RowMenu
+          label={t('plugins.more', { id: pkg.id })}
+          testId={`package-more-${pkg.id}`}
           disabled={busy}
-          onClick={() => {
-            if (!sure) {
-              setSure(true);
-              return;
-            }
-            setSure(false);
-            act(pkg.id, () => window.piarc.uninstallPackage(pkg.id, workspace));
-          }}
-        >
-          {sure ? t('plugins.uninstallSure', { id: pkg.id }) : t('plugins.uninstall')}
-        </Button>
+          items={[
+            {
+              id: 'update',
+              testId: 'package-update',
+              label: t('plugins.update'),
+              run: () => {
+                act(pkg.id, () => window.piarc.updatePackage(pkg.id, where));
+              },
+            },
+            {
+              id: 'uninstall',
+              testId: 'package-uninstall-start',
+              label: t('plugins.uninstall'),
+              danger: true,
+              run: () => {
+                setSure(true);
+              },
+            },
+          ]}
+        />
       </div>
+      {pending.length === 0 || !pkg.enabled ? null : (
+        <p className="package-alert" data-testid="package-pending">
+          {t('plugins.pending', { count: pending.length })}
+        </p>
+      )}
+      {(pkg.issues ?? []).map((issue) => (
+        <p key={issue} className="package-alert">
+          {issue}
+        </p>
+      ))}
     </li>
   );
 }
 
-function InstallForm({
+type SourceKind = 'directory' | 'git' | 'npm';
+
+function InstallDialog({
   workspace,
   operation,
   act,
+  onClose,
 }: {
   readonly workspace: string | null;
   readonly operation: string | undefined;
-  readonly act: (label: string, run: () => Promise<string>) => void;
+  readonly act: (label: string, run: () => Promise<string>, done?: (ok: boolean) => void) => void;
+  readonly onClose: () => void;
 }) {
   const { t } = useApp();
   const busy = operation !== undefined;
   const installing = operation === 'install';
+  const titleId = useId();
   const kindId = useId();
   const locationId = useId();
   const scopeId = useId();
-  const [kind, setKind] = useState<'directory' | 'git' | 'npm'>('directory');
+  const [kind, setKind] = useState<SourceKind>('directory');
   const [location, setLocation] = useState('');
   const [scope, setScope] = useState<PackageScope>('user');
+  const placeholder: Record<SourceKind, MessageId> = {
+    directory: 'plugins.location.directory',
+    git: 'plugins.location.git',
+    npm: 'plugins.location.npm',
+  };
   return (
-    <form
-      className="settings-install-form"
-      data-testid="package-install"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (location.trim() === '') return;
-        act('install', () =>
-          window.piarc.installPackage({
-            kind,
-            location: location.trim(),
-            scope,
-            ...(workspace === null ? {} : { workspace }),
-          }),
-        );
-      }}
+    <Dialog
+      labelledBy={titleId}
+      onCancel={onClose}
+      testId="package-install-dialog"
+      className="mcp-add"
     >
-      <div className="setting">
-        <label htmlFor={kindId} className="setting-label">
-          {t('plugins.kind')}
-        </label>
-        <select
-          id={kindId}
-          className="input"
-          data-testid="package-kind"
-          value={kind}
-          onChange={(e) => {
-            const value = e.currentTarget.value;
-            if (value === 'directory' || value === 'git' || value === 'npm') setKind(value);
-          }}
-        >
-          <option value="directory">{t('plugins.kind.directory')}</option>
-          <option value="git">{t('plugins.kind.git')}</option>
-          <option value="npm">{t('plugins.kind.npm')}</option>
-        </select>
-      </div>
-      <div className="setting">
-        <label htmlFor={locationId} className="setting-label">
-          {t('plugins.location')}
-        </label>
-        <input
-          id={locationId}
-          className="input"
-          data-testid="package-location"
-          value={location}
-          onChange={(e) => {
-            setLocation(e.currentTarget.value);
-          }}
-        />
-      </div>
-      {kind === 'directory' ? (
-        <Button
-          size="small"
-          data-testid="package-choose"
-          onClick={() => {
-            void window.piarc.chooseFolder().then((path) => {
-              if (path !== null) setLocation(path);
-            });
-          }}
-        >
-          {t('plugins.chooseFolder')}
-        </Button>
-      ) : null}
-      <div className="setting">
-        <label htmlFor={scopeId} className="setting-label">
-          {t('plugins.scope')}
-        </label>
-        <select
-          id={scopeId}
-          className="input"
-          data-testid="package-scope"
-          value={scope}
-          onChange={(e) => {
-            setScope(e.currentTarget.value === 'project' ? 'project' : 'user');
-          }}
-        >
-          <option value="user">{t('plugins.scope.user')}</option>
-          {workspace === null ? null : (
-            <option value="project">{t('plugins.scope.project')}</option>
-          )}
-        </select>
-      </div>
-      <Button
-        type="submit"
-        variant="primary"
-        data-testid="package-install-submit"
-        loading={installing}
-        aria-label={installing ? t('plugins.installing') : undefined}
-        disabled={busy || location.trim() === ''}
+      <form
+        data-testid="package-install"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (location.trim() === '') return;
+          act(
+            'install',
+            () =>
+              window.piarc.installPackage({
+                kind,
+                location: location.trim(),
+                scope,
+                ...(workspace === null ? {} : { workspace }),
+              }),
+            (ok) => {
+              if (ok) onClose();
+            },
+          );
+        }}
       >
-        {t('plugins.install')}
-      </Button>
-    </form>
+        <h2 id={titleId} className="dialog-title">
+          {t('plugins.installTitle')}
+        </h2>
+        <fieldset className="mcp-add-fields" disabled={busy}>
+          <div className="mcp-add-field">
+            <span className="mcp-add-label" id={kindId}>
+              {t('plugins.kind')}
+            </span>
+            <SegmentedControl<SourceKind>
+              aria-labelledby={kindId}
+              name={`${kindId}-choice`}
+              options={['directory', 'git', 'npm']}
+              value={kind}
+              labelOf={(v) => t(`plugins.kind.${v}`)}
+              onChange={setKind}
+              testIdPrefix="package-kind"
+            />
+          </div>
+          <div className="mcp-add-field">
+            <label htmlFor={locationId} className="mcp-add-label">
+              {t('plugins.location')}
+            </label>
+            <div className="package-location-row">
+              <input
+                id={locationId}
+                className="input mono-text"
+                data-testid="package-location"
+                data-autofocus
+                spellCheck={false}
+                placeholder={t(placeholder[kind])}
+                value={location}
+                onChange={(e) => {
+                  setLocation(e.currentTarget.value);
+                }}
+              />
+              {kind === 'directory' ? (
+                <Button
+                  size="small"
+                  data-testid="package-choose"
+                  onClick={() => {
+                    void window.piarc.chooseFolder().then((path) => {
+                      if (path !== null) setLocation(path);
+                    });
+                  }}
+                >
+                  {t('plugins.chooseFolder')}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="mcp-add-field">
+            <span className="mcp-add-label" id={scopeId}>
+              {t('plugins.scope')}
+            </span>
+            <SegmentedControl<PackageScope>
+              aria-labelledby={scopeId}
+              name={`${scopeId}-choice`}
+              options={workspace === null ? ['user'] : ['user', 'project']}
+              value={scope}
+              labelOf={(v) => t(v === 'project' ? 'plugins.scope.project' : 'plugins.scope.user')}
+              onChange={setScope}
+              testIdPrefix="package-scope"
+            />
+          </div>
+        </fieldset>
+        <div className="dialog-actions">
+          <Button variant="ghost" onClick={onClose}>
+            {t('dialog.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            data-testid="package-install-submit"
+            loading={installing}
+            aria-label={installing ? t('plugins.installing') : undefined}
+            disabled={busy || location.trim() === ''}
+          >
+            {t('plugins.install')}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
@@ -391,6 +441,7 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [operation, setOperation] = useState<string>();
+  const [installing, setInstalling] = useState(false);
   const busy = operation !== undefined;
   const load = useCallback(() => {
     window.piarc
@@ -405,15 +456,17 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
   }, [workspace, t]);
   useEffect(load, [load]);
   const act = useCallback(
-    (label: string, run: () => Promise<string>) => {
+    (label: string, run: () => Promise<string>, done?: (ok: boolean) => void) => {
       setOperation(label);
       setStatus('');
       run()
         .then((raw) => {
           if (isCancelled(raw)) {
             setStatus(t('plugins.cancelled'));
+            done?.(false);
             return;
           }
+          done?.(true);
           const value: unknown = JSON.parse(raw);
           if (isRecord(value) && isRecord(value.package)) {
             const pkg = packageOf(value.package);
@@ -440,6 +493,7 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
         })
         .catch((e: unknown) => {
           setStatus(`${label}: ${reason(e)}`);
+          done?.(false);
         })
         .finally(() => {
           setOperation(undefined);
@@ -449,11 +503,11 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
     [load, t],
   );
   return (
-    <section data-testid="plugins-section">
-      <h2 className="settings-heading">{t('plugins.title')}</h2>
-      <p className="muted small">{t('plugins.hint')}</p>
-      <h3 className="settings-heading">{t('plugins.installTitle')}</h3>
-      <InstallForm workspace={workspace} operation={operation} act={act} />
+    <SettingsSection
+      title={t('plugins.title')}
+      testId="plugins-section"
+      aside={<SettingsInfo text={t('plugins.hint')} />}
+    >
       {status === '' ? null : (
         <p className="muted small" data-testid="package-status" role="status">
           {status}
@@ -466,11 +520,27 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
       )}
       {list === undefined ? null : (
         <>
-          {list.packages.length === 0 ? <p className="muted">{t('plugins.none')}</p> : null}
-          <ul className="agent-list" data-testid="package-list">
+          {list.packages.length === 0 ? (
+            <p className="settings-row-note package-empty">{t('plugins.none')}</p>
+          ) : null}
+          <ul className="package-list" data-testid="package-list">
             {list.packages.map((pkg) => (
               <PackageRow key={pkg.id} pkg={pkg} busy={busy} act={act} workspace={workspace} />
             ))}
+            <li className="mcp-add-row">
+              <button
+                type="button"
+                className="settings-add-link"
+                data-testid="package-install-open"
+                disabled={busy}
+                onClick={() => {
+                  setInstalling(true);
+                }}
+              >
+                <PlusIcon />
+                {t('plugins.installTitle')}
+              </button>
+            </li>
           </ul>
           {(list.missing ?? []).length === 0 ? null : (
             <p className="error-text small" data-testid="package-missing">
@@ -479,6 +549,16 @@ export function PluginsSection({ workspace }: { readonly workspace: string | nul
           )}
         </>
       )}
-    </section>
+      {installing ? (
+        <InstallDialog
+          workspace={workspace}
+          operation={operation}
+          act={act}
+          onClose={() => {
+            setInstalling(false);
+          }}
+        />
+      ) : null}
+    </SettingsSection>
   );
 }

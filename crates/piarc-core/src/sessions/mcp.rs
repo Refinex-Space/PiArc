@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 use super::login::{LOGIN_TIMEOUT, emit, end_payload};
 use super::{Hub, host_error};
 use crate::error::{Error, Result};
-use crate::mcp::McpConfigSource;
+use crate::mcp::{AddScope, McpConfigSource};
 
 fn encode(value: &impl Serialize) -> Result<Value> {
     serde_json::to_value(value).map_err(|e| Error::Internal {
@@ -71,6 +71,27 @@ impl Hub {
             .await
             .map_err(host_error)?;
         encode(&status)
+    }
+
+    /// Adds server `name` (definition `definition`, JSON text) in `scope` (`user` or
+    /// `projectLocal`) after the main process's native confirmation; answers the workspace's
+    /// status, read again with the new server.
+    pub async fn mcp_add_server(
+        &self,
+        workspace: PathBuf,
+        scope: String,
+        name: String,
+        definition: String,
+    ) -> Result<Value> {
+        let scope = AddScope::parse(&scope)?;
+        let raw: Value = serde_json::from_str(&definition).map_err(|_| Error::InvalidArgument {
+            field: "definition",
+            reason: "not JSON".into(),
+        })?;
+        self.mcp_config()
+            .add_server(&workspace, scope, &name, raw)
+            .await?;
+        self.mcp_status(workspace).await
     }
 
     /// Signs in to OAuth server `name` of `workspace`; resolves once the tokens are in the

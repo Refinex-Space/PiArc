@@ -173,6 +173,7 @@ export const IPC_CHANNELS = {
   mcpReconnect: 'piarc:mcp.reconnect',
   mcpSetEnabled: 'piarc:mcp.setEnabled',
   mcpLogin: 'piarc:mcp.login',
+  mcpAddServer: 'piarc:mcp.addServer',
   chromeProfiles: 'piarc:chrome.profiles',
   chromeSites: 'piarc:chrome.sites',
   chromeImport: 'piarc:chrome.import',
@@ -249,6 +250,26 @@ export interface AuditQuery {
 
 /** What the settings page installs (T40): a directory, a git URL or an npm spec, and where it
  * is declared (the project scope needs the workspace). */
+/**
+ * An MCP server the settings page adds (ADR-0101): a local command or an HTTP endpoint, for every
+ * project (`user`) or only this one, not shared (`projectLocal`, `.piarc/settings.local.json`).
+ */
+export type McpServerInput =
+  | {
+      readonly scope: 'user' | 'projectLocal';
+      readonly name: string;
+      readonly transport: 'stdio';
+      readonly command: string;
+      readonly args: readonly string[];
+      readonly env: Readonly<Record<string, string>>;
+    }
+  | {
+      readonly scope: 'user' | 'projectLocal';
+      readonly name: string;
+      readonly transport: 'http';
+      readonly url: string;
+    };
+
 export interface PackageInstallInput {
   readonly kind: 'directory' | 'git' | 'npm';
   readonly location: string;
@@ -1140,6 +1161,11 @@ export interface PiarcApi {
    * with `answerLogin`. Resolves with its `McpServerStatus` and `loginId` as JSON.
    */
   mcpLogin(workspace: string, name: string): Promise<string>;
+  /**
+   * Adds an MCP server after a native confirmation that shows the command or address; resolves
+   * with the workspace's `McpStatus` as JSON, or `{"status":"cancelled"}`.
+   */
+  mcpAddServer(workspace: string, server: McpServerInput): Promise<string>;
 
   notifyAttention(notice: AttentionNotice): Promise<void>;
   /** The number of sessions that need the user (Dock badge, taskbar overlay icon). */

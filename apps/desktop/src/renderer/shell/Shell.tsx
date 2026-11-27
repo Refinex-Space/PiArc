@@ -8,7 +8,7 @@ import type { AppCommand, LaunchTarget } from '../../shared/ipc.js';
 import { parseComposerInfo, type ComposerInfo } from '../composer/attachments.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
-import { SettingsModal } from '../settings/SettingsModal.js';
+import { preloadSettings, SettingsLayer } from '../settings/SettingsLayer.js';
 import { AppStore } from '../store/app-store.js';
 import { StoreConnection } from '../store/connection.js';
 import { StoreContext, useHarnessOf, useSessionOf, useTasksOf } from '../store/hooks.js';
@@ -202,6 +202,13 @@ export function Shell() {
     isSettingsRoute() ? 0 : null,
   );
   const settingsOpen = settingsEntry !== null;
+  // The settings morph should not wait for its code on the first ⌘,.
+  useEffect(() => {
+    const timer = window.setTimeout(preloadSettings, 1500);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, []);
   const openSettings = useCallback((page?: string) => {
     if (page === undefined && isSettingsRoute()) {
       setSettingsEntry((current) => current ?? 0);
@@ -424,7 +431,7 @@ export function Shell() {
     if (settingsOpen) {
       if (
         command === 'session.close' &&
-        !document.querySelector('.settings-dialog [role="dialog"]')
+        !document.querySelector('.settings-surface :is(dialog[open], [role="dialog"])')
       )
         closeSettings();
       return;
@@ -576,7 +583,8 @@ export function Shell() {
         <div
           className={`shell${collapsed ? ' is-collapsed' : ''}`}
           data-testid="app-shell"
-          inert={Boolean(trust) || shortcutsOpen || paletteOpen}
+          inert={Boolean(trust) || shortcutsOpen || paletteOpen || settingsOpen}
+          data-settings={settingsOpen ? 'open' : undefined}
           onKeyDown={(event) => {
             if (
               sidebarPeek &&
@@ -685,6 +693,12 @@ export function Shell() {
             </WorkbenchPanels>
           </div>
         </div>
+        <SettingsLayer
+          open={settingsOpen}
+          entry={settingsEntry ?? 0}
+          onClose={closeSettings}
+          sidebarWidth={layout.sidebarWidth}
+        />
         <Toasts />
         <BrowserNotices />
         <AgentReveal />
@@ -727,7 +741,6 @@ export function Shell() {
             }}
           />
         )}
-        {settingsEntry !== null && <SettingsModal entry={settingsEntry} onClose={closeSettings} />}
       </UiContext.Provider>
     </StoreContext.Provider>
   );

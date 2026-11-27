@@ -100,6 +100,7 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 ## MCP（`mcp`，T36，ADR-0053）
 
 - `McpConfigSource`（Core 一份，工作区入站处理器共用）应答 `mcp/servers`：用 `TrustService::permission_settings` 加载设置（与权限裁决同一份），收集 local、project、user 三个作用域的来源交给 `piarc_config::mcp::merge`，`${VAR}` 用 `ToolIo::expansion_environment`（登录 shell 环境去掉 PiArc 内部变量）展开，`env` 是命令环境（ADR-0035）。启停选择存 `core.sqlite` 的 `mcp_servers`（`set_enabled`）。子 agent 的内联 server 由 `tool_io/subagents.rs` 在 `agents/list` 中经 `inline_servers` 检查与展开。
+- 添加（ADR-0101）：`McpConfigSource::add_server`（`mcp/add.rs`）只接受 stdio 的 `command`/`args`/`env` 或 HTTP 的 `url`，拒绝任何来源已用的名字，写用户级 `settings.json` 或 `.piarc/settings.local.json`；后者经 `TrustService::confirm_items` 并入已有的信任决定（主进程已原生确认）。NAPI `mcpAddServer` 答复写入后重读的 `McpStatus`。
 - 状态与操作经 `Hub::{mcp_status, mcp_reconnect, mcp_set_enabled, mcp_login}`（`sessions/mcp.rs`，NAPI `mcpStatus` 等）：工作区有运行中的 Agent Host 时转给它，没有时 `status_from_config` 按配置回答（可运行的为 `idle`）。Agent Host 的 `mcp/statusChanged` 以 `HostEvent::HostNotification` 到达工作区 actor，加上 `workspace` 发到路由 `core/mcp`（`MCP_ROUTE`）。MCP 登录沿用 T29 的登录记录与 `core/login`，provider 为 `mcp:<server>`。
 - `policy/evaluate` 的 `requiresUserInteraction` 经 `tool_io::policy` 的 `requires_user_interaction` 成为必须询问的一步并清空可保存的规则；`ToolSearch` 在只读宿主工具里。配置诊断报告的 `mcp` 由 `diagnostics()` 给出（不展开变量）。打包产物的探针（`host_probe`）只用 `<数据目录>/settings.json` 的 `mcpServers` 回答（`settings_file_servers`）。
 

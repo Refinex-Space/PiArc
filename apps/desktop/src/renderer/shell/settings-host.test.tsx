@@ -9,16 +9,16 @@ import { AppProvider } from '../app/app-context.js';
 import { rememberMemoryTarget, takeMemoryTarget } from '../settings/memory-target.js';
 import { Shell } from './Shell.js';
 
-// Only the page contents stand in for Core. The workbench, routing and native dialog are real.
+// Only the page contents stand in for Core. The workbench, routing and settings layer are real.
 vi.mock('../settings/pages.js', () => ({ registerBuiltInSettingsPages: vi.fn() }));
-vi.mock('../settings/SettingsApp.js', () => ({
-  SettingsApp: () => {
+vi.mock('../settings/SettingsSurface.js', () => ({
+  SettingsSurface: () => {
     const [target] = useState(takeMemoryTarget);
     return <p data-note={target?.note} />;
   },
 }));
 
-it('retargets an open settings dialog on the same page and closes it before handling workbench commands', async () => {
+it('retargets open settings on the same page and closes them before handling workbench commands', async () => {
   const listeners = new Set<(event: AppEvent) => void>();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('Worker', EventTarget);
@@ -64,18 +64,25 @@ it('retargets an open settings dialog on the same page and closes it before hand
     await act(async () => {
       await vi.dynamicImportSettled();
     });
-    const dialog = host.querySelector('dialog[open]');
-    expect(dialog?.querySelector('[data-note="first"]')).toBeTruthy();
+    const layer = host.querySelector('.settings-layer[data-open="true"]');
+    expect(layer?.querySelector('[data-note="first"]')).toBeTruthy();
+    // The workbench stays mounted underneath and takes no input (ADR-0101).
+    expect(host.querySelector('[data-testid="app-shell"]')?.hasAttribute('inert')).toBe(true);
 
     await send({ type: 'command', command: 'app.commandPalette' });
     expect(host.querySelector('[data-testid="command-palette"]')).toBeNull();
     rememberMemoryTarget({ workspace: 'project', note: 'second' });
     await send({ type: 'launch', target: { kind: 'settings', page: 'memory' } });
-    expect(host.querySelector('dialog[open]')).toBe(dialog);
-    expect(dialog?.querySelector('[data-note="second"]')).toBeTruthy();
+    expect(host.querySelector('.settings-layer[data-open="true"]')).toBe(layer);
+    expect(layer?.querySelector('[data-note="second"]')).toBeTruthy();
 
     await send({ type: 'command', command: 'session.close' });
-    expect(host.querySelector('dialog[open]')).toBeNull();
+    expect(host.querySelector('.settings-layer[data-open="true"]')).toBeNull();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(host.querySelector('.settings-layer')).toBeNull();
+    expect(host.querySelector('[data-testid="app-shell"]')?.hasAttribute('inert')).toBe(false);
     expect(window.location.hash).toBe('');
     expect(host.querySelector('[data-testid="app-shell"]')).toBeTruthy();
   } finally {

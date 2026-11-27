@@ -29,6 +29,7 @@
   --piarc-motion-easing: cubic-bezier(0.2, 0, 0, 1);
   --piarc-motion-curve-snap: cubic-bezier(0.32, 0.72, 0, 1);
   --piarc-motion-curve-out: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --piarc-motion-view: 320ms;
   --piarc-shadow-button: 0 1px 2px rgb(0 0 0 / 0.05);
   --piarc-shadow-overlay: 0 8px 28px rgb(0 0 0 / 0.18), 0 1px 3px rgb(0 0 0 / 0.12);
   --piarc-size-titlebar-height: 44px;
@@ -43,15 +44,12 @@
   --piarc-workbench-composer-shadow: 0 4px 20px rgb(0 0 0 / 0.035);
   --piarc-workbench-menu-radius: 12px;
   --piarc-workbench-icon-size: 18px;
-  --piarc-settings-width: 1000px;
-  --piarc-settings-height: 780px;
-  --piarc-settings-rail: 208px;
-  --piarc-settings-header: 56px;
-  --piarc-settings-gutter: 32px;
+  --piarc-settings-measure: 720px;
+  --piarc-settings-gutter: 40px;
   --piarc-settings-radius: 12px;
-  --piarc-settings-header-text: 16px;
   --piarc-settings-page-title: 18px;
-  --piarc-settings-nav-text: 14.5px;
+  --piarc-settings-heading: 26px;
+  --piarc-settings-row-height: 60px;
   --piarc-session-measure: 768px;
   --piarc-session-gutter: 32px;
   --piarc-session-gutter-narrow: 16px;
@@ -228,6 +226,15 @@
   --piarc-session-inline-code-fill: #e8e9ec;
   --piarc-session-tooltip: #1d2027;
   --piarc-session-tooltip-ink: #ffffff;
+  --piarc-theme-preview-light-canvas: #ffffff;
+  --piarc-theme-preview-light-navigation: #fafafa;
+  --piarc-theme-preview-light-line: #00000013;
+  --piarc-theme-preview-light-ink: #626262;
+  --piarc-theme-preview-dark-canvas: #191919;
+  --piarc-theme-preview-dark-navigation: #202020;
+  --piarc-theme-preview-dark-card: #303030;
+  --piarc-theme-preview-dark-line: #ffffff1a;
+  --piarc-theme-preview-dark-ink: #b3b3b3;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -238,8 +245,8 @@
     --piarc-surface-panel: #17181b;
     --piarc-surface-raised: #1e2024;
     --piarc-surface-input: #17181b;
-    --piarc-surface-hover: #1e2024;
-    --piarc-surface-active: #25272c;
+    --piarc-surface-hover: #2b2e34;
+    --piarc-surface-active: #33363d;
     --piarc-surface-selected: #202c56;
     --piarc-workbench-canvas: #191919;
     --piarc-workbench-navigation: #202020;
@@ -257,7 +264,7 @@
     --piarc-border-subtle: #33363d;
     --piarc-border-default: #3e424a;
     --piarc-border-strong: #6b707c;
-    --piarc-border-focus: #787d89;
+    --piarc-border-focus: #a9adb7;
     --piarc-action-surface: #ffffff26;
     --piarc-action-hover: #ffffff37;
     --piarc-action-pressed: #ffffff47;
@@ -308,6 +315,15 @@
     --piarc-session-inline-code-fill: #33363d;
     --piarc-session-tooltip: #303030;
     --piarc-session-tooltip-ink: #eceef2;
+    --piarc-theme-preview-light-canvas: #ffffff;
+    --piarc-theme-preview-light-navigation: #fafafa;
+    --piarc-theme-preview-light-line: #00000013;
+    --piarc-theme-preview-light-ink: #626262;
+    --piarc-theme-preview-dark-canvas: #191919;
+    --piarc-theme-preview-dark-navigation: #202020;
+    --piarc-theme-preview-dark-card: #303030;
+    --piarc-theme-preview-dark-line: #ffffff1a;
+    --piarc-theme-preview-dark-ink: #b3b3b3;
   }
 }
 
@@ -388,6 +404,15 @@
   --piarc-session-inline-code-fill: #e8e9ec;
   --piarc-session-tooltip: #1d2027;
   --piarc-session-tooltip-ink: #ffffff;
+  --piarc-theme-preview-light-canvas: #ffffff;
+  --piarc-theme-preview-light-navigation: #fafafa;
+  --piarc-theme-preview-light-line: #00000013;
+  --piarc-theme-preview-light-ink: #626262;
+  --piarc-theme-preview-dark-canvas: #191919;
+  --piarc-theme-preview-dark-navigation: #202020;
+  --piarc-theme-preview-dark-card: #303030;
+  --piarc-theme-preview-dark-line: #ffffff1a;
+  --piarc-theme-preview-dark-ink: #b3b3b3;
 }
 
 :root[data-color-mode='dark'] {
@@ -397,8 +422,8 @@
   --piarc-surface-panel: #17181b;
   --piarc-surface-raised: #1e2024;
   --piarc-surface-input: #17181b;
-  --piarc-surface-hover: #1e2024;
-  --piarc-surface-active: #25272c;
+  --piarc-surface-hover: #2b2e34;
+  --piarc-surface-active: #33363d;
   --piarc-surface-selected: #202c56;
   --piarc-workbench-canvas: #191919;
   --piarc-workbench-navigation: #202020;
@@ -416,7 +441,7 @@
   --piarc-border-subtle: #33363d;
   --piarc-border-default: #3e424a;
   --piarc-border-strong: #6b707c;
-  --piarc-border-focus: #787d89;
+  --piarc-border-focus: #a9adb7;
   --piarc-action-surface: #ffffff26;
   --piarc-action-hover: #ffffff37;
   --piarc-action-pressed: #ffffff47;
@@ -467,6 +492,15 @@
   --piarc-session-inline-code-fill: #33363d;
   --piarc-session-tooltip: #303030;
   --piarc-session-tooltip-ink: #eceef2;
+  --piarc-theme-preview-light-canvas: #ffffff;
+  --piarc-theme-preview-light-navigation: #fafafa;
+  --piarc-theme-preview-light-line: #00000013;
+  --piarc-theme-preview-light-ink: #626262;
+  --piarc-theme-preview-dark-canvas: #191919;
+  --piarc-theme-preview-dark-navigation: #202020;
+  --piarc-theme-preview-dark-card: #303030;
+  --piarc-theme-preview-dark-line: #ffffff1a;
+  --piarc-theme-preview-dark-ink: #b3b3b3;
 }
 
 :root[data-color-mode='lightHighContrast'] {
@@ -546,6 +580,15 @@
   --piarc-session-inline-code-fill: #e0e2e6;
   --piarc-session-tooltip: #1d2027;
   --piarc-session-tooltip-ink: #ffffff;
+  --piarc-theme-preview-light-canvas: #ffffff;
+  --piarc-theme-preview-light-navigation: #fafafa;
+  --piarc-theme-preview-light-line: #00000013;
+  --piarc-theme-preview-light-ink: #626262;
+  --piarc-theme-preview-dark-canvas: #191919;
+  --piarc-theme-preview-dark-navigation: #202020;
+  --piarc-theme-preview-dark-card: #303030;
+  --piarc-theme-preview-dark-line: #ffffff1a;
+  --piarc-theme-preview-dark-ink: #b3b3b3;
 }
 
 :root[data-color-mode='darkHighContrast'] {
@@ -555,8 +598,8 @@
   --piarc-surface-panel: #17181b;
   --piarc-surface-raised: #1e2024;
   --piarc-surface-input: #17181b;
-  --piarc-surface-hover: #1e2024;
-  --piarc-surface-active: #25272c;
+  --piarc-surface-hover: #2b2e34;
+  --piarc-surface-active: #33363d;
   --piarc-surface-selected: #202c56;
   --piarc-workbench-canvas: #000000;
   --piarc-workbench-navigation: #000000;
@@ -625,6 +668,15 @@
   --piarc-session-inline-code-fill: #2b2e34;
   --piarc-session-tooltip: #000000;
   --piarc-session-tooltip-ink: #ffffff;
+  --piarc-theme-preview-light-canvas: #ffffff;
+  --piarc-theme-preview-light-navigation: #fafafa;
+  --piarc-theme-preview-light-line: #00000013;
+  --piarc-theme-preview-light-ink: #626262;
+  --piarc-theme-preview-dark-canvas: #191919;
+  --piarc-theme-preview-dark-navigation: #202020;
+  --piarc-theme-preview-dark-card: #303030;
+  --piarc-theme-preview-dark-line: #ffffff1a;
+  --piarc-theme-preview-dark-ink: #b3b3b3;
 }
 
 :root[data-density='compact'] {
@@ -682,6 +734,15 @@
 @media (forced-colors: active) {
   :root,
   :root[data-color-mode] {
+    --piarc-theme-preview-light-canvas: Canvas;
+    --piarc-theme-preview-light-navigation: Canvas;
+    --piarc-theme-preview-light-line: CanvasText;
+    --piarc-theme-preview-light-ink: CanvasText;
+    --piarc-theme-preview-dark-canvas: Canvas;
+    --piarc-theme-preview-dark-navigation: Canvas;
+    --piarc-theme-preview-dark-card: Canvas;
+    --piarc-theme-preview-dark-line: CanvasText;
+    --piarc-theme-preview-dark-ink: CanvasText;
     --piarc-workbench-canvas: Canvas;
     --piarc-workbench-navigation: Canvas;
     --piarc-workbench-editor: Field;

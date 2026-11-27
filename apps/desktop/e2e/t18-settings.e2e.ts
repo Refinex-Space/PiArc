@@ -145,15 +145,25 @@ test('adjacent hovered and selected navigation rows keep a non-interactive gap',
   }
 });
 
-test('appearance segments keep the reference geometry and one moving selected surface', async ({
+test('appearance: colour mode cards, segments with the reference geometry and one moving surface', async ({
   page,
 }, info) => {
   const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-appearance').click();
-  const track = settings.getByTestId('setting-theme').getByRole('radiogroup');
+  // The colour mode is three pictures of the app in one radio group (ADR-0101).
+  const modes = settings.getByTestId('setting-theme').getByRole('radiogroup');
+  await expect(modes.getByRole('radio')).toHaveCount(3);
+  for (const theme of ['dark', 'light'] as const) {
+    await modes
+      .locator('label')
+      .filter({ has: settings.getByTestId('theme-' + theme) })
+      .click();
+    await expect(settings.getByTestId('theme-' + theme)).toBeChecked();
+    await expect(settings.locator('html')).toHaveAttribute('data-color-mode', theme);
+  }
+  // Density keeps the reference segmented control (ADR-0073).
+  const track = settings.getByTestId('setting-density').getByRole('radiogroup');
   const labels = track.locator('label');
-  await expect(labels.locator('svg[aria-hidden="true"]')).toHaveCount(3);
-  await expect(settings.getByTestId('setting-reduceMotion').getByRole('combobox')).toBeVisible();
   const thumb = track.locator('.segment-thumb');
   const rects = () =>
     labels.evaluateAll((nodes) =>
@@ -171,50 +181,36 @@ test('appearance segments keep the reference geometry and one moving selected su
     await expect(track).toHaveCSS('border-top-width', '0px');
     await expect(track).toHaveCSS('height', String(height) + 'px');
     await expect(track).toHaveCSS('border-radius', String(radius) + 'px');
-    await expect(track).toHaveCSS('width', String(3 * (height - 2) + 2) + 'px');
     await expect(thumb).toHaveCount(1);
+    const selected = settings.getByTestId('density-' + density);
+    await expect(selected).toBeChecked();
+    await expect
+      .poll(() =>
+        thumb.evaluate((node) => {
+          const chosen = node.parentElement?.querySelector('input:checked')?.parentElement;
+          if (!chosen) return false;
+          const a = node.getBoundingClientRect(),
+            b = chosen.getBoundingClientRect();
+          return Math.abs(a.x - b.x) < 0.5 && Math.abs(a.width - b.width) < 0.5;
+        }),
+      )
+      .toBe(true);
     const before = await rects();
-    for (const theme of ['light', 'dark'] as const) {
-      const label = labels.filter({ has: settings.getByTestId('theme-' + theme) });
-      await label.click();
-      await expect(label.getByRole('radio')).toBeChecked();
-      await expect(settings.locator('html')).toHaveAttribute('data-color-mode', theme);
-      await expect
-        .poll(() =>
-          thumb.evaluate((node) => {
-            const selected = node.parentElement?.querySelector('input:checked')?.parentElement;
-            if (!selected) return false;
-            const a = node.getBoundingClientRect(),
-              b = selected.getBoundingClientRect();
-            return (
-              Math.abs(a.x - b.x) < 0.5 &&
-              Math.abs(a.width - b.width) < 0.5 &&
-              a.height === b.height
-            );
-          }),
-        )
-        .toBe(true);
-      expect(await rects()).toEqual(before);
-      await settings.getByTestId('settings-page-appearance').screenshot({
-        path: info.outputPath(density + '-' + theme + '.png'),
-      });
-    }
-    await settings.keyboard.press('ArrowLeft');
-    await expect(settings.getByTestId('theme-light')).toBeChecked();
-    await expect(thumb).toHaveAttribute('data-moving', '');
-    await expect(thumb).toHaveCSS('box-shadow', 'none');
-    await expect(settings.getByTestId('theme-light').locator('..')).toHaveCSS(
-      'outline-width',
-      '1px',
-    );
+    await settings.getByTestId('theme-dark').focus();
+    expect(await rects()).toEqual(before);
+    await settings.getByTestId('settings-page-appearance').screenshot({
+      path: info.outputPath(density + '.png'),
+    });
   }
-  const motion = settings.getByTestId('setting-reduceMotion').getByRole('combobox');
-  await motion.focus();
-  // Space opens the native picker on macOS; the active option then receives the keys.
-  await settings.keyboard.press('Space');
-  await expect.poll(() => motion.evaluate((el) => el.matches(':open'))).toBe(true);
-  await settings.keyboard.press('ArrowDown');
-  await settings.keyboard.press('Enter');
-  await expect(motion).toHaveValue('on');
+  await prefer(settings, { key: 'appearance.density', value: 'comfortable' });
+  // Reduce motion is a segmented choice too.
+  await settings
+    .getByTestId('setting-reduceMotion')
+    .locator('label')
+    .filter({ has: settings.getByTestId('reduceMotion-on') })
+    .click();
+  await expect(settings.getByTestId('reduceMotion-on')).toBeChecked();
   await expect(settings.locator('html')).toHaveAttribute('data-reduce-motion', 'true');
+  await prefer(settings, { key: 'appearance.reduceMotion', value: 'system' });
+  await prefer(settings, { key: 'appearance.theme', value: 'system' });
 });

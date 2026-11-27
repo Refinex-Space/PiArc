@@ -1,22 +1,27 @@
-// Settings stay in their originating workbench. The search operates on the local settings catalog.
+// Settings are a view of the originating workbench (ADR-0101). The search operates on the local
+// settings catalog.
 import type { BrowserWindow } from 'electron';
 
 import { expect, test } from './sessions.js';
 import { prefer } from './t19.js';
 
-test('the gear opens a modal in place, finds a setting and restores focus', async ({
+test('the gear turns the workbench into settings, finds a setting and turns back', async ({
   app,
   page,
 }, info) => {
   await prefer(page, { key: 'language', value: 'en' });
   const gear = page.getByTestId('open-settings');
   await gear.click();
-  const panel = page.getByRole('dialog', { name: 'Settings', exact: true });
-  await expect(panel).toBeVisible();
+  const settings = page.getByTestId('settings-window');
+  await expect(settings).toBeVisible();
   expect(app.windows()).toHaveLength(1);
-  const search = panel.getByRole('combobox', { name: 'Search settings' });
+  // ADR-0101: no dialog; the workbench stays mounted underneath and takes no input.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('app-shell')).toHaveAttribute('inert', '');
+  await expect(page.getByTestId('shell-sidebar')).toBeAttached();
+  const search = settings.getByRole('combobox', { name: 'Search settings' });
   await expect(search).toBeFocused();
-  const frame = panel.locator('.settings-search');
+  const frame = settings.locator('.settings-search');
   const singleEdge = async (width: string) => {
     await expect(search).toBeFocused();
     await expect(search).toHaveCSS('outline-style', 'none');
@@ -29,18 +34,34 @@ test('the gear opens a modal in place, finds a setting and restores focus', asyn
   await search.press('Tab');
   await page.keyboard.press('Shift+Tab');
   await singleEdge('1px');
+  // Results fill the page area; the navigation keeps only the groups with a match.
   await search.fill('density');
+  await expect(settings.getByTestId('settings-results')).toBeVisible();
+  await expect(settings.getByTestId('settings-nav-appearance')).toBeVisible();
+  await expect(settings.getByTestId('settings-nav-general')).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('search-results.png') });
   await search.press('Enter');
-  await expect(panel.getByTestId('settings-page-appearance')).toBeVisible();
-  await expect(search).toHaveCSS('outline-style', 'none');
-  await expect(panel.getByTestId('theme-dark')).toHaveAccessibleName('Dark');
+  await expect(settings.getByTestId('settings-page-appearance')).toBeVisible();
+  await expect(settings.getByTestId('setting-density')).toHaveClass(/is-located/u);
+  await expect(settings.getByTestId('theme-dark')).toHaveAccessibleName('Dark');
   await page.screenshot({ path: info.outputPath('appearance-light.png') });
-  await panel.getByTestId('settings-close').click();
-  await expect(panel).toHaveCount(0);
+  // Esc clears a search first, then leaves settings; focus goes back to the gear.
+  await search.fill('proxy');
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(settings).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(settings).toHaveCount(0);
+  await expect(page.getByTestId('app-shell')).not.toHaveAttribute('inert', '');
+  await expect(gear).toBeFocused();
+  // The back button does the same.
+  await gear.click();
+  await settings.getByTestId('settings-close').click();
+  await expect(settings).toHaveCount(0);
   await expect(gear).toBeFocused();
 });
 
-test('the settings frame leaves balanced margins as the workbench resizes', async ({
+test('settings take the sidebar column and centre the page as the workbench resizes', async ({
   app,
   page,
 }, info) => {
@@ -49,9 +70,9 @@ test('the settings frame leaves balanced margins as the workbench resizes', asyn
   const area = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea);
   expect(initial.width).toBe(Math.min(1200, area.width));
   expect(initial.height).toBe(Math.min(800, area.height));
-  const button = page.getByTestId('open-settings');
-  await button.click();
-  const dialog = page.locator('.settings-dialog');
+  await page.getByTestId('open-settings').click();
+  const settings = page.getByTestId('settings-window');
+  await expect(settings).toBeVisible();
   for (const [width, height] of [
     [1200, 800],
     [960, 600],
@@ -64,28 +85,35 @@ test('the settings frame leaves balanced margins as the workbench resizes', asyn
       { width, height },
     );
     await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(width);
-    const rect = await dialog.evaluate((el) => {
-      const r = el.getBoundingClientRect();
+    const geometry = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error(`missing ${selector}`);
+        return element.getBoundingClientRect();
+      };
+      const nav = box('.settings-sidebar');
+      const sidebar = box('[data-testid="shell-sidebar"]');
+      const view = box('.settings-view');
+      const column = box('.settings-column');
       return {
-        width: r.width,
-        height: r.height,
-        left: r.left,
-        right: innerWidth - r.right,
-        top: r.top,
-        bottom: innerHeight - r.bottom,
-        viewHeight: innerHeight,
+        navLeft: nav.left,
+        navWidth: nav.width,
+        sidebarWidth: sidebar.width,
+        viewRight: innerWidth - view.right,
+        viewHeight: view.height,
+        columnWidth: column.width,
+        left: column.left - view.left,
+        right: view.right - column.right,
       };
     });
-    expect(rect.left).toBeCloseTo(rect.right, 0);
-    expect(rect.top).toBeCloseTo(rect.bottom, 0);
-    expect(rect.width).toBeCloseTo(
-      Math.min(1000, width - Math.max(32, Math.min(width * 0.08, 96))),
-      0,
-    );
-    expect(rect.height).toBeCloseTo(
-      Math.min(780, rect.viewHeight - Math.max(32, Math.min(rect.viewHeight * 0.1, 96))),
-      0,
-    );
+    // The settings navigation is the sidebar's column, the page fills the rest of the window.
+    expect(geometry.navLeft).toBe(0);
+    expect(geometry.navWidth).toBeCloseTo(geometry.sidebarWidth, 0);
+    expect(geometry.viewRight).toBe(0);
+    expect(geometry.viewHeight).toBe(height);
+    expect(geometry.columnWidth).toBeLessThanOrEqual(720);
+    // The page's column is centred, with the scrollbar's room on the right.
+    expect(Math.abs(geometry.left - geometry.right)).toBeLessThanOrEqual(12);
     await page.screenshot({ path: info.outputPath('settings-' + String(width) + '.png') });
   }
 });

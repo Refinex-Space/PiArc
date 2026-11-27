@@ -84,7 +84,16 @@ export type ColorToken =
   | 'session.inlineCode'
   | 'session.inlineCodeFill'
   | 'session.tooltip'
-  | 'session.tooltipInk';
+  | 'session.tooltipInk'
+  | 'themePreview.lightCanvas'
+  | 'themePreview.lightNavigation'
+  | 'themePreview.lightLine'
+  | 'themePreview.lightInk'
+  | 'themePreview.darkCanvas'
+  | 'themePreview.darkNavigation'
+  | 'themePreview.darkCard'
+  | 'themePreview.darkLine'
+  | 'themePreview.darkInk';
 
 /** Mode- and density-dependent sizes, fonts and motion values. */
 export type ScaleToken =
@@ -112,6 +121,7 @@ export type ScaleToken =
   | 'motion.easing'
   | 'motion.curveSnap'
   | 'motion.curveOut'
+  | 'motion.view'
   | 'shadow.button'
   | 'shadow.overlay'
   | 'size.titlebarHeight'
@@ -126,15 +136,12 @@ export type ScaleToken =
   | 'workbench.composerShadow'
   | 'workbench.menuRadius'
   | 'workbench.iconSize'
-  | 'settings.width'
-  | 'settings.height'
-  | 'settings.rail'
-  | 'settings.header'
+  | 'settings.measure'
   | 'settings.gutter'
   | 'settings.radius'
-  | 'settings.headerText'
   | 'settings.pageTitle'
-  | 'settings.navText'
+  | 'settings.heading'
+  | 'settings.rowHeight'
   | 'session.measure'
   | 'session.gutter'
   | 'session.gutterNarrow'
@@ -317,6 +324,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.inlineCodeFill': '#e8e9ec',
     'session.tooltip': '#1d2027',
     'session.tooltipInk': '#ffffff',
+    'themePreview.lightCanvas': '#ffffff',
+    'themePreview.lightNavigation': '#fafafa',
+    'themePreview.lightLine': '#00000013',
+    'themePreview.lightInk': '#626262',
+    'themePreview.darkCanvas': '#191919',
+    'themePreview.darkNavigation': '#202020',
+    'themePreview.darkCard': '#303030',
+    'themePreview.darkLine': '#ffffff1a',
+    'themePreview.darkInk': '#b3b3b3',
   },
   dark: {
     'surface.app': '#111214',
@@ -324,8 +340,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'surface.panel': '#17181b',
     'surface.raised': '#1e2024',
     'surface.input': '#17181b',
-    'surface.hover': '#1e2024',
-    'surface.active': '#25272c',
+    'surface.hover': '#2b2e34',
+    'surface.active': '#33363d',
     'surface.selected': '#202c56',
     'workbench.canvas': '#191919',
     'workbench.navigation': '#202020',
@@ -343,7 +359,7 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'border.subtle': '#33363d',
     'border.default': '#3e424a',
     'border.strong': '#6b707c',
-    'border.focus': '#787d89',
+    'border.focus': '#a9adb7',
     'action.surface': '#ffffff26',
     'action.hover': '#ffffff37',
     'action.pressed': '#ffffff47',
@@ -394,6 +410,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.inlineCodeFill': '#33363d',
     'session.tooltip': '#303030',
     'session.tooltipInk': '#eceef2',
+    'themePreview.lightCanvas': '#ffffff',
+    'themePreview.lightNavigation': '#fafafa',
+    'themePreview.lightLine': '#00000013',
+    'themePreview.lightInk': '#626262',
+    'themePreview.darkCanvas': '#191919',
+    'themePreview.darkNavigation': '#202020',
+    'themePreview.darkCard': '#303030',
+    'themePreview.darkLine': '#ffffff1a',
+    'themePreview.darkInk': '#b3b3b3',
   },
   lightHighContrast: {
     'surface.app': '#ffffff',
@@ -471,6 +496,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.inlineCodeFill': '#e0e2e6',
     'session.tooltip': '#1d2027',
     'session.tooltipInk': '#ffffff',
+    'themePreview.lightCanvas': '#ffffff',
+    'themePreview.lightNavigation': '#fafafa',
+    'themePreview.lightLine': '#00000013',
+    'themePreview.lightInk': '#626262',
+    'themePreview.darkCanvas': '#191919',
+    'themePreview.darkNavigation': '#202020',
+    'themePreview.darkCard': '#303030',
+    'themePreview.darkLine': '#ffffff1a',
+    'themePreview.darkInk': '#b3b3b3',
   },
   darkHighContrast: {
     'surface.app': '#000000',
@@ -478,8 +512,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'surface.panel': '#17181b',
     'surface.raised': '#1e2024',
     'surface.input': '#17181b',
-    'surface.hover': '#1e2024',
-    'surface.active': '#25272c',
+    'surface.hover': '#2b2e34',
+    'surface.active': '#33363d',
     'surface.selected': '#202c56',
     'workbench.canvas': '#000000',
     'workbench.navigation': '#000000',
@@ -548,6 +582,15 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'session.inlineCodeFill': '#2b2e34',
     'session.tooltip': '#000000',
     'session.tooltipInk': '#ffffff',
+    'themePreview.lightCanvas': '#ffffff',
+    'themePreview.lightNavigation': '#fafafa',
+    'themePreview.lightLine': '#00000013',
+    'themePreview.lightInk': '#626262',
+    'themePreview.darkCanvas': '#191919',
+    'themePreview.darkNavigation': '#202020',
+    'themePreview.darkCard': '#303030',
+    'themePreview.darkLine': '#ffffff1a',
+    'themePreview.darkInk': '#b3b3b3',
   },
 };
 
@@ -628,6 +671,15 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'session.inlineCodeFill': '--piarc-session-inline-code-fill',
   'session.tooltip': '--piarc-session-tooltip',
   'session.tooltipInk': '--piarc-session-tooltip-ink',
+  'themePreview.lightCanvas': '--piarc-theme-preview-light-canvas',
+  'themePreview.lightNavigation': '--piarc-theme-preview-light-navigation',
+  'themePreview.lightLine': '--piarc-theme-preview-light-line',
+  'themePreview.lightInk': '--piarc-theme-preview-light-ink',
+  'themePreview.darkCanvas': '--piarc-theme-preview-dark-canvas',
+  'themePreview.darkNavigation': '--piarc-theme-preview-dark-navigation',
+  'themePreview.darkCard': '--piarc-theme-preview-dark-card',
+  'themePreview.darkLine': '--piarc-theme-preview-dark-line',
+  'themePreview.darkInk': '--piarc-theme-preview-dark-ink',
   'font.ui': '--piarc-font-ui',
   'font.mono': '--piarc-font-mono',
   'fontSize.caption': '--piarc-font-size-caption',
@@ -652,6 +704,7 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'motion.easing': '--piarc-motion-easing',
   'motion.curveSnap': '--piarc-motion-curve-snap',
   'motion.curveOut': '--piarc-motion-curve-out',
+  'motion.view': '--piarc-motion-view',
   'shadow.button': '--piarc-shadow-button',
   'shadow.overlay': '--piarc-shadow-overlay',
   'size.titlebarHeight': '--piarc-size-titlebar-height',
@@ -666,15 +719,12 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'workbench.composerShadow': '--piarc-workbench-composer-shadow',
   'workbench.menuRadius': '--piarc-workbench-menu-radius',
   'workbench.iconSize': '--piarc-workbench-icon-size',
-  'settings.width': '--piarc-settings-width',
-  'settings.height': '--piarc-settings-height',
-  'settings.rail': '--piarc-settings-rail',
-  'settings.header': '--piarc-settings-header',
+  'settings.measure': '--piarc-settings-measure',
   'settings.gutter': '--piarc-settings-gutter',
   'settings.radius': '--piarc-settings-radius',
-  'settings.headerText': '--piarc-settings-header-text',
   'settings.pageTitle': '--piarc-settings-page-title',
-  'settings.navText': '--piarc-settings-nav-text',
+  'settings.heading': '--piarc-settings-heading',
+  'settings.rowHeight': '--piarc-settings-row-height',
   'session.measure': '--piarc-session-measure',
   'session.gutter': '--piarc-session-gutter',
   'session.gutterNarrow': '--piarc-session-gutter-narrow',

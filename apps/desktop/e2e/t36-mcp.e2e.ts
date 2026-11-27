@@ -8,7 +8,7 @@
 import { openSettings } from './settings-panel.js';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Page } from '@playwright/test';
+import type { ElectronApplication, Page } from '@playwright/test';
 
 import {
   expect,
@@ -143,13 +143,19 @@ test('the MCP page shows the pool and turns servers off, on and reconnects them'
   const settings = await openMcp(page);
   const echoRow = server(settings, 'echo');
   await expect(echoRow).toHaveAttribute('data-state', 'connected');
-  await expect(echoRow.getByTestId('mcp-source')).toHaveText(path.join(ws, '.mcp.json'));
-  await expect(echoRow).toContainText('Local command (stdio) · Project · 3 tools');
+  await expect(echoRow.getByTestId('mcp-source')).toHaveAttribute(
+    'data-source',
+    path.join(ws, '.mcp.json'),
+  );
+  await expect(echoRow).toContainText('Project · Local command (stdio) · 3 tools');
   await expect(echoRow).toContainText('used by 1 session');
   const notes = server(settings, 'notes');
   await expect(notes).toHaveAttribute('data-state', 'connected');
-  await expect(notes.getByTestId('mcp-source')).toHaveText(path.join(userDataDir, 'settings.json'));
-  await expect(notes).toContainText('Local command (stdio) · User · 5 tools');
+  await expect(notes.getByTestId('mcp-source')).toHaveAttribute(
+    'data-source',
+    path.join(userDataDir, 'settings.json'),
+  );
+  await expect(notes).toContainText('User · Local command (stdio) · 5 tools');
   for (const [name, transport, reason] of [
     ['legacy', 'SSE', 'the SSE transport is deprecated'],
     ['sockets', 'WebSocket', 'PiArc does not support the WebSocket transport'],
@@ -157,7 +163,7 @@ test('the MCP page shows the pool and turns servers off, on and reconnects them'
     const row = server(settings, name);
     await expect(row).toHaveAttribute('data-state', 'unsupported');
     await expect(row.getByTestId('mcp-state')).toHaveText('Not supported');
-    await expect(row).toContainText(`${transport} · Project`);
+    await expect(row).toContainText(`Project · ${transport}`);
     await expect(row.getByTestId('mcp-tools')).toHaveCount(0);
     await expect(row.getByTestId('mcp-error')).toContainText(reason);
     await expect(row.getByTestId('mcp-reconnect')).toHaveCount(0);
@@ -216,4 +222,116 @@ test('the MCP page shows the pool and turns servers off, on and reconnects them'
   );
   await issues.scrollIntoViewIfNeeded();
   await issues.screenshot({ path: path.join(EVIDENCE, 'diagnostics-mcp-en.png') });
+});
+
+async function answerNext(app: ElectronApplication, answer: boolean): Promise<void> {
+  await app.evaluate((_electron, value) => {
+    const hooks = globalThis.__piarcTestHooks;
+    if (hooks === undefined) throw new Error('test hooks are missing: build the development app');
+    hooks.answerConfirm(value);
+  }, answer);
+}
+
+async function confirmations(
+  app: ElectronApplication,
+): Promise<readonly { message: string; detail: string }[]> {
+  return app.evaluate(() => globalThis.__piarcTestHooks?.confirmations() ?? []);
+}
+
+test('servers added on the page are confirmed natively, written where chosen and connect', async ({
+  app,
+  page,
+  workspaces,
+  userDataDir,
+}) => {
+  test.setTimeout(150_000);
+  await mkdir(EVIDENCE, { recursive: true });
+  await prefer(page, { key: 'language', value: 'en' });
+  const ws = await makeWorkspace(workspaces, 'mcp add 添加', {});
+  await openFolder(page, app, ws);
+  await startSession(page, 'Hello', 't18-chat', 'trust');
+  await idle(page);
+  await focusMain(app);
+  const settings = await openMcp(page);
+
+  // A local command for this project only. Cancelling the native confirmation writes nothing
+  // and keeps what was typed.
+  await settings.getByTestId('mcp-add').click();
+  const dialog = settings.getByTestId('mcp-add-dialog');
+  await dialog.getByTestId('mcp-add-name').fill('a b');
+  await dialog.getByTestId('mcp-add-submit').click();
+  await expect(dialog.getByRole('alert')).toHaveText([
+    'Letters, digits, - and _ only',
+    'Enter the command to run',
+  ]);
+  await dialog.getByTestId('mcp-add-name').fill('added');
+  const command = [process.execPath, ECHO_SERVER, 'added'].map((w) => JSON.stringify(w)).join(' ');
+  await dialog.getByTestId('mcp-add-command').fill(command);
+  await dialog.getByTestId('mcp-add-env-name-0').fill('MCP_ECHO_START_LOG');
+  await dialog.getByTestId('mcp-add-env-value-0').fill('mcp-starts.jsonl');
+  await dialog.getByTestId('mcp-add-scope-projectLocal').check({ force: true });
+  await dialog.screenshot({ path: path.join(EVIDENCE, 'mcp-add-dialog-en.png') });
+  await answerNext(app, false);
+  await dialog.getByTestId('mcp-add-submit').click();
+  await expect.poll(async () => (await confirmations(app)).length).toBe(1);
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId('mcp-add-name')).toHaveValue('added');
+  await expect(readFile(path.join(ws, '.piarc', 'settings.local.json'), 'utf8')).rejects.toThrow();
+  const [shown] = await confirmations(app);
+  expect(shown?.message).toBe('Add the MCP server “added”?');
+  expect(shown?.detail).toContain('.piarc/settings.local.json');
+  expect(shown?.detail).toContain(`Runs: ${process.execPath}`);
+  expect(shown?.detail).toContain('MCP_ECHO_START_LOG');
+
+  // Confirmed: written to the project's local settings; the project stays trusted, so the
+  // server connects without asking for trust again.
+  await answerNext(app, true);
+  await dialog.getByTestId('mcp-add-submit').click();
+  await expect(dialog).toHaveCount(0);
+  const local = JSON.parse(
+    await readFile(path.join(ws, '.piarc', 'settings.local.json'), 'utf8'),
+  ) as { mcpServers: Record<string, unknown> };
+  expect(local.mcpServers.added).toEqual({
+    type: 'stdio',
+    command: process.execPath,
+    args: [ECHO_SERVER, 'added'],
+    env: { MCP_ECHO_START_LOG: 'mcp-starts.jsonl' },
+  });
+  const added = server(settings, 'added');
+  await expect(added).toContainText('Project · Local command (stdio)');
+  await expect(added).not.toHaveAttribute('data-state', 'untrusted');
+  await added.getByTestId('mcp-reconnect').click();
+  await expect(added).toHaveAttribute('data-state', 'connected', { timeout: 15_000 });
+  await expect.poll(async () => (await starts(ws, 'added')).length).toBeGreaterThan(0);
+
+  // An HTTP server for every project goes to the user's settings; a taken name is refused
+  // before anything is confirmed.
+  await settings.getByTestId('mcp-add').click();
+  await dialog.getByTestId('mcp-add-name').fill('added');
+  await dialog.getByTestId('mcp-add-transport-http').check({ force: true });
+  await dialog.getByTestId('mcp-add-url').fill('https://mcp.example.test/mcp');
+  await dialog.getByTestId('mcp-add-submit').click();
+  await expect(dialog.getByRole('alert')).toContainText('A server has this name');
+  await dialog.getByTestId('mcp-add-name').fill('remote');
+  await answerNext(app, true);
+  await dialog.getByTestId('mcp-add-submit').click();
+  await expect(dialog).toHaveCount(0);
+  const user = JSON.parse(await readFile(path.join(userDataDir, 'settings.json'), 'utf8')) as {
+    mcpServers: Record<string, unknown>;
+  };
+  expect(user.mcpServers.remote).toEqual({ type: 'http', url: 'https://mcp.example.test/mcp' });
+  await expect(server(settings, 'remote')).toContainText('User · HTTP');
+  await settings.screenshot({ path: path.join(EVIDENCE, 'mcp-page-added-en.png') });
+
+  // The list shows every server, the ones all projects get, or this project's.
+  const every = await settings.getByTestId('mcp-server').count();
+  await settings.getByTestId('mcp-filter-thisProject').check({ force: true });
+  await expect(server(settings, 'added')).toBeVisible();
+  await expect(server(settings, 'remote')).toHaveCount(0);
+  await settings.getByTestId('mcp-filter-allProjects').check({ force: true });
+  await expect(server(settings, 'remote')).toBeVisible();
+  await expect(server(settings, 'added')).toHaveCount(0);
+  await settings.getByTestId('mcp-filter-all').check({ force: true });
+  await expect(settings.getByTestId('mcp-server')).toHaveCount(every);
+  await expect(settings.getByTestId('mcp-add-failure')).toHaveCount(0);
 });

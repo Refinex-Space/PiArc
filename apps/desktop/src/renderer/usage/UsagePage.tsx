@@ -2,6 +2,10 @@
 // of every session (or one workspace's) by model and by session, subagents and auxiliary calls
 // under their session, and the price table: each model's price with its source, which the user
 // can replace (USD per million tokens, saved in the user settings) or reset to the catalog's.
+import { PageHeadActions } from '../settings/page-head.js';
+import { ScopePicker } from '../settings/ScopePicker.js';
+import { WorkspaceOptions } from '../settings/WorkspaceOptions.js';
+import { SettingsInfo, SettingsSection } from '../settings/layout.js';
 import type { ModelUsage, UsageReport } from '@piarc/protocol';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -119,6 +123,17 @@ function PriceEditor({
   );
 }
 
+/** The last part of a workspace path, as the sidebar names it. */
+function folderName(path: string): string {
+  return (
+    path
+      .split(/[\\/]+/u)
+      .filter(Boolean)
+      .at(-1) ?? path
+  );
+}
+
+/** One row per model: its share of the tokens, the tokens, the cost and its price. */
 function ModelTable({
   models,
   onChanged,
@@ -128,129 +143,180 @@ function ModelTable({
 }) {
   const { t, format } = useApp();
   const [editing, setEditing] = useState<string | undefined>(undefined);
+  const total = models.reduce((sum, m) => sum + totalTokens(m.tokens), 0);
   return (
-    <div className="usage-table-wrap">
-      <table className="diagnostics-table usage-table" data-testid="usage-models">
-        <thead>
-          <tr>
-            <th>{t('usage.model')}</th>
-            <th className="usage-number">{t('usage.requestsColumn')}</th>
-            <th className="usage-number">{t('usage.tokens.input')}</th>
-            <th className="usage-number">{t('usage.tokens.output')}</th>
-            <th className="usage-number">{t('usage.tokens.cacheRead')}</th>
-            <th className="usage-number">{t('usage.tokens.cacheWrite')}</th>
-            <th className="usage-number">{t('usage.costColumn')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {models.map((m) => {
-            const key = `${m.provider}/${m.model}`;
-            return [
-              <tr key={key} data-testid="usage-model-row" data-model={key}>
-                <td className="usage-model-cell">
-                  <div className="diagnostics-code">{key}</div>
-                  <div className="usage-price-line">
-                    <span className="muted small" data-testid="usage-price-source">
-                      {t(`usage.price.source.${m.priceSource}`)}
-                    </span>
-                    <Button
-                      size="small"
-                      data-testid="usage-price-edit"
-                      onClick={() => {
-                        setEditing(editing === key ? undefined : key);
-                      }}
-                    >
-                      {t('usage.price.edit')}
-                    </Button>
-                  </div>
-                </td>
-                <td className="usage-number">{format.number(m.tokens.requests)}</td>
-                <td className="usage-number">{format.number(m.tokens.input)}</td>
-                <td className="usage-number">{format.number(m.tokens.output)}</td>
-                <td className="usage-number">{format.number(m.tokens.cacheRead)}</td>
-                <td className="usage-number">{format.number(m.tokens.cacheWrite)}</td>
-                <td className="usage-number">
-                  <Cost cost={m.cost} testId="usage-model-cost" bare />
-                </td>
-              </tr>,
-              editing === key ? (
-                <tr key={`${key}-edit`}>
-                  <td colSpan={7}>
-                    <PriceEditor
-                      model={m}
-                      onDone={() => {
-                        setEditing(undefined);
-                        onChanged();
-                      }}
-                    />
-                  </td>
-                </tr>
-              ) : null,
-            ];
-          })}
-        </tbody>
-      </table>
+    <div className="usage-models" data-testid="usage-models">
+      {models.map((m) => {
+        const key = `${m.provider}/${m.model}`;
+        const tokens = totalTokens(m.tokens);
+        const share = total === 0 ? 0 : Math.round((tokens / total) * 100);
+        const breakdown = [
+          `${t('usage.requestsColumn')} ${format.number(m.tokens.requests)}`,
+          `${t('usage.tokens.input')} ${format.number(m.tokens.input)}`,
+          `${t('usage.tokens.output')} ${format.number(m.tokens.output)}`,
+          `${t('usage.tokens.cacheRead')} ${format.number(m.tokens.cacheRead)}`,
+          `${t('usage.tokens.cacheWrite')} ${format.number(m.tokens.cacheWrite)}`,
+        ].join(' · ');
+        return (
+          <div key={key} className="usage-model-block">
+            <div className="usage-model" data-testid="usage-model-row" data-model={key}>
+              <div className="usage-model-name">
+                <span className="mono-text" title={key}>
+                  {m.model}
+                </span>
+                <span className="usage-model-detail">
+                  {t('usage.share', { share })}
+                  {' · '}
+                  <span data-testid="usage-price-source">
+                    {t(`usage.price.source.${m.priceSource}`)}
+                  </span>
+                </span>
+              </div>
+              <span className="usage-share" aria-hidden="true">
+                <span style={{ inlineSize: `${String(share)}%` }} />
+              </span>
+              <span className="usage-model-tokens" data-tooltip={breakdown}>
+                {format.number(tokens, { notation: 'compact', maximumFractionDigits: 1 })}
+              </span>
+              <span className="usage-model-cost">
+                <Cost cost={m.cost} testId="usage-model-cost" bare />
+              </span>
+              <Button
+                size="small"
+                variant="ghost"
+                data-testid="usage-price-edit"
+                aria-expanded={editing === key}
+                onClick={() => {
+                  setEditing(editing === key ? undefined : key);
+                }}
+              >
+                {t('usage.price.edit')}
+              </Button>
+            </div>
+            {editing === key ? (
+              <PriceEditor
+                model={m}
+                onDone={() => {
+                  setEditing(undefined);
+                  onChanged();
+                }}
+              />
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
+/** Sessions shown at first, and added by each "show more". */
+const SESSION_PAGE = 10;
+
+/**
+ * The sessions that used the most tokens first, a filter by title or project, and a bounded
+ * list that grows on request: a long history never turns into an endless page.
+ */
 function SessionTable({ report }: { readonly report: UsageReport }) {
   const { t, format } = useApp();
+  const [query, setQuery] = useState('');
+  const [shown, setShown] = useState(SESSION_PAGE);
+  const needle = query.trim().toLowerCase();
+  const sessions = [...report.sessions]
+    .filter(
+      (s) =>
+        needle === '' ||
+        (s.title ?? '').toLowerCase().includes(needle) ||
+        (s.workspace ?? '').toLowerCase().includes(needle),
+    )
+    .sort((a, b) => totalTokens(b.tokens) - totalTokens(a.tokens));
+  const visible = sessions.slice(0, shown);
   return (
-    <div className="usage-table-wrap">
-      <table className="diagnostics-table usage-table" data-testid="usage-sessions">
-        <thead>
-          <tr>
-            <th>{t('usage.session')}</th>
-            <th className="usage-number">{t('usage.tokensColumn')}</th>
-            <th className="usage-number">{t('usage.costColumn')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.sessions.map((s) => (
-            <tr key={s.sessionId} data-testid="usage-session-row" data-session={s.sessionId}>
-              <td>
-                <div>{s.title ?? t('usage.untitled')}</div>
-                {s.workspace === undefined ? null : (
-                  <div className="muted small diagnostics-code">{s.workspace}</div>
-                )}
-                {(s.subagents ?? []).map((sub) => (
-                  <div
-                    key={sub.sessionId}
-                    className="muted small"
-                    data-testid="usage-session-subagent"
-                  >
-                    {sub.agentType == null
-                      ? t('usage.subagentUntyped')
-                      : t('usage.subagent', { type: sub.agentType })}
-                    {' · '}
-                    {t('usage.tokenCount', { count: totalTokens(sub.tokens) })}
-                    {' · '}
-                    <Cost cost={sub.cost} />
-                  </div>
-                ))}
-                {(s.auxiliary ?? []).map((a) => (
-                  <div
-                    key={a.purpose}
-                    className="muted small"
-                    data-testid="usage-session-auxiliary"
-                  >
-                    {purposeLabel(t, a.purpose)}
-                    {' · '}
-                    {t('usage.tokenCount', { count: totalTokens(a.tokens) })}
-                    {' · '}
-                    <Cost cost={a.cost} />
-                  </div>
-                ))}
-              </td>
-              <td className="usage-number">{format.number(totalTokens(s.tokens))}</td>
-              <td className="usage-number">
-                <Cost cost={s.cost} partial={s.partial} testId="usage-session-cost" bare />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="usage-sessions" data-testid="usage-sessions">
+      {report.sessions.length > SESSION_PAGE && (
+        <input
+          className="input usage-session-filter"
+          type="search"
+          value={query}
+          aria-label={t('usage.sessions.filter')}
+          placeholder={t('usage.sessions.filter')}
+          data-testid="usage-session-filter"
+          onChange={(e) => {
+            setQuery(e.currentTarget.value);
+            setShown(SESSION_PAGE);
+          }}
+        />
+      )}
+      {visible.map((s) => (
+        <div
+          key={s.sessionId}
+          className="usage-session"
+          data-testid="usage-session-row"
+          data-session={s.sessionId}
+        >
+          <div className="usage-session-name">
+            <span className="usage-session-title">{s.title ?? t('usage.untitled')}</span>
+            {s.workspace == null ? null : (
+              <span className="usage-model-detail" title={s.workspace}>
+                {folderName(s.workspace)}
+              </span>
+            )}
+            {(s.subagents ?? []).map((sub) => (
+              <span
+                key={sub.sessionId}
+                className="usage-model-detail"
+                data-testid="usage-session-subagent"
+              >
+                {sub.agentType == null
+                  ? t('usage.subagentUntyped')
+                  : t('usage.subagent', { type: sub.agentType })}
+                {' · '}
+                {t('usage.tokenCount', { count: totalTokens(sub.tokens) })}
+                {' · '}
+                <Cost cost={sub.cost} />
+              </span>
+            ))}
+            {(s.auxiliary ?? []).map((a) => (
+              <span
+                key={a.purpose}
+                className="usage-model-detail"
+                data-testid="usage-session-auxiliary"
+              >
+                {purposeLabel(t, a.purpose)}
+                {' · '}
+                {t('usage.tokenCount', { count: totalTokens(a.tokens) })}
+                {' · '}
+                <Cost cost={a.cost} />
+              </span>
+            ))}
+          </div>
+          <span className="usage-model-tokens">
+            {format.number(totalTokens(s.tokens), {
+              notation: 'compact',
+              maximumFractionDigits: 1,
+            })}
+          </span>
+          <span className="usage-model-cost">
+            <Cost cost={s.cost} partial={s.partial} testId="usage-session-cost" bare />
+          </span>
+        </div>
+      ))}
+      {sessions.length === 0 ? (
+        <p className="settings-row-note">{t('settings.search.empty')}</p>
+      ) : null}
+      {sessions.length > shown ? (
+        <div className="usage-session-more">
+          <Button
+            size="small"
+            variant="ghost"
+            data-testid="usage-session-more"
+            onClick={() => {
+              setShown((n) => n + 2 * SESSION_PAGE);
+            }}
+          >
+            {t('usage.sessions.more', { count: sessions.length - shown })}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -352,30 +418,37 @@ export function UsagePage() {
   useEffect(load, [load]);
   return (
     <div className="settings-detail-page usage-page" data-testid="usage-page">
-      <div className="permission-filters">
-        <label htmlFor={selectId} className="permission-filter-label">
-          {t('permissions.workspace')}
-        </label>
-        <select
-          id={selectId}
-          className="input"
-          value={chosen}
-          data-testid="usage-workspace"
-          onChange={(e) => {
-            setChosen(e.currentTarget.value);
+      <PageHeadActions>
+        <ScopePicker
+          all={{
+            label: t('usage.all'),
+            selected: chosen === '',
+            onSelect: () => {
+              setChosen('');
+            },
+            testId: 'usage-all',
           }}
         >
-          <option value="">{t('usage.allWorkspaces')}</option>
-          {workspaces.map((w) => (
-            <option key={w} value={w}>
-              {w}
+          <select
+            id={selectId}
+            aria-label={t('permissions.workspace')}
+            className="settings-scope-select"
+            value={chosen}
+            data-testid="usage-workspace"
+            onChange={(e) => {
+              setChosen(e.currentTarget.value);
+            }}
+          >
+            <option value="" hidden>
+              {t('usage.chooseWorkspace')}
             </option>
-          ))}
-        </select>
+            <WorkspaceOptions workspaces={workspaces} />
+          </select>
+        </ScopePicker>
         <Button size="small" data-testid="usage-refresh" onClick={load}>
           {t('usage.refresh')}
         </Button>
-      </div>
+      </PageHeadActions>
       {error === '' ? null : (
         <p className="error-text" role="alert">
           {error}
@@ -384,19 +457,23 @@ export function UsagePage() {
       {report === undefined ? null : (
         <>
           <UsageOverview report={report} />
-          <h2 className="settings-heading">{t('usage.modelDetails')}</h2>
-          <p className="muted">{t('usage.hint')}</p>
-          {report.models.length === 0 ? (
-            <p className="muted">{t('usage.empty')}</p>
-          ) : (
-            <ModelTable models={report.models} onChanged={load} />
-          )}
-          <h2 className="settings-heading">{t('usage.sessions')}</h2>
-          {report.sessions.length === 0 ? (
-            <p className="muted">{t('usage.empty')}</p>
-          ) : (
-            <SessionTable report={report} />
-          )}
+          <SettingsSection
+            title={t('usage.modelDetails')}
+            aside={<SettingsInfo text={t('usage.hint')} />}
+          >
+            {report.models.length === 0 ? (
+              <p className="settings-row-note">{t('usage.empty')}</p>
+            ) : (
+              <ModelTable models={report.models} onChanged={load} />
+            )}
+          </SettingsSection>
+          <SettingsSection title={t('usage.sessions')}>
+            {report.sessions.length === 0 ? (
+              <p className="settings-row-note">{t('usage.empty')}</p>
+            ) : (
+              <SessionTable report={report} />
+            )}
+          </SettingsSection>
         </>
       )}
     </div>

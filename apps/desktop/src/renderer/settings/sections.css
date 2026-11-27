@@ -434,30 +434,6 @@
   justify-self: end;
 }
 
-.markdown-image-settings .preference-row > div {
-  min-width: 0;
-}
-.markdown-image-settings select,
-.markdown-image-settings input {
-  max-width: 100%;
-}
-.markdown-image-settings select.preference-language {
-  width: auto;
-  max-width: min(24rem, 100%);
-  field-sizing: content;
-}
-.markdown-image-settings .image-location-example {
-  overflow-wrap: anywhere;
-  font-family: var(--piarc-font-mono);
-  color: var(--piarc-text-secondary);
-}
-.markdown-image-settings .preference-row > div:last-child {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--piarc-space-2);
-}
-
 /* ADR-0082: the proxy page. The explanation is a tooltip on the label's info sign; the detected
    proxy and the typed address read as addresses. The detect action shares a line with the
    "system proxy" label; the address sits on the line below. */

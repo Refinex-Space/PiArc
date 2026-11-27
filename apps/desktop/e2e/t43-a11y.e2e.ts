@@ -264,14 +264,16 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     }),
   });
   const settings = await openSettings(page);
-  await checkState(settings, 'dialog:settings');
+  await checkState(settings, 'window:settings');
   const search = settings.getByRole('combobox', { name: 'Search settings' });
   await search.fill('theme');
   await expect(settings.getByRole('listbox', { name: 'Search settings' })).toBeVisible();
   await checkState(settings, 'state:settings-search');
   await search.press('Escape');
   await settings.getByTestId('settings-nav-skills').click();
-  await settings.getByTestId('package-kind').selectOption('directory');
+  await settings.getByTestId('package-install-open').click();
+  await expect(settings.getByTestId('package-install-dialog')).toBeVisible();
+  await checkState(settings, 'dialog:package-install');
   await settings.getByTestId('package-location').fill(plugin);
   await settings.getByTestId('package-install-submit').click();
   await expect(settings.getByTestId('package-status')).toContainText('Installed', {
@@ -300,6 +302,13 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     await expect(settings.getByTestId(`settings-page-${id}`)).toBeVisible();
     await checkState(settings, `settings:${id}`);
   }
+  // ADR-0101: the add-server dialog of the MCP page.
+  await settings.getByTestId('settings-nav-mcp').click();
+  await settings.getByTestId('mcp-add').click();
+  await expect(settings.getByTestId('mcp-add-dialog')).toBeVisible();
+  await checkState(settings, 'dialog:mcp-add');
+  await settings.keyboard.press('Escape');
+  await expect(settings.getByTestId('mcp-add-dialog')).toHaveCount(0);
   // B5.1: the Chrome import dialog (the test home has no Chrome).
   await settings.getByTestId('settings-nav-browser').click();
   await settings.getByTestId('browser-import-open').click();

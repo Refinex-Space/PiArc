@@ -63,6 +63,7 @@ const PIARC_API_SNAPSHOT = [
   'markSessionRead',
   'markdownImage',
   'markdownImageSettings',
+  'mcpAddServer',
   'mcpLogin',
   'mcpReconnect',
   'mcpSetEnabled',

@@ -1,4 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react';
+// Settings search (ADR-0101): the field sits at the top of the settings navigation, the results
+// fill the page area. Enter opens the chosen setting's page and focuses its control.
+import { Fragment, useEffect, useRef } from 'react';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { useT } from '../app/app-context.js';
 import { isImeComposing } from '../composer/ime-guard.js';
@@ -6,7 +8,11 @@ import { SettingsIcon } from './SettingsIcon.js';
 import type { SettingsPage } from './registry.js';
 
 // Index setting names, never user values, credentials or paths.
-const fields: Record<string, readonly (readonly [MessageId, string])[]> = {
+// An optional third entry is another name people search the setting by.
+export const SEARCH_FIELDS: Record<
+  string,
+  readonly (readonly [MessageId, string] | readonly [MessageId, string, MessageId])[]
+> = {
   general: [
     ['settings.language', 'setting-language'],
     ['settings.notifications', 'setting-notifications'],
@@ -18,7 +24,7 @@ const fields: Record<string, readonly (readonly [MessageId, string])[]> = {
     ['files.images.links', 'markdown-image-link'],
   ],
   appearance: [
-    ['settings.theme', 'setting-theme'],
+    ['settings.theme.title', 'setting-theme', 'settings.theme'],
     ['settings.contrast', 'setting-contrast'],
     ['settings.density', 'setting-density'],
     ['settings.reduceMotion', 'setting-reduceMotion'],
@@ -66,33 +72,74 @@ const fields: Record<string, readonly (readonly [MessageId, string])[]> = {
     ['memory.import.button', 'memory-import'],
   ],
 };
-export function SettingsSearch({
-  pages,
-  open,
-}: {
-  readonly pages: readonly SettingsPage[];
-  readonly open: (id: string, target?: string) => void;
-}) {
-  const t = useT(),
-    input = useRef<HTMLInputElement>(null),
-    listId = useId();
-  const [query, setQuery] = useState(''),
-    [index, setIndex] = useState(0);
-  const normalized = query.trim().toLowerCase();
-  const results = pages
+
+export interface SearchResult {
+  readonly page: string;
+  readonly label: MessageId;
+  /** The field's test id; empty for the page itself. */
+  readonly target: string;
+}
+
+/** The pages and settings whose name contains every word of `query`. */
+export function searchSettings(
+  pages: readonly SettingsPage[],
+  query: string,
+  t: (id: MessageId) => string,
+): readonly SearchResult[] {
+  const words = query.trim().toLowerCase().split(/\s+/u).filter(Boolean);
+  if (words.length === 0) return [];
+  return pages
     .flatMap((p) => [
       { page: p.id, label: p.title, target: '' },
-      ...(fields[p.id] ?? []).map(([label, target]) => ({ page: p.id, label, target })),
+      ...(SEARCH_FIELDS[p.id] ?? []).map(([label, target, alias]) => ({
+        page: p.id,
+        label,
+        target,
+        ...(alias === undefined ? {} : { alias }),
+      })),
     ])
-    .filter((item) => normalized && t(item.label).toLowerCase().includes(normalized));
-  const active = Math.min(index, results.length - 1);
-  const choose = (i: number) => {
-    const item = results[i];
-    if (item) {
-      setQuery('');
-      open(item.page, item.target);
-    }
-  };
+    .filter((item: SearchResult & { readonly alias?: MessageId }) => {
+      const page = t(pages.find((p) => p.id === item.page)?.title ?? item.label);
+      const alias = item.alias === undefined ? '' : t(item.alias);
+      const text = `${t(item.label)} ${alias} ${page}`;
+      return words.every((word) => text.toLowerCase().includes(word));
+    });
+}
+
+/** `text` with the first occurrence of the query's first word marked. */
+export function Marked({ text, query }: { readonly text: string; readonly query: string }) {
+  const word = query.trim().split(/\s+/u)[0] ?? '';
+  const at = word ? text.toLowerCase().indexOf(word.toLowerCase()) : -1;
+  if (at < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, at)}
+      <mark>{text.slice(at, at + word.length)}</mark>
+      {text.slice(at + word.length)}
+    </>
+  );
+}
+
+export function SettingsSearchField({
+  query,
+  onQuery,
+  results,
+  active,
+  onActive,
+  onChoose,
+  listId,
+}: {
+  readonly query: string;
+  readonly onQuery: (query: string) => void;
+  readonly results: readonly SearchResult[];
+  readonly active: number;
+  readonly onActive: (index: number) => void;
+  readonly onChoose: (index: number) => void;
+  readonly listId: string;
+}) {
+  const t = useT();
+  const input = useRef<HTMLInputElement>(null);
+  const searching = query.trim() !== '';
   useEffect(() => {
     input.current?.focus({ preventScroll: true });
     const find = (e: KeyboardEvent) => {
@@ -100,7 +147,7 @@ export function SettingsSearch({
         (e.metaKey || e.ctrlKey) &&
         e.key.toLowerCase() === 'f' &&
         !isImeComposing(e) &&
-        !input.current?.closest('dialog')?.querySelector('[aria-modal="true"]')
+        !document.querySelector('.settings-surface :is(dialog[open], [role="dialog"])')
       ) {
         e.preventDefault();
         input.current?.focus();
@@ -112,16 +159,8 @@ export function SettingsSearch({
       window.removeEventListener('keydown', find);
     };
   }, []);
-  useEffect(() => {
-    document.getElementById(listId + '-' + String(active))?.scrollIntoView({ block: 'nearest' });
-  }, [active, listId, query]);
   return (
-    <div
-      className="settings-search"
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setQuery('');
-      }}
-    >
+    <div className="settings-search">
       <SettingsIcon name="search" />
       <input
         data-focus-proxy
@@ -130,65 +169,115 @@ export function SettingsSearch({
         aria-label={t('settings.search')}
         placeholder={t('settings.search.placeholder')}
         aria-controls={listId}
-        aria-expanded={Boolean(normalized)}
+        aria-expanded={searching}
         aria-autocomplete="list"
         aria-activedescendant={
-          normalized && active >= 0 ? listId + '-' + String(active) : undefined
+          searching && results.length > 0 ? `${listId}-${String(active)}` : undefined
         }
         value={query}
         onChange={(e) => {
-          setQuery(e.currentTarget.value);
-          setIndex(0);
+          onQuery(e.currentTarget.value);
+          onActive(0);
         }}
         onKeyDown={(e) => {
-          if (!normalized || isImeComposing(e.nativeEvent)) return;
+          if (!searching || isImeComposing(e.nativeEvent)) return;
           if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            setQuery('');
+            onQuery('');
           }
           if (e.key === 'Enter') {
             e.preventDefault();
-            choose(active);
+            onChoose(active);
           }
           if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && results.length) {
             e.preventDefault();
-            setIndex((active + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length);
+            onActive((active + (e.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length);
           }
         }}
       />
+    </div>
+  );
+}
+
+/** The results in the page area, grouped by page in navigation order. */
+export function SettingsResults({
+  pages,
+  query,
+  results,
+  active,
+  onActive,
+  onChoose,
+  listId,
+}: {
+  readonly pages: readonly SettingsPage[];
+  readonly query: string;
+  readonly results: readonly SearchResult[];
+  readonly active: number;
+  readonly onActive: (index: number) => void;
+  readonly onChoose: (index: number) => void;
+  readonly listId: string;
+}) {
+  const t = useT();
+  useEffect(() => {
+    document.getElementById(`${listId}-${String(active)}`)?.scrollIntoView({ block: 'nearest' });
+  }, [active, listId, query]);
+  return (
+    <section className="settings-results-page" data-testid="settings-results">
+      <header className="settings-page-head">
+        <div className="settings-page-heading">
+          <h2 className="settings-title">“{query.trim()}”</h2>
+          <p>
+            {results.length === 0
+              ? t('settings.search.empty')
+              : `${t('settings.results', { count: results.length })} · ${t('settings.results.keys')}`}
+          </p>
+        </div>
+      </header>
       <div
         id={listId}
         className="settings-results"
         role="listbox"
         aria-label={t('settings.search')}
-        hidden={!normalized}
       >
-        {results.map((r, i) => (
-          <div
-            key={r.page + '-' + r.label}
-            role="option"
-            id={listId + '-' + String(i)}
-            aria-selected={active === i}
-            onMouseDown={(e) => {
-              e.preventDefault();
-            }}
-            onMouseMove={() => {
-              setIndex(i);
-            }}
-            onClick={() => {
-              choose(i);
-            }}
-          >
-            {t(r.label)}
-          </div>
-        ))}
-        {normalized && !results.length && (
-          <div role="option" aria-disabled="true" aria-selected="false">
-            {t('settings.search.empty')}
-          </div>
-        )}
+        {pages.map((page) => {
+          const hits = results
+            .map((result, index) => ({ result, index }))
+            .filter(({ result }) => result.page === page.id);
+          if (hits.length === 0) return null;
+          return (
+            <Fragment key={page.id}>
+              <div className="settings-results-group" role="presentation">
+                <SettingsIcon name={page.id} />
+                {t(page.title)}
+              </div>
+              {hits.map(({ result, index }) => (
+                <div
+                  key={`${result.page}-${result.label}`}
+                  id={`${listId}-${String(index)}`}
+                  role="option"
+                  className="settings-result"
+                  aria-selected={active === index}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onMouseMove={() => {
+                    onActive(index);
+                  }}
+                  onClick={() => {
+                    onChoose(index);
+                  }}
+                >
+                  <span className="settings-result-label">
+                    <Marked text={t(result.label)} query={query} />
+                  </span>
+                  <SettingsIcon name="chevron" />
+                </div>
+              ))}
+            </Fragment>
+          );
+        })}
       </div>
-    </div>
+    </section>
   );
 }

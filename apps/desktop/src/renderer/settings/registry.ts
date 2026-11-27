@@ -6,12 +6,22 @@ import type { ComponentType } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
 
+/** The navigation's groups, in order (ADR-0101). */
+export const SETTINGS_GROUPS = ['app', 'models', 'security', 'agents', 'tools', 'support'] as const;
+export type SettingsGroup = (typeof SETTINGS_GROUPS)[number];
+
 export interface SettingsPage {
   /** Stable id: the window's hash route `#/settings/<id>` opens it. */
   readonly id: string;
   /** Message id of the navigation label and page title. */
   readonly title: MessageId;
-  /** Lower first. */
+  /** Message id of the one line under the page title. */
+  readonly description: MessageId;
+  /** The navigation group the page is listed in. */
+  readonly group: SettingsGroup;
+  /** Whether the page's settings are chosen per project (marked in the navigation). */
+  readonly scoped?: boolean;
+  /** Lower first within its group. */
   readonly order: number;
   readonly component: ComponentType;
 }
@@ -23,7 +33,10 @@ export function registerSettingsPage(page: SettingsPage): void {
   pages.set(page.id, page);
 }
 
-/** The registered pages in navigation order. */
+/** The registered pages in navigation order: by group, then by `order`. */
 export function settingsPages(): readonly SettingsPage[] {
-  return [...pages.values()].sort((a, b) => a.order - b.order);
+  return [...pages.values()].sort(
+    (a, b) =>
+      SETTINGS_GROUPS.indexOf(a.group) - SETTINGS_GROUPS.indexOf(b.group) || a.order - b.order,
+  );
 }

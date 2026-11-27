@@ -80,7 +80,8 @@ async function openSkills(page: Page): Promise<Page> {
 }
 
 async function install(settings: Page, dir: string): Promise<void> {
-  await settings.getByTestId('package-kind').selectOption('directory');
+  await settings.getByTestId('package-install-open').click();
+  await settings.getByTestId('package-kind-directory').check({ force: true });
   await settings.getByTestId('package-location').fill(dir);
   await settings.getByTestId('package-install-submit').click();
   await expect(settings.getByTestId('package-status')).toContainText('Installed', {

@@ -120,10 +120,13 @@ test('the Subagents page lists types, overrides, warnings and invalid files', as
   await expect(warnings).toContainText('skills');
   await expect(warnings).toContainText('T48');
   await expect(warnings).toContainText('bypassPermissions');
+  // Grouped by where they come from (ADR-0101): the built-in ones in their own group.
+  const builtInGroup = settings.getByTestId('agent-group-builtIn');
+  await expect(builtInGroup).toContainText('Built in');
   for (const builtIn of ['general-purpose', 'Explore', 'Plan']) {
     await expect(
-      settings.locator(`[data-testid="agent-row"][data-name="${builtIn}"]`),
-    ).toContainText('Built in');
+      builtInGroup.locator(`[data-testid="agent-row"][data-name="${builtIn}"]`),
+    ).toBeVisible();
   }
   const issues = settings.getByTestId('agent-issues');
   await expect(issues).toContainText('broken.md');

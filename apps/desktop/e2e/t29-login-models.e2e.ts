@@ -71,6 +71,7 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     expect(opened[0]).toContain(`${auth.base}/authorize?`);
     await settings.getByTestId('login-close').click();
     await expect(row).toBeVisible();
+    await settings.getByTestId(`account-more-${PROVIDER}`).click();
     await settings.getByTestId(`logout-${PROVIDER}`).click();
     await expect(row).toHaveCount(0);
 
@@ -149,6 +150,7 @@ test('sign-in flows, refusal, expiry and cancel; model settings', async ({
     await settings.locator(`[data-testid^="account-use-${PROVIDER}-"]`).click();
     await expect(aside).not.toHaveAttribute('data-testid', first ?? '');
     await expect(aside).toHaveCount(1);
+    await settings.locator(`[data-testid^="account-more-${PROVIDER}-"]`).click();
     await settings.locator(`[data-testid^="account-remove-${PROVIDER}-"]`).click();
     await expect(aside).toHaveCount(0);
     await expect(row).toBeVisible();

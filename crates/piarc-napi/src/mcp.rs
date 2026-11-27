@@ -48,6 +48,23 @@ impl CoreRuntime {
         })
     }
 
+    /// Adds MCP server `name` (definition as JSON text) to `workspace` in `scope` (`user` or
+    /// `projectLocal`); the main process confirms it natively first. The workspace's status as
+    /// JSON text.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn mcp_add_server<'env>(
+        &self,
+        env: &'env Env,
+        workspace: String,
+        scope: String,
+        name: String,
+        definition: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.mcpAddServer", |core, done| {
+            core.mcp_add_server(workspace.into(), scope, name, definition, done)
+        })
+    }
+
     /// Signs in to OAuth MCP server `name` of `workspace`; its state and `loginId` as JSON
     /// text once the tokens are stored.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]

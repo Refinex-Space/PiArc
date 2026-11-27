@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { useT } from '../app/app-context.js';
 import { Button } from '../app/Button.js';
+import { SettingsRow, SettingsSection } from './layout.js';
 import { reason } from '../shell/errors.js';
 import {
   locations,
@@ -89,13 +90,7 @@ export function MarkdownPage() {
   };
   const valid = validImageFolder(folder);
   return (
-    <section
-      className="settings-section settings-detail-page preference-rows markdown-image-settings"
-      aria-labelledby={uid}
-    >
-      <h2 id={uid} className="settings-heading" data-testid="markdown-image-storage">
-        {t('files.images.storage')}
-      </h2>
+    <SettingsSection title={t('files.images.storage')} testId="markdown-image-storage">
       {error && (
         <p role="alert" className="error-text">
           {t('files.failed', { reason: error })}
@@ -103,11 +98,10 @@ export function MarkdownPage() {
       )}
       {prefs && (
         <>
-          <label className="preference-row">
-            <span>{t('files.images.location')}</span>
+          <SettingsRow label={t('files.images.location')} htmlFor={uid + '-location'}>
             <select
-              className="input preference-language"
-              aria-label={t('files.images.location')}
+              id={uid + '-location'}
+              className="input"
               data-testid="markdown-image-location"
               value={prefs.mode}
               disabled={busy}
@@ -128,74 +122,78 @@ export function MarkdownPage() {
                 </option>
               ))}
             </select>
-          </label>
+          </SettingsRow>
+          {prefs.mode === 'reference' && (
+            <p className="settings-row-note">{t('files.images.referenceHint')}</p>
+          )}
           {prefs.mode === 'relative' && (
-            <div className="preference-row">
-              <div>
-                <label htmlFor={uid + '-folder'}>{t('files.images.relativeFolder')}</label>
-                <p className="muted">{t('files.images.template')}</p>
-              </div>
-              <div>
-                <input
-                  id={uid + '-folder'}
-                  value={folder}
-                  spellCheck={false}
-                  disabled={busy}
-                  aria-invalid={!valid}
-                  onChange={(e) => {
-                    setFolder(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && valid) set(prefs.mode, folder, prefs.link);
-                  }}
-                />
-                <Button
-                  size="small"
-                  disabled={busy || !valid || folder === prefs.folder}
-                  onClick={() => {
-                    set(prefs.mode, folder, prefs.link);
-                  }}
-                >
-                  {t('files.images.apply')}
-                </Button>
-                {!valid && (
-                  <p className="error-text" role="alert">
+            <SettingsRow
+              label={t('files.images.relativeFolder')}
+              htmlFor={uid + '-folder'}
+              description={
+                valid ? (
+                  t('files.images.template')
+                ) : (
+                  <span className="error-text" role="alert">
                     {t('files.images.invalidFolder')}
-                  </p>
-                )}
-              </div>
-            </div>
+                  </span>
+                )
+              }
+            >
+              <input
+                id={uid + '-folder'}
+                className="input mono-input"
+                value={folder}
+                spellCheck={false}
+                disabled={busy}
+                aria-invalid={!valid}
+                onChange={(e) => {
+                  setFolder(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && valid) set(prefs.mode, folder, prefs.link);
+                }}
+              />
+              <Button
+                disabled={busy || !valid || folder === prefs.folder}
+                onClick={() => {
+                  set(prefs.mode, folder, prefs.link);
+                }}
+              >
+                {t('files.images.apply')}
+              </Button>
+            </SettingsRow>
           )}
           {(prefs.mode === 'selected' || prefs.directory) && (
-            <div className="preference-row">
-              <div>
-                <span>{t('files.images.directory')}</span>
-                <p className="image-location-example">{prefs.directory}</p>
-                <p className="preference-description">{t('files.images.folderGrant')}</p>
-              </div>
-              <div>
-                <Button size="small" disabled={busy} onClick={() => void update({ op: 'choose' })}>
-                  {t('files.images.chooseFolder')}
+            <SettingsRow
+              label={t('files.images.directory')}
+              description={
+                prefs.directory ? (
+                  <span className="mono-text">{prefs.directory}</span>
+                ) : (
+                  t('files.images.folderGrant')
+                )
+              }
+            >
+              {prefs.directory && (
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => void update({ op: 'forget' })}
+                >
+                  {t('files.images.forget')}
                 </Button>
-                {prefs.directory && (
-                  <Button
-                    size="small"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => void update({ op: 'forget' })}
-                  >
-                    {t('files.images.forget')}
-                  </Button>
-                )}
-              </div>
-            </div>
+              )}
+              <Button disabled={busy} onClick={() => void update({ op: 'choose' })}>
+                {t('files.images.chooseFolder')}
+              </Button>
+            </SettingsRow>
           )}
-          <label className="preference-row">
-            <span>{t('files.images.links')}</span>
+          <SettingsRow label={t('files.images.links')} htmlFor={uid + '-link'}>
             <select
-              className="input preference-language"
+              id={uid + '-link'}
+              className="input"
               disabled={busy}
-              aria-label={t('files.images.links')}
               data-testid="markdown-image-link"
               value={prefs.link}
               onChange={(e) => {
@@ -208,16 +206,14 @@ export function MarkdownPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <div className="preference-row">
-            <span>{t('files.images.example')}</span>
-            <output className="image-location-example" dir="ltr">
+          </SettingsRow>
+          <SettingsRow label={t('files.images.example')}>
+            <output className="mono-text" dir="ltr">
               {preview(prefs, folder)}
             </output>
-          </div>
-          {prefs.mode === 'reference' && <p className="muted">{t('files.images.referenceHint')}</p>}
+          </SettingsRow>
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }

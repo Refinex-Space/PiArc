@@ -24,7 +24,7 @@ export function useCommands(run: (command: AppCommand) => void): void {
       const command = commandForEvent(event, bindingsRef.current, keyPlatform);
       if (
         command === undefined ||
-        (document.querySelector('.settings-dialog[open]') && command !== 'session.close')
+        (document.querySelector('.settings-layer[data-open="true"]') && command !== 'session.close')
       ) {
         return;
       }
