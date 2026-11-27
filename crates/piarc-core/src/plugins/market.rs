@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use super::{Fetched, PluginManager, fetch, npm_package_dir, scope_workspace, scripts_note};
 use crate::error::Result;
 use fetch::failed;
+use piarc_store::PackageRecord;
 
 /// What the market asks to install.
 #[derive(Debug, Clone)]
@@ -43,7 +44,10 @@ fn check_staged(prefix: &Path, spec: &MarketSpec) -> Option<String> {
     if fetch::prefix_dependency(prefix).as_deref() != Some(spec.name.as_str()) {
         return Some(format!("npm did not install exactly {}", spec.name));
     }
-    let manifest = read_json(&npm_package_dir(prefix, &spec.name).join("package.json"))?;
+    let Some(manifest) = read_json(&npm_package_dir(prefix, &spec.name).join("package.json"))
+    else {
+        return Some(format!("cannot read the package.json of {}", spec.name));
+    };
     let field = |key: &str| {
         manifest
             .get(key)
@@ -59,9 +63,9 @@ fn check_staged(prefix: &Path, spec: &MarketSpec) -> Option<String> {
             spec.version
         ));
     }
-    let lock = read_json(&prefix.join("package-lock.json"))
-        .ok_or("npm wrote no lock file")
-        .ok()?;
+    let Some(lock) = read_json(&prefix.join("package-lock.json")) else {
+        return Some("cannot read npm's lock file".into());
+    };
     let packages = lock.get("packages").and_then(Value::as_object);
     let Some(packages) = packages else {
         return Some("npm's lock file lists no packages".into());
@@ -97,7 +101,57 @@ fn check_staged(prefix: &Path, spec: &MarketSpec) -> Option<String> {
     None
 }
 
+/// The location a market install records: the registry and the name. It tells market packages
+/// apart (their updates go through the market's checks) and is not an npm spec.
+pub(crate) fn market_location(registry: &str, name: &str) -> String {
+    format!("{registry}/{name}")
+}
+
+/// The host of the registry `base` (for audit rows).
+pub(crate) fn net_host(base: &str) -> String {
+    crate::market::net::host_of(base)
+}
+
 impl PluginManager {
+    /// Whether package `id` came from the market whose registry is `registry`.
+    ///
+    /// # Errors
+    ///
+    /// The database failed.
+    pub(crate) async fn is_market_package(&self, id: &str, registry: &str) -> Result<bool> {
+        Ok(self.records().await?.iter().any(|r| {
+            r.id == id && r.source_kind == "npm" && r.location == market_location(registry, id)
+        }))
+    }
+
+    /// Installs the catalog's version of a market package again in place of `record`'s files:
+    /// the market's registry only, the install's checks, the old files back on any failure.
+    pub(super) async fn refetch_market(
+        &self,
+        record: &mut PackageRecord,
+        spec: &MarketSpec,
+    ) -> Result<Vec<String>> {
+        if record.id != spec.name || record.source_kind != "npm" {
+            return Err(failed(
+                ErrorKind::InvalidParams,
+                format!("{} is not a market package", record.id),
+            ));
+        }
+        let pi = self.storage.dirs().pi();
+        let staging = fetch::staging_prefix(&pi)?;
+        let problem = match self.npm_market(&staging, spec).await {
+            Ok(()) => check_staged(&staging, spec),
+            Err(error) => Some(error.to_string()),
+        };
+        if let Some(problem) = problem {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(failed(ErrorKind::InvalidParams, problem));
+        }
+        let notes = self.swap_npm(record, staging, &spec.name).await?;
+        record.location = market_location(&spec.registry, &spec.name);
+        Ok(notes)
+    }
+
     /// Installs `spec` (off) and declares it in `scope`.
     ///
     /// # Errors
@@ -114,13 +168,13 @@ impl PluginManager {
         let root = scope_workspace(scope, workspace)?;
         let request = PackageInstallRequest {
             kind: PackageSourceKind::Npm,
-            // Updates install the newest version of this name.
-            location: spec.name.clone(),
+            // Updates go through the market's checks again (`is_market_package`).
+            location: market_location(&spec.registry, &spec.name),
             scope,
             workspace: workspace.map(str::to_owned),
         };
         let fetched = self.fetch_market(&spec).await;
-        let host = crate::market::net::host_of(&spec.registry);
+        let host = net_host(&spec.registry);
         let origin = json!({ "origin": "market", "registry": host, "requested": spec.version });
         self.finish_install(&request, root, fetched, Some(origin))
             .await
@@ -286,5 +340,24 @@ mod tests {
             let _ = std::fs::remove_dir_all(dir);
         }
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A gate that cannot read what it checks refuses: a missing or unreadable manifest or
+    /// lock file is a refusal, never a pass.
+    #[test]
+    fn unreadable_files_are_refusals() {
+        let good = "https://registry.npmjs.org/dep/-/dep-1.0.0.tgz";
+        for (file, why) in [
+            ("package-lock.json", "lock file"),
+            ("node_modules/pi-x/package.json", "package.json"),
+        ] {
+            let (dir, spec) = staged(&lock("sha512-good", good), "1.0.0");
+            std::fs::write(dir.join(file), "{ not json").expect("break");
+            let problem = check_staged(&dir, &spec).expect("refused");
+            assert!(problem.contains(why), "{why}: {problem}");
+            std::fs::remove_file(dir.join(file)).expect("remove");
+            assert!(check_staged(&dir, &spec).is_some(), "{file} missing");
+            let _ = std::fs::remove_dir_all(dir);
+        }
     }
 }

@@ -192,6 +192,23 @@ async fn the_proxy_carries_every_request_and_its_failure_is_not_a_direct_connect
     .unwrap_err();
     assert_eq!(refused.code(), "proxy");
     assert!(!refused.retryable());
+    // A proxy nobody listens on is the proxy's failure too, not the network's: no retry, no
+    // direct connection.
+    let closed = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let unreachable = get(
+        &getter(),
+        &url,
+        64,
+        Some(&format!("http://127.0.0.1:{closed}")),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(unreachable.code(), "proxy", "{unreachable}");
+    assert!(!unreachable.retryable());
     assert_eq!(server.seen.lock().unwrap().len(), 1, "no direct request");
 }
 

@@ -337,7 +337,11 @@ async fn installs_are_checked_stay_off_and_refusals_leave_nothing() {
     let result = rig.install("pi-demo", "1.1.0").await.expect("installed");
     assert_eq!(result["package"]["id"], "pi-demo");
     assert_eq!(result["package"]["source"]["version"], "1.1.0");
-    assert_eq!(result["package"]["source"]["location"], "pi-demo");
+    // The location names the market's registry: updates go through the same checks.
+    assert_eq!(
+        result["package"]["source"]["location"],
+        format!("{}/pi-demo", rig.npm.base())
+    );
     assert_eq!(result["package"]["enabled"], false);
     let path = PathBuf::from(result["package"]["path"].as_str().expect("path"));
     assert!(path.join("ext.ts").is_file());
@@ -361,6 +365,23 @@ async fn installs_are_checked_stay_off_and_refusals_leave_nothing() {
         .map(|e| e.file_name().to_string_lossy().into_owned())
         .collect();
     assert_eq!(left.len(), 1, "only pi-demo's prefix: {left:?}");
+
+    // M-19: updating a market package (from the market or the installed list) installs the
+    // catalog's version from the same registry with the same checks.
+    let updated = rig
+        .call(|core, done| {
+            core.package_update("pi-demo".into(), None, done)
+                .expect("queued");
+        })
+        .await
+        .expect("updated through the market's checks");
+    assert_eq!(updated["package"]["source"]["version"], "1.1.0");
+    assert!(
+        updated["package"]["source"]["integrity"]
+            .as_str()
+            .is_some_and(|i| i.starts_with("sha512-")),
+        "{updated}"
+    );
     assert_eq!(rig.npm.violations(), Vec::<String>::new());
 }
 

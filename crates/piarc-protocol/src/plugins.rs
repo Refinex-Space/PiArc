@@ -55,6 +55,12 @@ pub struct PackageSource {
     /// npm's integrity value of the installed tarball.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub integrity: Option<String>,
+    /// The npm package name installed (npm sources; may differ from the id).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub npm_name: Option<String>,
+    /// Install scripts the package declares; PiArc never runs them (ADR-0102).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub install_scripts: Vec<String>,
 }
 
 /// Where a package is declared (and so where it applies).

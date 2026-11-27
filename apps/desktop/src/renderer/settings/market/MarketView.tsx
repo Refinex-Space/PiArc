@@ -217,8 +217,8 @@ export function MarketView({
   }, [load]);
 
   const run: MarketRun = useCallback(
-    (label, action) => {
-      const key = label;
+    (name, label, action) => {
+      const key = name;
       setBusy((b) => new Set(b).add(key));
       setNotice({ text: label, failed: false });
       action()
@@ -254,13 +254,12 @@ export function MarketView({
     }
   };
 
-  const anyBusy = busy.size > 0;
   if (open !== null) {
     return (
       <MarketDetail
         name={open}
         target={target}
-        busy={anyBusy}
+        busy={busy.has(open)}
         run={run}
         revision={revision}
         onBack={() => {
@@ -405,7 +404,7 @@ export function MarketView({
               key={entry.name}
               entry={entry}
               target={target}
-              busy={anyBusy}
+              busy={busy.has(entry.name)}
               run={run}
               onOpen={() => {
                 show(entry.name);

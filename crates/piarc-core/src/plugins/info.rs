@@ -117,6 +117,14 @@ impl PluginManager {
                 commit: record.commit.clone(),
                 version: record.version.clone(),
                 integrity: record.integrity.clone(),
+                npm_name: (record.source_kind == "npm")
+                    .then(|| self.npm_name_of(record))
+                    .flatten(),
+                install_scripts: if record.source_kind == "directory" {
+                    Vec::new()
+                } else {
+                    super::fetch::declared_scripts(std::path::Path::new(&record.path))
+                },
             },
             path: record.path.clone(),
             scope: declared.map(|(_, _, scope)| *scope),

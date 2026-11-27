@@ -147,12 +147,20 @@ export function installInput(raw: unknown): PackageInstallInput {
 /** The members of a listed package the confirmation shows. */
 export interface ListedPackage {
   readonly id: string;
+  /** `claudePlugin` or `piPackage`. */
+  readonly kind?: string;
+  /** Components PiArc does not support. */
+  readonly unsupported?: readonly string[];
   readonly source: {
     readonly kind: string;
     readonly location: string;
     readonly commit?: string;
     readonly version?: string;
     readonly integrity?: string;
+    /** The npm package name (npm sources). */
+    readonly npmName?: string;
+    /** Install scripts the package declares (never run). */
+    readonly installScripts?: readonly string[];
   };
   readonly components: Readonly<Record<string, readonly string[]>>;
   readonly executables: readonly {
@@ -186,14 +194,20 @@ export function listedPackage(list: string, id: string): ListedPackage | undefin
   const commit = text(source.commit);
   const version = text(source.version);
   const integrity = text(source.integrity);
+  const npmName = text(source.npmName);
+  const kind = text(raw.kind);
   return {
     id,
+    ...(kind === undefined ? {} : { kind }),
+    unsupported: strings(raw.unsupported),
     source: {
       kind: text(source.kind) ?? '',
       location: text(source.location) ?? '',
       ...(commit === undefined ? {} : { commit }),
       ...(version === undefined ? {} : { version }),
       ...(integrity === undefined ? {} : { integrity }),
+      ...(npmName === undefined ? {} : { npmName }),
+      installScripts: strings(source.installScripts),
     },
     components,
     executables,
@@ -202,16 +216,29 @@ export function listedPackage(list: string, id: string): ListedPackage | undefin
 
 const KINDS = ['hook', 'mcpServer', 'piExtension', 'agentHook', 'agentMcpServer'] as const;
 
+/** The registry host of a market package's location (`https://<host>/<name>`). */
+function registryHost(pkg: ListedPackage): string | undefined {
+  if (pkg.source.kind !== 'npm' || !pkg.source.location.startsWith('https://')) return undefined;
+  try {
+    return new URL(pkg.source.location).host;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * The text of a confirmation: the source (location; git commit; npm version and integrity),
- * each executable item of `items` by kind with the note that Pi extensions run in the Agent
- * Host, or, without executable items, the components.
+ * The text of a confirmation: what the package is (type; npm name and id, with a warning when
+ * they differ; registry host), its source (location; git commit; npm version and integrity),
+ * declared install scripts that never run, unsupported parts, the scope turned on, each
+ * executable item of `items` by kind with the note that Pi extensions run in the Agent Host, or,
+ * without executable items, the components (ADR-0102, M-18).
  */
 export function confirmationText(
   t: Translator,
   pkg: ListedPackage,
   items: readonly { readonly kind: string; readonly name: string }[],
   message: MessageId,
+  scope?: 'user' | 'project',
 ): ShownConfirmation {
   const sourceKind: MessageId =
     pkg.source.kind === 'git'
@@ -231,7 +258,38 @@ export function confirmationText(
       ? []
       : [t.t('plugins.integrity', { integrity: pkg.source.integrity })]),
   ].join('\n');
-  const sections: string[] = [source];
+  const about: string[] = [];
+  if (pkg.kind === 'claudePlugin' || pkg.kind === 'piPackage') {
+    about.push(
+      t.t(pkg.kind === 'piPackage' ? 'plugins.type.piPackage' : 'plugins.type.claudePlugin'),
+    );
+  }
+  const npmName = pkg.source.npmName;
+  if (npmName !== undefined) {
+    about.push(
+      npmName === pkg.id
+        ? t.t('plugins.confirm.npmName', { name: npmName })
+        : t.t('plugins.confirm.nameDiffers', { name: npmName, id: pkg.id }),
+    );
+  }
+  const host = registryHost(pkg);
+  if (host !== undefined) about.push(t.t('plugins.confirm.registry', { host }));
+  if (scope !== undefined) {
+    about.push(t.t(scope === 'project' ? 'plugins.scope.project' : 'plugins.scope.user'));
+  }
+  const notes: string[] = [];
+  const scripts = pkg.source.installScripts ?? [];
+  if (scripts.length > 0) {
+    notes.push(t.t('plugins.confirm.scripts', { list: scripts.join(', ') }));
+  }
+  if ((pkg.unsupported ?? []).length > 0) {
+    notes.push(t.t('plugins.unsupported', { list: (pkg.unsupported ?? []).join(', ') }));
+  }
+  const sections: string[] = [
+    ...(about.length === 0 ? [] : [about.join('\n')]),
+    source,
+    ...(notes.length === 0 ? [] : [notes.join('\n')]),
+  ];
   if (items.length === 0) {
     const parts = Object.entries(pkg.components)
       .filter(([, names]) => names.length > 0)
@@ -278,7 +336,7 @@ export function registerPackageHandlers(
     const pkg = listedPackage(await core.packagesList(root), name);
     if (pkg === undefined) throw new TypeError(`no package ${name} is installed`);
     const t = translator();
-    const text = confirmationText(t, pkg, pkg.executables, 'plugins.confirmEnable');
+    const text = confirmationText(t, pkg, pkg.executables, 'plugins.confirmEnable', target);
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!(await confirm.ask(window, text, [t.t('plugins.enable'), t.t('dialog.cancel')]))) {
       return CANCELLED;

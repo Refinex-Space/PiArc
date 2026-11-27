@@ -18,8 +18,9 @@ export interface MarketTarget {
   readonly trusted: boolean;
 }
 
-/** Runs one action; answers the text to show, or throws. */
-export type MarketRun = (label: string, run: () => Promise<string | null>) => void;
+/** Runs one action on package `name`; answers the text to show, or throws. Only that
+ * package's controls wait for it (Core runs npm operations one after another). */
+export type MarketRun = (name: string, label: string, run: () => Promise<string | null>) => void;
 
 export function MarketAction({
   entry,
@@ -30,7 +31,7 @@ export function MarketAction({
 }: {
   readonly entry: MarketEntry;
   readonly target: MarketTarget;
-  /** Another operation of this entry runs. */
+  /** Another operation on this package runs. */
   readonly busy: boolean;
   readonly run: MarketRun;
   readonly size?: 'small' | 'regular';
@@ -40,7 +41,7 @@ export function MarketAction({
   const action = actionOf(entry, target.workspace);
   const name = entry.name;
   const install = (scope: 'user' | 'project') => {
-    run(t('market.installing', { name }), async () => {
+    run(name, t('market.installing', { name }), async () => {
       await window.piarc.marketInstall({
         name,
         version: entry.version,
@@ -51,7 +52,7 @@ export function MarketAction({
     });
   };
   const enable = (id: string, scope: 'user' | 'project') => {
-    run(t('market.enabling', { name }), async () => {
+    run(name, t('market.enabling', { name }), async () => {
       const answer = await window.piarc.setPackageEnabled(
         id,
         true,
@@ -78,7 +79,7 @@ export function MarketAction({
           data-action="update"
           onClick={(e) => {
             e.stopPropagation();
-            run(t('market.updating', { name }), async () => {
+            run(name, t('market.updating', { name }), async () => {
               await window.piarc.updatePackage(action.id, target.workspace);
               return t('market.updated', { name, version: action.version });
             });

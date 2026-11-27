@@ -40,6 +40,9 @@ pub enum DownloadError {
     /// The proxy refused (`407` needs credentials PiArc does not keep).
     #[error("the proxy refused the connection (HTTP {0})")]
     Proxy(u16),
+    /// The proxy could not be reached (never a reason to connect directly).
+    #[error("cannot reach the proxy: {0}")]
+    ProxyUnreachable(String),
     /// Certificate or TLS failure.
     #[error("TLS failed: {0}")]
     Tls(String),
@@ -73,7 +76,7 @@ impl DownloadError {
         match self {
             Self::Refused(_) | Self::Blocked => "refused",
             Self::Network(_) | Self::Status(_) | Self::Truncated | Self::Redirects => "network",
-            Self::Proxy(_) => "proxy",
+            Self::Proxy(_) | Self::ProxyUnreachable(_) => "proxy",
             Self::Tls(_) => "tls",
             Self::TooLarge | Self::Checksum => "checksum",
             // "No space left on device" (Unix), "There is not enough space on the disk" (Windows).

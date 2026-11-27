@@ -334,3 +334,17 @@ async fn packages_installed_in_the_shared_prefix_uninstall_by_their_npm_name() {
         .expect("uninstall");
     assert!(!path.exists());
 }
+
+/// An install that cannot be declared (the user settings cannot be written) leaves nothing:
+/// no record, no npm files.
+#[tokio::test]
+async fn an_install_that_cannot_be_declared_is_taken_back() {
+    let f = Fixture::new();
+    let tarball = f.pi_tarball("undeclared", "pi-undeclared", "1.0.0");
+    // A directory where the user settings file goes: writing it fails.
+    std::fs::create_dir_all(f.root.join("data").join("settings.json")).expect("block");
+    assert!(f.install_npm(&tarball).await.is_err());
+    assert_eq!(f.npm_entries("pi-undeclared"), Vec::<PathBuf>::new());
+    let list = f.manager.list(None).await.expect("list");
+    assert!(list.packages.is_empty(), "{:?}", list.packages);
+}

@@ -69,7 +69,7 @@ impl Hub {
 
     /// Updates package `id`; new executable items wait for confirmation.
     pub async fn package_update(&self, id: String, workspace: Option<PathBuf>) -> Result<Value> {
-        let result = self.plugins().update(&id, workspace.as_deref()).await?;
+        let result = self.update_package(&id, workspace.as_deref()).await?;
         self.packages_changed().await;
         encode(&result)
     }

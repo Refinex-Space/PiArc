@@ -291,6 +291,39 @@ impl PluginManager {
             .await
     }
 
+    async fn declare_and_describe(
+        &self,
+        request: &PackageInstallRequest,
+        workspace: &Option<PathBuf>,
+        record: &PackageRecord,
+    ) -> Result<piarc_protocol::plugins::PackageInfo> {
+        self.declare(&record.id, request.scope, workspace.as_deref(), Some(false))
+            .await?;
+        self.info(record, workspace.as_deref()).await
+    }
+
+    /// Takes back a registered install that could not be finished: its declaration, record and
+    /// fetched files (a directory source stays where it is).
+    async fn undo_install(
+        &self,
+        record: &PackageRecord,
+        scope: PackageScope,
+        workspace: Option<&Path>,
+    ) {
+        let _ = self.declare(&record.id, scope, workspace, None).await;
+        match record.source_kind.as_str() {
+            "npm" => {
+                let _ = self.remove_npm(record).await;
+            }
+            "git" => {
+                let _ = std::fs::remove_dir_all(&record.path);
+            }
+            _ => {}
+        }
+        let key = record.id.clone();
+        let _ = self.storage.run(move |s| s.remove_package(&key)).await;
+    }
+
     /// Registers what was fetched, declares it off in the scope and writes the audit row
     /// (`origin` added to it).
     async fn finish_install(
@@ -304,9 +337,25 @@ impl PluginManager {
             Ok(fetched) => self.register(request, fetched).await,
             Err(error) => Err(error),
         };
+        // Declared off, then described: either failing undoes the whole install.
+        let outcome = match outcome {
+            Ok((record, notes)) => match self
+                .declare_and_describe(request, &workspace, &record)
+                .await
+            {
+                Ok(package) => Ok((record, notes, package)),
+                Err(error) => {
+                    self.undo_install(&record, request.scope, workspace.as_deref())
+                        .await;
+                    Err(error)
+                }
+            },
+            Err(error) => Err(error),
+        };
         let detail = |result: &str| {
             let mut detail = json!({
                 "action": "install",
+                "origin": "manual",
                 "source": source_name(request.kind),
                 "location": request.location,
                 "scope": request.scope,
@@ -318,16 +367,13 @@ impl PluginManager {
             detail
         };
         match outcome {
-            Ok((record, notes)) => {
-                self.declare(&record.id, request.scope, workspace.as_deref(), Some(false))
-                    .await?;
+            Ok((record, notes, package)) => {
                 let mut detail = detail("installed");
                 detail["id"] = json!(record.id);
                 detail["version"] = json!(record.version);
                 detail["commit"] = json!(record.commit);
                 detail["integrity"] = json!(record.integrity);
                 self.audit(workspace.as_deref(), detail).await;
-                let package = self.info(&record, workspace.as_deref()).await?;
                 Ok(PackageInstallResult {
                     package,
                     previous_commit: None,
@@ -756,12 +802,36 @@ impl PluginManager {
     ///
     /// No such package, or fetching failed (the previous version stays).
     pub async fn update(&self, id: &str, workspace: Option<&Path>) -> Result<PackageInstallResult> {
+        self.update_with(id, workspace, None).await
+    }
+
+    /// [`Self::update`]; with `market`, a market package is installed again from the market's
+    /// registry at the catalog's version, with the install's checks (ADR-0102).
+    pub(crate) async fn update_with(
+        &self,
+        id: &str,
+        workspace: Option<&Path>,
+        market: Option<market::MarketSpec>,
+    ) -> Result<PackageInstallResult> {
         let _npm = self.npm_lock.lock().await;
         let mut record = self.record(id).await?;
         let previous_commit = record.commit.clone();
         let previous_version = record.version.clone();
-        let result = self.refetch(&mut record).await;
-        let detail = |result: String| json!({ "action": "update", "id": id, "from": previous_commit, "result": result });
+        let origin = market.as_ref().map(
+            |spec| json!({ "origin": "market", "registry": market::net_host(&spec.registry) }),
+        );
+        let result = match &market {
+            Some(spec) => self.refetch_market(&mut record, spec).await,
+            None => self.refetch(&mut record).await,
+        };
+        let detail = |result: String| {
+            let mut detail = json!({ "action": "update", "id": id, "from": previous_commit,
+                "fromVersion": previous_version, "result": result });
+            if let (Some(Value::Object(extra)), Value::Object(map)) = (&origin, &mut detail) {
+                map.extend(extra.clone());
+            }
+            detail
+        };
         match result {
             Ok(notes) => {
                 record.updated_at = now_ms();
@@ -769,6 +839,7 @@ impl PluginManager {
                 let mut detail = detail("updated".into());
                 detail["to"] = json!(record.commit);
                 detail["version"] = json!(record.version);
+                detail["integrity"] = json!(record.integrity);
                 self.audit(workspace, detail).await;
                 Ok(PackageInstallResult {
                     package: self.info(&record, workspace).await?,
@@ -778,8 +849,12 @@ impl PluginManager {
                 })
             }
             Err(error) => {
-                self.audit(workspace, detail(format!("failed: {error}")))
-                    .await;
+                let reason = crate::market::npm::clean(&error.to_string(), 2048, false);
+                self.audit(
+                    workspace,
+                    detail(format!("failed: {}", redact_urls(&reason))),
+                )
+                .await;
                 Err(error)
             }
         }
@@ -837,7 +912,12 @@ impl PluginManager {
                     let prefix = fetch::prefix_of(&self.storage.dirs().pi(), &path);
                     removed.push(prefix.unwrap_or(path).display().to_string());
                 }
-                Err(e) => result = format!("uninstalled; npm could not remove it: {e}"),
+                Err(e) => {
+                    result = format!(
+                        "uninstalled; npm could not remove it: {}",
+                        redact_urls(&crate::market::npm::clean(&e.to_string(), 2048, false))
+                    );
+                }
             },
             _ => {}
         }
@@ -866,7 +946,6 @@ impl PluginManager {
     /// An npm package's newest version for its spec, installed beside the current one and
     /// swapped in once it reads as the same package; the old files go only after that.
     async fn refetch_npm(&self, record: &mut PackageRecord) -> Result<Vec<String>> {
-        let pi = self.storage.dirs().pi();
         let name = self.npm_name_of(record).ok_or_else(|| {
             failed(
                 ErrorKind::NotFound,
@@ -881,6 +960,19 @@ impl PluginManager {
                 format!("{:?} now installs {installed}, not {name}", record.location),
             ));
         }
+        self.swap_npm(record, staging, &name).await
+    }
+
+    /// Puts the staged install `staging` of npm package `name` in place of `record`'s files,
+    /// keeping the old ones until the new version reads as the same package.
+    pub(crate) async fn swap_npm(
+        &self,
+        record: &mut PackageRecord,
+        staging: PathBuf,
+        name: &str,
+    ) -> Result<Vec<String>> {
+        let pi = self.storage.dirs().pi();
+        let name = name.to_owned();
         let old_path = PathBuf::from(&record.path);
         let prefix = fetch::pkgs_root(&pi)?.join(fetch::prefix_key(&name));
         let aside = prefix.with_file_name(format!(".previous-{}", fetch::prefix_key(&name)));

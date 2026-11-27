@@ -151,8 +151,8 @@ impl Connector {
         let tcp =
             tokio::time::timeout(STALL, TcpStream::connect((proxy_host.as_str(), proxy_port)))
                 .await
-                .map_err(|_| DownloadError::Network("proxy timed out".into()))?
-                .map_err(|e| DownloadError::Network(e.to_string()))?;
+                .map_err(|_| DownloadError::ProxyUnreachable("timed out".into()))?
+                .map_err(|e| DownloadError::ProxyUnreachable(e.to_string()))?;
         let mut stream = if proxy.scheme() == "https" {
             let name = rustls::pki_types::ServerName::try_from(proxy_host.clone())
                 .map_err(|_| DownloadError::Refused("proxy"))?;

@@ -14130,6 +14130,13 @@
           "description": "The git commit checked out.",
           "type": ["string", "null"]
         },
+        "installScripts": {
+          "description": "Install scripts the package declares; PiArc never runs them (ADR-0102).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "integrity": {
           "description": "npm's integrity value of the installed tarball.",
           "type": ["string", "null"]
@@ -14141,6 +14148,10 @@
         "location": {
           "description": "The directory, git URL or npm spec as given.",
           "type": "string"
+        },
+        "npmName": {
+          "description": "The npm package name installed (npm sources; may differ from the id).",
+          "type": ["string", "null"]
         },
         "version": {
           "description": "The package version (`plugin.json` or `package.json`; npm's resolved version).",

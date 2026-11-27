@@ -112,7 +112,7 @@ impl Hub {
             });
         }
         market.started_install(&request.name).await;
-        let result = self.install_from_market(&request).await;
+        let result = self.install_is_market_package(&request).await;
         let problem = result.as_ref().err().map(|e| MarketProblem {
             code: serde_json::to_value(e.kind())
                 .ok()
@@ -126,7 +126,7 @@ impl Hub {
         encode(&result)
     }
 
-    async fn install_from_market(
+    async fn install_is_market_package(
         &self,
         request: &MarketInstallRequest,
     ) -> Result<piarc_protocol::plugins::PackageInstallResult> {
@@ -146,20 +146,29 @@ impl Hub {
                 ));
             }
         }
+        let spec = self.checked_spec(&request.name, &request.version).await?;
+        self.plugins()
+            .install_market(spec, request.scope, request.workspace.as_deref())
+            .await
+    }
+
+    /// The catalog's `name@version` as an install may fetch it: listed in the catalog at that
+    /// version, a sha512 integrity, every dependency from the registry, not themes only.
+    async fn checked_spec(&self, name: &str, version: &str) -> Result<MarketSpec> {
         let market = &self.ctx.market;
         let row = market
-            .row(&request.name)
+            .row(name)
             .await?
-            .ok_or_else(|| refused(format!("the market has no package {}", request.name)))?;
-        if row.listing.version != request.version {
+            .ok_or_else(|| refused(format!("the market has no package {}", name)))?;
+        if row.listing.version != version {
             return Err(refused(format!(
                 "the market lists {}@{}, not {}",
-                request.name, row.listing.version, request.version
+                name, row.listing.version, version
             )));
         }
         let proxy = self.proxy_now();
         let info = market
-            .version(&request.name, &request.version, proxy.as_deref())
+            .version(name, version, proxy.as_deref())
             .await
             .map_err(|p| Error::Feature {
                 kind: ErrorKind::IoError,
@@ -182,9 +191,9 @@ impl Hub {
                 "the package only brings themes, which PiArc does not use",
             ));
         }
-        let spec = MarketSpec {
-            name: request.name.clone(),
-            version: request.version.clone(),
+        Ok(MarketSpec {
+            name: name.to_owned(),
+            version: version.to_owned(),
             integrity,
             registry: market.registry_base().to_owned(),
             ca_file: market
@@ -192,9 +201,26 @@ impl Hub {
                 .test_net
                 .as_ref()
                 .and_then(|t| t.ca_file.clone()),
-        };
-        self.plugins()
-            .install_market(spec, request.scope, request.workspace.as_deref())
-            .await
+        })
+    }
+
+    /// Updates package `id`: a market package installs the catalog's current version again
+    /// through the install's checks (ADR-0102, M-19); others update as T40 does.
+    pub(super) async fn update_package(
+        &self,
+        id: &str,
+        workspace: Option<&std::path::Path>,
+    ) -> Result<piarc_protocol::plugins::PackageInstallResult> {
+        let plugins = self.plugins();
+        let market = &self.ctx.market;
+        if !plugins.is_market_package(id, market.registry_base()).await? {
+            return plugins.update(id, workspace).await;
+        }
+        let row = market
+            .row(id)
+            .await?
+            .ok_or_else(|| refused(format!("the market no longer lists {id}")))?;
+        let spec = self.checked_spec(id, &row.listing.version).await?;
+        plugins.update_with(id, workspace, Some(spec)).await
     }
 }

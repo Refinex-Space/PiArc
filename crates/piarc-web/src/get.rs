@@ -35,9 +35,12 @@ pub enum GetError {
     /// Name resolution, connection or reading failed.
     #[error("network error: {0}")]
     Network(String),
-    /// The proxy refused or could not be reached (`0`: no answer).
+    /// The proxy refused the tunnel.
     #[error("the proxy refused the connection (HTTP {0})")]
     Proxy(u16),
+    /// The proxy could not be reached.
+    #[error("cannot reach the proxy: {0}")]
+    ProxyUnreachable(String),
     /// Certificate or TLS failure.
     #[error("TLS failed: {0}")]
     Tls(String),
@@ -72,7 +75,7 @@ impl GetError {
         match self {
             Self::Refused(_) | Self::Blocked => "refused",
             Self::Network(_) | Self::Redirects | Self::Encoding(_) => "network",
-            Self::Proxy(_) => "proxy",
+            Self::Proxy(_) | Self::ProxyUnreachable(_) => "proxy",
             Self::Tls(_) => "tls",
             Self::Status { status: 404, .. } => "notFound",
             Self::Status { .. } => "status",
@@ -109,6 +112,7 @@ impl From<DownloadError> for GetError {
             DownloadError::Refused(what) => Self::Refused(what),
             DownloadError::Blocked => Self::Blocked,
             DownloadError::Proxy(status) => Self::Proxy(status),
+            DownloadError::ProxyUnreachable(why) => Self::ProxyUnreachable(why),
             DownloadError::Tls(message) => Self::Tls(message),
             DownloadError::Redirects => Self::Redirects,
             DownloadError::Cancelled => Self::Cancelled,

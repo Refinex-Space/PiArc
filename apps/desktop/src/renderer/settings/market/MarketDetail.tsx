@@ -174,7 +174,7 @@ export function MarketDetail({
                   onSure={setSure}
                   onUninstall={() => {
                     const id = entry.installed?.id ?? '';
-                    run(t('market.uninstalling', { name }), async () => {
+                    run(name, t('market.uninstalling', { name }), async () => {
                       await window.piarc.uninstallPackage(id, target.workspace);
                       return t('market.uninstalled', { name });
                     });
@@ -222,11 +222,9 @@ export function MarketDetail({
             <SettingsRow label={t('market.detail.downloads')}>
               <span className="market-fact">{format.number(entry.downloadsMonthly)}</span>
             </SettingsRow>
-            {detail?.license != null && (
-              <SettingsRow label={t('market.detail.license')}>
-                <span className="market-fact">{detail.license}</span>
-              </SettingsRow>
-            )}
+            <SettingsRow label={t('market.detail.license')}>
+              <span className="market-fact">{detail?.license ?? '—'}</span>
+            </SettingsRow>
             <SettingsRow label={t('market.detail.dependencies')}>
               <span
                 className="market-fact"

@@ -11151,6 +11151,10 @@ export interface PackageSource {
    */
   commit?: string | null;
   /**
+   * Install scripts the package declares; PiArc never runs them (ADR-0102).
+   */
+  installScripts?: string[];
+  /**
    * npm's integrity value of the installed tarball.
    */
   integrity?: string | null;
@@ -11162,6 +11166,10 @@ export interface PackageSource {
    * The directory, git URL or npm spec as given.
    */
   location: string;
+  /**
+   * The npm package name installed (npm sources; may differ from the id).
+   */
+  npmName?: string | null;
   /**
    * The package version (`plugin.json` or `package.json`; npm's resolved version).
    */

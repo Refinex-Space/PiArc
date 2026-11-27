@@ -57,6 +57,57 @@ describe('extension package IPC', () => {
     expect(listedPackage(list, 'other')).toBeUndefined();
   });
 
+  it('names the npm package, its type, registry, scripts, unsupported parts and scope (M-18)', () => {
+    const market = JSON.stringify({
+      packages: [
+        {
+          id: 'pi-tools',
+          kind: 'piPackage',
+          unsupported: ['themes'],
+          source: {
+            kind: 'npm',
+            location: 'https://registry.npmjs.org/pi-tools',
+            version: '1.2.0',
+            integrity: 'sha512-abc',
+            npmName: 'pi-tools',
+            installScripts: ['postinstall'],
+          },
+          components: {},
+          executables: [{ kind: 'piExtension', name: 'index.ts', confirmed: false }],
+        },
+        {
+          id: 'other-id',
+          kind: 'claudePlugin',
+          source: { kind: 'npm', location: 'some-npm', npmName: 'some-npm' },
+          components: {},
+          executables: [],
+        },
+      ],
+    });
+    const t = new Translator('en');
+    const pkg = listedPackage(market, 'pi-tools');
+    if (pkg === undefined) throw new Error('listed');
+    const { detail } = confirmationText(t, pkg, pkg.executables, 'plugins.confirmEnable', 'user');
+    for (const line of [
+      'Pi package',
+      'npm package pi-tools',
+      'Registry registry.npmjs.org',
+      'Version 1.2.0',
+      'Integrity sha512-abc',
+      'Declares install scripts (postinstall); PiArc never runs them',
+      'Not supported: themes',
+      'Every workspace',
+      '• index.ts',
+    ]) {
+      expect(detail).toContain(line);
+    }
+    const other = listedPackage(market, 'other-id');
+    if (other === undefined) throw new Error('listed');
+    expect(confirmationText(t, other, [], 'plugins.confirmEnable', 'project').detail).toContain(
+      'Warning: the npm package some-npm names itself other-id',
+    );
+  });
+
   it('answers planned confirmations and records them', async () => {
     const confirm = new NativeConfirm();
     confirm.answerNext(false);
