@@ -157,6 +157,15 @@ threats:
         tests:
           - vitest:agent-host/src/runtime/pi-settings.test.ts::THR-03 hides every package source from Pi, so nothing installs, runs or loads
           - cap:CAP-SEC-PI-PACKAGES-001
+      - arch: 市场安装只连目录的 registry，装完核对名称、版本、完整性值与锁文件来源，不符即删除（ADR-0102）
+        measure: 页面只能给包名、精确版本与作用域；npm 只连固定 registry、不读用户 .npmrc、不运行安装脚本；装完的包与目录不符、依赖来自别处或只含主题时删除并拒绝；安装默认关闭，开启仍经原生确认；代理连不上不改直连
+        type: automated
+        tests:
+          - rust:crates/piarc-core/src/plugins/market.rs::the_staged_install_must_be_what_the_catalog_described
+          - rust:crates/piarc-testkit/tests/market.rs::installs_are_checked_stay_off_and_refusals_leave_nothing
+          - rust:crates/piarc-testkit/tests/market.rs::the_users_proxy_carries_everything_and_its_refusal_is_not_a_direct_connection
+          - vitest:apps/desktop/src/main/core/market-ipc.test.ts::builds install requests from a name, a version and a scope, never a location
+          - l4:apps/desktop/e2e/market-install.e2e.ts::installs off, turns on through the native confirmation and uninstalls in two steps
 
   - id: THR-04
     title: 凭据泄露
@@ -395,6 +404,11 @@ threats:
           - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::turns every XSS payload into text or a link without a dangerous target
           - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::drops every other target, including encoded ones
           - vitest:apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts::keeps raw HTML as html nodes, verbatim
+      - measure: Pi 包市场的包名、描述与 README 来自第三方：名称与描述只作文本、双向控制字符显示为码位，README 只经 MarkdownView（原始 HTML 当文本），链接经 openExternal 的原生确认（ADR-0102）
+        type: automated
+        tests:
+          - vitest:apps/desktop/src/renderer/settings/market/MarketDetail.test.tsx::shows a package, its warnings and its README as Markdown with raw HTML as text
+          - l4:apps/desktop/e2e/market-browse.e2e.ts::browses categories, searches, opens details and comes back to the same list
       - arch: preload 白名单 + 主进程校验来源
         measure: window.piarc 只有白名单函数，主进程按 senderFrame 的 origin 拒绝外来请求
         type: automated

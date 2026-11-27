@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.78（2026-11-27） |
+| 版本 | 2.79（2026-11-27） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -1475,6 +1475,8 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 - 首次在某个工作区创建 `.piarc/` 时，提示把 `settings.local.json` 与 `worktrees/` 加入该仓库的 `.gitignore`。
 - T13 落地（ADR-0025）：主进程在 `ready` 与单实例锁之前设置 `userData`（数据目录）与 `sessionData`（缓存目录下的 `Chromium/`，Chromium 的缓存与 `localStorage`），路径由 `apps/desktop/src/main/platform/data-dirs.ts` 的纯函数计算；`--user-data-dir=<dir>` 时两者都在 `<dir>` 下（缓存为 `<dir>/Cache`）。Core 收到目录后建上面的子目录、打开 `core.sqlite`，日志按 UTC 天写成 `logs/core-<日期>.log` 与 `logs/agent-host-<日期>.log`，启动时与每次换天时删除 7 天前的文件。
 
+ADR-0102（Pi 包市场，[设计增补](addenda/pi-package-market.md)）："Skills 与插件"页分"已安装"与"市场"两个视图。市场的目录只来自 npm registry（`keywords:pi-package` 的搜索结果，按版本读 `/latest` 的 `pi` 清单补全类型），缓存在 `core.sqlite`，分类为全部、扩展、Skills、提示模板（只含主题的包不列出）。安装沿用 T40 的包管理，只接受目录里的包名与精确版本，npm 只连同一 registry、不读用户 `.npmrc`，装完核对名称、版本、完整性值与锁文件来源；安装即关闭，开启仍经原生确认。T40 表中"安装位置"的 npm 部分改为每包一个前缀 `<数据目录>/pi/npm/pkgs/<键>/`（旧的共用前缀里的包按 npm 包名卸载，更新时迁走），所有 npm 操作串行。卸载在已安装行与市场详情里直接可见（页内两步确认），审计行写明删除的路径与清掉的声明；权限页的审计有"包"类别。
+
 ### 9.2 SQLite 模型（概要）
 
 | 表 | 内容 |
@@ -1485,6 +1487,7 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 | `session_fts` | FTS5：用户消息与助手正文（从 JSONL 增量同步）。T35（schema v8）：外部内容表 `session_text`（会话、entry id、角色、时间、正文，每条至多 20,000 字符）+ `session_fts`（trigram 分词），触发器同步；与会话行同一事务写入，整文件重扫先删该会话的行，重建索引时清空重读 |
 | `checkpoints` | schema v5（T28）：会话、PiArc 回合 id、创建时间；`checkpoint_files` 为每次写入的路径、前后内容 SHA-256（空为不存在）、操作类型与恢复批次；`checkpoint_sessions` 为会话最近访问时间 |
 | `audit_events` | 权限裁决、审批结果、hooks 执行结果、沙箱拒绝（T39：`kind: "sandbox"`，被拒的路径或主机与网络卡的答复） |
+| `market_packages`、`market_sync` | schema v16（ADR-0102）：Pi 包市场的目录缓存（npm 的搜索字段、清单读出的类型与版本、索引代次）与同步状态（代次、页数、最近成功与失败的时间、最近的错误）；可以随时丢弃重取 |
 | `background_tasks` | 后台命令、子 agent 与 Monitor 的元数据与输出文件路径（schema v7 重建：主会话、工作区、标题、cwd、输出字节数，其余在 `metadata` JSON；`kind` 不设 CHECK，T33 加终端类型） |
 | `schema_migrations` | 迁移记录 |
 | `project_trust` | 主 checkout 的规范路径（键）、决定（信任 / 拒绝）、决定时间、当时可执行项的快照（T13） |
@@ -1537,7 +1540,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 |---|---|---|
 | 提示注入导致破坏性操作 | 仓库文件、网页、MCP 返回内容诱导 agent 执行 `rm -rf`、泄露密钥 | 默认询问；deny 规则；Bash 子命令分析；关键路径删除总是询问；沙箱；审批卡展示完整命令；WebFetch 的网页只作为辅助模型提问里的材料，提取结果是工具结果，不进 system prompt，网页内容不影响权限裁决（T29） |
 | 恶意项目配置 | 克隆的仓库带 hooks、MCP、allow 规则、插件，打开即执行 | 项目信任闸门（10.2）：信任前不执行任何项目级可执行配置 |
-| 恶意插件 / MCP server / Pi 包 | 安装后获得进程权限 | 安装前展示来源与能力；启用需确认；Agent Host 的 Seatbelt 配置限制进程级写入范围；Pi 自己设置里的包清单不由 Agent Host 安装或加载（T45） |
+| 恶意插件 / MCP server / Pi 包 | 安装后获得进程权限 | 安装前展示来源与能力；启用需确认；Agent Host 的 Seatbelt 配置限制进程级写入范围；Pi 自己设置里的包清单不由 Agent Host 安装或加载（T45）；市场安装只连目录的 registry，装完核对名称、版本、完整性值与锁文件来源，不符即删除（ADR-0102） |
 | 凭据泄露 | 明文文件、环境变量继承、日志 | 加密保险箱，主密钥只在系统凭据库；不经环境变量传递；日志与诊断包自动脱敏 |
 | 沙箱逃逸 | 命令通过未代理的网络通道外传 | 沙箱默认无直连网络；沙箱外重试必须审批 |
 | 审批疲劳与误点 | 连续弹窗导致误允许 | 400 ms 防误触；长参数阅读闸门；"总是允许"规则可预览、可编辑、可撤销；审计可查 |
@@ -1618,7 +1621,7 @@ macOS 通过 Electron 的原生缓冲区回调交付 `app:` 资源，Windows 继
 
 - 遥测默认关闭；开启后只上报匿名的性能与崩溃指标，不含会话内容、文件路径、命令文本。
 - 诊断包由用户手动导出，导出前展示内容清单并脱敏。
-- T45 落地（ADR-0062）：PiArc 还没有遥测代码（没有上报，也没有开关）；Pi 的版本检查与安装遥测由 Core 固定关闭。会话之外的全部外连逐项列在[外连与遥测](../security/egress.md)，一次完整 mock 会话里 Agent Host 只连模型服务商、Electron 没有外连（`crates/piarc-testkit/tests/egress.rs`、`apps/desktop/e2e/t45-egress.e2e.ts`）。日志写入时由 `piarc-telemetry::redact` 替换保险箱里的凭据值与常见密钥格式（Agent Host 的 stderr 同样）。诊断包在配置诊断页准备：Core 在内存里组装日志、版本、用户级设置与配置诊断（设置里密钥名的键、`env` 与 `headers` 的值也替换，主目录写作 `~`），页面列出文件、替换计数与永不包含的内容（保险箱、数据库、会话内容、检查点），用户在主进程的原生保存对话框里选位置后才写出 ZIP。第 10.1 节每条威胁的对策与测试见 `tests/security/threats.yaml`，生成的覆盖表在 [`docs/security/threat-coverage.md`](../security/threat-coverage.md)；Electron 官方清单的逐条复核在 [`docs/security/electron-checklist.md`](../security/electron-checklist.md)。
+- T45 落地（ADR-0062）：PiArc 还没有遥测代码（没有上报，也没有开关）；Pi 的版本检查与安装遥测由 Core 固定关闭。会话之外的全部外连逐项列在[外连与遥测](../security/egress.md)（ADR-0102 起含 Pi 包市场对 `registry.npmjs.org` 的读取与安装，只在用户打开市场或安装时发生），一次完整 mock 会话里 Agent Host 只连模型服务商、Electron 没有外连（`crates/piarc-testkit/tests/egress.rs`、`apps/desktop/e2e/t45-egress.e2e.ts`）。日志写入时由 `piarc-telemetry::redact` 替换保险箱里的凭据值与常见密钥格式（Agent Host 的 stderr 同样）。诊断包在配置诊断页准备：Core 在内存里组装日志、版本、用户级设置与配置诊断（设置里密钥名的键、`env` 与 `headers` 的值也替换，主目录写作 `~`），页面列出文件、替换计数与永不包含的内容（保险箱、数据库、会话内容、检查点），用户在主进程的原生保存对话框里选位置后才写出 ZIP。第 10.1 节每条威胁的对策与测试见 `tests/security/threats.yaml`，生成的覆盖表在 [`docs/security/threat-coverage.md`](../security/threat-coverage.md)；Electron 官方清单的逐条复核在 [`docs/security/electron-checklist.md`](../security/electron-checklist.md)。
 
 ---
 
@@ -1933,6 +1936,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.72 | 2026-11-26 | 第 5.4 节：同一服务商多个账号、连接测试、服务商启停与端点模型列表；保险箱新增只给 Core 的 `account/` 键（ADR-0083）。 |
 | 2.73 | 2026-11-25 | Git 工具（ADR-0084、ADR-0085、ADR-0086）：第 4 章新增三条 ADR，ADR-0044 第 8 条被 ADR-0084 取代；6.9 节说明 Changes 面板成为 Git 工具的"本会话"范围；7.6 节 `gitRequest`、`cancelGit` 与事件 `core/git`；7.7 节 Git diff 的来源、上限与按 hunk 暂存；8.2 节 Git 工具、提交视图、分支弹窗与设置页；10.1 节新增威胁"恶意仓库的 Git 配置"（THR-15）。 |
 | 2.74 | 2026-11-26 | 内置浏览器（ADR-0088–0093，[设计增补](addenda/browser.md)）：第 4 章新增六条 ADR；5.4、8.5、10.3 写明浏览器 guest 不属于应用窗口；10.1 THR-13 第一条改为"应用窗口"；ADR-0013 增加浏览器平台集成、ADR-0021 增加浏览器分区 cookie 的例外。THR-16、THR-17 与第 7.1、8.1 节的模块表随实现落地补入。 |
+| 2.79 | 2026-11-27 | Pi 包市场与卸载（ADR-0102，[设计增补](addenda/pi-package-market.md)）：6.7 节写明市场视图、目录来源、安装核对与每包一个 npm 前缀；9.2 节新增 `market_packages`、`market_sync`（schema v16）；10.1 节 THR-03 新增市场安装的核对；10.5 节外连含市场。 |
 | 2.78 | 2026-11-27 | 第 8.2 节：设置改为工作台里的一个视图，按组导航，搜索结果在主区（ADR-0101）。 |
 | 2.77 | 2026-11-27 | 第 8.2 节：两层输入卡片与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏（ADR-0100）。 |
 | 2.76 | 2026-11-26 | 语音输入（ADR-0094–0097，[设计增补](addenda/voice-dictation.md)）：7.1 节新增 `piarc-speech` 与 `sherpa-onnx-sys`（目录 `piarc-sherpa-sys`）并列入依赖链与单向例外；8.2 节 composer 写明发送键左侧的语音输入；第 11 章安装包与安装后两行判定扣除内置语音资产，新增"内置语音资产"一行（安装后 ≤ 230 MB、安装包增量 ≤ 190 MB，ADR-0095）；10.1 节 THR-14 的 entitlements 写明主程序另有 `device.audio-input`，新增威胁"麦克风与听写内容"（THR-18）与"语音模型篡改"（THR-19），对策与测试见 `tests/security/threats.yaml`。 |

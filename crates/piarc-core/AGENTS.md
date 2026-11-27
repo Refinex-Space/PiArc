@@ -116,6 +116,8 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 同步（`market/sync.rs`）：打开市场时索引旧于 `stale_after` 才在后台按页同步（每页 250、至多 21 页，npm 搜索的 `from` 过 5000 即回到第一页），每页写库并发 `core/market` 的 `sync`；整轮成功才 `market_end_index`，失败保留旧数据；之后按版本读 `/latest` 补全类型（`classify_concurrency` 个并发，失败即停，下次再补）。搜索词非空时 `Market::query` 先实时查 npm，失败退回本地匹配并带 `problem`。
 - 安装：`Hub::market_install`（`sessions/market.rs`）先核对缓存版本、读该版本文档（要有 sha512 integrity、依赖都是 registry 版本、不是纯主题），再 `PluginManager::install_market`（`plugins/market.rs`：`name@version --save-exact`，`npm_config_registry` 固定、用户与全局 npmrc 换成两个空文件，测试的 CA 经 `NODE_EXTRA_CA_CERTS`；装完 `check_staged` 核对名称、版本、integrity 与锁文件每个条目来自该 registry，不符则删前缀）；id 必须等于 npm 包名、类型必须是 Pi 包；审计行带 `origin: market`。
 - 包管理（ADR-0102 起）：新的 npm 安装每包一个前缀 `<数据目录>/pi/npm/pkgs/<键>/`（先装到 `.staging-*` 再改名，`fetch::prefix_key` 带哈希防碰撞），所有 npm 操作持 `Ctx.npm_lock`，npm 带用户的代理变量；旧的共用前缀里的包按 npm 包名卸载，更新时迁到新前缀；注册失败删除前缀；不同 id 落到同一插件数据目录时拒绝。
+- 失败后的退避：同步失败后 `MarketLimits::failure_backoff`（2 分钟）内，读取与打开市场不再起同步，只有用户刷新（`force`）才起；否则页面每收到同步事件就重读、重读又起同步，离线时形成循环。
+- 源码树运行时 Agent Host 的 node 是裸名 `node`：npm 经 `plugins::fetch::locate_npm` 在命令环境的 `PATH` 里找同目录的 `npm-cli.js`（发布构建用内置 node）。卸载的审计行带 `removed`（删除的前缀、克隆与数据目录）与 `declarations`。
 - 测试：`cargo test -p piarc-core --lib market` 与 `--lib plugins`；端到端 `cargo test -p piarc-testkit --test market`（假 npm registry 与 CONNECT 代理，真实 npm）。开发构建的 `createForTests` 读 `PIARC_TEST_MARKET_REGISTRY`（没设时指向 `https://registry.invalid`）、`PIARC_TEST_MARKET_CA`、`PIARC_TEST_MARKET_HOSTS`。
 
 ## 用量与成本（`usage`，T41，ADR-0059）
