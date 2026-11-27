@@ -11,12 +11,14 @@ import { EXCLUDED, METRICS } from './metrics.mjs';
  */
 function coverage(rows) {
   const covers = (/** @type {string} */ row, /** @type {string} */ name) => row.startsWith(name);
+  // Metrics budgeted by a design addendum name no chapter 11 row; they cover none.
+  const named = METRICS.flatMap((m) => (m.row === null ? [] : [m.row]));
   return {
     unmeasured: rows.filter(
       (row) =>
-        !METRICS.some((m) => covers(row, m.row)) && !EXCLUDED.some((e) => covers(row, e.row)),
+        !named.some((name) => covers(row, name)) && !EXCLUDED.some((e) => covers(row, e.row)),
     ),
-    stale: [...METRICS.map((m) => m.row), ...EXCLUDED.map((e) => e.row)].filter(
+    stale: [...named, ...EXCLUDED.map((e) => e.row)].filter(
       (name) => !rows.some((row) => covers(row, name)),
     ),
   };
@@ -40,6 +42,13 @@ describe('chapter 11 coverage', () => {
       '',
     ].join('\n');
     expect(coverage(chapter11Rows(markdown)).unmeasured).toEqual(['新的指标']);
+  });
+
+  it('names the design addendum section of every budget outside chapter 11', () => {
+    for (const metric of METRICS) {
+      if (metric.row === null) expect(metric.source, metric.id).toMatch(/^[\w-]+\.md B\d/u);
+      else expect(metric.row, metric.id).not.toBe('');
+    }
   });
 
   it('has unique metric ids, each in at least one lane', () => {

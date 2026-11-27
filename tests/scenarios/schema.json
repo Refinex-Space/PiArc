@@ -232,6 +232,114 @@
         }
       }
     },
+    "browser": {
+      "description": "The built-in browser's fake desktop client (design addendum browser.md 5.2): Core attaches it before the workspace opens, so sessions get the Browser tool; each run event on core/browser gets the next script of runs.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "run": {
+                "description": "A field subset of the run event (toolCallId, timeoutMs, script, sessionId, mainSessionId).",
+                "type": "object"
+              },
+              "steps": {
+                "description": "In order; without an answer step the client never answers the run.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "maxProperties": 1,
+                  "properties": {
+                    "site": {
+                      "description": "browserSite: may a page of the run reach host? The decision must match.",
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["url", "host", "decision"],
+                      "properties": {
+                        "url": { "type": "string" },
+                        "host": { "type": "string" },
+                        "local": { "type": "boolean" },
+                        "sensitive": { "type": "boolean" },
+                        "pending": { "type": "array", "items": { "type": "string" } },
+                        "decision": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["allowed"],
+                          "properties": {
+                            "allowed": { "type": "boolean" },
+                            "scope": { "enum": ["run", "session"] }
+                          }
+                        }
+                      }
+                    },
+                    "stage": {
+                      "description": "browserFiles stage: staged lists the content of each copy (below the session's browser/uploads/), refused a text of Core's refusal.",
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["paths"],
+                      "oneOf": [{ "required": ["staged"] }, { "required": ["refused"] }],
+                      "properties": {
+                        "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+                        "staged": { "type": "array", "items": { "type": "string" } },
+                        "refused": { "type": "string" }
+                      }
+                    },
+                    "answer": {
+                      "description": "answerBrowserRun: output (repeat times, then output_end), images, error, blocked_hosts; delay_ms answers later; accepted false expects Core to have stopped waiting.",
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "output": { "type": "string" },
+                        "repeat": { "type": "integer", "minimum": 1 },
+                        "output_end": { "type": "string" },
+                        "images": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["media_type", "data", "width", "height"],
+                            "properties": {
+                              "media_type": { "type": "string" },
+                              "data": { "type": "string" },
+                              "width": { "type": "integer", "minimum": 1 },
+                              "height": { "type": "integer", "minimum": 1 }
+                            }
+                          }
+                        },
+                        "error": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["name", "message"],
+                          "properties": {
+                            "name": { "type": "string" },
+                            "message": { "type": "string" },
+                            "code": { "type": "string" }
+                          }
+                        },
+                        "blocked_hosts": { "type": "array", "items": { "type": "string" } },
+                        "delay_ms": { "type": "integer", "minimum": 1 },
+                        "accepted": { "type": "boolean" }
+                      }
+                    },
+                    "wait_cancel": {
+                      "description": "Waits for Core's cancel event of the run.",
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "cloud_providers": {
       "description": "Configure a cloud API key through the real settings path; model requests remain on loopback mocks.",
       "type": "array",
@@ -1527,6 +1635,11 @@
             "pausedTotal"
           ]
         },
+        "rules": {
+          "description": "Exactly the rules the card offers to save with Always allow; [] means the card has no Always allow (browser site cards for local or sensitive hosts).",
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "decision": {
           "description": "wait leaves the card unanswered: a question form whose timeout answers it (T26).",
           "enum": ["allow", "deny", "always", "session", "wait"]
@@ -1777,7 +1890,7 @@
           }
         },
         "audit": {
-          "description": "Audit rows Core recorded in the workspace (T47): each entry's kind (memory, hook, permission, sandbox, autoReview) and a field subset of the row's detail; every entry must match a row, count rows when given.",
+          "description": "Audit rows Core recorded in the workspace (T47): each entry's kind (memory, hook, permission, sandbox, autoReview, browser) and a field subset of the row's detail; every entry must match a row, count rows when given.",
           "type": "array",
           "items": {
             "type": "object",
@@ -1785,7 +1898,7 @@
             "required": ["kind", "detail"],
             "properties": {
               "kind": {
-                "enum": ["memory", "hook", "permission", "sandbox", "autoReview"]
+                "enum": ["memory", "hook", "permission", "sandbox", "autoReview", "browser"]
               },
               "detail": {
                 "type": "object"

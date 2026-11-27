@@ -137,6 +137,9 @@ export interface TranscriptActions {
   readonly prompt?: (text: string) => void;
   /** Opens the settings window's memory page, at `note` when given (T47). */
   readonly openMemory?: (note: string | undefined) => void;
+  /** Opens a link inside the app when it should (a local link in the preview, B5.5); answers
+   * whether it did, otherwise the link goes through `openExternal`. */
+  readonly openLink?: (href: string) => boolean;
 }
 
 /** One session's transcript as a view shows it. */

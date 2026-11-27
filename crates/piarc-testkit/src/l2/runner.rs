@@ -39,6 +39,7 @@ use env::{Env, pi_provider};
 
 mod approvals;
 mod asserts;
+mod browser;
 mod checkpoints;
 mod env;
 mod harness;
@@ -222,6 +223,7 @@ async fn run_in(
         terminals: BTreeMap::new(),
         mode,
         asks: Vec::new(),
+        browser: browser::BrowserClient::default(),
     };
     let mut failures = match driver.drive().await {
         Ok(()) => {
@@ -315,6 +317,8 @@ struct Driver<'a> {
     asks: Vec<Value>,
     /// Session id → the terminal `open_terminal` opened last (T34).
     terminals: BTreeMap<String, u32>,
+    /// The built-in browser's fake desktop client (`browser`).
+    browser: browser::BrowserClient,
 }
 
 impl Driver<'_> {
@@ -337,6 +341,7 @@ impl Driver<'_> {
             })
             .await?;
         }
+        self.browser_settled().await?;
         self.check_provider_settings().await?;
         self.check_config_diagnostics().await?;
         self.check_audit().await
@@ -899,6 +904,7 @@ impl Driver<'_> {
             loop {
                 let events = Arc::clone(self.events);
                 let notified = events.arrived.notified();
+                self.browser_tick()?;
                 self.answer_visible().await?;
                 if done(&self.observed()) {
                     return Ok(());

@@ -119,6 +119,57 @@ pub(crate) fn reports(inputs: &Inputs<'_>) -> Vec<FileReport> {
         out.extend(packages(list, inputs.settings.trust().is_trusted()));
     }
     out.extend(enterprise(inputs.managed));
+    out.extend(launch(inputs));
+    out
+}
+
+/// The launch files (ADR-0092): each configuration applies (with its command line), a
+/// `.claude` one hidden by a `.piarc` one of the same name is overridden, problems carry their
+/// place; nothing runs until the project is trusted.
+fn launch(inputs: &Inputs<'_>) -> Vec<FileReport> {
+    use piarc_config::launch::{self, LaunchSource};
+    let loaded = launch::load(inputs.root);
+    let trusted = inputs.settings.trust().is_trusted();
+    let mut out = Vec::new();
+    for source in [LaunchSource::Piarc, LaunchSource::Claude] {
+        let name = launch::file_of(source);
+        if !loaded.files.contains(&name) {
+            continue;
+        }
+        let file = inputs.root.join(name);
+        let mut r = report(SourceKind::Launch, "launch", file.clone(), Scope::Project);
+        r.writable = source == LaunchSource::Piarc;
+        for config in loaded.configs.iter().filter(|c| c.source == source) {
+            let pointer = format!("/configurations/{}", config.name);
+            let value = json!(config.display(inputs.root));
+            if trusted {
+                r.effective.push(item(pointer, value));
+            } else {
+                r.ignored
+                    .push(ignored(pointer, IgnoreReason::Untrusted, None));
+            }
+        }
+        for hidden in loaded.hidden.iter().filter(|c| c.source == source) {
+            r.overridden.push(overridden(
+                format!("/configurations/{}", hidden.name),
+                "launch",
+                &inputs.root.join(launch::PIARC_LAUNCH).display().to_string(),
+            ));
+        }
+        for found in loaded.issues.iter().filter(|i| i.file == name) {
+            let mut problem = issue(&file, found.message.clone(), found.at.map(|(l, _)| l));
+            problem.column = found
+                .at
+                .and_then(|(_, column)| usize::try_from(column).ok());
+            r.issues.push(problem);
+        }
+        if !trusted && !r.ignored.is_empty() {
+            r.status = FileStatus::Untrusted;
+        } else if !r.issues.is_empty() && r.effective.is_empty() {
+            r.status = FileStatus::Invalid;
+        }
+        out.push(r);
+    }
     out
 }
 

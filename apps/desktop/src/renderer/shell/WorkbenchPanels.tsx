@@ -13,12 +13,13 @@ import { IconButton } from '../app/IconButton.js';
 import { effectiveBindings } from '../../shared/keybindings.js';
 import { useApp, useT } from '../app/app-context.js';
 import { requestTerminalFocus } from '../terminal/panel-state.js';
+import { usePreviewDot } from '../browser/attention.js';
 import {
   ChangesIcon,
   GitBranchIcon,
   FolderIcon,
   MoreIcon,
-  PreviewIcon,
+  GlobeIcon,
   LayoutListIcon,
   SideChatIcon,
   TasksIcon,
@@ -229,12 +230,14 @@ export function SessionTools({ context }: { context: PanelContext }) {
   const menu = useMenu();
   const { railOpen, setRailOpen, openIds } = usePanelPresentation();
   const { preferences } = useApp();
+  // B4.4: a local service started, or a server failed, while the preview was not shown.
+  const previewDot = usePreviewDot(context.sessionId);
   if (!context.sessionId) return null;
   const bindings = effectiveBindings(preferences.keybindings);
   const controls = [
     ['terminal', 'panel.terminal', <TerminalIcon />, bindings['terminal.toggle']],
     ['changes', 'panel.changes', <GitBranchIcon />, bindings['changes.toggle']],
-    ['preview', 'tiles.preview', <PreviewIcon />, ''],
+    ['preview', 'tiles.preview', <GlobeIcon />, bindings['preview.toggle']],
     ['files', 'tiles.files', <FolderIcon />, bindings['files.toggle']],
   ] as const;
   const names = [
@@ -272,11 +275,15 @@ export function SessionTools({ context }: { context: PanelContext }) {
           {...(keys === '' ? {} : { keys })}
           data-testid={'tool-' + id}
           aria-pressed={openIds.includes(id)}
+          {...(id === 'preview' && previewDot ? { 'data-attention': true } : {})}
           onClick={() => {
             togglePanel(id);
           }}
         >
           {icon}
+          {id === 'preview' && previewDot && (
+            <span className="tool-dot" data-testid="tool-preview-dot" aria-hidden="true" />
+          )}
         </IconButton>
       ))}
       <IconButton

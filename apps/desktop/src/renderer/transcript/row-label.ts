@@ -49,6 +49,7 @@ export function rowKind(row: TranscriptRow): RowKind | undefined {
     case 'reminder':
     case 'subagent':
     case 'webSearch':
+    case 'browser':
       return item.type;
     case 'dynamicToolCall':
       if (OWN_ROW_TOOLS.has(item.tool)) return HOST_TOOL_KIND[item.tool] ?? 'group';
@@ -115,6 +116,12 @@ function itemLabel(item: Item, t: Translate, members: readonly Item[]): string {
       return t('a11y.row.webSearch', {
         query: excerpt(item.query),
         count: item.sources?.length ?? 0,
+        status,
+      });
+    case 'browser':
+      return t('a11y.row.browser', {
+        label: excerpt(item.description ?? t('transcript.browser.default')),
+        count: item.images?.length ?? 0,
         status,
       });
     case 'dynamicToolCall':

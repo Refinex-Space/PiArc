@@ -17,6 +17,7 @@ import { expectTestHooks } from './core.js';
 import { browserDouble, PROVIDER, PROVIDER_FILE, startAuth, writeProvider } from './oauth.js';
 import { idle, killAgentHost, openSession, prefer, send } from './t19.js';
 import { conflictOnMain, fakeGh, git, githubRemote, makeRepository } from './git.js';
+import { clickInPage } from './browser-b3.js';
 
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -177,6 +178,33 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await page.getByTestId('tool-preview').click();
   await expect(page.getByTestId('tile-preview')).toBeVisible();
   await checkState(page, 'panel:preview');
+  // B3: a picked element's card, the annotation tools and the discard question.
+  await writeFile(
+    path.join(ws, 'b3.html'),
+    '<!doctype html><title>B3</title><main><h1>Plans</h1><button id="save">Save</button></main>',
+  );
+  const address = page.getByTestId('browser-address');
+  await address.click();
+  await address.fill(path.join(ws, 'b3.html'));
+  await address.press('Enter');
+  await expect(page.getByTestId('browser-tab').first()).toHaveText('B3');
+  await page.getByTestId('browser-pick-toggle').click();
+  await expect(page.getByTestId('browser-picks')).toBeVisible();
+  await clickInPage(app, 'b3.html', '#save');
+  await expect(page.getByTestId('browser-pick-card')).toHaveCount(1);
+  await checkState(page, 'state:browser-picks');
+  await page.getByTestId('browser-picks-done').click();
+  await page.getByTestId('browser-picks-clear').click();
+  await page.getByTestId('browser-annotate-toggle').click();
+  await expect(page.getByTestId('browser-annotate')).toBeVisible();
+  await page.getByTestId('browser-annotate-tool-marker').click();
+  await page.getByTestId('browser-annotate-canvas').click({ position: { x: 24, y: 24 } });
+  await expect(page.getByTestId('browser-annotate-comment')).toHaveCount(1);
+  await checkState(page, 'state:browser-annotate');
+  await page.getByTestId('browser-annotate-cancel').click();
+  await expect(page.getByTestId('browser-annotate-discard')).toBeVisible();
+  await checkState(page, 'dialog:browser-annotate-discard');
+  await page.getByTestId('browser-annotate-discard-confirm').click();
   await page.getByTestId('tile-close-preview').click();
   await page.getByTestId('tile-close-files').click();
   await checkState(page, 'row:userMessage');
@@ -242,6 +270,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     'sandbox',
     'proxy',
     'git',
+    'browser',
     'agents',
     'skills',
     'memory',
@@ -254,6 +283,12 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     await expect(settings.getByTestId(`settings-page-${id}`)).toBeVisible();
     await checkState(settings, `settings:${id}`);
   }
+  // B5.1: the Chrome import dialog (the test home has no Chrome).
+  await settings.getByTestId('settings-nav-browser').click();
+  await settings.getByTestId('browser-import-open').click();
+  await expect(settings.getByTestId('chrome-import-none')).toBeVisible();
+  await checkState(settings, 'dialog:chrome-import');
+  await settings.getByTestId('chrome-import-close').click();
   await closeSettings(settings);
   await send(page, 'Thanks.');
 });
@@ -437,6 +472,55 @@ test.describe('web search', () => {
     await expect(page.getByTestId('web-search-card')).toHaveAttribute('data-status', 'completed');
     await checkState(page, 'row:webSearch');
   });
+});
+
+test('a Browser call with its screenshot, and the preview console', async ({
+  app,
+  page,
+  workspaces,
+}) => {
+  await openSession(app, page, workspaces, 'browser 浏览器', 'browser-run', 'Check the browser', {
+    'logs.html':
+      '<!doctype html><title>Logs</title><script>console.log("hello");console.warn("slow");' +
+      'setTimeout(() => { throw new TypeError("boom") }, 0);</script>',
+    'fail.js': "console.error('boom: the fixture cannot start');\nprocess.exit(3);\n",
+    '.piarc/launch.json': JSON.stringify({
+      version: '0.2.0',
+      configurations: [
+        { name: 'broken', runtimeExecutable: 'node', program: 'fail.js', port: 45_179 },
+      ],
+    }),
+  });
+  await idle(page);
+  const card = page.getByTestId('browser-card');
+  await expect(card).toHaveAttribute('data-status', 'completed');
+  await expect(card.getByTestId('browser-shot')).toHaveAttribute('data-state', 'shown');
+  await checkState(page, 'row:browser');
+  // B1.1.1, B4.5: the start page with a launch configuration, and a server that failed.
+  // The agent's call may have opened the preview already; its button toggles the tool.
+  if (!(await page.getByTestId('tile-preview').isVisible())) {
+    await page.getByTestId('tool-preview').click();
+  }
+  await expect(page.getByTestId('browser-start')).toBeVisible();
+  const broken = page.locator('[data-testid="browser-server"][data-name="broken"]');
+  await expect(broken).toBeVisible();
+  await checkState(page, 'state:browser-start');
+  await broken.getByTestId('browser-server-run').click();
+  await expect(
+    page.locator('[data-testid="browser-server-failed"][data-name="broken"]'),
+  ).toBeVisible({ timeout: 60_000 });
+  await checkState(page, 'state:browser-server-failed');
+  // B1.4.3: the console drawer under a workspace page.
+  const address = page.getByTestId('browser-address');
+  await address.click();
+  await address.fill('./logs.html');
+  await address.press('Enter');
+  await page.getByTestId('browser-more').click();
+  await page.getByRole('menuitem', { name: /Console|控制台/ }).click();
+  // The page's three messages (the missing favicon may add a fourth, Chromium's own).
+  await expect(page.getByTestId('browser-console')).toContainText('Uncaught TypeError: boom');
+  await expect(page.getByTestId('browser-console')).toContainText('slow');
+  await checkState(page, 'state:browser-console');
 });
 
 test.describe('failures, compaction, reminders and model dialogs', () => {

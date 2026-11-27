@@ -77,6 +77,25 @@ import {
   Sparkles,
   Tag,
   Undo2,
+  ArrowLeft,
+  Camera,
+  CodeXml,
+  Crop,
+  Lock,
+  LockOpen,
+  PenLine,
+  RotateCw,
+  ShieldAlert,
+  Smartphone,
+  SquareMousePointer,
+  ZoomIn,
+  ZoomOut,
+  Eraser,
+  EyeOff,
+  Hash,
+  MoveUpRight,
+  Redo2,
+  Square,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -138,6 +157,30 @@ export const GripIcon = glyph(GripVertical);
 export const PreviewIcon = glyph(Play);
 export const PencilIcon = glyph(Pencil);
 export const GlobeIcon = glyph(Globe);
+// ---- Built-in browser (ADR-0088) ----
+export const BackIcon = glyph(ArrowLeft);
+export const ReloadIcon = glyph(RotateCw);
+export const LockIcon = glyph(Lock);
+export const UnlockIcon = glyph(LockOpen);
+export const ShieldAlertIcon = glyph(ShieldAlert);
+export const DeviceIcon = glyph(Smartphone);
+export const PickIcon = glyph(SquareMousePointer);
+export const AnnotateIcon = glyph(PenLine);
+export const ScreenshotIcon = glyph(Camera);
+export const RegionIcon = glyph(Crop);
+// Annotation tools (B3.3).
+export const RectIcon = glyph(Square);
+export const EllipseIcon = glyph(Circle);
+export const ArrowToolIcon = glyph(MoveUpRight);
+export const TextToolIcon = glyph(Type);
+export const MarkerIcon = glyph(Hash);
+export const RedactIcon = glyph(EyeOff);
+export const UndoIcon = glyph(Undo2);
+export const RedoIcon = glyph(Redo2);
+export const ClearIcon = glyph(Eraser);
+export const DevtoolsIcon = glyph(CodeXml);
+export const ZoomInIcon = glyph(ZoomIn);
+export const ZoomOutIcon = glyph(ZoomOut);
 export const ExpandIcon = glyph(Maximize2);
 export const RestoreIcon = glyph(Minimize2);
 export const MaximizeIcon = glyph(Maximize);

@@ -163,6 +163,7 @@ const GROUPED_TYPES = new Set([
   'fileChange',
   'commandExecution',
   'webSearch',
+  'browser',
 ]);
 
 /** Host tools with rows of their own (T26): the task card, the plan card, the answered

@@ -58,3 +58,4 @@ Core 的数据库 `<数据目录>/core.sqlite`（rusqlite，SQLite 随 `bundled`
 
 - 架构第 9.1–9.3 节；ADR-0011、ADR-0044；`docs/research/pi-v1.4.0-baseline.md` 第 4.3 节。
 - schema v13（T49）为 `usage_records` 加入 `ephemeral_workspace`。侧边对话的请求由 Core 直接记账，归入 `auxiliary/sideChat`。索引重建保留这些记录，即使主会话还没有 JSONL 也能按工作区查询用量。删除会话时一并清理。
+- schema v14（ADR-0090）：`browser_imports(workspace, site, count, profile, imported_at)` 记从 Chrome 导入过登录的站点（`src/browser_imports.rs` 的 `put_browser_import`、`browser_imports`、`remove_browser_import`），cookie 本身在 Chromium 的分区里，不在这里。

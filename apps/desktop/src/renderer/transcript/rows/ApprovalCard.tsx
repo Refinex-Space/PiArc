@@ -44,6 +44,15 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
   const long = content.length > PREVIEW_CHARS || content.split('\n').length > PREVIEW_LINES;
   // T39: a network-domain card names a host; its "always" adds it to the allowed domains.
   const network = request.tool === 'SandboxNetwork' && request.domain != null;
+  // ADR-0089: a site card names the address the agent's page asks for; "once" covers this call,
+  // "always" saves the card's own `Browser(domain:…)` rule (Core saves exactly that rule).
+  const site = request.tool === 'BrowserSite' ? request.site : undefined;
+  // B2.6.6: a page of the agent's browser uploads a file, or the agent saves a download.
+  const browserFile =
+    request.tool === 'BrowserUpload' || request.tool === 'BrowserSave' ? request.tool : undefined;
+  // ADR-0092: the agent's script starts a launch configuration; the card names it.
+  const ownCard =
+    network || site != null || browserFile !== undefined || request.tool === 'BrowserServer';
   const allowPersistent =
     !network && request.protectedPath !== true && (offered.length > 0 || request.directory != null);
   function answer(decision: ApprovalAnswer['decision']) {
@@ -96,11 +105,19 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
   const gated = allowPersistent && !canAlwaysAllow(false, long, expanded);
   const title = network
     ? t('approval.network')
-    : request.kind === 'command'
-      ? t('approval.title.command')
-      : request.kind === 'fileChange' && request.path
-        ? t('approval.title.edit', { name: revealBidi(baseName(request.path)) })
-        : t(`approval.kind.${request.kind}`);
+    : site != null
+      ? t('approval.site')
+      : browserFile === 'BrowserUpload'
+        ? t('approval.browserUpload')
+        : browserFile === 'BrowserSave'
+          ? t('approval.browserSave')
+          : request.tool === 'BrowserServer'
+            ? t('approval.browserServer')
+            : request.kind === 'command'
+              ? t('approval.title.command')
+              : request.kind === 'fileChange' && request.path
+                ? t('approval.title.edit', { name: revealBidi(baseName(request.path)) })
+                : t(`approval.kind.${request.kind}`);
   return (
     <section
       ref={card}
@@ -115,7 +132,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
         <div className="approval-body">
           <header className="approval-title">
             <strong>{title}</strong>
-            {!network && <span className="approval-tool">{request.tool}</span>}
+            {!ownCard && <span className="approval-tool">{request.tool}</span>}
           </header>
           <ApprovalOrigin request={request} />
           <ReviewLine request={request} />
@@ -137,6 +154,18 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               <div className="approval-path" data-testid="approval-domain">
                 {t('approval.networkHost', { target: request.domain })}
               </div>
+            )}
+            {site != null && (
+              <>
+                <div className="approval-path" data-testid="approval-site">
+                  {t('approval.siteUrl', { url: revealBidi(site.url) })}
+                </div>
+                {site.hosts != null && site.hosts.length > 0 && (
+                  <div className="approval-path" data-testid="approval-site-hosts">
+                    {t('approval.siteHosts', { hosts: revealBidi(site.hosts.join(', ')) })}
+                  </div>
+                )}
+              </>
             )}
             {request.cwd && (
               <div className="approval-path">
@@ -204,7 +233,10 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
                 spellCheck={false}
                 autoCapitalize="off"
                 autoCorrect="off"
-                readOnly={request.kind === 'permissionExpansion' && request.tool === 'MemoryImport'}
+                readOnly={
+                  request.kind === 'permissionExpansion' &&
+                  (request.tool === 'MemoryImport' || site != null)
+                }
                 onChange={(e) => {
                   setRules(e.target.value);
                 }}
@@ -225,7 +257,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               />
             </label>
           )}
-          {!reviewing && !network && !writing && (
+          {!reviewing && !ownCard && !writing && (
             <button
               type="button"
               className="approval-link approval-add-feedback"
@@ -237,7 +269,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
               {t('approval.addFeedback')}
             </button>
           )}
-          {!reviewing && !network && writing && (
+          {!reviewing && !ownCard && writing && (
             <label className="approval-field">
               <span className="visually-hidden">{t('approval.feedback')}</span>
               <textarea
@@ -321,7 +353,7 @@ export function ApprovalCard({ request }: { readonly request: ApprovalRequest })
                     answer('allowOnce');
                   }}
                 >
-                  {t('approval.once')}
+                  {site != null ? t('approval.siteOnce') : t('approval.once')}
                   <span className="approval-keys" aria-hidden="true">
                     <Keycaps binding="Mod+Enter" platform={keyPlatform} />
                   </span>

@@ -696,6 +696,17 @@
           "description": "Owning session.",
           "type": "string"
         },
+        "site": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserSiteCard"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A site card (a `permissionExpansion` card for tool [`BROWSER_SITE_TOOL`], ADR-0089):\nthe address a page the agent drives asks for, with `domain` the host the answer covers.\n`allowOnce` lets the running `Browser` call reach it, `allowSession` the session,\n`allowAlways` saves the card's `Browser(domain:…)` rule (only when `rules` offers it);\n`deny`, the run ending or no answer within the timeout refuse it."
+        },
         "subagent": {
           "anyOf": [
             {
@@ -1114,6 +1125,648 @@
         }
       },
       "required": ["options"],
+      "type": "object"
+    },
+    "BrowserClientEvent": {
+      "description": "What Core tells the desktop client on `core/browser` (Core API).",
+      "oneOf": [
+        {
+          "description": "Run a script in the session's browser and answer with `answerBrowserRun`.",
+          "properties": {
+            "agentType": {
+              "description": "The subagent's type when a subagent made the call.",
+              "type": ["string", "null"]
+            },
+            "mainSessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The main session: its Spaces show the run (a subagent's runs show under it)."
+            },
+            "runId": {
+              "description": "The run's id, to answer with.",
+              "type": "string"
+            },
+            "script": {
+              "description": "The script.",
+              "type": "string"
+            },
+            "sessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The session of the call (a subagent's own id for a subagent)."
+            },
+            "timeoutMs": {
+              "description": "How long it may run, in milliseconds.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "toolCallId": {
+              "description": "The `Browser` call.",
+              "type": "string"
+            },
+            "type": {
+              "const": "run",
+              "type": "string"
+            },
+            "workspace": {
+              "description": "The workspace (main checkout path); it picks the browser partition.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "runId",
+            "sessionId",
+            "mainSessionId",
+            "workspace",
+            "toolCallId",
+            "script",
+            "timeoutMs"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Stop a run (the turn was interrupted, the session closed or the run timed out).",
+          "properties": {
+            "runId": {
+              "description": "The run's id.",
+              "type": "string"
+            },
+            "type": {
+              "const": "cancel",
+              "type": "string"
+            }
+          },
+          "required": ["type", "runId"],
+          "type": "object"
+        },
+        {
+          "description": "The TCP ports a session's background tasks, terminals and development servers listen\non, and the ports its launch configurations declare (ADR-0092 rule 5): the agent's\npages may reach them (B2.6.2) and the start page lists them (B4.4). A complete\nsnapshot, sent when it changes.",
+          "properties": {
+            "declared": {
+              "description": "Ports the project's launch configurations declare.",
+              "items": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "ports": {
+              "description": "Listening ports, by port.",
+              "items": {
+                "$ref": "#/$defs/ListeningPort"
+              },
+              "type": "array"
+            },
+            "sessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The main session."
+            },
+            "type": {
+              "const": "ports",
+              "type": "string"
+            },
+            "workspace": {
+              "description": "Its workspace (main checkout path).",
+              "type": "string"
+            }
+          },
+          "required": ["type", "sessionId", "workspace", "ports", "declared"],
+          "type": "object"
+        },
+        {
+          "description": "The development servers a session started and where they stand (ADR-0092). A\ncomplete snapshot, sent when it changes.",
+          "properties": {
+            "servers": {
+              "description": "The servers, in start order.",
+              "items": {
+                "$ref": "#/$defs/DevServerState"
+              },
+              "type": "array"
+            },
+            "sessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The main session."
+            },
+            "type": {
+              "const": "servers",
+              "type": "string"
+            },
+            "workspace": {
+              "description": "Its workspace (main checkout path).",
+              "type": "string"
+            }
+          },
+          "required": ["type", "sessionId", "workspace", "servers"],
+          "type": "object"
+        }
+      ]
+    },
+    "BrowserFilesRequest": {
+      "description": "A file request of the agent's browser (Core API, `browserFiles`, design addendum B2.6.6):\nstage files for a page's file input, or save a finished download.",
+      "oneOf": [
+        {
+          "description": "Copy `paths` (absolute, or relative to the session's working directory) for an upload.",
+          "properties": {
+            "op": {
+              "const": "stage",
+              "type": "string"
+            },
+            "paths": {
+              "description": "1 to 20 files.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "sessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The session of the running `Browser` call."
+            },
+            "toolCallId": {
+              "description": "The running `Browser` call.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "sessionId", "toolCallId", "paths"],
+          "type": "object"
+        },
+        {
+          "description": "Save the finished download `source` (in the session's downloads) to `path`.",
+          "properties": {
+            "op": {
+              "const": "save",
+              "type": "string"
+            },
+            "path": {
+              "description": "Where to save it (absolute, or relative to the working directory); must not exist.",
+              "type": "string"
+            },
+            "sessionId": {
+              "$ref": "#/$defs/SessionId",
+              "description": "The session of the running `Browser` call."
+            },
+            "source": {
+              "description": "The download's file.",
+              "type": "string"
+            },
+            "toolCallId": {
+              "description": "The running `Browser` call.",
+              "type": "string"
+            }
+          },
+          "required": ["op", "sessionId", "toolCallId", "source", "path"],
+          "type": "object"
+        }
+      ]
+    },
+    "BrowserFilesResult": {
+      "description": "Core's answer to a [`BrowserFilesRequest`].",
+      "properties": {
+        "saved": {
+          "description": "Where the download was saved (`save`).",
+          "type": ["string", "null"]
+        },
+        "staged": {
+          "description": "The staged copies, in order (`stage`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "BrowserImage": {
+      "description": "An image the script attached (`page.screenshot()`).",
+      "properties": {
+        "blob": {
+          "description": "SHA-256 of the image bytes once Core kept them in the session's blobs (ADR-0093), so\nthe transcript can show what the model saw.",
+          "type": ["string", "null"]
+        },
+        "data": {
+          "description": "Base64 of the image bytes.",
+          "type": "string"
+        },
+        "height": {
+          "description": "Height in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mediaType": {
+          "description": "`image/png` or `image/jpeg`.",
+          "type": "string"
+        },
+        "width": {
+          "description": "Width in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["mediaType", "data", "width", "height"],
+      "type": "object"
+    },
+    "BrowserItemImage": {
+      "description": "A screenshot of a run as the transcript shows it (ADR-0093): a session blob.",
+      "properties": {
+        "blob": {
+          "description": "SHA-256 of the image, lowercase hex: its name in the session's blobs.",
+          "type": "string"
+        },
+        "height": {
+          "description": "Height in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mediaType": {
+          "description": "`image/png` or `image/jpeg`.",
+          "type": "string"
+        },
+        "width": {
+          "description": "Width in pixels.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["blob", "mediaType", "width", "height"],
+      "type": "object"
+    },
+    "BrowserRunAnswer": {
+      "description": "How the desktop client answers a run (Core API).",
+      "properties": {
+        "blockedHosts": {
+          "description": "Hosts the browser kept the page from reaching during the run.",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserScriptError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The error the script ended with."
+        },
+        "images": {
+          "description": "Images the script attached.",
+          "items": {
+            "$ref": "#/$defs/BrowserImage"
+          },
+          "type": ["array", "null"]
+        },
+        "output": {
+          "description": "What the script printed, whole.",
+          "type": "string"
+        },
+        "refusedMethods": {
+          "description": "DevTools methods the CDP proxy refused during the run (for the audit row only, B2.6.5).",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "visitedHosts": {
+          "description": "Hosts the run's pages reached (for the audit row only, B2.7.2).",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        }
+      },
+      "required": ["output"],
+      "type": "object"
+    },
+    "BrowserRunParams": {
+      "description": "Parameters of `browser/run`.",
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/ToolOrigin",
+          "description": "The approved `Browser` call; its input's `script` must equal `script`."
+        },
+        "script": {
+          "description": "The JavaScript to run with the browser SDK's helpers in scope.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session of the call."
+        },
+        "timeoutMs": {
+          "description": "How long the script may run, in milliseconds (default 120,000, at most 600,000).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        }
+      },
+      "required": ["sessionId", "origin", "script"],
+      "type": "object"
+    },
+    "BrowserRunRequest": {
+      "description": "Request for `browser/run`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "browser/run",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/BrowserRunParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "BrowserRunResponse": {
+      "description": "Successful response to `browser/run`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/BrowserRunResult"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
+    "BrowserRunResult": {
+      "description": "Result of `browser/run`.",
+      "properties": {
+        "blockedHosts": {
+          "description": "Hosts the page tried to reach that the agent may not (the user can allow them).",
+          "items": {
+            "type": "string"
+          },
+          "type": ["array", "null"]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserScriptError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The error the script ended with, when it did not finish."
+        },
+        "images": {
+          "description": "Images attached by the script, in order.",
+          "items": {
+            "$ref": "#/$defs/BrowserImage"
+          },
+          "type": ["array", "null"]
+        },
+        "output": {
+          "description": "What the script printed, cut to the inline budget.",
+          "type": "string"
+        },
+        "spill": {
+          "description": "The file with the whole output (home-relative paths start with `~`).",
+          "type": ["string", "null"]
+        },
+        "truncated": {
+          "description": "The output was longer than the budget; the whole text is in `spill`.",
+          "type": ["boolean", "null"]
+        }
+      },
+      "required": ["output"],
+      "type": "object"
+    },
+    "BrowserScriptError": {
+      "description": "The error the script ended with.",
+      "properties": {
+        "code": {
+          "description": "The SDK's stable code (`EGO_TASK_SPACE_USER_IN_CONTROL`, `PIARC_SITE_REFUSED`).",
+          "type": ["string", "null"]
+        },
+        "message": {
+          "description": "Its message.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The error's name (`TypeError`, `SyntaxError`, `EgoError`).",
+          "type": "string"
+        }
+      },
+      "required": ["name", "message"],
+      "type": "object"
+    },
+    "BrowserSiteCard": {
+      "description": "A site card's subject (ADR-0089, design addendum B2.6.3): the address a page the agent\ndrives asks for, and the other hosts its run is waiting on.",
+      "properties": {
+        "hosts": {
+          "description": "Other hosts the same run was kept from reaching, which the answer covers too.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "url": {
+          "description": "The full address the page asks for.",
+          "type": "string"
+        }
+      },
+      "required": ["url"],
+      "type": "object"
+    },
+    "BrowserSiteDecision": {
+      "description": "Core's answer to a [`BrowserSiteRequest`].",
+      "properties": {
+        "allowed": {
+          "description": "Whether the page may reach the host (and the card's other hosts).",
+          "type": "boolean"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BrowserSiteScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How long an allowing answer holds; absent when refused."
+        }
+      },
+      "required": ["allowed"],
+      "type": "object"
+    },
+    "BrowserSiteRequest": {
+      "description": "What the desktop client asks Core about one host an agent's page wants to reach (Core API,\n`browserSite`).",
+      "properties": {
+        "host": {
+          "description": "The host the answer covers: `host` for a site, `host:port` for a local address.",
+          "type": "string"
+        },
+        "local": {
+          "description": "A loopback or local development address.",
+          "type": "boolean"
+        },
+        "pending": {
+          "description": "Other hosts the run was kept from reaching, shown on the card and covered by its answer.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sensitive": {
+          "description": "A private network address or a site with imported sign-ins: every mode asks and the\nanswer is never saved as a rule.",
+          "type": "boolean"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session of the running `Browser` call (a subagent's own id for a subagent)."
+        },
+        "toolCallId": {
+          "description": "The running `Browser` call; the card goes away with it.",
+          "type": "string"
+        },
+        "url": {
+          "description": "The full address.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId", "url", "host"],
+      "type": "object"
+    },
+    "BrowserSiteScope": {
+      "description": "How long an allowing answer holds.",
+      "oneOf": [
+        {
+          "const": "run",
+          "description": "For the rest of this run.",
+          "type": "string"
+        },
+        {
+          "const": "session",
+          "description": "For the rest of the session.",
+          "type": "string"
+        }
+      ]
+    },
+    "BrowserStateController": {
+      "description": "Who controls a task space.",
+      "oneOf": [
+        {
+          "const": "agent",
+          "description": "The agent (ego's `agent`).",
+          "type": "string"
+        },
+        {
+          "const": "user",
+          "description": "The user took it over or the agent handed it to them (`agentDelegatedToUser`, `user`).",
+          "type": "string"
+        }
+      ]
+    },
+    "BrowserStateSpace": {
+      "description": "One task space in a [`BrowserStateSummary`].",
+      "properties": {
+        "controlledBy": {
+          "$ref": "#/$defs/BrowserStateController",
+          "description": "Who controls it now."
+        },
+        "id": {
+          "description": "The task space's number (`taskSpace(id)`).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "description": "Its name, at most 64 characters.",
+          "type": "string"
+        },
+        "tabCount": {
+          "description": "How many tabs it has.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tabs": {
+          "description": "Its tabs while the agent controls it (at most 20, titles cut to 80 characters); empty\nwhile the user does.",
+          "items": {
+            "$ref": "#/$defs/BrowserStateTab"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["id", "name", "controlledBy", "tabCount"],
+      "type": "object"
+    },
+    "BrowserStateSummary": {
+      "description": "The text of a `browserState` reminder (JSON): the session's task spaces and how many tabs\nthe user has of their own. Titles come from pages and are data.",
+      "properties": {
+        "spaces": {
+          "description": "At most 4.",
+          "items": {
+            "$ref": "#/$defs/BrowserStateSpace"
+          },
+          "type": "array"
+        },
+        "userTabs": {
+          "description": "Tabs of the user's own Space (only counted).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["spaces", "userTabs"],
+      "type": "object"
+    },
+    "BrowserStateTab": {
+      "description": "One tab of a [`BrowserStateSpace`].",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": ["title", "url"],
+      "type": "object"
+    },
+    "BrowserStateUpdate": {
+      "description": "The browser of a main session as the agent should know it before its next request (Core\nAPI, `browserState`, design addendum B2.7.3): the desktop client sends it when the user\nchanged something between the agent's calls; Core keeps the newest as one `browserState`\nreminder.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The main session."
+        },
+        "spaces": {
+          "description": "At most 4.",
+          "items": {
+            "$ref": "#/$defs/BrowserStateSpace"
+          },
+          "type": "array"
+        },
+        "userTabs": {
+          "description": "Tabs of the user's own Space (only counted).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["sessionId", "spaces", "userTabs"],
       "type": "object"
     },
     "Capability": {
@@ -2066,6 +2719,167 @@
         {
           "const": "missing",
           "description": "The directory no longer exists.",
+          "type": "string"
+        }
+      ]
+    },
+    "DevServerAgent": {
+      "description": "The `Browser` call that starts a server.",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session of the call (a subagent's own id for a subagent)."
+        },
+        "toolCallId": {
+          "description": "The running `Browser` call; the question goes away with it.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "toolCallId"],
+      "type": "object"
+    },
+    "DevServerFailure": {
+      "description": "Why a server failed.",
+      "oneOf": [
+        {
+          "const": "exited",
+          "description": "The process exited.",
+          "type": "string"
+        },
+        {
+          "const": "timeout",
+          "description": "The port did not answer within 180 seconds.",
+          "type": "string"
+        },
+        {
+          "const": "spawn",
+          "description": "It could not be started.",
+          "type": "string"
+        }
+      ]
+    },
+    "DevServerStart": {
+      "description": "`startDevServer`'s request.",
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DevServerAgent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when the agent's running `Browser` call starts it: the first start of a\nconfiguration's fingerprint in the session asks the user."
+        },
+        "name": {
+          "description": "The configuration.",
+          "type": "string"
+        },
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The main session whose panel or agent starts it."
+        },
+        "wait": {
+          "description": "Answer once the server is ready or failed instead of once it started.",
+          "type": "boolean"
+        }
+      },
+      "required": ["sessionId", "name"],
+      "type": "object"
+    },
+    "DevServerStarter": {
+      "description": "Who started a server.",
+      "oneOf": [
+        {
+          "const": "user",
+          "description": "The user, from the browser panel.",
+          "type": "string"
+        },
+        {
+          "const": "agent",
+          "description": "The agent, through the browser SDK's `startServer`.",
+          "type": "string"
+        }
+      ]
+    },
+    "DevServerState": {
+      "description": "One server a session started.",
+      "properties": {
+        "exitCode": {
+          "description": "The exit code, when it exited.",
+          "format": "int32",
+          "type": ["integer", "null"]
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DevServerFailure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why it failed."
+        },
+        "log": {
+          "description": "The last lines of its output when it failed (at most 20).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "The configuration's name.",
+          "type": "string"
+        },
+        "port": {
+          "description": "The port it was started on (after `autoPort`).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "startedBy": {
+          "$ref": "#/$defs/DevServerStarter",
+          "description": "Who started it."
+        },
+        "status": {
+          "$ref": "#/$defs/DevServerStatus",
+          "description": "Where it stands."
+        },
+        "taskId": {
+          "description": "Its background task.",
+          "type": ["string", "null"]
+        },
+        "url": {
+          "description": "The address to open.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "status", "startedBy", "port", "url"],
+      "type": "object"
+    },
+    "DevServerStatus": {
+      "description": "Where a development server stands.",
+      "oneOf": [
+        {
+          "const": "starting",
+          "description": "Started; its port does not answer yet.",
+          "type": "string"
+        },
+        {
+          "const": "ready",
+          "description": "Its process tree listens on the port.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "It exited, or did not become ready in time.",
+          "type": "string"
+        },
+        {
+          "const": "stopped",
+          "description": "Stopped by the user, the agent or the session.",
           "type": "string"
         }
       ]
@@ -9421,6 +10235,71 @@
           "type": "object"
         },
         {
+          "description": "A run of the built-in browser (`Browser`, ADR-0089): the script's label, and once it\nended the screenshots it attached (session blobs, ADR-0093), the hosts its pages were\nkept from and the error it ended with.",
+          "properties": {
+            "arguments": {
+              "additionalProperties": true,
+              "description": "The arguments the tool was called with.",
+              "type": "object"
+            },
+            "blockedHosts": {
+              "description": "Hosts the browser kept the run's pages from reaching, in `item/completed`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "description": "The label the model gave the run.",
+              "type": ["string", "null"]
+            },
+            "errorCode": {
+              "description": "The stable code of the error the script ended with, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "images": {
+              "description": "Screenshots the run attached, in `item/completed`.",
+              "items": {
+                "$ref": "#/$defs/BrowserItemImage"
+              },
+              "type": "array"
+            },
+            "itemId": {
+              "$ref": "#/$defs/ItemId",
+              "description": "The item's identifier: the tool call id."
+            },
+            "output": {
+              "description": "The text the tool returned, in `item/completed`.",
+              "type": ["string", "null"]
+            },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolReview"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The reviewer model decided the call in Auto mode (T46)."
+            },
+            "status": {
+              "$ref": "#/$defs/ItemStatus",
+              "description": "Lifecycle state."
+            },
+            "tool": {
+              "description": "Canonical tool name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "browser",
+              "type": "string"
+            }
+          },
+          "required": ["type", "itemId", "status", "tool", "arguments"],
+          "type": "object"
+        },
+        {
           "description": "A tool call without a specialised item type.",
           "properties": {
             "arguments": {
@@ -9764,6 +10643,125 @@
       "const": "2.0",
       "type": "string"
     },
+    "LaunchConfigView": {
+      "description": "One launch configuration as the start page shows it.",
+      "properties": {
+        "autoPort": {
+          "description": "Another free port is taken when this one is busy.",
+          "type": "boolean"
+        },
+        "command": {
+          "description": "The command line, quoted for reading.",
+          "type": "string"
+        },
+        "cwd": {
+          "description": "The directory it runs in.",
+          "type": "string"
+        },
+        "fingerprint": {
+          "description": "SHA-256 of what it runs (command, arguments, directory, environment, port), lowercase\nhex: the agent's start is approved per fingerprint.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Its name, unique in the project.",
+          "type": "string"
+        },
+        "port": {
+          "description": "The port it serves on (`port`, the `url`'s, `env.PORT`, `--port`/`-p`, or 3000).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/LaunchSource",
+          "description": "The file it comes from."
+        },
+        "url": {
+          "description": "The address to open once it is ready.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "source", "command", "cwd", "port", "url", "fingerprint"],
+      "type": "object"
+    },
+    "LaunchIssue": {
+      "description": "A problem in a launch file.",
+      "properties": {
+        "column": {
+          "description": "1-based column, when the problem has a place.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "file": {
+          "description": "The file, relative to the project with `/`.",
+          "type": "string"
+        },
+        "line": {
+          "description": "1-based line, when the problem has a place.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "message": {
+          "description": "What is wrong.",
+          "type": "string"
+        }
+      },
+      "required": ["file", "message"],
+      "type": "object"
+    },
+    "LaunchSource": {
+      "description": "The file a configuration comes from.",
+      "oneOf": [
+        {
+          "const": "piarc",
+          "description": "`.piarc/launch.json`.",
+          "type": "string"
+        },
+        {
+          "const": "claude",
+          "description": "`.claude/launch.json` (read only, ADR-0038).",
+          "type": "string"
+        }
+      ]
+    },
+    "LaunchView": {
+      "description": "What `launchConfigs` answers for a session.",
+      "properties": {
+        "autoVerify": {
+          "description": "`autoVerify` (default true): the agent is reminded to look at the page after it changes\na running server's front-end files.",
+          "type": "boolean"
+        },
+        "configs": {
+          "description": "The configurations, `.piarc` ones first, in file order.",
+          "items": {
+            "$ref": "#/$defs/LaunchConfigView"
+          },
+          "type": "array"
+        },
+        "issues": {
+          "description": "Problems of the launch files.",
+          "items": {
+            "$ref": "#/$defs/LaunchIssue"
+          },
+          "type": "array"
+        },
+        "servers": {
+          "description": "The servers the session started.",
+          "items": {
+            "$ref": "#/$defs/DevServerState"
+          },
+          "type": "array"
+        },
+        "trusted": {
+          "description": "The project is trusted: its configurations may run (ADR-0025).",
+          "type": "boolean"
+        }
+      },
+      "required": ["configs", "autoVerify", "trusted"],
+      "type": "object"
+    },
     "LineEndings": {
       "description": "How `fs/write` treats the line breaks of the new text when it replaces an existing file.",
       "oneOf": [
@@ -9778,6 +10776,31 @@
           "type": "string"
         }
       ]
+    },
+    "ListeningPort": {
+      "description": "A TCP port a process tree of a session listens on.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/TaskKind",
+          "description": "What the task runs."
+        },
+        "port": {
+          "description": "The port.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "taskId": {
+          "description": "The background task whose process tree listens on it.",
+          "type": "string"
+        },
+        "title": {
+          "description": "The task's title (the command, the configuration's name).",
+          "type": "string"
+        }
+      },
+      "required": ["port", "taskId", "kind", "title"],
+      "type": "object"
     },
     "LoginCancelParams": {
       "description": "Parameters of `models/login/cancel`.",
@@ -13773,6 +14796,16 @@
           "const": "outputStyle",
           "description": "The output style changed during the session (T37, capability `skills`).",
           "type": "string"
+        },
+        {
+          "const": "browserVerify",
+          "description": "The agent changed front-end files a running development server serves: look at the\npage (ADR-0092 rule 6, `autoVerify`).",
+          "type": "string"
+        },
+        {
+          "const": "browserState",
+          "description": "The session's browser changed between the agent's calls (design addendum B2.7.3): the\nuser took a Space over or handed it back, or pages moved on. Environment state, not\ninstructions; `text` is a JSON [`crate::browser::BrowserStateSummary`].",
+          "type": "string"
         }
       ]
     },
@@ -15986,7 +17019,7 @@
         },
         "type": {
           "$ref": "#/$defs/ReminderType",
-          "description": "What it tells the model: `backgroundTask`, or `monitorOutput` (T32)."
+          "description": "What it tells the model: `backgroundTask`, `monitorOutput` (T32), or `browserVerify`\n(ADR-0092; `text` then lists the changed files, one per line, and `source` names the\nserver)."
         },
         "wake": {
           "description": "When the session is idle, start a turn whose input is this reminder (a Monitor waking\nthe session, T32).",
@@ -17895,6 +18928,11 @@
         {
           "const": "terminal",
           "description": "A terminal: a shell in a PTY whose screen Core keeps (T33).",
+          "type": "string"
+        },
+        {
+          "const": "devServer",
+          "description": "A development server started from a launch configuration (ADR-0092).",
           "type": "string"
         }
       ]
@@ -20704,6 +21742,12 @@
     },
     {
       "$ref": "#/$defs/WebFetchResponse"
+    },
+    {
+      "$ref": "#/$defs/BrowserRunRequest"
+    },
+    {
+      "$ref": "#/$defs/BrowserRunResponse"
     },
     {
       "$ref": "#/$defs/WebSearchRequest"

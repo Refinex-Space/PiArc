@@ -18,6 +18,22 @@ export function approvalLabel(request: ApprovalRequest, t: Translate): string {
   if (request.tool === 'SandboxNetwork' && request.domain != null) {
     return t('a11y.approval', { kind: t('approval.network'), target: request.domain });
   }
+  // A site card (ADR-0089) asks about the address an agent's page wants to open.
+  if (request.tool === 'BrowserSite' && request.site != null) {
+    return t('a11y.approval', { kind: t('approval.site'), target: request.site.url });
+  }
+  // ADR-0092: the agent's script starts a launch configuration (its command line).
+  if (request.tool === 'BrowserServer') {
+    return t('a11y.approval', {
+      kind: t('approval.browserServer'),
+      target: short(request.command ?? request.tool),
+    });
+  }
+  if ((request.tool === 'BrowserUpload' || request.tool === 'BrowserSave') && request.path) {
+    const kind =
+      request.tool === 'BrowserUpload' ? t('approval.browserUpload') : t('approval.browserSave');
+    return t('a11y.approval', { kind, target: request.path });
+  }
   const target =
     request.kind === 'command'
       ? (request.command ?? request.tool)

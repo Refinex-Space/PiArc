@@ -89,6 +89,20 @@ impl BoundSpec {
     }
 }
 
+/// The ports the processes of terminal `entry` listen on are its session's (ADR-0092 rule 5):
+/// task `task_id`'s tree is the terminal's, for as long as the terminal lives.
+fn follow_tree(tasks: &crate::tasks::TaskManager, task_id: &str, entry: &Arc<super::Entry>) {
+    let followed = Arc::downgrade(entry);
+    tasks.set_tree(
+        task_id,
+        Arc::new(move || {
+            followed
+                .upgrade()
+                .and_then(|entry| entry.tree.as_ref().map(|tree| tree.listen_tree()))
+        }),
+    );
+}
+
 /// A session terminal that was opened.
 #[derive(Debug, Clone)]
 pub(crate) struct Opened {
@@ -241,6 +255,7 @@ impl Terminals {
         let _ = hooks.bound.set(Arc::clone(&bound));
         let entry = self.insert(id, session, Some(Arc::clone(&bound)));
         let _ = bound.session.set(Arc::downgrade(&entry.session));
+        follow_tree(&context.tasks, &reserved.task_id, &entry);
         if entry.session.exit().is_some() {
             // The shell ended before the hooks knew the task: end it now (a second end is
             // ignored by the task manager).

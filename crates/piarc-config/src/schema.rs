@@ -758,6 +758,50 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             },
         ]),
     },
+    // The built-in browser (B5.5), read from the user's file only (`crate::settings` removes
+    // it from project layers): Core reads `agentEnabled` and `approvalTimeout`, the desktop
+    // client the rest.
+    Field {
+        name: "browser",
+        shape: Shape::Object(&[
+            Field {
+                name: "agentEnabled",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "revealOnAgentUse",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "storage",
+                shape: Shape::OneOf(&["persist", "session"]),
+            },
+            Field {
+                name: "localHostnames",
+                shape: Shape::ListOf(&STRINGS),
+            },
+            Field {
+                name: "openLocalLinks",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "searchEngine",
+                shape: Shape::OneOf(&["google", "bing", "duckduckgo", "baidu"]),
+            },
+            Field {
+                name: "downloadDirectory",
+                shape: Shape::String,
+            },
+            Field {
+                name: "devtoolsDock",
+                shape: Shape::OneOf(&["bottom", "right"]),
+            },
+            Field {
+                name: "approvalTimeout",
+                shape: Shape::Number,
+            },
+        ]),
+    },
 ]);
 
 #[cfg(test)]

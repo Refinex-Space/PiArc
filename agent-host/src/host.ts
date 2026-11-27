@@ -6,6 +6,7 @@ import { PROTOCOL_VERSION, isPermissionMode } from '@piarc/protocol';
 import type { HostShutdownResult, HostStatus } from '@piarc/protocol';
 
 import { credentialStatus, saveCredential } from './providers/settings.js';
+import { REMIND_TYPES, isRemindType } from './harness/core-reminders.js';
 import { askCoreTrust } from './harness/project-trust.js';
 import { Connection, type FrameSource } from './protocol/connection.js';
 import { AhpError, describeError } from './protocol/errors.js';
@@ -54,6 +55,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'checkpoints',
   'webFetch',
   'webSearch',
+  'browser',
   'login',
   'subagents',
   'backgroundTasks',
@@ -488,14 +490,10 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     const fields = paramsObject(method, params);
     const sessionId = stringField(method, fields, 'sessionId');
     const type = fields.type;
-    if (
-      type !== 'backgroundTask' &&
-      type !== 'monitorOutput' &&
-      (type !== 'hookContext' || fields.wake === true)
-    ) {
+    if (!isRemindType(type) && (type !== 'hookContext' || fields.wake === true)) {
       throw new AhpError(
         'invalidParams',
-        `${method}: expected backgroundTask, monitorOutput, or hookContext without wake`,
+        `${method}: expected ${REMIND_TYPES.join(', ')}, or hookContext without wake`,
         {
           details: { member: 'type' },
         },
@@ -785,6 +783,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
           checkpoints: welcome.enabled.includes('checkpoints'),
           webFetch: welcome.enabled.includes('webFetch'),
           webSearch: welcome.enabled.includes('webSearch'),
+          browser: welcome.enabled.includes('browser'),
           subagents: welcome.enabled.includes('subagents'),
           backgroundTasks: welcome.enabled.includes('backgroundTasks'),
           skills: welcome.enabled.includes('skills'),

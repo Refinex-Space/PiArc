@@ -121,6 +121,7 @@ impl TaskManager {
             done,
             feed: None,
             stop_by: None,
+            tree: None,
         };
         lock(&self.inner.state)
             .tasks

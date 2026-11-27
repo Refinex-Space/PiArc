@@ -2,7 +2,7 @@
 // ESLint), so every window gets `secureWebPreferences`.
 import { BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 
-import { secureWebPreferences } from './web-preferences.js';
+import { blankWebPreferences, secureWebPreferences } from './web-preferences.js';
 import { MAIN_WINDOW_DEFAULT } from './platform/window-state.js';
 
 /** The smallest main window. */
@@ -33,6 +33,23 @@ export function createMainWindow(
   });
   reloadAfterCrash(window);
   return window;
+}
+
+/**
+ * The built-in browser's hidden window (B1.5.3): pages no panel shows are attached to it so
+ * they keep running, painting and answering the agent. It never loads anything itself.
+ */
+export function createParkingWindow(): BrowserWindow {
+  return new BrowserWindow({
+    show: false,
+    width: 1280,
+    height: 800,
+    paintWhenInitiallyHidden: true,
+    skipTaskbar: true,
+    // i18n-exempt: never shown.
+    title: 'PiArc browser pages',
+    webPreferences: blankWebPreferences(),
+  });
 }
 
 /** A renderer that went away more often than this within a minute is not reloaded again. */

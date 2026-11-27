@@ -999,6 +999,18 @@
     },
     {
       "kind": "request",
+      "method": "browser/run",
+      "name": "browser/run",
+      "schema": "BrowserRunRequest"
+    },
+    {
+      "kind": "response",
+      "method": "browser/run",
+      "name": "browser/run/result",
+      "schema": "BrowserRunResponse"
+    },
+    {
+      "kind": "request",
       "method": "web/search",
       "name": "web/search",
       "schema": "WebSearchRequest"

@@ -248,10 +248,11 @@ fn specifier(name: &str, spec: &str, behavior: Behavior) -> Result<Spec, String>
             Spec::Path(PathPattern::parse(spec, deny_like).map_err(|e| e.to_string())?)
         }
         "Write" | "NotebookEdit" | "Glob" | "Grep" => Spec::Inert,
-        "WebFetch" => {
+        // `Browser(domain:…)` (ADR-0089) names the sites the agent's pages may reach.
+        "WebFetch" | "Browser" => {
             let host = spec
                 .strip_prefix("domain:")
-                .ok_or("a WebFetch rule needs domain:<host>")?
+                .ok_or_else(|| format!("a {name} rule needs domain:<host>"))?
                 .trim()
                 .trim_end_matches('.')
                 .to_ascii_lowercase();

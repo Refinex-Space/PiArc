@@ -85,6 +85,13 @@ impl RouteKey {
         Self(Arc::from(crate::git::GIT_ROUTE))
     }
 
+    /// The route of the built-in browser's runs for the desktop client (`core/browser`,
+    /// ADR-0089).
+    #[must_use]
+    pub fn browser() -> Self {
+        Self(Arc::from("core/browser"))
+    }
+
     /// The route of provider sign-in progress and questions (`core/login`, T29).
     #[must_use]
     pub fn login() -> Self {

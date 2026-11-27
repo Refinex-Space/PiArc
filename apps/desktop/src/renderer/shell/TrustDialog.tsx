@@ -89,6 +89,7 @@ const CATEGORY_ORDER = [
   'additionalDirectory',
   'plugin',
   'piExtension',
+  'launchConfig',
 ];
 
 export function TrustDialog({

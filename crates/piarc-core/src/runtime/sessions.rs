@@ -342,6 +342,157 @@ impl CoreRuntime {
         })
     }
 
+    /// The port of a browser partition's proxy (ADR-0088): JSON `{ partition, localNames,
+    /// deniedPorts }`; answers `{ port }`.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn browser_proxy(
+        &self,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.browser_proxy(request_json).await
+        })
+    }
+
+    /// The desktop client runs `Browser` scripts from now on (ADR-0089).
+    ///
+    /// # Errors
+    /// [`Error::NoDataDirectory`], [`Error::ShuttingDown`].
+    pub fn attach_browser_client(&self) -> Result<()> {
+        self.ensure_running()?;
+        self.services()?.sessions.attach_browser_client();
+        Ok(())
+    }
+
+    /// The desktop client's answer to a `Browser` run; whether a run was waiting for it.
+    ///
+    /// # Errors
+    /// [`Error::InvalidArgument`] for a malformed answer; as [`Self::attach_browser_client`].
+    pub fn answer_browser_run(&self, run_id: &str, answer_json: &str) -> Result<bool> {
+        self.ensure_running()?;
+        self.services()?
+            .sessions
+            .answer_browser_run(run_id, answer_json)
+    }
+
+    /// The launch configurations of open session `session_id`'s project and the servers it
+    /// started (ADR-0092): a [`piarc_protocol::dev_server::LaunchView`].
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn launch_configs(
+        &self,
+        session_id: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&session_id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.launch_configs(session_id).await
+        })
+    }
+
+    /// Starts a launch configuration (ADR-0092): JSON
+    /// [`piarc_protocol::dev_server::DevServerStart`] in, the server's
+    /// [`piarc_protocol::dev_server::DevServerState`] out (once ready or failed with `wait`).
+    /// An agent's start may wait for the user's answer.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`]; [`Error::InvalidArgument`] for a malformed request.
+    pub fn start_dev_server(
+        &self,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.start_dev_server(request_json).await
+        })
+    }
+
+    /// Stops session `session_id`'s development server `name` with its process tree.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn stop_dev_server(
+        &self,
+        session_id: String,
+        name: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        crate::sessions::check_session_id(&session_id)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.stop_dev_server(session_id, name).await
+        })
+    }
+
+    /// Whether a page of a running `Browser` call may reach a host (ADR-0089, site cards):
+    /// JSON [`piarc_protocol::browser::BrowserSiteRequest`] in,
+    /// [`piarc_protocol::browser::BrowserSiteDecision`] out. Waits for the user's answer when
+    /// it shows a card.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`]; [`Error::InvalidArgument`] for a malformed request.
+    pub fn browser_site(
+        &self,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.browser_site(request_json).await
+        })
+    }
+
+    /// A file request of the agent's browser (B2.6.6): JSON
+    /// [`piarc_protocol::browser::BrowserFilesRequest`] in,
+    /// [`piarc_protocol::browser::BrowserFilesResult`] out; may wait for the user.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`]; [`Error::InvalidArgument`] for a malformed request.
+    pub fn browser_files(
+        &self,
+        request_json: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.browser_files(request_json).await
+        })
+    }
+
+    /// What the user changed in a session's browser since the agent's last call (B2.7.3): JSON
+    /// [`piarc_protocol::browser::BrowserStateUpdate`], kept as a `browserState` reminder.
+    ///
+    /// # Errors
+    /// [`Error::ShuttingDown`], [`Error::InvalidArgument`], `sessionNotFound`, `invalidParams`.
+    pub fn browser_state(&self, request_json: &str) -> Result<()> {
+        self.ensure_running()?;
+        self.services()?.sessions.browser_state(request_json)
+    }
+
+    /// Where the downloads of a session's agent tabs go (B2.6.6).
+    ///
+    /// # Errors
+    /// [`Error::ShuttingDown`], `sessionNotFound`.
+    pub fn browser_downloads_dir(&self, session_id: &str) -> Result<String> {
+        self.ensure_running()?;
+        self.services()?.sessions.browser_downloads_dir(session_id)
+    }
+
+    /// Stops a browser partition's proxy (its data was cleared); answers `{ stopped }`.
+    ///
+    /// # Errors
+    /// As [`Self::session_op`].
+    pub fn stop_browser_proxy(
+        &self,
+        partition: String,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.stop_browser_proxy(partition).await
+        })
+    }
+
     /// Writes the user's sandbox values (T39); answers the new view of `workspace`.
     ///
     /// # Errors

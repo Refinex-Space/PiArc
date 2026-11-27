@@ -110,6 +110,9 @@ pub struct ScenarioSpec {
     /// files is the server's URL.
     #[serde(default)]
     pub mcp_http: BTreeMap<String, McpHttpSpec>,
+    /// The built-in browser's fake desktop client (design addendum `browser.md` 5.2).
+    #[serde(default)]
+    pub browser: Option<crate::l2::browser_spec::BrowserSpec>,
     /// Extension packages installed before the workspace opens (T40).
     #[serde(default)]
     pub packages: Vec<crate::l2::package_spec::PackageSpec>,

@@ -1,0 +1,45 @@
+id: browser-auto-review
+description: In Auto mode the Browser call itself needs no review, and a site card goes to the user, never to the reviewer model (design addendum browser.md section 8, B2.6.3).
+capabilities: [CAP-BROWSER-SITE-001]
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              { script: 'await (await taskSpace("t").newPage()).goto("https://example.com/");' }
+      - text: 'Opened.'
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - text: never used
+sessions:
+  main: { provider: main, mode: auto }
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'https://example.com/'
+            host: example.com
+            decision: { allowed: true, scope: run }
+        - answer: { output: 'opened' }
+actions:
+  - prompt: { text: 'Open example.com.', turn: one }
+approvals:
+  - { tool: BrowserSite, decision: allow, review: none }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  request_counts: { main: 2, rev: 0 }
+  audit:
+    - kind: browser
+      count: 1
+      detail: { approval: site, step: card, decision: allowOnce, conclusion: allow }

@@ -1,0 +1,18 @@
+{
+  "id": "browser-run",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "browser1",
+          "name": "Browser",
+          "input": {
+            "description": "Check the start page",
+            "script": "const task = await taskSpace(\"start check\");\nconst page = task.page(\"p1\");\nconsole.log({ space: task.spaceId, url: await page.url() });\nconsole.log(await page.screenshot());\nawait task.finish({ keep: [] });"
+          }
+        }
+      ]
+    },
+    { "text": "The browser opened a blank page and took a screenshot." }
+  ]
+}

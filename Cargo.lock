@@ -532,6 +532,7 @@ dependencies = [
  "block-buffer",
  "const-oid",
  "crypto-common",
+ "ctutils",
 ]
 
 [[package]]
@@ -963,6 +964,15 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
+name = "hmac"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6303bc9732ae41b04cb554b844a762b4115a61bfaa81e3e83050991eeb56863f"
+dependencies = [
+ "digest",
+]
 
 [[package]]
 name = "htmd"
@@ -1898,6 +1908,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pbkdf2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "112d82ceb8c5bf524d9af484d4e4970c9fd5a0cc15ba14ad93dccd28873b0629"
+dependencies = [
+ "digest",
+ "hmac",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1943,6 +1963,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "piarc-browser-import"
+version = "0.0.0"
+dependencies = [
+ "aes-gcm",
+ "base64",
+ "cbc",
+ "pbkdf2",
+ "piarc-protocol",
+ "rusqlite",
+ "security-framework",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "thiserror 2.0.21",
+ "windows-sys 0.61.2",
+ "zeroize",
+]
+
+[[package]]
 name = "piarc-checkpoint"
 version = "0.0.0"
 dependencies = [
@@ -1961,6 +2001,7 @@ dependencies = [
  "serde",
  "serde-saphyr",
  "serde_json",
+ "sha2",
  "thiserror 2.0.21",
 ]
 
@@ -1968,12 +2009,14 @@ dependencies = [
 name = "piarc-core"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "encoding_rs",
  "getrandom 0.4.3",
  "http",
  "jsonschema",
  "minisign-verify",
  "nix",
+ "piarc-browser-import",
  "piarc-checkpoint",
  "piarc-config",
  "piarc-diff",
@@ -2002,6 +2045,7 @@ dependencies = [
  "tracing",
  "unicode-normalization",
  "windows-registry",
+ "zeroize",
 ]
 
 [[package]]
@@ -2124,6 +2168,7 @@ dependencies = [
  "piarc-protocol",
  "serde",
  "serde_json",
+ "zeroize",
 ]
 
 [[package]]
@@ -2819,6 +2864,17 @@ dependencies = [
  "cfg-if",
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 import type { Node } from 'prosemirror-model';
 import type { PendingAttachment } from './attachments.js';
+import type { PendingBrowserContext } from './browser-context.js';
 import type { ComposerSubmission, MentionSource } from './Composer.js';
 import type { Draft } from '../shell/session-input.js';
 import type { MentionData } from './schema.js';
@@ -47,4 +48,6 @@ export function draftOf(submission: ComposerSubmission): Draft {
 export interface EditorDraft {
   doc?: Node;
   files?: readonly PendingAttachment[];
+  /** Browser context attachments (B3.5). */
+  contexts?: readonly PendingBrowserContext[];
 }

@@ -16,6 +16,8 @@ use crate::error::{Error, Result};
 /// `autoMode` (T46): the reviewer model and the user's review policy, user-level only.
 /// `proxy` (ADR-0082): the Agent Hosts' proxy, checked by `network::check_setting`.
 /// `git` (ADR-0085): the Git panel's settings, read by `git::settings_of`.
+/// `browser` (B5.5): the built-in browser's settings, user-level only (`tool_io::browser`
+/// reads `agentEnabled` and `approvalTimeout`, the main process the rest).
 pub const CLIENT_KEYS: &[&str] = &[
     "language",
     "appearance",
@@ -24,6 +26,7 @@ pub const CLIENT_KEYS: &[&str] = &[
     "autoMode",
     "proxy",
     "git",
+    "browser",
 ];
 
 /// The user's settings file as a JSON object; `{}` when it does not exist.

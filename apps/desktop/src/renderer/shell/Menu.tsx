@@ -14,6 +14,7 @@ import {
 } from 'react';
 
 import { useT } from '../app/app-context.js';
+import { useOverlayRect } from '../app/overlays.js';
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from './icons.js';
 import { revealListOption } from '../app/list-navigation.js';
 import { isImeComposing } from '../composer/ime-guard.js';
@@ -104,6 +105,8 @@ export function MenuPopup({
   const ownerDoc = useSurfaceDocument();
   const win = documentWindow(ownerDoc);
   const ref = useRef<HTMLDivElement>(null);
+  // A menu over the preview's page would be hidden behind it (B1.5.2).
+  useOverlayRect(ref);
   const [active, setActive] = useState(backLabel && choices.length ? 1 : 0);
   const [query, setQuery] = useState('');
   const filter = useRef<HTMLInputElement>(null);

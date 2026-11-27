@@ -193,8 +193,8 @@ fn snapshot(flags: u32) -> io::Result<OwnedHandle> {
     Ok(OwnedHandle(handle))
 }
 
-/// One running process, for tests that follow a process tree.
-#[cfg(test)]
+/// One running process with its parent (process trees in tests, parent links of
+/// `listeners`).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ProcessEntry {
     pub(crate) pid: u32,
@@ -202,7 +202,6 @@ pub(crate) struct ProcessEntry {
 }
 
 /// Every running process with its parent's pid.
-#[cfg(test)]
 pub(crate) fn process_table() -> io::Result<Vec<ProcessEntry>> {
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
         PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,

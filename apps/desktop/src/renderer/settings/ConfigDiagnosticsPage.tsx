@@ -37,6 +37,7 @@ const REASONS = [
   'projectSandbox',
   'projectAutoMode',
   'projectGit',
+  'projectBrowser',
   'platform',
   'unsupported',
   'disabled',
@@ -67,6 +68,7 @@ const SOURCE_KINDS = [
   'command',
   'outputStyle',
   'plugin',
+  'launch',
   'enterprise',
 ] as const;
 

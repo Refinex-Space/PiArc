@@ -31,8 +31,11 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 mod auto_memory;
+mod browser;
+mod browser_state;
 mod checkpoints;
 mod context;
+mod dev_servers;
 mod exec;
 mod files;
 mod git_files;
@@ -54,6 +57,7 @@ mod web_search;
 mod worktree_hooks;
 pub(crate) use web_search::chosen_backend as chosen_search_backend;
 
+pub use dev_servers::DevServerLimits;
 pub use exec::{CommandEnv, DISPLAY_WINDOW};
 pub use piarc_config::sandbox::Enterprise as SandboxEnterprise;
 use piarc_exec::ExecLimits;
@@ -213,6 +217,9 @@ struct SessionIo {
     /// The git remotes configured when the session was registered (T46: Auto mode trusts
     /// these, not ones added later); a subagent's are its main session's.
     remotes: Vec<piarc_protocol::policy::GitRemote>,
+    /// Hosts the user let the agent’s pages reach for this session (ADR-0089, site cards);
+    /// a subagent uses its main session’s.
+    browser_hosts: Mutex<Vec<String>>,
 }
 
 impl SessionIo {
@@ -255,8 +262,12 @@ pub struct ToolIo {
     terminals: Option<crate::terminal::Terminals>,
     /// The vault, for search services' API keys (T38); none without Core's state.
     secrets: Option<crate::secrets::SecretsService>,
-    /// Notices for the user (`core/notices`).
+    /// Notices for the user (`core/notices`) and the browser's runs (`core/browser`).
     notices: Option<EventSender>,
+    /// `Browser` runs waiting for the desktop client (ADR-0089).
+    browser: Arc<browser::BrowserRuns>,
+    /// Development servers of the sessions (ADR-0092).
+    dev_servers: Arc<dev_servers::DevServers>,
     /// Whether the sandbox failed to start in this Core (T39, R10).
     sandbox_health: Arc<sandbox::Health>,
 }
@@ -297,6 +308,8 @@ impl ToolIo {
             terminals: None,
             secrets: None,
             notices,
+            browser: Arc::default(),
+            dev_servers: Arc::default(),
             sandbox_health: Arc::default(),
         }
     }
@@ -340,6 +353,7 @@ impl ToolIo {
                     | "mcp/cancelElicitation"
                     | "context/settings"
                     | "web/fetch"
+                    | "browser/run"
                     | "web/search"
                     | "web/searchBackend"
             )
@@ -560,6 +574,7 @@ impl ToolIo {
                 file_watch: Mutex::default(),
                 config_seen: tokio::sync::Mutex::default(),
                 remotes,
+                browser_hosts: Mutex::default(),
             }),
         );
         // The baseline `ConfigChange` compares with (T41); outside a runtime (some tests) the
@@ -780,6 +795,7 @@ impl ToolIo {
             "mcp/elicit" => return self.elicit(parse(method, params)?, peer).await,
             "ui/ask" => return self.ask(parse(method, params)?, peer).await,
             "web/fetch" => return self.web_fetch(parse(method, params)?, peer).await,
+            "browser/run" => return self.browser_run(parse(method, params)?, peer).await,
             "web/search" => return self.web_search(parse(method, params)?, peer).await,
             "web/searchBackend" => return to_value(&self.search_backend().await),
             "context/settings" => return self.context_settings(&parse(method, params)?).await,
@@ -836,7 +852,14 @@ impl ToolIo {
                 let p: FsWriteParams = parse(method, params)?;
                 let (s, locks) = (self.session(&p.session_id.0)?, Arc::clone(&self.locks));
                 let checkpoints = self.checkpoints_for(&s).await;
-                answer(move || files::write(permit, &s, &locks, checkpoints.as_ref(), p)).await
+                let (written, session) = ((p.session_id.0.clone(), p.path.clone()), Arc::clone(&s));
+                let result =
+                    answer(move || files::write(permit, &s, &locks, checkpoints.as_ref(), p)).await;
+                if result.is_ok() {
+                    // ADR-0092 rule 6: the agent changed a running server's front end.
+                    self.dev_file_written(&written.0, &session, &written.1);
+                }
+                result
             }
             "fs/spill" => {
                 let p: FsSpillParams = parse(method, params)?;

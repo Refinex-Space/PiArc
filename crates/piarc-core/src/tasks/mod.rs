@@ -27,6 +27,7 @@ mod limits;
 mod monitor;
 mod record;
 mod terminal;
+mod trees;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -46,6 +47,7 @@ pub(crate) use feed::MonitorEnd;
 use feed::MonitorFeed;
 pub use limits::{TaskLimits, TasksConfig};
 pub(crate) use terminal::{NewTerminal, TerminalViews};
+pub(crate) use trees::{TreeSource, TreeTask, command_tree};
 
 use crate::events::{Event, EventSender};
 use crate::route::RouteKey;
@@ -153,6 +155,8 @@ struct Entry {
     done: watch::Sender<bool>,
     feed: Option<MonitorFeed>,
     stop_by: Option<StopBy>,
+    /// Its process tree while it runs (ADR-0092 rule 5).
+    tree: Option<TreeSource>,
 }
 
 #[derive(Default)]
@@ -162,6 +166,8 @@ struct State {
     notices: HashMap<String, BTreeMap<String, Notice>>,
     /// Sessions with a turn running.
     running: HashSet<String>,
+    /// Sessions that got their `browserVerify` reminder in the current turn (ADR-0092 rule 6).
+    verified: HashSet<String>,
     revision: u64,
 }
 
@@ -410,6 +416,7 @@ impl TaskManager {
             done,
             feed,
             stop_by: None,
+            tree: None,
         };
         lock(&self.inner.state)
             .tasks
@@ -739,9 +746,9 @@ impl TaskManager {
 
     /// A turn of `session_id` started.
     pub(crate) fn turn_started(&self, session_id: &str) {
-        lock(&self.inner.state)
-            .running
-            .insert(session_id.to_owned());
+        let mut state = lock(&self.inner.state);
+        state.running.insert(session_id.to_owned());
+        state.verified.remove(session_id);
     }
 
     /// A turn of `session_id` ended: Monitor lines it did not deliver wake the session.
@@ -842,7 +849,7 @@ impl TaskManager {
 
     // ---- notices ----
 
-    fn add_notice(&self, session_id: &str, notice: Notice) {
+    pub(crate) fn add_notice(&self, session_id: &str, notice: Notice) {
         lock(&self.inner.state)
             .notices
             .entry(session_id.to_owned())

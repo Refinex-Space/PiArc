@@ -33,6 +33,9 @@ pub(super) struct Env {
     /// The managed files' root and its layout (T47): `managed.files` and `write_managed` go
     /// below `.0` (`Library/Application Support` or `Program Files` of a fake system root).
     pub(super) managed: Option<(PathBuf, piarc_core::managed::store::Layout)>,
+    /// The scenario has a fake browser client (`browser`): every Core of the run attaches it
+    /// before any workspace opens, as the app's main process does at start.
+    pub(super) browser: bool,
 }
 
 impl Env {
@@ -113,6 +116,7 @@ impl Env {
                 .as_ref()
                 .map(|m| prepare_managed(m, root))
                 .transpose()?,
+            browser: spec.browser.is_some(),
         })
     }
 
@@ -191,8 +195,13 @@ impl Env {
 
     /// Starts Core; every Core of the run delivers to the same `events`.
     pub(super) fn start_core(&self, events: &Arc<Events>) -> Result<CoreRuntime, String> {
-        CoreRuntime::start(self.core_config(), Arc::new(Sink(Arc::clone(events))))
-            .map_err(|e| format!("Core did not start: {e}"))
+        let core = CoreRuntime::start(self.core_config(), Arc::new(Sink(Arc::clone(events))))
+            .map_err(|e| format!("Core did not start: {e}"))?;
+        if self.browser {
+            core.attach_browser_client()
+                .map_err(|e| format!("attaching the browser client: {e}"))?;
+        }
+        Ok(core)
     }
 
     pub(super) fn records(&self) -> BTreeMap<String, Vec<RequestRecord>> {

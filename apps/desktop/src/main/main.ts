@@ -18,6 +18,7 @@ import {
 import { DOCUMENT_SCHEME, ProjectPreviews } from './core/project-preview.js';
 import { registerProjectWatch } from './core/project-file-watch.js';
 import { registerMarkdownImageHandlers } from './core/markdown-images.js';
+import { registerSessionImageHandlers } from './core/session-images.js';
 import { registerProjectFileHandlers } from './core/project-files-ipc.js';
 import { registerEventHandlers } from './core/event-ipc.js';
 import { hasTestingExports } from './core/load.js';
@@ -34,7 +35,7 @@ import { startupFailure } from './core/startup-error.js';
 import { installTestHooks } from './core/test-hooks.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
-import { createIpcRegistrar } from './ipc/register.js';
+import { createIpcRegistrar, registerHostHandler } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
 import { registerMcpHandlers } from './core/mcp-ipc.js';
 import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
@@ -47,6 +48,7 @@ import { applyAppIdentity } from './platform/index.js';
 import { confirmQuit } from './platform/quit.js';
 import { TrayIcon, parseActivity, trayIconDirectory } from './platform/tray.js';
 import { WindowStateFile } from './platform/window-state.js';
+import { BROWSER_HOST_CHANNEL } from '../shared/browser-host.js';
 import type { LaunchTarget } from '../shared/ipc.js';
 import { resolveLocale, Translator } from '../shared/i18n/index.js';
 import { runVelopackStartup } from './platform/velopack.js';
@@ -55,7 +57,19 @@ import { guardWebContents } from './security/navigation.js';
 import { applyPermissionPolicy } from './security/permissions.js';
 import { refuseRemoteDebugging } from './security/runtime-switches.js';
 import { ToolWindows } from './tool-windows.js';
-import { createMainWindow } from './window.js';
+import { createMainWindow, createParkingWindow } from './window.js';
+import { BROWSER_ROUTE } from './browser/agent-bridge.js';
+import { startAgentRuntime, type AgentRuntime } from './browser/agent-runtime.js';
+import { registerBrowserHandlers } from './browser/browser-ipc.js';
+import { ChromeImports, persistentPartition } from './browser/chrome-import.js';
+import { registerChromeImportHandlers } from './browser/import-ipc.js';
+import { chromeUserAgent, refuseClientCertificates } from './browser/guest-session.js';
+import { HOST_PAGE } from './browser/host-session.js';
+import { HOST_SCHEME } from './browser/script-host.js';
+import { BrowserService } from './browser/service.js';
+import { BROWSE_SCHEME, WorkspaceFiles } from './browser/workspace-files.js';
+import { electronExternalLinkPort } from './external-link-port.js';
+import { LinkConfirmations } from './external-links.js';
 
 // Release builds refuse Chromium's remote debugging before anything else runs (T45, I10): the
 // switches are removed, so the DevTools server never starts, and the app exits.
@@ -77,6 +91,12 @@ const trustedOrigins: readonly string[] =
 
 let shell: AppShell | undefined;
 let tray: TrayIcon | undefined;
+/** The built-in browser (ADR-0088); exists once Core runs. */
+let browser: BrowserService | undefined;
+/** The agent's side of the browser (ADR-0089); exists once Core runs. */
+let browserAgent: AgentRuntime | undefined;
+/** Runs started by the development test hook `browserScript`. */
+let testRuns = 0;
 const eventRouter = new EventRouter();
 /** Launch targets that arrived before the shell existed (macOS sends them before `ready`). */
 const early: LaunchTarget[] = [];
@@ -146,6 +166,45 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
       app.run('app.quit');
     },
     mainWindows: () => app.mainWindows().map((w) => w.webContents.id),
+    browser: (sessionId) => {
+      if (browser === undefined) return Promise.reject(new Error('The browser has not started'));
+      return browser.observe(sessionId);
+    },
+    browserScript: async (sessionId, script, timeoutMs) => {
+      if (browserAgent === undefined) throw new Error('The browser agent has not started');
+      const answer = await browserAgent.hosts.run({
+        runId: `test-${String(++testRuns)}`,
+        sessionId,
+        // No Core call: site cards are refused, so pages reach only allowed hosts.
+        callSessionId: sessionId,
+        toolCallId: `test-${String(testRuns)}`,
+        script,
+        timeoutMs: timeoutMs ?? 30_000,
+      });
+      if (answer === undefined) return null;
+      return {
+        output: answer.output,
+        images: (answer.images ?? []).map(({ mediaType, width, height }) => ({
+          mediaType,
+          width,
+          height,
+        })),
+        ...(answer.error == null
+          ? {}
+          : {
+              error: {
+                name: answer.error.name,
+                message: answer.error.message,
+                ...(answer.error.code == null ? {} : { code: answer.error.code }),
+              },
+            }),
+        ...(answer.blockedHosts == null ? {} : { blockedHosts: answer.blockedHosts }),
+      };
+    },
+    browserShare: async (sessionId, tabId) => {
+      if (browserAgent === undefined) throw new Error('The browser agent has not started');
+      return (await browserAgent.spaces.share(sessionId, tabId)) ?? null;
+    },
     attention: () => app.attention.observed(),
     notificationAction: (index) => app.attention.pressAction(index),
     failNext: (channel, message) => {
@@ -171,6 +230,112 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
   });
 }
 
+/** The built-in browser: its service, the idle-page sweep and the cleanup at quit. */
+function startBrowser(
+  core: CoreHost,
+  appShell: AppShell,
+  dirs: DataDirs,
+  toolWindows: ToolWindows,
+  preferences: PreferenceStore,
+): BrowserService {
+  const links = new LinkConfirmations();
+  const devPort = devServer === undefined ? undefined : Number(new URL(devServer.origin).port);
+  const denied = new Set<number>(devPort === undefined || devPort === 0 ? [] : [devPort]);
+  const service = new BrowserService({
+    core: core.runtime,
+    windows: () => appShell.mainWindows(),
+    translator: () => appShell.t(),
+    openExternal: (window, url) => {
+      void links.open(window?.id ?? 0, url, electronExternalLinkPort(window, appShell.t()));
+    },
+    dataDir: path.join(dirs.data, 'browser'),
+    platform: process.platform,
+    deniedPorts: () => denied,
+    createParking: createParkingWindow,
+    files: new WorkspaceFiles(core.runtime),
+    home: app.getPath('home'),
+    toolWindow: (token, owner) => toolWindows.previewWindow(token, owner),
+    // The user's settings (B5.5, `browser.*` of the user's settings file).
+    preferences: () => {
+      const chosen = preferences.get().browser;
+      return {
+        storage: chosen.storage,
+        searchEngine: chosen.searchEngine,
+        localHostnames: chosen.localHostnames,
+        devtoolsDock: chosen.devtoolsDock,
+        downloadDirectory: chosen.downloadDirectory,
+      };
+    },
+  });
+  // A changed DevTools dock (or other browser setting) applies to the open views at once.
+  preferences.onChange(() => {
+    service.preferencesChanged();
+  });
+  const sweep = setInterval(() => {
+    service.discardIdle();
+  }, 60_000);
+  sweep.unref();
+  app.on('before-quit', () => {
+    service.quitting();
+  });
+  app.on('will-quit', () => {
+    clearInterval(sweep);
+    service.dispose();
+  });
+  return service;
+}
+
+/**
+ * The agent's side of the browser (ADR-0089): script hosts answer `core/browser` runs. Core
+ * offers the `Browser` tool only after `attachBrowserClient`, so it comes last.
+ */
+function startBrowserAgent(
+  core: CoreHost,
+  service: BrowserService,
+  preferences: PreferenceStore,
+  imports: ChromeImports,
+): void {
+  const hostDevServer = import.meta.env.DEV ? BROWSER_HOST_VITE_DEV_SERVER_URL : undefined;
+  const agent = startAgentRuntime({
+    service,
+    core: core.runtime,
+    hostFolder: bundlePath('renderer', BROWSER_HOST_VITE_NAME),
+    hostPage: hostDevServer === undefined ? HOST_PAGE : `${hostDevServer}/index.html`,
+    devOrigin: hostDevServer === undefined ? undefined : new URL(hostDevServer).origin,
+    preload: bundlePath('build', 'browser-host.cjs'),
+    devTools: !__PIARC_RELEASE_BUILD__,
+    localNames: () => preferences.get().browser.localHostnames,
+    // B5.4: hosts with imported Chrome sign-ins are sensitive for the agent.
+    importedHost: async (sessionId, host) =>
+      imports.covers((await service.agentModel(sessionId)).workspace, host),
+    userAgent: chromeUserAgent(app.userAgentFallback),
+    handedOff: () => {
+      // The panel shows the hand-off from the Space's state (B2.5.3).
+    },
+    handedBack: (sessionId) => {
+      // The agent asked the user to act in the browser; it goes on when the user says so.
+      core.runtime
+        .followUp(sessionId, shell?.t().t('browser.agent.handedBack') ?? '')
+        .catch((error: unknown) => {
+          console.warn('[browser] could not tell the agent the browser is back', error);
+        });
+    },
+  });
+  registerHostHandler(
+    BROWSER_HOST_CHANNEL,
+    (sender) => agent.hosts.isHost(sender),
+    (sender, request) => agent.hosts.call(sender, request),
+  );
+  eventRouter.listen(BROWSER_ROUTE, (batch) => {
+    agent.bridge.deliver(batch);
+  });
+  app.on('will-quit', () => {
+    agent.hosts.dispose();
+  });
+  agent.bridge.attach();
+  browserAgent = agent;
+}
+
 function start(dirs: DataDirs): void {
   let toolWindows: ToolWindows | undefined;
   let previews: ProjectPreviews | undefined;
@@ -185,7 +350,15 @@ function start(dirs: DataDirs): void {
   app.on('session-created', (created) => {
     applyPermissionPolicy(created, trustedOrigins);
   });
+  // Browser guests and the agent's script host are recognized by their partition when they
+  // are created (ADR-0088 rule 2): they get the browser's guards, never the app's.
+  refuseClientCertificates((contents) => browser?.isBrowserContents(contents) ?? false);
   app.on('web-contents-created', (_event, contents) => {
+    if (browser?.isBrowserContents(contents) === true) return;
+    contents.on('destroyed', () => browser?.released(contents));
+    contents.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) browser?.released(contents);
+    });
     guardWebContents(
       contents,
       trustedOrigins,
@@ -319,6 +492,7 @@ function start(dirs: DataDirs): void {
     registerMarkdownImageHandlers(registerHandler, core.runtime, terminalOwners, () =>
       appShell.t(),
     );
+    registerSessionImageHandlers(registerHandler, dirs.data);
     registerProjectFileHandlers(registerHandler, core.runtime, terminalOwners, (child) =>
       toolWindows?.fileOwner(child),
     );
@@ -339,7 +513,9 @@ function start(dirs: DataDirs): void {
     toolWindows.register(registerHandler);
     // Every page is watched from its creation: terminal input needs the page's recent real
     // input (I51), so the first keystroke must already be seen.
+    // A guest's input (including CDP's synthetic input) is never the workbench's real input.
     app.on('web-contents-created', (_event, contents) => {
+      if (browser?.isBrowserContents(contents) === true) return;
       terminalOwners.watch(contents);
     });
     registerEventHandlers(registerHandler, eventRouter, (windowId, route) =>
@@ -354,6 +530,20 @@ function start(dirs: DataDirs): void {
       terminalOwners,
       () => preferences.locale(),
     );
+    browser = startBrowser(core, appShell, dirs, toolWindows, preferences);
+    registerBrowserHandlers(registerHandler, browser);
+    // Chrome sign-in import (ADR-0090): native confirmation, then Core decrypts and the
+    // cookies go into the workspace's persistent partition.
+    const chromeImports = new ChromeImports({
+      core: core.runtime,
+      storage: () => preferences.get().browser.storage,
+      translator: () => appShell.t(),
+      confirm: nativeConfirm,
+      platform: process.platform,
+      partition: persistentPartition,
+    });
+    registerChromeImportHandlers(registerHandler, core.runtime, chromeImports);
+    startBrowserAgent(core, browser, preferences, chromeImports);
     startTestHooks(core, terminalOwners, appShell);
     // The preferences come first: the window's language, theme and menu depend on them.
     void preferences.load().then(() => {
@@ -376,7 +566,13 @@ runVelopackStartup();
 // privileges.
 applyAppIdentity();
 app.enableSandbox();
-protocol.registerSchemesAsPrivileged([APP_SCHEME_REGISTRATION, DOCUMENT_SCHEME]);
+protocol.registerSchemesAsPrivileged([
+  APP_SCHEME_REGISTRATION,
+  DOCUMENT_SCHEME,
+  BROWSE_SCHEME,
+  // The agent's script host page (ADR-0089): a standard, secure origin of its own.
+  { scheme: HOST_SCHEME, privileges: { standard: true, secure: true } },
+]);
 // Before `ready` and before the single-instance lock, which lives in `userData`.
 const dataDirs = applyDataDirs(app, process.env, process.platform);
 

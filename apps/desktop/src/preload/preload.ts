@@ -335,6 +335,28 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.folderDialog)
       .then((value: unknown) => expectStringOrNull(value)),
+  chromeProfiles: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.chromeProfiles).then((value: unknown) => expectString(value)),
+  chromeSites: (profile) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.chromeSites, profile)
+      .then((value: unknown) => expectString(value)),
+  chromeImport: (workspace, profile, sites) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.chromeImport, workspace, profile, sites)
+      .then((value: unknown) => expectString(value)),
+  browserImports: (workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.browserImports, workspace)
+      .then((value: unknown) => expectString(value)),
+  forgetBrowserImport: (workspace, site) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.browserForgetImport, workspace, site)
+      .then((value: unknown) => expectString(value)),
+  clearBrowserData: async (workspace) => {
+    await ipcRenderer.invoke(IPC_CHANNELS.browserClearWorkspace, workspace);
+    return null;
+  },
   openWorkspace: (path) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.workspaceOpen, path)
@@ -411,6 +433,9 @@ const api: PiarcApi = {
       .then((value: unknown) => expectString(value)),
   cancelGit: (opId) =>
     ipcRenderer.invoke(IPC_CHANNELS.gitCancel, opId).then((value: unknown) => value === true),
+  browser: (id, request) => ipcRenderer.invoke(IPC_CHANNELS.browserRequest, id, request),
+  placeBrowser: (id, placement) =>
+    ipcRenderer.invoke(IPC_CHANNELS.browserPlace, id, placement).then(() => undefined),
   switchBranch: (id, entryId) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionSwitchBranch, id, entryId)
@@ -434,6 +459,10 @@ const api: PiarcApi = {
   markdownImage: (id, document, request) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.markdownImage, id, document, request)
+      .then((s: unknown) => expectString(s)),
+  sessionImage: (id, blob, release) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionImage, id, blob, ...(release === undefined ? [] : [release]))
       .then((s: unknown) => expectString(s)),
   markdownImageSettings: (req) =>
     ipcRenderer

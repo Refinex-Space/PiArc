@@ -595,3 +595,45 @@ fn git_settings_apply_from_the_user_file_only() {
         );
     }
 }
+
+/// The built-in browser's settings (B5.5) come from the user's file only: a project file
+/// cannot turn the agent's browser on, lengthen the site card timeout or change where
+/// downloads go, and diagnostics say why.
+#[test]
+fn browser_settings_apply_from_the_user_file_only() {
+    let f = Fixture::new("browser-settings");
+    write(
+        &f.user(),
+        r#"{"browser": {"agentEnabled": false, "approvalTimeout": 60, "storage": "session",
+            "localHostnames": ["*.localhost"], "devtoolsDock": "right"}}"#,
+    );
+    write(
+        &f.project(),
+        r#"{"browser": {"agentEnabled": true, "approvalTimeout": 600,
+            "downloadDirectory": "/tmp/elsewhere"}}"#,
+    );
+    let settings = Settings::load(f.table(), TrustState::Trusted);
+    assert!(settings.issues().is_empty(), "{:?}", settings.issues());
+    assert_eq!(settings.get("/browser/agentEnabled"), Some(&json!(false)));
+    assert_eq!(settings.get("/browser/approvalTimeout"), Some(&json!(60)));
+    assert_eq!(settings.get("/browser/downloadDirectory"), None);
+    let report = settings.diagnostics();
+    let project = report
+        .iter()
+        .find(|r| r.layer == ids::PROJECT)
+        .expect("project report");
+    for pointer in [
+        "/browser/agentEnabled",
+        "/browser/approvalTimeout",
+        "/browser/downloadDirectory",
+    ] {
+        assert!(
+            project
+                .ignored
+                .iter()
+                .any(|k| k.pointer == pointer && k.reason == IgnoreReason::ProjectBrowser),
+            "{pointer}: {:?}",
+            project.ignored
+        );
+    }
+}

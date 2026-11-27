@@ -1,0 +1,41 @@
+id: browser-upload-same-name
+description: Two uploads of one Browser run that stage files with the same name keep separate copies - the first file input's copy still holds the first file after the second staging, since the page may read it until the run ends (design addendum browser.md B2.6.6).
+capabilities: [CAP-BROWSER-FILES-001]
+workspace:
+  files:
+    a/report.txt: "first file\n"
+    b/report.txt: "second file\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              {
+                script: 'const p = (await taskSpace("t").pages())[0]; await p.setInputFiles("#one", "a/report.txt"); await p.setInputFiles("#two", "b/report.txt");',
+              }
+      - text: 'Both inputs are filled.'
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - stage:
+            paths: [a/report.txt]
+            staged: ["first file\n"]
+        # The client checks that the first copy still holds "first file" after this one.
+        - stage:
+            paths: [b/report.txt]
+            staged: ["second file\n"]
+        - answer: { output: 'filled' }
+actions:
+  - prompt: { text: 'Fill both file inputs.', turn: one }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  request_counts: { main: 2 }
+  audit:
+    - kind: browser
+      count: 2
+      detail: { approval: upload, toolCallId: b1, conclusion: allow }

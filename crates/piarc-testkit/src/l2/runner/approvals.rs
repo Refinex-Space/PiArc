@@ -169,6 +169,12 @@ fn check_card(
             ));
         }
     }
+    if expected.rules.as_ref().is_some_and(|r| r != &card.rules) {
+        return Err(format!(
+            "approval expected rules {:?}, got {:?}",
+            expected.rules, card.rules
+        ));
+    }
     if expected
         .notification_allow
         .is_some_and(|allow| allow != card.notification_allow)

@@ -102,4 +102,10 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0085](0085-git-command-boundaries.md) | Git 命令的执行边界：只读模式命令行覆盖可执行键、写操作只在受信任项目、用户模式环境、参数约束、串行与忙碌、危险操作原生确认、回滚快照、输出脱敏、gh 约束 | 已接受（补充） |
 | [0086](0086-commit-message-generation.md) | 提交信息生成：会话级 `session/commitMessage`、Core 组装与扣下敏感文件、语言跟随界面、只填入输入框 | 已接受（补充） |
 | [0087](0087-pr-description-and-review.md) | PR 描述与 AI 审查的生成：会话级 `session/gitAssist`（任务 `prDescription`、`review`）、扣下与脱敏同 0086、审查发现由 Core 校验、只呈现不执行 | 已接受（补充） |
+| [0088](0088-browser-guests-in-the-security-baseline.md) | 浏览器 guest 进入安全基线：独立分区、按分区识别并走 guest 守卫、不计入真实输入、浏览器出网经 Core 代理做地址检查、THR-13 措辞限定应用窗口 | 已接受 |
+| [0089](0089-agent-browser-execution-boundary.md) | 智能体浏览器的执行边界：`Browser` 工具与 `browser/run`、Core 的 `BrowserClient`、沙箱脚本宿主、请求闸门与端口策略、站点卡复用网络卡、CDP 允许名单、文件经 Core | 已接受 |
+| [0090](0090-chrome-cookie-import.md) | 从 Chrome 按站点导入登录；浏览器分区 cookie 是保险箱外的凭据（ADR-0021 例外），导入站点每会话审批 | 已接受 |
+| [0091](0091-browser-sdk-from-ego-browser.md) | 浏览器 SDK 移植 ego-browser（MIT，上游 `56589ea8`）：保留布局、换绑定、删子系统、严格类型不加豁免 | 已接受（补充） |
+| [0092](0092-launch-configs-and-dev-servers.md) | 启动配置（`.piarc/launch.json`、`.claude/launch.json` 只读）、`TaskKind::DevServer`、进程树端口发现、`autoVerify` | 已接受（补充） |
+| [0093](0093-tool-result-images-in-transcript.md) | 工具结果图片写入会话 blob 并在 transcript 显示（关闭 I234） | 已接受（补充） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |

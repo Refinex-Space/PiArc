@@ -508,6 +508,26 @@ pub(in crate::tool_io) fn claim_fetch(
     Ok(())
 }
 
+/// Consumes the grant of an allowed `Browser` call whose `script` is `p.script` (ADR-0089):
+/// one approval, one run.
+pub(in crate::tool_io) fn claim_browser(
+    s: &SessionIo,
+    p: &piarc_protocol::browser::BrowserRunParams,
+    peer: &Peer,
+) -> Result<(), ErrorObject> {
+    let mut state = lock(&s.policy);
+    let grant = state
+        .grants
+        .get(&p.origin.tool_call_id)
+        .filter(|g| g.belongs(&p.origin.tool, peer) && g.tool == "Browser")
+        .ok_or_else(mismatch)?;
+    if grant.input.get("script").and_then(Value::as_str) != Some(p.script.as_str()) {
+        return Err(mismatch());
+    }
+    state.grants.remove(&p.origin.tool_call_id);
+    Ok(())
+}
+
 /// Consumes the grant of an allowed `WebSearch` call whose `query` is `p.query` (T38): one
 /// approval, one search.
 pub(in crate::tool_io) fn claim_search(

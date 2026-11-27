@@ -32,6 +32,12 @@ pub enum Error {
     /// [`crate::CwdProbe::pin_program`] was given a name that is not a plain program name.
     #[error("{0:?} is not a plain program name")]
     InvalidProgram(String),
+    /// The listening TCP sockets cannot be listed ([`crate::listeners::listening`]).
+    #[error("cannot list the listening TCP ports: {source}")]
+    Listeners {
+        /// The operating system's error, or `lsof`'s failure.
+        source: io::Error,
+    },
 }
 
 /// Result type of this crate's file and process functions.
@@ -50,16 +56,17 @@ impl Error {
             Self::File { source, .. } if source.kind() == io::ErrorKind::NotFound => {
                 ErrorKind::NotFound
             }
-            Self::File { .. } | Self::Process { .. } => ErrorKind::IoError,
+            Self::File { .. } | Self::Process { .. } | Self::Listeners { .. } => ErrorKind::IoError,
             Self::InvalidProgram(_) => ErrorKind::InvalidParams,
         }
     }
 
-    /// Whether the same call can succeed later: never; a file the data directory cannot hold
-    /// or a process that cannot be followed needs the user, and a bad name stays bad.
+    /// Whether the same call can succeed later: a file the data directory cannot hold or a
+    /// process that cannot be followed needs the user, and a bad name stays bad; listing the
+    /// listening ports is asked again on the next scan.
     #[must_use]
     pub fn retryable(&self) -> bool {
-        false
+        matches!(self, Self::Listeners { .. })
     }
 
     /// The file involved, for callers that report file errors in their own shape.
@@ -67,7 +74,7 @@ impl Error {
     pub fn path(&self) -> Option<&Path> {
         match self {
             Self::File { path, .. } => Some(path),
-            Self::Process { .. } | Self::InvalidProgram(_) => None,
+            Self::Process { .. } | Self::InvalidProgram(_) | Self::Listeners { .. } => None,
         }
     }
 
@@ -82,7 +89,9 @@ impl Error {
     #[must_use]
     pub fn into_io(self) -> Option<io::Error> {
         match self {
-            Self::File { source, .. } | Self::Process { source, .. } => Some(source),
+            Self::File { source, .. }
+            | Self::Process { source, .. }
+            | Self::Listeners { source } => Some(source),
             Self::InvalidProgram(_) => None,
         }
     }

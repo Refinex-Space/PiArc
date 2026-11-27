@@ -65,6 +65,12 @@ export const A11Y_STATES = [
     page: 'git',
     note: 'Git (branches, push and pull, commits)',
   },
+  {
+    id: 'settings:browser',
+    area: 'settings',
+    page: 'browser',
+    note: 'Browser: the agent, browsing data and Chrome sign-ins, pages (B5.5)',
+  },
   { id: 'settings:agents', area: 'settings', page: 'agents', note: 'Subagents' },
   {
     id: 'settings:skills',
@@ -128,6 +134,7 @@ export const A11Y_STATES = [
   { id: 'row:reminder', area: 'row', row: 'reminder', note: 'a reminder in the detailed view' },
   { id: 'row:subagent', area: 'row', row: 'subagent', note: 'a subagent card' },
   { id: 'row:webSearch', area: 'row', row: 'webSearch', note: 'a web search with its sources' },
+  { id: 'row:browser', area: 'row', row: 'browser', note: 'a Browser call with its screenshot' },
   { id: 'row:todo', area: 'row', row: 'todo', note: 'the task card (TodoWrite)' },
   { id: 'row:plan', area: 'row', row: 'plan', note: 'a submitted plan (ExitPlanMode)' },
   {
@@ -186,6 +193,21 @@ export const A11Y_STATES = [
     note: 'Git tool: the Commit view with a staged file and the message box',
   },
   { id: 'state:git-branches', area: 'state', note: 'Git tool: the branch popup' },
+  {
+    id: 'state:browser-start',
+    area: 'state',
+    note: 'preview: the start page with a launch configuration and the focused address bar',
+  },
+  {
+    id: 'state:browser-server-failed',
+    area: 'state',
+    note: 'preview: a development server that failed, with its last log lines and actions',
+  },
+  {
+    id: 'state:browser-console',
+    area: 'state',
+    note: 'preview: the console drawer with a message, a warning and an uncaught error',
+  },
   {
     id: 'state:git-log',
     area: 'state',
@@ -267,6 +289,22 @@ export const A11Y_STATES = [
   },
 
   { id: 'panel:preview', area: 'panel', panel: 'preview', note: 'session preview tile' },
+  {
+    id: 'state:browser-picks',
+    area: 'state',
+    note: 'preview: picker on, tray with a picked element card (B3.1)',
+  },
+  {
+    id: 'state:browser-annotate',
+    area: 'state',
+    note: 'preview: frozen page with the annotation tools and a numbered marker (B3.3)',
+  },
+  {
+    id: 'dialog:browser-annotate-discard',
+    area: 'dialog',
+    source: 'browser/AnnotateCanvas.tsx',
+    note: 'leaving an annotation that is not in the conversation',
+  },
   // Dialogs, one or more per file that renders `<Dialog>`.
   {
     id: 'dialog:workspace-search',
@@ -305,6 +343,12 @@ export const A11Y_STATES = [
     area: 'dialog',
     source: 'settings/ServiceChooser.tsx',
     note: 'add a model service',
+  },
+  {
+    id: 'dialog:chrome-import',
+    area: 'dialog',
+    source: 'settings/ChromeImportDialog.tsx',
+    note: 'import sign-ins from Chrome (no Chrome in the test home)',
   },
   {
     id: 'dialog:sign-in',

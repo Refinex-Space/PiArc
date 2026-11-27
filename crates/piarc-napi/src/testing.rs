@@ -62,7 +62,9 @@ impl CoreRuntime {
     /// these names on local ports and nothing else) and `PIARC_TEST_SANDBOX_ENTERPRISE_DOMAINS`
     /// (comma-separated domains standing in for the enterprise's allowlist until T47). G5:
     /// `PIARC_TEST_GH` (the fake `gh` the Git tool runs instead of the one on `PATH`, so L4
-    /// never reaches the machine's `gh` and the user's GitHub account).
+    /// never reaches the machine's `gh` and the user's GitHub account). The Chrome import
+    /// (ADR-0090) reads `PIARC_TEST_CHROME_ROOT` (a fixture Chrome folder) and always uses the
+    /// fixed test key, never the keychain or DPAPI.
     #[napi(factory, catch_unwind)]
     pub fn create_for_tests(
         env: Env,
@@ -140,6 +142,12 @@ impl CoreRuntime {
             if let Some(program) = std::env::var_os("PIARC_TEST_GH") {
                 config.gh_program = Some(std::path::PathBuf::from(program));
             }
+            // The Chrome sign-in import (ADR-0090) never reads this machine's Chrome or
+            // keychain here: Chrome's folder is `PIARC_TEST_CHROME_ROOT` (a fixture) or the
+            // test home's, and the key is the fixed test key.
+            config.chrome = piarc_core::browser::import::ChromeConfig::for_tests(
+                std::env::var_os("PIARC_TEST_CHROME_ROOT").map(std::path::PathBuf::from),
+            );
             if let Some(file) = std::env::var_os("PIARC_TEST_OAUTH_PROVIDER") {
                 config.sessions.tune_host = Some(std::sync::Arc::new(move |host| {
                     host.extra_args.push("--test-oauth-provider".into());

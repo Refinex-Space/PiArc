@@ -9,6 +9,8 @@
 @import './files/viewer-styles.css';
 @import './files/tree-style.css';
 @import './changes/git/git.css';
+@import './browser/browser.css';
+@import './settings/browser-page.css';
 @import './changes/git/history.css';
 @import './changes/git/merge.css';
 @import './changes/git/review.css';
@@ -68,6 +70,7 @@ body,
    virtual lists. */
 :root[data-app] :focus-visible:not(:where([data-focus-proxy])),
 :root[data-app] .settings-search:has(input:focus-visible),
+:root[data-app] .browser-address:has(> input:focus-visible),
 .segment:has(> input:focus-visible),
 .composer-attach:has(> input:focus-visible),
 :root[data-app] .terminal-surface:has(textarea:focus-visible) {
@@ -99,7 +102,8 @@ body,
    This also covers implicit text inputs, multiline editors, and native selects. */
 :root[data-app][data-pointer-focus]
   :is(input:read-write, input[readonly], textarea, select):focus:not(:where([data-focus-proxy])),
-:root[data-app][data-pointer-focus] .settings-search:has(input:focus) {
+:root[data-app][data-pointer-focus] .settings-search:has(input:focus),
+:root[data-app][data-pointer-focus] .browser-address:has(> input:focus) {
   outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
   outline-offset: calc(-1 * var(--piarc-c-focus-width));
   transition: outline-color var(--piarc-motion-fast) var(--piarc-motion-easing);

@@ -39,7 +39,7 @@ import {
   currentPlan,
   PlanMode,
 } from './plan-mode.js';
-import { backgroundTaskNotice } from './prompts/notices.js';
+import { REMIND_TYPES, formatRemind, isRemindType } from './core-reminders.js';
 import { createAskUserQuestionTool } from './questions.js';
 import { createSuggestNextStepsTool } from './next-steps.js';
 import { REMINDER_ENTRY, Reminders, reminderRecords, type ReminderMessage } from './reminders.js';
@@ -48,6 +48,7 @@ import { createTodoWriteTool, currentTodos, todosOf, todoWatch } from './todos.j
 import type { AuxiliaryModel } from './auxiliary.js';
 import { createAgentTool, type AgentToolHost } from './subagents/agent-tool.js';
 import { createKillShellTool, createMonitorTool } from './task-tools.js';
+import { createBrowserTool } from './browser.js';
 import { createWebFetchTool } from './web-fetch.js';
 import { createWebSearchTool } from './web-search.js';
 import type { SessionSkills } from './skills/session-skills.js';
@@ -68,6 +69,8 @@ export interface HostToolCapabilities {
   readonly webFetch?: boolean;
   /** `webSearch` (T38): Core answers `web/searchBackend` and `web/search`. */
   readonly webSearch?: boolean;
+  /** `browser` (ADR-0089): a desktop app runs `Browser` scripts (`browser/run`). */
+  readonly browser?: boolean;
   /** `subagents` (T31): the `Agent` tool and child sessions Core registers. */
   readonly subagents?: boolean;
   /** `backgroundTasks` (T32): background commands, `KillShell` and `Monitor`. */
@@ -295,6 +298,9 @@ export class SessionHarness {
       ...(core?.webFetch === true && this.#o.io !== undefined && this.#o.auxiliary !== undefined
         ? [createWebFetchTool(profile.WebFetch, this.#o.io, this.#o.auxiliary)]
         : []),
+      ...(core?.browser === true && this.#o.io !== undefined
+        ? [createBrowserTool(profile.Browser, this.#o.io)]
+        : []),
       ...(this.webSearchOffered && this.#o.io !== undefined && this.#o.auxiliary !== undefined
         ? [
             createWebSearchTool(profile.WebSearch, {
@@ -351,35 +357,32 @@ export class SessionHarness {
   }
 
   /**
-   * `session/remind`: a background task's reminder for the model's next request. With a `key`
-   * (Core's task manager, T32) the text is complete as given, a queued reminder with the same
-   * key is replaced, and one with the same type and source already on the branch is not
-   * queued again (`'delivered'`): Core resends what it has not seen delivered.
+   * `session/remind`: a reminder Core pushes for the model's next request (`core-reminders.ts`
+   * lists the types and words each). With a `key` (Core's task manager, T32) a queued reminder
+   * with the same key is replaced, and one with the same type and source already on the branch
+   * is not queued again (`'delivered'`): Core resends what it has not seen delivered.
    */
   remind(
     params: Pick<SessionRemindParams, 'type' | 'source' | 'text'> & { readonly key?: string },
   ): 'queued' | 'delivered' {
-    if (params.type !== 'backgroundTask' && params.type !== 'monitorOutput') {
+    if (!isRemindType(params.type)) {
       throw new AhpError(
         'invalidParams',
-        'session/remind accepts backgroundTask and monitorOutput reminders only',
+        `session/remind accepts ${REMIND_TYPES.join(', ')} reminders only`,
         { details: { member: 'type' } },
       );
     }
+    const text = formatRemind(params.type, params.source, params.text, params.key !== undefined);
     if (params.key === undefined) {
       this.reminders.enqueue(this.reminders.uniqueKey('task'), {
         type: params.type,
         source: params.source,
-        text: backgroundTaskNotice(params.source, params.text),
+        text,
       });
       return 'queued';
     }
     if (this.#delivered(params.type, params.source)) return 'delivered';
-    this.reminders.enqueue(params.key, {
-      type: params.type,
-      source: params.source,
-      text: params.text,
-    });
+    this.reminders.enqueue(params.key, { type: params.type, source: params.source, text });
     return 'queued';
   }
 

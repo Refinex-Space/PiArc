@@ -1,0 +1,66 @@
+id: browser-site-always-rule
+description: Always allow on a site card saves Browser(domain:…) in the user's settings, so a later session's page reaches the host through that rule for the run without a card (design addendum browser.md B2.6.3).
+capabilities: [CAP-BROWSER-SITE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              {
+                script: 'await (await taskSpace("t").newPage()).goto("https://docs.example.org/");',
+              }
+      - text: 'Saved.'
+      - tool_calls:
+          - id: b2
+            name: Browser
+            input:
+              {
+                script: 'await (await taskSpace("t").newPage()).goto("https://docs.example.org/later");',
+              }
+      - text: 'No card this time.'
+sessions:
+  main: { provider: main }
+  later: { provider: main, deferred: true }
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'https://docs.example.org/'
+            host: docs.example.org
+            decision: { allowed: true, scope: session }
+        - answer: { output: 'first' }
+    - run: { toolCallId: b2 }
+      steps:
+        - site:
+            url: 'https://docs.example.org/later'
+            host: docs.example.org
+            decision: { allowed: true, scope: run }
+        - answer: { output: 'second' }
+actions:
+  - prompt: { session: main, text: 'Open the docs.', turn: one }
+  - wait: { session: main, method: turn/completed, turn: one }
+  - prompt: { session: later, text: 'Open the docs again.', turn: two }
+approvals:
+  - tool: BrowserSite
+    decision: always
+    rules: ['Browser(domain:docs.example.org)']
+expect:
+  events:
+    - { session: later, method: turn/completed, turn: two, params: { status: completed } }
+  requests:
+    - index: 3
+      tool_results:
+        - { id: b2, is_error: false, contains: 'second' }
+  request_counts: { main: 4 }
+  audit:
+    - kind: browser
+      count: 1
+      detail:
+        { approval: site, toolCallId: b1, step: card, decision: allowAlways, conclusion: allow }
+    - kind: browser
+      count: 1
+      detail: { approval: site, toolCallId: b2, step: allowRule, conclusion: allow }

@@ -414,3 +414,43 @@ fn a_hook_whose_type_headers_variables_or_model_change_is_a_new_item() {
     );
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// ADR-0092: each launch configuration of both files is an item named by what it runs; a
+/// changed environment value or port is a new item.
+#[test]
+fn launch_configurations_are_executable_items() {
+    let root = std::env::temp_dir().join(format!("piarc-exec launch 中文 {}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let launch = |port: u16| {
+        format!(
+            "{{ // dev\n  \"configurations\": [{{ \"name\": \"web\", \"runtimeExecutable\": \"npm\", \"runtimeArgs\": [\"run\", \"dev\"], \"port\": {port} }},],\n}}"
+        )
+    };
+    put(&root, ".piarc/launch.json", &launch(3000));
+    put(
+        &root,
+        ".claude/launch.json",
+        r#"{"configurations":[{"name":"api","program":"${workspaceFolder}/api.js"}]}"#,
+    );
+    let first = enumerate(&root);
+    let launches: Vec<&Item> = first
+        .items
+        .iter()
+        .filter(|i| i.category == Category::LaunchConfig)
+        .collect();
+    assert_eq!(launches.len(), 2, "{launches:?}");
+    assert_eq!(launches[0].source, ".claude/launch.json");
+    assert!(
+        launches[0]
+            .name
+            .starts_with("api: node '${workspaceFolder}/api.js' [")
+    );
+    assert_eq!(launches[1].source, ".piarc/launch.json");
+    assert!(launches[1].name.starts_with("web: npm run dev ["));
+    put(&root, ".piarc/launch.json", &launch(3001));
+    let later = enumerate(&root);
+    let added = new_items(&later.items, &first.items);
+    assert_eq!(added.len(), 1, "{added:?}");
+    assert!(added[0].name.starts_with("web: npm run dev ["));
+    std::fs::remove_dir_all(&root).expect("cleanup");
+}

@@ -25,6 +25,8 @@
 //! - Managed (enterprise) settings ([`managed`], T47): checking and merging the documents
 //!   Core reads from the administrator's places into the `enterprise` layer, its locks and
 //!   which settings it locks.
+//! - Launch configurations ([`launch`], ADR-0092): `.piarc/launch.json` over the read-only
+//!   `.claude/launch.json` (JSONC), problems with their places, ports and fingerprints.
 //!
 //! # Not responsible for
 //!
@@ -47,6 +49,7 @@ pub mod claude;
 pub mod diagnostics;
 pub mod executables;
 pub mod frontmatter;
+pub mod launch;
 pub mod layers;
 pub mod managed;
 pub mod mcp;

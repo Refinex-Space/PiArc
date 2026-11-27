@@ -43,7 +43,8 @@ function Link({
   children: ReactNode;
 }) {
   const t = useT();
-  const files = useContext(TranscriptContext)?.fileLinks;
+  const view = useContext(TranscriptContext);
+  const files = view?.fileLinks;
   if (projectTarget && files?.root) {
     const target =
       projectTarget.startsWith('#L') && files.document
@@ -81,6 +82,10 @@ function Link({
       href={href}
       title={title ?? href}
       onClick={(event) => {
+        if (view?.actions.openLink?.(href) === true) {
+          event.preventDefault();
+          return;
+        }
         openLink(event, href);
       }}
     >

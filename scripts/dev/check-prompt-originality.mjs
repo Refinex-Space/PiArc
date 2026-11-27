@@ -32,6 +32,7 @@ function render() {
         import * as memory from './agent-host/src/harness/prompts/auto-memory.ts';
         import * as commit from './agent-host/src/harness/prompts/commit-message.ts';
         import * as assist from './agent-host/src/harness/prompts/git-assist.ts';
+        import * as browserNotices from './agent-host/src/harness/prompts/browser-notices.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -91,7 +92,9 @@ function render() {
           memory.MEMORY_PREAMBLE, memory.managedSource(''), memory.restoredMemory(''),
           // ADR-0086, ADR-0087: the Git tool's commit message, PR description and review requests.
           commit.COMMIT_MESSAGE_SYSTEM, ...Object.values(commit.LANGUAGE_REQUIREMENT), commit.AMEND_NOTE,
-          assist.PR_DESCRIPTION_SYSTEM, assist.REVIEW_SYSTEM, ...Object.values(assist.ASSIST_LANGUAGE)];
+          assist.PR_DESCRIPTION_SYSTEM, assist.REVIEW_SYSTEM, ...Object.values(assist.ASSIST_LANGUAGE),
+          // ADR-0092: the reminder after the agent changed a running dev server's front end.
+          browserNotices.browserVerifyNotice(' ' + String.fromCharCode(10) + ' ')];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,
       resolveDir: repoRoot,
     },

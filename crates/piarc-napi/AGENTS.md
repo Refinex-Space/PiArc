@@ -26,6 +26,7 @@ NAPI-RS 导出层（薄）：把 `piarc_core::CoreRuntime` 暴露为主进程里
 - Promise 用 `JsDeferred` 由 Core 自己的运行时结算，不用 `#[napi] async fn`（它会另起 NAPI-RS 的全局 tokio 运行时）。
 - `testing` feature 只给开发构建：演示事件源、`echo`、`eventStats`、`triggerPanic`、`spawnPanickingTask`。发布构建不带。
 - `.d.ts` 快照在 `apps/desktop/src/main/core/native/`：`piarc-core.d.ts`（发布）与 `piarc-core.testing.d.ts`（开发），由构建脚本经 Prettier 格式化写入，不手改。字符串枚举生成为类型联合（`constEnum: false`）。
+- Chrome 导入（ADR-0090，`browser_import.rs`）：`chromeProfiles`、`chromeSites`、`chromeImport`、`browserImports`、`forgetBrowserImport` 两种构建都有；`chromeImport` 的答复含 cookie 明文，经 `SecretText`（`ToNapiValue` 转发给 `&String`）交给 V8 后清零 Core 的缓冲，不经 `settle`/`serde_json::Value`。`createForTests` 读 `PIARC_TEST_CHROME_ROOT` 并固定用测试密钥（`ChromeConfig::for_tests`），发布构建没有这条路径。
 - 会话的文本入口始终把字符串当作用户正文（包括 JSON 文本）。主进程将带提及、附件或指定幂等键的输入交给 `promptInput`、`steerInput`、`followUpInput`（ADR-0030）。
 
 - 设置窗口经 `providerSettings/saveProvider/deleteProvider/setCatalogRefresh` 访问 Core，`saveProvider` 的写入专用凭据参数与公开配置分开。模型菜单经 `workspaceModels/sessionModels/previewModelSwitch/setSessionModel/setSessionEffort`；切换预览不修改 Pi 会话。

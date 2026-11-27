@@ -3,6 +3,9 @@
 // `undefined` in packaged builds.
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
+// The agent's script host page (ADR-0089), a second renderer entry.
+declare const BROWSER_HOST_VITE_DEV_SERVER_URL: string | undefined;
+declare const BROWSER_HOST_VITE_NAME: string;
 
 // Vite replaces `import.meta.env.DEV` at build time: true under `electron-forge start`,
 // false when packaging.

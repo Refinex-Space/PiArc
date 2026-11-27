@@ -16,7 +16,8 @@ use hyper::body::Bytes;
 use hyper_util::rt::TokioIo;
 use piarc_ports::BoxFuture;
 use piarc_sandbox::proxy::{
-    Allowlist, DENIED_HEADER, DenyReason, Network, NetworkProxy, ProxyHooks, ProxyLimits, Refused,
+    Allowlist, BrowserPolicy, DENIED_HEADER, DenyReason, Network, NetworkProxy, ProxyHooks,
+    ProxyLimits, Refused, UPSTREAM_HEADER,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -507,4 +508,99 @@ async fn a_slow_request_head_is_cut_off() {
     .await
     .expect("the proxy closes before the safety net")
     .expect("reads");
+}
+
+/// A browser partition's proxy (ADR-0088): names resolve as listed, loopback and private
+/// addresses are served by the local HTTP upstream.
+async fn browser_proxy(denied_ports: Vec<u16>) -> NetworkProxy {
+    let http = http_upstream().await;
+    let loopback = IpAddr::from([127, 0, 0, 1]);
+    let private = IpAddr::from([10, 0, 0, 5]);
+    let names = HashMap::from([
+        ("docs.example", IpAddr::from(HTTP_IP)),
+        ("wiki.corp", private),
+        ("nas.test", private),
+        ("app.test", loopback),
+        ("web.localhost", loopback),
+        ("down.test", IpAddr::from([127, 0, 0, 2])),
+        ("rebind.example", loopback),
+        ("metadata.example", IpAddr::from([169, 254, 169, 254])),
+    ]);
+    let routes = HashMap::from([
+        (IpAddr::from(HTTP_IP), http),
+        (loopback, http),
+        (private, http),
+    ]);
+    let policy = BrowserPolicy {
+        local_names: Allowlist::new(["*.test"]).expect("valid"),
+        denied_ports,
+    };
+    NetworkProxy::start_browser(
+        policy,
+        Arc::new(TestNetwork { names, routes }),
+        Arc::new(Recorder::default()),
+        ProxyLimits::default(),
+    )
+    .await
+    .expect("proxy starts")
+}
+
+#[tokio::test]
+async fn thr16_a_browser_proxy_lets_public_names_through_and_private_ones_only_when_local() {
+    let proxy = browser_proxy(Vec::new()).await;
+    for host in ["docs.example", "203.0.113.10", "nas.test"] {
+        let reply = http_get(&proxy, &format!("http://{host}/page"), host).await;
+        assert_eq!(reply.status, 200, "{host}");
+    }
+    // A name outside the local development names leading into the LAN is DNS rebinding.
+    let reply = http_get(&proxy, "http://wiki.corp/page", "wiki.corp").await;
+    assert_eq!(reply.status, 403);
+}
+
+#[tokio::test]
+async fn thr16_a_browser_proxy_reaches_loopback_only_behind_local_names() {
+    let proxy = browser_proxy(Vec::new()).await;
+    for host in ["app.test", "web.localhost", "localhost", "127.0.0.1"] {
+        let target = if host == "localhost" {
+            "127.0.0.1"
+        } else {
+            host
+        };
+        let reply = http_get(&proxy, &format!("http://{target}/"), host).await;
+        assert_eq!(reply.status, 200, "{host}");
+    }
+    let reply = http_get(&proxy, "http://rebind.example/", "rebind.example").await;
+    assert_eq!(reply.status, 403);
+    assert_eq!(reply.header(DENIED_HEADER), Some("blocked-address"));
+    assert!(reply.body.contains("not local"), "{}", reply.body);
+    let reply = connect(&proxy, "metadata.example:443").await;
+    assert_eq!(reply.status, 403);
+    assert_eq!(reply.header(DENIED_HEADER), Some("blocked-address"));
+}
+
+#[tokio::test]
+async fn thr16_a_browser_proxy_refuses_piarc_ports_and_takes_a_new_policy() {
+    let proxy = browser_proxy(vec![4100]).await;
+    let reply = connect(&proxy, "app.test:4100").await;
+    assert_eq!(reply.status, 403);
+    assert!(reply.body.contains("PiArc itself"), "{}", reply.body);
+    proxy.set_browser_policy(BrowserPolicy::default());
+    let reply = http_get(&proxy, "http://app.test/", "app.test").await;
+    assert_eq!(reply.status, 403, "*.test is no longer a local name");
+}
+
+/// B1.3.1: a local server that is not up yet is told apart from other failures, so the
+/// browser can wait for it as it does without a proxy (`ERR_CONNECTION_REFUSED`).
+#[tokio::test]
+async fn a_browser_proxy_marks_a_refused_connection() {
+    let proxy = browser_proxy(Vec::new()).await;
+    let reply = http_get(&proxy, "http://down.test/", "down.test").await;
+    assert_eq!(reply.status, 502);
+    assert_eq!(reply.header(UPSTREAM_HEADER), Some("connection-refused"));
+    let reply = connect(&proxy, "down.test:443").await;
+    assert_eq!(reply.status, 502);
+    assert_eq!(reply.header(UPSTREAM_HEADER), Some("connection-refused"));
+    let reply = http_get(&proxy, "http://app.test/", "app.test").await;
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.header(UPSTREAM_HEADER), None);
 }

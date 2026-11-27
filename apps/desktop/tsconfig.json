@@ -8,6 +8,7 @@
     { "path": "src/main" },
     { "path": "src/preload" },
     { "path": "src/renderer" },
+    { "path": "src/browser-host" },
     { "path": "e2e" },
     { "path": "tsconfig.config.json" }
   ]

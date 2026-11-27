@@ -26,6 +26,12 @@ const symbols: Record<string, ReactNode> = {
       <path d="M2.4 10h15.2 M10 2.4c2.1 2.2 3.2 4.7 3.2 7.6s-1.1 5.4-3.2 7.6c-2.1-2.2-3.2-4.7-3.2-7.6S7.9 4.6 10 2.4Z" />
     </>
   ),
+  browser: (
+    <>
+      <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+      <path d="M2.5 7.5h15 M5.2 5.5h.1 M7.4 5.5h.1" />
+    </>
+  ),
   git: (
     <>
       <circle cx="6" cy="4.5" r="2" />

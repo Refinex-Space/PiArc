@@ -150,10 +150,20 @@ const config: ForgeConfig = {
       build: [
         { entry: 'src/main/main.ts', config: 'vite.main.config.ts', target: 'main' },
         { entry: 'src/preload/preload.ts', config: 'vite.preload.config.ts', target: 'preload' },
+        // The agent's script host (ADR-0089): `.vite/build/browser-host.cjs`.
+        {
+          entry: 'src/preload/browser-host.ts',
+          config: 'vite.preload.config.ts',
+          target: 'preload',
+        },
       ],
       // The name is also the output directory `.vite/renderer/main_window` (see
       // vite.renderer.config.ts) and the value of MAIN_WINDOW_VITE_NAME in the main process.
-      renderer: [{ name: 'main_window', config: 'vite.renderer.config.ts' }],
+      renderer: [
+        { name: 'main_window', config: 'vite.renderer.config.ts' },
+        // The agent's script host page: `.vite/renderer/browser_host` (vite.browser-host.config.ts).
+        { name: 'browser_host', config: 'vite.browser-host.config.ts' },
+      ],
     }),
     new FusesPlugin(toFuseConfig(fuseSettingsFor(flavor))),
   ],

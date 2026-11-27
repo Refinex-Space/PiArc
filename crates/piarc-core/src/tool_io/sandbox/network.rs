@@ -62,6 +62,7 @@ pub(super) async fn ask(a: &Ask<'_>) -> bool {
         subagent: None,
         sandbox: Some(CommandPlace::Sandbox),
         domain: Some(a.host.to_owned()),
+        site: None,
         notification_allow: false,
         review: None,
     };

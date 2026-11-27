@@ -29,6 +29,13 @@
 | claw-code | `reference/claw-code` | MIT | Rust 侧的 crate 划分、窄 trait 隔离 I/O、权限阶梯、parity 测试方法；以及它的反面教训 | 实验项目，质量参差，教训见 `harness-reference-notes.md` 第 2 节 |
 | OpenClaudeDesktop | `reference/OpenClaudeDesktop` | 声明 MIT，但含官方应用切出的组件 | 信息架构、交互流程、Electron 宿主层结构、UI 与内核之间的协议语义（Codex app-server v2 风格） | 前端可研读对应源码并测量渲染结果，逐项复刻视觉和交互，由 PiArc 独立实现（ADR-0073）。已提炼的要点见 `docs/research/ui-reference-notes.md` |
 | open-claude-ui | `reference/open-claude-ui` | MIT | 交互物理：滚动跟随、输入法守卫、拖拽死区、悬停意图、动效参数 | 只复用交互逻辑（MIT，注明出处），不用视觉组件与令牌 |
+| ego-lite | `reference/ego-lite` | MIT | 智能体浏览器 SDK（`package/ego-browser/src`）、原生绑定与快照规格（`docs/`）、使用说明（`package/ego-browser/skill-body/SKILL.md`） | 按 ADR-0091 移植到 `apps/desktop/src/browser-host/sdk/`，保留版权与上游提交；浏览器本体闭源，快照自写 |
+| VS Code（integrated browser 部分） | `reference/vscode`（稀疏：`src/vs/platform/browserView`、`src/vs/workbench/contrib/browserView`） | MIT | 浏览器级 CDP 代理（`common/cdp/proxy.ts`）、WebContentsView 宿主、遮挡占位、分区与网络过滤、设备模拟 | CDP 代理可按 MIT 改编并注明出处；其余只学机制 |
+| Playwright（injected 部分） | `reference/playwright`（稀疏：`packages/injected`、`packages/playwright-core/src/tools`） | Apache-2.0 | ARIA 快照与 ref 稳定性、可操作性检查、MCP 工具设计 | 只学机制；复制需保留 NOTICE |
+| chrome-devtools-mcp | `reference/chrome-devtools-mcp` | Apache-2.0 | 智能体的 console、network、性能 trace、模拟工具在纯 CDP 上的做法 | 只学机制 |
+| react-grab、bippy | `reference/react-grab`、`reference/bippy` | MIT | 元素 → 组件栈 → 源码位置（React 18/19、source map） | 逻辑可按 MIT 改编并注明出处 |
+| ZCode | `reference/ZCode` | Apache-2.0 | 内置浏览器的踩坑记录（`docs/browser-use/`）、元素上下文、权限治理、本地 HTML 协议 | 只学机制；不走 `<webview>` 路线 |
+| PI-Desktop | `reference/PI-Desktop` | LGPL-3.0-or-later | WebContentsView 后台宿主、CDP 白名单与超时恢复 | **只学机制，不复制代码**（LGPL 义务） |
 
 ## 读 Pi 的锁定版本
 

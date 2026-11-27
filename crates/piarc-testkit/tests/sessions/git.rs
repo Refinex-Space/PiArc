@@ -368,6 +368,39 @@ fn has_branch(repo: &Path, branch: &str) -> bool {
         .success()
 }
 
+/// The stash part of `history_operations_guard_stale_state_and_protected_branches`: the untracked
+/// note is stashed, a drop naming another commit is refused, the pop brings it back.
+async fn stash_round_trip(core: &CoreRuntime, id: &str, env: &Env, head: &str) {
+    // Stash the untracked note; a drop naming another commit is refused.
+    let pushed = git(
+        core,
+        id,
+        json!({ "op": "stashPush", "message": "笔记", "includeUntracked": true }),
+    )
+    .await;
+    assert!(pushed.get("result").is_some(), "{pushed}");
+    assert!(!env.ws.join("notes 笔记.md").exists());
+    let stashes = git(core, id, json!({ "op": "stashes" })).await;
+    let entry = &stashes["result"]["entries"][0];
+    assert_eq!(entry["message"], "笔记", "{stashes}");
+    let oid = entry["oid"].as_str().expect("oid").to_owned();
+    let wrong = git(
+        core,
+        id,
+        json!({ "op": "stashDrop", "index": 0, "oid": head }),
+    )
+    .await;
+    assert_eq!(wrong["failure"]["kind"], "stale", "{wrong}");
+    let popped = git(
+        core,
+        id,
+        json!({ "op": "stashApply", "index": 0, "oid": oid, "pop": true }),
+    )
+    .await;
+    assert!(popped.get("result").is_some(), "{popped}");
+    assert!(env.ws.join("notes 笔记.md").exists());
+}
+
 /// G3 through Core (design addendum 9.1): history pages, writes that wait for trust, resets and
 /// stash operations refused as stale when the state the dialog showed moved, and remote branch
 /// deletion that leaves protected branches alone and can be undone.
@@ -416,35 +449,7 @@ async fn history_operations_guard_stale_state_and_protected_branches() {
     assert_eq!(stale["failure"]["kind"], "stale", "{stale}");
     assert_eq!(rev(&env.ws, &env.root, "HEAD"), head);
 
-    // Stash the untracked note; a drop naming another commit is refused.
-    let pushed = git(
-        &core,
-        &id,
-        json!({ "op": "stashPush", "message": "笔记", "includeUntracked": true }),
-    )
-    .await;
-    assert!(pushed.get("result").is_some(), "{pushed}");
-    assert!(!env.ws.join("notes 笔记.md").exists());
-    let stashes = git(&core, &id, json!({ "op": "stashes" })).await;
-    let entry = &stashes["result"]["entries"][0];
-    assert_eq!(entry["message"], "笔记", "{stashes}");
-    let oid = entry["oid"].as_str().expect("oid").to_owned();
-    let wrong = git(
-        &core,
-        &id,
-        json!({ "op": "stashDrop", "index": 0, "oid": head }),
-    )
-    .await;
-    assert_eq!(wrong["failure"]["kind"], "stale", "{wrong}");
-    let popped = git(
-        &core,
-        &id,
-        json!({ "op": "stashApply", "index": 0, "oid": oid, "pop": true }),
-    )
-    .await;
-    assert!(popped.get("result").is_some(), "{popped}");
-    assert!(env.ws.join("notes 笔记.md").exists());
-
+    stash_round_trip(&core, &id, &env, &head).await;
     remote_branch_round_trip(&core, &id, &env, &bare, &head).await;
 
     let fetched = git(&core, &id, json!({ "op": "fetch", "background": true })).await;

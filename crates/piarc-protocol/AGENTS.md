@@ -38,6 +38,7 @@ AHP 与 Core API 数据类型的唯一来源：Rust 类型 → JSON Schema → `
 
 - `tasks.rs`（T32，能力 `backgroundTasks`）：`BackgroundTask`、`TaskKind`、`TaskStatus`、`TaskStarted`（`exec/run` 的 `task`、`CommandExecutionInfo.task`）、`exec/monitor`、`exec/background/list|read|kill`、`TasksSnapshot`（Core API 的 `core/tasks`）；`session/remind` 的 `key`、`wake` 与 `ReminderType::MonitorOutput` 在 `context.rs`。T33（能力 `terminalTasks`）：`TaskKind::Terminal`、`BackgroundTask.terminal`（`TerminalTask`：终端句柄、来源 `TerminalOrigin`、是否共享）、`ExecRunParams.terminal`。
 - `terminal.rs`（T33）：Core API 的终端类型：事件 `TerminalEvent`（按 `type` 标记）、读屏范围 `TerminalTextRange`（按 `kind` 标记）、`TerminalInfo`、`TerminalCommand`、`TerminalPoint`、`TerminalMatch`、`TerminalPasteOutcome`。`term_frame` 的 JSON 形式（`TermFrame` 等）的 `u32` 字段用 `#[schemars(with = "u64")]`：schemars 的 `uint32` 格式 ajv 不认识。
+- `dev_server.rs`（ADR-0092）：Core API 的 `LaunchView`、`LaunchConfigView`、`LaunchIssue`、`DevServerState`、`DevServerStart`、`ListeningPort`（端口用 `#[schemars(with = "u64")]`）；`BrowserClientEvent` 的 `ports`、`servers`，`TaskKind::DevServer`，`ReminderType::BrowserVerify`，`policy::BROWSER_SERVER_TOOL`。
 - `web.rs`（T29，能力 `webFetch`）：`web/fetch`；`models.rs` 的 `models/login/start|cancel`、`models/logout`、`ui/loginInteraction`（能力 `login`，交互以 `type` 标记）、`ModelPreferences`/`ModelOverride`（`core/welcome.modelPreferences`、`models/reload.preferences`）与 `ToolReliability::Low`、`ToolProfileKind`。整数字段用 `u64`：schemars 给 `u16` 的 `uint16` 格式 ajv 不认识。空结构体的结果能从 `[]` 反序列化，反例用 `false`。
 
 ## 易错点

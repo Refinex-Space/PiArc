@@ -48,6 +48,62 @@ export interface Preferences {
   readonly proxy: { readonly mode: ProxyMode; readonly url: string };
   /** ADR-0085: the Git panel's settings (the user's file; Core reads the same keys). */
   readonly git: GitPreferences;
+  /** B5.5: the built-in browser's settings (the user's file only; Core reads two of them). */
+  readonly browser: BrowserSettings;
+}
+
+/** How a workspace's browsing data is kept: on disk, or until PiArc quits. */
+export const BROWSER_STORAGES = ['persist', 'session'] as const;
+export type BrowserStorageChoice = (typeof BROWSER_STORAGES)[number];
+/** The address bar's search engines (`main/browser/address.ts` `SEARCH_ENGINES`). */
+export const BROWSER_SEARCH_ENGINES = ['google', 'bing', 'duckduckgo', 'baidu'] as const;
+export type BrowserSearchEngine = (typeof BROWSER_SEARCH_ENGINES)[number];
+/** Where DevTools docks in the panel (B1.4.1). */
+export const DEVTOOLS_DOCKS = ['bottom', 'right'] as const;
+export type DevtoolsDock = (typeof DEVTOOLS_DOCKS)[number];
+/** Host names the browser treats as this machine (B1.7.3). */
+export const DEFAULT_LOCAL_HOSTNAMES: readonly string[] = ['*.localhost', '*.test', '*.local'];
+/** The site card timeout in seconds (Core's `SITE_TIMEOUT_SECONDS` and default). */
+export const BROWSER_APPROVAL_TIMEOUT = { min: 10, max: 600, default: 120 } as const;
+/** Local development names a user may list. */
+export const LOCAL_HOSTNAME_LIMIT = 32;
+
+export interface BrowserSettings {
+  /** The agent may use the browser (`Browser` tool); Core reads it. */
+  readonly agentEnabled: boolean;
+  /** The panel opens the first time the agent uses the browser in a session (B2.5.5). */
+  readonly revealOnAgentUse: boolean;
+  readonly storage: BrowserStorageChoice;
+  readonly localHostnames: readonly string[];
+  /** Local links (`localhost`, local names) in the conversation open in the panel. */
+  readonly openLocalLinks: boolean;
+  readonly searchEngine: BrowserSearchEngine;
+  /** `null`: ask with the save dialog each time; otherwise downloads go straight there. */
+  readonly downloadDirectory: string | null;
+  readonly devtoolsDock: DevtoolsDock;
+  /** Seconds a site card waits (10–600); Core reads it. */
+  readonly approvalTimeout: number;
+}
+
+/** A local development name: `name.tld` or `*.suffix`, lowercase letters, digits, `-`, `.`. */
+export function isLocalHostname(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 253 &&
+    /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(value)
+  );
+}
+
+/** An absolute directory path on macOS or Windows, one line. */
+export function isAbsoluteDirectory(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= 4096 &&
+    // eslint-disable-next-line no-control-regex -- control characters are what is refused
+    !/[\u0000-\u001f\u007f]/.test(value) &&
+    (value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\'))
+  );
 }
 
 /** How a pull integrates the upstream (`config` follows `pull.rebase` and `pull.ff`). */
@@ -188,6 +244,17 @@ export const DEFAULT_PREFERENCES: Preferences = {
     prInstructions: '',
     reviewPresentation: 'inline',
   },
+  browser: {
+    agentEnabled: true,
+    revealOnAgentUse: true,
+    storage: 'persist',
+    localHostnames: DEFAULT_LOCAL_HOSTNAMES,
+    openLocalLinks: true,
+    searchEngine: 'google',
+    downloadDirectory: null,
+    devtoolsDock: 'bottom',
+    approvalTimeout: BROWSER_APPROVAL_TIMEOUT.default,
+  },
 };
 
 /** A `provider/model` reference as the reviewer setting takes it (no alias). */
@@ -263,6 +330,35 @@ export function preferencesFrom(settings: unknown): Preferences {
       url: isRecord(file.proxy) && typeof file.proxy.url === 'string' ? file.proxy.url : '',
     },
     git: gitFrom(file.git),
+    browser: browserFrom(file.browser),
+  };
+}
+
+function browserFrom(value: unknown): BrowserSettings {
+  const browser = isRecord(value) ? value : {};
+  const defaults = DEFAULT_PREFERENCES.browser;
+  const timeout = browser.approvalTimeout;
+  return {
+    agentEnabled: browser.agentEnabled !== false,
+    revealOnAgentUse: browser.revealOnAgentUse !== false,
+    storage: oneOf(BROWSER_STORAGES, browser.storage, defaults.storage),
+    localHostnames: Array.isArray(browser.localHostnames)
+      ? browser.localHostnames.filter(isLocalHostname).slice(0, LOCAL_HOSTNAME_LIMIT)
+      : defaults.localHostnames,
+    openLocalLinks: browser.openLocalLinks !== false,
+    searchEngine: oneOf(BROWSER_SEARCH_ENGINES, browser.searchEngine, defaults.searchEngine),
+    downloadDirectory: isAbsoluteDirectory(browser.downloadDirectory)
+      ? browser.downloadDirectory
+      : null,
+    devtoolsDock: oneOf(DEVTOOLS_DOCKS, browser.devtoolsDock, defaults.devtoolsDock),
+    // Core clamps the same way (`tool_io::browser::site_timeout`).
+    approvalTimeout:
+      typeof timeout === 'number' && Number.isFinite(timeout)
+        ? Math.min(
+            BROWSER_APPROVAL_TIMEOUT.max,
+            Math.max(BROWSER_APPROVAL_TIMEOUT.min, Math.floor(timeout)),
+          )
+        : defaults.approvalTimeout,
   };
 }
 
@@ -355,7 +451,19 @@ export type PreferenceChange =
   | { readonly key: 'git.draftPullRequests'; readonly value: boolean }
   /** `null` (or the default text) restores the default instructions. */
   | { readonly key: 'git.prInstructions'; readonly value: string | null }
-  | { readonly key: 'git.reviewPresentation'; readonly value: ReviewPresentation };
+  | { readonly key: 'git.reviewPresentation'; readonly value: ReviewPresentation }
+  /** B5.5: the built-in browser; defaults are written as removals. */
+  | { readonly key: 'browser.agentEnabled'; readonly value: boolean }
+  | { readonly key: 'browser.revealOnAgentUse'; readonly value: boolean }
+  | { readonly key: 'browser.storage'; readonly value: BrowserStorageChoice }
+  /** `null` restores the default names. */
+  | { readonly key: 'browser.localHostnames'; readonly value: readonly string[] | null }
+  | { readonly key: 'browser.openLocalLinks'; readonly value: boolean }
+  | { readonly key: 'browser.searchEngine'; readonly value: BrowserSearchEngine }
+  /** `null`: ask where to save each download. */
+  | { readonly key: 'browser.downloadDirectory'; readonly value: string | null }
+  | { readonly key: 'browser.devtoolsDock'; readonly value: DevtoolsDock }
+  | { readonly key: 'browser.approvalTimeout'; readonly value: number };
 
 /**
  * Validates a change received over IPC and returns the settings-file pointer and value to
@@ -477,6 +585,62 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
     case 'git.reviewPresentation':
       return oneOf(REVIEW_PRESENTATIONS, value, 'inline') === value
         ? { pointer: '/git/reviewPresentation', value: value === 'inline' ? null : value }
+        : undefined;
+    default:
+      return browserPointer(key, value);
+  }
+}
+
+/** The `browser.*` changes (B5.5); `undefined` for anything else. */
+function browserPointer(
+  key: string,
+  value: unknown,
+): { pointer: string; value: unknown } | undefined {
+  const flag = (pointer: string) =>
+    typeof value === 'boolean' ? { pointer, value: value ? null : false } : undefined;
+  switch (key) {
+    case 'browser.agentEnabled':
+      return flag('/browser/agentEnabled');
+    case 'browser.revealOnAgentUse':
+      return flag('/browser/revealOnAgentUse');
+    case 'browser.openLocalLinks':
+      return flag('/browser/openLocalLinks');
+    case 'browser.storage':
+      return oneOf(BROWSER_STORAGES, value, 'persist') === value
+        ? { pointer: '/browser/storage', value: value === 'persist' ? null : value }
+        : undefined;
+    case 'browser.localHostnames': {
+      if (value === null) return { pointer: '/browser/localHostnames', value: null };
+      if (!Array.isArray(value) || value.length > LOCAL_HOSTNAME_LIMIT) return undefined;
+      const names = value.map((n: unknown) =>
+        typeof n === 'string' ? n.trim().toLowerCase() : '',
+      );
+      return names.every(isLocalHostname)
+        ? { pointer: '/browser/localHostnames', value: [...new Set(names)] }
+        : undefined;
+    }
+    case 'browser.searchEngine':
+      return oneOf(BROWSER_SEARCH_ENGINES, value, 'google') === value
+        ? { pointer: '/browser/searchEngine', value: value === 'google' ? null : value }
+        : undefined;
+    case 'browser.downloadDirectory':
+      if (value === null) return { pointer: '/browser/downloadDirectory', value: null };
+      return isAbsoluteDirectory(value)
+        ? { pointer: '/browser/downloadDirectory', value }
+        : undefined;
+    case 'browser.devtoolsDock':
+      return oneOf(DEVTOOLS_DOCKS, value, 'bottom') === value
+        ? { pointer: '/browser/devtoolsDock', value: value === 'bottom' ? null : value }
+        : undefined;
+    case 'browser.approvalTimeout':
+      return typeof value === 'number' &&
+        Number.isInteger(value) &&
+        value >= BROWSER_APPROVAL_TIMEOUT.min &&
+        value <= BROWSER_APPROVAL_TIMEOUT.max
+        ? {
+            pointer: '/browser/approvalTimeout',
+            value: value === BROWSER_APPROVAL_TIMEOUT.default ? null : value,
+          }
         : undefined;
     default:
       return undefined;

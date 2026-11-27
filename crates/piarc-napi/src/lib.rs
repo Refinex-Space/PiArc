@@ -51,6 +51,9 @@
 //! not used because it would start NAPI-RS's separate global tokio runtime.
 
 mod boundary;
+pub mod browser;
+pub mod browser_import;
+pub mod dev_servers;
 pub mod diagnostics;
 pub mod mcp;
 pub mod plugins;

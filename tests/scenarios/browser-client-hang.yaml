@@ -1,0 +1,43 @@
+id: browser-client-hang
+description: When the desktop client never answers a run, Core gives up timeoutMs + 2 s later, tells the client to cancel and gives the model a timeout result; the next Browser call runs normally (design addendum browser.md B2.1.4).
+capabilities: [CAP-BROWSER-RUN-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input: { script: 'while (true) { await new Promise(() => {}); }', timeoutMs: 1000 }
+      - tool_calls:
+          - id: b2
+            name: Browser
+            input: { script: 'console.log("still works");' }
+      - text: 'The first script hung; the second worked.'
+browser:
+  runs:
+    # Core's own timer: 1,000 ms plus the 2 s grace, real time.
+    - run: { toolCallId: b1, timeoutMs: 1000 }
+      steps:
+        - wait_cancel: {}
+    - run: { toolCallId: b2, timeoutMs: 120000 }
+      steps:
+        - answer: { output: 'still works' }
+actions:
+  - prompt: { text: 'Run the scripts.', turn: one }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: b1, is_error: true, contains: 'the browser script did not finish within 1000 ms' }
+        - { id: b2, is_error: false, contains: 'still works' }
+  request_counts: { main: 3 }
+  audit:
+    - kind: browser
+      count: 1
+      detail: { tool: Browser, toolCallId: b1, outcome: timeout }
+    - kind: browser
+      count: 1
+      detail: { tool: Browser, toolCallId: b2, outcome: ok }

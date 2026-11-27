@@ -73,17 +73,22 @@ impl Driver<'_> {
             .collect())
     }
 
+    /// The workspace's audit rows of `kind`, newest first, as Core's `audit_events` answers
+    /// them (the built-in browser's `browser` rows included, design addendum B2.7.2).
+    pub(super) async fn audit_rows(&self, kind: &str) -> Result<Vec<Value>, String> {
+        let query = json!({ "kind": kind, "workspace": self.env.workspace, "limit": 1000 });
+        let rows = call(
+            |done| self.core.audit_events(query.to_string(), done),
+            "reading the audit",
+        )
+        .await?;
+        Ok(rows["events"].as_array().cloned().unwrap_or_default())
+    }
+
     /// `expect.audit` (T47): every entry matches rows of its kind in the workspace's audit.
     pub(super) async fn check_audit(&self) -> Result<(), String> {
         for (n, expected) in self.spec.expect.audit.iter().enumerate() {
-            let query =
-                json!({ "kind": expected.kind, "workspace": self.env.workspace, "limit": 1000 });
-            let rows = call(
-                |done| self.core.audit_events(query.to_string(), done),
-                "reading the audit",
-            )
-            .await?;
-            let rows = rows["events"].as_array().cloned().unwrap_or_default();
+            let rows = self.audit_rows(&expected.kind).await?;
             let matching = rows
                 .iter()
                 .filter(|row| {

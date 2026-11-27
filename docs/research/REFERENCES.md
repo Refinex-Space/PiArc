@@ -11,6 +11,14 @@ PiArc 在设计阶段研读了以下开源仓库。为了随时查阅和核对�
 | `reference/claw-code` | https://github.com/ultraworkers/claw-code | `508b4d862d42` | MIT | 用 Rust 复刻 Claude Code Harness 的实验项目。参考 crate 划分、mock 服务与行为对齐测试方法。 |
 | `reference/OpenClaudeDesktop` | https://github.com/oleyyu/OpenClaudeDesktop | `62f08512e012` | 仓库声明 MIT，但含官方应用切出的组件，见下文 | Claude Desktop Code 界面复刻（Electron 44.4.3 + React 19.3 + Vite 8.3）。参考信息架构、交互流程、Electron 宿主层结构，以及 UI 与内核之间的协议（Codex app-server v2）。 |
 | `reference/open-claude-ui` | https://github.com/Caho1/open-claude-ui | `be395eb4b783` | MIT | 逆向还原的 Claude 设计系统与交互物理。参考令牌结构、动效参数、滚动跟随、IME 守卫等工程经验。 |
+| `reference/ego-lite` | https://github.com/citrolabs/ego-lite | `56589ea8b98f` | MIT | 智能体浏览器 SDK 与使用说明，内置浏览器的移植来源（ADR-0091）。 |
+| `reference/vscode` | https://github.com/microsoft/vscode | `727002e46c72`（稀疏检出 integrated browser） | MIT | 内置浏览器的宿主、CDP 代理、遮挡与分区。 |
+| `reference/playwright` | https://github.com/microsoft/playwright | `80290e838ba5`（稀疏检出 `packages/injected` 与 MCP 工具） | Apache-2.0 | ARIA 快照、可操作性检查、浏览器工具设计。 |
+| `reference/chrome-devtools-mcp` | https://github.com/ChromeDevTools/chrome-devtools-mcp | `761c5e0850a3` | Apache-2.0 | CDP 上的智能体调试工具。 |
+| `reference/react-grab` | https://github.com/aidenybai/react-grab | `c695bdbaea10` | MIT | 元素到组件与源码位置。 |
+| `reference/bippy` | https://github.com/aidenybai/bippy | `fbafc407ca31` | MIT | React fiber 与 source map 符号化。 |
+| `reference/ZCode` | https://github.com/zai-org/ZCode | `a4b4445141eb` | Apache-2.0 | 内置浏览器的设计文档与踩坑记录。 |
+| `reference/PI-Desktop` | https://github.com/vastsa/PI-Desktop | `720bbe15de8d` | LGPL-3.0-or-later | WebContentsView 后台宿主与 CDP 白名单（只学机制）。 |
 
 ## 使用边界
 

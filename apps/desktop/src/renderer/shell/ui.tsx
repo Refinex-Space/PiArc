@@ -23,6 +23,8 @@ export interface Toast {
   readonly id: string;
   readonly sessionId: string;
   readonly text: string;
+  /** Takes the place of "Open" (B4.4: "Open in preview"); runs, then the toast goes. */
+  readonly action?: { readonly label: string; readonly run: () => void };
 }
 
 /** How the trust dialog was opened. */

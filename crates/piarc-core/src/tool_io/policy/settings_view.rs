@@ -298,6 +298,10 @@ impl ToolIo {
                 // T47: auto memory changes and hooks (managed-only skips among them).
                 Some("memory") => "memory".into(),
                 Some("hook") => "hook".into(),
+                // The built-in browser (B2.7.2, B5.2): runs, site cards, uploads and saves, and
+                // Chrome imports (sites and counts only).
+                Some("browser") => "browser".into(),
+                Some("browserImport") => "browserImport".into(),
                 Some(other) => {
                     return Err(ErrorObject::new(
                         ErrorKind::InvalidParams,

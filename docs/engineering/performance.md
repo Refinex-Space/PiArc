@@ -108,6 +108,19 @@ git add scripts/perf/baselines && git commit -m "perf: update the <machine> base
 | 渲染进程崩溃或重载后恢复 | `renderer-recovery` | 同上 | mock 回合流式输出中重载页面，到新文档里的 transcript 可见；同时核对回合继续、mock 收到的请求数不变（会话不中断）。渲染进程崩溃（`forcefullyCrashRenderer`）由主进程自动重载（每分钟最多 3 次），同样计时，记在报告 `detail` 中 | 否 |
 | Beta 期无崩溃会话率 | —（`EXCLUDED`） | — | 依赖 Beta 期用户同意后的崩溃统计，不进 CI，由 T51、R6 跟踪 | — |
 
+### 4.2 内置浏览器（设计增补 B5.6）
+
+第 11 章不加新行：标签切换与空闲 CPU 记在已有的"会话切换""空闲 CPU"两行下，快照与遮挡替身的预算来自设计增补，指标的 `row` 为 `null`、`source` 写增补的条目。探针 `scripts/perf/probe-browser.mjs` 只在 Nightly 运行，经开发构建的测试钩子 `browser`、`browserScript` 驱动；页面来自探针自己的本机 HTTP 夹具，用户先在自己的标签里打开夹具端口，智能体的页面才能用它（B2.6.2）。
+
+| 预算来源 | 指标 | 方法与口径 | 预算 |
+|---|---|---|---|
+| B2.4.3 | `browser-snapshot-1k`、`browser-snapshot-10k` | 智能体标签打开约 1,000 与 10,000 个节点的页面，在脚本宿主里各计时 20 次 `page.snapshot({ scope: "full_page" })`，取 p95 | 250 ms、1.5 s |
+| 第 11 章"会话切换" | `browser-tab-switch` | 两个已加载的用户标签之间切换 20 次：渲染进程发 `selectTab` 到主进程把该标签的视图放上面板（主进程内每 2 ms 读一次 `browserState()`），取 p95 | 100 ms（同已缓存的会话切换） |
+| B1.5.2 | `browser-occlusion` | 页面显示时打开面板的"更多"菜单 20 次，在渲染进程里计时到遮挡替身（`#browser-occlusion`）上屏，取 p95 | 100 ms，暂定：增补没有给数，待测得基线后由用户确认 |
+| 第 11 章"空闲 CPU" | `browser-idle-cpu` | 窗口可见，预览显示一个用户标签；另一个用户标签（计时器每 50 ms 改 DOM、CSS 动画）与脚本结束后留下的智能体标签都隐藏；全部应用进程加 Agent Host 60 s 的 CPU 时间，折合一个核心的百分比 | 5% |
+
+隐藏的标签由 `main/browser/throttling.ts` 节流（`setBackgroundThrottling(true)`），只有智能体的调用正在运行的 Space 不节流：脚本在看不见的页面上等待计时器与动画。每个前台标签是一个渲染进程，计入 `app-memory` 的同一口径（`getAppMetrics()` 的全部进程）。
+
 ### 4.1 长跑
 
 `scripts/perf/long-run.mjs`：一个窗口、一个会话，`acceptEdits` 模式。每 30 s 发一个提示，mock 的这个回合先读文件、写文件、启动一个后台命令，再流式回答；同时在会话的终端里键入一条输出命令。前 30 分钟预热，之后每 10 分钟采样主进程、渲染进程（`getAppMetrics()`）与 Agent Host（RSS）的内存；增长率 =（最后一次采样 − 稳态第一次采样）/ 稳态第一次采样，三者分别判定 ≤ 10%。采样边测边写入输出文件，中途中断也留有数据。

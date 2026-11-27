@@ -31,6 +31,11 @@ Core 层的集成测试在 `crates/piarc-core/tests/exec_commands.rs`（cwd、�
 - Windows：shell 启动后立刻加入一个 `KILL_ON_JOB_CLOSE` 的 Job Object（`Job::assign_pid`），之后它启动的都在 Job 里，结束即终止 Job，没有宽限。shell 加入 Job 之前（启动后的一瞬间、读到任何输入之前）启动的进程不在 Job 里。
 - 列进程要在挂断之前：挂断后进程脱离终端，按终端设备就找不到了。Core 的 `Terminals` 负责在关闭终端与有序关闭时调用 `end` 并等它结束。
 
+## 监听端口（`listeners.rs`，ADR-0092）
+
+- `listening(&[Tree])` 给出每棵树监听的 TCP 端口：macOS 运行 `/usr/sbin/lsof -nP -w -iTCP -sTCP:LISTEN -FpgRn`（`LSOF_TIMEOUT` 5 s 后杀掉）列出本用户的监听套接字，按 pid、进程组（`ProcessTreeSpawner` 的子进程自成进程组）、`members`（终端设备上的进程）归属；Windows 由 `tcp_table.rs` 的 `GetExtendedTcpTable`（IPv4 与 IPv6 各一次，crate 的第三处 unsafe）加 `job::process_table` 的父进程链。解析是纯函数（`parse_lsof`、`parse_tcp_table`），两个平台的格式都有单测。
+- 任务的 pid 由 `CommandRunner::run_reporting` 的 `started` 交出；终端的树是 `TerminalTree::listen_tree`。
+
 ## cwd 跟踪（`cwd.rs`）
 
 - 自动允许（只读白名单、自动接受编辑的文件命令，T23）依赖的每个外部程序由 `CwdProbe::pin_program(名称, 路径)` 在启动时核对 Bash 实际解析的文件并锁定物理程序（`hash -p`），解析变化时以 126 退出、不运行命令；名称只接受字母、数字与 `._+-`。Core 发现项目可控的 PATH、用户覆盖或启动脚本时由审批卡决定，人工批准后的命令同样只继承 ADR-0035 所列的字段。

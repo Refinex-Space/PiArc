@@ -153,6 +153,22 @@ impl CommandRunner {
         output: mpsc::Sender<OutputChunk>,
         cancel: CancellationToken,
     ) -> io::Result<CommandExit> {
+        self.run_reporting(spec, output, cancel, None).await
+    }
+
+    /// Like [`Self::run`]; `started` gets the process id once the program started, so the
+    /// caller can ask about its process tree (the ports it listens on, ADR-0092).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::run`].
+    pub async fn run_reporting(
+        &self,
+        spec: CommandSpec,
+        output: mpsc::Sender<OutputChunk>,
+        cancel: CancellationToken,
+        started: Option<Arc<std::sync::OnceLock<u32>>>,
+    ) -> io::Result<CommandExit> {
         let (program, args) = match spec.launcher {
             Some(launcher) => {
                 let mut args = launcher.args;
@@ -168,6 +184,9 @@ impl CommandRunner {
             cwd: spec.cwd,
             env: spec.env,
         })?;
+        if let (Some(started), Some(pid)) = (started, process.control.pid()) {
+            let _ = started.set(pid);
+        }
         // The command reads nothing: EOF on its stdin, as Pi's tool gives it.
         drop(process.stdin);
         // Stopping also covers a consumer that went away, and a caller that dropped this

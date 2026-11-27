@@ -27,6 +27,7 @@ pub(super) fn new_request(
         subagent: None,
         sandbox: None,
         domain: None,
+        site: None,
         notification_allow: false,
         review: None,
     })

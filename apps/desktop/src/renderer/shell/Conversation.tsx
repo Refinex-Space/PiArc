@@ -5,8 +5,9 @@
 // pages when the user scrolls to the top.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
-import { useT } from '../app/app-context.js';
+import { useApp, useT } from '../app/app-context.js';
 import { useWindowFocused } from '../app/window-focus.js';
+import { openLocalLink } from '../browser/local-links.js';
 import type { PaletteCommand } from '../composer/command-plugin.js';
 import { builtin, typedBuiltin, type BuiltinAction } from '../composer/builtins.js';
 import { EMPTY_COMMANDS, parseCommandsList, type CommandsList } from '../composer/commands-list.js';
@@ -336,6 +337,12 @@ export function Conversation({
   const sessionWorkspace = session?.workspace;
   const fileRoot = projectFileRoot(session);
   const fileDirectory = projectPath(session?.cwd ?? '', fileRoot) ?? '';
+  // B5.5: read at click time, so a changed setting does not rebuild the transcript's view.
+  const browserPreferences = useApp().preferences.browser;
+  const browserSettings = useRef(browserPreferences);
+  useEffect(() => {
+    browserSettings.current = browserPreferences;
+  }, [browserPreferences]);
   const view = useMemo<TranscriptView>(
     () => ({
       services: ui.transcriptServices,
@@ -373,6 +380,8 @@ export function Conversation({
           if (path) openProjectFile(id, { path, ...(line === undefined ? {} : { line }) });
           else ui.addToast({ sessionId: id, text: t('files.outside') });
         },
+        // Local links open in the preview when the user chose so (B5.5).
+        openLink: (href) => openLocalLink(id, href, browserSettings.current),
         // A `Memory` call's "Open in settings" (T47): the memory page on this workspace's note.
         openMemory: (note) => {
           if (sessionWorkspace !== undefined) {

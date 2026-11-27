@@ -107,6 +107,13 @@ export class ToolWindows {
     parent?: string,
     initiator?: string,
   ) => boolean;
+  /** The open preview tool window of `token` that `owner` popped out (B1.5.3). */
+  previewWindow(token: string, owner: WebContents): BrowserWindow | undefined {
+    const open = this.#open.get(token);
+    if (open?.ticket.owner !== owner || open.ticket.panel !== 'preview' || open.child.isDestroyed())
+      return undefined;
+    return open.child;
+  }
   fileOwner(contents: WebContents): WebContents | undefined {
     for (const { child, ticket } of this.#open.values())
       if (ticket.panel === 'files' && child.webContents === contents) return ticket.owner;

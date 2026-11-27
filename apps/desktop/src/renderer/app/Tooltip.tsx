@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 
 import { useApp } from './app-context.js';
 import { Keycaps } from './Keycaps.js';
+import { useOverlayRect } from './overlays.js';
 import { documentWindow, useSurfaceDocument } from './surface-document.js';
 
 /** Hover time before a tooltip opens (ms). */
@@ -44,6 +45,8 @@ export function TooltipLayer() {
   const [tip, setTip] = useState<Tip>();
   const bubble = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<{ left: number; top: number }>();
+  // A tooltip over the preview's page would be hidden behind it (B1.5.2).
+  useOverlayRect(bubble, tip !== undefined);
   useEffect(() => {
     const view = documentWindow(doc);
     let current: HTMLElement | null = null;

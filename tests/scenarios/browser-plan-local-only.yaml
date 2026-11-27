@@ -1,0 +1,53 @@
+id: browser-plan-local-only
+description: In plan mode a page of a Browser run may reach a local address for the run, while a public host is refused without a card; both decisions are audited with step mode (design addendum browser.md B2.6.3, tool_io/policy/site.rs).
+capabilities: [CAP-BROWSER-SITE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              {
+                script: 'const p = await taskSpace("t").newPage(); await p.goto("http://localhost:5173/"); await p.goto("https://example.com/");',
+              }
+      - text: 'Only the local server was reachable.'
+sessions:
+  main: { provider: main, mode: plan }
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'http://localhost:5173/'
+            host: 'localhost:5173'
+            local: true
+            decision: { allowed: true, scope: run }
+        - site:
+            url: 'https://example.com/'
+            host: example.com
+            decision: { allowed: false }
+        - answer: { output: 'local ok', blocked_hosts: [example.com] }
+actions:
+  - prompt: { text: 'Look at the app and example.com.', turn: one }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: b1, is_error: false, contains: 'local ok' }
+      contains: [example.com]
+  request_counts: { main: 2 }
+  audit:
+    - kind: browser
+      count: 1
+      detail:
+        { approval: site, hosts: ['localhost:5173'], local: true, step: mode, conclusion: allow }
+    - kind: browser
+      count: 1
+      detail: { approval: site, hosts: [example.com], step: mode, conclusion: deny }
+    - kind: browser
+      count: 1
+      detail: { tool: Browser, outcome: ok, blockedHosts: [example.com] }

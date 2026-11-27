@@ -22,6 +22,7 @@ Core（Rust）在这次会话里不发起连接：它的网络出口只有下表
 | WebFetch | Core（`piarc-web`） | 请求的 URL | 获准的工具调用 | 每次经权限裁决，SSRF 检查 |
 | WebSearch 第三方后端 | Core（`piarc_web::search`） | 搜索词 | 获准的工具调用 | 用户保存 key 后才有 |
 | 沙箱代理 | Core（`piarc-sandbox`） | 沙箱内命令自己的流量 | 沙箱命令联网 | 白名单外的主机询问 |
+| 内置浏览器（预览面板） | 浏览器 guest（每个工作区一个分区），经 Core 的浏览器代理（`piarc_core::browser`） | 用户与智能体打开的网页自己的流量；从 Chrome 导入的站点带导入的 cookie | 用户在面板里打开网页，或智能体的 `Browser` 脚本驱动它的 Space | 用户的标签不询问；智能体控制的 Space 经请求闸门，新主机问站点卡（ADR-0089，THR-16）；PiArc 自己的端口与链路本地地址拒绝；脚本宿主不能联网 |
 | 扩展包安装与更新 | Core（内置 npm、git） | 包名与版本 | 用户安装或更新 | 用户操作；`--ignore-scripts` |
 | Pi 的远程模型目录 `https://pi.dev/api/models/providers/<id>` | Agent Host（Pi `ModelRuntime`） | 服务商 id，不含会话内容 | 只对配置了凭据的内置服务商，每个至多 4 小时一次 | 默认开启，`modelProviders.catalogRefresh: false` 关闭；mock 会话里没有内置服务商的凭据，不发生 |
 | Chromium 拼写检查词典 | Electron（Hunspell） | 语言代码 | Windows 与 Linux 首次需要某语言的词典时，从 Google 的 CDN（`redirector.gvt1.com`）下载 | 保留：只取词典文件，不含会话内容；macOS 用系统拼写检查，不下载。Windows 的 L4 允许这个主机 |

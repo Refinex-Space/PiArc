@@ -38,6 +38,34 @@ pub fn blocked_reason(ip: IpAddr) -> Option<&'static str> {
     }
 }
 
+/// Whether `ip` is in a private network range (RFC 1918, carrier-grade NAT, IPv6 unique local),
+/// IPv4-mapped forms included.
+#[must_use]
+pub(super) fn is_private(ip: IpAddr) -> bool {
+    let ip = match ip {
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(ip, IpAddr::V4),
+        IpAddr::V4(_) => ip,
+    };
+    match ip {
+        IpAddr::V4(v4) => {
+            let [a, b, ..] = v4.octets();
+            v4.is_private() || (a == 100 && (64..128).contains(&b))
+        }
+        IpAddr::V6(v6) => (v6.segments()[0] & 0xfe00) == 0xfc00,
+    }
+}
+
+/// Whether `ip` is a loopback address, IPv4-mapped forms included.
+#[must_use]
+pub(super) fn is_loopback(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V6(v6) => v6
+            .to_ipv4_mapped()
+            .map_or_else(|| v6.is_loopback(), |v4| v4.is_loopback()),
+        IpAddr::V4(v4) => v4.is_loopback(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

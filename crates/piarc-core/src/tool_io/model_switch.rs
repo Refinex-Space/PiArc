@@ -132,6 +132,7 @@ impl ToolIo {
             subagent: None,
             sandbox: None,
             domain: None,
+            site: None,
             notification_allow: false,
             review: None,
             elicitation: None,
