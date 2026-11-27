@@ -46,7 +46,7 @@
 - 开发构建的 Core 导出 `agentHostProbe`（从 `process.resourcesPath` 下的 `agent-host/` 按生产方式启动 Agent Host，跑一轮对话）与 `keychainProbe`；主进程测试钩子另有 `showNotification`。模型经测试数据目录的 `pi/models.json` 指向 mock provider，MCP server 来自测试数据目录 `settings.json` 的 `mcpServers`（T36，探针只读这一处），不需要额外的启动参数；发布构建没有这些导出。
 - `e2e/agent-host.e2e.ts`、`e2e/agent-host-kill.e2e.ts`、`e2e/notification.e2e.ts` 只在 `packaged` 项目运行（`playwright.config.ts` 的 `testIgnore`）：`dev` 形态没有 `Resources/agent-host/`，签名也是 Electron 自己的。`agent-host-kill.e2e.ts` 只在 Windows 运行：回合进行中 `taskkill /F` 主进程，检查 Job Object 结束 Agent Host 的整棵进程树（S8）。两者共用 `e2e/agent-host.ts` 的 `startMock`。
 - fuse 配置的单一来源是 `fuses.mjs`；`PIARC_BUILD_FLAVOR`（由 `package:desktop --flavor` 设置）选择配置，默认 `release`。开发构建只多开 `EnableNodeCliInspectArguments`，L4 的打包形态靠它被 Playwright 驱动。
-- `electron-forge start` 用 node_modules 中的 Electron，不写 fuse；界面来自 Vite 开发服务器，开发服务器 origin 加入可信 origin，CSP 放宽三项（见 `dev-server.ts`）。
+- `electron-forge start` 用 node_modules 中的 Electron，不写 fuse，bundle 的名称与图标也是 Electron 的（主进程在未打包时用 `app.dock.setIcon` 换上 `design/brand/icon.iconset/icon_512x512@2x.png`，只改 Dock）；界面来自 Vite 开发服务器，开发服务器 origin 加入可信 origin，CSP 放宽三项（见 `dev-server.ts`）。
 - `app-protocol.ts` 的两个传输共用资源范围、方法、MIME 和安全头。macOS 的原生缓冲区回调是 ADR-0072 的限定例外；升级 Electron 时同时复测资源契约与主进程内存。
 
 项目文件菜单和预览采用 [ADR-0076](../../../../docs/adr/0076-project-files.md)。工作树由 Core 绑定。专用文档来源只供当前窗口的文件呈现；它没有工作台 IPC 权限。系统编辑器只从已知安装目录选择，文件名作为独立进程参数。

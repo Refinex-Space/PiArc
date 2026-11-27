@@ -438,21 +438,27 @@ function start(dirs: DataDirs): void {
       },
     });
     shell = appShell;
-    tray = new TrayIcon(
-      process.platform,
-      trayIconDirectory(app.isPackaged, process.resourcesPath, app.getAppPath()),
-      () => appShell.t(),
-      {
-        open: () => appShell.focusMain(),
-        newWindow: () => appShell.openMain(),
-        openSession: (id) => {
-          appShell.launch({ kind: 'session', sessionId: id });
-        },
-        quit: () => {
-          appShell.run('app.quit');
-        },
-      },
+    const iconDirectory = trayIconDirectory(
+      app.isPackaged,
+      process.resourcesPath,
+      app.getAppPath(),
     );
+    // From source the Dock shows node_modules' Electron.app and its icon; packaged builds
+    // carry design/brand/icon.icns in their bundle (forge.config.ts `packagerConfig.icon`).
+    // The iconset's 1024 px image is the same macOS-grid artwork as that .icns.
+    if (!app.isPackaged) {
+      app.dock?.setIcon(path.join(iconDirectory, 'icon.iconset', 'icon_512x512@2x.png'));
+    }
+    tray = new TrayIcon(process.platform, iconDirectory, () => appShell.t(), {
+      open: () => appShell.focusMain(),
+      newWindow: () => appShell.openMain(),
+      openSession: (id) => {
+        appShell.launch({ kind: 'session', sessionId: id });
+      },
+      quit: () => {
+        appShell.run('app.quit');
+      },
+    });
     appShell.onLanguage(() => tray?.refresh());
     connectJumpList(
       eventRouter,
