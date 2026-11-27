@@ -18,6 +18,7 @@ function pick(overrides: Partial<BrowserPick['context']> = {}): BrowserPick {
   return {
     id: 'p1',
     tab: 'tab-1',
+    info: {},
     context: {
       url: 'http://localhost:5173/',
       tag: 'button',

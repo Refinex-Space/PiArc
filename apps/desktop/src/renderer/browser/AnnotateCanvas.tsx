@@ -1,12 +1,15 @@
 // Annotating a frozen page (design addendum B3.3): the page's view is hidden and its screenshot
 // shows on a canvas `#browser-annotate` with rectangles, ellipses, arrows, pen strokes, text,
 // numbered markers and redaction, in five token colors and three widths, with undo, redo and
-// clear. Boxes and markers are numbered and take a comment each. "Add to conversation (N)" hands
+// clear. Boxes and markers are numbered; each takes a comment on a card that opens beside it when
+// it is drawn (or when its number is clicked). "Add to conversation (N)" hands
 // the drawn image and the numbered items to the composer; leaving with drawings asks first.
-// The same surface cuts a region out of the screenshot for the screenshot menu (B3.4).
+// The same surface cuts a region out of the screenshot for the screenshot menu (B3.4): the drawn
+// region stays outlined and a card beside it takes a comment and copies, saves or adds it.
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -56,6 +59,37 @@ import {
   type Shape,
 } from './annotate-model.js';
 import { canvasImage, loadImage } from './images.js';
+import { placeBeside, scaleRect, type Placement } from './inline-place.js';
+
+/** What the region card does with the selected region. */
+export type RegionAction = 'copy' | 'save' | 'add';
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Radius of a number badge, CSS pixels as shown. */
+const BADGE = 11;
+
+/** Where a numbered shape's number sits (image pixels). */
+function badgeAt(shape: Shape): Point | undefined {
+  if (shape.kind === 'marker') return shape.at;
+  if (shape.kind === 'rect' || shape.kind === 'ellipse') {
+    const area = rectOf(shape.from, shape.to);
+    return { x: area.x, y: area.y };
+  }
+  return undefined;
+}
+
+/** What a numbered shape's card goes beside (image pixels); `scale` is image px per shown px. */
+function anchorOf(shape: Shape, scale: number): Box | undefined {
+  if (shape.kind === 'rect' || shape.kind === 'ellipse') return rectOf(shape.from, shape.to);
+  if (shape.kind !== 'marker') return undefined;
+  const r = BADGE * scale;
+  return { x: shape.at.x - r, y: shape.at.y - r, width: r * 2, height: r * 2 };
+}
 
 /** The design token of each color. */
 const COLOR_TOKENS: Readonly<Record<AnnotateColor, string>> = {
@@ -225,12 +259,13 @@ function drawShape(
   }
 }
 
-/** Draws the screenshot and the shapes. */
+/** Draws the screenshot and the shapes; `numbers` off for a region (it is not an item list). */
 function paint(
   canvas: HTMLCanvasElement,
   background: HTMLImageElement | undefined,
   shapes: readonly Shape[],
   draft: Shape | undefined,
+  numbers = true,
 ): void {
   const context = canvas.getContext('2d');
   if (context === null) return;
@@ -239,9 +274,12 @@ function paint(
   const scale = shown > 0 ? canvas.width / shown : 1;
   context.clearRect(0, 0, canvas.width, canvas.height);
   if (background !== undefined) context.drawImage(background, 0, 0);
-  const numbers = new Map(numbered(shapes).map(({ n, shape }) => [shape.id, n]));
-  for (const shape of shapes) drawShape(context, shape, numbers.get(shape.id), palette, scale);
-  if (draft !== undefined) drawShape(context, draft, numbers.size + 1, palette, scale);
+  const order = new Map(numbered(shapes).map(({ n, shape }) => [shape.id, n]));
+  const number = (n: number | undefined) => (numbers ? n : undefined);
+  for (const shape of shapes) {
+    drawShape(context, shape, number(order.get(shape.id)), palette, scale);
+  }
+  if (draft !== undefined) drawShape(context, draft, number(order.size + 1), palette, scale);
 }
 
 export function AnnotateSurface({
@@ -255,7 +293,8 @@ export function AnnotateSurface({
   /** `annotate` draws; `region` takes one rectangle (the screenshot menu's region). */
   readonly mode: 'annotate' | 'region';
   readonly onAdd: (image: BrowserImage, items: BrowserContextItem[]) => void;
-  readonly onRegion: (rect: { x: number; y: number; width: number; height: number }) => void;
+  /** The selected region (image pixels) and what to do with it. */
+  readonly onRegion: (rect: Box, action: RegionAction, comment: string) => void;
   readonly onClose: () => void;
 }) {
   const t = useT();
@@ -269,6 +308,15 @@ export function AnnotateSurface({
   const [typing, setTyping] = useState<{ at: Point; shown: Point; value: string }>();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [region, setRegion] = useState<{ shape: Shape; rect: Box }>();
+  /** The numbered shape whose comment card is open. */
+  const [commenting, setCommenting] = useState<string>();
+  const commented = state.shapes.find((shape) => shape.id === commenting);
+  const commentBox = useRef<HTMLTextAreaElement>(null);
+  const [note, setNote] = useState('');
+  const [place, setPlace] = useState<Placement>();
+  const stage = useRef<HTMLDivElement>(null);
+  const card = useRef<HTMLElement>(null);
   const nextId = useRef(1);
 
   useEffect(() => {
@@ -286,8 +334,57 @@ export function AnnotateSurface({
   }, [image.data]);
 
   useEffect(() => {
-    if (canvas.current !== null) paint(canvas.current, background, state.shapes, draft);
-  }, [background, state.shapes, draft]);
+    if (canvas.current !== null) {
+      paint(
+        canvas.current,
+        background,
+        region === undefined ? state.shapes : [region.shape],
+        draft,
+        mode === 'annotate',
+      );
+    }
+  }, [background, state.shapes, draft, region, mode]);
+
+  // The region card goes beside the region, in the stage's pixels.
+  useLayoutEffect(() => {
+    const stageElement = stage.current;
+    const canvasElement = canvas.current;
+    const cardElement = card.current;
+    if (stageElement === null || canvasElement === null || cardElement === null) return;
+    if (region === undefined && commented === undefined) return;
+    const measure = () => {
+      const area = stageElement.getBoundingClientRect();
+      const shown = canvasElement.getBoundingClientRect();
+      const ratio = image.width > 0 ? shown.width / image.width : 1;
+      const target =
+        region?.rect ?? (commented === undefined ? undefined : anchorOf(commented, 1 / ratio));
+      if (target === undefined) return;
+      const rect = scaleRect(target, ratio);
+      setPlace(
+        placeBeside(
+          {
+            x: rect.x + shown.left - area.left,
+            y: rect.y + shown.top - area.top,
+            width: rect.width,
+            height: rect.height,
+          },
+          { width: cardElement.offsetWidth, height: cardElement.offsetHeight },
+          { width: area.width, height: area.height },
+        ),
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(stageElement);
+    return () => {
+      observer.disconnect();
+    };
+  }, [region, commented, image.width]);
+
+  // An opened comment card has its box ready to type in.
+  useEffect(() => {
+    if (commenting !== undefined) commentBox.current?.focus({ preventScroll: true });
+  }, [commenting]);
 
   const leave = useCallback(() => {
     if (mode === 'annotate' && hasWork(state)) setConfirm(true);
@@ -306,10 +403,32 @@ export function AnnotateSurface({
   const onDown = (event: PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0 || typing !== undefined) return;
     const at = point(event);
+    // A new drag selects the region again.
+    if (mode === 'region') setRegion(undefined);
+    if (mode === 'annotate') {
+      // A click on a number opens that comment instead of drawing.
+      const shown = event.currentTarget.getBoundingClientRect().width;
+      const reach = BADGE * (shown > 0 ? image.width / shown : 1);
+      const hit = numbered(state.shapes).find(({ shape }) => {
+        const badge = badgeAt(shape);
+        return (
+          badge !== undefined && Math.hypot(badge.x - at.image.x, badge.y - at.image.y) <= reach
+        );
+      });
+      if (hit !== undefined) {
+        setPlace(undefined);
+        setCommenting(hit.shape.id);
+        return;
+      }
+      setCommenting(undefined);
+    }
     if (mode === 'annotate' && tool === 'marker') {
+      const marker = id();
       setState((current) =>
-        addShape(current, { id: id(), kind: 'marker', color, width, at: at.image }),
+        addShape(current, { id: marker, kind: 'marker', color, width, at: at.image }),
       );
+      setPlace(undefined);
+      setCommenting(marker);
       return;
     }
     if (mode === 'annotate' && tool === 'text') {
@@ -348,8 +467,19 @@ export function AnnotateSurface({
     }
     if (shape.kind === 'text' || shape.kind === 'marker' || !bigEnough(shape.from, shape.to))
       return;
-    if (mode === 'region') onRegion(rectOf(shape.from, shape.to));
-    else setState((current) => addShape(current, shape));
+    if (mode === 'region') {
+      setPlace(undefined);
+      setRegion({
+        shape: { ...shape, color: 'accent', width: 2 },
+        rect: rectOf(shape.from, shape.to),
+      });
+    } else {
+      setState((current) => addShape(current, shape));
+      if (shape.kind === 'rect' || shape.kind === 'ellipse') {
+        setPlace(undefined);
+        setCommenting(shape.id);
+      }
+    }
   };
 
   const commitText = () => {
@@ -376,6 +506,7 @@ export function AnnotateSurface({
       event.preventDefault();
       event.stopPropagation();
       if (typing !== undefined) setTyping(undefined);
+      else if (commented !== undefined) setCommenting(undefined);
       else leave();
       return;
     }
@@ -399,6 +530,7 @@ export function AnnotateSurface({
   };
 
   const items = numbered(state.shapes);
+  const commentN = items.findIndex((each) => each.shape.id === commenting) + 1;
   return (
     <div
       id="browser-annotate"
@@ -536,7 +668,7 @@ export function AnnotateSurface({
           )}
         </div>
       </div>
-      <div className="browser-annotate-stage">
+      <div ref={stage} className="browser-annotate-stage">
         <div className="browser-annotate-frame">
           <canvas
             ref={canvas}
@@ -550,10 +682,10 @@ export function AnnotateSurface({
             role="img"
             aria-label={t('browser.annotate.canvas')}
             onPointerDown={onDown}
-            // The text field opens on pointerdown and takes the focus; the mousedown that
-            // follows would move the focus to the page and close the empty field at once.
+            // The text field and a comment card open on pointerdown and take the focus; the
+            // mousedown that follows would move the focus away (closing an empty text field).
             onMouseDown={(event) => {
-              if (mode === 'annotate' && tool === 'text') event.preventDefault();
+              if (mode === 'annotate') event.preventDefault();
             }}
             onPointerMove={onMove}
             onPointerUp={onUp}
@@ -587,29 +719,157 @@ export function AnnotateSurface({
             />
           )}
         </div>
-      </div>
-      {mode === 'annotate' && items.length > 0 && (
-        <ol className="browser-annotate-comments" data-testid="browser-annotate-comments">
-          {items.map(({ n, shape }) => (
-            <li key={shape.id}>
-              <label htmlFor={`browser-annotate-comment-${shape.id}`}>
-                {t('browser.picks.number', { n })}
-              </label>
-              <textarea
-                id={`browser-annotate-comment-${shape.id}`}
-                rows={1}
-                data-testid="browser-annotate-comment"
-                placeholder={t('browser.picks.commentPlaceholder')}
-                value={state.comments[shape.id] ?? ''}
-                onChange={(event) => {
-                  const value = event.target.value.slice(0, 2000);
-                  setState((current) => setComment(current, shape.id, value));
+        {mode === 'annotate' && commented !== undefined && (
+          <section
+            ref={card}
+            className="browser-regioncard"
+            data-testid="browser-annotate-card"
+            data-side={place?.side}
+            role="dialog"
+            aria-label={t('browser.picks.comment', {
+              n: commentN,
+            })}
+            style={place === undefined ? { opacity: 0 } : { left: place.x, top: place.y }}
+          >
+            <span className="browser-regioncard-title">
+              <span className="browser-pick-number" aria-hidden="true">
+                {commentN}
+              </span>
+              <span className="browser-regioncard-size">
+                {t('browser.picks.number', {
+                  n: commentN,
+                })}
+              </span>
+            </span>
+            <textarea
+              ref={commentBox}
+              className="browser-pick-comment"
+              data-testid="browser-annotate-comment"
+              aria-label={t('browser.picks.comment', {
+                n: commentN,
+              })}
+              rows={2}
+              placeholder={t('browser.picks.askPlaceholder')}
+              value={state.comments[commented.id] ?? ''}
+              onChange={(event) => {
+                const value = event.target.value.slice(0, 2000);
+                setState((current) => setComment(current, commented.id, value));
+              }}
+              onKeyDown={(event) => {
+                if (isImeComposing(event.nativeEvent)) return;
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  setCommenting(undefined);
+                }
+              }}
+            />
+            <div className="browser-regioncard-actions">
+              <Button
+                size="small"
+                data-testid="browser-annotate-card-done"
+                onClick={() => {
+                  setCommenting(undefined);
                 }}
-              />
-            </li>
-          ))}
-        </ol>
-      )}
+              >
+                {t('browser.picks.done')}
+              </Button>
+              <Button
+                variant="primary"
+                size="small"
+                loading={busy}
+                data-testid="browser-annotate-card-add"
+                onClick={() => {
+                  void add();
+                }}
+              >
+                {t('browser.picks.add', { count: Math.max(1, items.length) })}
+              </Button>
+            </div>
+          </section>
+        )}
+        {region !== undefined && (
+          <section
+            ref={card}
+            className="browser-regioncard"
+            data-testid="browser-region-card"
+            data-side={place?.side}
+            role="dialog"
+            aria-label={t('browser.region.title')}
+            style={place === undefined ? { opacity: 0 } : { left: place.x, top: place.y }}
+          >
+            <span className="browser-regioncard-title">
+              {t('browser.region.title')}
+              <span className="browser-regioncard-size">
+                {`${String(Math.round(region.rect.width))} × ${String(Math.round(region.rect.height))}`}
+              </span>
+            </span>
+            <label className="visually-hidden" htmlFor="browser-region-comment">
+              {t('browser.picks.comment', { n: 1 })}
+            </label>
+            <textarea
+              id="browser-region-comment"
+              className="browser-pick-comment"
+              data-testid="browser-region-comment"
+              rows={2}
+              placeholder={t('browser.picks.askPlaceholder')}
+              value={note}
+              ref={(element) => {
+                if (element !== null && place === undefined) element.focus({ preventScroll: true });
+              }}
+              onChange={(event) => {
+                setNote(event.target.value.slice(0, 2000));
+              }}
+              onKeyDown={(event) => {
+                if (isImeComposing(event.nativeEvent)) return;
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  onRegion(region.rect, 'add', note.trim());
+                }
+              }}
+            />
+            <div className="browser-regioncard-actions">
+              <Button
+                variant="ghost"
+                size="small"
+                data-testid="browser-region-redo"
+                onClick={() => {
+                  setRegion(undefined);
+                }}
+              >
+                {t('browser.region.redo')}
+              </Button>
+              <Button
+                size="small"
+                data-testid="browser-shot-copy"
+                onClick={() => {
+                  onRegion(region.rect, 'copy', note.trim());
+                }}
+              >
+                {t('browser.shot.copy')}
+              </Button>
+              <Button
+                size="small"
+                data-testid="browser-shot-save"
+                onClick={() => {
+                  onRegion(region.rect, 'save', note.trim());
+                }}
+              >
+                {t('browser.shot.save')}
+              </Button>
+              <Button
+                variant="primary"
+                size="small"
+                data-testid="browser-shot-add"
+                onClick={() => {
+                  onRegion(region.rect, 'add', note.trim());
+                }}
+              >
+                {t('browser.shot.add')}
+              </Button>
+            </div>
+          </section>
+        )}
+      </div>
       {confirm && (
         <Dialog
           labelledBy="browser-annotate-discard-title"

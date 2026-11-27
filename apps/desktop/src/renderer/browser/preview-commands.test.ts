@@ -12,6 +12,7 @@ function pick(path?: string): BrowserPick {
   return {
     id: 'p',
     tab: 'tab-1',
+    info: {},
     context: {
       url: 'http://h/',
       tag: 'div',

@@ -369,7 +369,32 @@ export interface BrowserPick {
   readonly context: BrowserElementContext;
   /** The element with a margin around it; absent when the element has no visible box. */
   readonly image?: BrowserImage;
+  /**
+   * The panel's information card (computed font, colors, spacing): page data for the user's
+   * eyes only, never part of what the agent receives. Keys are `ELEMENT_INFO` names.
+   */
+  readonly info: Readonly<Record<string, string>>;
+  /**
+   * The visible page when the element was picked (collected picks only): the panel shows it
+   * frozen with the element outlined and the card beside it. `scale` is image pixels per CSS
+   * pixel of `context.box`.
+   */
+  readonly frame?: { readonly image: BrowserImage; readonly scale: number };
 }
+
+/** What a pick's information card shows, in this order (`BrowserPick.info`). */
+export const ELEMENT_INFO = [
+  'display',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+  'color',
+  'background-color',
+  'margin',
+  'padding',
+  'border-radius',
+] as const;
 
 /** The limits of B3.2 and of the images the panel hands back. */
 export const BROWSER_CONTEXT_LIMITS = {

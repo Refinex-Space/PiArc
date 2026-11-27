@@ -55,3 +55,18 @@ export function elementItem(n: number, pick: BrowserPick, comment: string): Brow
 export function imageName(kind: string, n: number, extension = 'png'): string {
   return `${kind}-${String(n)}.${extension}`;
 }
+
+/** A selected region of the page with what the user wrote about it (B3.4). */
+export function regionItem(
+  rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  comment: string,
+): BrowserContextItem {
+  const where = `x ${String(Math.round(rect.x))}, y ${String(Math.round(rect.y))}, ${String(Math.round(rect.width))} × ${String(Math.round(rect.height))}`;
+  return {
+    n: 1,
+    kind: 'shot',
+    title: `region at ${where}`,
+    data: [['area', `${where} (image px of the visible page)`]],
+    comment,
+  };
+}

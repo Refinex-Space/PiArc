@@ -9,6 +9,7 @@ import {
   capBytes,
   containedSource,
   elementClip,
+  elementInfo,
   ELEMENT_FACTS,
   FACT_LIMITS,
   FRAMEWORK_FACTS,
@@ -229,6 +230,46 @@ describe('shaping the context', () => {
     const wide = elementClip({ x: 100, y: 100, width: 3000, height: 100 }, { x: 0, y: 0 }, 2);
     expect(wide?.scale).toBeCloseTo(1200 / (3032 * 2));
     expect(elementClip({ x: 0, y: 0, width: 0, height: 10 }, { x: 0, y: 0 }, 1)).toBeUndefined();
+  });
+});
+
+describe('the panel’s information card', () => {
+  it('lists the computed font, colors and spacing whether or not they are inherited', () => {
+    const info = elementInfo({
+      display: 'inline-block',
+      'font-family': 'Inter, system-ui, sans-serif',
+      'font-size': '14px',
+      'font-weight': '600',
+      'line-height': '20px',
+      color: 'rgb(17, 24, 39)',
+      'background-color': 'rgba(0, 0, 0, 0)',
+      'margin-top': '0px',
+      'margin-right': '0px',
+      'margin-bottom': '0px',
+      'margin-left': '0px',
+      'padding-top': '8px',
+      'padding-right': '16px',
+      'padding-bottom': '8px',
+      'padding-left': '16px',
+      'border-radius': '6px',
+      cursor: 'pointer',
+    });
+    expect(info).toEqual({
+      display: 'inline-block',
+      'font-family': 'Inter, system-ui, sans-serif',
+      'font-size': '14px',
+      'font-weight': '600',
+      'line-height': '20px',
+      color: 'rgb(17, 24, 39)',
+      'background-color': 'rgba(0, 0, 0, 0)',
+      margin: '0px',
+      padding: '8px 16px',
+      'border-radius': '6px',
+    });
+  });
+
+  it('leaves out what the page did not report', () => {
+    expect(elementInfo({ color: 'red' })).toEqual({ color: 'red' });
   });
 });
 

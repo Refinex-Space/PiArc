@@ -101,12 +101,38 @@ test('visible, full page, region and element screenshots; copy, save and add', a
     await page.mouse.move(canvas.x + 110, canvas.y + 60);
     await page.mouse.move(canvas.x + 210, canvas.y + 110);
     await page.mouse.up();
-    await expect(surface).toHaveCount(0);
-    await expect(page.getByTestId('browser-shot')).toHaveAttribute('data-kind', 'region');
-    const region = await shotSize(page);
+    // The region stays outlined on the frozen page with its card beside it.
+    const regionCard = page.getByTestId('browser-region-card');
+    await expect(regionCard).toBeVisible();
+    await expect(page.getByTestId('browser-region-comment')).toBeFocused();
+    const placed = await regionCard.boundingBox();
+    if (placed === null) throw new Error('No region card');
+    expect(
+      placed.y >= canvas.y + 110 - 1 ||
+        placed.x >= canvas.x + 210 - 1 ||
+        placed.y + placed.height <= canvas.y + 10 + 1,
+    ).toBe(true);
+    await page.screenshot({ path: info.outputPath('screenshot-region.png') });
+    // Copy: the region's pixels.
     const scale = visible.width / canvas.width;
-    expect(Math.abs(region.width - 200 * scale)).toBeLessThanOrEqual(2 * scale + 1);
-    expect(Math.abs(region.height - 100 * scale)).toBeLessThanOrEqual(2 * scale + 1);
+    await withSavedClipboard(app, async () => {
+      await regionCard.getByTestId('browser-shot-copy').click();
+      // The PNG on the clipboard: its size from the header.
+      const size = () =>
+        app.evaluate(async ({ clipboard }) => {
+          const item = (await clipboard.read()).find((each) => each.types.includes('image/png'));
+          if (item === undefined) return { width: 0, height: 0 };
+          const view = new DataView(await (await item.getType('image/png')).arrayBuffer());
+          return { width: view.getUint32(16), height: view.getUint32(20) };
+        });
+      await expect.poll(async () => (await size()).width).toBeGreaterThan(0);
+      const region = await size();
+      expect(Math.abs(region.width - 200 * scale)).toBeLessThanOrEqual(2 * scale + 1);
+      expect(Math.abs(region.height - 100 * scale)).toBeLessThanOrEqual(2 * scale + 1);
+    });
+    // Esc leaves; nothing went to the conversation.
+    await page.keyboard.press('Escape');
+    await expect(surface).toHaveCount(0);
 
     // Element: one real click picks it; the image is the element with its margin.
     await shotMenu(page, 'element');
@@ -125,6 +151,24 @@ test('visible, full page, region and element screenshots; copy, save and add', a
     await expect(page.getByTestId('pending-attachment')).toHaveCount(1);
     await expect(page.getByTestId('pending-browser-context')).toHaveCount(1);
     await expect(page.getByTestId('composer-input')).toBeFocused();
+
+    // A region with a comment: Enter in its card adds both.
+    // Adding moved the focus to the conversation; the preview may still be on screen.
+    if (!(await page.getByTestId('browser-screenshot').isVisible())) {
+      await page.getByTestId('tool-preview').click();
+    }
+    await shotMenu(page, 'region');
+    await expect(surface).toHaveAttribute('data-mode', 'region');
+    await page.mouse.move(canvas.x + 20, canvas.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(canvas.x + 120, canvas.y + 80);
+    await page.mouse.up();
+    await expect(page.getByTestId('browser-region-comment')).toBeFocused();
+    await page.keyboard.type('Too much space here');
+    await page.keyboard.press('Enter');
+    await expect(surface).toHaveCount(0);
+    await expect(page.getByTestId('pending-attachment')).toHaveCount(2);
+    await expect(page.getByTestId('pending-browser-context').last()).toContainText('1');
   } finally {
     await server.close();
   }

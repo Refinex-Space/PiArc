@@ -36,6 +36,27 @@ async function drag(page: Page, from: [number, number], to: [number, number]): P
   await page.mouse.up();
 }
 
+/** The card sits beside the canvas area `[x0, y0, x1, y1]` (fractions), not over it. */
+async function beside(
+  page: Page,
+  card: ReturnType<Page['getByTestId']>,
+  area: [number, number, number, number],
+): Promise<void> {
+  const box = await page.getByTestId('browser-annotate-canvas').boundingBox();
+  const own = await card.boundingBox();
+  if (box === null || own === null) throw new Error('No canvas or card');
+  const left = box.x + box.width * area[0];
+  const top = box.y + box.height * area[1];
+  const right = box.x + box.width * area[2];
+  const bottom = box.y + box.height * area[3];
+  const apart =
+    own.y >= bottom - 1 ||
+    own.y + own.height <= top + 1 ||
+    own.x >= right - 1 ||
+    own.x + own.width <= left + 1;
+  expect(apart).toBe(true);
+}
+
 async function clickCanvas(page: Page, at: [number, number]): Promise<void> {
   const box = await page.getByTestId('browser-annotate-canvas').boundingBox();
   if (box === null) throw new Error('No canvas');
@@ -84,11 +105,24 @@ test('annotating freezes the page, draws, numbers and goes to the input', async 
     );
     await drag(page, [0.1, 0.1], [0.4, 0.3]);
     await expect(canvas).toHaveAttribute('data-shapes', '1');
+    // Its comment card opens beside it, ready to type in; Enter closes it.
+    const card = page.getByTestId('browser-annotate-card');
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId('browser-annotate-comment')).toBeFocused();
+    await beside(page, card, [0.1, 0.1, 0.4, 0.3]);
+    await page.keyboard.type('Header is cramped');
+    await page.keyboard.press('Enter');
+    await expect(card).toHaveCount(0);
     // Ellipse (2) in green, thick.
     await page.getByTestId('browser-annotate-tool-ellipse').click();
     await page.getByTestId('browser-annotate-color-success').click();
     await page.getByTestId('browser-annotate-width-8').click();
     await drag(page, [0.5, 0.1], [0.8, 0.3]);
+    await expect(card).toBeVisible();
+    // Esc closes the card, not the surface.
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
+    await expect(surface).toBeVisible();
     // Arrow, pen and redaction carry no number.
     await page.getByTestId('browser-annotate-tool-arrow').click();
     await page.getByTestId('browser-annotate-color-accent').click();
@@ -109,7 +143,11 @@ test('annotating freezes the page, draws, numbers and goes to the input', async 
     await page.getByTestId('browser-annotate-color-danger').click();
     await clickCanvas(page, [0.5, 0.5]);
     await expect(canvas).toHaveAttribute('data-shapes', '7');
-    await expect(page.getByTestId('browser-annotate-comment')).toHaveCount(3);
+    await expect(card).toBeVisible();
+    await page.keyboard.type('Button too small');
+    await page.screenshot({ path: info.outputPath('annotate-card.png') });
+    await page.getByTestId('browser-annotate-card-done').click();
+    await expect(card).toHaveCount(0);
 
     // Undo, redo, clear (undoable).
     await page.getByTestId('browser-annotate-undo').click();
@@ -122,13 +160,16 @@ test('annotating freezes the page, draws, numbers and goes to the input', async 
     await page.keyboard.press(`${MOD}+Z`);
     await expect(canvas).toHaveAttribute('data-shapes', '7');
 
-    // Comments per number.
-    await page.getByTestId('browser-annotate-comment').nth(0).fill('Header is cramped');
-    await page.getByTestId('browser-annotate-comment').nth(2).fill('Button too small');
+    // A click on a number opens its comment again (the marker tool does not add one there).
+    await clickCanvas(page, [0.1, 0.1]);
+    await expect(canvas).toHaveAttribute('data-shapes', '7');
+    await expect(page.getByTestId('browser-annotate-comment')).toHaveValue('Header is cramped');
+    await page.keyboard.press('Escape');
+    await expect(card).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('annotate.png') });
 
     // Esc asks before discarding; keep editing.
-    await page.getByTestId('browser-annotate-comment').nth(0).focus();
+    await page.getByTestId('browser-annotate-undo').focus();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('browser-annotate-discard')).toBeVisible();
     await page.getByRole('button', { name: /Keep editing|继续编辑/u }).click();

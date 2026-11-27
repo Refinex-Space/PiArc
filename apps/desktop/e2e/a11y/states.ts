@@ -298,12 +298,17 @@ export const A11Y_STATES = [
   {
     id: 'state:browser-picks',
     area: 'state',
-    note: 'preview: picker on, tray with a picked element card (B3.1)',
+    note: 'preview: frozen page, picked element outlined, its card beside it (B3.1)',
   },
   {
     id: 'state:browser-annotate',
     area: 'state',
-    note: 'preview: frozen page with the annotation tools and a numbered marker (B3.3)',
+    note: 'preview: frozen page, annotation tools, a numbered marker with its comment card (B3.3)',
+  },
+  {
+    id: 'state:browser-region',
+    area: 'state',
+    note: 'preview: frozen page, a selected region with its card beside it (B3.4)',
   },
   {
     id: 'dialog:browser-annotate-discard',

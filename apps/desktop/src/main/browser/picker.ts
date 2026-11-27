@@ -21,6 +21,7 @@ import { captureClip, captureFullPage, captureVisible, layoutMetrics } from './c
 import {
   buildContext,
   elementClip,
+  elementInfo,
   ELEMENT_FACTS,
   FACT_LIMITS,
   FRAMEWORK_FACTS,
@@ -198,7 +199,14 @@ export class BrowserPicker {
       ignorePointerEventsNone: true,
     });
     if (!isRecord(answer) || typeof answer.backendNodeId !== 'number') return;
-    const pick = await this.#context(sessionId, tab, page.contents, page.url, answer.backendNodeId);
+    const pick = await this.#context(
+      sessionId,
+      tab,
+      page.contents,
+      page.url,
+      answer.backendNodeId,
+      true,
+    );
     if (pick !== undefined) this.host.deliver(sessionId, 'collect', pick);
   }
 
@@ -229,7 +237,14 @@ export class BrowserPicker {
     if (active.mode === 'shot') this.stop(sessionId);
     const url = this.host.page(sessionId, active.tab)?.url ?? '';
     try {
-      const pick = await this.#context(sessionId, active.tab, active.contents, url, backendNodeId);
+      const pick = await this.#context(
+        sessionId,
+        active.tab,
+        active.contents,
+        url,
+        backendNodeId,
+        active.mode === 'collect',
+      );
       if (pick !== undefined) this.host.deliver(sessionId, active.mode, pick);
     } catch (error) {
       console.warn('[browser] reading the picked element failed', error);
@@ -248,6 +263,8 @@ export class BrowserPicker {
     contents: WebContents,
     url: string,
     backendNodeId: number,
+    /** Also the visible page, for the panel's in-place card (collected picks). */
+    withFrame: boolean,
   ): Promise<BrowserPick | undefined> {
     const send = sender(contents);
     try {
@@ -279,11 +296,14 @@ export class BrowserPicker {
       const clip = elementClip(box, metrics?.scroll ?? { x: 0, y: 0 }, facts.dpr, metrics?.content);
       const image =
         clip === undefined ? undefined : await captureClip(send, clip).catch(() => undefined);
+      const frame = withFrame ? await captureVisible(send).catch(() => undefined) : undefined;
       return {
         id: randomUUID(),
         tab,
         context: buildContext(url, facts, framework, accessibility, box, source),
         ...(image === undefined ? {} : { image }),
+        info: elementInfo(facts.self),
+        ...(frame === undefined ? {} : { frame: { image: frame, scale: facts.dpr } }),
       };
     } finally {
       await send('Runtime.releaseObjectGroup', { objectGroup: OBJECT_GROUP }).catch(

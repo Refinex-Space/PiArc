@@ -1,11 +1,13 @@
 // B3.1, B3.2, B3.5, B3.6 of the built-in browser (design addendum section 3.3): the element
 // picker selects only on a real click in the page (the page's own synthetic events do nothing),
-// keeps picking until Esc or Done, and each pick becomes a numbered card with its selector,
-// component and source location. Four fixture pages carry the dev-build metadata of React 18
+// holds the page still after each pick with the element outlined and a card beside it (selector,
+// component, source, computed styles, a comment box), and goes on with "Pick another" until Esc. Four fixture pages carry the dev-build metadata of React 18
 // (`_debugSource`), React 19 (`_debugStack` with a same-origin inline source map), Vue (`__file`)
 // and Svelte (`__svelte_meta`); every card points into the workspace (`src/App.tsx:<line>`).
 // "Add to conversation (N)" puts the cards' images and one context attachment into the input,
 // and the sent message carries the page data inside a `<browser-context nonce=…>` boundary.
+import type { Page } from '@playwright/test';
+
 import { expect, test } from './sessions.js';
 import {
   acceptImages,
@@ -23,6 +25,19 @@ import {
 import { idle, openSession, requests, userTexts } from './t19.js';
 import { watchMarkup } from './transcript.js';
 import { XSS_SENTINEL_UNTOUCHED } from '../src/shared/xss-payloads.js';
+
+/** The open card is beside the outlined element, not over it. */
+async function expectBeside(page: Page): Promise<void> {
+  const outline = await page.getByTestId('browser-pick-outline').boundingBox();
+  const card = await page.getByTestId('browser-picks').boundingBox();
+  if (outline === null || card === null) throw new Error('No outline or card');
+  const apart =
+    card.y >= outline.y + outline.height - 1 ||
+    card.y + card.height <= outline.y + 1 ||
+    card.x >= outline.x + outline.width - 1 ||
+    card.x + card.width <= outline.x + 1;
+  expect(apart).toBe(true);
+}
 
 test.beforeEach(async ({ userDataDir }) => {
   await acceptImages(userDataDir);
@@ -51,10 +66,15 @@ for (const fixture of FRAMEWORK_FIXTURES) {
       await expect.poll(async () => (await observe(app, id)).tabs[0]?.host).toBe('panel');
       await page.getByTestId('browser-pick-toggle').click();
       await expect(page.getByTestId('browser-pick-toggle')).toHaveAttribute('aria-pressed', 'true');
-      await expect(page.getByTestId('browser-picks')).toBeVisible();
       await clickInPage(app, server.origin, '#target');
       const card = page.getByTestId('browser-pick-card');
       await expect(card).toHaveCount(1);
+      // The page holds still: its frame with the element outlined, the card beside it.
+      await expect.poll(async () => (await observe(app, id)).tabs[0]?.visible).toBe(false);
+      await expect(page.getByTestId('browser-pick-outline')).toBeVisible();
+      await expectBeside(page);
+      await expect(page.getByTestId('browser-pick-comment')).toBeFocused();
+      await expect(card.getByTestId('browser-pick-info')).toContainText(/px/u);
       await expect(card.getByTestId('browser-pick-source')).toHaveText(fixture.source);
       await expect(card.getByTestId('browser-pick-component')).toContainText(fixture.component);
       await expect(card.getByTestId('browser-pick-selector')).toHaveText('#target');
@@ -91,7 +111,7 @@ test('page scripts cannot pick; Esc ends picking; picks go to the input as one g
     await openPage(page, server.origin, 'Picker');
     await page.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+Shift+S`);
     await expect.poll(async () => (await observe(app, id)).active).not.toBeNull();
-    await expect(page.getByTestId('browser-picks')).toBeVisible();
+    await expect(page.getByTestId('browser-pick-toggle')).toHaveAttribute('aria-pressed', 'true');
 
     // THR-01: the page's own events, however it makes them, select nothing.
     await inPage(
@@ -105,22 +125,28 @@ test('page scripts cannot pick; Esc ends picking; picks go to the input as one g
     await page.waitForTimeout(500);
     await expect(page.getByTestId('browser-pick-card')).toHaveCount(0);
 
-    // Real clicks: picking goes on until Esc.
+    // A real click: the card opens beside the element; say something about it, copy its selector.
     await clickInPage(app, server.origin, '#save');
     await expect(page.getByTestId('browser-pick-card')).toHaveCount(1);
+    await page.getByTestId('browser-pick-comment').fill('Make this the primary action');
+    await page.getByTestId('browser-pick-copy').click();
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('#save');
+    // "Pick another": the page moves again and picking goes on.
+    await page.getByTestId('browser-picks-continue').click();
+    await expect(page.getByTestId('browser-pick-stage')).toHaveCount(0);
+    await expect.poll(async () => (await observe(app, id)).tabs[0]?.visible).toBe(true);
     await clickInPage(app, server.origin, '#title');
     await expect(page.getByTestId('browser-pick-card')).toHaveCount(2);
     // The page did not get the clicks (inspect mode takes them).
     expect(await inPage(app, server.origin, 'document.activeElement?.id ?? ""')).not.toBe('save');
     // Bidi controls in page text show as code points on the card.
     await expect(page.getByTestId('browser-pick-card').nth(1)).toContainText('[U+202E]');
-    await page.getByTestId('browser-pick-comment').first().fill('Make this the primary action');
+    // The first card keeps what was said about it.
+    await expect(page.getByTestId('browser-pick-said')).toHaveText('Make this the primary action');
 
-    // Copy selector.
-    await page.getByTestId('browser-pick-copy').first().click();
-    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('#save');
-
-    // Esc in the page ends picking; the cards stay.
+    // Esc in the page ends picking; the cards stay and open again on the page as it is now.
+    await page.getByTestId('browser-picks-continue').click();
+    await expect.poll(async () => (await observe(app, id)).tabs[0]?.visible).toBe(true);
     await app.evaluate(({ webContents }, origin) => {
       const contents = webContents.getAllWebContents().find((c) => c.getURL().startsWith(origin));
       contents?.focus();
@@ -129,6 +155,11 @@ test('page scripts cannot pick; Esc ends picking; picks go to the input as one g
     }, server.origin);
     await expect(page.getByTestId('browser-pick-toggle')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByTestId('browser-pick-card')).toHaveCount(2);
+    await expect(page.getByTestId('browser-pick-stage')).toBeVisible();
+    // Back to the page: the cards wait, counted on the pick button.
+    await page.getByTestId('browser-picks-hide').click();
+    await expect(page.getByTestId('browser-pick-count')).toHaveText('2');
+    await expect.poll(async () => (await observe(app, id)).tabs[0]?.visible).toBe(true);
 
     // The page menu's "Add to Conversation" adds the element under the pointer (B1.3.8).
     await recordMenus(app);
@@ -274,7 +305,6 @@ test('THR-11 a picked element with markup in its id and text shows it as text', 
     await watchMarkup(page);
     await openPage(page, server.origin, 'Picker xss');
     await page.getByTestId('browser-pick-toggle').click();
-    await expect(page.getByTestId('browser-picks')).toBeVisible();
     await clickInPage(app, server.origin, 'button');
     const card = page.getByTestId('browser-pick-card');
     await expect(card).toHaveCount(1);

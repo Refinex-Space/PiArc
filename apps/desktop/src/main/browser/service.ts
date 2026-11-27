@@ -1208,6 +1208,11 @@ export class BrowserService {
     }
     active.applyEmulation(area);
     view.setVisible(!placement.occluded);
+    // A hidden page keeps no keyboard focus: what the user types next goes to the workbench
+    // that now shows the page's frame (a pick's card, the annotation), not to the page.
+    if (placement.occluded && view.webContents.isFocused() && !placement.owner.isDestroyed()) {
+      placement.owner.focus();
+    }
     this.#shieldOver(model, active, placement.window, view.getBounds(), !placement.occluded);
   }
 

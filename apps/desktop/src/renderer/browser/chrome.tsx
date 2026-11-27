@@ -312,6 +312,7 @@ export function NavigationRow({
   findOn,
   picking = false,
   annotating = false,
+  pending = 0,
 }: {
   readonly tab: BrowserTabState | undefined;
   readonly actions: ChromeActions;
@@ -321,6 +322,8 @@ export function NavigationRow({
   readonly findOn: boolean;
   readonly picking?: boolean;
   readonly annotating?: boolean;
+  /** Picked elements waiting to be added: a count on the pick button. */
+  readonly pending?: number;
 }) {
   const pageOpen = tab !== undefined && tab.url !== '' && !tab.crashed;
   const t = useT();
@@ -468,14 +471,24 @@ export function NavigationRow({
       </div>
       <IconButton
         size="sm"
-        label={t('browser.pick')}
+        label={
+          pending > 0
+            ? `${t('browser.pick')} · ${t('browser.picks.pending', { count: pending })}`
+            : t('browser.pick')
+        }
         keys="Mod+Shift+S"
         aria-pressed={picking}
         disabled={!pageOpen || annotating}
+        className="browser-pick-toggle"
         data-testid="browser-pick-toggle"
         onClick={actions.pick}
       >
         <PickIcon />
+        {pending > 0 && (
+          <span className="browser-pick-count" data-testid="browser-pick-count" aria-hidden="true">
+            {pending}
+          </span>
+        )}
       </IconButton>
       <IconButton
         size="sm"

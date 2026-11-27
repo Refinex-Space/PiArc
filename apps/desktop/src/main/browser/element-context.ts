@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   BROWSER_CONTEXT_LIMITS,
+  ELEMENT_INFO,
   type BrowserElementContext,
   type BrowserSourceLocation,
 } from '../../shared/browser.js';
@@ -627,6 +628,24 @@ function sides(
   const [top, right, bottom, left] = values;
   if (top === bottom && right === left) return top === right ? top : `${top ?? ''} ${right ?? ''}`;
   return values.join(' ');
+}
+
+/**
+ * The panel's information card of an element (`BrowserPick.info`): its computed values as they
+ * are, inherited or not; four-sided properties as one shorthand (`0px` when all are zero).
+ */
+export function elementInfo(self: Readonly<Record<string, string>>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of ELEMENT_INFO) {
+    const value =
+      name === 'margin' || name === 'padding'
+        ? self[`${name}-top`] === undefined
+          ? undefined
+          : (sides(self, name) ?? '0px')
+        : self[name];
+    if (value !== undefined && value !== '') out[name] = value;
+  }
+  return out;
 }
 
 /**

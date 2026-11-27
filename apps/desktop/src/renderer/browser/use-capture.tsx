@@ -1,6 +1,6 @@
-// B3 of the preview panel in one place (design addendum 3.3): the element picker and its tray,
-// annotation of a frozen page, the screenshot menu and its result, and the hand-off of all of it
-// to the session's input. Picks come only from the main process (`browserPick` events: a real
+// B3 of the preview panel in one place (design addendum 3.3): the element picker and its card
+// in place on the frozen page, annotation of a frozen page, the screenshot menu and its result,
+// and the hand-off of all of it to the session's input. Picks come only from the main process (`browserPick` events: a real
 // click while the picker is on, or the page menu); the page itself has no way to add one.
 import {
   useCallback,
@@ -27,7 +27,7 @@ import { showPanel } from '../shell/registry.js';
 import { useUi } from '../shell/ui.js';
 import { useSession } from '../store/hooks.js';
 import { AnnotateSurface } from './AnnotateCanvas.js';
-import { imageName } from './context-items.js';
+import { imageName, regionItem } from './context-items.js';
 import { attachableBlob, cropImage, dataUrlBytes, extensionOf } from './images.js';
 import {
   addPick,
@@ -38,8 +38,8 @@ import {
   usePicks,
   type TrayCard,
 } from './picks.js';
+import { PickSurface, type PickStage } from './PickSurface.js';
 import { onPreviewCommand, scopeSource, trayItems } from './preview-commands.js';
-import { PickTray } from './PickTray.js';
 import { SHOT_LABELS, ShotBar, type ShotKind } from './ShotBar.js';
 
 function isImage(value: unknown): value is BrowserImage {
@@ -60,12 +60,16 @@ export interface Capture {
   /** The picker is collecting cards in the shown tab. */
   readonly picking: boolean;
   readonly annotating: boolean;
+  /** The page is held still: annotating, or a picked element's card is open. */
+  readonly frozen: boolean;
+  /** Picked elements waiting to be added. */
+  readonly pending: number;
   readonly pick: () => void;
   readonly annotate: () => void;
   readonly screenshot: (anchor: HTMLElement) => void;
-  /** Drawn inside the viewport while annotating (the page's view is hidden). */
+  /** Drawn inside the viewport while the page is frozen (its view is hidden). */
   readonly surface: ReactNode;
-  /** The screenshot result and the tray, under the page. */
+  /** The screenshot result, under the page. */
   readonly strips: ReactNode;
   readonly menu: ReactNode;
   readonly onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
@@ -94,6 +98,7 @@ export function useCapture({
     mode: 'annotate' | 'region';
   }>();
   const [shot, setShot] = useState<{ image: BrowserImage; kind: ShotKind }>();
+  const [stage, setStage] = useState<PickStage>();
   const picking =
     state?.picking !== undefined && state.picking.tab === tab?.id ? state.picking.mode : undefined;
   const workspace = session?.workspace ?? '';
@@ -116,8 +121,18 @@ export function useCapture({
         if (event.mode === 'shot') {
           if (pick.image === undefined) toast(t('browser.shot.noBox'));
           else setShot({ image: pick.image, kind: 'element' });
-        } else if (!addPick(sessionId, pick)) {
+          return;
+        }
+        // The frame is shown once, beside the card; the tray keeps the rest.
+        const { frame, ...card } = pick;
+        if (!addPick(sessionId, card)) {
           toast(t('browser.picks.full', { max: BROWSER_CONTEXT_LIMITS.picks }));
+        } else if (frame !== undefined) {
+          setStage({
+            frame: frame.image,
+            focus: pick.id,
+            outline: { id: pick.id, box: pick.context.box, scale: frame.scale },
+          });
         }
       }),
     [sessionId, workspace, root, toast, t],
@@ -152,6 +167,7 @@ export function useCapture({
 
   const annotate = useCallback(() => {
     if (tab === undefined || annotation !== undefined) return;
+    setStage(undefined);
     if (picking !== undefined) call({ op: 'pick', tab: tab.id, mode: 'off' });
     void capture('visible').then((image) => {
       if (image !== undefined) setAnnotation({ image, mode: 'annotate' });
@@ -170,6 +186,35 @@ export function useCapture({
     [sessionId],
   );
 
+  // Picking ended with elements waiting: their card opens again on the page as it is now.
+  const wasPicking = useRef(false);
+  const held = useRef({ stage, annotation });
+  held.current = { stage, annotation };
+  useEffect(() => {
+    const was = wasPicking.current;
+    wasPicking.current = picking === 'collect';
+    if (!was || picking === 'collect') return;
+    if (held.current.stage !== undefined || held.current.annotation !== undefined) return;
+    const last = picksOf(sessionId).at(-1);
+    if (last === undefined) return;
+    void capture('visible').then((image) => {
+      if (image !== undefined)
+        setStage((current) => current ?? { frame: image, focus: last.pick.id });
+    });
+  }, [picking, sessionId, capture]);
+
+  // Another tab or page: the frozen frame is no longer what the panel shows.
+  useEffect(() => {
+    setStage(undefined);
+  }, [tab?.id, url]);
+
+  const resume = () => {
+    setStage(undefined);
+    if (picking !== 'collect' && tab !== undefined) {
+      call({ op: 'pick', tab: tab.id, mode: 'collect' });
+    }
+  };
+
   const addCards = async () => {
     const current = picksOf(sessionId);
     if (current.length === 0) return;
@@ -181,6 +226,7 @@ export function useCapture({
     }
     handOff({ url: current[0]?.pick.context.url ?? url, items: trayItems(current), images });
     clearPicks(sessionId);
+    setStage(undefined);
     if (picking !== undefined && tab !== undefined) call({ op: 'pick', tab: tab.id, mode: 'off' });
   };
 
@@ -223,6 +269,8 @@ export function useCapture({
       label: t(SHOT_LABELS.region),
       testId: 'browser-shot-region',
       run: () => {
+        // The region gets its own card on the frozen page; an earlier result goes away.
+        setShot(undefined);
         void capture('visible').then((image) => {
           if (image !== undefined) setAnnotation({ image, mode: 'region' });
         });
@@ -255,20 +303,42 @@ export function useCapture({
     }
   };
 
+  const copyShot = (image: BrowserImage) => {
+    void window.piarc
+      .browser(sessionId, { op: 'copyImage', image: image.data })
+      .then(() => {
+        toast(t('browser.shot.copied'));
+      })
+      .catch(report);
+  };
+  const saveShot = (image: BrowserImage) => {
+    void window.piarc
+      .saveImage({ kind: 'png', name: 'screenshot.png', bytes: dataUrlBytes(image.data) })
+      .catch(report);
+  };
+
   const surface =
-    annotation === undefined ? null : (
+    annotation !== undefined ? (
       <AnnotateSurface
         image={annotation.image}
         mode={annotation.mode}
         onClose={() => {
           setAnnotation(undefined);
         }}
-        onRegion={(rect) => {
+        onRegion={(rect, action, comment) => {
           const source = annotation.image;
-          setAnnotation(undefined);
           void cropImage(source, rect)
-            .then((image) => {
-              setShot({ image, kind: 'region' });
+            .then(async (image) => {
+              if (action === 'copy') copyShot(image);
+              else if (action === 'save') saveShot(image);
+              else {
+                setAnnotation(undefined);
+                await addImage(
+                  image,
+                  'screenshot',
+                  comment === '' ? [] : [regionItem(rect, comment)],
+                );
+              }
             })
             .catch(report);
         }}
@@ -280,73 +350,66 @@ export function useCapture({
             .catch(report);
         }}
       />
-    );
+    ) : stage !== undefined && cards.length > 0 ? (
+      <PickSurface
+        stage={stage}
+        cards={cards}
+        onFocus={(id) => {
+          setStage({ ...stage, focus: id });
+        }}
+        onComment={(id, comment) => {
+          setPickComment(sessionId, id, comment);
+        }}
+        onRemove={(id) => {
+          removePick(sessionId, id);
+          const last = picksOf(sessionId).at(-1);
+          if (last === undefined) setStage(undefined);
+          else if (stage.focus === id) setStage({ ...stage, focus: last.pick.id });
+        }}
+        onClear={() => {
+          clearPicks(sessionId);
+          setStage(undefined);
+        }}
+        onContinue={resume}
+        onHide={() => {
+          setStage(undefined);
+        }}
+        onAdd={() => {
+          void addCards().catch(report);
+        }}
+        onOpenSource={openSource}
+        onCopySelector={(card) => {
+          void navigator.clipboard
+            .writeText(card.pick.context.selector)
+            .then(() => {
+              toast(t('browser.picks.copied'));
+            })
+            .catch(report);
+        }}
+      />
+    ) : null;
 
-  const strips = (
-    <>
-      {shot !== undefined && (
-        <ShotBar
-          image={shot.image}
-          kind={shot.kind}
-          onCopy={() => {
-            void window.piarc
-              .browser(sessionId, { op: 'copyImage', image: shot.image.data })
-              .then(() => {
-                toast(t('browser.shot.copied'));
-              })
-              .catch(report);
-          }}
-          onSave={() => {
-            void window.piarc
-              .saveImage({
-                kind: 'png',
-                name: 'screenshot.png',
-                bytes: dataUrlBytes(shot.image.data),
-              })
-              .catch(report);
-          }}
-          onAdd={() => {
-            const image = shot.image;
-            setShot(undefined);
-            void addImage(image, 'screenshot', []).catch(report);
-          }}
-          onClose={() => {
-            setShot(undefined);
-          }}
-        />
-      )}
-      {(cards.length > 0 || picking === 'collect') && (
-        <PickTray
-          cards={cards}
-          picking={picking === 'collect'}
-          onComment={(id, comment) => {
-            setPickComment(sessionId, id, comment);
-          }}
-          onRemove={(id) => {
-            removePick(sessionId, id);
-          }}
-          onClear={() => {
-            clearPicks(sessionId);
-          }}
-          onDone={() => {
-            if (tab !== undefined) call({ op: 'pick', tab: tab.id, mode: 'off' });
-          }}
-          onAdd={() => {
-            void addCards().catch(report);
-          }}
-          onOpenSource={openSource}
-          onCopySelector={(card) => {
-            void navigator.clipboard
-              .writeText(card.pick.context.selector)
-              .then(() => {
-                toast(t('browser.picks.copied'));
-              })
-              .catch(report);
-          }}
-        />
-      )}
-    </>
-  );
+  const strips =
+    shot === undefined ? null : (
+      <ShotBar
+        image={shot.image}
+        kind={shot.kind}
+        onCopy={() => {
+          copyShot(shot.image);
+        }}
+        onSave={() => {
+          saveShot(shot.image);
+        }}
+        onAdd={() => {
+          const image = shot.image;
+          setShot(undefined);
+          void addImage(image, 'screenshot', []).catch(report);
+        }}
+        onClose={() => {
+          setShot(undefined);
+        }}
+      />
+    );
 
   const menu =
     shotMenu.open === null ? null : (
@@ -362,6 +425,8 @@ export function useCapture({
   return {
     picking: picking === 'collect',
     annotating: annotation !== undefined,
+    frozen: annotation !== undefined || (stage !== undefined && cards.length > 0),
+    pending: cards.length,
     pick,
     annotate,
     screenshot,

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BrowserRequest } from '../../shared/browser.js';
-import { useT } from '../app/app-context.js';
+import { useApp, useT } from '../app/app-context.js';
 import { Button } from '../app/Button.js';
 import { reason } from '../shell/errors.js';
 import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
@@ -12,6 +12,7 @@ import { ToolHeaderContent } from '../shell/ToolHeaderSlot.js';
 import { useUi } from '../shell/ui.js';
 import { AgentBar, DeviceBar, Downloads, FindBar, PromptBar } from './bars.js';
 import { NavigationRow, TabStrip, type ChromeActions } from './chrome.js';
+import { ChromePrompt } from './ChromePrompt.js';
 import { ConsoleDrawer } from './console.js';
 import { browserCall, useBrowserState } from './use-browser.js';
 import { useCapture } from './use-capture.js';
@@ -24,8 +25,11 @@ import { openChromeImport } from './site-import.js';
 
 export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
   const t = useT();
+  const { preferences } = useApp();
   const ui = useUi();
   const menu = useMenu();
+  const root = useRef<HTMLDivElement>(null);
+  const siteButton = useCallback(() => root.current?.querySelector('.browser-site'), []);
   // The session's workspace: the Chrome import goes into its partition (B5.1).
   const workspace = useSession(sessionId)?.workspace;
   const { state, failure } = useBrowserState(sessionId);
@@ -293,7 +297,12 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
   const pageShown =
     tab !== undefined && !tab.crashed && tab.failure === undefined && tab.url !== '';
   return (
-    <div className="browser-panel" data-testid="browser-panel" onKeyDown={capture.onKeyDown}>
+    <div
+      ref={root}
+      className="browser-panel"
+      data-testid="browser-panel"
+      onKeyDown={capture.onKeyDown}
+    >
       <ToolHeaderContent>
         <TabStrip state={state} actions={actions} />
       </ToolHeaderContent>
@@ -305,6 +314,7 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
         findOn={findOn}
         picking={capture.picking}
         annotating={capture.annotating}
+        pending={capture.pending}
       />
       {space !== undefined && (
         <AgentBar
@@ -379,7 +389,7 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
           sessionId={sessionId}
           active={pageShown}
           claim={claim}
-          frozen={capture.annotating}
+          frozen={capture.frozen}
           onEnter={() => {
             if (tab !== undefined) call({ op: 'focus', tab: tab.id });
           }}
@@ -452,6 +462,19 @@ export function BrowserPanel({ sessionId }: { readonly sessionId: string }) {
         }}
       />
       {capture.menu}
+      <ChromePrompt
+        url={tab?.url ?? ''}
+        workspace={workspace}
+        enabled={
+          pageShown &&
+          !capture.frozen &&
+          !capture.picking &&
+          space?.kind !== 'agent' &&
+          preferences.browser.storage !== 'session'
+        }
+        localNames={preferences.browser.localHostnames}
+        anchor={siteButton}
+      />
       {menu.open && (
         <MenuPopup
           at={menu.open}
