@@ -39,13 +39,6 @@
     padding-inline: var(--piarc-session-gutter-narrow);
   }
 }
-.environment-card {
-  width: min(var(--piarc-workbench-environment-width), 100%);
-  box-sizing: border-box;
-  border: 1px solid var(--piarc-border-subtle);
-  border-radius: var(--piarc-settings-radius);
-  background: var(--piarc-workbench-editor);
-}
 .choice-button {
   display: inline-flex;
   align-items: center;
@@ -71,41 +64,6 @@
 .mention-option > svg {
   flex-shrink: 0;
 }
-.environment-card > .choice-button {
-  display: flex;
-  justify-content: flex-start;
-  width: 100%;
-  min-height: calc(var(--piarc-space-5) + var(--piarc-space-4));
-  gap: var(--piarc-space-2);
-  padding: 0 var(--piarc-space-3);
-  border-radius: 0;
-  font-size: var(--piarc-font-size-button);
-}
-.environment-card > .environment-current {
-  border-radius: var(--piarc-settings-radius) var(--piarc-settings-radius) 0 0;
-}
-.environment-current > svg:last-child {
-  margin-inline-start: auto;
-}
-.environment-card > .environment-change {
-  border-top: 1px solid var(--piarc-border-subtle);
-  border-radius: 0 0 var(--piarc-settings-radius) var(--piarc-settings-radius);
-}
-.environment-change > svg {
-  width: var(--piarc-space-3);
-}
-.environment-card .worktree-fields {
-  padding: var(--piarc-space-3);
-  border-top: 1px solid var(--piarc-border-subtle);
-}
-.environment-card .worktree-fields .field-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--piarc-space-1);
-}
-.environment-card .worktree-fields .input {
-  width: 100%;
-}
 /* The input sits on the reading column: the measure plus the session gutters, narrower gutters in
    a narrow pane. One row is 44 px (28 px controls in 8 px of padding) in either density. */
 .home,
@@ -119,7 +77,7 @@
   width: min(calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter)), 100%);
   min-width: 0;
   margin-inline: auto;
-  padding: var(--piarc-space-2) var(--piarc-session-gutter);
+  padding: var(--piarc-space-2) var(--piarc-session-gutter) var(--piarc-space-4);
   border: 0;
   background: transparent;
 }
@@ -135,14 +93,15 @@
   padding: 0;
 }
 .composer .composer-box {
+  position: relative;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
-    'shelf shelf shelf'
-    'add editor send';
-  align-items: end;
-  min-height: var(--piarc-workbench-composer-height);
+    'shelf shelf shelf shelf'
+    'editor editor editor editor'
+    'add lead trail send';
+  align-items: center;
   gap: 0 var(--piarc-space-1);
   padding: var(--piarc-session-composer-pad);
   border: 0;
@@ -170,6 +129,14 @@
 }
 .composer-box > .composer-mount {
   grid-area: editor;
+  align-self: stretch;
+}
+.composer-box > .composer-lead {
+  grid-area: lead;
+}
+.composer-box > .composer-trail {
+  grid-area: trail;
+  justify-content: flex-end;
 }
 .composer-box > .composer-swap {
   grid-area: send;
@@ -204,6 +171,17 @@
   }
 }
 
+.composer-box > .icon-button.is-sm:is(.composer-swap, .composer-mic) {
+  border-radius: var(--piarc-radius-pill);
+}
+/* Send is the card's one filled control once there is something to send. */
+:root[data-app] .composer-box > .composer-send:enabled {
+  background: var(--piarc-c-button-primary-background);
+  color: var(--piarc-c-button-primary-text);
+}
+:root[data-app] .composer-box > .composer-send:enabled:hover {
+  background: var(--piarc-c-button-primary-background-hover);
+}
 .composer-box .composer-stop {
   background: var(--piarc-session-fill-hover);
 }
@@ -219,10 +197,9 @@
 }
 .composer .composer-editor {
   box-sizing: border-box;
-  min-height: var(--piarc-session-composer-row);
+  min-height: calc(2 * var(--piarc-session-prose-line) + 2 * var(--piarc-space-2));
   max-height: min(384px, 40vh);
-  padding: calc((var(--piarc-session-composer-row) - var(--piarc-session-prose-line)) / 2)
-    var(--piarc-session-pad-xs);
+  padding: var(--piarc-space-2);
 }
 .home[data-starting='true'] .composer-mount::before {
   content: attr(data-placeholder);
@@ -230,14 +207,14 @@
   pointer-events: none;
 }
 .home[data-starting='true'] .composer .composer-editor {
-  max-height: var(--piarc-session-composer-row);
+  max-height: calc(2 * var(--piarc-session-prose-line) + 2 * var(--piarc-space-2));
   overflow: hidden;
   opacity: 0;
 }
 .composer .composer-mount[data-empty='true']::before,
 .home[data-starting='true'] .composer .composer-mount::before {
-  top: calc((var(--piarc-session-composer-row) - var(--piarc-session-prose-line)) / 2);
-  left: var(--piarc-session-pad-xs);
+  top: var(--piarc-space-2);
+  left: var(--piarc-space-2);
   right: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -370,51 +347,137 @@
     opacity: 1;
   }
 }
-/* The row under the input: model and effort, mode, sandbox and usage, at the end. */
-.conversation-composer .environment-bar {
+/* The action row inside the card: + and the permission mode with its status at the start; the
+   model with its effort and the context ring before the microphone and send. */
+.composer-box > :is(.composer-lead, .composer-trail) {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: 0 var(--piarc-space-1);
-  min-height: var(--piarc-session-row-small);
-  padding: var(--piarc-space-2) 0 0;
+  min-width: 0;
   color: var(--piarc-text-secondary);
-  font-size: var(--piarc-session-footnote);
+  font-size: var(--piarc-session-body);
   line-height: var(--piarc-session-body-line);
+  cursor: default;
 }
-.environment-bar .choice-button {
-  max-width: min(40%, var(--piarc-workbench-environment-width));
-  height: var(--piarc-session-row-small);
+.composer-box > .composer-lead:empty,
+.composer-box > .composer-trail:empty {
+  display: none;
+}
+:is(.composer-lead, .composer-trail) .choice-button,
+.composer-tray .choice-button {
+  height: var(--piarc-session-composer-row);
   min-height: 0;
-  padding: 0 var(--piarc-session-pad-xs);
-  border-radius: calc(var(--piarc-session-radius) - 2px);
+  max-width: var(--piarc-workbench-environment-width);
+  padding: 0 var(--piarc-session-pad-sm);
+  border-radius: var(--piarc-radius-pill);
   overflow: hidden;
   color: var(--piarc-text-secondary);
   font-weight: var(--piarc-font-weight-regular);
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-curve-out);
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-curve-out),
+    color var(--piarc-motion-surface) var(--piarc-motion-curve-out);
 }
-.environment-bar .choice-button:is(:hover, [aria-expanded='true']):enabled {
+:is(.composer-lead, .composer-trail, .composer-tray)
+  .choice-button:is(:hover, [aria-expanded='true']):enabled {
   background: var(--piarc-session-ghost-hover);
   color: var(--piarc-text-primary);
 }
-.environment-bar .choice-button[data-mode='bypassPermissions'] {
+.composer-trail .choice-button {
+  flex: 0 1 auto;
+}
+/* The model reads first and its effort follows as a quieter tail, as one label with two targets. */
+.composer-trail .choice-button.composer-model {
+  color: var(--piarc-text-primary);
+}
+.composer-trail .composer-model + .composer-effort {
+  margin-inline-start: calc(-1 * var(--piarc-space-1));
+}
+.composer-lead .choice-button[data-mode='bypassPermissions'] {
   color: var(--piarc-text-warning);
 }
-.environment-bar .choice-button[data-top-tier] {
+.composer-trail .choice-button[data-top-tier] {
   color: var(--piarc-text-accent);
   font-weight: var(--piarc-font-weight-medium);
 }
-.environment-bar .composer-spacer {
-  flex: 1 1 0;
+.composer-lead .tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.environment-bar .usage-ring {
+/* Where the work runs: a tinted tray inset from the card and tucked under its top edge. */
+.composer > .composer-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  margin: 0 var(--piarc-space-3) calc(-1 * var(--piarc-workbench-composer-radius));
+  padding: var(--piarc-space-1) var(--piarc-space-2)
+    calc(var(--piarc-workbench-composer-radius) + var(--piarc-space-1));
+  border-radius: var(--piarc-workbench-composer-radius) var(--piarc-workbench-composer-radius) 0 0;
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+.composer-tray .choice-button > svg,
+.composer-tray-item > svg {
+  flex: none;
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+.composer-tray .choice-button {
+  gap: var(--piarc-session-pad-xs);
+}
+.composer-tray-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-session-pad-xs);
+  min-width: 0;
+  height: var(--piarc-session-composer-row);
+  padding: 0 var(--piarc-session-pad-sm);
+}
+.composer-tray .worktree-fields {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  padding: 0 var(--piarc-session-pad-sm) var(--piarc-space-1);
+}
+.composer-tray .worktree-fields .field-row {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  min-width: 0;
+}
+.composer-tray .worktree-fields .input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  height: var(--piarc-session-composer-row);
+  border-color: var(--piarc-session-line);
+  background: var(--piarc-workbench-editor);
+  font-size: var(--piarc-session-footnote);
+}
+.composer-tray .worktree-fields .field-label {
+  flex: none;
+}
+@media (forced-colors: active) {
+  .composer > .composer-tray {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+.composer-trail .usage-ring {
   justify-content: center;
-  min-width: var(--piarc-session-row-small);
-  height: var(--piarc-session-row-small);
-  margin-inline-start: 1px;
+  min-width: var(--piarc-session-composer-row);
+  height: var(--piarc-session-composer-row);
   padding: 0 var(--piarc-space-1);
   border: 0;
   border-radius: calc(var(--piarc-session-radius) - 2px);
@@ -422,10 +485,10 @@
   color: inherit;
   font: inherit;
 }
-.environment-bar .usage-ring:hover {
+.composer-trail .usage-ring:hover {
   background: var(--piarc-session-ghost-hover);
 }
-.environment-bar .usage-ring[data-level='normal'] .usage-ring-text {
+.composer-trail .usage-ring[data-level='normal'] .usage-ring-text {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -650,11 +713,12 @@
    keeps its own place and look); the dictation strip is its own row between the shelf and the
    editor row. */
 .composer .composer-box.has-mic {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
   grid-template-areas:
-    'shelf shelf shelf shelf'
-    'voice voice voice voice'
-    'add editor mic send';
+    'shelf shelf shelf shelf shelf'
+    'voice voice voice voice voice'
+    'editor editor editor editor editor'
+    'add lead trail mic send';
 }
 .composer-box > .composer-mic {
   grid-area: mic;

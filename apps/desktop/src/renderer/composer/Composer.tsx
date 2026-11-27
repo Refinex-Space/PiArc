@@ -220,6 +220,9 @@ export function Composer({
   limits,
   supportsImages = true,
   above,
+  tray,
+  leading,
+  trailing,
   error,
   fill,
   insert,
@@ -239,6 +242,12 @@ export function Composer({
   supportsImages?: boolean | undefined;
   /** Shown above the input (the queue). */
   above?: ReactNode;
+  /** Where the work runs (folder, environment, worktree): a tinted tray tucked behind the card's top. */
+  tray?: ReactNode;
+  /** The action row's controls after `+` (permission mode and its status). */
+  leading?: ReactNode;
+  /** The action row's controls before the microphone and send (model, effort, context usage). */
+  trailing?: ReactNode;
   /** Why the last message was not sent. */
   error?: string | undefined;
   /**
@@ -979,6 +988,11 @@ export function Composer({
           {error === undefined ? null : <div>{error}</div>}
         </div>
       )}
+      {tray === undefined ? null : (
+        <div className="composer-tray" data-testid="composer-tray">
+          {tray}
+        </div>
+      )}
       <div
         className={`composer-box${disabled ? ' is-disabled' : ''}${voice.controller === undefined ? '' : ' has-mic'}`}
       >
@@ -1085,6 +1099,8 @@ export function Composer({
                 : t('composer.placeholder')
           }
         />
+        <div className="composer-lead">{leading}</div>
+        <div className="composer-trail">{trailing}</div>
         {voice.controller !== undefined && (
           <MicButton controller={voice.controller} ui={voice.ui} disabled={disabled} />
         )}

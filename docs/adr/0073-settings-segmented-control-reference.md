@@ -1,6 +1,6 @@
 # 0073. 桌面前端对标 Claude Desktop，首项为设置分段控件
 
-- 状态：已接受
+- 状态：已接受（composer 的运行位置托盘由 [ADR-0100](0100-two-tier-composer-and-context-tray.md) 修订）
 - 日期：2026-11-24
 - 修订：ADR-0006 第 3、4 条及其「复刻 Claude Desktop 视觉」备选结论的前端范围
 - 相关：ADR-0029，架构第 8.6、8.7 节

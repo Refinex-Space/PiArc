@@ -88,7 +88,7 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0070](0070-in-memory-side-conversations.md) | 独立的内存侧边对话、工具拒绝和无转录来源的用量 | 已接受（补充） |
 | [0071](0071-local-esm-chunks.md) | Agent Host 按本地 ESM 分块构建与校验 | 已接受，修订架构第 5.6 节 |
 | [0072](0072-macos-local-asset-responses.md) | macOS 通过原生缓冲区交付本地应用资源 | 已接受，升级 Electron 时重新评估 |
-| [0073](0073-settings-segmented-control-reference.md) | 桌面前端长期对标 Claude Desktop 的视觉与交互，首项为设置分段控件；PiArc 自有内核与 Harness | 已接受 |
+| [0073](0073-settings-segmented-control-reference.md) | 桌面前端长期对标 Claude Desktop 的视觉与交互，首项为设置分段控件；PiArc 自有内核与 Harness | 已接受（composer 的运行位置托盘由 0100 修订） |
 | [0074](0074-workbench-settings.md) | 设置在发起操作的工作台内打开，采用模态面板 | 已接受 |
 | [0075](0075-session-tool-tiles.md) | 会话工具右侧分块、比例与窗口生命周期 | 已接受 |
 | [0076](0076-project-files.md) | 工作树文件浏览、冲突安全的编辑和独立本地文档预览 | 已接受 |
@@ -114,4 +114,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0097](0097-speech-model-downloads.md) | 增强语音模型的下载：`piarc_web::download`（HTTPS、逐跳白名单、代理 CONNECT、上限、续传、取消、边下边哈希），按文件从 ModelScope 锁定 revision 下载、不解包，加载前校验（THR-19） | 已接受（补充） |
 | [0098](0098-remove-project-from-sidebar.md) | 从侧栏移除项目：`workspaces.removed`（schema v15），停止该项目的后台任务并关闭会话，只在用户打开文件夹或在其中新建会话时恢复，有运行中的工作时原生确认 | 已接受（补充） |
 | [0099](0099-draft-sessions-for-new-session-tools.md) | 新会话页的工具：首次用工具时建草稿会话（列表不显示、首条输入后转正、离开即丢弃、Core 拒绝丢弃对话），worktree 下工具等第一条消息 | 已接受（补充） |
+| [0100](0100-two-tier-composer-and-context-tray.md) | 两层输入卡片（编辑区在上、模式与模型等在卡片内的操作行）与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏 | 已接受（修订 0073 的 composer 范围） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |

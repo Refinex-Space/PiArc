@@ -72,7 +72,7 @@ test('starts a session in its own worktree and asks before archiving its changes
   await page.getByTestId('home').screenshot({ path: info.outputPath('environment-local.png') });
   await environment.click();
   await page.getByTestId('menu-worktree').click();
-  await expect(page.getByTestId('home-worktree')).toBeChecked();
+  await expect(page.getByTestId('home-worktree-fields')).toBeVisible();
   await expect(environment).toHaveText('Worktree');
   await page.getByTestId('home').screenshot({ path: info.outputPath('environment-worktree.png') });
   const base = page.getByTestId('home-worktree-base');

@@ -2101,13 +2101,6 @@ textarea.input {
 .model-preview dd {
   margin: 0;
 }
-.environment-bar {
-  display: flex;
-  gap: var(--piarc-space-2);
-  flex-wrap: wrap;
-  align-items: center;
-}
-
 /* Permissions settings page (T23). */
 .permission-rules {
   padding: 0;

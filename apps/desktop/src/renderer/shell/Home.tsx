@@ -10,7 +10,7 @@ import type { PaletteCommand } from '../composer/command-plugin.js';
 import { parseCommandsList } from '../composer/commands-list.js';
 import { coreMentions, draftOf } from '../composer/session-draft.js';
 import { useStore, useWorkspaces } from '../store/hooks.js';
-import { CheckIcon, ChevronDownIcon, ComputerIcon, FolderIcon } from './icons.js';
+import { ComputerIcon, FolderIcon, GitBranchIcon } from './icons.js';
 import { ChoiceButton, type MenuItem } from './Menu.js';
 import { keyOf, useModelCatalog, type Effort } from './model-catalog.js';
 import { permissionChoices } from './PermissionModeMenu.js';
@@ -70,7 +70,6 @@ function HomeForm({
     () => coreMentions(workspace, ui.composer?.maxSearchResults ?? 20),
     [workspace, ui.composer?.maxSearchResults],
   );
-  const [configuring, setConfiguring] = useState(false);
   // The shell opens a draft session for the tools in this folder; a worktree waits (ADR-0099).
   const { report: reportTools, sessionId: draftId } = ui.homeTools;
   useEffect(() => {
@@ -114,7 +113,6 @@ function HomeForm({
       icon: <ComputerIcon />,
       run: () => {
         tree.setEnabled(false);
-        setConfiguring(false);
       },
     },
     {
@@ -122,10 +120,9 @@ function HomeForm({
       label: t('home.worktree'),
       selected: tree.enabled,
       disabled: !workspace,
-      icon: <FolderIcon />,
+      icon: <GitBranchIcon />,
       run: () => {
         tree.setEnabled(true);
-        setConfiguring(true);
       },
     },
   ];
@@ -257,7 +254,7 @@ function HomeForm({
   return (
     <section className="home workbench-home" data-testid="home" data-starting={echo !== undefined}>
       <div className="environment-stage">
-        {echo !== undefined ? (
+        {echo === undefined ? null : (
           // Where the conversation will show it: the user's message at the top of the reading
           // column (quiet while it is on its way), the working line at the foot.
           <div className="home-pending">
@@ -272,34 +269,6 @@ function HomeForm({
               </span>
               <span className="working-activity shimmer">{t('home.starting')}</span>
             </div>
-          </div>
-        ) : (
-          <div className="environment-card">
-            <ChoiceButton
-              label={t('home.folder')}
-              valueLabel={label}
-              className="environment-current"
-              items={folderItems}
-              above={false}
-              disabled={busy}
-            >
-              <ComputerIcon />
-              <span className="truncate">{label}</span>
-              {workspace && <CheckIcon />}
-            </ChoiceButton>
-            <ChoiceButton
-              label={t('workbench.environment')}
-              valueLabel={localLabel}
-              className="environment-change"
-              items={setupItems}
-              above={false}
-              disabled={busy}
-              testId="home-environment"
-            >
-              <span className="truncate">{localLabel}</span>
-              <ChevronDownIcon />
-            </ChoiceButton>
-            {configuring && tree.enabled && <WorktreeFields choice={tree} disabled={busy} />}
           </div>
         )}
       </div>
@@ -332,6 +301,86 @@ function HomeForm({
               else if (cmd.name === 'model') modelButton.current?.click();
             },
           }}
+          tray={
+            <>
+              <ChoiceButton
+                label={t('workbench.environment')}
+                valueLabel={localLabel}
+                items={setupItems}
+                disabled={busy}
+                testId="home-environment"
+              >
+                {tree.enabled ? <GitBranchIcon /> : <ComputerIcon />}
+                <span className="truncate">{localLabel}</span>
+              </ChoiceButton>
+              <ChoiceButton
+                label={t('home.folder')}
+                valueLabel={label}
+                items={folderItems}
+                heading={t('jumpList.recentWorkspaces')}
+                testId="home-workspace"
+                value={workspace}
+                disabled={busy}
+              >
+                <FolderIcon />
+                <span className="truncate">{label}</span>
+              </ChoiceButton>
+              {tree.enabled && <WorktreeFields choice={tree} disabled={busy} />}
+            </>
+          }
+          leading={
+            <ChoiceButton
+              label={t('approval.modeMenu')}
+              testId="home-mode"
+              valueLabel={modeLabel}
+              disabled={!workspace || busy}
+              items={[
+                {
+                  id: 'workspace-mode',
+                  label: t('home.modeDefault'),
+                  selected: !mode,
+                  run: () => {
+                    setMode(undefined);
+                  },
+                },
+                ...permissionChoices(t, preferences.permissions, mode, setMode, false),
+              ]}
+              heading={t('approval.modeMenu')}
+            >
+              {modeLabel}
+            </ChoiceButton>
+          }
+          trailing={
+            <>
+              <ChoiceButton
+                label={t('models.label')}
+                className="composer-model"
+                items={modelItems}
+                heading={t('models.label')}
+                buttonRef={modelButton}
+                valueLabel={modelLabel}
+                disabled={!workspace || busy}
+                onOpen={() => {
+                  setCatalogRequested(workspace);
+                }}
+                testId="home-model"
+              >
+                {modelLabel}
+              </ChoiceButton>
+              {resolved && resolved.efforts.length > 1 && (
+                <ChoiceButton
+                  label={t('models.effort')}
+                  className="composer-effort"
+                  disabled={busy}
+                  heading={t('models.effort')}
+                  items={effortItems}
+                  valueLabel={effortLabel}
+                >
+                  {effortLabel}
+                </ChoiceButton>
+              )}
+            </>
+          }
           above={
             (error ?? catalogFailure) && (
               <p className="composer-problems" role="alert" data-testid="home-error">
@@ -340,75 +389,6 @@ function HomeForm({
             )
           }
         />
-        <div className="environment-bar">
-          <ChoiceButton
-            label={t('workbench.environment')}
-            valueLabel={localLabel}
-            items={setupItems}
-            disabled={busy}
-          >
-            <ComputerIcon />
-            {localLabel}
-          </ChoiceButton>
-          <ChoiceButton
-            label={t('home.folder')}
-            valueLabel={label}
-            items={folderItems}
-            heading={t('jumpList.recentWorkspaces')}
-            testId="home-workspace"
-            value={workspace}
-            disabled={busy}
-          >
-            <FolderIcon />
-            <span className="truncate">{label}</span>
-          </ChoiceButton>
-          <span className="composer-spacer" />
-          <ChoiceButton
-            label={t('models.label')}
-            items={modelItems}
-            heading={t('models.label')}
-            buttonRef={modelButton}
-            valueLabel={modelLabel}
-            disabled={!workspace || busy}
-            onOpen={() => {
-              setCatalogRequested(workspace);
-            }}
-            testId="home-model"
-          >
-            {modelLabel}
-          </ChoiceButton>
-          {resolved && resolved.efforts.length > 1 && (
-            <ChoiceButton
-              label={t('models.effort')}
-              disabled={busy}
-              heading={t('models.effort')}
-              items={effortItems}
-              valueLabel={effortLabel}
-            >
-              {effortLabel}
-            </ChoiceButton>
-          )}
-          <ChoiceButton
-            label={t('approval.modeMenu')}
-            testId="home-mode"
-            valueLabel={modeLabel}
-            disabled={!workspace || busy}
-            items={[
-              {
-                id: 'workspace-mode',
-                label: t('home.modeDefault'),
-                selected: !mode,
-                run: () => {
-                  setMode(undefined);
-                },
-              },
-              ...permissionChoices(t, preferences.permissions, mode, setMode, false),
-            ]}
-            heading={t('approval.modeMenu')}
-          >
-            {modeLabel}
-          </ChoiceButton>
-        </div>
       </div>
     </section>
   );
@@ -488,18 +468,6 @@ function WorktreeFields({ choice, disabled }: { choice: WorktreeChoice; disabled
   const { branches } = choice;
   return (
     <div className="worktree-fields" data-testid="home-worktree-fields">
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={choice.enabled}
-          disabled={disabled}
-          data-testid="home-worktree"
-          onChange={(event) => {
-            choice.setEnabled(event.currentTarget.checked);
-          }}
-        />
-        {t('home.worktree')}
-      </label>
       {choice.enabled && branches === false && (
         <p className="muted small" role="status" data-testid="home-worktree-unavailable">
           {t('home.worktreeNoRepo')}

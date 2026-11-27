@@ -49,7 +49,7 @@
     "readingWidth": "768px",
     "environmentWidth": "320px",
     "composerHeight": "44px",
-    "composerRadius": "14px",
+    "composerRadius": "18px",
     "composerShadow": "0 4px 20px rgb(0 0 0 / 0.035)",
     "menuRadius": "12px",
     "iconSize": "18px"

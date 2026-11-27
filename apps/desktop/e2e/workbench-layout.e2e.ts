@@ -16,8 +16,9 @@ test('the composer stays on its reading axis through navigation and panel toggle
   const folder = await makeWorkspace(workspaces, 'Workbench');
   await openFolder(page, app, folder);
   await expect(page.locator('.composer-box')).toHaveCSS('width', '768px');
-  await expect(page.locator('.composer-box')).toHaveCSS('height', '46px');
-  await expect(page.locator('.environment-card')).toHaveCSS('width', '320px');
+  await expect(page.locator('.composer-box')).toHaveCSS('height', '102px');
+  // The tray with the folder and environment sits inset behind the card's top edge.
+  await expect(page.locator('.composer-tray')).toHaveCSS('width', '744px');
   await expect(page.locator('[data-testid^="tile-body-"]')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('new-session.png') });
   await startSession(page, 'Check the workspace', 't18-chat');
@@ -43,35 +44,49 @@ test('the composer stays on its reading axis through navigation and panel toggle
   await expect(page.getByTestId('expand-sidebar')).toBeVisible();
 });
 
-test('the empty composer centers its icons and prompt in both densities', async ({
+test('the empty composer keeps two lines for the prompt over one action row in both densities', async ({
   app,
   page,
   workspaces,
 }) => {
   await openFolder(page, app, await makeWorkspace(workspaces, 'Composer'));
   const box = page.locator('.composer-box');
-  for (const density of ['comfortable', 'compact'] as const) {
+  // Two prose lines in the editor's padding (the 8 px step, 6 px compact) and the action row, inside
+  // the card's 8 px padding.
+  for (const [density, height, step] of [
+    ['comfortable', '102px', 8],
+    ['compact', '96px', 6],
+  ] as const) {
     await prefer(page, { key: 'appearance.density', value: density });
     await expect(page.locator('html')).toHaveAttribute('data-density', density);
-    await expect(box).toHaveCSS('height', '46px');
-    const offsets = await box.evaluate((element) => {
+    await expect(box).toHaveCSS('height', height);
+    const layout = await box.evaluate((element) => {
       const center = (rect: DOMRect) => rect.top + rect.height / 2;
-      const middle = center(element.getBoundingClientRect());
+      const card = element.getBoundingClientRect();
       const mount = element.querySelector<HTMLElement>('.composer-mount');
-      if (!mount) throw new Error('Missing composer editor');
+      const mode = element.querySelector<HTMLElement>('.composer-lead .choice-button');
+      const model = element.querySelector<HTMLElement>('.composer-trail .choice-button');
+      if (!mount || !mode || !model) throw new Error('Missing composer parts');
+      const row = center(mode.getBoundingClientRect());
       const hint = getComputedStyle(mount, '::before');
-      const hintCenter =
-        mount.getBoundingClientRect().top + parseFloat(hint.top) + parseFloat(hint.lineHeight) / 2;
-      return [
-        ...Array.from(
-          element.querySelectorAll('.workbench-icon > svg'),
-          (icon) => center(icon.getBoundingClientRect()) - middle,
-        ),
-        hintCenter - middle,
-      ];
+      return {
+        // The prompt starts where typed text starts: 8 px into the editor, below the card's padding.
+        hintTop: mount.getBoundingClientRect().top + parseFloat(hint.top) - card.top,
+        // Every control on the action row shares one center line, the card's padding above its bottom.
+        rowBottom: card.bottom - mode.getBoundingClientRect().bottom,
+        offsets: [
+          ...Array.from(
+            element.querySelectorAll('.workbench-icon > svg'),
+            (icon) => center(icon.getBoundingClientRect()) - row,
+          ),
+          center(model.getBoundingClientRect()) - row,
+        ],
+      };
     });
-    expect(offsets).toHaveLength(3);
-    for (const offset of offsets)
-      expect(Math.abs(offset), `${density}: ${offsets.join(', ')}`).toBeLessThanOrEqual(0.5);
+    expect(layout.hintTop, density).toBe(8 + step);
+    expect(layout.rowBottom, density).toBe(8);
+    expect(layout.offsets.length, density).toBeGreaterThanOrEqual(3);
+    for (const offset of layout.offsets)
+      expect(Math.abs(offset), `${density}: ${layout.offsets.join(', ')}`).toBeLessThanOrEqual(0.5);
   }
 });

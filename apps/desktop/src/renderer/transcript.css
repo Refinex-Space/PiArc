@@ -2402,10 +2402,6 @@
   }
 }
 
-.environment-bar {
-  padding: 0 var(--piarc-space-5) var(--piarc-space-2);
-}
-
 /* The question card: a quiet strip with the question, divided option rows, then the answer. */
 .approval-box.is-question {
   gap: 0;

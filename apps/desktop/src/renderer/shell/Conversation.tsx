@@ -41,6 +41,7 @@ import { PermissionModeMenu } from './PermissionModeMenu.js';
 import { AutoReviewStatus } from './AutoReviewStatus.js';
 import { SandboxStatus } from './SandboxStatus.js';
 import { UsageRing } from './ContextUsage.js';
+import { GitBranchIcon } from './icons.js';
 import { NoticeBar } from './NoticeBar.js';
 import { QueueList } from './QueueList.js';
 import { compactFocus, SessionInput } from './session-input.js';
@@ -583,6 +584,58 @@ export function Conversation({
           }
           fill={fill}
           insert={insert}
+          tray={
+            session?.worktreeName === undefined ? undefined : (
+              <span
+                className="composer-tray-item worktree-tag"
+                data-testid="env-worktree"
+                title={t('env.worktreeTitle', {
+                  path: session.worktreePath ?? '',
+                  branch: session.worktreeBranch ?? '',
+                })}
+              >
+                <GitBranchIcon />
+                <span className="truncate">
+                  {t('env.worktree', { name: session.worktreeName })}
+                  {session.worktreeBranch === undefined ? null : ` · ${session.worktreeBranch}`}
+                </span>
+              </span>
+            )
+          }
+          leading={
+            <>
+              <PermissionModeMenu
+                key={id}
+                id={id}
+                mode={session?.open === true ? session.permissionMode : undefined}
+                buttonRef={modeButton}
+                onError={(failure) => {
+                  setError(t('composer.failed', { reason: reason(failure) }));
+                }}
+              />
+              <AutoReviewStatus
+                state={session?.open === true ? session.autoReviewState : undefined}
+                reason={session?.autoReviewReason}
+              />
+              <SandboxStatus workspace={workspace} />
+            </>
+          }
+          trailing={
+            <>
+              <ModelMenus
+                id={id}
+                catalog={catalog}
+                running={turn.running}
+                modelButton={modelButton}
+                effortButton={effortButton}
+                onChange={refresh}
+                onError={(e) => {
+                  setError(t('models.failed', { reason: reason(e) }));
+                }}
+              />
+              <UsageRing sessionId={id} />
+            </>
+          }
           above={
             queue.length === 0 ? (
               tail === undefined ? null : (
@@ -628,47 +681,6 @@ export function Conversation({
             )
           }
         />
-        <div className="environment-bar">
-          {session?.worktreeName !== undefined && (
-            <span
-              className="tag worktree-tag"
-              data-testid="env-worktree"
-              title={t('env.worktreeTitle', {
-                path: session.worktreePath ?? '',
-                branch: session.worktreeBranch ?? '',
-              })}
-            >
-              {t('env.worktree', { name: session.worktreeName })}
-              {session.worktreeBranch === undefined ? null : ` · ${session.worktreeBranch}`}
-            </span>
-          )}
-          <ModelMenus
-            id={id}
-            catalog={catalog}
-            running={turn.running}
-            modelButton={modelButton}
-            effortButton={effortButton}
-            onChange={refresh}
-            onError={(e) => {
-              setError(t('models.failed', { reason: reason(e) }));
-            }}
-          />
-          <PermissionModeMenu
-            key={id}
-            id={id}
-            mode={session?.open === true ? session.permissionMode : undefined}
-            buttonRef={modeButton}
-            onError={(failure) => {
-              setError(t('composer.failed', { reason: reason(failure) }));
-            }}
-          />
-          <AutoReviewStatus
-            state={session?.open === true ? session.autoReviewState : undefined}
-            reason={session?.autoReviewReason}
-          />
-          <SandboxStatus workspace={workspace} />
-          <UsageRing sessionId={id} />
-        </div>
       </div>
       {choosingStyle && workspace !== undefined ? (
         <OutputStyleDialog

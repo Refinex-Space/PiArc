@@ -237,6 +237,30 @@ export function SessionGallery() {
                 mentions={MENTIONS}
                 commands={COMMANDS}
                 limits={undefined}
+                leading={
+                  <PermissionModeMenu
+                    id="gallery"
+                    mode="default"
+                    buttonRef={modeButton}
+                    onError={() => undefined}
+                  />
+                }
+                trailing={
+                  <>
+                    <ModelMenus
+                      id="gallery"
+                      catalog={CATALOG}
+                      running={section.running === true}
+                      modelButton={modelButton}
+                      effortButton={effortButton}
+                      onChange={() => undefined}
+                      onError={() => undefined}
+                    />
+                    {section.input === true
+                      ? RINGS.map(([id]) => <UsageRing key={id} sessionId={id} />)
+                      : null}
+                  </>
+                }
                 above={
                   section.queue === undefined ? null : (
                     <QueueList
@@ -247,26 +271,6 @@ export function SessionGallery() {
                   )
                 }
               />
-              <div className="environment-bar">
-                <ModelMenus
-                  id="gallery"
-                  catalog={CATALOG}
-                  running={section.running === true}
-                  modelButton={modelButton}
-                  effortButton={effortButton}
-                  onChange={() => undefined}
-                  onError={() => undefined}
-                />
-                <PermissionModeMenu
-                  id="gallery"
-                  mode="default"
-                  buttonRef={modeButton}
-                  onError={() => undefined}
-                />
-                {section.input === true
-                  ? RINGS.map(([id]) => <UsageRing key={id} sessionId={id} />)
-                  : null}
-              </div>
             </div>
           </section>
         </main>

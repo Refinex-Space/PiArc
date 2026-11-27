@@ -106,7 +106,7 @@ export function ModelMenus({
     <>
       <button
         type="button"
-        className="choice-button"
+        className="choice-button composer-model"
         ref={modelButton}
         disabled={running || busy}
         data-testid="session-model"
@@ -122,7 +122,7 @@ export function ModelMenus({
       </button>
       <button
         type="button"
-        className="choice-button"
+        className="choice-button composer-effort"
         ref={effortButton}
         disabled={running || busy || !current?.efforts.length}
         data-testid="session-effort"
