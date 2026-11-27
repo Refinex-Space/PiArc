@@ -799,6 +799,21 @@ impl TaskManager {
         }
     }
 
+    /// Workspace `workspace` is removed from the list: the tasks of its sessions stop (their
+    /// rows and output stay, as when the session is archived).
+    pub(crate) async fn workspace_removed(&self, workspace: &str) {
+        let ids = self.running_matching(|t| t.workspace == workspace);
+        for id in &ids {
+            let _ = self.stop(id, StopBy::Session).await;
+        }
+    }
+
+    /// The tasks running in workspace `workspace`.
+    #[must_use]
+    pub fn running_in(&self, workspace: &str) -> usize {
+        self.running_matching(|t| t.workspace == workspace).len()
+    }
+
     fn running_matching(&self, keep: impl Fn(&BackgroundTask) -> bool) -> Vec<String> {
         lock(&self.inner.state)
             .tasks

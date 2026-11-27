@@ -97,6 +97,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - store（`src/renderer/store/`）：业务状态只来自 Core 的事件；组件用 `hooks.ts` 的细粒度订阅（列表、单个会话条目、单行），不要订阅整个 store；快照按 `revision` 门控；乐观行以 `clientId` 对账，Core 未确认时显示未送达，重发复用原键。"需要处理"的定义与徽标优先级只在 `store/status.ts`。
 - 窗口是否在前台以主进程的应用事件为准（`app/window-focus.ts`），不要用 `document.hasFocus()`：自动化下它恒为真。
 - 流式期间只有流式那一行重新渲染：行组件按 id 订阅 store 与解析结果，块组件按对象身份记忆化；改动时用 L4 的渲染计数用例（`transcript-render.e2e.ts`）验证。
+- 移除项目（ADR-0098）：项目菜单（右键或 `…`）的"移除项目"调 `removeWorkspace`。主进程（`core/workspace-removal.ts`）先取 Core 的 `workspaceWork`，有运行中的会话或后台任务时弹原生确认，再交给 Core；当前视图属于该项目时回到不带项目的主页。`PIARC_EVIDENCE_TASK=workspace-remove npx playwright test -c apps/desktop/playwright.config.ts workspace-remove --project dev` 覆盖右键与 `…`、确认与取消、重新打开恢复、重启后保持（截图在 `tmp/evidence/workspace-remove/`）。
 - 信任对话框提交 Core 返回的清单版本。收到过期视图时显示新增项、说明变化并再次确认。原生删除确认只从 Core 索引读取标题与工作区，并显示本次实际删除的会话 ID。
 
 ## 易错点

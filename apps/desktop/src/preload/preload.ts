@@ -361,6 +361,10 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.workspaceOpen, path)
       .then((value: unknown) => expectString(value)),
+  removeWorkspace: (path) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.workspaceRemove, path)
+      .then((value: unknown) => expectBoolean(value)),
   createSession: (workspace, model, worktree) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionCreate, workspace, model, worktree)

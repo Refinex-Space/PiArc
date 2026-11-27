@@ -57,6 +57,40 @@ impl CoreRuntime {
         })
     }
 
+    /// The sessions in a turn and the running background tasks of a workspace:
+    /// `{ sessions, tasks }` (asked before removing it from the list).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn workspace_work(
+        &self,
+        path: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.workspace_work(path).await },
+        )
+    }
+
+    /// Removes a workspace from the list: stops its background tasks, closes its sessions and
+    /// its Agent Host; its folder and sessions stay, and opening the folder lists it again.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn remove_workspace(
+        &self,
+        path: PathBuf,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.remove_workspace(path).await?;
+            Ok(serde_json::Value::Null)
+        })
+    }
+
     /// Runs a provider setting operation through the dedicated settings Agent Host.
     ///
     /// # Errors

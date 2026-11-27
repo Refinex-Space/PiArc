@@ -196,6 +196,17 @@ export declare class CoreRuntime {
   /** Closes a workspace: its sessions and its Agent Host. Resolves with `null`. */
   closeWorkspace(path: string): Promise<string>;
   /**
+   * The sessions in a turn and the running background tasks of a workspace. Resolves with
+   * `{ sessions, tasks }` (counts).
+   */
+  workspaceWork(path: string): Promise<string>;
+  /**
+   * Removes a workspace from the list: stops its background tasks, closes its sessions and
+   * its Agent Host. Its folder and sessions stay; opening the folder lists it again.
+   * Resolves with `null`.
+   */
+  removeWorkspace(path: string): Promise<string>;
+  /**
    * Creates a session in a workspace (opened when needed). Resolves with
    * `{ sessionId, workspace, cwd, restoredMessages }`.
    */

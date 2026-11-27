@@ -58,6 +58,7 @@ export const IPC_CHANNELS = {
   settingsOpen: 'piarc:settings.open',
   folderDialog: 'piarc:workspace.folderDialog',
   workspaceOpen: 'piarc:workspace.open',
+  workspaceRemove: 'piarc:workspace.remove',
   sessionCreate: 'piarc:session.create',
   sessionResume: 'piarc:session.resume',
   sessionClose: 'piarc:session.close',
@@ -759,6 +760,12 @@ export interface PiarcApi {
   clearBrowserData(workspace: string): Promise<null>;
   /** Opens a directory as a workspace (starts its Agent Host); resolves with Core's JSON. */
   openWorkspace(path: string): Promise<string>;
+  /**
+   * Removes a project from the sidebar: Core stops its running sessions and background tasks
+   * (after a native confirmation when there are some) and keeps its folder and sessions;
+   * opening the folder again lists it. Resolves `false` when the user kept it.
+   */
+  removeWorkspace(path: string): Promise<boolean>;
   /** Creates a session in a workspace; resolves with `{ sessionId, ... }` as JSON. */
   createSession(workspace: string, model?: ModelRef, worktree?: WorktreeOptions): Promise<string>;
   providerSettings(): Promise<string>;

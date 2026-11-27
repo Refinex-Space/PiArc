@@ -46,6 +46,7 @@ mod memory;
 mod plugins;
 mod project_files;
 mod provider_settings;
+mod removal;
 mod session;
 mod skills;
 mod snapshot;
@@ -197,6 +198,9 @@ struct Routes {
     /// when one came is not in `workspaces` yet and catches up after it is registered.
     trust_epoch: u64,
     trust_changes: std::collections::VecDeque<(u64, PathBuf)>,
+    /// Workspaces being removed from the list, with how many removals run: they do not open
+    /// meanwhile (a client reopening the session that just closed would list them again).
+    removing: HashMap<PathBuf, usize>,
 }
 
 /// Trust changes remembered for workspaces that were opening (far more than can overlap).
@@ -229,7 +233,7 @@ impl Hub {
     /// Opens `path` (an existing directory) as a workspace and waits until its Agent Host is
     /// ready: connected, and the sessions that were open reopened.
     pub async fn open_workspace(&self, path: PathBuf) -> Result<WorkspaceView> {
-        let workspace = self.workspace(path).await?;
+        let workspace = self.workspace_opened_by_user(path).await?;
         workspace.acquire().await?;
         Ok(workspace.view().await)
     }
@@ -237,9 +241,15 @@ impl Hub {
     /// Closes every session of the workspace and stops its Agent Host.
     pub async fn close_workspace(&self, path: PathBuf) -> Result<()> {
         let path = canonical_dir(path, "path").await?;
+        self.close_open_workspace(path).await;
+        Ok(())
+    }
+
+    /// Closes the sessions and the Agent Host of open workspace `path` (canonical).
+    async fn close_open_workspace(&self, path: PathBuf) {
         let removed = lock(&self.routes).workspaces.remove(&path);
         let Some(workspace) = removed else {
-            return Ok(());
+            return;
         };
         let sessions: Vec<session::SessionHandle> = {
             let mut routes = lock(&self.routes);
@@ -258,7 +268,6 @@ impl Hub {
             let _ = session.close().await;
         }
         workspace.close().await;
-        Ok(())
     }
 
     /// The configuration diagnostics of a workspace (T24).
@@ -733,22 +742,47 @@ impl Hub {
 
     /// The open workspace at `path`, opening it (and starting its Agent Host) when needed.
     async fn workspace(&self, path: PathBuf) -> Result<workspace::WorkspaceHandle> {
+        self.workspace_with(path, false).await
+    }
+
+    /// [`Self::workspace`] for the user's own open (the folder, or a session started in it):
+    /// a workspace removed from the list is listed again.
+    async fn workspace_opened_by_user(&self, path: PathBuf) -> Result<workspace::WorkspaceHandle> {
+        self.workspace_with(path, true).await
+    }
+
+    /// The open workspace at `path`, opened when needed. A workspace removed from the list
+    /// opens only when `restore` (other requests, such as a window resuming a session it still
+    /// shows, are refused).
+    async fn workspace_with(
+        &self,
+        path: PathBuf,
+        restore: bool,
+    ) -> Result<workspace::WorkspaceHandle> {
         // Register a new workspace before a simultaneous settings update enumerates Hosts.
         // Its handshake and any subsequent reload then observe the same committed preference.
         let _provider_writer = self.ctx.provider_writer.lock().await;
         self.recover_provider_settings().await?;
         let path = canonical_dir(path, "workspace").await?;
-        if let Some(open) = lock(&self.routes).workspaces.get(&path).cloned() {
-            return Ok(open);
+        {
+            let routes = lock(&self.routes);
+            if routes.removing.contains_key(&path) {
+                return Err(being_removed());
+            }
+            if let Some(open) = routes.workspaces.get(&path).cloned() {
+                return Ok(open);
+            }
         }
         let epoch = lock(&self.routes).trust_epoch;
-        let opened = workspace::WorkspaceHandle::open(&self.ctx, path.clone()).await?;
+        let opened = workspace::WorkspaceHandle::open(&self.ctx, path.clone(), restore).await?;
         // Another request may have opened it meanwhile (keep the first), or Core began to shut
         // down: the new one is closed again.
         let kept: Result<(Option<workspace::WorkspaceHandle>, Vec<PathBuf>)> = {
             let mut routes = lock(&self.routes);
             if routes.closed {
                 Err(Error::ShuttingDown)
+            } else if routes.removing.contains_key(&path) {
+                Err(being_removed())
             } else if let Some(first) = routes.workspaces.get(&path).cloned() {
                 Ok((Some(first), Vec::new()))
             } else {
@@ -955,6 +989,14 @@ pub(crate) fn host_error(error: piarc_host::Error) -> Error {
 }
 
 /// A path as text for the client and the database.
+/// A workspace asked for while it is being removed from the list.
+fn being_removed() -> Error {
+    Error::InvalidArgument {
+        field: "workspace",
+        reason: "is being removed from the list".into(),
+    }
+}
+
 pub(crate) fn path_text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }

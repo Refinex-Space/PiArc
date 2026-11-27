@@ -10,7 +10,7 @@
 //! state the actors report (open workspaces and their Agent Host, open sessions, their status
 //! and unread flag). Live state wins for the fields it has.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use piarc_protocol::policy::{ApprovalRequest, PermissionMode};
@@ -298,6 +298,7 @@ impl Snapshots {
             policies: BTreeMap::new(),
             subagents: BTreeMap::new(),
             recent: Vec::new(),
+            removed: BTreeSet::new(),
             indexed: Vec::new(),
             workspace_revision: 0,
             session_revision: 0,
@@ -359,6 +360,8 @@ struct SnapshotTask {
     /// Running subagent sessions → their main session.
     subagents: BTreeMap<String, String>,
     recent: Vec<piarc_store::WorkspaceRecord>,
+    /// Workspaces the user removed from the list: neither they nor their sessions are listed.
+    removed: BTreeSet<String>,
     indexed: Vec<piarc_store::SessionRecord>,
     workspace_revision: u64,
     session_revision: u64,
@@ -423,11 +426,18 @@ impl SnapshotTask {
     async fn reload(&mut self) {
         match self
             .storage
-            .run(|store| Ok::<_, piarc_store::Error>((store.workspaces()?, store.sessions()?)))
+            .run(|store| {
+                Ok::<_, piarc_store::Error>((
+                    store.workspaces()?,
+                    store.removed_workspaces()?,
+                    store.sessions()?,
+                ))
+            })
             .await
         {
-            Ok(Ok((recent, indexed))) => {
+            Ok(Ok((recent, removed, indexed))) => {
                 self.recent = recent;
+                self.removed = removed.into_iter().collect();
                 self.indexed = indexed;
             }
             Ok(Err(error)) => {
@@ -457,7 +467,9 @@ impl SnapshotTask {
             })
             .collect();
         for (path, view) in &self.workspaces {
-            list.insert(path.clone(), view.clone());
+            if !self.removed.contains(path) {
+                list.insert(path.clone(), view.clone());
+            }
         }
         let mut workspaces: Vec<WorkspaceView> = list.into_values().collect();
         workspaces.sort_by_key(|w| std::cmp::Reverse(w.last_opened_at));
@@ -496,6 +508,13 @@ impl SnapshotTask {
                 list.push(view);
             }
         }
+        // A removed workspace's sessions are grouped under it in the sidebar: none are listed.
+        list.retain(|view| {
+            view.workspace
+                .as_ref()
+                .or(view.cwd.as_ref())
+                .is_none_or(|path| !self.removed.contains(path))
+        });
         for view in &mut list {
             if let Some((mode, requests, auto)) = self.policies.get(&view.id) {
                 view.permission_mode = *mode;

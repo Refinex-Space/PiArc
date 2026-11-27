@@ -112,4 +112,5 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0095](0095-bundled-speech-asset-budget.md) | 内置语音资产单列预算：第 11 章非语音预算不变，语音资产安装后 ≤ 230 MB、安装包增量 ≤ 190 MB | 已接受 |
 | [0096](0096-microphone-access-in-the-security-baseline.md) | 麦克风进入安全基线：usage description 与只给主程序的 audio-input entitlement（改 THR-14）、真实输入与按窗口路由、Seatbelt 拒绝 Agent Host 与沙箱命令录音、子进程继承授权的剩余风险（THR-18） | 已接受 |
 | [0097](0097-speech-model-downloads.md) | 增强语音模型的下载：`piarc_web::download`（HTTPS、逐跳白名单、代理 CONNECT、上限、续传、取消、边下边哈希），按文件从 ModelScope 锁定 revision 下载、不解包，加载前校验（THR-19） | 已接受（补充） |
+| [0098](0098-remove-project-from-sidebar.md) | 从侧栏移除项目：`workspaces.removed`（schema v15），停止该项目的后台任务并关闭会话，只在用户打开文件夹或在其中新建会话时恢复，有运行中的工作时原生确认 | 已接受（补充） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |

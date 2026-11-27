@@ -871,6 +871,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'workspace.actions': '“{name}”的操作',
   'workspace.newSession': '在 {name} 中新建会话',
   'workspace.trust': '项目信任…',
+  'workspace.remove': '移除项目',
   'workspace.count': '{count} 个会话',
 
   'home.title': '开始一个会话',
@@ -1647,6 +1648,10 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'dialog.quit.message': '退出 PiArc？',
   'dialog.quit.detail': '正在运行：{sessions} 个会话、{tasks} 个后台任务。退出会停止它们。',
   'dialog.quit.confirm': '退出',
+  'dialog.removeWorkspace.message': '从侧栏移除“{name}”？',
+  'dialog.removeWorkspace.detail':
+    '正在运行：{sessions} 个会话、{tasks} 个后台任务。移除项目会停止它们。文件夹和会话仍保留在这台电脑上，再次打开该文件夹即可恢复项目。',
+  'dialog.removeWorkspace.confirm': '停止并移除',
   'jumpList.recentWorkspaces': '最近的工作区',
   'tray.open': '打开 PiArc',
   'tray.newWindow': '新建窗口',

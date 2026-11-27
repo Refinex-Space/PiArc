@@ -101,13 +101,14 @@ impl Activity {
 
 impl WorkspaceHandle {
     /// Records the workspace, starts its actor, its settings watcher and its Agent Host.
-    pub async fn open(ctx: &Arc<Ctx>, path: PathBuf) -> Result<Self> {
+    /// A workspace removed from the list opens only when `restore`, and is listed again.
+    pub async fn open(ctx: &Arc<Ctx>, path: PathBuf, restore: bool) -> Result<Self> {
         if ctx.config.launch.is_none() {
             return Err(Error::Internal {
                 reason: "Core has no Agent Host to start (no launch configuration)".into(),
             });
         }
-        let record = record_workspace(ctx, &path).await?;
+        let record = record_workspace(ctx, &path, restore).await?;
         let settings = match WorkspaceSettings::open(
             ctx.storage.dirs(),
             path.clone(),
@@ -812,10 +813,12 @@ async fn route(handle: &WorkspaceHandle, session: &str, msg: SessionMsg) {
     }
 }
 
-/// Upserts the `workspaces` row: display name, main checkout, last opened.
+/// Upserts the `workspaces` row: display name, main checkout, last opened. A workspace removed
+/// from the list is listed again when `restore`, and refused otherwise.
 async fn record_workspace(
     ctx: &Ctx,
     path: &std::path::Path,
+    restore: bool,
 ) -> Result<piarc_store::WorkspaceRecord> {
     let checkout = match piarc_git::resolve(path) {
         Ok(checkout) => path_text(&checkout.main),
@@ -832,18 +835,32 @@ async fn record_workspace(
         default_mode: None,
         default_model: None,
     };
-    // Reopening keeps what the user chose for the workspace.
-    let stored = ctx
+    // Reopening keeps what the user chose for the workspace, also after it was removed.
+    let recorded = ctx
         .storage
         .run(move |store| {
             let mut row = record;
-            if let Some(known) = store.workspaces()?.into_iter().find(|w| w.path == row.path) {
+            if let Some(known) = store.workspace(&row.path)? {
                 row.default_mode = known.default_mode;
                 row.default_model = known.default_model;
             }
+            let removed = store.removed_workspaces()?.contains(&row.path);
+            if removed && !restore {
+                return Ok::<_, piarc_store::Error>(None);
+            }
             store.upsert_workspace(&row)?;
-            Ok::<_, piarc_store::Error>(row)
+            Ok(Some((row, removed)))
         })
         .await??;
+    let Some((stored, restored)) = recorded else {
+        return Err(Error::InvalidArgument {
+            field: "workspace",
+            reason: "was removed from the list; open the folder to add it back".into(),
+        });
+    };
+    if restored {
+        // A removed workspace's sessions are listed again.
+        ctx.snapshots.send(super::snapshot::SnapshotMsg::Reload);
+    }
     Ok(stored)
 }

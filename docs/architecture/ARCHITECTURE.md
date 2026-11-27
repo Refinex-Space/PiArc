@@ -1493,6 +1493,8 @@ PiArc 数据目录：macOS 为 `~/Library/Application Support/PiArc/`；Windows 
 
 T49（ADR-0070）为用量表增加可空的 `ephemeral_workspace`（schema v13）。没有 JSONL 的侧边请求只能从用量表恢复计数。重建转录索引时保留这些独立记录，即使主会话尚未落盘，也能计入对应工作区；删除父会话时清理。
 
+移除项目（ADR-0098，schema v15）：`workspaces.removed` 标记用户从侧栏移除的项目；快照不列出它和它的会话，文件夹、会话与默认模式、模型都保留，用户打开该文件夹或在其中新建会话时清除标记。
+
 T23（ADR-0037）：`workspaces.default_mode` 记录用户在该工作区最后选择的权限模式；`audit_events` 的权限记录带步骤、命中规则与来源层，设置页按会话、工具、结论、时间筛选。
 
 T25（ADR-0039）：每次 hook 运行每个 handler 写一行 `audit_events`（`kind: "hook"`），记录事件、matcher 看到的值、来源层与文件、JSON Pointer、程序名与命令的 SHA-256（不存命令原文）、退出码、耗时、是否超时或被取消、判定。

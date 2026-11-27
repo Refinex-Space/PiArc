@@ -28,11 +28,14 @@ import { LinkConfirmations, parseExternalUrl } from '../external-links.js';
 import type { RegisterHandler } from '../ipc/register.js';
 import type { CoreRuntime } from './native/piarc-core.js';
 import { registerSideChatHandlers } from './side-chat-ipc.js';
+import { removeWorkspace } from './workspace-removal.js';
 
 /** The part of Core these commands use. */
 export type SessionCore = Pick<
   CoreRuntime,
   | 'openWorkspace'
+  | 'workspaceWork'
+  | 'removeWorkspace'
   | 'createSession'
   | 'createWorktreeSession'
   | 'resumeSession'
@@ -498,6 +501,22 @@ export function registerSessionHandlers(
     const opened = await core.openWorkspace(absolutePath(dir));
     await faults.hold(IPC_CHANNELS.workspaceOpen);
     return opened;
+  });
+  registerHandler(IPC_CHANNELS.workspaceRemove, (event, [dir]) => {
+    const target = absolutePath(dir);
+    const window = BrowserWindow.fromWebContents(event.sender);
+    return removeWorkspace(
+      core,
+      translator(),
+      async (options) => {
+        const { response } =
+          window === null
+            ? await dialog.showMessageBox(options)
+            : await dialog.showMessageBox(window, options);
+        return response;
+      },
+      target,
+    );
   });
   registerHandler(IPC_CHANNELS.sessionCreate, (_event, [workspace, selected, tree]) => {
     const dir = absolutePath(workspace);

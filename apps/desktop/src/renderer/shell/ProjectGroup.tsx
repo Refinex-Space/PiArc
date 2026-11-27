@@ -1,12 +1,17 @@
 import { useId, useState } from 'react';
 import { IconButton } from '../app/IconButton.js';
 import { useT } from '../app/app-context.js';
+import { useStore } from '../store/hooks.js';
 import type { SessionEntry } from '../store/snapshots.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { DisclosureIcon, MoreIcon, PlusIcon } from './icons.js';
 import { MenuPopup, useMenu, type MenuItem } from './Menu.js';
 import { SessionRow } from './SessionRow.js';
 import { useUi } from './ui.js';
+
+function report(error: unknown): void {
+  console.error('[sidebar] project action failed', error);
+}
 
 export interface ProjectSessions {
   readonly path: string;
@@ -39,6 +44,7 @@ export function ProjectGroup({
 }) {
   const t = useT();
   const ui = useUi();
+  const store = useStore();
   const menu = useMenu();
   const listId = useId();
   const [dropTarget, setDropTarget] = useState(false);
@@ -70,6 +76,21 @@ export function ProjectGroup({
       disabled: last,
       run: () => {
         onMove(1);
+      },
+    },
+    {
+      id: 'remove',
+      label: t('workspace.remove'),
+      run: () => {
+        // Core keeps the folder and the sessions; the main process asks first when some of
+        // them are running. A view of this project falls back to the plain home view.
+        window.piarc.removeWorkspace(group.path).then((removed) => {
+          if (!removed) return;
+          const view = ui.view;
+          const entry = view.kind === 'session' ? store.session(view.id) : undefined;
+          const shown = view.kind === 'home' ? view.workspace : (entry?.workspace ?? entry?.cwd);
+          if (shown === group.path) ui.show({ kind: 'home', workspace: undefined });
+        }, report);
       },
     },
   ];

@@ -90,7 +90,7 @@ pub struct AuditEvent {
 }
 
 impl Store {
-    /// Inserts or updates a workspace.
+    /// Inserts or updates a workspace. A removed workspace is listed again.
     ///
     /// # Errors
     ///
@@ -102,7 +102,8 @@ impl Store {
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                  ON CONFLICT(path) DO UPDATE SET display_name = excluded.display_name,
                     main_checkout = excluded.main_checkout, last_opened_at = excluded.last_opened_at,
-                    default_mode = excluded.default_mode, default_model = excluded.default_model",
+                    default_mode = excluded.default_mode, default_model = excluded.default_model,
+                    removed = 0",
                 params![
                     workspace.path,
                     workspace.display_name,
@@ -116,7 +117,7 @@ impl Store {
             .map_err(Error::sqlite("cannot write workspaces"))
     }
 
-    /// Workspaces, most recently opened first.
+    /// Workspaces, most recently opened first; removed ones are left out.
     ///
     /// # Errors
     ///
@@ -126,20 +127,74 @@ impl Store {
             .conn
             .prepare(
                 "SELECT path, display_name, main_checkout, last_opened_at, default_mode, default_model
-                 FROM workspaces ORDER BY last_opened_at DESC, path",
+                 FROM workspaces WHERE removed = 0 ORDER BY last_opened_at DESC, path",
             )
             .map_err(Error::sqlite("cannot read workspaces"))?;
         let rows = statement
-            .query_map([], |row| {
-                Ok(WorkspaceRecord {
-                    path: row.get(0)?,
-                    display_name: row.get(1)?,
-                    main_checkout: row.get(2)?,
-                    last_opened_at: row.get(3)?,
-                    default_mode: row.get(4)?,
-                    default_model: row.get(5)?,
-                })
-            })
+            .query_map([], workspace_from_row)
+            .map_err(Error::sqlite("cannot read workspaces"))?;
+        rows.collect::<rusqlite::Result<_>>()
+            .map_err(Error::sqlite("cannot read workspaces"))
+    }
+
+    /// The row of workspace `path`, removed or not.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the table cannot be read.
+    pub fn workspace(&self, path: &str) -> Result<Option<WorkspaceRecord>> {
+        self.conn
+            .query_row(
+                "SELECT path, display_name, main_checkout, last_opened_at, default_mode, default_model
+                 FROM workspaces WHERE path = ?1",
+                params![path],
+                workspace_from_row,
+            )
+            .optional()
+            .map_err(Error::sqlite("cannot read workspaces"))
+    }
+
+    /// Removes workspace `path` from the list: its row stays, marked, until it is opened again
+    /// ([`Store::upsert_workspace`]). A path with sessions but no row gets a marked row, so its
+    /// sessions are not listed either. Returns whether it was listed before.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the row cannot be written.
+    pub fn remove_workspace(&self, path: &str, display_name: &str) -> Result<bool> {
+        let listed = self
+            .conn
+            .query_row(
+                "SELECT removed = 0 FROM workspaces WHERE path = ?1",
+                params![path],
+                |row| row.get::<_, bool>(0),
+            )
+            .optional()
+            .map_err(Error::sqlite("cannot read workspaces"))?
+            .unwrap_or(false);
+        self.conn
+            .execute(
+                "INSERT INTO workspaces (path, display_name, main_checkout, last_opened_at, removed)
+                 VALUES (?1, ?2, ?1, 0, 1)
+                 ON CONFLICT(path) DO UPDATE SET removed = 1",
+                params![path, display_name],
+            )
+            .map_err(Error::sqlite("cannot write workspaces"))?;
+        Ok(listed)
+    }
+
+    /// The paths of the removed workspaces.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Sqlite`] when the table cannot be read.
+    pub fn removed_workspaces(&self) -> Result<Vec<String>> {
+        let mut statement = self
+            .conn
+            .prepare("SELECT path FROM workspaces WHERE removed = 1 ORDER BY path")
+            .map_err(Error::sqlite("cannot read workspaces"))?;
+        let rows = statement
+            .query_map([], |row| row.get(0))
             .map_err(Error::sqlite("cannot read workspaces"))?;
         rows.collect::<rusqlite::Result<_>>()
             .map_err(Error::sqlite("cannot read workspaces"))
@@ -331,6 +386,17 @@ impl Store {
     }
 }
 
+fn workspace_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkspaceRecord> {
+    Ok(WorkspaceRecord {
+        path: row.get(0)?,
+        display_name: row.get(1)?,
+        main_checkout: row.get(2)?,
+        last_opened_at: row.get(3)?,
+        default_mode: row.get(4)?,
+        default_model: row.get(5)?,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,6 +429,63 @@ mod tests {
             Some("plan")
         );
         assert_eq!(store.workspace_mode("/other").expect("read"), None);
+    }
+
+    #[test]
+    fn removed_workspaces_are_left_out_until_opened_again() {
+        let store = Store::open_in_memory(0).expect("store");
+        let record = WorkspaceRecord {
+            path: "/项目 w".into(),
+            display_name: "项目 w".into(),
+            main_checkout: "/项目 w".into(),
+            last_opened_at: 5,
+            default_mode: Some("plan".into()),
+            default_model: Some("p/m".into()),
+        };
+        store.upsert_workspace(&record).expect("workspace");
+        assert!(store.remove_workspace("/项目 w", "项目 w").expect("remove"));
+        assert!(store.workspaces().expect("list").is_empty());
+        assert_eq!(
+            store.removed_workspaces().expect("removed"),
+            vec!["/项目 w".to_owned()]
+        );
+        // The row and what the user chose for it stay.
+        assert_eq!(
+            store.workspace("/项目 w").expect("row"),
+            Some(record.clone())
+        );
+        assert_eq!(
+            store.workspace_mode("/项目 w").expect("mode").as_deref(),
+            Some("plan")
+        );
+        // Removing again changes nothing and reports it was not listed.
+        assert!(!store.remove_workspace("/项目 w", "项目 w").expect("again"));
+
+        // Opening it again lists it.
+        store
+            .upsert_workspace(&WorkspaceRecord {
+                last_opened_at: 9,
+                ..record
+            })
+            .expect("reopen");
+        assert_eq!(store.workspaces().expect("list").len(), 1);
+        assert!(store.removed_workspaces().expect("removed").is_empty());
+    }
+
+    #[test]
+    fn a_path_without_a_row_is_remembered_as_removed() {
+        let store = Store::open_in_memory(0).expect("store");
+        assert!(!store.remove_workspace("/gone", "gone").expect("remove"));
+        assert!(store.workspaces().expect("list").is_empty());
+        assert_eq!(
+            store.removed_workspaces().expect("removed"),
+            vec!["/gone".to_owned()]
+        );
+        let row = store.workspace("/gone").expect("row").expect("marked row");
+        assert_eq!(
+            (row.display_name.as_str(), row.main_checkout.as_str()),
+            ("gone", "/gone")
+        );
     }
 
     #[test]

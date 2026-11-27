@@ -19,7 +19,7 @@ impl Hub {
         mode: Option<piarc_protocol::policy::PermissionMode>,
         worktree: Option<WorktreeRequest>,
     ) -> Result<Value> {
-        let workspace = self.workspace(workspace).await?;
+        let workspace = self.workspace_opened_by_user(workspace).await?;
         let id = new_session_id()?;
         let (cwd, created) = match (cwd, worktree) {
             (Some(_), Some(_)) => {

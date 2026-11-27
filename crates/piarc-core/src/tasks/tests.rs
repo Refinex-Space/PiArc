@@ -342,3 +342,29 @@ async fn reads_a_task_output_in_parts() {
     assert_eq!(rest.status, TaskStatus::Running);
     assert!(f.tasks.read(Some("t"), &id, 0, None).await.is_err());
 }
+
+#[tokio::test]
+async fn removing_a_workspace_stops_its_tasks() {
+    let f = Fixture::new("workspace removed");
+    let (main, cancel) = f.start(TaskKind::Command, "main", "main");
+    f.end_on_cancel(&main, cancel);
+    let (child, cancel) = f.start(TaskKind::Command, "child", "main");
+    f.end_on_cancel(&child, cancel);
+    assert_eq!(f.tasks.running_in("/w"), 2);
+    assert_eq!(f.tasks.running_in("/other"), 0);
+
+    f.tasks.workspace_removed("/other").await;
+    assert_eq!(f.tasks.running_in("/w"), 2, "another workspace's removal");
+
+    f.tasks.workspace_removed("/w").await;
+    assert_eq!(f.tasks.running_in("/w"), 0);
+    let snapshot = f.tasks.snapshot();
+    for id in [&main, &child] {
+        let task = snapshot
+            .tasks
+            .iter()
+            .find(|t| &t.task_id == id)
+            .expect("the task stays listed");
+        assert_eq!(task.status, TaskStatus::Killed);
+    }
+}

@@ -20,6 +20,7 @@ mod sandbox;
 mod support;
 mod tasks;
 mod turns;
+mod workspaces;
 
 use piarc_core::composer::UserInput;
 use piarc_core::sessions::Op;

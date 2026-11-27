@@ -885,6 +885,7 @@ export const en = {
   'workspace.actions': 'Actions for {name}',
   'workspace.newSession': 'New session in {name}',
   'workspace.trust': 'Project trust…',
+  'workspace.remove': 'Remove project',
   'workspace.count': '{count, plural, one {# session} other {# sessions}}',
 
   'home.title': 'Start a session',
@@ -1696,6 +1697,10 @@ export const en = {
   'dialog.quit.detail':
     'Running now: {sessions} sessions and {tasks} background tasks. Quitting stops them.',
   'dialog.quit.confirm': 'Quit',
+  'dialog.removeWorkspace.message': 'Remove “{name}” from the sidebar?',
+  'dialog.removeWorkspace.detail':
+    'Running now: {sessions} sessions and {tasks} background tasks. Removing the project stops them. The folder and its sessions stay on this computer; open the folder again to bring the project back.',
+  'dialog.removeWorkspace.confirm': 'Stop and remove',
   'jumpList.recentWorkspaces': 'Recent workspaces',
   'tray.open': 'Open PiArc',
   'tray.newWindow': 'New Window',

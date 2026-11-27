@@ -73,6 +73,29 @@ impl CoreRuntime {
         })
     }
 
+    /// The sessions in a turn and the running background tasks of a workspace. Resolves with
+    /// `{ sessions, tasks }` (counts).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn workspace_work<'env>(&self, env: &'env Env, path: String) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.workspaceWork", |core, done| {
+            core.workspace_work(PathBuf::from(path), done)
+        })
+    }
+
+    /// Removes a workspace from the list: stops its background tasks, closes its sessions and
+    /// its Agent Host. Its folder and sessions stay; opening the folder lists it again.
+    /// Resolves with `null`.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn remove_workspace<'env>(
+        &self,
+        env: &'env Env,
+        path: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.removeWorkspace", |core, done| {
+            core.remove_workspace(PathBuf::from(path), done)
+        })
+    }
+
     /// Creates a session in a workspace (opened when needed). Resolves with
     /// `{ sessionId, workspace, cwd, restoredMessages }`.
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]

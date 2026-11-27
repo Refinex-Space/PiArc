@@ -90,6 +90,7 @@ const PIARC_API_SNAPSHOT = [
   'readTaskOutput',
   'removeProviderAccount',
   'removeSessionWorktree',
+  'removeWorkspace',
   'renameSession',
   'requestTerminalFrame',
   'resendSnapshots',
