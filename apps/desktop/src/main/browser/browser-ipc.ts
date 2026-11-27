@@ -98,6 +98,7 @@ export function parseBrowserRequest(value: unknown): BrowserRequest {
     case 'state':
     case 'reopenClosed':
     case 'clearData':
+    case 'still':
     case 'startPage':
     case 'openHtmlFile':
       return { op: fields.op };

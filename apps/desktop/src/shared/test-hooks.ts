@@ -154,6 +154,8 @@ export interface BrowserTabObservation {
   readonly bounds: { x: number; y: number; width: number; height: number } | null;
   readonly zoom: number;
   readonly devtools: 'closed' | 'docked' | 'window';
+  /** The docked DevTools view's bounds while it is in a window. */
+  readonly devtoolsBounds: { x: number; y: number; width: number; height: number } | null;
   readonly emulated: boolean;
 }
 

@@ -328,8 +328,6 @@ export type AppEvent =
   | { readonly type: 'approvalNotice'; readonly sessionId: string; readonly status: string }
   /** The built-in browser's state of a session changed (ADR-0088). */
   | { readonly type: 'browser'; readonly sessionId: string; readonly state: BrowserSessionState }
-  /** A still frame of the session's page, shown while something covers the page (B1.5.2). */
-  | { readonly type: 'browserStill'; readonly sessionId: string; readonly image: string }
   /**
    * A process tree of the session started listening on `port` (B4.4): the window shows a toast
    * and a dot on the preview tool. Sent once per port and session.

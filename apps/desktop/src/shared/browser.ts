@@ -263,6 +263,11 @@ export type BrowserRequest =
   | { readonly op: 'consoleClear'; readonly tab: string }
   | { readonly op: 'clearData' }
   /**
+   * A still frame of the shown page (B1.5.2), a JPEG data URL or null: the panel paints it under
+   * the page before it reports the page covered, so hiding the page never shows a gap.
+   */
+  | { readonly op: 'still' }
+  /**
    * The user and an agent Space (B2.5): take it over (the agent's calls then fail with "user
    * in control"), hand it back, or stop the agent's current `Browser` call.
    */

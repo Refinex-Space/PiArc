@@ -313,14 +313,12 @@ export class BrowserService {
         return;
       }
     }
-    const wasOccluded = current?.owner === sender && current.occluded;
     model.placement = {
       window,
       owner: sender,
       bounds: toDips(placement.bounds, window.webContents.getZoomFactor()),
       occluded: placement.occluded,
     };
-    if (placement.occluded && !wasOccluded) await this.#sendStill(model, sender);
     this.#layout(model);
     if (current?.owner !== sender) this.#changed(model);
   }
@@ -556,6 +554,12 @@ export class BrowserService {
           bounds: view === undefined ? null : { ...view.getBounds() },
           zoom: tab.zoom,
           devtools: tab.devtools,
+          devtoolsBounds: (() => {
+            const docked = model.devtools.get(tab.id);
+            return docked === undefined || this.#views.parentOf(docked) === undefined
+              ? null
+              : { ...docked.getBounds() };
+          })(),
           emulated: tab.emulation !== null,
         };
       }),
@@ -826,6 +830,8 @@ export class BrowserService {
         return null;
       case 'clearData':
         return this.#clearData(model);
+      case 'still':
+        return this.#still(model);
       case 'pick':
         if (request.mode === 'off') {
           this.#picker.stop(model.id);
@@ -1070,8 +1076,17 @@ export class BrowserService {
     } else if (mode === 'docked') {
       const view = createDevtoolsView();
       contents.setDevToolsWebContents(view.webContents);
-      contents.openDevTools();
+      // Undocked as far as DevTools knows (Electron's way with setDevToolsWebContents): docked,
+      // its front end keeps part of its own view empty for the inspected page.
+      contents.openDevTools({ mode: 'detach', activate: false });
       model.devtools.set(tab.id, view);
+      // DevTools going away on their own (their renderer crashed): the page takes the space back.
+      view.webContents.once('render-process-gone', () => {
+        if (model.devtools.get(tab.id) !== view) return;
+        this.#closeDevtools(model, tab);
+        this.#layout(model);
+        this.#changed(model);
+      });
     }
     tab.devtools = mode;
     this.#layout(model);
@@ -1220,22 +1235,27 @@ export class BrowserService {
     model.shield.setVisible(visible);
   }
 
-  async #sendStill(model: SessionModel, owner: WebContents): Promise<void> {
+  /** A still frame of the shown page (B1.5.2); null without one (the window is not on screen). */
+  async #still(model: SessionModel): Promise<string | null> {
     const view = model.tabs.find((t) => t.id === model.active)?.view;
-    if (view === undefined || view.webContents.isDestroyed()) return;
+    if (view === undefined || view.webContents.isDestroyed()) return null;
     try {
       const image = await view.webContents.capturePage();
-      if (image.isEmpty()) return;
-      const still = `data:image/jpeg;base64,${image.toJPEG(70).toString('base64')}`;
-      send(owner, { type: 'browserStill', sessionId: model.id, image: still });
+      if (image.isEmpty()) return null;
+      return `data:image/jpeg;base64,${image.toJPEG(70).toString('base64')}`;
     } catch {
-      // No frame (the window is not on screen): the panel shows its background.
+      return null;
     }
   }
 
   #hooks(model: SessionModel) {
     return {
       changed: (tab: BrowserTab) => {
+        // DevTools closed on its own (its window, a crash): the page takes its space back.
+        if (tab.devtools === 'closed' && model.devtools.has(tab.id)) {
+          this.#closeDevtools(model, tab);
+          this.#layout(model);
+        }
         this.#changed(model);
         tabEvent(model, { kind: 'changed', tab });
         if (tab.space === USER_SPACE) rememberUserPort(model, tab.url);

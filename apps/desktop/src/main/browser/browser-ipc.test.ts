@@ -32,6 +32,7 @@ describe('parseBrowserRequest', () => {
     [{ op: 'answer', prompt, accept: true, user: 'me', password: 'secret' }],
     [{ op: 'download', download: prompt, action: 'show' }],
     [{ op: 'clearData' }],
+    [{ op: 'still' }],
   ])('accepts %j', (request) => {
     expect(parseBrowserRequest(request)).toEqual(request);
   });

@@ -75,6 +75,90 @@ async function moreMenu(page: Page, item: string | RegExp): Promise<void> {
   await page.getByRole('menuitem', { name: item }).click();
 }
 
+/** What the DevTools view and the page each draw, as PNG files (review evidence). */
+async function viewShots(app: ElectronApplication, url: string, prefix: string): Promise<void> {
+  const shots = await app.evaluate(async ({ webContents }, page) => {
+    const all = webContents.getAllWebContents();
+    const pick = async (contents: Electron.WebContents | undefined) =>
+      contents === undefined ? '' : (await contents.capturePage()).toPNG().toString('base64');
+    return {
+      devtools: await pick(all.find((c) => c.getURL().startsWith('devtools://'))),
+      page: await pick(all.find((c) => c.getURL().startsWith(page))),
+    };
+  }, url);
+  for (const [name, data] of Object.entries(shots)) {
+    if (data !== '') await writeFile(`${prefix}-${name}.png`, Buffer.from(data, 'base64'));
+  }
+}
+
+test('B1.4.1 docked DevTools share the panel exactly and give the space back when they close', async ({
+  app,
+  page,
+  workspaces,
+}, info) => {
+  test.setTimeout(120_000);
+  const { server, origin } = await serve();
+  try {
+    const { id } = await openSession(
+      app,
+      page,
+      workspaces,
+      'Browser devtools',
+      't18-chat',
+      'Hello',
+    );
+    await idle(page);
+    await openPreview(page);
+    await go(page, origin);
+    await expect(page.getByTestId('browser-tab')).toHaveText(['Zoom home']);
+    const alone = await observe(app, id);
+    const area = alone.placement?.bounds;
+    expect(area).toBeDefined();
+    await page.getByTestId('browser-devtools').click();
+    await expect.poll(async () => (await observe(app, id)).tabs[0]?.devtoolsBounds).not.toBeNull();
+    const docked = (await observe(app, id)).tabs[0];
+    // Docked at the bottom: the page above, DevTools below, together exactly the panel.
+    expect(docked?.bounds).toMatchObject({ x: area?.x, y: area?.y, width: area?.width });
+    expect(docked?.devtoolsBounds).toMatchObject({ x: area?.x, width: area?.width });
+    expect((docked?.bounds?.height ?? 0) + (docked?.devtoolsBounds?.height ?? 0)).toBe(
+      area?.height,
+    );
+    await page.waitForTimeout(1500);
+    await viewShots(app, origin, info.outputPath('devtools-docked'));
+    const backToPage = async () => {
+      await expect
+        .poll(async () => {
+          const tab = (await observe(app, id)).tabs[0];
+          return [tab?.devtools, tab?.devtoolsBounds, tab?.bounds];
+        })
+        .toEqual(['closed', null, area]);
+    };
+    // The toolbar closes them: the page takes the whole panel back, nothing of DevTools stays.
+    await page.getByTestId('browser-devtools').click();
+    await backToPage();
+    // DevTools going away on their own (their renderer is gone) give the space back too.
+    await page.getByTestId('browser-devtools').click();
+    await expect.poll(async () => (await observe(app, id)).tabs[0]?.devtoolsBounds).not.toBeNull();
+    // Once their front end has loaded (a reopened DevTools view starts without a URL).
+    await expect
+      .poll(() =>
+        app.evaluate(({ webContents }) => {
+          const tools = webContents
+            .getAllWebContents()
+            .find((c) => !c.isDestroyed() && c.getURL().startsWith('devtools://'));
+          tools?.forcefullyCrashRenderer();
+          return tools !== undefined;
+        }),
+      )
+      .toBe(true);
+    await backToPage();
+    await page.waitForTimeout(500);
+    await viewShots(app, origin, info.outputPath('devtools-closed'));
+  } finally {
+    await close(server);
+  }
+});
+
 test('B1.3.1 a refused local server is retried until it starts', async ({
   app,
   page,

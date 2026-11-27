@@ -621,17 +621,17 @@ export function AnnotateSurface({
           <h2 id="browser-annotate-discard-title">{t('browser.annotate.discardTitle')}</h2>
           <p>{t('browser.annotate.discardDetail')}</p>
           <div className="dialog-actions">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               data-autofocus
               onClick={() => {
                 setConfirm(false);
               }}
             >
               {t('browser.annotate.keep')}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="destructive"
               data-testid="browser-annotate-discard-confirm"
               onClick={() => {
                 setConfirm(false);
@@ -639,7 +639,7 @@ export function AnnotateSurface({
               }}
             >
               {t('browser.annotate.discard')}
-            </button>
+            </Button>
           </div>
         </Dialog>
       )}
