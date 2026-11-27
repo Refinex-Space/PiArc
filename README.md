@@ -10,17 +10,21 @@ PiArc aims to combine three things:
 - **Pi's multi-provider model layer**: Anthropic, OpenAI, Google, DeepSeek, Kimi, Qwen, GLM, OpenRouter, local models, and more, with the same harness behavior across providers.
 - **One desktop app for macOS and Windows**: a single Electron + React codebase for the UI, with the agent control plane in a Rust core. Windows ships from the same code, at most one milestone behind macOS.
 
-> **Status: pre-release.** The app runs from source and packages on macOS and Windows (see [Development](#development)); there is no published release yet.
+> **Status: pre-release.** The app runs from source and packages on macOS and Windows (see [Development](#development)). The features below work on macOS; the release pipeline, the Windows catch-up for the Beta and the Beta acceptance are still ahead (see [Roadmap](#roadmap)). There is no published release yet.
 
-## Highlights (planned)
+## Features
 
 - Bring your existing Claude Code setup: `CLAUDE.md` / `AGENTS.md`, permission rules, hooks, `.claude/agents`, skills, commands and `.mcp.json` are read as-is (PiArc never writes to `.claude/`).
 - Use any model for any job, for example run read-only exploration subagents on a fast, cheap model while the main session uses a stronger one.
-- Structured approvals with diff previews, per-session and persistent rules, and an audit trail.
+- Structured approvals with diff previews, per-session and persistent rules, and an audit trail. In Auto mode a reviewer model you choose answers routine approvals; anything it is unsure of comes back to you.
 - Deterministic rewind backed by pre-write file snapshots, with per-file and per-hunk discard.
 - Parallel sessions with optional git worktree isolation; MCP servers are shared per workspace instead of being duplicated per session.
 - A built-in terminal powered by libghostty, whose screen the agent can also read for background tasks.
-- Performance budgets (startup, memory, streaming frame time) enforced in CI on both platforms.
+- A Git tool: stage hunks, commit with a generated message, browse history, resolve merges and rebases, and open and review GitHub pull requests through your own `gh`.
+- A built-in browser for previewing your app; the agent can drive it too, behind the same approvals as every other tool.
+- Voice input that runs on your machine, for Chinese, English and mixed technical speech.
+- Auto memory across sessions, and managed settings for teams.
+- Performance budgets (startup, memory, streaming frame time) measured in CI on macOS and Windows; a regression fails the build.
 
 ## Architecture at a glance
 
@@ -85,6 +89,13 @@ npm run start -w @piarc/desktop         # the app with hot reload
 
 Run `npm run build:core` again after changing Rust code, and `npm run build:agent-host` after changing `agent-host/`. From source, the Agent Host runs on the `node` found on PATH.
 
+On macOS the source run lives inside Electron's own `Electron.app` from `node_modules`: the menu bar says "Electron", and PiArc swaps in its Dock icon once it starts. To see the app as it ships, with its own name, icon, bundled node and signing layout, package a development build and open it:
+
+```bash
+npm run package:desktop -- --flavor development
+open apps/desktop/out/development/PiArc-darwin-arm64/PiArc.app
+```
+
 ### Checks
 
 ```bash
@@ -116,16 +127,16 @@ The second step installs the locked Velopack `vpk` into `.tools/vpk/` and needs 
 
 ## Roadmap
 
-| Milestone | Scope |
-|---|---|
-| M0 | Technical spikes on both platforms: Rust Core in Electron via NAPI-RS, streaming transcript, multi-session Agent Host, credentials, signing and packaging, libghostty terminal, sandbox, Electron security baseline |
-| M1 | Walking skeleton: sessions, streaming, core tools via Rust Core, basic approvals, model settings |
-| M2 | Harness core: permission rules, plan mode, task list, hooks, checkpoints and rewind, compaction, Changes panel |
-| M3 | Parallel sessions, subagents, background tasks, terminal, worktrees, MCP, skills and commands |
-| M4 | Sandbox, plugins, accessibility, localization, performance budgets in CI |
-| M5 | Beta on macOS and Windows: auto-review mode, auto memory, managed settings, release pipeline |
+| Milestone | Scope | Status |
+|---|---|---|
+| M0 | Technical spikes on both platforms: Rust Core in Electron via NAPI-RS, streaming transcript, multi-session Agent Host, credentials, signing and packaging, libghostty terminal, sandbox, Electron security baseline | Done |
+| M1 | Walking skeleton: sessions, streaming, core tools via Rust Core, basic approvals, model settings | Done on both platforms |
+| M2 | Harness core: permission rules, plan mode, task list, hooks, checkpoints and rewind, compaction, Changes panel | Done on both platforms |
+| M3 | Parallel sessions, subagents, background tasks, terminal, worktrees, MCP, skills and commands | Features done on both platforms; the memory budget is still open |
+| M4 | Sandbox, plugins, accessibility, localization, performance budgets in CI | Features done on macOS; some performance budgets are not met yet; Windows follows in W4 |
+| M5 | Beta on macOS and Windows: auto-review mode, auto memory, managed settings, release pipeline | Auto mode, auto memory, managed settings and side chat done on macOS; release pipeline, Windows sync and Beta acceptance ahead |
 
-Each milestone is reached on macOS first; Windows meets the same exit criteria no later than the end of the next milestone.
+Each milestone is reached on macOS first; Windows meets the same exit criteria no later than the end of the next milestone. The Git tool, the built-in browser and voice input were added outside these milestones. The live task board is [docs/plan/PLAN.md](docs/plan/PLAN.md) (Chinese).
 
 ## Unsigned builds
 

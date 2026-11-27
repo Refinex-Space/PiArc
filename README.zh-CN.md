@@ -10,17 +10,21 @@ PiArc 想把三件事放在一起：
 - **Pi 的多服务商模型层**：Anthropic、OpenAI、Google、DeepSeek、Kimi、Qwen、GLM、OpenRouter、本地模型等，换服务商不换 Harness 行为。
 - **一套代码覆盖 macOS 与 Windows**：界面用 Electron + React，Agent 控制面在 Rust 编写的 Core 中。Windows 与 macOS 共用代码，最多晚一个里程碑。
 
-> **当前状态：预发布。** 应用可以从源码运行，也能在 macOS 与 Windows 上打包（见[本地开发与构建](#本地开发与构建)），还没有发布正式版本。
+> **当前状态：预发布。** 应用可以从源码运行，也能在 macOS 与 Windows 上打包（见[本地开发与构建](#本地开发与构建)）。下面列出的功能在 macOS 上可用；发布流水线、Windows 为 Beta 补齐与 Beta 验收还没做（见[路线图](#路线图)）。还没有发布正式版本。
 
-## 计划中的亮点
+## 功能
 
 - 直接沿用已有的 Claude Code 配置：`CLAUDE.md` / `AGENTS.md`、权限规则、hooks、`.claude/agents`、skills、commands、`.mcp.json` 原样读取（PiArc 不会写入 `.claude/`）。
 - 按任务选模型，例如只读的探索子 agent 跑在便宜快速的模型上，主会话用更强的模型。
-- 结构化审批：带 diff 预览，支持本会话允许与持久规则，全部有审计记录。
+- 结构化审批：带 diff 预览，支持本会话允许与持久规则，全部有审计记录。Auto 模式下由你选定的审查模型答复常规审批，拿不准的仍交给你。
 - 基于写前文件快照的确定性回退，支持按文件、按 hunk 丢弃改动。
 - 多会话并行，可选 git worktree 隔离；MCP server 按工作区共享，不随会话数复制。
 - 内置终端基于 libghostty，agent 也能读取后台终端的屏幕内容。
-- 启动时间、内存、流式渲染帧时间等性能预算在两个平台的 CI 中把关。
+- Git 工具：按 hunk 暂存，生成提交信息后提交，浏览历史，处理合并与变基冲突，经你自己的 `gh` 创建和审查 GitHub PR。
+- 内置浏览器：预览你的应用，agent 也能操作它，和其他工具走同一套审批。
+- 语音输入：识别在本机完成，支持中文、英文与中英混合的技术术语。
+- 跨会话的自动记忆，以及面向团队的托管设置。
+- 启动时间、内存、流式渲染帧时间等性能预算在 macOS 与 Windows 的 CI 中测量，回归会让构建失败。
 
 ## 架构概览
 
@@ -85,6 +89,13 @@ npm run start -w @piarc/desktop         # 启动应用（热更新）
 
 改了 Rust 代码后重新运行 `npm run build:core`，改了 `agent-host/` 后重新运行 `npm run build:agent-host`。从源码运行时，Agent Host 用 PATH 上的 `node` 启动。
 
+在 macOS 上，从源码运行的应用跑在 `node_modules` 里 Electron 自带的 `Electron.app` 中：菜单栏显示 "Electron"，Dock 图标在应用启动后换成 PiArc 的。要看到发布时的样子（应用名、图标、内置 node 与签名分层），打一个开发构建再打开：
+
+```bash
+npm run package:desktop -- --flavor development
+open apps/desktop/out/development/PiArc-darwin-arm64/PiArc.app
+```
+
 ### 检查
 
 ```bash
@@ -116,16 +127,16 @@ node scripts/release/pack-windows.mjs --arch x64 --flavor release --versions 0.1
 
 ## 路线图
 
-| 里程碑 | 范围 |
-|---|---|
-| M0 | 两个平台上的技术验证：Rust Core 经 NAPI-RS 接入 Electron、流式对话渲染、多会话 Agent Host、凭据、签名与打包、libghostty 终端、沙箱、Electron 安全基线 |
-| M1 | 可行走骨架：会话、流式对话、经 Rust Core 执行的核心工具、基础审批、模型设置 |
-| M2 | Harness 核心：权限规则、计划模式、任务清单、hooks、检查点与回退、压缩、Changes 面板 |
-| M3 | 多会话并行、子 agent、后台任务、终端、worktree、MCP、skills 与命令 |
-| M4 | 沙箱、插件、无障碍、本地化、性能预算进入 CI |
-| M5 | macOS 与 Windows 同时 Beta：自动审查模式、自动记忆、企业托管配置、发布流水线 |
+| 里程碑 | 范围 | 状态 |
+|---|---|---|
+| M0 | 两个平台上的技术验证：Rust Core 经 NAPI-RS 接入 Electron、流式对话渲染、多会话 Agent Host、凭据、签名与打包、libghostty 终端、沙箱、Electron 安全基线 | 已完成 |
+| M1 | 可行走骨架：会话、流式对话、经 Rust Core 执行的核心工具、基础审批、模型设置 | 两个平台已完成 |
+| M2 | Harness 核心：权限规则、计划模式、任务清单、hooks、检查点与回退、压缩、Changes 面板 | 两个平台已完成 |
+| M3 | 多会话并行、子 agent、后台任务、终端、worktree、MCP、skills 与命令 | 两个平台的功能已交付；内存预算待定 |
+| M4 | 沙箱、插件、无障碍、本地化、性能预算进入 CI | macOS 的功能已交付，部分性能预算还未达标；Windows 由 W4 跟进 |
+| M5 | macOS 与 Windows 同时 Beta：自动审查模式、自动记忆、企业托管配置、发布流水线 | macOS 已交付 Auto 模式、自动记忆、托管配置与侧边对话；发布流水线、Windows 同步与 Beta 验收待做 |
 
-每个里程碑由 macOS 先达标，Windows 最迟在下一个里程碑结束前达到同样的退出标准。
+每个里程碑由 macOS 先达标，Windows 最迟在下一个里程碑结束前达到同样的退出标准。Git 工具、内置浏览器与语音输入是里程碑之外追加的功能。实时的任务看板见 [docs/plan/PLAN.md](docs/plan/PLAN.md)。
 
 ## 未签名构建
 
