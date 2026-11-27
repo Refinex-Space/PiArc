@@ -331,3 +331,46 @@ describe('SessionTranscript rows', () => {
     });
   });
 });
+
+describe('SessionTranscript running state from the session snapshot', () => {
+  it('adopts a running turn the window did not see start, and reads the history again', () => {
+    const transcript = new SessionTranscript();
+    transcript.apply([note('item/completed', { turnId: 't0', item: user('u0', 'Hi') })]);
+    expect(transcript.needsReload()).toBe(false);
+    transcript.syncStatus('running');
+    expect(transcript.turnInfo().running).toBe(true);
+    expect(transcript.turnInfo().turnId).toBeUndefined();
+    expect(transcript.rowIds()).toContain(WORKING_ROW);
+    expect(transcript.needsReload()).toBe(true);
+    // The first event naming the turn gives it its id; its end ends the adopted turn.
+    transcript.apply([note('item/started', { turnId: 't1', item: read('r1', 'inProgress') })]);
+    expect(transcript.turnInfo().turnId).toBe('t1');
+    transcript.apply([note('turn/completed', { turnId: 't1', status: 'completed' })]);
+    expect(transcript.turnInfo().running).toBe(false);
+    expect(transcript.rowIds()).not.toContain(WORKING_ROW);
+  });
+
+  it('ends an adopted turn with the snapshot when the window missed its end too', () => {
+    const transcript = new SessionTranscript();
+    transcript.syncStatus('running');
+    transcript.load([], 0);
+    transcript.syncStatus('idle');
+    expect(transcript.turnInfo().running).toBe(false);
+    expect(transcript.needsReload()).toBe(true);
+  });
+
+  it('leaves a turn it saw alone and ignores a running snapshot just after the end', () => {
+    const transcript = new SessionTranscript();
+    transcript.apply([note('turn/started', { turnId: 't1' })]);
+    // A late idle snapshot from before this turn does not end a turn the window saw start.
+    transcript.syncStatus('idle');
+    expect(transcript.turnInfo()).toMatchObject({ running: true, turnId: 't1' });
+    transcript.apply([note('turn/completed', { turnId: 't1', status: 'completed' })]);
+    // The snapshot that still says running trails the turn's own end: not a new turn.
+    transcript.syncStatus('running', performance.now() + 100);
+    expect(transcript.turnInfo().running).toBe(false);
+    // Long after, a running snapshot is a turn this window missed.
+    transcript.syncStatus('running', performance.now() + 10_000);
+    expect(transcript.turnInfo().running).toBe(true);
+  });
+});

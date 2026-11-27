@@ -32,6 +32,7 @@ import { SessionContextUsage } from './context-usage.js';
 import { SessionBranches } from './branches.js';
 import { SessionChanges } from './changes.js';
 import { SessionHarness } from './harness.js';
+import type { SessionStatus } from './snapshots.js';
 import type { PendingAttachment } from '../composer/attachments.js';
 
 /** An attachment as the user message shows it: a stored attachment or one being sent. */
@@ -150,6 +151,12 @@ const IDLE: TurnInfo = {
   openTools: [],
   compacting: false,
 };
+
+/**
+ * How long after a turn ended here a `running` session snapshot is taken as stale rather than as
+ * a turn this window missed (ms): the snapshot can trail the session's own events.
+ */
+export const ADOPT_AFTER_MS = 1_500;
 
 /**
  * Item types folded into a tool group: every tool call but subagents (T31), which keep a card of
@@ -384,6 +391,10 @@ export class SessionTranscript {
   /** The files the session changed (T28). */
   readonly changes = new SessionChanges();
   private turn: TurnInfo = IDLE;
+  /** The running turn came from Core's snapshot (`syncStatus`), not from `turn/started`. */
+  private adopted = false;
+  /** When this window last saw a turn end (`performance.now()`). */
+  private turnEndedAt = Number.NEGATIVE_INFINITY;
   private queueItems: readonly QueuedInput[] = [];
   private reload = false;
   /** Cache of `userTurns`, cleared when rows are added or removed. */
@@ -440,6 +451,32 @@ export class SessionTranscript {
 
   isRunning(): boolean {
     return this.turn.running;
+  }
+
+  /**
+   * Core's status of the session, from its entity snapshot. A window that missed this turn's
+   * `turn/started` (the page loaded or subscribed while the turn ran) adopts the running turn, so
+   * the composer stops and steers and the working row shows, and reads the conversation again; an
+   * adopted turn ends with the snapshot when the window missed `turn/completed` too. A `running`
+   * snapshot that arrives just after this window saw the turn end is stale and ignored.
+   */
+  syncStatus(status: SessionStatus, now: number = performance.now()): void {
+    const batch = new Batch();
+    if (status === 'running') {
+      if (this.turn.running || now - this.turnEndedAt < ADOPT_AFTER_MS) return;
+      this.turn = { ...IDLE, running: true };
+      this.adopted = true;
+    } else if (this.adopted && this.turn.running) {
+      this.turn = IDLE;
+      this.adopted = false;
+      this.turnEndedAt = now;
+    } else {
+      return;
+    }
+    this.reload = true;
+    batch.state = true;
+    batch.list = true;
+    this.finish(batch);
   }
 
   turnInfo(): TurnInfo {
@@ -734,9 +771,15 @@ export class SessionTranscript {
   private applyOne(method: string, params: Record<string, unknown>, batch: Batch): void {
     const ts = numberOr(params.ts);
     const turnId = typeof params.turnId === 'string' ? params.turnId : '';
+    // An adopted turn (`syncStatus`) learns its id from the first event that names one.
+    if (this.adopted && this.turn.turnId === undefined && turnId !== '') {
+      this.turn = { ...this.turn, turnId };
+      batch.state = true;
+    }
     switch (method) {
       case 'turn/started':
         this.turn = { ...IDLE, running: true, turnId, startedAt: ts };
+        this.adopted = false;
         batch.state = true;
         batch.list = true;
         break;
@@ -811,8 +854,13 @@ export class SessionTranscript {
   }
 
   private onTurnCompleted(turnId: string, params: Record<string, unknown>, batch: Batch): void {
-    if (this.turn.running && (this.turn.turnId === turnId || turnId === '')) {
+    if (
+      this.turn.running &&
+      (this.turn.turnId === turnId || turnId === '' || this.turn.turnId === undefined)
+    ) {
       this.turn = IDLE;
+      this.adopted = false;
+      this.turnEndedAt = performance.now();
       batch.state = true;
       batch.list = true;
     }

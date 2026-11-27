@@ -78,7 +78,9 @@ export class AppStore {
     let transcript = this.transcripts.get(id);
     if (transcript === undefined) {
       transcript = new SessionTranscript();
-      transcript.setApprovals(this.sessionById.get(id)?.approvals ?? []);
+      const session = this.sessionById.get(id);
+      transcript.setApprovals(session?.approvals ?? []);
+      if (session !== undefined) transcript.syncStatus(session.status);
       this.transcripts.set(id, transcript);
       for (const listener of [...this.transcriptListeners]) {
         listener(transcript);
@@ -138,7 +140,10 @@ export class AppStore {
       if (old !== undefined && sameEntry(old, entry)) {
         return old;
       }
-      this.transcripts.get(entry.id)?.setApprovals(entry.approvals);
+      const transcript = this.transcripts.get(entry.id);
+      transcript?.setApprovals(entry.approvals);
+      // A turn this window did not see start (or end) still shows in its composer.
+      if (old?.status !== entry.status) transcript?.syncStatus(entry.status);
       this.sessionById.set(entry.id, entry);
       changed.push(entry.id);
       return entry;
