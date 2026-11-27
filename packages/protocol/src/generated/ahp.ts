@@ -51,7 +51,13 @@ export type ProtocolValue =
   | GitRebasePlan
   | GitPrDraft
   | GitReview
-  | GitPullRequestStatus;
+  | GitPullRequestStatus
+  | DictationEvent
+  | DictationStart
+  | DictationStarted
+  | DictationStatus
+  | InputDevice
+  | SpeechModels;
 /**
  * Any message covered by the Agent Host Protocol 1.0 contracts. Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.
  */
@@ -2363,6 +2369,116 @@ export type GitHubState =
  * A pull request's state.
  */
 export type GitPrState = 'open' | 'closed' | 'merged';
+/**
+ * An event on `dictation/<webContentsId>`.
+ */
+export type DictationEvent =
+  | {
+      /**
+       * Why, for `error` (and for a stop the engine decided itself, see [`DictationEvent::Notice`]).
+       */
+      code?: string | null;
+      /**
+       * Increases by one with every event of the session.
+       */
+      sequence: number;
+      /**
+       * The session.
+       */
+      sessionId: string;
+      /**
+       * The new state.
+       */
+      state: DictationState;
+      type: 'state';
+    }
+  | {
+      /**
+       * Captured audio so far, in milliseconds, at the end of this window.
+       */
+      audioMs: number;
+      /**
+       * Peak of each equal part of the window, 0–1, at most [`MAX_ENVELOPE_BUCKETS`].
+       */
+      envelope: number[];
+      /**
+       * Peak absolute sample, 0–1.
+       */
+      peak: number;
+      /**
+       * Root mean square, 0–1.
+       */
+      rms: number;
+      /**
+       * Increases by one with every event of the session.
+       */
+      sequence: number;
+      /**
+       * The session.
+       */
+      sessionId: string;
+      type: 'level';
+    }
+  | {
+      /**
+       * Increases with every new text for the same segment.
+       */
+      revision: number;
+      /**
+       * The segment, counted from 0 in speaking order.
+       */
+      segmentId: number;
+      /**
+       * Increases by one with every event of the session.
+       */
+      sequence: number;
+      /**
+       * The session.
+       */
+      sessionId: string;
+      /**
+       * How settled the text is.
+       */
+      stage: TextStage;
+      /**
+       * The text; empty for a partial means the segment had no speech after all.
+       */
+      text: string;
+      type: 'text';
+    }
+  | {
+      /**
+       * What happened.
+       */
+      code: string;
+      /**
+       * Increases by one with every event of the session.
+       */
+      sequence: number;
+      /**
+       * The session.
+       */
+      sessionId: string;
+      type: 'notice';
+    };
+/**
+ * The state of a dictation session.
+ */
+export type DictationState =
+  'preparing' | 'recording' | 'finalizing' | 'completed' | 'cancelled' | 'error';
+/**
+ * How settled a piece of recognized text is.
+ */
+export type TextStage = 'partial' | 'provisional' | 'final';
+/**
+ * Which model a status describes.
+ */
+export type SpeechModelKind = 'base' | 'enhanced';
+/**
+ * The state of one speech model.
+ */
+export type SpeechModelState =
+  'ready' | 'missing' | 'corrupt' | 'downloading' | 'verifying' | 'failed';
 
 /**
  * A request whose method is not interpreted.
@@ -12644,4 +12760,138 @@ export interface GitChecks {
    * Not finished.
    */
   pending: number;
+}
+/**
+ * What a dictation is started for (sent by the main process, which fills `window_id`).
+ */
+export interface DictationStart {
+  /**
+   * The composer in that window: `session:<id>` or `workspace:<path>` (its draft key).
+   */
+  composer: string;
+  /**
+   * A level-only microphone test (settings): no model, no text.
+   */
+  test?: boolean;
+  /**
+   * The `webContents` id of the window that started it; events go to its route.
+   */
+  windowId: number;
+  /**
+   * The workspace whose trusted vocabulary may be used.
+   */
+  workspace?: string | null;
+}
+/**
+ * Answer to a start.
+ */
+export interface DictationStarted {
+  /**
+   * The route its events go to.
+   */
+  route: string;
+  /**
+   * The new session.
+   */
+  sessionId: string;
+}
+/**
+ * The dictation the process has, if any (`dictationStatus`).
+ */
+export interface DictationStatus {
+  /**
+   * Whether an input device is open.
+   */
+  captureOpen: boolean;
+  /**
+   * Its composer.
+   */
+  composer?: string | null;
+  /**
+   * Whether the recognition models are loaded.
+   */
+  engineLoaded: boolean;
+  /**
+   * The running session, if any.
+   */
+  sessionId?: string | null;
+  /**
+   * Its state.
+   */
+  state?: DictationState | null;
+  /**
+   * Whether it is a microphone test.
+   */
+  test?: boolean;
+  /**
+   * Its window.
+   */
+  windowId?: number | null;
+}
+/**
+ * An audio input device. `id` is opaque (a stable hash of the system's device name).
+ */
+export interface InputDevice {
+  /**
+   * Whether it is the system default input.
+   */
+  default: boolean;
+  /**
+   * Opaque id to store in settings.
+   */
+  id: string;
+  /**
+   * Display name.
+   */
+  name: string;
+}
+/**
+ * The payload of `core/speech` events and of `speechModels`.
+ */
+export interface SpeechModels {
+  /**
+   * Every model PiArc knows.
+   */
+  models: SpeechModel[];
+}
+/**
+ * The state of one speech model, broadcast on `core/speech`.
+ */
+export interface SpeechModel {
+  /**
+   * Whether dictation uses it now.
+   */
+  active: boolean;
+  /**
+   * Bytes a download transfers (0 for the bundled model).
+   */
+  downloadBytes: number;
+  /**
+   * Error code of the last failure (`network`, `checksum`, `diskFull`, `cancelled`…).
+   */
+  error?: string | null;
+  /**
+   * Stable id (`x-asr-zh-en-480ms-int8`, `qwen3-asr-0.6b-int8`).
+   */
+  id: string;
+  /**
+   * Bytes on disk once installed.
+   */
+  installedBytes: number;
+  /**
+   * Base or enhanced.
+   */
+  kind: SpeechModelKind;
+  /**
+   * Bytes received so far while downloading.
+   */
+  receivedBytes?: number | null;
+  /**
+   * State.
+   */
+  state: SpeechModelState;
+  /**
+   * Model version (release date).
+   */
+  version: string;
 }

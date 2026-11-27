@@ -21,6 +21,8 @@ members = [
     "crates/piarc-telemetry",
     "crates/piarc-web",
     "crates/piarc-browser-import",
+    "crates/piarc-speech",
+    "crates/piarc-sherpa-sys",
     "crates/piarc-napi",
     "crates/piarc-testkit",
     "crates/piarc-devcli",
@@ -57,6 +59,9 @@ piarc-secrets     = { path = "crates/piarc-secrets" }
 piarc-telemetry   = { path = "crates/piarc-telemetry" }
 piarc-web         = { path = "crates/piarc-web" }
 piarc-browser-import = { path = "crates/piarc-browser-import" }
+piarc-speech      = { path = "crates/piarc-speech" }
+# The -sys layer of sherpa-onnx (ADR-0094): the upstream package name, PiArc's run-time loader.
+sherpa-onnx-sys   = { path = "crates/piarc-sherpa-sys" }
 piarc-napi        = { path = "crates/piarc-napi" }
 piarc-testkit     = { path = "crates/piarc-testkit" }
 
@@ -123,6 +128,24 @@ windows-native-keyring-store = { version = "=1.1.0", default-features = false }
 windows-registry = { version = "=0.100.0", default-features = false }
 windows-sys = { version = "=0.61.2", default-features = false }
 zeroize     = { version = "=1.9.1", features = ["serde", "std"] }
+# Voice dictation (ADR-0094): the sherpa-onnx safe wrapper (its -sys crate is patched below),
+# audio capture, resampling, the capture queue and run-time library loading.
+sherpa-onnx = { version = "=2.0.1", default-features = false }
+cpal        = "=0.18.2"
+rubato      = "=5.1.0"
+rtrb        = "=0.3.6"
+libloading  = "=0.9.1"
+
+[patch.crates-io]
+# sherpa-onnx-sys downloads unverified prebuilt libraries and links them at build time; PiArc's
+# generated replacement loads the verified libraries of Resources/speech/runtime on first use
+# (ADR-0094, scripts/dev/gen-sherpa-sys.mjs).
+sherpa-onnx-sys = { path = "crates/piarc-sherpa-sys" }
+
+# Verifying the speech assets hashes about 200 MB on the first dictation; unoptimized SHA-256
+# makes that take seconds in development builds.
+[profile.dev.package.sha2]
+opt-level = 3
 
 [workspace.lints.rust]
 # `unsafe` is allowed only in -sys crates, at the NAPI boundary and in safe

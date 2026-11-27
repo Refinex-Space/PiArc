@@ -8,6 +8,7 @@ Bash 沙箱与 Agent Host 的 Seatbelt 配置、会话的本地代理与域名�
 |---|---|
 | `cargo test -p piarc-sandbox` | 策略规范化、两份配置的 golden 与转义、白名单、地址检查、拒绝识别（`denials`）、代理（`tests/proxy.rs`：本机上游 + 注入解析器，不用外网；运行中换白名单、白名单外询问与拒绝回报、`Host` 改写、空闲与读头超时） |
 | `PIARC_UPDATE_SNAPSHOTS=1 cargo test -p piarc-sandbox seatbelt` | 有意改了配置后重写 `tests/snapshots/seatbelt-profile.sbpl` 与 `agent-host-profile.sbpl`，在评审中看 diff |
+| `cargo test -p piarc-sandbox --test devices` | THR-18（ADR-0096）：两份配置在真实 `sandbox-exec` 下拒绝 `device-microphone` 与 `device-camera`（经 JXA 调 `sandbox_check` 询问运行中的进程，另有无规则的对照） |
 | `cargo test -p piarc-core --test agent_host_profile` | Agent Host 配置在真实 `sandbox-exec` 上：允许的位置写得进、其余写不进、读取放开（T39-A09） |
 | `cargo test -p piarc-testkit --test sessions sandbox::` | 真实 Agent Host：测试扩展写主目录失败、npx MCP server 只写允许的位置（A09）；网络卡四种答复与超时、改白名单后下一条命令生效且 Agent Host 进程不变、直连失败、审计（A05、A07、A14）；git、python、cargo build、npm install 经 Bash 工具在沙箱内（A11，后两项连真实 registry） |
 | `cargo test -p piarc-testkit --test scenarios -- sandbox-` | L2：两种模式、四种拦截、四条启动路径、沙箱外重试、项目只能收紧、Windows 不生效 |
@@ -38,6 +39,7 @@ Bash 沙箱与 Agent Host 的 Seatbelt 配置、会话的本地代理与域名�
 ## Agent Host 的配置（T39 定稿，ADR-0056 第 11 条）
 
 - 模板 `src/seatbelt/agent-host.sbpl`，生成函数 `SeatbeltProfile::agent_host(workspace, data_dir, protected)`，包装 `agent_host_launch(workspace, data_dir)`；golden 为 `tests/snapshots/agent-host-profile.sbpl`。
+- 麦克风与摄像头拒绝（`(deny device-microphone)`、`(deny device-camera)`，ADR-0096）：语音输入的麦克风授权只给主进程，Bash 沙箱配置末尾同样写明（基础配置已默认拒绝，显式写出防止以后的放开盖过它）。
 - 读取、进程、网络放开；写入只限工作区（受保护路径除外，`.piarc/worktrees/<名称>/` 同样）、`<数据目录>/pi`（`extensions/`、`skills/`、`prompts/`、`npm/`、`git/`、`settings.json`、`models.json` 除外：Pi 自动加载或 Core 当作用户级来源读取，R5）、`<数据目录>/agent-host`、`<数据目录>/sessions/*/tmp` 与终端设备；`.pi/settings.json.lock` 单独放行（Pi 1.5.2 读项目设置前用 proper-lockfile 建它）。用户设置、`core.sqlite`、保险箱、用户级资源、shell integration、检查点与日志对 Agent Host 及其子进程只读。
 - Core（`piarc_core::agent_host`）在 macOS 上对打包与开发两种启动都套这份配置，`agent_host_env` 把 `TMPDIR`、`npm_config_cache`、`XDG_CACHE_HOME` 指向 `<数据目录>/agent-host/`，启动前建好这些目录。
 - 第 6.10 节说的"MCP server 在沙箱外"指 Bash 沙箱：stdio MCP server 由 Agent Host 启动，仍受这份配置约束。常见 MCP server 若必须放宽写入范围才能运行，属于放松安全基线，按变更型写 ADR。

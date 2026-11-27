@@ -72,7 +72,7 @@ export function readLock() {
  * @param {string} file
  * @returns {Promise<string>}
  */
-async function sha256Of(file) {
+export async function sha256Of(file) {
   const hash = createHash('sha256');
   await pipeline(createReadStream(file), hash);
   return hash.digest('hex');
@@ -81,9 +81,9 @@ async function sha256Of(file) {
 /**
  * Checks a file against its lock entry; returns a description of the mismatch, or null.
  * @param {string} file
- * @param {Artefact} artefact
+ * @param {{ size: number, sha256: string }} artefact
  */
-async function mismatch(file, artefact) {
+export async function mismatch(file, artefact) {
   const { size } = await stat(file);
   if (size !== artefact.size) {
     return `size ${String(size)}, expected ${String(artefact.size)}`;
@@ -104,7 +104,18 @@ export async function fetchArtefact(name, target) {
   if (binary === undefined || artefact === undefined) {
     throw new Error(`${LOCK_FILE} has no artefact "${name}" for ${target}`);
   }
-  const dir = path.join(CACHE_DIR, name);
+  return downloadVerified(artefact, path.join(CACHE_DIR, name), LOCK_FILE);
+}
+
+/**
+ * Downloads `artefact.url` into `dir` (or reuses the cached copy) and checks its size and
+ * SHA-256; a mismatch removes the file and fails.
+ * @param {{ url: string, size: number, sha256: string }} artefact
+ * @param {string} dir cache directory
+ * @param {string} lockFile named in the error when the download does not match
+ * @returns {Promise<string>} path of the verified file
+ */
+export async function downloadVerified(artefact, dir, lockFile) {
   const file = path.join(dir, path.posix.basename(new URL(artefact.url).pathname));
   if (existsSync(file)) {
     const problem = await mismatch(file, artefact);
@@ -125,9 +136,7 @@ export async function fetchArtefact(name, target) {
   const problem = await mismatch(partial, artefact);
   if (problem !== null) {
     await rm(partial);
-    throw new Error(
-      `${artefact.url} does not match ${path.relative(repoRoot, LOCK_FILE)}: ${problem}`,
-    );
+    throw new Error(`${artefact.url} does not match ${path.relative(repoRoot, lockFile)}: ${problem}`);
   }
   await rename(partial, file);
   return file;
@@ -135,11 +144,11 @@ export async function fetchArtefact(name, target) {
 
 /**
  * Extracts an archive with the system `tar` (bsdtar on macOS and Windows 10+, which also reads
- * zip files), keeping file modes and the code signatures embedded in Mach-O files.
+ * zip and bzip2 files), keeping file modes and the code signatures embedded in Mach-O files.
  * @param {string} archive
  * @param {string} into
  */
-async function extract(archive, into) {
+export async function extract(archive, into) {
   await mkdir(into, { recursive: true });
   // On Windows, Git's GNU tar can come first on PATH and cannot read zip files.
   const tar =

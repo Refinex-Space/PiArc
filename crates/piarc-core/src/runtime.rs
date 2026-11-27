@@ -27,6 +27,7 @@
 
 mod browser_import;
 mod diagnostics;
+mod dictation;
 mod mcp;
 mod plugins;
 mod sessions;
@@ -127,6 +128,8 @@ pub struct CoreConfig {
     /// Chrome's folder and key source for the sign-in import (ADR-0090); the platform's
     /// places by default, development builds' L4 a fixture folder and a fixed key.
     pub chrome: crate::browser::import::ChromeConfig,
+    /// Voice dictation's assets and engine settings (ADR-0094).
+    pub speech: crate::dictation::SpeechConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -168,6 +171,7 @@ impl Default for CoreConfig {
             managed: crate::managed::ManagedConfig::default(),
             gh_program: None,
             chrome: crate::browser::import::ChromeConfig::default(),
+            speech: crate::dictation::SpeechConfig::default(),
         }
     }
 }
@@ -222,6 +226,8 @@ struct Shared {
     coalescer: Mutex<Option<JoinHandle<()>>>,
     demo: Mutex<DemoRegistry>,
     terminals: Terminals,
+    /// Voice dictation (ADR-0094); nothing runs until the first request.
+    dictation: Arc<crate::dictation::DictationService>,
     state_dirs: Option<StateServices>,
     waiters: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
 }
@@ -280,6 +286,14 @@ impl CoreRuntime {
             }
         });
         let terminals = Terminals::new(handle.clone(), events.clone());
+        let dictation = Arc::new(crate::dictation::DictationService::new(
+            &config.speech,
+            config
+                .dirs
+                .as_ref()
+                .map_or_else(std::env::temp_dir, |dirs| dirs.cache().to_owned()),
+            events.clone(),
+        ));
         let cancel = CancellationToken::new();
         let state_dirs = match config.dirs.clone() {
             Some(dirs) => Some(open_state(
@@ -299,6 +313,7 @@ impl CoreRuntime {
                 coalescer: Mutex::new(Some(supervisor)),
                 demo: Mutex::new(DemoRegistry::default()),
                 terminals,
+                dictation,
                 state_dirs,
                 waiters: Mutex::new(Vec::new()),
             }),
@@ -544,6 +559,9 @@ impl CoreRuntime {
 
 impl Shared {
     fn run_shutdown(&self) {
+        // Dictation first: close the microphone and join the engine's threads (no native
+        // decode outlives Core).
+        self.dictation.shutdown();
         let sources: Vec<DemoSource> = lock(&self.demo).sources.drain().map(|(_, s)| s).collect();
         let coalescer = lock(&self.coalescer).take();
         self.handle.block_on(async {

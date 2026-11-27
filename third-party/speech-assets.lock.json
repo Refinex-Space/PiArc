@@ -1,0 +1,179 @@
+{
+  "$comment": [
+    "Speech assets that ship in Resources/speech/ (ADR-0094, ADR-0095): the sherpa-onnx and ONNX Runtime shared libraries (no-TTS builds, so no espeak-ng), the X-ASR-zh-en 480 ms INT8 streaming model and the Silero VAD model.",
+    "scripts/dev/fetch-speech-assets.mjs downloads each archive or file into .tools/cache/speech/, checks size and SHA-256 against this file, extracts only the members listed under `files`, checks every extracted file again and lays them out in target/speech-assets/<platform>-<arch>/ (the `to` paths). Nothing is downloaded or packaged without an entry here.",
+    "Archive SHA-256 values match the `digest` that GitHub reports for each release asset; the file entries were computed from the extracted archives on 2026-11-26. `derived.bpe.vocab` is exported from bpe.model by scripts/dev/fetch-speech-assets.mjs (sentencepiece pieces and scores, the format sherpa-onnx reads for hotwords) and must hash to the value below.",
+    "testFiles are real-speech WAVs from the model release, used by the real-model tests only and never packaged.",
+    "Bumping a version: update the archive and every file entry together, run `node scripts/dev/fetch-speech-assets.mjs --all`, regenerate crates/piarc-sherpa-sys when the sherpa-onnx version changes (scripts/dev/gen-sherpa-sys.mjs) and update third-party/sources.json."
+  ],
+  "runtime": {
+    "name": "sherpa-onnx",
+    "version": "2.0.1",
+    "license": "Apache-2.0 (sherpa-onnx), MIT (ONNX Runtime)",
+    "artefacts": {
+      "darwin-arm64": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-osx-arm64-shared-no-tts-lib.tar.bz2",
+        "size": 8455084,
+        "sha256": "ac5594ad237db56ec4a6c4b3fc48700441b33a07bb71c235f35530a52a93f2e3",
+        "root": "sherpa-onnx-v2.0.1-osx-arm64-shared-no-tts-lib",
+        "files": {
+          "lib/libonnxruntime.dylib": {
+            "to": "runtime/libonnxruntime.dylib",
+            "size": 28775120,
+            "sha256": "3567d114f7299d559993e536d605a6f46d7bc9d2542004accc80ee9bf5457f0b"
+          },
+          "lib/libsherpa-onnx-c-api.dylib": {
+            "to": "runtime/libsherpa-onnx-c-api.dylib",
+            "size": 3437024,
+            "sha256": "2a169fe29c7e75168cc308b0d5b7f9085efebbb3a7f812d46c3a983d6788759f"
+          }
+        }
+      },
+      "darwin-x64": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-osx-x64-shared-no-tts-lib.tar.bz2",
+        "size": 9632197,
+        "sha256": "b0107b8166c4131245380bc9b984345c4ea8637c65807f09ca5f501c72926be5",
+        "root": "sherpa-onnx-v2.0.1-osx-x64-shared-no-tts-lib",
+        "files": {
+          "lib/libonnxruntime.dylib": {
+            "to": "runtime/libonnxruntime.dylib",
+            "size": 32315856,
+            "sha256": "2bf27180c09e6fd3f407c9ab25205ebf1ff95f2d53bfa35e35409b5849e0ac70"
+          },
+          "lib/libsherpa-onnx-c-api.dylib": {
+            "to": "runtime/libsherpa-onnx-c-api.dylib",
+            "size": 3689552,
+            "sha256": "2694b4549db9ecf168b8faf4718913a5b9b6271640abcab92dba349d3f8df15e"
+          }
+        }
+      },
+      "win32-x64": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-win-x64-shared-MD-Release-no-tts-lib.tar.bz2",
+        "size": 7038587,
+        "sha256": "3aea6fc2360ac67b349f61b5cbe237f34b2bb53dc805aa4b3df7ab23ba7ab35c",
+        "root": "sherpa-onnx-v2.0.1-win-x64-shared-MD-Release-no-tts-lib",
+        "files": {
+          "lib/onnxruntime.dll": {
+            "to": "runtime/onnxruntime.dll",
+            "size": 17136128,
+            "sha256": "422d776ab0e3218260f7f628fcb84606aaa5c21116f720c8619a6da5e0b2e0f9"
+          },
+          "lib/onnxruntime_providers_shared.dll": {
+            "to": "runtime/onnxruntime_providers_shared.dll",
+            "size": 10752,
+            "sha256": "0190137dee4933261c065c5d030c3568a68c7aa43cad942b4726a07011738bc2"
+          },
+          "lib/sherpa-onnx-c-api.dll": {
+            "to": "runtime/sherpa-onnx-c-api.dll",
+            "size": 3301376,
+            "sha256": "71728fb12b3a15a9ab7c4961fceafc6dd802f7fc038f461f5ea59e07d7104bec"
+          }
+        }
+      },
+      "win32-arm64": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-win-arm64-shared-MD-Release-no-tts-lib.tar.bz2",
+        "size": 6764515,
+        "sha256": "44c31e2da1b7005da3d29a24e88da9686d71d5368e0805f44a0a517302231f6e",
+        "root": "sherpa-onnx-v2.0.1-win-arm64-shared-MD-Release-no-tts-lib",
+        "files": {
+          "lib/onnxruntime.dll": {
+            "to": "runtime/onnxruntime.dll",
+            "size": 16996352,
+            "sha256": "bdf49b23dca01ba77d2af8ac2e9ea56bc27fa507c525e3d1846d01dcb4ffabae"
+          },
+          "lib/onnxruntime_providers_shared.dll": {
+            "to": "runtime/onnxruntime_providers_shared.dll",
+            "size": 10752,
+            "sha256": "6e985b2fc392d440d89edf5ee543b2f46b8cf72408cae118e932834db74815b4"
+          },
+          "lib/sherpa-onnx-c-api.dll": {
+            "to": "runtime/sherpa-onnx-c-api.dll",
+            "size": 3645440,
+            "sha256": "b8eff86e2e60d7cc6dab4e4e29e43f315ce0e00bc423525755eb254e9167bb15"
+          }
+        }
+      }
+    }
+  },
+  "models": {
+    "x-asr-zh-en-480ms-int8": {
+      "version": "2026-06-05",
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/GilgameshWind/X-ASR-zh-en (revision 689ff18c584d29910da37b6fe904db0c1489c9d1), converted and released by k2-fsa",
+      "archive": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05.tar.bz2",
+        "size": 133895136,
+        "sha256": "fa5f63d618e5a01526e275a358bb7772e403f84808a4769fba52cffd8160bf74",
+        "root": "sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05"
+      },
+      "files": {
+        "encoder.int8.onnx": {
+          "to": "models/x-asr-zh-en-480ms-int8/encoder.int8.onnx",
+          "size": 155278641,
+          "sha256": "908596dcc137a73b95be908ca55e88caa1b3dbbe8027c171615f4b0609c5eb1e"
+        },
+        "decoder.onnx": {
+          "to": "models/x-asr-zh-en-480ms-int8/decoder.onnx",
+          "size": 11309084,
+          "sha256": "a1cbc9eac2d5e3fb6617a218c67ad6daaa7f4e0fd225f08b2c22ab0413c8c257"
+        },
+        "joiner.int8.onnx": {
+          "to": "models/x-asr-zh-en-480ms-int8/joiner.int8.onnx",
+          "size": 2581422,
+          "sha256": "aedb7fa697b2ab43f20499826fff7c997eea7d67db77be97769aeeeb726e63b3"
+        },
+        "tokens.txt": {
+          "to": "models/x-asr-zh-en-480ms-int8/tokens.txt",
+          "size": 58806,
+          "sha256": "b818a60878b9aae978cbb8ad594acbd403d76d1af2e31ef4197c84e2dbdba27c"
+        },
+        "bpe.model": {
+          "to": "models/x-asr-zh-en-480ms-int8/bpe.model",
+          "size": 119265,
+          "sha256": "f87a38025a5fdd1e4e9591f6a44bb81295097ce0b80df6f4ab9f44e52c64ca5f"
+        }
+      },
+      "derived": {
+        "bpe.vocab": {
+          "from": "bpe.model",
+          "to": "models/x-asr-zh-en-480ms-int8/bpe.vocab",
+          "size": 69594,
+          "sha256": "28fc94d67aae53d8c58010fcfb16fc8c2f8dd263e03f3490c98210e354e8f914"
+        }
+      },
+      "testFiles": {
+        "test_wavs/0.wav": {
+          "to": "test-wavs/0.wav",
+          "size": 321744,
+          "sha256": "7d93384ca14702cc584a7a33fe2fed92e89e708549161cb12ea38c916882103b"
+        },
+        "test_wavs/1.wav": {
+          "to": "test-wavs/1.wav",
+          "size": 163244,
+          "sha256": "8bfb42c963e623ebab31b81ff4404867d07d3102507c87ac14577c4c61663b8c"
+        },
+        "test_wavs/2.wav": {
+          "to": "test-wavs/2.wav",
+          "size": 150124,
+          "sha256": "20805bcc696b9b65f3357a2508a419d4f33b81006d47e1312e219b0fad934d1d"
+        },
+        "test_wavs/3.wav": {
+          "to": "test-wavs/3.wav",
+          "size": 282604,
+          "sha256": "5851e31f3e8e5f741635da9466e19fccfbabd117ebcdc92db242c92483aee064"
+        }
+      }
+    },
+    "silero-vad": {
+      "version": "silero_vad.onnx of 2025-07-11 (sherpa-onnx asr-models release)",
+      "license": "MIT",
+      "source": "https://github.com/snakers4/silero-vad, released by k2-fsa",
+      "file": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+        "to": "models/silero-vad/silero_vad.onnx",
+        "size": 643854,
+        "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+      }
+    }
+  }
+}

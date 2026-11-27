@@ -59,6 +59,7 @@ pub mod checkpoint;
 pub mod context;
 pub mod contract;
 pub mod dev_server;
+pub mod dictation;
 pub mod diff;
 mod error;
 pub mod exec;

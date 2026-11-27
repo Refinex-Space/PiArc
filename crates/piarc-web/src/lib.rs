@@ -37,6 +37,7 @@
 use std::time::Duration;
 
 pub mod convert;
+pub mod download;
 mod error;
 mod fetch;
 pub mod search;

@@ -7,6 +7,10 @@ license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+# Development builds only (piarc-napi's `testing`): the WAV file audio source of dictation.
+testing = ["piarc-speech/testing"]
+
 [dependencies]
 base64.workspace = true
 getrandom.workspace = true
@@ -27,6 +31,7 @@ piarc-ports.workspace = true
 piarc-protocol.workspace = true
 piarc-sandbox.workspace = true
 piarc-secrets.workspace = true
+piarc-speech.workspace = true
 piarc-store.workspace = true
 piarc-telemetry.workspace = true
 piarc-term.workspace = true

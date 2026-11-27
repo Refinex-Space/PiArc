@@ -92,6 +92,13 @@ impl RouteKey {
         Self(Arc::from("core/browser"))
     }
 
+    /// The route of the speech models' state (`core/speech`, ADR-0094): every window sees it;
+    /// it carries no recognized text.
+    #[must_use]
+    pub fn speech() -> Self {
+        Self(Arc::from(crate::dictation::SPEECH_ROUTE))
+    }
+
     /// The route of provider sign-in progress and questions (`core/login`, T29).
     #[must_use]
     pub fn login() -> Self {

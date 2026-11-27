@@ -8,6 +8,7 @@ WebFetch 的网络侧（架构第 6.1.4 节，ADR-0045）：SSRF 检查（`ssrf`
 |---|---|
 | `cargo test -p piarc-web` | SSRF 表驱动单测（每个网段、IPv6、映射与内嵌形式、允许列表）、转换单测（脚本剔除、字符集、二进制拒绝、按字符截断）、`tests/fetch.rs`（本地 HTTP 服务器 + 按名字给地址的解析器：内网拒绝、混合地址整体拒绝、重定向后重绑定、同站跟随与跨站返回、上限、超时、取消） |
 | `cargo test -p piarc-web --test call` | `Fetcher::call`：POST 的方法、头与体到达本地服务、`Reach::Public` 拒绝回环、重定向原样返回、体积上限 |
+| `cargo test -p piarc-web --test download` | 模型下载（ADR-0097）：本地 HTTPS 服务与测试 CA（`tests/fixtures/tls/`，只给测试）上的校验与进度、重定向只到允许的主机且只用 https、直连本地地址拒绝、校验失败与超长删除文件、`Range` 续传、取消、代理 `CONNECT` 与 407 |
 | `cargo clippy -p piarc-web --all-targets -- -D warnings` | lint |
 
 ## 不变量
@@ -18,6 +19,7 @@ WebFetch 的网络侧（架构第 6.1.4 节，ADR-0045）：SSRF 检查（`ssrf`
 - 上限只在 `FetchLimits`（默认 10 MiB、100,000 字符、60 s、10 次重定向）。超限的正文截断并标记，超时与重定向过多报错；错误消息写给模型看（`to_error_object`，`details.reason` 区分原因）。
 - TLS 用 rustls 的 ring 实现与 `rustls-platform-verifier`（系统信任库）。不要打开 rustls 的默认特性（会引入 aws-lc-rs）。
 - `Reach::Configured` 只给用户自己配置的地址（hooks 的 `url`、搜索服务的端点）；模型给出的地址一律 `Reach::Public`（`fetch` 与它同路）。
+- 大文件下载（`download`，ADR-0097，语音增强模型）：只接受 https、每一跳的主机由调用方的清单判断、直连时与 WebFetch 同一套地址检查并连接检查过的地址；有用户代理时经 `CONNECT`（代理地址不做地址检查）；超过预期大小立即删除，完整后对整个文件（含续传前的部分）算 SHA-256，不符删除；部分文件用 `Range` 续传。错误的 `code()` 是客户端显示的稳定代码。
 - 搜索后端加一个 `search::Backend` 实现并登记进 `BACKENDS`：请求只经 `call`，回答只经 `results`，key 由调用方每次传入、只放进请求头，错误消息不带 key。结果按 `filter` 的主机后缀匹配过滤并截到 `MAX_RESULTS`（10）。错误枚举在 `error.rs`（I128）。
 
 ## 易错点

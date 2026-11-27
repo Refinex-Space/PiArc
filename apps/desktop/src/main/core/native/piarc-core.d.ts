@@ -96,6 +96,28 @@ export declare class CoreRuntime {
    * `{path, bytes}` as JSON text.
    */
   exportDiagnostics(id: string, path: string): Promise<string>;
+  /**
+   * Starts a dictation. `requestJson` is a `DictationStart` (`windowId`, `composer`,
+   * `workspace?`, `test?`). Resolves with `DictationStarted` (`sessionId`, `route`).
+   */
+  dictationStart(requestJson: string): Promise<string>;
+  /** Stops a dictation of window `windowId`; `mode` is `keep` or `send`. */
+  dictationStop(windowId: number, sessionId: string, mode: string): void;
+  /** Cancels a dictation of window `windowId`. */
+  dictationCancel(windowId: number, sessionId: string): void;
+  /** Window `windowId` is gone; its dictation ends without text. */
+  dictationRelease(windowId: number): void;
+  /** The running dictation as `DictationStatus` JSON. */
+  dictationStatus(): string;
+  /** Resolves with the input devices as a JSON array of `InputDevice`. */
+  speechDevices(): Promise<string>;
+  /** Resolves with `SpeechModels` JSON and broadcasts it on `core/speech`. */
+  speechModels(): Promise<string>;
+  /**
+   * One action on a speech model (`download`, `cancel`, `delete`, `verify`); resolves with
+   * `SpeechModels` JSON. The main process asks natively before `delete`.
+   */
+  speechModelAction(modelId: string, action: string): Promise<string>;
   /** Every configured MCP server of `workspace` with its state, as JSON text (`McpStatus`). */
   mcpStatus(workspace: string): Promise<string>;
   /** Connects MCP server `name` of `workspace` anew; its state as JSON text. */
@@ -695,6 +717,11 @@ export interface CoreOptions {
    * minutes).
    */
   idleTimeoutMs?: number;
+  /**
+   * Voice dictation's bundled assets (`Resources/speech`, or the source tree's
+   * `target/speech-assets/<platform>-<arch>`, ADR-0094); absent: dictation reports them missing.
+   */
+  speechDir?: string;
 }
 
 /** Lifecycle state of a runtime. */

@@ -375,10 +375,10 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 ### 语音输入 V1–V8（计划外，ADR-0094–0097，设计增补 `docs/architecture/addenda/voice-dictation.md`）
 
 - [x] 1. 原生 PoC（设计增补附录 A）、评审与裁决（附录 C）、ADR-0094–0097（用户 2026-11-26 确认基础模型、语音资产预算、麦克风安全取舍、Esc 语义）、设计增补。
-- [ ] 2. 语音资产锁文件与 `fetch-speech-assets.mjs`、`piarc-sherpa-sys`（生成的转发层）与 `[patch.crates-io]`、deny 与依赖规则。
-- [ ] 3. `piarc-speech` 纯模块：音频、词汇、文本规范化、状态机、分段协调器。
-- [ ] 4. 引擎线程、采集、在线识别、真实模型测试。
-- [ ] 5. 协议、Core `dictation`、NAPI、文件音源。
+- [x] 2. 语音资产锁文件与 `fetch-speech-assets.mjs`、`piarc-sherpa-sys`（生成的转发层）与 `[patch.crates-io]`、deny 与依赖规则。
+- [x] 3. `piarc-speech` 纯模块：音频、词汇、文本规范化、状态机、分段协调器。
+- [x] 4. 引擎线程、采集、在线识别、真实模型测试。
+- [x] 5. 协议、Core `dictation`、NAPI、文件音源。
 - [ ] 6. 主进程 IPC、授权端口、路由授权、生命周期、Info.plist 与 entitlement、Seatbelt。
 - [ ] 7. 渲染进程：听写插件与控制器、麦克风按钮、听写条与波形、Composer 接入。
 - [ ] 8. 设置页"语音输入"与偏好 `voiceDictation`。

@@ -32,6 +32,10 @@
 ; PiArc: no writes through read-only descriptors
 (deny system-fcntl (fcntl-command 80 110))
 
+; PiArc: no microphone or camera
+(deny device-microphone)
+(deny device-camera)
+
 ;; params
 DENY_READ_0=/Users/dev/.ssh
 DENY_READ_1=/Users/dev/项目 one/secrets/key.pem

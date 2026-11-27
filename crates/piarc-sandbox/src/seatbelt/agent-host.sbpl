@@ -65,3 +65,10 @@
 ; writable; the rest of .pi/ does not.
 (allow file-write*
   (regex (string-append "^" (param "WORKSPACE_RE") "/(.*/)?\\.pi/settings\\.json\\.lock(/.*)?$")))
+
+; No microphone or camera (ADR-0096, THR-18): PiArc holds the microphone permission for voice
+; dictation in the main process only. The Agent Host and everything it starts (MCP servers, Pi
+; extensions, npx) are not to record, even though the permission belongs to the app; tccd asks
+; the sandbox about these operations for the requesting process.
+(deny device-microphone)
+(deny device-camera)

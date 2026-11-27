@@ -139,6 +139,13 @@ fn git_types(generator: &mut schemars::SchemaGenerator) {
     generator.subschema_for::<crate::git::GitDescription>();
     generator.subschema_for::<crate::git::GitFailure>();
     generator.subschema_for::<crate::git::GitEvent>();
+    // Voice dictation (ADR-0094): window events, requests and model state.
+    generator.subschema_for::<crate::dictation::DictationEvent>();
+    generator.subschema_for::<crate::dictation::DictationStart>();
+    generator.subschema_for::<crate::dictation::DictationStarted>();
+    generator.subschema_for::<crate::dictation::DictationStatus>();
+    generator.subschema_for::<crate::dictation::InputDevice>();
+    generator.subschema_for::<crate::dictation::SpeechModels>();
     generator.subschema_for::<crate::git::GitLog>();
     generator.subschema_for::<crate::git::GitCommitDetail>();
     generator.subschema_for::<crate::git::GitStashes>();

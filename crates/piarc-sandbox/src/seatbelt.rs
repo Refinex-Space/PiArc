@@ -18,6 +18,7 @@
 //!   removed, for the same reason;
 //! - network: only outgoing connections to the proxy on `localhost:<port>`; no binding, no
 //!   Unix sockets, no other address.
+//! - devices: no microphone and no camera (ADR-0096).
 //!
 //! Seatbelt evaluates the rules in order and the last match wins, so the denies come after
 //! the allows. On the default case-insensitive APFS volume Seatbelt matches paths without
@@ -119,6 +120,11 @@ impl SeatbeltProfile {
         builder.section("PiArc: no writes through read-only descriptors");
         // F_MAKECOMPRESSED = 80, F_TRANSFEREXTENTS = 110 (as in Codex's generator).
         builder.line("(deny system-fcntl (fcntl-command 80 110))");
+        // Denied by the base policy already; stated so that no later allow can open them
+        // (ADR-0096, THR-18: the app's microphone permission is for dictation only).
+        builder.section("PiArc: no microphone or camera");
+        builder.line("(deny device-microphone)");
+        builder.line("(deny device-camera)");
         Ok(Self {
             text: builder.text,
             params: builder.params,

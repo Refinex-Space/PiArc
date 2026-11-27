@@ -195,6 +195,12 @@ async function buildFiles() {
       'GitPrDraft',
       'GitReview',
       'GitPullRequestStatus',
+      'DictationEvent',
+      'DictationStart',
+      'DictationStarted',
+      'DictationStatus',
+      'InputDevice',
+      'SpeechModels',
     ].map((name) => ({
       $ref: `#/$defs/${name}`,
     })),

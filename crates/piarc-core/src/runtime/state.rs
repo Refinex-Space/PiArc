@@ -77,10 +77,17 @@ impl CoreRuntime {
             .starts_with("/proxy")
             .then(|| self.services().map(|s| s.sessions))
             .transpose()?;
+        // Turning voice dictation off stops a running dictation and frees its models.
+        let dictation = pointer
+            .starts_with("/voiceDictation")
+            .then(|| std::sync::Arc::clone(&self.shared.dictation));
         self.client_settings_job(on_done, move |dir| {
             let written = crate::client_settings::write(dir, &managed, &pointer, value)?;
             if let Some(hub) = &hub {
                 hub.refresh_network();
+            }
+            if let Some(dictation) = &dictation {
+                CoreRuntime::voice_preferences_changed(dictation, dir);
             }
             Ok(written)
         })

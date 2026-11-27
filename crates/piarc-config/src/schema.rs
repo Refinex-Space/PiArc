@@ -758,6 +758,41 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             },
         ]),
     },
+    // Voice dictation (ADR-0094): Core reads it from the user's file only
+    // (`piarc_core::dictation::VoicePreferences`); a project file's copy has no effect.
+    Field {
+        name: "voiceDictation",
+        shape: Shape::Object(&[
+            Field {
+                name: "enabled",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "device",
+                shape: Shape::String,
+            },
+            Field {
+                name: "mode",
+                shape: Shape::OneOf(&["basic", "enhanced"]),
+            },
+            Field {
+                name: "punctuation",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "techTerms",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "workspaceTerms",
+                shape: Shape::Bool,
+            },
+            Field {
+                name: "customTerms",
+                shape: Shape::ListOf(&STRINGS),
+            },
+        ]),
+    },
     // The built-in browser (B5.5), read from the user's file only (`crate::settings` removes
     // it from project layers): Core reads `agentEnabled` and `approvalTimeout`, the desktop
     // client the rest.

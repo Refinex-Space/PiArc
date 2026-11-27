@@ -49,6 +49,13 @@ fn to_i64(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
+/// Dictation plays `PIARC_TEST_SPEECH_SOURCE` (a WAV file) at real-time pace instead of the
+/// microphone, through the same pipeline (ADR-0094, voice dictation addendum V-9.5).
+fn test_speech(mut config: piarc_core::CoreConfig) -> piarc_core::CoreConfig {
+    config.speech.test_source = std::env::var_os("PIARC_TEST_SPEECH_SOURCE").map(Into::into);
+    config
+}
+
 #[napi]
 impl CoreRuntime {
     /// Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
@@ -73,7 +80,7 @@ impl CoreRuntime {
         on_events: crate::sink::EventListener,
     ) -> napi::Result<Self> {
         boundary::call(&env, "CoreRuntime.createForTests", move || {
-            let mut config = crate::runtime::config_of(options)?;
+            let mut config = test_speech(crate::runtime::config_of(options)?);
             config.home = config
                 .dirs
                 .as_ref()
@@ -232,6 +239,15 @@ impl CoreRuntime {
 
     /// Spawns a Core task that panics. The panic must arrive as an error event on the
     /// `core/errors` route.
+    /// Makes the open dictation input fail like a removed microphone (L4).
+    #[napi(catch_unwind)]
+    pub fn dictation_fail_device(&self, env: Env) -> napi::Result<()> {
+        crate::boundary::call(&env, "CoreRuntime.dictationFailDevice", || {
+            self.core.dictation_fail_device();
+            Ok(())
+        })
+    }
+
     #[napi(catch_unwind)]
     pub fn spawn_panicking_task(&self, env: Env) -> napi::Result<()> {
         boundary::call(&env, "CoreRuntime.spawnPanickingTask", || {

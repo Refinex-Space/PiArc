@@ -38,7 +38,8 @@
         "piarc-secrets",
         "piarc-telemetry",
         "piarc-web",
-        "piarc-browser-import"
+        "piarc-browser-import",
+        "piarc-speech"
       ],
       "mayDependOn": ["foundation"]
     },
@@ -51,7 +52,7 @@
     {
       "name": "sys",
       "description": "-sys crates with raw FFI bindings. Each is reachable only through a registered exception.",
-      "crates": ["piarc-ghostty-sys"],
+      "crates": ["piarc-ghostty-sys", "sherpa-onnx-sys"],
       "mayDependOn": []
     },
     {
@@ -72,6 +73,11 @@
       "from": "piarc-fs",
       "to": "piarc-checkpoint",
       "reason": "Every write through Core saves the original file content to a checkpoint first (architecture section 6.9). The edge is one-way: piarc-checkpoint never depends on piarc-fs."
+    },
+    {
+      "from": "piarc-speech",
+      "to": "sherpa-onnx-sys",
+      "reason": "sherpa-onnx-sys (crate directory piarc-sherpa-sys) is the -sys layer of sherpa-onnx, patched in for the upstream safe wrapper; piarc-speech is its only consumer and calls its run-time loader (ADR-0094)."
     },
     {
       "from": "piarc-term",

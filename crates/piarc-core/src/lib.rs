@@ -79,6 +79,7 @@ pub mod clock;
 pub mod composer;
 pub mod config_diagnostics;
 pub mod demo;
+pub mod dictation;
 pub mod dirs;
 mod error;
 pub mod events;

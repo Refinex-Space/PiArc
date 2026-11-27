@@ -276,7 +276,7 @@ interface VoiceDictationPreferences {
 - `PIARC_REQUIRE_SPEECH_MODELS=1 cargo test -p piarc-speech --test real_model`：EOF 之前出 partial（中、英、混合）、末字不吞、长句跨段无重复、静音与噪声不出字、热词开关对比、两次解码一致；`--test real_model_refine`（Qwen3，nightly）：精修与截止降级。不设变量时打印 NOT RUN（不算通过）。
 - `cargo test -p piarc-web download`：本地 HTTPS 夹具（测试 CA、过期证书、SAN 不符）、本地 CONNECT 代理与 407、哈希不符、截断续传、忽略 Range、超出 size、白名单外重定向与 `http://`、跳数、取消、并发单飞。
 - `cargo test -p piarc-core --lib dictation::`：并发 start 只有一个 owner、错误 owner 的 stop/cancel、事件只在 `dictation/<id>`、工作区词汇只在受信任项目且不跟随出项目的链接、偏好白名单与 `strip_project`、刚启动无引擎线程、结束后无音频文件且日志里没有识别文字（THR-18 金丝雀）。
-- `cargo test -p piarc-core --test agent_host_profile`：Seatbelt 配置拒绝 `device-microphone`（THR-18）。
+- `cargo test -p piarc-sandbox --test devices`：Agent Host 与 Bash 沙箱两份 Seatbelt 配置在真实 `sandbox-exec` 下拒绝 `device-microphone`、`device-camera`（`sandbox_check` 询问运行中的进程，THR-18）。
 - `cargo test -p piarc-sherpa-sys`：未加载时创建函数返回空、加载失败给出 kind。
 
 ### 5.2 Vitest
@@ -318,7 +318,7 @@ E01 默认可见与关闭隐藏、启动不加载不联网；E02 文件音源中
 | 3 | `piarc-speech` 纯模块（audio、vocabulary、transcript、session、coordinator 的逻辑） | `cargo test -p piarc-speech && cargo clippy -p piarc-speech --all-targets -- -D warnings` |
 | 4 | 引擎、采集、在线识别、真实模型测试 | `PIARC_REQUIRE_SPEECH_MODELS=1 cargo test -p piarc-speech --test real_model` |
 | 5 | 协议、Core 服务、NAPI、文件音源 | `npm run gen:protocol && cargo test -p piarc-core --lib dictation:: && npm run build:core -- --flavor all` |
-| 6 | 主进程 IPC、授权、路由、生命周期、Info.plist 与 entitlement、Seatbelt | `npx vitest run apps/desktop/src/main && cargo test -p piarc-core --test agent_host_profile` |
+| 6 | 主进程 IPC、授权、路由、生命周期、Info.plist 与 entitlement、Seatbelt | `npx vitest run apps/desktop/src/main && cargo test -p piarc-sandbox --test devices` |
 | 7 | 渲染进程插件、控制器、按钮、听写条、波形、Composer 接入 | `npx vitest run apps/desktop/src/renderer/composer` |
 | 8 | 设置页与偏好 | `npx vitest run apps/desktop/src/shared apps/desktop/src/renderer/settings` |
 | 9 | 下载器、增强模型管理、精修与合并 | `cargo test -p piarc-web download && cargo test -p piarc-speech refine` |

@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 # Exports for tests and benchmarks only: demo event sources, the synchronous echo call,
 # event counters and panic triggers. Development builds of the desktop app enable it;
 # shipping builds do not (scripts/dev/build-core.mjs).
-testing = []
+testing = ["piarc-core/testing"]
 
 [dependencies]
 napi.workspace = true
