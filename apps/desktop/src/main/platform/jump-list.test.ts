@@ -39,7 +39,7 @@ describe('Windows jump list', () => {
     expect(categories).toHaveLength(1);
     expect(categories[0]?.type).toBe('tasks');
     const tasks = categories[0]?.items ?? [];
-    expect(tasks.map((item) => item.title)).toEqual(['新建会话', '打开文件夹']);
+    expect(tasks.map((item) => item.title)).toEqual(['新建会话', '打开项目']);
     for (const [index, kind] of ['newSession', 'chooseFolder'].entries()) {
       const args = tasks[index]?.args ?? '';
       expect(tasks[index]?.program).toBe(program);
