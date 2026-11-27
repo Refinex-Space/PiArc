@@ -153,6 +153,10 @@ export const IPC_CHANNELS = {
   sandboxUpdate: 'piarc:sandbox.update',
   packagesList: 'piarc:packages.list',
   packageInstall: 'piarc:packages.install',
+  marketQuery: 'piarc:market.query',
+  marketDetail: 'piarc:market.detail',
+  marketRefresh: 'piarc:market.refresh',
+  marketInstall: 'piarc:market.install',
   packageUpdate: 'piarc:packages.update',
   packageEnable: 'piarc:packages.enable',
   packageConfirm: 'piarc:packages.confirm',
@@ -269,6 +273,24 @@ export type McpServerInput =
       readonly transport: 'http';
       readonly url: string;
     };
+
+/** One page of the Pi package market (ADR-0102). */
+export interface MarketQueryInput {
+  readonly query: string;
+  readonly category: 'all' | 'extension' | 'skill' | 'prompt';
+  readonly sort: 'popular' | 'updated';
+  readonly offset: number;
+  readonly limit: number;
+  readonly workspace: string | null;
+}
+
+/** Installs one market package: an npm name and an exact version the catalog lists. */
+export interface MarketInstallInput {
+  readonly name: string;
+  readonly version: string;
+  readonly scope: 'user' | 'project';
+  readonly workspace: string | null;
+}
 
 export interface PackageInstallInput {
   readonly kind: 'directory' | 'git' | 'npm';
@@ -1096,6 +1118,17 @@ export interface PiarcApi {
   confirmPackage(id: string, workspace: string | null): Promise<string>;
   /** Uninstalls a package; answers the list (T40). */
   uninstallPackage(id: string, workspace: string | null): Promise<string>;
+  /**
+   * One page of the Pi package market as `MarketPage` JSON (ADR-0102); sync progress, kinds
+   * and installs arrive on `core/market`.
+   */
+  marketQuery(query: MarketQueryInput): Promise<string>;
+  /** One market package's details as `MarketDetail` JSON. */
+  marketDetail(name: string, workspace: string | null): Promise<string>;
+  /** Syncs the catalog now; answers `MarketStatus` JSON. */
+  marketRefresh(): Promise<string>;
+  /** Installs a market package, off; answers `PackageInstallResult` JSON. */
+  marketInstall(input: MarketInstallInput): Promise<string>;
   /**
    * Sets the output style: the workspace's `.piarc/settings.local.json` (`/output-style`), or the
    * user's settings when `workspace` is null; a null name removes the choice (T37).

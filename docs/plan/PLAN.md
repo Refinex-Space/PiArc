@@ -395,7 +395,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 4. M3 缓存表（schema v16）。
 - [x] 5. M8 前半：`piarc-mock-npm`、`piarc-mock-proxy`、测试证书。
 - [x] 6. M4 Core `market`、协议、NAPI。
-- [ ] 7. M5 主进程 IPC 与测试覆盖变量。
+- [x] 7. M5 主进程 IPC 与测试覆盖变量。
 - [ ] 8. M6 设置页：已安装与市场视图、详情、安装与卸载、i18n、a11y。
 - [ ] 9. M7 审计"插件"类别、独立 skill 的"在访达中显示"。
 - [ ] 10. M8 后半：威胁映射、架构与 egress、S10、AGENTS.md；L4、截图；全量 verify 与 `dev-flow:spec-reviewer` 复核。

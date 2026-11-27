@@ -22,6 +22,8 @@ const NO_PARAMETERS = new Set([
   'resendSnapshots',
   'takeLaunchTargets',
   'detectProxy',
+  // The Pi package market (ADR-0102): refreshing takes no parameters.
+  'marketRefresh',
   // Voice dictation (ADR-0094).
   'dictationStatus',
   'speechDevices',

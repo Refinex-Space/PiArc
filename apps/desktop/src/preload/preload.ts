@@ -719,6 +719,20 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.packageUninstall, id, workspace)
       .then((value: unknown) => expectString(value)),
+  marketQuery: (query) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.marketQuery, query)
+      .then((value: unknown) => expectString(value)),
+  marketDetail: (name, workspace) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.marketDetail, name, workspace)
+      .then((value: unknown) => expectString(value)),
+  marketRefresh: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.marketRefresh).then((value: unknown) => expectString(value)),
+  marketInstall: (input) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.marketInstall, input)
+      .then((value: unknown) => expectString(value)),
   setOutputStyle: async (workspace, name) => {
     await ipcRenderer.invoke(IPC_CHANNELS.outputStyleSet, workspace, name);
   },

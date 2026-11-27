@@ -37,6 +37,7 @@ import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar, registerHostHandler } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
+import { registerMarketHandlers } from './core/market-ipc.js';
 import { registerMcpHandlers } from './core/mcp-ipc.js';
 import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
 import { registerGitHandlers } from './core/git-ipc.js';
@@ -501,6 +502,7 @@ function start(dirs: DataDirs): void {
     registerProxyHandlers(registerHandler, systemProxy);
     registerMcpHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
+    registerMarketHandlers(registerHandler, core.runtime);
     registerWorktreeHandlers(
       registerHandler,
       core.runtime,
