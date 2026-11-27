@@ -28,6 +28,7 @@
 mod browser_import;
 mod diagnostics;
 mod dictation;
+mod market;
 mod mcp;
 mod plugins;
 mod sessions;
@@ -130,6 +131,9 @@ pub struct CoreConfig {
     pub chrome: crate::browser::import::ChromeConfig,
     /// Voice dictation's assets and engine settings (ADR-0094).
     pub speech: crate::dictation::SpeechConfig,
+    /// The Pi package market's registry and limits (ADR-0102); development builds and tests
+    /// point it at a local registry.
+    pub market: crate::market::MarketConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -172,6 +176,7 @@ impl Default for CoreConfig {
             gh_program: None,
             chrome: crate::browser::import::ChromeConfig::default(),
             speech: crate::dictation::SpeechConfig::default(),
+            market: crate::market::MarketConfig::default(),
         }
     }
 }
@@ -633,6 +638,20 @@ fn state_secrets(config: &CoreConfig, data: &std::path::Path) -> SecretsService 
     }
 }
 
+fn market_of(
+    config: &CoreConfig,
+    storage: &Storage,
+    events: &EventSender,
+    cancel: &CancellationToken,
+) -> crate::market::Market {
+    crate::market::Market::new(
+        config.market.clone(),
+        storage.clone(),
+        events.clone(),
+        cancel.child_token(),
+    )
+}
+
 fn open_state(
     dirs: DataDirs,
     config: &CoreConfig,
@@ -699,6 +718,7 @@ fn open_state(
         diagnostics: crate::sessions::PreparedBundle::default(),
         proxy: Arc::new(crate::network::Proxy::starting(&data)),
         npm_lock: Arc::default(),
+        market: market_of(config, &storage, events, cancel),
         git: Arc::default(),
         browser: Arc::clone(&proxies),
         chrome: crate::browser::import::ChromeImports::new(

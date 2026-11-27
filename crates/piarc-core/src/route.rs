@@ -79,6 +79,13 @@ impl RouteKey {
         Self(Arc::from(crate::mcp::MCP_ROUTE))
     }
 
+    /// The route of the Pi package market's sync, kinds and installs (`core/market`,
+    /// ADR-0102).
+    #[must_use]
+    pub fn market() -> Self {
+        Self(Arc::from(crate::market::MARKET_ROUTE))
+    }
+
     /// The route of the Git panel's progress and repository changes (`core/git`, ADR-0085).
     #[must_use]
     pub fn git() -> Self {

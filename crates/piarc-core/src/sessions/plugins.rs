@@ -35,7 +35,7 @@ impl Hub {
     }
 
     /// Tells every running Agent Host to read its resources again.
-    async fn packages_changed(&self) {
+    pub(super) async fn packages_changed(&self) {
         let handles: Vec<_> = self
             .routes
             .lock()

@@ -90,6 +90,7 @@ pub mod identity;
 pub mod keychain_probe;
 pub mod managed;
 mod markdown_images;
+pub mod market;
 pub mod mcp;
 pub mod network;
 pub mod plugins;

@@ -110,6 +110,14 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - `TrustService::permission_settings` 在有 `plugins` 声明时读记录并 `set_packages`（`trust.rs` 的 `attach_packages`），hooks（`config_with` 的层 `plugin:<id>`）、MCP（`mcp.rs` 的 `plugin_sources`，作用域 `plugin`）、skills（`tool_io/skills.rs`）、子 agent（`tool_io/subagents.rs` 的 `definitions_in`）与 AHP `plugins/extensions`（`plugins::extensions`）都用这一份。信任视图把 `.piarc/` 开启的包的可执行项列为 `plugin:<id>` 项（`package_items`），信任时记为已确认（`confirm_listed_packages`），它们不计入新增项。
 - 测试：`cargo test -p piarc-core --lib plugins::`（npm 的进程与参数、postinstall 未运行；作用域、开关、卸载与审计；未信任项目与信任后加载；git 更新后新项不运行直到确认）。
 
+## Pi 包市场（`market`，ADR-0102，设计增补 `pi-package-market.md`）
+
+- `Market`（Hub 的 `Ctx.market`，`CoreConfig.market`）：目录只来自 `MarketConfig.registry`（发布构建为 `https://registry.npmjs.org`），请求经 `piarc_web::get` 的 `Getter`（`market/net.rs`：只连该主机、有生效代理一律 CONNECT、代理失败不改直连、网络错误与 `429`/`5xx` 按 `MarketLimits` 重试）。上限都在 `MarketLimits`。解析、清洗与名字版本校验在 `market/npm.rs`（字符串去控制字符并限长，双向控制字符留给渲染进程显示）。
+- 同步（`market/sync.rs`）：打开市场时索引旧于 `stale_after` 才在后台按页同步（每页 250、至多 21 页，npm 搜索的 `from` 过 5000 即回到第一页），每页写库并发 `core/market` 的 `sync`；整轮成功才 `market_end_index`，失败保留旧数据；之后按版本读 `/latest` 补全类型（`classify_concurrency` 个并发，失败即停，下次再补）。搜索词非空时 `Market::query` 先实时查 npm，失败退回本地匹配并带 `problem`。
+- 安装：`Hub::market_install`（`sessions/market.rs`）先核对缓存版本、读该版本文档（要有 sha512 integrity、依赖都是 registry 版本、不是纯主题），再 `PluginManager::install_market`（`plugins/market.rs`：`name@version --save-exact`，`npm_config_registry` 固定、用户与全局 npmrc 换成两个空文件，测试的 CA 经 `NODE_EXTRA_CA_CERTS`；装完 `check_staged` 核对名称、版本、integrity 与锁文件每个条目来自该 registry，不符则删前缀）；id 必须等于 npm 包名、类型必须是 Pi 包；审计行带 `origin: market`。
+- 包管理（ADR-0102 起）：新的 npm 安装每包一个前缀 `<数据目录>/pi/npm/pkgs/<键>/`（先装到 `.staging-*` 再改名，`fetch::prefix_key` 带哈希防碰撞），所有 npm 操作持 `Ctx.npm_lock`，npm 带用户的代理变量；旧的共用前缀里的包按 npm 包名卸载，更新时迁到新前缀；注册失败删除前缀；不同 id 落到同一插件数据目录时拒绝。
+- 测试：`cargo test -p piarc-core --lib market` 与 `--lib plugins`；端到端 `cargo test -p piarc-testkit --test market`（假 npm registry 与 CONNECT 代理，真实 npm）。开发构建的 `createForTests` 读 `PIARC_TEST_MARKET_REGISTRY`（没设时指向 `https://registry.invalid`）、`PIARC_TEST_MARKET_CA`、`PIARC_TEST_MARKET_HOSTS`。
+
 ## 用量与成本（`usage`，T41，ADR-0059）
 
 - `usage.rs` 是计价的唯一实现：单价换成每 token 的皮美元（`Pricing`），没有分档按合计算、有分档逐请求选档（`calculateCost` 的规则，1 小时缓存写入按输入价两倍），`u128` 精确求和后才转美元；`PriceBook` 先用户的 `modelPrices` 后目录价，都没有为 `Unknown`（成本 `None`，报告标 `partial`）。`report` 沿 `subagent_parent` 把子会话计入主会话并单独列出，辅助调用按用途列出。共享向量 `tests/usage/cost-vectors.json` 由 pi-ai 的 `calculateCost` 算出，`usage_tests.rs` 与 `agent-host/src/providers/usage-costs.test.ts` 都按它核对。

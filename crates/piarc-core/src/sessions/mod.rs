@@ -42,6 +42,7 @@ mod git;
 mod hooks;
 mod inbound;
 mod login;
+mod market;
 mod mcp;
 mod memory;
 mod plugins;
@@ -176,6 +177,8 @@ pub(crate) struct Ctx {
     pub proxy: Arc<crate::network::Proxy>,
     /// One npm operation at a time across every package manager of this Core (ADR-0102).
     pub npm_lock: Arc<tokio::sync::Mutex<()>>,
+    /// The Pi package market (ADR-0102).
+    pub market: crate::market::Market,
     /// The Git panel's locks and operations (ADR-0085).
     pub git: Arc<crate::git::GitState>,
     /// The built-in browser's partition proxies (ADR-0088).

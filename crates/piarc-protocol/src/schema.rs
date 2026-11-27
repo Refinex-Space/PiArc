@@ -54,6 +54,11 @@ pub fn export_schema() -> Vec<(&'static str, Value)> {
     generator.subschema_for::<crate::plugins::PackagesList>();
     generator.subschema_for::<crate::plugins::PackageInstallRequest>();
     generator.subschema_for::<crate::plugins::PackageInstallResult>();
+    generator.subschema_for::<crate::market::MarketQuery>();
+    generator.subschema_for::<crate::market::MarketPage>();
+    generator.subschema_for::<crate::market::MarketDetail>();
+    generator.subschema_for::<crate::market::MarketInstallRequest>();
+    generator.subschema_for::<crate::market::MarketEvent>();
     generator.subschema_for::<crate::usage::UsageReport>();
     git_types(&mut generator);
     generator.subschema_for::<crate::browser::BrowserClientEvent>();

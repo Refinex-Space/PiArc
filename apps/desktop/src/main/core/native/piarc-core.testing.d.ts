@@ -118,6 +118,17 @@ export declare class CoreRuntime {
    * `SpeechModels` JSON. The main process asks natively before `delete`.
    */
   speechModelAction(modelId: string, action: string): Promise<string>;
+  /** One page of the market; `query_json` is a `MarketQuery`. Answers a `MarketPage`. */
+  marketQuery(queryJson: string): Promise<string>;
+  /** One package's details (`MarketDetail`) as `workspace` sees its installed state. */
+  marketDetail(name: string, workspace?: string | null): Promise<string>;
+  /** Syncs the catalog now, in the background (`MarketStatus`). */
+  marketRefresh(): Promise<string>;
+  /**
+   * Installs a market package (off); `request_json` is a `MarketInstallRequest`. Answers a
+   * `PackageInstallResult`.
+   */
+  marketInstall(requestJson: string): Promise<string>;
   /** Every configured MCP server of `workspace` with its state, as JSON text (`McpStatus`). */
   mcpStatus(workspace: string): Promise<string>;
   /** Connects MCP server `name` of `workspace` anew; its state as JSON text. */

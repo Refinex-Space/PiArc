@@ -17,6 +17,9 @@
 
 pub(crate) mod fetch;
 mod info;
+mod market;
+
+pub(crate) use market::MarketSpec;
 
 use std::collections::BTreeSet;
 use std::ffi::OsString;
@@ -110,6 +113,8 @@ struct Fetched {
     notes: Vec<String>,
     /// The per-package npm prefix (removed again when registering fails).
     prefix: Option<PathBuf>,
+    /// A market install: the package must be a Pi package whose id is this npm name.
+    expect: Option<String>,
 }
 
 impl PluginManager {
@@ -222,13 +227,30 @@ impl PluginManager {
     }
 
     async fn run_npm(&self, cwd: &Path, args: Vec<OsString>) -> Result<()> {
+        self.run_npm_with(cwd, args, Vec::new()).await
+    }
+
+    /// `run_npm` with `extra` added to npm's environment (last, so they win).
+    async fn run_npm_with(
+        &self,
+        cwd: &Path,
+        args: Vec<OsString>,
+        extra: Vec<(OsString, OsString)>,
+    ) -> Result<()> {
         let node = self.node.clone().ok_or_else(|| {
             failed(
                 ErrorKind::NotFound,
                 "Core has no bundled Node to run npm with",
             )
         })?;
-        let env = self.npm_env(&node).await;
+        let mut env = self.npm_env(&node).await;
+        env.retain(|(k, _)| {
+            !extra.iter().any(|(e, _)| {
+                e.to_string_lossy()
+                    .eq_ignore_ascii_case(&k.to_string_lossy())
+            })
+        });
+        env.extend(extra);
         let out = fetch::npm(&self.spawner, &node, cwd, env, &args).await?;
         if out.code == Some(0) {
             Ok(())
@@ -265,18 +287,35 @@ impl PluginManager {
         let _npm = self.npm_lock.lock().await;
         let workspace = scope_workspace(request.scope, request.workspace.as_deref())?;
         let fetched = self.fetch(&request).await;
+        self.finish_install(&request, workspace, fetched, None)
+            .await
+    }
+
+    /// Registers what was fetched, declares it off in the scope and writes the audit row
+    /// (`origin` added to it).
+    async fn finish_install(
+        &self,
+        request: &PackageInstallRequest,
+        workspace: Option<PathBuf>,
+        fetched: Result<Fetched>,
+        origin: Option<Value>,
+    ) -> Result<PackageInstallResult> {
         let outcome = match fetched {
-            Ok(fetched) => self.register(&request, fetched).await,
+            Ok(fetched) => self.register(request, fetched).await,
             Err(error) => Err(error),
         };
         let detail = |result: &str| {
-            json!({
+            let mut detail = json!({
                 "action": "install",
                 "source": source_name(request.kind),
                 "location": request.location,
                 "scope": request.scope,
                 "result": result,
-            })
+            });
+            if let (Some(Value::Object(extra)), Value::Object(map)) = (&origin, &mut detail) {
+                map.extend(extra.clone());
+            }
+            detail
         };
         match outcome {
             Ok((record, notes)) => {
@@ -286,6 +325,7 @@ impl PluginManager {
                 detail["id"] = json!(record.id);
                 detail["version"] = json!(record.version);
                 detail["commit"] = json!(record.commit);
+                detail["integrity"] = json!(record.integrity);
                 self.audit(workspace.as_deref(), detail).await;
                 let package = self.info(&record, workspace.as_deref()).await?;
                 Ok(PackageInstallResult {
@@ -296,8 +336,12 @@ impl PluginManager {
                 })
             }
             Err(error) => {
-                self.audit(workspace.as_deref(), detail(&format!("failed: {error}")))
-                    .await;
+                let reason = crate::market::npm::clean(&error.to_string(), 2048, false);
+                self.audit(
+                    workspace.as_deref(),
+                    detail(&format!("failed: {}", redact_urls(&reason))),
+                )
+                .await;
                 Err(error)
             }
         }
@@ -324,6 +368,7 @@ impl PluginManager {
                     integrity: None,
                     notes: Vec::new(),
                     prefix: None,
+                    expect: None,
                 })
             }
             PackageSourceKind::Git => {
@@ -361,6 +406,7 @@ impl PluginManager {
                     integrity: None,
                     notes,
                     prefix: None,
+                    expect: None,
                 })
             }
             PackageSourceKind::Npm => self.fetch_npm(&request.location).await,
@@ -413,6 +459,7 @@ impl PluginManager {
             version,
             integrity,
             prefix: Some(prefix),
+            expect: None,
         })
     }
 
@@ -459,6 +506,21 @@ impl PluginManager {
         }
     }
 
+    /// The npm name of every npm package, by id.
+    ///
+    /// # Errors
+    ///
+    /// The database failed.
+    pub(crate) async fn npm_names(&self) -> Result<std::collections::HashMap<String, String>> {
+        Ok(self
+            .records()
+            .await?
+            .iter()
+            .filter(|r| r.source_kind == "npm")
+            .filter_map(|r| Some((r.id.clone(), self.npm_name_of(r)?)))
+            .collect())
+    }
+
     async fn npm_installed(&self, name: &str) -> Result<bool> {
         Ok(self
             .records()
@@ -492,7 +554,17 @@ impl PluginManager {
         };
         let records = self.records().await?;
         let data = self.data();
-        let conflict = if records.iter().any(|r| r.id == manifest.id) {
+        let unexpected = fetched.expect.as_ref().and_then(|name| {
+            (manifest.id != *name || manifest.kind != PackageKind::PiPackage).then(|| {
+                format!(
+                    "{name} is not the Pi package it claims to be (id {:?}, {:?})",
+                    manifest.id, manifest.kind
+                )
+            })
+        });
+        let conflict = if let Some(reason) = unexpected {
+            Some(reason)
+        } else if records.iter().any(|r| r.id == manifest.id) {
             Some(format!(
                 "a package named {:?} is installed already",
                 manifest.id
@@ -904,6 +976,31 @@ pub(crate) async fn extensions(
         })
         .collect();
     Ok(PluginsExtensions { extensions })
+}
+
+/// `text` with the user information of URLs (`scheme://user:secret@host`) replaced, for audit
+/// rows of npm's errors.
+fn redact_urls(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(i) = rest.find("://") {
+        let (head, tail) = rest.split_at(i + 3);
+        out.push_str(head);
+        let end = tail
+            .find(|c: char| c.is_whitespace() || c == '/')
+            .unwrap_or(tail.len());
+        let authority = &tail[..end];
+        match authority.rfind('@') {
+            Some(at) => {
+                out.push_str("<redacted>@");
+                out.push_str(&authority[at + 1..]);
+            }
+            None => out.push_str(authority),
+        }
+        rest = &tail[end..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// `<prefix>/node_modules/<name>` (a scoped name is two directories).

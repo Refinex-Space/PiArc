@@ -14,6 +14,11 @@ export type ProtocolValue =
   | PackagesList
   | PackageInstallRequest
   | PackageInstallResult
+  | MarketQuery
+  | MarketPage
+  | MarketDetail
+  | MarketInstallRequest
+  | MarketEvent
   | UsageReport
   | BrowserClientEvent
   | BrowserRunAnswer
@@ -1335,6 +1340,43 @@ export type PackageScope = 'user' | 'project';
  * Where a package was installed from.
  */
 export type PackageSourceKind = 'directory' | 'git' | 'npm';
+/**
+ * The categories of the market (themes are not one: PiArc does not use Pi's themes).
+ */
+export type MarketCategory = 'all' | 'extension' | 'skill' | 'prompt';
+/**
+ * How the list is ordered.
+ */
+export type MarketSort = 'popular' | 'updated';
+/**
+ * A resource kind a package brings.
+ */
+export type MarketKind = ('extension' | 'skill' | 'prompt') | 'theme';
+/**
+ * The state of the catalog sync.
+ */
+export type MarketSyncState = 'idle' | 'syncing' | 'failed';
+/**
+ * An event on `core/market`.
+ */
+export type MarketEvent =
+  | {
+      status: MarketStatus;
+      type: 'sync';
+    }
+  | {
+      names: string[];
+      type: 'kinds';
+    }
+  | {
+      name: string;
+      problem?: MarketProblem | null;
+      /**
+       * `started`, `finished` or `failed`.
+       */
+      state: string;
+      type: 'install';
+    };
 /**
  * Where a model's price comes from.
  */
@@ -11166,6 +11208,198 @@ export interface PackageInstallResult {
    * The version before an update.
    */
   previousVersion?: string | null;
+}
+/**
+ * One page of the market.
+ */
+export interface MarketQuery {
+  category?: MarketCategory & string;
+  /**
+   * 1–100.
+   */
+  limit: number;
+  offset?: number;
+  /**
+   * Words to search for (at most 200 characters); empty to browse.
+   */
+  query?: string;
+  sort?: MarketSort & string;
+  /**
+   * The workspace the installed state is reported for.
+   */
+  workspace?: string | null;
+}
+/**
+ * One page of the market.
+ */
+export interface MarketPage {
+  counts: MarketCounts;
+  entries: MarketEntry[];
+  /**
+   * The search words were answered by the registry (otherwise from the cache only).
+   */
+  live: boolean;
+  status: MarketStatus;
+  /**
+   * Entries the query selects in its category.
+   */
+  total: number;
+}
+/**
+ * Entries per category of a query (theme-only and deprecated packages left out).
+ */
+export interface MarketCounts {
+  all: number;
+  extension: number;
+  prompt: number;
+  skill: number;
+}
+/**
+ * A package in the market.
+ */
+export interface MarketEntry {
+  /**
+   * Its current version is deprecated.
+   */
+  deprecated: boolean;
+  description: string;
+  downloadsMonthly: number;
+  /**
+   * npm flags it as insecure.
+   */
+  insecure: boolean;
+  installed?: MarketInstalled | null;
+  /**
+   * An install of it is running.
+   */
+  installing: boolean;
+  /**
+   * What it brings (empty: not known yet).
+   */
+  kinds: MarketKind[];
+  /**
+   * `kinds` come from the package's manifest (otherwise from its keywords).
+   */
+  kindsFromManifest: boolean;
+  /**
+   * The npm name.
+   */
+  name: string;
+  publisher: string;
+  /**
+   * Unix ms of the latest publish.
+   */
+  updated: number;
+  version: string;
+}
+/**
+ * An installed package a market entry corresponds to.
+ */
+export interface MarketInstalled {
+  enabled: boolean;
+  /**
+   * The package id (its npm name).
+   */
+  id: string;
+  /**
+   * Where it is declared for the workspace asked about (`None`: not declared there).
+   */
+  scope?: PackageScope | null;
+  /**
+   * A newer version in the catalog.
+   */
+  update?: string | null;
+  version?: string | null;
+}
+/**
+ * Where the catalog stands.
+ */
+export interface MarketStatus {
+  /**
+   * Index packages whose manifest was read, and all index packages.
+   */
+  classified: number;
+  /**
+   * Pages synced and pages to sync (a sync in progress).
+   */
+  done: number;
+  indexed: number;
+  /**
+   * Why the last sync or search failed.
+   */
+  problem?: MarketProblem | null;
+  state: MarketSyncState;
+  /**
+   * Unix ms of the last complete sync.
+   */
+  syncedAt?: number | null;
+  total: number;
+}
+/**
+ * A failure the market shows: a stable code (`network`, `proxy`, `tls`, `timeout`,
+ * `tooLarge`, `status`, `notFound`, `refused`) and a message.
+ */
+export interface MarketProblem {
+  code: string;
+  message: string;
+}
+/**
+ * One package's details.
+ */
+export interface MarketDetail {
+  /**
+   * Runtime dependencies by name.
+   */
+  dependencies: string[];
+  /**
+   * The deprecation message of the current version.
+   */
+  deprecatedMessage?: string | null;
+  entry: MarketEntry;
+  /**
+   * Dependencies not from the registry (the market refuses to install the package).
+   */
+  foreignDependencies: string[];
+  homepageUrl?: string | null;
+  /**
+   * Install scripts the package declares (PiArc never runs them).
+   */
+  installScripts: string[];
+  keywords: string[];
+  license?: string | null;
+  npmUrl?: string | null;
+  /**
+   * Why the details are incomplete (offline: the cached entry only).
+   */
+  problem?: MarketProblem | null;
+  /**
+   * The README (Markdown, at most 256 KiB).
+   */
+  readme?: string | null;
+  /**
+   * The package document was too large to read; see npm.
+   */
+  readmeTooLarge: boolean;
+  readmeTruncated: boolean;
+  repositoryUrl?: string | null;
+}
+/**
+ * Installs one market package (off) through the extension package manager.
+ */
+export interface MarketInstallRequest {
+  /**
+   * The npm name.
+   */
+  name: string;
+  scope: PackageScope;
+  /**
+   * An exact version the catalog lists.
+   */
+  version: string;
+  /**
+   * Required for the project scope.
+   */
+  workspace?: string | null;
 }
 /**
  * Usage of every session (or one workspace's).

@@ -11369,6 +11369,474 @@
       "required": ["provider"],
       "type": "object"
     },
+    "MarketCategory": {
+      "description": "The categories of the market (themes are not one: PiArc does not use Pi's themes).",
+      "enum": ["all", "extension", "skill", "prompt"],
+      "type": "string"
+    },
+    "MarketCounts": {
+      "description": "Entries per category of a query (theme-only and deprecated packages left out).",
+      "properties": {
+        "all": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "extension": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "prompt": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "skill": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["all", "extension", "skill", "prompt"],
+      "type": "object"
+    },
+    "MarketDetail": {
+      "description": "One package's details.",
+      "properties": {
+        "dependencies": {
+          "description": "Runtime dependencies by name.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "deprecatedMessage": {
+          "description": "The deprecation message of the current version.",
+          "type": ["string", "null"]
+        },
+        "entry": {
+          "$ref": "#/$defs/MarketEntry"
+        },
+        "foreignDependencies": {
+          "description": "Dependencies not from the registry (the market refuses to install the package).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "homepageUrl": {
+          "type": ["string", "null"]
+        },
+        "installScripts": {
+          "description": "Install scripts the package declares (PiArc never runs them).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "license": {
+          "type": ["string", "null"]
+        },
+        "npmUrl": {
+          "type": ["string", "null"]
+        },
+        "problem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarketProblem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the details are incomplete (offline: the cached entry only)."
+        },
+        "readme": {
+          "description": "The README (Markdown, at most 256 KiB).",
+          "type": ["string", "null"]
+        },
+        "readmeTooLarge": {
+          "description": "The package document was too large to read; see npm.",
+          "type": "boolean"
+        },
+        "readmeTruncated": {
+          "type": "boolean"
+        },
+        "repositoryUrl": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": [
+        "entry",
+        "keywords",
+        "readmeTruncated",
+        "readmeTooLarge",
+        "installScripts",
+        "foreignDependencies",
+        "dependencies"
+      ],
+      "type": "object"
+    },
+    "MarketEntry": {
+      "description": "A package in the market.",
+      "properties": {
+        "deprecated": {
+          "description": "Its current version is deprecated.",
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "downloadsMonthly": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "insecure": {
+          "description": "npm flags it as insecure.",
+          "type": "boolean"
+        },
+        "installed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarketInstalled"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "installing": {
+          "description": "An install of it is running.",
+          "type": "boolean"
+        },
+        "kinds": {
+          "description": "What it brings (empty: not known yet).",
+          "items": {
+            "$ref": "#/$defs/MarketKind"
+          },
+          "type": "array"
+        },
+        "kindsFromManifest": {
+          "description": "`kinds` come from the package's manifest (otherwise from its keywords).",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "The npm name.",
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "updated": {
+          "description": "Unix ms of the latest publish.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "description",
+        "publisher",
+        "downloadsMonthly",
+        "updated",
+        "kinds",
+        "kindsFromManifest",
+        "insecure",
+        "deprecated",
+        "installing"
+      ],
+      "type": "object"
+    },
+    "MarketEvent": {
+      "description": "An event on `core/market`.",
+      "oneOf": [
+        {
+          "description": "The catalog sync advanced, finished or failed.",
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/MarketStatus"
+            },
+            "type": {
+              "const": "sync",
+              "type": "string"
+            }
+          },
+          "required": ["type", "status"],
+          "type": "object"
+        },
+        {
+          "description": "Manifests of these packages were read: their kinds may have changed.",
+          "properties": {
+            "names": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "kinds",
+              "type": "string"
+            }
+          },
+          "required": ["type", "names"],
+          "type": "object"
+        },
+        {
+          "description": "An install started, finished or failed.",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "problem": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MarketProblem"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "description": "`started`, `finished` or `failed`.",
+              "type": "string"
+            },
+            "type": {
+              "const": "install",
+              "type": "string"
+            }
+          },
+          "required": ["type", "name", "state"],
+          "type": "object"
+        }
+      ]
+    },
+    "MarketInstallRequest": {
+      "description": "Installs one market package (off) through the extension package manager.",
+      "properties": {
+        "name": {
+          "description": "The npm name.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/PackageScope"
+        },
+        "version": {
+          "description": "An exact version the catalog lists.",
+          "type": "string"
+        },
+        "workspace": {
+          "description": "Required for the project scope.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["name", "version", "scope"],
+      "type": "object"
+    },
+    "MarketInstalled": {
+      "description": "An installed package a market entry corresponds to.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "id": {
+          "description": "The package id (its npm name).",
+          "type": "string"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where it is declared for the workspace asked about (`None`: not declared there)."
+        },
+        "update": {
+          "description": "A newer version in the catalog.",
+          "type": ["string", "null"]
+        },
+        "version": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["id", "enabled"],
+      "type": "object"
+    },
+    "MarketKind": {
+      "description": "A resource kind a package brings.",
+      "oneOf": [
+        {
+          "enum": ["extension", "skill", "prompt"],
+          "type": "string"
+        },
+        {
+          "const": "theme",
+          "description": "Pi's terminal themes: listed in a package's details, never used by PiArc.",
+          "type": "string"
+        }
+      ]
+    },
+    "MarketPage": {
+      "description": "One page of the market.",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/MarketCounts"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/MarketEntry"
+          },
+          "type": "array"
+        },
+        "live": {
+          "description": "The search words were answered by the registry (otherwise from the cache only).",
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/MarketStatus"
+        },
+        "total": {
+          "description": "Entries the query selects in its category.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["entries", "total", "counts", "status", "live"],
+      "type": "object"
+    },
+    "MarketProblem": {
+      "description": "A failure the market shows: a stable code (`network`, `proxy`, `tls`, `timeout`,\n`tooLarge`, `status`, `notFound`, `refused`) and a message.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": ["code", "message"],
+      "type": "object"
+    },
+    "MarketQuery": {
+      "description": "One page of the market.",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/MarketCategory",
+          "default": "all"
+        },
+        "limit": {
+          "description": "1–100.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "query": {
+          "default": "",
+          "description": "Words to search for (at most 200 characters); empty to browse.",
+          "type": "string"
+        },
+        "sort": {
+          "$ref": "#/$defs/MarketSort",
+          "default": "popular"
+        },
+        "workspace": {
+          "description": "The workspace the installed state is reported for.",
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["limit"],
+      "type": "object"
+    },
+    "MarketSort": {
+      "description": "How the list is ordered.",
+      "oneOf": [
+        {
+          "const": "popular",
+          "description": "Monthly downloads, then name.",
+          "type": "string"
+        },
+        {
+          "const": "updated",
+          "description": "Latest publish, then name.",
+          "type": "string"
+        }
+      ]
+    },
+    "MarketStatus": {
+      "description": "Where the catalog stands.",
+      "properties": {
+        "classified": {
+          "description": "Index packages whose manifest was read, and all index packages.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "done": {
+          "description": "Pages synced and pages to sync (a sync in progress).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "indexed": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "problem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MarketProblem"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why the last sync or search failed."
+        },
+        "state": {
+          "$ref": "#/$defs/MarketSyncState"
+        },
+        "syncedAt": {
+          "description": "Unix ms of the last complete sync.",
+          "format": "int64",
+          "type": ["integer", "null"]
+        },
+        "total": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["state", "done", "total", "classified", "indexed"],
+      "type": "object"
+    },
+    "MarketSyncState": {
+      "description": "The state of the catalog sync.",
+      "enum": ["idle", "syncing", "failed"],
+      "type": "string"
+    },
     "McpAvailability": {
       "description": "Whether a configured server may be connected, before any connection is tried.",
       "oneOf": [

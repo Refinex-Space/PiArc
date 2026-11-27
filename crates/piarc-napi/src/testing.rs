@@ -56,6 +56,34 @@ fn test_speech(mut config: piarc_core::CoreConfig) -> piarc_core::CoreConfig {
     config
 }
 
+/// The market of development builds (ADR-0102): the registry is `PIARC_TEST_MARKET_REGISTRY`,
+/// or an address that resolves nowhere, so a test that forgot to set it fails instead of
+/// reaching the real registry; `PIARC_TEST_MARKET_CA` (a PEM file) is the only CA Core and npm
+/// trust for it, and `PIARC_TEST_MARKET_HOSTS` (comma-separated names) resolve to loopback.
+fn test_market() -> piarc_core::market::MarketConfig {
+    let registry = std::env::var("PIARC_TEST_MARKET_REGISTRY")
+        .unwrap_or_else(|_| "https://registry.invalid".to_owned());
+    let ca_file = std::env::var_os("PIARC_TEST_MARKET_CA").map(std::path::PathBuf::from);
+    let test_net = ca_file
+        .as_ref()
+        .map(|file| piarc_core::market::MarketTestNet {
+            ca_pem: std::fs::read(file).unwrap_or_default(),
+            ca_file: Some(file.clone()),
+            loopback: std::env::var("PIARC_TEST_MARKET_HOSTS")
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_owned)
+                .collect(),
+        });
+    piarc_core::market::MarketConfig {
+        registry,
+        test_net,
+        ..piarc_core::market::MarketConfig::default()
+    }
+}
+
 #[napi]
 impl CoreRuntime {
     /// Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
@@ -97,6 +125,7 @@ impl CoreRuntime {
                     .map(str::to_owned)
                     .collect();
             }
+            config.market = test_market();
             if let Ok(list) = std::env::var("PIARC_TEST_SEARCH_ENDPOINTS") {
                 config.web.search_endpoints = list
                     .split(',')
