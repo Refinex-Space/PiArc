@@ -301,6 +301,51 @@ async fn the_question_form_times_out_on_the_injected_clock() {
 }
 
 #[tokio::test]
+async fn a_reply_in_the_conversation_declines_a_plan_and_nothing_else() {
+    use piarc_protocol::policy::AnswerVia;
+    let f = Fixture::new().await;
+    f.io.changed_mode(SESSION, PermissionMode::Plan)
+        .await
+        .expect("mode");
+    let (result, ()) = tokio::join!(
+        f.evaluate("exit", "ExitPlanMode", json!({"plan": PLAN})),
+        async {
+            let card = f.pending().await;
+            let mut reply = answer(&card, ApprovalDecision::Deny);
+            reply.via = Some(AnswerVia::Conversation);
+            // The message is the feedback: a reply carries none of its own.
+            let mut with_feedback = reply.clone();
+            with_feedback.feedback = Some("More".into());
+            assert!(f.io.answer_approval(with_feedback).await.is_err());
+            assert_eq!(
+                f.io.answer_approval(reply).await.expect("answer")["status"],
+                "applied"
+            );
+        }
+    );
+    assert_eq!(result["allowed"], false);
+    let reason = result["reason"].as_str().expect("reason");
+    assert!(
+        reason.contains("message comes right after this result"),
+        "{reason}"
+    );
+    assert_eq!(f.mode(), PermissionMode::Plan);
+    // Any other card is answered on the card: the question form refuses the origin.
+    let (form, ()) = tokio::join!(f.ask(questions()), async {
+        let card = f.pending().await;
+        let mut reply = answer(&card, ApprovalDecision::Deny);
+        reply.via = Some(AnswerVia::Conversation);
+        assert!(f.io.answer_approval(reply).await.is_err());
+        let close = answer(&card, ApprovalDecision::Deny);
+        assert_eq!(
+            f.io.answer_approval(close).await.expect("answer")["status"],
+            "applied"
+        );
+    });
+    assert!(form.is_ok());
+}
+
+#[tokio::test]
 async fn without_a_timeout_the_form_waits_and_closing_it_declines() {
     let clock = ManualClock::new();
     let f = Fixture::with_clock(Arc::clone(&clock)).await;

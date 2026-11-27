@@ -20,20 +20,37 @@ export function commentsOf(request: ApprovalRequest) {
 }
 
 /**
- * Sends `steer` (the user's message as a steering input), then declines `request` as a reply in
- * the conversation. A failed steer leaves the plan waiting; the caller reports it.
+ * How a reply went: the message did not go (`notSent`: the draft stays), or it went and the plan
+ * was sent back (`answered`, with the ledger's outcome) or was not (`notAnswered`: the plan still
+ * waits, the message is queued behind it).
  */
+export type PlanReply =
+  | { readonly kind: 'notSent'; readonly error: unknown }
+  | { readonly kind: 'answered'; readonly outcome: AnswerOutcome }
+  | { readonly kind: 'notAnswered'; readonly error: unknown };
+
+/** Sends `steer` (the user's message as a steering input), then declines `request` as a reply in
+ * the conversation. Nothing is declined when the message did not go. */
 export async function replyToPlan(
   request: ApprovalRequest,
   steer: () => Promise<void>,
-): Promise<AnswerOutcome> {
-  await steer();
+  answer: typeof answerRequest = answerRequest,
+): Promise<PlanReply> {
+  try {
+    await steer();
+  } catch (error) {
+    return { kind: 'notSent', error };
+  }
   const comments = commentsOf(request);
-  const outcome = await answerRequest(request, {
-    decision: 'deny',
-    via: 'conversation',
-    ...(comments.length === 0 ? {} : { comments }),
-  });
-  if (outcome === 'applied') planComments.clear(request.requestId);
-  return outcome;
+  try {
+    const outcome = await answer(request, {
+      decision: 'deny',
+      via: 'conversation',
+      ...(comments.length === 0 ? {} : { comments }),
+    });
+    if (outcome === 'applied') planComments.clear(request.requestId);
+    return { kind: 'answered', outcome };
+  } catch (error) {
+    return { kind: 'notAnswered', error };
+  }
 }

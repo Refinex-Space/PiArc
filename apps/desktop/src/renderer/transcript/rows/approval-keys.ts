@@ -28,6 +28,18 @@ export function typedElsewhere(field: {
   return field.editable && !field.inCard && !field.inComposer;
 }
 
+/**
+ * Mod+Enter and Mod+Shift+Enter typed into a composer that holds a draft send or queue the draft:
+ * they reach the composer and answer no approval (ADR-0103: the user replies to a plan from the
+ * composer). From an empty composer, or anywhere else, they answer the first visible card.
+ */
+export function draftKeeps(
+  key: ApprovalKey,
+  field: { inComposer: boolean; composerEmpty: boolean },
+): boolean {
+  return key !== 'deny' && field.inComposer && !field.composerEmpty;
+}
+
 export function canAnswerByKey(
   key: ApprovalKey,
   state: {

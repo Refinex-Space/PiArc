@@ -514,10 +514,19 @@ export function Conversation({
         // Queueing (Mod+Enter) waits for the turn as always; sending or steering answers the plan.
         const plan = planRequest.current;
         if (plan !== undefined && intent !== 'queue') {
-          replyToPlan(plan, () => input.add('steer', draft)).catch((failure: unknown) => {
-            setError(t('composer.failed', { reason: reason(failure) }));
+          // The draft clears only once the message went; a plan that was not sent back says so.
+          return replyToPlan(plan, () => input.add('steer', draft)).then((reply) => {
+            if (reply.kind === 'notSent') {
+              setError(t('composer.failed', { reason: reason(reply.error) }));
+              return false;
+            }
+            if (reply.kind === 'notAnswered') {
+              setError(t('plan.reply.notAnswered', { reason: reason(reply.error) }));
+            } else if (reply.outcome === 'handled') {
+              setError(t('plan.reply.handled'));
+            }
+            return true;
           });
-          return true;
         }
         if (intent === 'send') {
           void input.send(draft);

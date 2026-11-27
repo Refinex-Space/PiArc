@@ -78,11 +78,16 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
   const revise = () => {
     focusComposer(card.current);
   };
-  useApprovalKeys(card, (key) => {
-    if (key === 'allowOnce') answer('acceptEdits');
-    else if (key === 'allowSession') answer('default');
-    else revise();
-  });
+  useApprovalKeys(
+    card,
+    (key) => {
+      if (key === 'allowOnce') answer('acceptEdits');
+      else if (key === 'allowSession') answer('default');
+      else revise();
+    },
+    undefined,
+    true,
+  );
 
   return (
     <section

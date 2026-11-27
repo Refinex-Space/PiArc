@@ -2144,6 +2144,9 @@ textarea.input {
   user-select: text;
   overflow-wrap: anywhere;
 }
+:root[data-app] .plan-doc:focus {
+  outline: none;
+}
 :root[data-app] .plan-doc > * {
   max-width: 72ch;
   margin-inline: auto;

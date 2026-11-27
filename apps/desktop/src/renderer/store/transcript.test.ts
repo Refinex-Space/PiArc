@@ -373,4 +373,20 @@ describe('SessionTranscript running state from the session snapshot', () => {
     transcript.syncStatus('running', performance.now() + 10_000);
     expect(transcript.turnInfo().running).toBe(true);
   });
+
+  it('ends a turn it saw start once Core reports it over and the end event was lost', () => {
+    const transcript = new SessionTranscript();
+    transcript.apply([note('turn/started', { turnId: 't1' })]);
+    transcript.syncStatus('idle', performance.now() + 10_000);
+    expect(transcript.turnInfo().running).toBe(false);
+    expect(transcript.needsReload()).toBe(true);
+  });
+
+  it('does not adopt a turn while its own prompt is on its way', () => {
+    const transcript = new SessionTranscript();
+    transcript.addOptimistic('c1', { text: 'Plan it', mentions: [], attachments: [] });
+    transcript.syncStatus('running');
+    expect(transcript.turnInfo().running).toBe(false);
+    expect(transcript.needsReload()).toBe(false);
+  });
 });

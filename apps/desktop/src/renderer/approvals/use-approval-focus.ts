@@ -39,7 +39,11 @@ export function guardedKey(key: string, ageMs: number): boolean {
 // From the start: a composition may begin before the first card appears.
 if (typeof window !== 'undefined') trackComposition();
 
-export function useApprovalFocus(card: RefObject<HTMLElement | null>): void {
+export function useApprovalFocus(
+  card: RefObject<HTMLElement | null>,
+  /** The card invites a reply in the composer (a plan, ADR-0103): typing there keeps its focus. */
+  yieldToComposer = false,
+): void {
   useEffect(() => {
     const el = card.current;
     if (el === null) return;
@@ -53,6 +57,7 @@ export function useApprovalFocus(card: RefObject<HTMLElement | null>): void {
     el.addEventListener('keydown', guard, true);
     el.addEventListener('keyup', guard, true);
     const move = () => {
+      if (yieldToComposer && document.activeElement?.closest('.composer') != null) return;
       if (el.isConnected && document.querySelector('[data-approval-card]') === el) {
         el.focus({ preventScroll: true });
       }
@@ -77,5 +82,5 @@ export function useApprovalFocus(card: RefObject<HTMLElement | null>): void {
       el.removeEventListener('keyup', guard, true);
       waiting?.();
     };
-  }, [card]);
+  }, [card, yieldToComposer]);
 }

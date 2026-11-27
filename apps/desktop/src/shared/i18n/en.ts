@@ -404,6 +404,10 @@ export const en = {
   'plan.comments': '{count, plural, one {# comment} other {# comments}}',
   'plan.expand': 'Show the whole plan',
   'plan.collapse': 'Show less',
+  'plan.reply.notAnswered':
+    'Your message is queued, but the plan was not sent back: {reason}. Answer the plan card.',
+  'plan.reply.handled':
+    'The plan card had already changed; your message is queued. Check the plan card.',
   'plan.comment.label': 'Comment on the selection',
   'plan.comment.placeholder': 'Add a comment',
   'plan.comment.save': 'Save comment',

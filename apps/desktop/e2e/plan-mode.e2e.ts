@@ -99,6 +99,42 @@ test('a reply in the composer revises the plan, and comments on the rendered pla
   await expect(page.getByTestId('plan-text')).not.toContainText('**');
   await shoot(page, info, 'plan-review-card');
 
+  // The page cannot claim a notification answered the card; only `conversation` is its origin.
+  const ids = {
+    requestId: (await card.getAttribute('data-request-id')) ?? '',
+    sessionId: (await page.getByTestId('conversation').getAttribute('data-session-id')) ?? '',
+  };
+  const forged = await page.evaluate(
+    async ({ requestId, sessionId }) =>
+      window.piarc
+        .answerApproval({
+          requestId,
+          sessionId,
+          revision: 1,
+          connectionEpoch: 1,
+          decision: 'deny',
+          via: 'notification',
+        })
+        .then(
+          () => 'answered',
+          (error: unknown) => (error instanceof Error ? error.message : 'refused'),
+        ),
+    ids,
+  );
+  expect(forged).toContain('invalid answer origin');
+  await expect(card).toHaveCount(1);
+
+  // Mod+Enter in the composer with a draft queues it; it does not approve the plan.
+  await page.getByTestId('composer-input').click();
+  await page.keyboard.type('Also keep the old helper.');
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await expect(page.getByTestId('queue-item')).toHaveCount(1);
+  await expect(card).toHaveCount(1);
+  await expect(page.getByTestId('permission-mode')).toHaveText(/Plan/u);
+  await page.getByTestId('queue-item').hover();
+  await page.getByTestId('queue-delete').click();
+  await expect(page.getByTestId('queue-item')).toHaveCount(0);
+
   // A reply from the composer: the plan is sent back with it, the message follows the plan.
   await send(page, 'Add the failing test first, as its own file.');
   await expect(page.locator('[data-testid="plan-row"][data-status="declined"]')).toHaveCount(1, {

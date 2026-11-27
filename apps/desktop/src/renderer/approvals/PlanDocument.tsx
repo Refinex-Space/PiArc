@@ -16,6 +16,7 @@ import {
 
 import { useT } from '../app/app-context.js';
 import { projectFileRoot, projectPath } from '../files/file-path.js';
+import type { MarkdownDocument } from '../files/markdown/document-model.js';
 import { useParsedDocument } from '../files/markdown/use-parsed-document.js';
 import { useUi } from '../shell/ui.js';
 import { useSession, useStore } from '../store/hooks.js';
@@ -38,6 +39,14 @@ function caretAt(doc: Document, x: number, y: number): { node: Node; offset: num
   const position = doc.caretPositionFromPoint(x, y);
   if (position !== null) return { node: position.offsetNode, offset: position.offset };
   return undefined;
+}
+
+/**
+ * Whether the rendered blocks show the whole plan: front matter and footnote definitions are not
+ * blocks, and a plan too large for the renderer is plain; such a plan shows as its source text.
+ */
+function renderable(document: MarkdownDocument): boolean {
+  return !document.plain && document.fields.length === 0 && document.notes.length === 0;
 }
 
 /** The rectangle the comment field sits against: the passage's last line, and its first line's
@@ -149,13 +158,16 @@ export function PlanDocument({
   }, [comments, editor, plan, document, domVersion]);
 
   const reviewing = requestId !== undefined;
+  // The open field holds text the user has not saved: a new selection does not replace it.
+  const unsaved = useRef(false);
   const pick = useCallback(() => {
     const element = root.current;
     const selection = element?.ownerDocument.getSelection();
     if (!reviewing || element === null || !selection || selection.isCollapsed) return;
-    if (selection.rangeCount === 0) return;
+    if (selection.rangeCount === 0 || unsaved.current) return;
     const range = selection.getRangeAt(0);
-    if (!element.contains(range.commonAncestorContainer)) return;
+    // A selection that runs past the plan's text is clipped to it.
+    if (!range.intersectsNode(element)) return;
     const found = selectionToSource(element, range, plan);
     if (found === undefined) return;
     setError(undefined);
@@ -173,7 +185,7 @@ export function PlanDocument({
     const doc = element?.ownerDocument;
     if (!reviewing || element === null || doc === undefined) return;
     const selection = doc.getSelection();
-    if (selection !== null && !selection.isCollapsed) return;
+    if ((selection !== null && !selection.isCollapsed) || unsaved.current) return;
     const caret = caretAt(doc, event.clientX, event.clientY);
     const at =
       caret === undefined ? undefined : pointToSource(element, caret.node, caret.offset, plan);
@@ -190,10 +202,17 @@ export function PlanDocument({
       : passageRect(element, plan, editor.start, editor.end);
   }, [editor, plan]);
 
-  const close = useCallback(() => {
+  const dismiss = useCallback(() => {
+    unsaved.current = false;
     setEditor(undefined);
     setError(undefined);
   }, []);
+  // Closing from the field (Esc, save, delete) gives the keyboard back to the plan, where the
+  // passage was; a press elsewhere only dismisses it.
+  const close = useCallback(() => {
+    dismiss();
+    root.current?.focus({ preventScroll: true });
+  }, [dismiss]);
 
   const editing = editor?.kind === 'edit' ? comments.find((c) => c.id === editor.id) : undefined;
   return (
@@ -201,6 +220,7 @@ export function PlanDocument({
       <div
         ref={root}
         className="plan-doc"
+        tabIndex={-1}
         data-testid="plan-text"
         data-reviewing={reviewing}
         aria-busy={document === undefined && parsed?.error === undefined}
@@ -212,8 +232,8 @@ export function PlanDocument({
         }}
         onClick={clicked}
       >
-        {document === undefined || document.plain ? (
-          parsed?.error !== undefined || document?.plain === true ? (
+        {document === undefined || !renderable(document) ? (
+          parsed?.error !== undefined || document !== undefined ? (
             <pre className="plan-block plan-plain" data-src-start={0} data-src-end={plan.length}>
               {plan}
             </pre>
@@ -247,6 +267,10 @@ export function PlanDocument({
           editing={editing !== undefined}
           error={error}
           onClose={close}
+          onDismiss={dismiss}
+          onChange={(dirty) => {
+            unsaved.current = dirty;
+          }}
           onSave={(text) => {
             const saved =
               editor.kind === 'edit'

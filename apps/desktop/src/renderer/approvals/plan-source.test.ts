@@ -84,6 +84,40 @@ describe('plan source mapping', () => {
     );
   });
 
+  it('ignores blocks a selection only touches: a triple click, or a start at a block end', () => {
+    const root = render();
+    const heading = root.querySelector('h1');
+    const firstItem = root.querySelector('li');
+    if (heading?.firstChild == null || firstItem?.firstChild == null) throw new Error('none');
+    // A triple click on the heading ends at the start of the next block.
+    const triple = document.createRange();
+    triple.setStart(heading.firstChild, 0);
+    triple.setEnd(firstItem.firstChild, 0);
+    const title = selectionToSource(root, triple, PLAN);
+    if (title === undefined) throw new Error('no source range');
+    expect(PLAN.slice(title.start, title.end)).toBe('计划');
+    // A selection that starts at the end of the heading selects only the list's text.
+    const late = document.createRange();
+    late.setStart(heading.firstChild, 2);
+    late.setEnd(firstItem.firstChild, 4);
+    const read = selectionToSource(root, late, PLAN);
+    if (read === undefined) throw new Error('no source range');
+    expect(PLAN.slice(read.start, read.end)).toBe('Read');
+    // A selection running past the plan's text is clipped to it.
+    const outside = document.createElement('p');
+    outside.textContent = 'after the plan';
+    root.after(outside);
+    const past = document.createRange();
+    if (outside.firstChild === null) throw new Error('none');
+    past.setStart(firstItem.firstChild, 0);
+    past.setEnd(outside.firstChild, 5);
+    const tail = selectionToSource(root, past, PLAN);
+    if (tail === undefined) throw new Error('no source range');
+    expect(PLAN.slice(tail.start, tail.end)).toBe(
+      PLAN.slice(PLAN.indexOf('Read'), PLAN.indexOf('parse()') + 7),
+    );
+  });
+
   it('marks a comment where the rendered text shows it, across elements and blocks', () => {
     const root = render();
     const start = PLAN.indexOf('😀');

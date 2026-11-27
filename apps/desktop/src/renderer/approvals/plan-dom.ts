@@ -101,8 +101,10 @@ function blocksOf(root: Element): Element[] {
 }
 
 /**
- * The source range of `plan` that a selection `range` inside `root` shows, or undefined when it
- * shows none (outside the plan, empty, or only text the renderer added).
+ * The source range of `plan` that a selection `range` shows inside `root`, or undefined when it
+ * shows none (outside the plan, empty, or only text the renderer added). The selection may run
+ * past the plan's text (it is clipped to it), and a block it touches without selecting any of its
+ * text (a triple click ends at the start of the next block) adds nothing.
  */
 export function selectionToSource(
   root: Element,
@@ -110,22 +112,24 @@ export function selectionToSource(
   plan: string,
 ): { start: number; end: number } | undefined {
   const blocks = blocksOf(root).filter((block) => range.intersectsNode(block));
-  const first = blocks[0];
-  const last = blocks.at(-1);
-  if (first === undefined || last === undefined) return undefined;
-  const firstText = blockText(first, plan);
-  const lastText = blockText(last, plan);
-  if (firstText === undefined || lastText === undefined) return undefined;
-  const from =
-    blockOf(range.startContainer, root) === first
-      ? indexOf(firstText, range.startContainer, range.startOffset)
-      : 0;
-  const to =
-    blockOf(range.endContainer, root) === last
-      ? indexOf(lastText, range.endContainer, range.endOffset)
-      : lastText.length;
-  const start = sourceRange(firstText.map, from, first === last ? to : firstText.length)?.start;
-  const end = sourceRange(lastText.map, first === last ? from : 0, to)?.end;
+  let start: number | undefined;
+  let end: number | undefined;
+  for (const block of blocks) {
+    const text = blockText(block, plan);
+    if (text === undefined) continue;
+    const from =
+      blockOf(range.startContainer, root) === block
+        ? indexOf(text, range.startContainer, range.startOffset)
+        : 0;
+    const to =
+      blockOf(range.endContainer, root) === block
+        ? indexOf(text, range.endContainer, range.endOffset)
+        : text.length;
+    const found = sourceRange(text.map, from, to);
+    if (found === undefined) continue;
+    start ??= found.start;
+    end = found.end;
+  }
   return start === undefined || end === undefined || end <= start ? undefined : { start, end };
 }
 

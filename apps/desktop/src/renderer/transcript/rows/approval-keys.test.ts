@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { approvalKey, canAlwaysAllow, canAnswerByKey, typedElsewhere } from './approval-keys.js';
+import {
+  approvalKey,
+  canAlwaysAllow,
+  canAnswerByKey,
+  draftKeeps,
+  typedElsewhere,
+} from './approval-keys.js';
 const key = {
   key: 'Enter',
   altKey: false,
@@ -41,6 +47,15 @@ describe('approval shortcuts', () => {
     expect(canAnswerByKey('deny', { ...state, composerEmpty: false, cardFocused: true })).toBe(
       true,
     );
+  });
+  it('leaves send and queue keys to a draft in the composer (ADR-0103)', () => {
+    // Mod+Enter in a composer with a draft queues the draft; it does not approve a card.
+    expect(draftKeeps('allowOnce', { inComposer: true, composerEmpty: false })).toBe(true);
+    expect(draftKeeps('allowSession', { inComposer: true, composerEmpty: false })).toBe(true);
+    // An empty composer, or a key typed elsewhere, still answers the card; Esc stays the card's.
+    expect(draftKeeps('allowOnce', { inComposer: true, composerEmpty: true })).toBe(false);
+    expect(draftKeeps('allowOnce', { inComposer: false, composerEmpty: false })).toBe(false);
+    expect(draftKeeps('deny', { inComposer: true, composerEmpty: false })).toBe(false);
   });
   it('leaves keys typed into another text field to that field', () => {
     expect(typedElsewhere({ editable: true, inCard: false, inComposer: false })).toBe(true);

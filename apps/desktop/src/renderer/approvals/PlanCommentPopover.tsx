@@ -43,6 +43,8 @@ export function PlanCommentPopover({
   onSave,
   onDelete,
   onClose,
+  onDismiss,
+  onChange,
 }: {
   /** The document the plan is in (a popped-out tool has its own). */
   readonly host: Document;
@@ -55,13 +57,17 @@ export function PlanCommentPopover({
   readonly onSave: (text: string) => void;
   readonly onDelete?: (() => void) | undefined;
   readonly onClose: () => void;
+  /** A press outside the field while nothing new was typed (defaults to `onClose`). */
+  readonly onDismiss?: (() => void) | undefined;
+  /** Whether the field holds text that differs from what it started with. */
+  readonly onChange?: ((unsaved: boolean) => void) | undefined;
 }) {
   const t = useT();
   const box = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(initial);
-  const latest = useRef({ text, initial, onClose });
-  latest.current = { text, initial, onClose };
+  const latest = useRef({ text, initial, dismiss: onDismiss ?? onClose });
+  latest.current = { text, initial, dismiss: onDismiss ?? onClose };
   const [place, setPlace] = useState<{ left: number; top: number } | undefined>(undefined);
 
   useLayoutEffect(() => {
@@ -94,7 +100,7 @@ export function PlanCommentPopover({
     const press = (event: PointerEvent) => {
       if (event.target instanceof Node && element.contains(event.target)) return;
       const now = latest.current;
-      if (!now.text.trim() || now.text === now.initial) now.onClose();
+      if (!now.text.trim() || now.text === now.initial) now.dismiss();
     };
     element.ownerDocument.addEventListener('pointerdown', press, true);
     return () => {
@@ -129,6 +135,7 @@ export function PlanCommentPopover({
           data-testid="plan-comment-input"
           onChange={(event) => {
             setText(event.target.value);
+            onChange?.(event.target.value.trim() !== '' && event.target.value !== initial);
           }}
           onKeyDown={(event) => {
             if (isImeComposing(event.nativeEvent)) return;

@@ -395,6 +395,8 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'plan.comments': '{count} 条评论',
   'plan.expand': '展开全文',
   'plan.collapse': '收起',
+  'plan.reply.notAnswered': '消息已排队，但计划没有退回：{reason}。请在计划卡上作答。',
+  'plan.reply.handled': '计划卡已经变化，消息已排队。请查看计划卡。',
   'plan.comment.label': '评论所选内容',
   'plan.comment.placeholder': '添加评论',
   'plan.comment.save': '保存评论',

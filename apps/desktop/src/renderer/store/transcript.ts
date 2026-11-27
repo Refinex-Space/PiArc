@@ -153,8 +153,9 @@ const IDLE: TurnInfo = {
 };
 
 /**
- * How long after a turn ended here a `running` session snapshot is taken as stale rather than as
- * a turn this window missed (ms): the snapshot can trail the session's own events.
+ * How long a session snapshot is taken as stale next to the session's own events (ms): a
+ * `running` snapshot this soon after this window saw a turn end, and a non-running one this soon
+ * after it saw a turn start, trail those events rather than report a turn the window missed.
  */
 export const ADOPT_AFTER_MS = 1_500;
 
@@ -395,6 +396,8 @@ export class SessionTranscript {
   private adopted = false;
   /** When this window last saw a turn end (`performance.now()`). */
   private turnEndedAt = Number.NEGATIVE_INFINITY;
+  /** When this window saw the running turn start (`performance.now()`). */
+  private turnSeenAt = Number.NEGATIVE_INFINITY;
   private queueItems: readonly QueuedInput[] = [];
   private reload = false;
   /** Cache of `userTurns`, cleared when rows are added or removed. */
@@ -463,10 +466,16 @@ export class SessionTranscript {
   syncStatus(status: SessionStatus, now: number = performance.now()): void {
     const batch = new Batch();
     if (status === 'running') {
-      if (this.turn.running || now - this.turnEndedAt < ADOPT_AFTER_MS) return;
+      // This window's own prompt is on its way: its `turn/started` follows.
+      const sending = this.order.some((id) => {
+        const row = this.rows.get(id);
+        return row?.kind === 'optimistic' && row.state === 'sending';
+      });
+      if (this.turn.running || sending || now - this.turnEndedAt < ADOPT_AFTER_MS) return;
       this.turn = { ...IDLE, running: true };
       this.adopted = true;
-    } else if (this.adopted && this.turn.running) {
+    } else if (this.turn.running && (this.adopted || now - this.turnSeenAt >= ADOPT_AFTER_MS)) {
+      // An adopted turn, or one whose end this window missed (lost events), ends with Core's.
       this.turn = IDLE;
       this.adopted = false;
       this.turnEndedAt = now;
@@ -780,6 +789,7 @@ export class SessionTranscript {
       case 'turn/started':
         this.turn = { ...IDLE, running: true, turnId, startedAt: ts };
         this.adopted = false;
+        this.turnSeenAt = performance.now();
         batch.state = true;
         batch.list = true;
         break;

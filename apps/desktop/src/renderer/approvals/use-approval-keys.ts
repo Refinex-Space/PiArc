@@ -10,6 +10,7 @@ import { useApprovalFocus } from './use-approval-focus.js';
 import {
   approvalKey,
   canAnswerByKey,
+  draftKeeps,
   typedElsewhere,
   type ApprovalKey,
 } from '../transcript/rows/approval-keys.js';
@@ -34,10 +35,11 @@ export function useApprovalKeys(
   card: RefObject<HTMLElement | null>,
   onKey: (key: ApprovalKey) => void,
   skip: (key: ApprovalKey) => boolean = () => false,
+  yieldToComposer = false,
 ): void {
   const { keyPlatform } = useApp();
   // Every card calls this hook: it also takes focus when it appears (T43).
-  useApprovalFocus(card);
+  useApprovalFocus(card, yieldToComposer);
   const mountedAt = useRef(performance.now());
   const latest = useRef({ onKey, skip });
   latest.current = { onKey, skip };
@@ -74,6 +76,14 @@ export function useApprovalKeys(
       const input = composer?.querySelector('[contenteditable="true"]');
       const composerEmpty =
         !input?.textContent && !composer?.querySelector('.composer-attachments');
+      // A draft keeps its send and queue keys (a reply to a plan is typed there).
+      if (
+        draftKeeps(key, {
+          inComposer: target !== null && composer?.contains(target) === true,
+          composerEmpty,
+        })
+      )
+        return;
       // Consume the shortcut even during the guard: it must not fall through to stop/queue.
       ev.preventDefault();
       ev.stopPropagation();
