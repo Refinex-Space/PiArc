@@ -33,7 +33,7 @@ export type MenuItem = {
   readonly tooltip?: string;
   readonly shortcut?: string;
   /** A submenu the filter searches: a query lists its matching items in its place, each with
-   * this item's label in front of its hint. */
+   * this item's label in front of its hint (and this item's icon when it has none). */
   readonly searchable?: boolean;
 } & (
   | { readonly submenu: readonly MenuItem[]; readonly run?: never }
@@ -127,6 +127,7 @@ export function MenuPopup({
           if (child.submenu) return [];
           const found: MenuItem = {
             ...child,
+            icon: child.icon ?? item.icon,
             hint: child.hint ? `${item.label} · ${child.hint}` : item.label,
           };
           return matches(found) ? [found] : [];

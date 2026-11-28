@@ -172,4 +172,27 @@ describe('the checks fail on bad tokens', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('lets through only the provider marks locked in their sources.json (ADR-0107)', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'piarc tokens 标记-'));
+    try {
+      const marks = path.join(root, 'design', 'brand', 'providers');
+      await mkdir(marks, { recursive: true });
+      await mkdir(path.join(root, 'design', 'other'), { recursive: true });
+      await writeFile(
+        path.join(marks, 'sources.json'),
+        JSON.stringify({ files: { 'anthropic.svg': '0'.repeat(64) } }),
+      );
+      await writeFile(path.join(marks, 'anthropic.svg'), '<svg/>');
+      await writeFile(path.join(marks, 'claude.svg'), '<svg/>');
+      await writeFile(path.join(root, 'design', 'other', 'anthropic.svg'), '<svg/>');
+      const problems = await checkAssets(root, ['design']);
+      expect(problems.map((p) => p.split(':')[0]).sort()).toEqual([
+        path.join('design', 'brand', 'providers', 'claude.svg'),
+        path.join('design', 'other', 'anthropic.svg'),
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

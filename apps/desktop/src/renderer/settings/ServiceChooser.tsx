@@ -3,11 +3,11 @@
 // Picking an account starts its sign-in; picking anything else opens the provider form preset to
 // it. Configured providers are left out (a provider is configured once); a provider signed in
 // already stays, to add another account (ADR-0083).
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 
 import { useT } from '../app/app-context.js';
 import { Dialog } from '../shell/Dialog.js';
-import { ChevronRightIcon, SearchIcon } from '../shell/icons.js';
+import { ChevronRightIcon, ProviderMark, SearchIcon } from '../shell/icons.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import {
   CLOUD_PROVIDERS,
@@ -25,6 +25,8 @@ interface Item {
   readonly testId: string;
   readonly rowTestId?: string;
   readonly name: string;
+  /** The provider's mark (ADR-0107). */
+  readonly mark: ReactNode;
   readonly detail?: string;
   readonly badge?: string;
   readonly choice: ServiceChoice;
@@ -68,6 +70,7 @@ export function ServiceChooser({
           testId: `login-${p.id}`,
           rowTestId: `login-provider-${p.id}`,
           name: p.name,
+          mark: <ProviderMark provider={p} size={20} />,
           ...(p.signedIn
             ? { detail: t('providers.chooser.signedIn') }
             : p.label === p.name
@@ -85,6 +88,7 @@ export function ServiceChooser({
             key: p.id,
             testId: `provider-choice-${p.id}`,
             name: p.name,
+            mark: <ProviderMark provider={p} size={20} />,
             choice: { type: 'provider', kind: 'builtin', id: p.id },
           })),
       },
@@ -96,6 +100,7 @@ export function ServiceChooser({
             key: p.id,
             testId: `provider-choice-${p.id}`,
             name: p.name,
+            mark: <ProviderMark provider={p} size={20} />,
             choice: { type: 'provider', kind: 'cloud', id: p.id },
           })),
       },
@@ -105,6 +110,7 @@ export function ServiceChooser({
           key: kind,
           testId: `provider-choice-${kind}`,
           name: t(`providers.${kind}`),
+          mark: <ProviderMark provider={{ id: kind }} local={kind === 'local'} size={20} />,
           detail: t(`providers.chooser.${kind}Detail`),
           choice: { type: 'provider', kind, id: '' },
         })),
@@ -183,6 +189,9 @@ export function ServiceChooser({
                         onPick(item.choice);
                       }}
                     >
+                      <span className="service-item-mark" aria-hidden="true">
+                        {item.mark}
+                      </span>
                       <span className="service-item-text">
                         <span className="service-item-name">
                           {item.name}

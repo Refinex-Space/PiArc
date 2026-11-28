@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
-import { act } from 'react';
+import { act, isValidElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { encodeIpcError } from '../../shared/ipc-error.js';
 import type { MenuItem } from './Menu.js';
+import { ProviderMark } from './icons.js';
 import {
   keyOf,
   modelChoiceItems,
@@ -174,5 +175,36 @@ describe('modelChoiceItems', () => {
 
   it('has no rows without a catalog', () => {
     expect(modelChoiceItems(undefined, () => false, vi.fn())).toEqual([]);
+  });
+});
+
+/** The provider a row's mark (ADR-0107) draws, or undefined when the row has none. */
+function markOf(item: MenuItem | undefined): unknown {
+  const icon = item?.icon;
+  if (!isValidElement<{ provider: unknown }>(icon)) return undefined;
+  expect(icon.type).toBe(ProviderMark);
+  return icon.props.provider;
+}
+
+describe('modelChoiceItems marks', () => {
+  it('leads each provider row with its mark and leaves the submenu rows plain', () => {
+    const catalog = directory([model('deepseek', 'chat'), model('openai', 'gpt')], {
+      providers: [{ id: 'openai', name: 'OpenAI' }],
+    });
+    const items = modelChoiceItems(catalog, () => false, vi.fn());
+    expect(items.map(markOf)).toEqual([
+      { id: 'deepseek', name: undefined },
+      { id: 'openai', name: 'OpenAI' },
+    ]);
+    expect(items[0]?.submenu?.map((m) => m.icon)).toEqual([undefined]);
+  });
+
+  it("marks a single provider's model rows", () => {
+    const items = modelChoiceItems(
+      directory([model('deepseek-test', 'flash')]),
+      () => false,
+      vi.fn(),
+    );
+    expect(markOf(items[0])).toEqual({ id: 'deepseek-test', name: undefined });
   });
 });

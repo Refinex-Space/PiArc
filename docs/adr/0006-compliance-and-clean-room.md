@@ -1,6 +1,6 @@
 # 0006. 合规红线：禁用 Claude 订阅登录、clean-room、自有品牌
 
-- 状态：已接受（第 3、4 条的前端对标范围及视觉复刻的备选结论由 [ADR-0073](0073-settings-segmented-control-reference.md) 修订）
+- 状态：已接受（第 3、4 条的前端对标范围及视觉复刻的备选结论由 [ADR-0073](0073-settings-segmented-control-reference.md) 修订；第 4 条的 logo 限制由 [ADR-0107](0107-provider-brand-marks.md) 修订：标识 Anthropic 服务商时可以显示它的标记）
 - 日期：2026-11-14
 - 相关：架构文档第 10 章；`docs/research/REFERENCES.md`
 

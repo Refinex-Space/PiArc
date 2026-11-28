@@ -80,7 +80,7 @@ async function main() {
   console.log(
     brand.length === 0
       ? `brand: default accent ramp "${String(model.ramps.accent)}" outside the orange/terracotta hues; ` +
-          'system fonts only; no bundled fonts, sounds or other brands’ icons'
+          'system fonts only; no bundled fonts, sounds or other brands’ icons beyond the locked provider marks'
       : '',
   );
   failed ||= brand.length > 0;

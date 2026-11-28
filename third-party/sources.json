@@ -149,6 +149,22 @@
       "notes": "The licence covers the SVG file only, not the Pi name or logo as trademarks; see design/brand/README.md (requirement D3)."
     },
     {
+      "id": "lobe-icons-provider-marks",
+      "name": "LobeHub Icons (model provider marks)",
+      "version": "1.106.0",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/lobe-icons.LICENSE",
+      "copyright": "Copyright (c) 2023 LobeHub",
+      "source": {
+        "repository": "https://github.com/lobehub/lobe-icons",
+        "package": "@lobehub/icons-static-svg@1.106.0 (icons/, mono variants)",
+        "artefacts": "https://registry.npmjs.org/@lobehub/icons-static-svg/-/icons-static-svg-1.106.0.tgz (sha512 and per-file SHA-256 in design/brand/providers/sources.json)"
+      },
+      "usedBy": "design/brand/providers/*.svg (copied unmodified), generated into apps/desktop/src/renderer/shell/provider-marks.generated.ts by scripts/dev/gen-provider-marks.mjs: provider marks in the service chooser, connection list and model menus (ADR-0107)",
+      "addedBy": "provider marks (ADR-0107)",
+      "notes": "The licence covers the SVG files only; each mark is its owner's trademark, used to identify that provider (design/brand/README.md)."
+    },
+    {
       "id": "marklyra-image-validation",
       "name": "Marklyra local image asset validation",
       "version": "0.3.2",

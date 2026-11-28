@@ -81,6 +81,9 @@ export const BRAND_RULES = {
   ],
   /** Image and icon names that suggest another brand's assets (lower case substrings). */
   forbiddenAssetNames: ['claude', 'anthropic'],
+  /** The model providers' marks (ADR-0107): files listed in this directory's sources.json, each
+   * locked by its hash, are exempt from the name check. */
+  providerMarks: path.join('design', 'brand', 'providers'),
   /** Extensions the name check applies to: images and icons. */
   imageExtensions: ['.png', '.svg', '.icns', '.ico', '.jpg', '.jpeg', '.gif', '.webp'],
   /** Directories whose files ship with the app or define its look. */
@@ -854,6 +857,16 @@ export function checkBrand(model, sources) {
 export async function checkAssets(root, roots = BRAND_RULES.assetRoots) {
   /** @type {string[]} */
   const problems = [];
+  const marks = path.join(root, BRAND_RULES.providerMarks);
+  const lockedMarks = new Set();
+  try {
+    const lock = readJsonFile(path.join(marks, 'sources.json'));
+    if (isRecord(lock) && isRecord(lock.files)) {
+      for (const file of Object.keys(lock.files)) lockedMarks.add(path.join(marks, file));
+    }
+  } catch {
+    // No provider marks: nothing is exempt.
+  }
   /** @param {string} dir */
   const walk = async (dir) => {
     let dirents;
@@ -876,7 +889,11 @@ export async function checkAssets(root, roots = BRAND_RULES.assetRoots) {
         problems.push(`${shown}: fonts and sounds are not bundled (system fonts only)`);
       }
       const isImage = BRAND_RULES.imageExtensions.includes(path.extname(lower));
-      if (isImage && BRAND_RULES.forbiddenAssetNames.some((name) => lower.includes(name))) {
+      if (
+        isImage &&
+        !lockedMarks.has(full) &&
+        BRAND_RULES.forbiddenAssetNames.some((name) => lower.includes(name))
+      ) {
         problems.push(`${shown}: the file name suggests another brand's asset`);
       }
     }

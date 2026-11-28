@@ -14,6 +14,7 @@
 | `mark.svg` | 单独的 Pi 字形，跟随明暗模式反色；用于界面内 logo，以及菜单栏 / 托盘图标的源文件 |
 | `mark.LICENSE` | Pi 字形来源的 MIT 许可证（必须随资产保留） |
 | `trayTemplate.png`、`trayTemplate@2x.png`、`tray-light.ico`、`tray-dark.ico` | 菜单栏与托盘图标，由 `mark.svg` 导出（T35） |
+| `providers/*.svg`、`providers/sources.json` | 模型服务商的品牌标记（ADR-0107），来源与哈希见下文“服务商标记” |
 
 重新生成 macOS 图标（`icon.icns` 一步只能在 macOS 上执行，`--check` 比对已提交的文件）：
 
@@ -35,3 +36,13 @@ macOS 的 Dock 与访达把每个图标画在 1024 画布上，圆角方底宽 8
 - 这个字形就是 Pi 项目自己的 logo 造型（Pi 在终端中用珊瑚、蓝、黄三色绘制同一个 "P + i" 像素图形），PiArc 用的是黑白版本。thesvg 的 MIT 许可证只覆盖这份 SVG 文件，不授予 Pi 名称或 logo 的商标权利。公开发布前要确认是否需要 Pi 项目的许可，或改用派生标记（需求规格 D3）。
 - 构建产物的第三方许可证清单（`THIRD_PARTY_NOTICES`）要包含 `mark.LICENSE`。
 - 菜单栏 / 托盘图标由 `node scripts/dev/export-tray-icons.mjs` 从 `mark.svg` 导出（T35）：`trayTemplate.png`、`trayTemplate@2x.png`（16、32 px，黑色加透明的 macOS template 图）与 `tray-light.ico`（黑）、`tray-dark.ico`（白，深色任务栏）（Windows，16–48 px 的 PNG 条目）。改了 `mark.svg` 后重新导出并提交，`--check` 比对已提交的文件。打包时作为 `Resources/` 下的资源。
+
+## 服务商标记
+
+`providers/` 中的 33 个 SVG 是模型服务商的品牌标记，只用于在"添加服务"、连接列表与模型菜单中标识对应的服务商（ADR-0107）。
+
+- **来源**：LobeHub Icons（<https://github.com/lobehub/lobe-icons>，图标站 <https://icons.lobehub.com/>）的 npm 包 `@lobehub/icons-static-svg@1.106.0`，取包内 `icons/` 下的 mono 版，文件未做任何修改。tarball 地址、sha512 与每个文件的 SHA-256 记在 `providers/sources.json`。
+- **许可证**：MIT，Copyright (c) 2023 LobeHub，全文见 `third-party/licenses/lobe-icons.LICENSE`，在 `third-party/sources.json` 中登记为 `lobe-icons-provider-marks`。发布构建的 `THIRD_PARTY_NOTICES` 必须包含它。
+- **商标**：各标记是对应公司的商标，归其所有者。MIT 许可只覆盖 SVG 文件，不授予商标权利。PiArc 与这些公司没有关联，也未获其认可，使用标记只为标识用户连接的服务。
+- **Radius**：Pi 自己的服务，沿用本目录的 `mark.svg`（来源见上文）。
+- **生成**：`node scripts/dev/gen-provider-marks.mjs` 先核对每个文件的哈希，再生成 `apps/desktop/src/renderer/shell/provider-marks.generated.ts`。加一个标记时，从同一版本的包里取文件，把它的 SHA-256 写进 `sources.json`，在 `shell/provider-marks.ts` 里加识别规则，然后运行脚本。升级包版本时，`version`、`integrity` 与全部哈希一起更新。`--check` 比对已提交的输出，Vitest 也会比对。

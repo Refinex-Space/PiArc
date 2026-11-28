@@ -1697,10 +1697,23 @@ textarea.input {
   color: var(--piarc-text-secondary);
 }
 
-/* A provider turned off (ADR-0083): its name and details recede; the controls stay usable. */
-.provider-list > li.is-off > div:first-child {
+/* A provider turned off (ADR-0083): its mark, name and details recede; the controls stay usable. */
+.provider-list > li.is-off > :is(.provider-row-mark, div:first-of-type) {
   opacity: 0.6;
   transition: opacity var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.service-item-mark,
+.provider-row-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-primary);
 }
 
 .provider-list > li > .preference-switch {

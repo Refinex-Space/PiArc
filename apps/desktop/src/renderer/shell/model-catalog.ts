@@ -1,6 +1,6 @@
 // The same model directory drives first-turn selection, in-session switching and attachments.
 // Session and workspace directory responses come from Core as JSON.
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import type {
   ModelRef,
   ModelsListResult,
@@ -10,6 +10,7 @@ import type {
 } from '@piarc/protocol';
 import { failureKind, reason } from './errors.js';
 import type { MenuItem } from './Menu.js';
+import { ProviderMark } from './icons.js';
 
 export const EFFORTS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = EffortLevel;
@@ -79,7 +80,8 @@ export function parseCatalog(text: string): Catalog {
 /**
  * The model rows of a model menu. With models from more than one provider each provider is a
  * row whose submenu holds its models (the search still finds every model); with one provider
- * the models are the rows.
+ * the models are the rows. Provider rows, and the model rows of a single provider, lead with the
+ * provider's mark (ADR-0107).
  */
 export function modelChoiceItems(
   catalog: Catalog | undefined,
@@ -93,12 +95,17 @@ export function modelChoiceItems(
     if (group) group.push(model);
     else groups.set(model.provider, [model]);
   }
+  const mark = (provider: string) =>
+    createElement(ProviderMark, {
+      provider: { id: provider, name: catalog?.providerNames?.[provider] },
+    });
   const option = (model: ModelChoice, grouped: boolean): MenuItem => {
     const hint = grouped ? (model.name === model.id ? undefined : model.id) : keyOf(model);
     return {
       id: keyOf(model),
       testId: `model-option-${keyOf(model)}`,
       label: model.name,
+      ...(grouped ? {} : { icon: mark(model.provider) }),
       ...(hint === undefined ? {} : { hint }),
       selected: isSelected(model),
       run: () => {
@@ -113,6 +120,7 @@ export function modelChoiceItems(
       id: `provider-${provider}`,
       testId: `model-provider-${provider}`,
       label: catalog?.providerNames?.[provider] ?? provider,
+      icon: mark(provider),
       ...(current ? { hint: current.name, selected: true } : {}),
       searchable: true,
       submenu: group.map((model) => option(model, true)),

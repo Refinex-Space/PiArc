@@ -7,7 +7,7 @@ import { useApp, useT } from '../app/app-context.js';
 import { Button } from '../app/Button.js';
 import { IconButton } from '../app/IconButton.js';
 import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
-import { MoreIcon } from '../shell/icons.js';
+import { MoreIcon, ProviderMark } from '../shell/icons.js';
 import { reason } from '../shell/errors.js';
 import {
   accountsByProvider,
@@ -219,6 +219,9 @@ export function ConnectionList({
         className={isOff ? 'is-off' : undefined}
         data-testid={account.active ? `account-${id}` : `account-${id}-${account.id}`}
       >
+        <span className="provider-row-mark" aria-hidden="true">
+          <ProviderMark provider={login} size={20} />
+        </span>
         <div>
           <div className="provider-name">
             <strong>{login.name}</strong>
@@ -308,6 +311,9 @@ export function ConnectionList({
       : t(`providers.${p.kind}`);
     return (
       <li key={p.id} className={isOff ? 'is-off' : undefined} data-testid={`provider-row-${p.id}`}>
+        <span className="provider-row-mark" aria-hidden="true">
+          <ProviderMark provider={p} local={p.kind === 'local'} size={20} />
+        </span>
         <div>
           <div className="provider-name">
             <strong>{name}</strong>

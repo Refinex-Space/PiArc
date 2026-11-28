@@ -1,6 +1,7 @@
 // PiArc's icons, the one entry for the whole app (ADR-0078): Lucide shapes (ISC, lucide-react
 // 1.66.0) at fixed sizes and stroke weights through `glyph`, and the few filled marks Lucide
-// lacks, drawn here on the same grid. Toolbars may thin the stroke to 1 in CSS.
+// lacks, drawn here on the same grid. Toolbars may thin the stroke to 1 in CSS. Model providers
+// show their brand marks (`ProviderMark`, ADR-0107), generated from design/brand/providers/.
 import {
   AppWindow,
   Archive,
@@ -110,6 +111,9 @@ import {
   Square,
   type LucideIcon,
 } from 'lucide-react';
+
+import { PROVIDER_MARKS, type Mark } from './provider-marks.generated.js';
+import { providerMarkOf, type ProviderIdentity } from './provider-marks.js';
 
 /** The icon sizes the app uses (CSS px). */
 export type GlyphSize = 12 | 16 | 20;
@@ -413,4 +417,49 @@ export function StepCaret() {
       />
     </svg>
   );
+}
+
+/**
+ * A model provider's brand mark in the text colour, or a neutral glyph when no mark identifies
+ * it: a laptop for a local endpoint, a globe otherwise.
+ */
+export function ProviderMark({
+  provider,
+  local = false,
+  size = 16,
+}: {
+  readonly provider: ProviderIdentity;
+  readonly local?: boolean;
+  readonly size?: GlyphSize;
+}) {
+  const name = providerMarkOf(provider);
+  if (name === undefined) return local ? <ComputerIcon size={size} /> : <GlobeIcon size={size} />;
+  const mark: Mark = PROVIDER_MARKS[name];
+  return (
+    <svg
+      className="icon provider-mark"
+      data-mark={name}
+      width={size}
+      height={size}
+      viewBox={mark.viewBox}
+      fill="currentColor"
+      fillRule={rule(mark.fillRule)}
+      aria-hidden="true"
+      focusable="false"
+    >
+      {mark.paths.map((path, index) => (
+        <path
+          key={index}
+          d={path.d}
+          fillRule={rule(path.fillRule)}
+          clipRule={rule(path.clipRule)}
+          fillOpacity={path.fillOpacity}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function rule(value: string | undefined): 'evenodd' | 'nonzero' | undefined {
+  return value === 'evenodd' || value === 'nonzero' ? value : undefined;
 }
