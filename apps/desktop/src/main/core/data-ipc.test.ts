@@ -133,6 +133,6 @@ describe('data management IPC', () => {
       offsetMinutes: number;
     };
     expect(labels.user).toBe('你');
-    expect(labels.offsetMinutes).toBe(-new Date().getTimezoneOffset());
+    expect(labels.offsetMinutes).toBe(0 - new Date().getTimezoneOffset());
   });
 });
