@@ -2,13 +2,11 @@
 
 PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客户端、Rust Core（经 NAPI-RS 加载在主进程）、基于 Pi SDK 的 Agent Host（独立 Node 进程，经 AHP 与 Core 通信）。架构唯一基线是 `docs/architecture/ARCHITECTURE.md`，文档索引见 `docs/README.md`。
 
-## 交付流程
+## 工作方式
 
-- 按 `docs/plan/PLAN.md` 的看板从上到下推进。一个任务一个会话：在仓库根目录开新会话，输入 `/task <编号>`（例如 `/task T02`），任务提示词在 `docs/plan/tasks/`。
-- 每个任务都严格遵守 `docs/plan/protocol.md`：开工检查、范围与决策分级、质量门禁、验收记录、收尾与最终报告。
-- 架构设计是基线，ADR（`docs/adr/`）记录对基线的决策。实现与基线不符时按协议的决策分级处理：补充型直接定并同步文档；变更型写状态为"提议"的 ADR，停下受影响的部分，等用户确认。
-- 验收项只在 `docs/plan/acceptance.json` 中改本任务的 `status` 与 `evidence`；不删改描述，不改其他任务的项。
-- 每完成一个检查项就更新 `PLAN.md` 的"当前任务检查点"并提交。用户授权后，可以普通推送到指定的远端和分支。
+- 贡献流程（分支、提交、PR、发布）见 `CONTRIBUTING.md`；安全问题按 `SECURITY.md` 私下报告。
+- 架构设计是基线，ADR（`docs/adr/`）记录对基线的决策。实现与基线不符时分两种处理：补充型（不改变已定内容）直接决定并同步文档；变更型写状态为"提议"的 ADR，停下受影响的部分，等维护者确认。较大的功能先在 `docs/architecture/addenda/` 写设计增补。
+- 提交前运行与改动相关的检查，合并前 `npm run verify` 全部通过。用户授权后，可以普通推送到指定的远端和分支。
 - 项目说明写在各目录的 `AGENTS.md`（Claude Code 与 Codex 共用）；同目录的 `CLAUDE.md` 只有一行 `@AGENTS.md`，不往里写内容。新建子目录说明时两个文件一起建。
 
 ## 命令
@@ -20,11 +18,11 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `npm ci --ignore-scripts` | 按 lockfile 安装 npm 依赖（CI 同款） |
 | `node scripts/dev/install-tools.mjs` | 把锁定版本的 cargo-deny、cargo-audit、ripgrep、fd、bindgen-cli 装进 `.tools/`（不做全局安装）；verify 第 11 步需要 cargo-deny，`npm run audit:deps` 需要 cargo-audit，Agent Host 行为对照测试（Pi 原生 grep/find）需要 ripgrep 与 fd，重新生成 libghostty-vt 绑定需要 bindgen |
 | `node scripts/dev/gen-ghostty-bindings.mjs [--check]` | 重新生成（或比对）`crates/piarc-ghostty-sys/src/bindings.rs`；只在升级 libghostty-vt 时需要 |
-| `npm run verify` | 全部 17 项检查，结束时打印汇总表；收尾跑一次（先提交代码），全部通过且工作区干净时记下提交 |
-| `npm run verify -- --baseline` | 开工基线：上次全量通过之后只改了 `docs/` 时只查改动文件与验收清单，否则跑全量（`docs/plan/protocol.md`） |
-| `npm run gen:tokens` | 由 `design/tokens/` 生成渲染进程的 CSS 自定义属性与共享的 TS 常量；改令牌后运行并提交（verify 第 15 步检查漂移、对比度与品牌，ADR-0029） |
-| `node scripts/ci/check-i18n.mjs` | verify 第 16 步：中英文目录键与占位符一致、ICU 有效、只用该语言有的复数类别、引用的键存在、渲染进程与主进程没有硬编码文字与不带 locale 的格式化（规则见 `docs/engineering/accessibility.md`） |
-| `node scripts/ci/check-threats.mjs [--results target/l2/results.json --doc check\|write]` | verify 第 17 步：第 10.1 节每条威胁在 `tests/security/threats.yaml` 有条目、每个对策都被映射、测试 ID 都存在、带威胁编号的测试都已映射；`--doc write` 重新生成 `docs/security/threat-coverage.md`（规则见 `testing.md` 第 16 节） |
+| `npm run verify` | 全部 16 项检查，结束时打印汇总表；收尾跑一次（先提交代码），全部通过且工作区干净时记下提交 |
+| `npm run verify -- --baseline` | 开工基线：上次全量通过之后只改了 `docs/` 时只查改动的文件，否则跑全量 |
+| `npm run gen:tokens` | 由 `design/tokens/` 生成渲染进程的 CSS 自定义属性与共享的 TS 常量；改令牌后运行并提交（verify 第 14 步检查漂移、对比度与品牌，ADR-0029） |
+| `node scripts/ci/check-i18n.mjs` | verify 第 15 步：中英文目录键与占位符一致、ICU 有效、只用该语言有的复数类别、引用的键存在、渲染进程与主进程没有硬编码文字与不带 locale 的格式化（规则见 `docs/engineering/accessibility.md`） |
+| `node scripts/ci/check-threats.mjs [--results target/l2/results.json --doc check\|write]` | verify 第 16 步：第 10.1 节每条威胁在 `tests/security/threats.yaml` 有条目、每个对策都被映射、测试 ID 都存在、带威胁编号的测试都已映射；`--doc write` 重新生成 `docs/security/threat-coverage.md`（规则见 `testing.md` 第 16 节） |
 | `npm run audit:deps` | 依赖安全（T45）：npm audit（全部工作区）、cargo-audit（`.tools/`）、cargo-deny 的 advisories 与 licenses、npm 发布依赖的许可证；例外只在 `tests/security/audit-exceptions.yaml`（过期即失败）；要联网，CI 的 `deps-security.yml` 在依赖改动与每天运行 |
 | `node scripts/ci/check-release-runtime.mjs` | 发布构建（先 `npm run package:desktop`）上 `ELECTRON_RUN_AS_NODE`、`NODE_OPTIONS`、`--inspect`、`--remote-debugging-port` 不生效，每项带未写 fuse 的 Electron 上的对照（T45-A12，CI `desktop` 作业） |
 | `PIARC_EVIDENCE_TASK=T45 npx playwright test -c apps/desktop/playwright.config.ts t45- --project dev` | T45 L4：XSS 载荷在审批卡、Changes 与评论、设置页、hook 提示、终端 OSC 8 上不执行；每个 `window.piarc` 命令以畸形参数调用得到结构化错误；页面伪造的 allow 规则与沙箱放宽停在原生确认；诊断包的预览与导出（截图在 `tmp/evidence/T45/`）；net log 里没有外连 |
@@ -45,7 +43,6 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `.tools/bin/cargo-deny check` | 许可证、安全公告、来源检查 |
 | `PIARC_REQUIRE_KEYCHAIN=1 cargo test -p piarc-secrets --test system_store -- --nocapture` | 真实系统凭据库（macOS 登录钥匙串）中创建、读取、删除测试主密钥；不设该变量时凭据库不可用只打印 NOT RUN |
 | `node scripts/ci/check-crate-deps.mjs` | crate 依赖方向检查（规则在 `crates/deps-rules.json`） |
-| `node scripts/plan/check-acceptance.mjs` | 验收清单与任务文件一致性检查 |
 | `node node_modules/electron/install.js` | 下载 Electron 二进制（`--ignore-scripts` 不会下载）；启动、打包、L4 之前需要 |
 | `npm run start -w @piarc/desktop` | 桌面应用开发服务器模式（`electron-forge start`） |
 | `npm run package:desktop -- --flavor development` | 开发构建打包到 `apps/desktop/out/development/`，并生成 L4 用的 `.vite/` 生产构建；不带参数为发布构建。会先构建 Core、Agent Host bundle，并按 `third-party/binaries.lock.json` 下载校验内置 node、rg、fd |
@@ -70,10 +67,10 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 | `cargo run -q -p piarc-testkit --bin piarc-mock-auth -- --port 0` | 启动 mock OAuth 授权服务器（授权码与设备码）：stdout 第一行是端口，stdin 每行 `approve`/`deny`/`expire` 改决定，关闭后退出 |
 | `cargo test -p piarc-testkit --test sessions login` | 服务商登录端到端（T29）：授权码、设备码、拒绝、过期、取消、手工粘贴代码，保险箱与无明文扫描 |
 | `npm run l3` | L3（T30）：同一个严格 mock 服务 PiArc 与真实的 `claude -p`，比对请求结构与行为轨迹，报告在 `tmp/l3/`；`-- --repeat 2` 检查同侧可重复，`-- --filter <id>` 只跑部分场景。需要 PATH 上有 `claude`（Nightly 锁定的版本见 `.github/workflows/l3-nightly.yml`，全局安装先征得同意；Windows 上用该版本 npm 平台包自带的 `claude.exe`，见 `testing.md` 第 14 节），不访问真实服务商（`testing.md` 第 14 节） |
-| `node scripts/ci/run-l2.mjs` | verify 第 14 步：构建 Agent Host bundle → 全部 L2 场景（报告写到 `target/l2/results.json`）→ 能力覆盖与 `docs/product/capabilities.md` 漂移检查 |
+| `node scripts/ci/run-l2.mjs` | verify 第 13 步：构建 Agent Host bundle → 全部 L2 场景（报告写到 `target/l2/results.json`）→ 能力覆盖与 `docs/product/capabilities.md` 漂移检查 |
 | `cargo test -p piarc-testkit --test scenarios -- <id> --exact` | 只跑一个 L2 场景（`tests/scenarios/<id>.yaml`）；不加筛选跑全部，`-- --results <文件>` 写报告 |
 | `cargo run -q -p piarc-devcli -- run tests/scenarios [--json <文件>]` | 不经 UI 运行一个场景文件或整个目录，输出 JSON 报告 |
-| `node scripts/plan/check-capabilities.mjs [--milestone M2]` | 检查能力清单；`--milestone` 列出该里程碑及之前未完成的能力；`--results <报告> --doc write` 重新生成 `capabilities.md` |
+| `node scripts/ci/check-capabilities.mjs` | 检查能力清单；`--results <报告> --doc write` 重新生成 `capabilities.md` |
 | `cargo test -p piarc-policy --test bash_cases -- --nocapture` | T23 的 Bash 分析数据驱动用例（`crates/piarc-policy/tests/bash_cases.json`，打印条数与类别）与随机输入测试 |
 | `cargo test -p piarc-core --lib terminal::` 与 `cargo test -p piarc-core --test terminal` | T33 终端：会话目录与命令环境、智能体的终端任务与屏幕文件、未共享的终端模型看不到、snapshot 保存与丢弃；关闭终端与关闭 Core 都结束整棵进程树（Windows 版 `--test terminal_windows`）。shell integration 在 `cargo test -p piarc-term --test shell_integration`（Windows：`shell_integration_windows`） |
 | `PIARC_EVIDENCE_TASK=T34 npx playwright test -c apps/desktop/playwright.config.ts t34- --project dev` | T34 终端面板 L4：标签与会话目录、关闭结束进程树、选区复制与附加到消息、查找、链接确认、共享、重载恢复、无障碍与 axe、vim/top/less 与缩放、键鼠与 bracketed paste、隐藏与最小化不拉帧、输入法（先打开发构建或重建渲染进程）；`cargo test -p piarc-term --test pointer` 是 Core 侧的选区、滚动、唤醒与默认颜色 |
@@ -116,7 +113,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - `tests/contracts/`：L1 契约样本（`<契约名>/` 与 `invalid/`）和帧编解码共享用例（`framing/`），流程见 `docs/engineering/testing.md` 第 7 节。
 - `scripts/`：跨平台 Node 脚本（`dev/` 本地入口、`ci/` 检查、`plan/` 计划文件检查、`lib/` 公共函数）。
 - `docs/engineering/`：编码规范、测试规范、AGENTS.md 规范。
-- `reference/`：只读参考仓库（gitignore），用法与边界见 `docs/plan/references.md`。
+- `reference/`：只读参考仓库（gitignore，不随仓库分发）；边界见 ADR-0006：只作行为与交互参考，不复制代码、提示词与界面组件。
 
 ## 不变量
 
@@ -151,15 +148,15 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - 主进程在 `ready` 前固定 `userData` 与 `sessionData`（`apps/desktop/src/main/platform/data-dirs.ts`）：带 `--user-data-dir=<dir>` 启动时 Core 的数据库、`pi/`、日志与 Chromium 数据都在 `<dir>` 下（L4 的隔离依赖它），否则在 macOS `~/Library/Application Support/PiArc/`、Windows `%LOCALAPPDATA%\PiArc\`。
 - 项目级可执行配置（hooks、MCP、allow 规则、插件、Pi 扩展）只经 `piarc_config::project_trust` 判断信任（Core 侧 `piarc_core::trust`，Agent Host 侧 `agent-host/src/harness/project-trust.ts`），失败一律不信任；不要另写读表或读 Pi `trust.json` 的路径（ADR-0025）。有未确认的新增可执行项时项目不受信任（ADR-0029，I63）。项目的 skill、命令、输出风格与子 agent 定义：信任只覆盖根自己资源目录里的文件（`piarc_config::executables::covered_by_trust`，worktree 里的副本与根以上目录的不算），解析链接后出了项目目录的不读（`stays_in_project`，R4）。
 - Claude Code 的配置只读（ADR-0005、ADR-0038）：`.claude/settings*.json` 与 `~/.claude/settings.json` 和 PiArc 设置同表合并，一个键生效与否只看 `piarc_config::claude::SETTINGS_KEYS`（实现某个键的功能时改这一行，不另写判断）；`piarc-config` 的写入拒绝 `.claude/` 与 `.claude.json`，L2 每个场景比对 Claude Code 配置快照。用户级 Claude Code 文件从 `CoreConfig.home` 读：测试、L2、L4（`<user data>/test-home`）一律注入临时目录，不读本机 `~/.claude`。
-- 界面颜色、字号、间距只来自设计令牌（`var(--piarc-…)`），界面字符串只经 `src/shared/i18n/` 的目录（英文与简体中文同键）；verify 第 15 步拒绝对比度不达标、主色落在橙色 / 陶土色、打包字体或音频的改动。
-- 无障碍与本地化（T43，规则在 `docs/engineering/accessibility.md`）：新增设置页、面板、对话框或 transcript 行类型要登记到 `apps/desktop/e2e/a11y/states.ts` 并接到 `t43-a11y` 的旅程（Vitest 的覆盖检查拒绝没登记的）；transcript 是 `feed` 不是 `log`，流式进展只经会话的节流 live region；中文没有 `one` 复数类别（用 `=1`）；数字与日期用应用上下文的 `format`，不调不带 locale 的 `toLocaleString()`（verify 第 16 步）。
+- 界面颜色、字号、间距只来自设计令牌（`var(--piarc-…)`），界面字符串只经 `src/shared/i18n/` 的目录（英文与简体中文同键）；verify 第 14 步拒绝对比度不达标、主色落在橙色 / 陶土色、打包字体或音频的改动。
+- 无障碍与本地化（T43，规则在 `docs/engineering/accessibility.md`）：新增设置页、面板、对话框或 transcript 行类型要登记到 `apps/desktop/e2e/a11y/states.ts` 并接到 `t43-a11y` 的旅程（Vitest 的覆盖检查拒绝没登记的）；transcript 是 `feed` 不是 `log`，流式进展只经会话的节流 live region；中文没有 `one` 复数类别（用 `=1`）；数字与日期用应用上下文的 `format`，不调不带 locale 的 `toLocaleString()`（verify 第 15 步）。
 - `cargo test`（含 `npm run verify`）会在登录钥匙串中以 `piarc-test.` 开头的服务名创建并删除测试条目；测试代码只用 `test_master_key_name` 命名条目，不碰 `piarc-core::identity` 的正式服务名。
 - `cargo test`（含 verify）中 `piarc-core` 的 `sandbox_commands` 测试经沙箱代理连 `registry.npmjs.org`、`index.crates.io`：离线时这两个用例失败并写明原因。沙箱内命令要联网的工具，配置文件里的代理设置会盖过 `HTTP_PROXY`（`crates/piarc-sandbox/AGENTS.md`）。
 - 测试里用 `vim -u NONE` 时加 `--cmd 'set encoding=utf-8'`：否则 vim 按 locale 选编码，`LANG` 为空的环境（CI runner、某些 IDE 或智能体的子进程）里中文显示成转义（I38）。
 - T21 服务商设置通过 Core 的设置 Host 调用 Pi 的 ModelRuntime 更新保险箱；自定义端点在用户设置中保存协议、基础地址和模型 ID，Core 生成隔离目录下的 `pi/models.json`。不要把密钥写入该文件或传入进程环境。设置变更中断时由 Core 对照保险箱恢复，见 ADR-0032。百炼 Token Plan 的内置提供商、两种协议的北京端点和套餐模型选择见 [Pi 调研](docs/research/pi-v1.4.0-baseline.md#t21-自定义提供商线协议与可用模型v152)。
 - 打包时 `postPackage` 才把内置 node 放进 `.app`，签名分层见 `apps/desktop/AGENTS.md`；不要对整个 bundle 用 `codesign --deep` 重签，会覆盖 node 的 Node.js 官方签名。
 - Windows 安装包由 CI 的 `package-windows` 作业产出（`scripts/release/pack-windows.mjs`，需要 .NET SDK）；Velopack 的 pack id 是应用标识，不能用 `PiArc`（会与数据目录 `%LOCALAPPDATA%\PiArc\` 重合）。
-- L2 场景目标（`--test scenarios`）设了 `test = false`，`cargo test --workspace` 不跑它，只有 verify 第 14 步与显式 `--test scenarios` 跑。新增或改动场景、改能力状态后重新生成 `docs/product/capabilities.md`（手改会被漂移检查拒绝）；`active` 能力没有场景时报 MISSING。
+- L2 场景目标（`--test scenarios`）设了 `test = false`，`cargo test --workspace` 不跑它，只有 verify 第 13 步与显式 `--test scenarios` 跑。新增或改动场景、改能力状态后重新生成 `docs/product/capabilities.md`（手改会被漂移检查拒绝）；`active` 能力没有场景时报 MISSING。
 - 升级 Pi 前后跑 golden 录制与漂移检查（见命令表）：投影、排队、中断补齐与工具批次都依赖 Pi 的事件顺序与队列语义（ADR-0026）。
 - 文件工具的不变量（先读后改、外部修改、编码与换行保持、原子替换、diff、越界与受保护路径）在 Core 的 `piarc-fs` 与 `tool_io/files.rs`，结果预算在 Agent Host 的 `harness/tool-results.ts`（ADR-0027）。Read 完成内容解析后才按调用提交快照（ADR-0034）。文件工具和预览均通过获准的目录句柄读写（ADR-0036）。替换已存在的文件只经 `piarc_fs::write`；会话目录外与受保护路径的操作只标记需要询问，由 Core 的 `tool_io::policy` 裁决，只有绑定到同一调用的 I/O 可使用审批结果（ADR-0031）。
 - 权限规则与 Bash 分析在 `piarc-policy`（规则语法、阶梯、只读白名单、关键路径删除与"总是允许"前缀见其 AGENTS.md），Core 侧组装在 `tool_io::policy::assess`（ADR-0037）。只读白名单里的命令（`echo`、`ls`、`cat`、`git status`…）在手动模式下免审批：要求审批的 L2/L4 夹具用不在白名单的命令（`env echo`、`sed`、`printenv`）。项目文件里新加的 allow 规则是未确认的可执行项，信任重新确认前不生效；跳过权限的开关只读用户级 `settings.json` 的 `permissions.enableBypassPermissions`。
@@ -184,7 +181,7 @@ PiArc 是 macOS 与 Windows 上的桌面编码智能体：Electron + React 客�
 - Hooks（T25，ADR-0039）：hook 命令只在 Core 运行（`piarc-hooks` 解析、匹配、执行、合并，`piarc-core::hooks` 读设置与信任、写审计），Agent Host 只经 `hooks/run` 报告 Pi 事件并应用结果；新增事件在 `HookEvent` 加一项、在挂载处调 `HooksService::run`，不另写执行器。Stop 续跑上限只在 `piarc_hooks::STOP_CONTINUATION_LIMIT`。L2 的 hook 夹具是 `tests/scenarios/fixtures/hooks/hook.mjs.txt`（复制成 `hook.mjs` 运行）。
 - Auto 模式（T46，设计增补 `docs/architecture/addenda/T46-auto-mode.md`）：只有阶梯结论为通用询问（`step == "ask"`，`piarc_policy::review::reviewable`）的调用在 PermissionRequest hooks 之后送审，其余询问照旧给用户；审查由 Core 经 AHP `policy/review` 请工作区的 Agent Host 调用审查模型（`harness/auto-review.ts`，提示词只在 `prompts/auto-review.ts`），结论在 Core 再校验（`piarc_policy::review::check_answer`），任何失败都转回人工审批卡、工具不执行。启用开关、审查模型与审查策略只读用户级（`piarc_config::auto_mode`），项目级的这些键忽略并进配置诊断；不要让审查模型接受别名或回退到会话模型。T48 的 `PermissionDenied` 接在 Core 的 `ToolIo::reviewer_refused`。
 - 托管设置与自动记忆（T47，设计增补 `docs/architecture/addenda/T47-auto-memory-and-managed-settings.md`）：托管来源只经 Core 的 `piarc_core::managed`（`PolicyStore` 的 `SystemPolicy`，测试一律 `FixedPolicy`，L4 用 `PIARC_TEST_MANAGED_ROOT`），合并只在 `piarc_config::managed`，作为 `enterprise` 层经 `DataDirs::layers` 进每张设置表；锁定判断只用 `piarc_config::managed::locked`（渲染进程 `settings/managed.tsx` 的 `isManaged`），写入被锁定的指针由 `piarc_config` 的写入函数拒绝（`permissionDenied`，`reason: managed`）。托管文档无效时 Core 拒绝启动，运行中变坏沿用上一份；用户目录、`HKCU`、`ProgramData` 与数据目录都不是管理员位置。自动记忆只由 Core 的 `auto_memory::Store` 读写（`<数据目录>/auto-memory/`，按主 checkout，worktree 共用），`Memory` 工具经 AHP `memory/apply`，每次改动写 `kind: "memory"` 审计；从 Claude Code 导入只读 `~/.claude/projects/…/memory/`。
-- 安全收口（T45，ADR-0062）：第 10.1 节的每条对策在 `tests/security/threats.yaml` 有测试（verify 第 17 步，`testing.md` 第 16 节），新增对策时同时改架构那一行与映射，新测试名带 `THR-NN`。日志写入时由 `piarc-telemetry::redact` 脱敏，Core 在每次保险箱操作后登记凭据值；不要把凭据格式化进错误再指望别处过滤，也不要绕过 tracing 直接写日志文件。诊断包只经 `piarc_telemetry::BundleInput` 加内容，保险箱、数据库与会话内容永不进去。Pi 自己设置里的 `packages` 对 Pi 不可见（`agent-host/src/runtime/pi-settings.ts`）：L2 与会话测试的 Agent Host 带 `PI_OFFLINE=1`，Pi 只在联网时走的路径要按 `crates/piarc-testkit/tests/egress.rs` 的方式测。构建期常量 `__PIARC_RELEASE_BUILD__` 只在 `package:desktop` 打发布构建时为真：发布构建拒绝 `--remote-debugging-port` 并去掉测试页（`renderer/test-pages.tsx`），bare `vite build` 与开发构建保留。审批卡、diff 与路径经 `transcript/reveal.ts` 显示双向控制字符。
+- 安全收口（T45，ADR-0062）：第 10.1 节的每条对策在 `tests/security/threats.yaml` 有测试（verify 第 16 步，`testing.md` 第 16 节），新增对策时同时改架构那一行与映射，新测试名带 `THR-NN`。日志写入时由 `piarc-telemetry::redact` 脱敏，Core 在每次保险箱操作后登记凭据值；不要把凭据格式化进错误再指望别处过滤，也不要绕过 tracing 直接写日志文件。诊断包只经 `piarc_telemetry::BundleInput` 加内容，保险箱、数据库与会话内容永不进去。Pi 自己设置里的 `packages` 对 Pi 不可见（`agent-host/src/runtime/pi-settings.ts`）：L2 与会话测试的 Agent Host 带 `PI_OFFLINE=1`，Pi 只在联网时走的路径要按 `crates/piarc-testkit/tests/egress.rs` 的方式测。构建期常量 `__PIARC_RELEASE_BUILD__` 只在 `package:desktop` 打发布构建时为真：发布构建拒绝 `--remote-debugging-port` 并去掉测试页（`renderer/test-pages.tsx`），bare `vite build` 与开发构建保留。审批卡、diff 与路径经 `transcript/reveal.ts` 显示双向控制字符。
 
 - T48 的 fork 只继承工具声明，执行权限仍由子会话闸门和 Core 裁决；隔离 skill 的正文与临时授权绑定到 Core 登记的子会话。Worktree hook 返回的目录由 Core 校验并登记归属。MCP 的 URL 询问在主进程确认；Core 只接受与当前卡片绑定的答复。见 ADR-0066、ADR-0067、ADR-0068。
 - T49 的侧边对话按面板在 Agent Host 内存中保存，只经 `session/sideChatAsk` 和 `session/sideChatControl` 访问。用量记在父会话的 `auxiliary/sideChat`，内容不进主会话文件。外部草稿只走 `piarc://draft`，保留工作区信任流程，由用户手动发送。App Intents 的打包与实机清单见 `docs/engineering/app-intents.md`；Windows AppUserModelID 与 Velopack 快捷方式一致。见 ADR-0069、ADR-0070。

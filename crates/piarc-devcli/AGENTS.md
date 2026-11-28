@@ -7,7 +7,7 @@
 | 命令 | 用途 |
 |---|---|
 | `cargo run -q -p piarc-devcli -- run tests/scenarios/turn-steer.yaml` | 运行一个场景 |
-| `cargo run -q -p piarc-devcli -- run tests/scenarios --json target/l2/devcli.json` | 运行目录下全部场景并写 JSON 报告（与 `scenarios` 测试的 `--results` 同一格式，可交给 `scripts/plan/check-capabilities.mjs --results`） |
+| `cargo run -q -p piarc-devcli -- run tests/scenarios --json target/l2/devcli.json` | 运行目录下全部场景并写 JSON 报告（与 `scenarios` 测试的 `--results` 同一格式，可交给 `scripts/ci/check-capabilities.mjs --results`） |
 | `cargo run -q -p piarc-devcli -- run tests/scenarios --filter turn- --threads 1` | 按 id 子串筛选（`--exact` 整串匹配）、串行运行便于看日志 |
 | `cargo run -q -p piarc-devcli -- list tests/scenarios` | 只列出场景 |
 | `cargo run -q -p piarc-devcli -- l3 <场景文件或目录> --out <目录>` | L3 的 PiArc 侧（T30）：逐个以 mock 的 L3 模式运行，写 `<目录>/<id>.json`（`failures`、`capture`）；由 `scripts/l3/run.mjs` 调用，场景是它从 `tests/l3/scenarios/` 生成的 L2 文件 |

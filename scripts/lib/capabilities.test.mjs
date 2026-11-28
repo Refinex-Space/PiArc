@@ -5,10 +5,8 @@ import {
   checkCatalog,
   checkCoverage,
   parseCatalog,
-  pendingUpTo,
   renderDoc,
   requirementIds,
-  taskStatuses,
 } from './capabilities.mjs';
 
 const CATALOG = `
@@ -41,14 +39,6 @@ const SOURCES = {
     '| FR-CH-03 | steer | P0 | M1 |\n| FR-TL-01 | tools | P0 | M1 |\n| FR-CH-05 | views | P1 | M2 |\n',
   ),
   sections: architectureSections('## 6. Harness\n### 6.15 不变量\n#### 6.3.2 事件\n'),
-  tasks: taskStatuses(
-    [
-      '| T14 | [会话](tasks/T14.md) | 2 | T13 | macOS | xhigh | 大 | 无 | 已完成 | eedccea |',
-      '| T16 | [文件工具](tasks/T16.md) | 2 | T15 | macOS | xhigh | 大 | 无 | 未开始 | — |',
-      '| T25 | [Hooks](tasks/T25.md) | 3 | T24 | macOS | xhigh | 大 | 无 | 未开始 | — |',
-      '| T29 | [WebFetch](tasks/T29.md) | 3 | T28 | macOS | high | 中 | 无 | 未开始 | — |',
-    ].join('\n'),
-  ),
 };
 
 /** @param {string} text */
@@ -75,7 +65,7 @@ function report(scenarios, filtered = false) {
 }
 
 describe('the catalog', () => {
-  it('passes with known references, board tasks and every requirement placed', () => {
+  it('passes with known references and every requirement placed', () => {
     expect(checkCatalog(catalogOf(CATALOG), SOURCES)).toEqual([]);
   });
 
@@ -95,17 +85,17 @@ describe('the catalog', () => {
     expect(checkCatalog(complete, SOURCES)).toEqual([]);
   });
 
-  it('rejects unknown references, unknown tasks, duplicates and unplaced requirements', () => {
+  it('rejects unknown references, duplicates and unplaced requirements', () => {
     const catalog = catalogOf(
-      CATALOG.replace('[FR-TL-01]', '[FR-TL-09, ARCH-99.1]')
-        .replace('task: T25', 'task: T99')
-        .replace('CAP-HOOK-PRE-001', 'CAP-TURN-STEER-001'),
+      CATALOG.replace('[FR-TL-01]', '[FR-TL-09, ARCH-99.1]').replace(
+        'CAP-HOOK-PRE-001',
+        'CAP-TURN-STEER-001',
+      ),
     );
     expect(checkCatalog(catalog, SOURCES)).toEqual([
       'CAP-TOOL-EDIT-002: FR-TL-09 is not a requirement',
       'CAP-TOOL-EDIT-002: ARCH-99.1 is not an architecture section',
       'CAP-TURN-STEER-001: listed twice',
-      'CAP-TURN-STEER-001: task T99 is not on the board',
       'FR-TL-01: no capability refers to it and it is not client_only',
     ]);
   });
@@ -148,22 +138,6 @@ describe('coverage by the L2 report', () => {
 
   it('rejects a filtered report', () => {
     expect(checkCoverage(catalog, report([], true)).problems[0]).toMatch(/filtered run/);
-  });
-});
-
-describe('the milestone gate', () => {
-  it('lists planned capabilities up to the milestone with their task status', () => {
-    const { pending, problems } = pendingUpTo(catalogOf(CATALOG), 'M1', SOURCES.tasks);
-    expect(pending.map((c) => `${c.id}:${c.taskStatus}`)).toEqual(['CAP-TOOL-EDIT-002:未开始']);
-    expect(problems).toEqual([]);
-    expect(pendingUpTo(catalogOf(CATALOG), 'M2', SOURCES.tasks).pending).toHaveLength(2);
-  });
-
-  it('flags a planned capability whose task is done', () => {
-    const catalog = catalogOf(CATALOG.replace('task: T16', 'task: T14'));
-    expect(pendingUpTo(catalog, 'M1', SOURCES.tasks).problems).toEqual([
-      'CAP-TOOL-EDIT-002: still planned although T14 is 已完成',
-    ]);
   });
 });
 

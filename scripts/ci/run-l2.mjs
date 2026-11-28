@@ -43,7 +43,7 @@ export function parts() {
       name: 'capability coverage and capabilities.md',
       cmd: process.execPath,
       args: [
-        path.join(repoRoot, 'scripts', 'plan', 'check-capabilities.mjs'),
+        path.join(repoRoot, 'scripts', 'ci', 'check-capabilities.mjs'),
         '--results',
         path.join(repoRoot, REPORT),
         '--doc',

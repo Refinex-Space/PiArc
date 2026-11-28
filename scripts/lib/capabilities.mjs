@@ -134,31 +134,10 @@ export function architectureSections(markdown) {
 }
 
 /**
- * Task ids and statuses of the board in PLAN.md (`| T16 | [title](…) | … | 状态 | 提交 |`).
- * @param {string} markdown
- * @returns {Map<string, string>}
- */
-export function taskStatuses(markdown) {
-  /** @type {Map<string, string>} */
-  const tasks = new Map();
-  for (const line of markdown.split('\n')) {
-    const cells = line.split('|').map((c) => c.trim());
-    if (
-      /^[TRW][0-9]{1,2}$/.test(cells[1] ?? '') &&
-      cells.length >= 11 &&
-      cells[2]?.startsWith('[')
-    ) {
-      tasks.set(cells[1] ?? '', cells[9] ?? '');
-    }
-  }
-  return tasks;
-}
-
-/**
- * Checks the list itself: ids, milestones, statuses, blocked entries, references, tasks, and
- * that every requirement of chapter 4 is a capability's ref or client-only.
+ * Checks the list itself: ids, milestones, statuses, blocked entries, references, and that
+ * every requirement of chapter 4 is a capability's ref or client-only.
  * @param {Catalog} catalog
- * @param {{ requirements: Set<string>, sections: Set<string>, tasks: Map<string, string> }} sources
+ * @param {{ requirements: Set<string>, sections: Set<string> }} sources
  * @returns {string[]}
  */
 export function checkCatalog(catalog, sources) {
@@ -179,15 +158,11 @@ export function checkCatalog(catalog, sources) {
     }
     if (c.refs.length === 0) problems.push(`${c.id}: refs is empty`);
     problems.push(...checkRefs(c.id, c.refs, sources));
-    if (!sources.tasks.has(c.task)) problems.push(`${c.id}: task ${c.task} is not on the board`);
   }
   const covered = new Set(catalog.capabilities.flatMap((c) => c.refs));
   for (const entry of catalog.clientOnly) {
     if (!sources.requirements.has(entry.ref)) {
       problems.push(`client_only ${entry.ref}: not a requirement of chapter 4`);
-    }
-    if (!sources.tasks.has(entry.task)) {
-      problems.push(`client_only ${entry.ref}: task ${entry.task} is not on the board`);
     }
     covered.add(entry.ref);
   }
@@ -258,25 +233,6 @@ function scenariosByCapability(report) {
   return map;
 }
 
-/**
- * Planned capabilities of milestones up to `milestone`, with their task's status; a planned
- * capability whose task is already done is an inconsistency.
- * @param {Catalog} catalog
- * @param {string} milestone
- * @param {Map<string, string>} tasks
- * @returns {{ pending: Array<Capability & { taskStatus: string }>, problems: string[] }}
- */
-export function pendingUpTo(catalog, milestone, tasks) {
-  const limit = MILESTONES.indexOf(milestone);
-  const pending = catalog.capabilities
-    .filter((c) => c.status === 'planned' && MILESTONES.indexOf(c.milestone) <= limit)
-    .map((c) => ({ ...c, taskStatus: tasks.get(c.task) ?? '?' }));
-  const problems = pending
-    .filter((c) => c.taskStatus === '已完成')
-    .map((c) => `${c.id}: still planned although ${c.task} is 已完成`);
-  return { pending, problems };
-}
-
 /** @param {string} text */
 function cell(text) {
   return text.replaceAll('|', '\\|').replaceAll('\n', ' ');
@@ -306,7 +262,7 @@ export function renderDoc(catalog, report) {
   const lines = [
     '# 能力清单',
     '',
-    '> 由 `node scripts/plan/check-capabilities.mjs --results <L2 报告> --doc write` 根据 `tests/capabilities.yaml` 与 L2 场景结果生成，不要手工编辑。格式与规则见 `docs/engineering/testing.md` 第 13 节。',
+    '> 由 `node scripts/ci/check-capabilities.mjs --results <L2 报告> --doc write` 根据 `tests/capabilities.yaml` 与 L2 场景结果生成，不要手工编辑。格式与规则见 `docs/engineering/testing.md` 第 13 节。',
     '',
     '状态：**已实现** = `active` 且至少一个 L2 场景覆盖；**计划中** = `planned`；**BLOCKED** = 因外部原因暂缓；**MISSING** = `active` 却没有场景；**失败** = 覆盖它的场景没有通过。',
     '',

@@ -1218,7 +1218,7 @@ T06 已实现的方法：Core → Agent Host 的 `host/ping`（结果附带 Agen
   - 心跳：超时只在期间没有收到任何帧、且读取没有停在投递上时计为失败，连续 2 次视为挂死并杀进程。
   - 重启：退避 1、2、4、8、16 秒（上限 30 秒），10 分钟窗口内最多 5 次，下一次失败停止并上报；重启时间与退避经 `Clock` 注入。重启后对经监管器打开的会话依次 `session/resume`。
   - 对账：调用状态为已发送 → （`session/prompt` 的已确认 →）终态；连接结束时未到终态的调用标为 `uncertain` 上报，不重放。进程退出后先等读取把 stdout 读完再判定，避免把已经回复的调用误标。
-  - 尚未实现：Agent Host 的整棵进程树清理（进程组 / Job Object，T17），见 `docs/plan/PLAN.md` I17。
+  - 尚未实现：Agent Host 的整棵进程树清理（进程组 / Job Object，T17）（登记事项 I17）。
 - T14 落地（I58）：经 `create_session`、`resume_session`、`fork_session` 打开的会话都被跟踪并在重启后恢复；Core 指定 id 的 `session/create` 超时或连接中断时仍按该 id 跟踪；重启后的会话恢复与关闭、Kill 命令并行处理，恢复挂住时不阻塞关闭；Kill 命令绑定它所针对的连接，迟到的 Kill 不会杀掉下一个进程；握手被接受之前与被拒之后，Agent Host 的请求一律以 `invalidRequest` 回答，不交给处理者；同时处理的入站请求至多 `inbound_concurrency`（默认 256）个，超出时读取等待。Core 侧每个工作区的入站处理者只为本工作区的会话回答 `fs/*`、`exec/*`。
 
 T19 在替换连接发布前登记待恢复的会话。输入等待本会话的 `session/resume` 成功才进入写队列及调用账本。恢复失败时把原因返回给等待者，连接中断时尚未发送的输入按未送达处理。新会话创建、心跳和宿主关闭保持可用。
@@ -1419,7 +1419,7 @@ T34 落地（ADR-0051）：Ctrl+\` 切换终端面板（`terminal.toggle`）。�
 - 本地化：第一版提供简体中文与英文；字符串集中管理（ICU MessageFormat），主进程菜单与渲染进程共用同一份资源，不在代码中硬编码。
 - T34（ADR-0051）：终端的输入框可聚焦并有可读名称（"终端 <名称>"），画布对辅助技术隐藏；"以文本查看屏幕"在对话框中显示 Core 读屏的文本，供屏幕阅读器阅读与复制；查找的匹配数以 `aria-live` 播报。面板经 axe 检查无违规。
 - T18 落地（ADR-0029）：intl-messageformat 12.1.4（解释执行，不放宽 CSP）；目录在 `src/shared/i18n/`（`en.ts` 定义消息 id，`zh-CN.ts` 必须覆盖全部 id），主进程的菜单、原生对话框、通知与渲染进程共用；语言偏好为 `system` 时取系统首选语言，改语言后各窗口与菜单立即更新。缺失翻译的检查与全面无障碍见下面 T43 一条。
-- T43 落地（ADR-0061）：状态清单（`apps/desktop/e2e/a11y/states.ts`）每个页面与组件状态一条，L4 逐条在亮暗两种主题下跑 axe 零违规，Vitest 按设置页、面板、对话框与行 kind 的注册核对清单覆盖。transcript 是 `feed`，每行是带名称的 `article`（"工具调用：读取 notes.txt，完成"），会话的 polite live region 至多每 5 秒播报一次进展、回合结束播报一次结果。审批卡出现时焦点移到卡片容器并读出类型与对象，输入法合成期间推迟，400 ms 内卡片上的 Enter、Space 无效。键盘：Tab 按侧栏 → 主区 → 右栏 → 停靠区，所有停靠点有焦点环，关掉含焦点的停靠面板时焦点回到输入框，右栏与停靠区的分隔条可用方向键调整。强制颜色下主按钮用系统按钮色、状态点保留形状。verify 第 16 步检查两种语言的目录、ICU 与占位符、复数类别（中文用 `=1` 而不是 `one`）、硬编码文字与不带 locale 的格式化；数字与日期按应用语言格式化。读屏核对清单在 `docs/engineering/accessibility.md`。
+- T43 落地（ADR-0061）：状态清单（`apps/desktop/e2e/a11y/states.ts`）每个页面与组件状态一条，L4 逐条在亮暗两种主题下跑 axe 零违规，Vitest 按设置页、面板、对话框与行 kind 的注册核对清单覆盖。transcript 是 `feed`，每行是带名称的 `article`（"工具调用：读取 notes.txt，完成"），会话的 polite live region 至多每 5 秒播报一次进展、回合结束播报一次结果。审批卡出现时焦点移到卡片容器并读出类型与对象，输入法合成期间推迟，400 ms 内卡片上的 Enter、Space 无效。键盘：Tab 按侧栏 → 主区 → 右栏 → 停靠区，所有停靠点有焦点环，关掉含焦点的停靠面板时焦点回到输入框，右栏与停靠区的分隔条可用方向键调整。强制颜色下主按钮用系统按钮色、状态点保留形状。verify 第 15 步检查两种语言的目录、ICU 与占位符、复数类别（中文用 `=1` 而不是 `one`）、硬编码文字与不带 locale 的格式化；数字与日期按应用语言格式化。读屏核对清单在 `docs/engineering/accessibility.md`。
 
 ### 8.8 平台集成
 
@@ -1674,9 +1674,9 @@ T44 起每一行都由 `scripts/perf/` 自动测量（方法、口径与本机�
 
 T35 的 M3 测量（[M3 内存](../perf/M3-memory.md)，`npm run perf:m3`，M1 Max / 32 GB，打包形态）：同一工作区 3 个并行会话（1 个在独立 worktree）加 1 个子 agent 持续流式输出并执行工具，Agent Host 最大 238 MB（4 个活动会话的上限 270 MB，达标）；应用其余进程合计最大 576 MB（macOS 预算 510 MB，**超出**），其中没有会话时的基线已有 505 MB（不连测试驱动 466 MB），会话只增加约 65 MB（渲染进程约 50 MB）。预算不放宽，R4 复测（I146）。
 
-R4 复测（[R4 评审](../reviews/R4-findings.md)第 1 节，同一台 M1 Max / 32 GB，开发构建打包形态，场景另加被 4 个会话共用的 1 个 stdio MCP server 与 8 个项目 skill 的索引）：两轮 Agent Host 最大 236、218 MB（上限 270 MB，达标）；应用其余进程合计最大 580、577 MB（macOS 预算 510 MB，**超出**），空闲基线约 511 MB；同一负载下这些进程的 phys_footprint 合计约 250 MB（最大 298 MB）。超出主要是 RSS 把各进程映射的同一份 Electron 框架代码页各算一次；口径的改变等于放宽，须走 ADR，交 T44（I26、I146）。
+R4 复测（R4 评审第 1 节，同一台 M1 Max / 32 GB，开发构建打包形态，场景另加被 4 个会话共用的 1 个 stdio MCP server 与 8 个项目 skill 的索引）：两轮 Agent Host 最大 236、218 MB（上限 270 MB，达标）；应用其余进程合计最大 580、577 MB（macOS 预算 510 MB，**超出**），空闲基线约 511 MB；同一负载下这些进程的 phys_footprint 合计约 250 MB（最大 298 MB）。超出主要是 RSS 把各进程映射的同一份 Electron 框架代码页各算一次；口径的改变等于放宽，须走 ADR，交 T44（I26、I146）。
 
-R5（[R5 评审](../reviews/R5-findings.md)第 1.2 节）：测量框架在 CI 上不判任何值（两个 runner 类别没有基线、不带 `--absolute`），R5 改为缺基线即失败，推送后从 CI 工件记录基线；"打开工作区到 Agent Host 就绪"的探针原来取 10 次的中位数（还把汇总行算作第 11 个样本），改回 T14 与本表的 10 次最大。"应用全部进程合计"的口径改为物理占用（ADR-0063，用户在 R5 采纳，属放宽：RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，独占内存约为 RSS 之和的 40–50%），预算数值不变；按新口径 R5 实测 208 MB（Nightly 场景）、3 会话 + 子 agent 场景最大 264 MB，都在 510 MB 内。
+R5（R5 评审第 1.2 节）：测量框架在 CI 上不判任何值（两个 runner 类别没有基线、不带 `--absolute`），R5 改为缺基线即失败，推送后从 CI 工件记录基线；"打开工作区到 Agent Host 就绪"的探针原来取 10 次的中位数（还把汇总行算作第 11 个样本），改回 T14 与本表的 10 次最大。"应用全部进程合计"的口径改为物理占用（ADR-0063，用户在 R5 采纳，属放宽：RSS 之和重复计入各 Chromium 进程映射的同一份框架代码页，独占内存约为 RSS 之和的 40–50%），预算数值不变；按新口径 R5 实测 208 MB（Nightly 场景）、3 会话 + 子 agent 场景最大 264 MB，都在 510 MB 内。
 
 体积估算依据：Electron 45 的 darwin-arm64 发行包压缩后约 121 MB，内置 Node 压缩后约 28–38 MB，再加应用代码、Core、rg、fd。作为对照，Claude Desktop 5.1231.2 安装后 621 MB（本机实测）。M0 实测：macOS arm64 安装后 449.0 MB，其中 Electron Framework 250 MiB、内置 node 145 MiB；Windows x64 的 Electron 本体约 360 MiB（`PiArc.exe` 238.5 MiB、locales 48.8 MiB），内置 node 102 MiB（S6 第 8、9.2 节）。
 
@@ -1717,7 +1717,7 @@ R5（[R5 评审](../reviews/R5-findings.md)第 1.2 节）：测量框架在 CI �
 - 期望的文件副作用；
 - 期望的请求断言（例如第 3 个请求必须包含某个 tool_result）。
 
-实现（T15）：运行器在 `piarc-testkit` 的 `l2` 模块，`piarc-devcli` 是它的命令行外壳。格式的唯一描述是 `tests/scenarios/schema.json`；场景还声明会话（多个会话各有 `cwd`）、驱动 Core 的动作（提示、steer、follow-up、排队编辑、中断、等待事件、写文件、重启 Core 与恢复会话）与能力 ID。每个 mock 端点是一个独立的 mock 与 Pi provider，请求断言按端点名与序号；事件按会话做"有序子序列 + 字段子集"匹配；另有工具批次（经 Core 的 `ToolIoObserver` 扣住整批再放行，不靠计时）与 Core I/O 断言，每个请求都必须通过严格 mock 的校验。每个场景在独立临时根中启动自己的 Core 与 Agent Host（不复用进程，换取完全隔离），自定义 test harness 让每个场景成为一个测试，verify 第 14 步运行全部场景。字段、匹配规则与取舍见 `docs/engineering/testing.md` 第 12 节。
+实现（T15）：运行器在 `piarc-testkit` 的 `l2` 模块，`piarc-devcli` 是它的命令行外壳。格式的唯一描述是 `tests/scenarios/schema.json`；场景还声明会话（多个会话各有 `cwd`）、驱动 Core 的动作（提示、steer、follow-up、排队编辑、中断、等待事件、写文件、重启 Core 与恢复会话）与能力 ID。每个 mock 端点是一个独立的 mock 与 Pi provider，请求断言按端点名与序号；事件按会话做"有序子序列 + 字段子集"匹配；另有工具批次（经 Core 的 `ToolIoObserver` 扣住整批再放行，不靠计时）与 Core I/O 断言，每个请求都必须通过严格 mock 的校验。每个场景在独立临时根中启动自己的 Core 与 Agent Host（不复用进程，换取完全隔离），自定义 test harness 让每个场景成为一个测试，verify 第 13 步运行全部场景。字段、匹配规则与取舍见 `docs/engineering/testing.md` 第 12 节。
 
 ### 12.4 能力清单与覆盖
 
@@ -1725,7 +1725,7 @@ R5（[R5 评审](../reviews/R5-findings.md)第 1.2 节）：测量框架在 CI �
 - 每个能力至少被一个场景覆盖，否则 CI 报 MISSING。
 - 能力完成状态由测试结果自动生成到 `docs/product/capabilities.md`，不手工勾选，避免文档与代码漂移。
 
-实现（T15）：清单一次登记 M1–M5 的全部能力，每项带里程碑、需求编号或架构章节、负责任务与状态（`planned`、`active`、`blocked`，后者带原因与链接）；行为全在客户端的需求列在 `client_only`，由 L4 验证，使需求第 4 章的每个编号都有归属。`scripts/plan/check-capabilities.mjs` 对照需求、架构与看板检查清单，按 L2 报告报 MISSING，`--milestone` 给评审任务列出未完成能力，并生成 `capabilities.md`；verify 重新生成并比对。规则见 `docs/engineering/testing.md` 第 13 节。
+实现（T15）：清单一次登记 M1–M5 的全部能力，每项带里程碑、需求编号或架构章节、负责任务与状态（`planned`、`active`、`blocked`，后者带原因与链接）；行为全在客户端的需求列在 `client_only`，由 L4 验证，使需求第 4 章的每个编号都有归属。`scripts/ci/check-capabilities.mjs` 对照需求与架构检查清单，按 L2 报告报 MISSING，并生成 `capabilities.md`；verify 重新生成并比对。规则见 `docs/engineering/testing.md` 第 13 节。
 
 ### 12.5 L3 行为对齐的做法
 
@@ -1866,15 +1866,15 @@ Windows 与 macOS 共用全部代码（ADR-0013）。本章规定双平台的节
 
 ## 16. 路线图与里程碑
 
-退出标准先在 macOS 上验收；Windows 按第 15.1 节的节奏，最迟在下一个里程碑结束前达到同样标准。里程碑拆分成的任务、依赖、验收项与执行协议见 [`docs/plan/PLAN.md`](../plan/PLAN.md)。
+退出标准先在 macOS 上验收；Windows 按第 15.1 节的节奏，最迟在下一个里程碑结束前达到同样标准。里程碑在开发期拆成带验收项的任务推进，交付记录在 git 历史中。
 
 | 里程碑 | 目标 | 退出标准 |
 |---|---|---|
 | **M0 技术验证**（3–5 周） | 在两个平台上验证高风险假设 | 每个 spike 的结论（通过 / 失败 / 有条件通过）记录在 `docs/spikes/`，两个平台分别给结论；失败项触发对应 ADR 复审。**已完成（R1，2026-11-16）：有条件进入 M1**，见 [M0 总结](../spikes/M0-summary.md) |
-| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 [W1 报告](../reviews/W1-windows-m1-parity.md)。 |
-| **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，并按用户确认的 ADR-0047 让带通配的命令规则不放行越界路径（L3 少了这条差异），见 [R3 评审](../reviews/R3-findings.md)。**Windows 已达标（W2，2026-11-21）**：L2 145 个通过（4 个 macOS 专属），L3 对 Claude Code 2.1.318 的 12 个场景 0 个未解释差异（allowlist 按平台限定 Windows 版的工具集差异），W1 遗留的 UNC 补验通过，修复 7 个 Windows 平台缺陷，见 [W2 报告](../reviews/W2-windows-m2-parity.md)。 |
-| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算。**macOS 按 ADR-0063 的口径达标（R5，2026-11-22）**：3 会话 + 子 agent + 共享 MCP 的场景中应用其余进程的物理占用最大 264 MB（≤ 510 MB）、Agent Host 最大 229 MB（≤ 270 MB），见 [R5 评审](../reviews/R5-findings.md)第 1.2 节；Windows 按同一口径达标（W3 收尾，2026-11-25）：私有工作集最大 314 MB（≤ 450 MB）、Agent Host 最大 163 MB（≤ 270 MB），见 [W3 报告](../reviews/W3-windows-m3-parity.md)第 4 节。此前的判定：**macOS 未达标（R4，2026-11-21）**：M3 能力全部有 L2 场景（L2 174 个通过、2 个 Windows 专属），四个独立审查的发现中修复 10 项缺陷；内存一项 Agent Host 达标（最大 236 MB，上限 270 MB），应用其余进程合计 580 MB 超出 510 MB（RSS 口径，phys_footprint 约 250 MB），阻塞进入 M4 的退出判定，见 [R4 评审](../reviews/R4-findings.md)。**Windows 未达标（W3，2026-11-22）**：M3 能力在 Windows 11 实机可用（ConPTY 终端与输入法、内置 Node 的 MCP、长路径与中文路径的 worktree、托盘、多窗口、`piarc://` 与右键菜单、讲述人与 NVDA），修复 10 个 Windows 缺陷；内存一项与 macOS 相同：Agent Host 最大 163 MB（达标），应用其余进程最大 576 MB 超出 450 MB（私有工作集合计 256 MB），见 [W3 报告](../reviews/W3-windows-m3-parity.md)。 |
-| **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标。**macOS 已达标（R5，2026-11-24）**。九项目标均有验收证据。M4 及之前没有 planned 能力；第 10.1 节 14 条威胁、59 个对策均已映射，macOS 与 Windows CI 通过威胁映射检查。本机完整 Nightly 的 25 项指标均达标。新安全用例双平台执行记录由 T45 跟踪，Windows M4 实机验收归 W4。见 [R5 评审](../reviews/R5-findings.md)。 |
+| **M1 可行走骨架** | 单工作区、多会话列表、流式对话；Read/Write/Edit/Bash（Windows 另有 PowerShell）/Glob/Grep 经 Core 执行；Manual 与 Accept edits 模式的基础审批；模型与凭据设置（凭据保险箱）；会话持久化与恢复；transcript P0 行类型 | 能用至少 2 家服务商完成"读代码 → 改代码 → 跑测试"的完整任务；L2 场景 ≥ 20 个通过。**macOS 已达标（R2，2026-11-19）**：两种协议的打包应用工作流通过，真实百炼 qwen-flash 通过，L2 61 个通过。**Windows 已达标（W1，2026-11-19）**：两种协议的工作流在两种形态通过，L2 60 个通过，UNC 共享未能实机验证，见 W1 报告。 |
+| **M2 Harness 核心** | 完整权限规则与 Bash 分析；plan 模式；任务清单；AskUserQuestion；hooks（M2 事件集，command 类型）；checkpoint 与 rewind；压缩与上下文用量；WebFetch；Changes 面板；memory 文件兼容 | 第 6 章 M2 能力全部有场景覆盖；L3 对齐在权限与 hooks 上无未解释差异。**macOS 已达标（R3，2026-11-20）**：M2 能力 46 项全部有 L2 场景，L2 118 个通过（2 个 Windows 专属），L3 对 Claude Code 2.1.318 的 12 个权限与 hooks 场景 0 个未解释差异；评审修复 16 项缺陷，并按用户确认的 ADR-0047 让带通配的命令规则不放行越界路径（L3 少了这条差异），见 R3 评审。**Windows 已达标（W2，2026-11-21）**：L2 145 个通过（4 个 macOS 专属），L3 对 Claude Code 2.1.318 的 12 个场景 0 个未解释差异（allowlist 按平台限定 Windows 版的工具集差异），W1 遗留的 UNC 补验通过，修复 7 个 Windows 平台缺陷，见 W2 报告。 |
+| **M3 多会话与生态** | 子 agent；后台任务与 Monitor；终端面板（libghostty-vt）；worktree；MCP 共享连接池；skills 与命令；WebSearch；ToolSearch；hooks 的 http/prompt 类型 | 3 个并行会话 + 子 agent 场景满足第 11 章内存预算。**macOS 按 ADR-0063 的口径达标（R5，2026-11-22）**：3 会话 + 子 agent + 共享 MCP 的场景中应用其余进程的物理占用最大 264 MB（≤ 510 MB）、Agent Host 最大 229 MB（≤ 270 MB），见 R5 评审第 1.2 节；Windows 按同一口径达标（W3 收尾，2026-11-25）：私有工作集最大 314 MB（≤ 450 MB）、Agent Host 最大 163 MB（≤ 270 MB），见 W3 报告第 4 节。此前的判定：**macOS 未达标（R4，2026-11-21）**：M3 能力全部有 L2 场景（L2 174 个通过、2 个 Windows 专属），四个独立审查的发现中修复 10 项缺陷；内存一项 Agent Host 达标（最大 236 MB，上限 270 MB），应用其余进程合计 580 MB 超出 510 MB（RSS 口径，phys_footprint 约 250 MB），阻塞进入 M4 的退出判定，见 R4 评审。**Windows 未达标（W3，2026-11-22）**：M3 能力在 Windows 11 实机可用（ConPTY 终端与输入法、内置 Node 的 MCP、长路径与中文路径的 worktree、托盘、多窗口、`piarc://` 与右键菜单、讲述人与 NVDA），修复 10 个 Windows 缺陷；内存一项与 macOS 相同：Agent Host 最大 163 MB（达标），应用其余进程最大 576 MB 超出 450 MB（私有工作集合计 256 MB），见 W3 报告。 |
+| **M4 安全与打磨** | macOS 沙箱；Windows 隔离方案评估；插件；NotebookEdit；可操作的系统通知；配置诊断；无障碍；本地化；性能预算全部进 CI | 安全威胁表逐条有测试；性能预算全部达标。**macOS 已达标（R5，2026-11-24）**。九项目标均有验收证据。M4 及之前没有 planned 能力；第 10.1 节 14 条威胁、59 个对策均已映射，macOS 与 Windows CI 通过威胁映射检查。本机完整 Nightly 的 25 项指标均达标。新安全用例双平台执行记录由 T45 跟踪，Windows M4 实机验收归 W4。见 R5 评审。 |
 | **M5 Beta** | Auto 模式（可配置审查模型）；自动记忆；企业托管配置；Anthropic 服务端压缩；fork 子 agent；平台快捷操作（App Intents / 跳转列表）；完整发布流水线 | macOS 与 Windows 同时公开 Beta |
 
 终端（ADR-0017）是 M3 中工作量最大的单项，估计 1 人 5.5–7 周。后台任务与 Monitor（T32）先用管道与输出文件实现，无头终端（T33）再加入"终端承载"的任务类型，渲染器（T34）最后接上；M0 的 S7 是开工前的闸门，不通过就直接启用 xterm.js 退路。

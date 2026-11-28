@@ -17,7 +17,7 @@ T48 的 fork 场景用 `same_system_as`、`same_tools_as` 核对原始请求字�
 | `cargo test -p piarc-testkit --test sessions` | T14：经 `piarc_core::CoreRuntime` 的会话层端到端（真实 Agent Host + mock，`tests/sessions/`） |
 | `cargo run --release -p piarc-testkit --example t14-warmup` | T14-A09：打开工作区到就绪、打开并恢复会话的 10 次测量，超过 1 s 预算即失败 |
 | `cargo test -p piarc-testkit --test ahp_round_trip -- --nocapture` | T07-A10：`fs/read` 的 AHP 往返计时（独立测试二进制，计时期间不跑别的测试） |
-| `cargo test -p piarc-testkit --test scenarios` | L2：`tests/scenarios/*.yaml` 每个文件一个测试（自定义 harness）；`-- <id> --exact` 只跑一个，`-- --results target/l2/results.json` 写 JSON 报告（相对路径按仓库根解析）。`test = false`：不在 `cargo test --workspace` 里，由 verify 第 14 步运行 |
+| `cargo test -p piarc-testkit --test scenarios` | L2：`tests/scenarios/*.yaml` 每个文件一个测试（自定义 harness）；`-- <id> --exact` 只跑一个，`-- --results target/l2/results.json` 写 JSON 报告（相对路径按仓库根解析）。`test = false`：不在 `cargo test --workspace` 里，由 verify 第 13 步运行 |
 | `cargo test -p piarc-testkit --test l2_runner -- --nocapture` | 运行器自身：格式错误、可读差异、未用的审批应答、重复运行与临时目录清理 |
 | `cargo test -p piarc-testkit --test npm_registry` | Pi 包市场的测试设施（ADR-0102）：真实 npm 只经 CONNECT 代理从 mock registry 安装（`NODE_EXTRA_CA_CERTS` 信任测试 CA、空的 `npm_config_userconfig`、`--save-exact`），代理 407 时没有直连；搜索的过滤、排序与翻页上限；未知路径记为违规 |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-npm -- --fixtures <packages.json> --work <目录>` 与 `--bin piarc-mock-proxy` | L4 用的独立进程：stdout 第一行是端口；stdin 每行一个控制（npm：`offline`、`online`、`status <路径> <码>`、`hold <路径>`、`release`、`requests`、`violations`；代理：`route <主机> <端口>`、`tunnel`、`refuse <状态>`、`drop`、`connects`），EOF 退出 |

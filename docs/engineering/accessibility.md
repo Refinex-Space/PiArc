@@ -52,7 +52,7 @@ PiArc 的界面要能只用键盘完成全部功能，在 VoiceOver、Narrator�
 
 **颜色与动效**
 
-- 颜色只来自设计令牌；文字对比度 4.5:1（大字与图形 3:1），verify 第 15 步检查令牌对，axe 检查实际页面。
+- 颜色只来自设计令牌；文字对比度 4.5:1（大字与图形 3:1），verify 第 14 步检查令牌对，axe 检查实际页面。
 - 代码高亮用 GitHub 高对比度主题（`transcript/highlight/themes.ts`），每个 token 在代码背景与 diff 增删底色上都不低于 4.5:1（`themes.test.ts`），并跟随应用的主题选择。
 - 侧栏在 macOS vibrancy / Windows Mica 上叠一层 90% 的自身底色，axe 看不到系统材质，按白底计算也达标。
 - 状态不只靠颜色：徽标靠形状和字符（`!`、`?`），工具状态点有隐藏文字与 `title`；强制颜色下改用系统色的形状（`forced-color-adjust: none` 只用于这些小标记）。
@@ -73,7 +73,7 @@ PiArc 的界面要能只用键盘完成全部功能，在 VoiceOver、Narrator�
 |---|---|---|
 | axe（WCAG 2.0–2.2 A/AA 与最佳实践），亮色与暗色 | `apps/desktop/e2e/t43-a11y.e2e.ts`，报告在 `tmp/evidence/<任务>/axe/` | 状态清单里任何一条有违规，或有一条本次运行没到达 |
 | 状态清单覆盖 | `apps/desktop/e2e/a11y/states.test.ts`（Vitest，verify 第 5 步） | 渲染进程注册的设置页（`registerSettingsPage`）、面板（`registerPanel`）、渲染 `<Dialog>` 的文件、transcript 行 kind（`ROW_KINDS`）有没登记的 |
-| i18n | `scripts/ci/check-i18n.mjs`（verify 第 16 步） | 两种语言键集合不同；ICU 无效；两种语言占位符不同；用了语言没有的复数类别；`t('…')` 引用不存在的键；渲染进程或主进程有硬编码的用户可见文字；不带 locale 的 `toLocaleString()` |
+| i18n | `scripts/ci/check-i18n.mjs`（verify 第 15 步） | 两种语言键集合不同；ICU 无效；两种语言占位符不同；用了语言没有的复数类别；`t('…')` 引用不存在的键；渲染进程或主进程有硬编码的用户可见文字；不带 locale 的 `toLocaleString()` |
 | 行名称、live region 节流、审批卡焦点 | `row-label.test.tsx`、`LiveRegion.test.tsx`、`live-announcer.test.ts`、`e2e/t43-approval-focus.e2e.ts` | 任何一种行没有名称，或中英文名称不对；流式期间更新频率超过节流间隔；卡片不取焦点或 400 ms 内键盘能激活 |
 | 键盘与系统偏好 | `e2e/t43-keyboard.e2e.ts` | 只用键盘走不完流程；Tab 跨区域顺序不对；有焦点停靠点没有可见焦点环（输入类表面按上文的轻样式）；减少动效、高对比度、强制颜色不生效 |
 | 中英文截断与溢出 | `e2e/t43-locales.e2e.ts`，截图在 `tmp/evidence/<任务>/locales/` | 按钮、标签页、导航项、表头、徽标的文字超出自身的框 |

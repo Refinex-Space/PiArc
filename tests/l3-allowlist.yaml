@@ -4,7 +4,7 @@
 # differences: intended deviations of PiArc from Claude Code, by scenario and field path. Every
 # entry needs a reason; an entry that applies to a run (Claude Code version in range, scenario
 # ran) but matches no difference fails `npm run l3`, so fixed deviations leave the list.
-# follow_up names the task that revisits an entry (listed in docs/plan/PLAN.md's registry).
+# follow_up names the task that revisits an entry (a label from the delivery history).
 # excluded: compared L2 scenarios (perm-, policy-, hooks-, config-) that no L3 scenario mirrors,
 # with the reason `claude -p` cannot reproduce them.
 # T48's mcp-elicitation cases use a desktop form and native consent to visit a URL. A URL

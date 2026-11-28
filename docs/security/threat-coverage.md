@@ -2,7 +2,7 @@
 
 > 由 `node scripts/ci/check-threats.mjs --results target/l2/results.json --doc write` 根据 `tests/security/threats.yaml`、架构第 10.1 节与 L2 场景结果生成，不要手工编辑。新增安全对策的登记方法见 `docs/engineering/testing.md` 第 16 节。
 
-测试 ID 的种类：**L2** = 能力 ID 与覆盖它的场景（verify 第 14 步）；**Rust** = `cargo test`（verify 第 8 步）；**Vitest** = verify 第 5 步；**L4** = Playwright（CI `desktop` 作业）；**CI** = 打包产物上的检查脚本（CI `desktop` 作业）；**流程** = PR 模板等人工检查项。对策类型：**自动化**、**流程**、**已接受风险**（写明理由与 ADR 或登记事项）、**待补**（由所列任务补测试）。
+测试 ID 的种类：**L2** = 能力 ID 与覆盖它的场景（verify 第 13 步）；**Rust** = `cargo test`（verify 第 8 步）；**Vitest** = verify 第 5 步；**L4** = Playwright（CI `desktop` 作业）；**CI** = 打包产物上的检查脚本（CI `desktop` 作业）；**流程** = PR 模板等人工检查项。对策类型：**自动化**、**流程**、**已接受风险**（写明理由与 ADR 或登记事项）、**待补**（由所列任务补测试）。
 
 ## 汇总
 

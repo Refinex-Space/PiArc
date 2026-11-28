@@ -110,7 +110,7 @@ fn harness_tools(events: &harness::Recorder, session: &str) -> Vec<(String, Stri
 const STALL_A: &str = r#"
 id: stall-a
 # Every rule on: the Harness Kit closes the interrupted turn, so the next request alternates
-# (PLAN.md I18, T14).
+# (issue I18, T14).
 steps:
   - text: "Still thinking about the answer"
     stall_after_events: 4
@@ -367,7 +367,7 @@ async fn an_mcp_hooks_local_abort_reaches_core_as_a_timeout() {
 const KILL_A: &str = r#"
 id: kill-a
 # Every rule on: the reopened session's turn, cut off by the kill, is closed when the session
-# is resumed (PLAN.md I18, T14).
+# is resumed (issue I18, T14).
 steps:
   - text: "Working on it"
     stall_after_events: 4

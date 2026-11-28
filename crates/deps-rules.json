@@ -4,7 +4,7 @@
     "Enforced by scripts/ci/check-crate-deps.mjs for normal, build and dev dependencies.",
     "A crate may depend on crates in the layers listed in its layer's mayDependOn, never on crates in its own layer.",
     "Chain: piarc-napi -> piarc-core -> feature crates -> {piarc-protocol, piarc-ports}. Feature crates collaborate through piarc-core.",
-    "Any other edge must be listed in exceptions with a reason. Adding a one-way exception that keeps the graph acyclic is a supplementary decision; reversing or bypassing the chain needs an ADR (docs/plan/protocol.md)."
+    "Any other edge must be listed in exceptions with a reason. Adding a one-way exception that keeps the graph acyclic is a supplementary decision; reversing or bypassing the chain needs an ADR (docs/adr/README.md)."
   ],
   "layers": [
     {

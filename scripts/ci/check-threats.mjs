@@ -5,9 +5,9 @@
 //
 // Usage:
 //   node scripts/ci/check-threats.mjs
-//       the map alone: rows, countermeasures, test IDs, deferred tasks, tests named after a threat
+//       the map alone: rows, countermeasures, test IDs, tests named after a threat
 //   node scripts/ci/check-threats.mjs --results target/l2/results.json --doc check|write
-//       plus the generated doc: compare (check, verify step 17) or rewrite (write)
+//       plus the generated doc: compare (check, verify step 16) or rewrite (write)
 // Exit code 1 on any problem.
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -15,7 +15,7 @@ import { parseArgs } from 'node:util';
 
 import { parse } from 'yaml';
 
-import { parseCatalog, taskStatuses, toReport } from '../lib/capabilities.mjs';
+import { parseCatalog, toReport } from '../lib/capabilities.mjs';
 import { capture, isMain, isRecord, readJsonFile, repoRoot } from '../lib/repo.mjs';
 import {
   checkThreats,
@@ -86,7 +86,6 @@ async function inventory(threats) {
     files,
     capabilities: new Map(catalog.capabilities.map((c) => [c.id, c.status])),
     scenarios,
-    tasks: taskStatuses(read('docs/plan/PLAN.md')),
   };
 }
 

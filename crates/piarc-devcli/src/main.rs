@@ -6,7 +6,7 @@
 //!   (directly, not through NAPI), the esbuild bundle of the Agent Host on Node, and the strict
 //!   mock provider of `piarc-testkit`, through the runner in `piarc_testkit::l2`.
 //! - One scenario file or every file of a directory; a JSON report for the capability list
-//!   (`scripts/plan/check-capabilities.mjs`).
+//!   (`scripts/ci/check-capabilities.mjs`).
 //! - The PiArc side of L3 (`l3`, T30): runs scenarios with the mocks in L3 mode and writes
 //!   each run's structure-only capture for `scripts/l3/run.mjs`.
 //!

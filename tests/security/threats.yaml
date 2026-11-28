@@ -1,5 +1,5 @@
 # Threat map (T45, NFR-03): one entry per row of architecture section 10.1, its countermeasures
-# and the tests that assert them. Checked by `node scripts/ci/check-threats.mjs` (verify step 17),
+# and the tests that assert them. Checked by `node scripts/ci/check-threats.mjs` (verify step 16),
 # which also generates docs/security/threat-coverage.md. Rules: docs/engineering/testing.md
 # section 16.
 #

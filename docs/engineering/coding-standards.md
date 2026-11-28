@@ -48,7 +48,7 @@ Markdown 不进 Prettier：文档中的宽表格每次编辑都会被重新填�
 
 ### 1.6 禁止写入仓库的内容
 
-凭据、个人信息、本机绝对路径；从 `reference/claude-code` 或 `reference/OpenClaudeDesktop` 复制的任何代码、提示词和界面组件（ADR-0006，`docs/plan/references.md`）。
+凭据、个人信息、本机绝对路径；从 `reference/claude-code` 或 `reference/OpenClaudeDesktop` 复制的任何代码、提示词和界面组件（ADR-0006）。
 
 ## 2. Rust
 
@@ -169,9 +169,8 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 
 | 能力 | 位置 | 说明 | 登记任务 |
 |---|---|---|---|
-| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 17 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
+| 统一检查入口 | `scripts/dev/verify.mjs`（`npm run verify`） | 按顺序运行 16 个检查步骤，失败后继续，最后打印汇总表；新增检查在 `STEPS` 中追加 | T01 |
 | crate 依赖方向检查 | `scripts/ci/check-crate-deps.mjs` + `crates/deps-rules.json` | 读取 `cargo metadata`，按层与例外校验 workspace crate 之间的依赖 | T01 |
-| 验收清单一致性检查 | `scripts/plan/check-acceptance.mjs` | 比对任务文件中的 `- [Txx-Ayy]` 验收项与 `docs/plan/acceptance.json` | T01 |
 | 仓库内工具安装 | `scripts/dev/install-tools.mjs` | 把锁定版本的工具（cargo-deny、ripgrep、fd、bindgen-cli）装进 `.tools/`，不做全局安装；`localToolPath()` 给出可执行文件路径 | T01 |
 | 脚本公共函数 | `scripts/lib/repo.mjs` | `repoRoot`、`isMain`、`run`（继承输出）、`capture`（捕获输出）、`resolveBin`、`readJsonFile`、`isRecord` | T01 |
 | AHP 帧编解码器 | Rust：`piarc_protocol::{FrameDecoder, encode_frame}`；TS：`@piarc/protocol` 的 `FrameDecoder`、`encodeFrame` | LF 分帧的 UTF-8 JSON，只处理字节缓冲，不做 I/O；半包缓存、超限帧丢弃到下一个 LF、错误按帧返回；两份实现跑同一份 `tests/contracts/framing/` 用例 | T02 |
@@ -249,7 +248,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 目录监听 | `piarc_fs::watch::Watcher` | notify 封装，非递归监听目录，回调给出路径；调用方去抖并重读 | T13 |
 | L2 场景运行器 | `piarc_testkit::l2`（`load`、`run`、`run_suite`、`RunnerConfig::build`）；`cargo test -p piarc-testkit --test scenarios`；`piarc-devcli run` | 加载并校验场景文件（`tests/scenarios/schema.json`），在含空格与中文的临时根中驱动 Core 无头运行时 + 真实 Agent Host + 每个端点一个严格 mock，断言事件、文件、请求、工具批次与 Core I/O，输出可读差异与 JSON 报告；新增 Harness 行为写一个场景，见 `testing.md` 第 12 节 | T15 |
 | 事件部分匹配断言 | `piarc_testkit::l2::matcher`（`is_subset`、`subset_mismatch`、`check_events`） | 字段子集匹配（对象按键子集、数组逐元素同长度、标量相等）与按会话的有序子序列（含 `any_order` 组）；失败时给出第一个未匹配的期望、乱序位置与附近的实际事件 | T15 |
-| 能力覆盖检查 | `scripts/plan/check-capabilities.mjs`、`scripts/lib/capabilities.mjs`；verify 第 14 步（`scripts/ci/run-l2.mjs`） | `tests/capabilities.yaml` 与需求、架构、看板对照；按 L2 报告报 MISSING 与未登记的能力 ID；`--milestone Mx` 列出未完成能力；生成并比对 `docs/product/capabilities.md`；见 `testing.md` 第 13 节 | T15 |
+| 能力覆盖检查 | `scripts/ci/check-capabilities.mjs`、`scripts/lib/capabilities.mjs`；verify 第 13 步（`scripts/ci/run-l2.mjs`） | `tests/capabilities.yaml` 与需求、架构对照；按 L2 报告报 MISSING 与未登记的能力 ID；生成并比对 `docs/product/capabilities.md`；见 `testing.md` 第 13 节 | T15 |
 | 路径规范化与访问检查 | `piarc_fs::Scope`（`check`、`resolve`、`locate`、`key`、`label`、`with_added_dir`、`with_read_only_dir`）、`piarc_fs::access`（受保护路径） | 相对路径、`..`、符号链接（含悬空）、`\\?\` 前缀与大小写不敏感的卷：文件 I/O 使用 `Scope::bind` 的目录句柄，审批跨步骤绑定 `DirectoryBinding`（ADR-0036），越界与受保护路径给出 `NeedsApproval`；文件身份比较用 `key`，diff 与消息里的路径用 `label`/`display`。规则见 `crates/piarc-fs/CLAUDE.md` | T16 |
 | 保真写入与文件状态 | `piarc_fs::{write, WriteSpec, check_fresh, stat_for_read, FileStates, PathLocks}`、`piarc_fs::encoding`；底层原子替换 `atomic::replace`（crate 内） | 替换已存在的文件：先读后改与外部修改检查、编码与 BOM 保持、按需换成文件的换行风格、同目录临时文件 + rename、失败不留半个文件；编码检测与按范围解码也在这里。Core 内其他写入工作区文件的地方复用这里而不是再写一份；功能 crate 不能依赖 `piarc-fs`，各自的原子写入见上面"原子写入"一行 | T16 |
 | 结构化 diff | `piarc_diff::file_diff` → `piarc_protocol::diff::FileDiff` | unified 文本与 hunk 同源，超限降级；Changes 面板、审批卡、快照回退都用这份结构 | T16 |
@@ -263,7 +262,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 面板与设置页注册 | `apps/desktop/src/renderer/shell/registry.ts`（`registerPanel`，area 为 `rail` 或 `dock`）、`src/renderer/settings/registry.ts`（`registerSettingsPage`） | 右栏卡片、停靠面板、设置页都在所属任务里注册，容器负责布局、尺寸记忆与导航；没有注册内容的区域不显示 | T18 |
 | 快捷键注册表 | `apps/desktop/src/shared/keybindings.ts`（`COMMANDS`、`effectiveBindings`、`commandForEvent`、`conflictFor`、`toAccelerator`、`displayKey`） | 命令 id → `Mod` 记法默认键；用户覆盖存于用户级设置；渲染进程按 `KeyboardEvent.code` 匹配，主进程菜单显示同一绑定；按平台换算物理按键判断冲突 | T18 |
 | 本地化 | `apps/desktop/src/shared/i18n/`（`Translator`、`resolveLocale`；目录 `en.ts`、`zh-CN.ts`）；渲染进程 `useT()`，主进程 `AppShell.t()` | ICU MessageFormat（intl-messageformat，不用 eval）；英文目录定义消息 id，中文目录类型上必须覆盖全部 id；主进程菜单、原生对话框、通知与渲染进程共用 | T18 |
-| 设计令牌 | `design/tokens/*.json` → `npm run gen:tokens`（`scripts/lib/design-tokens.mjs`）→ `src/renderer/theme/tokens.generated.css`、`src/shared/design-tokens.ts`（`COLORS`、`tokenVar`）；检查 `scripts/ci/check-design-tokens.mjs` | 四种颜色模式 × 两档密度；组件只读语义与组件令牌；对比度、品牌与资源检查在 verify 第 15 步 | T18 |
+| 设计令牌 | `design/tokens/*.json` → `npm run gen:tokens`（`scripts/lib/design-tokens.mjs`）→ `src/renderer/theme/tokens.generated.css`、`src/shared/design-tokens.ts`（`COLORS`、`tokenVar`）；检查 `scripts/ci/check-design-tokens.mjs` | 四种颜色模式 × 两档密度；组件只读语义与组件令牌；对比度、品牌与资源检查在 verify 第 14 步 | T18 |
 | 客户端偏好 | Core `piarc_core::client_settings`（NAPI `userSettings`、`writeClientSetting`）；主进程 `src/main/preferences.ts`（`PreferenceStore`）；共享 `src/shared/preferences.ts`（`preferencesFrom`、`pointerOf`） | 语言、外观、快捷键覆盖、通知写在用户级 `settings.json`，Core 是唯一写入方；改动推送到所有窗口 | T18 |
 | Transcript 行组件分派 | `apps/desktop/src/renderer/store/transcript.ts`（`SessionTranscript`）与 `transcript/rows/RowView.tsx` | 在同一个 store 生成行或组 ID，在 `RowView` 按行类型、协议 item 类型分派。历史与实时共用各行组件、记忆化与行级错误边界，新行补一项组件测试 | T19 |
 | 工作区模糊文件匹配 | `CoreRuntime.searchFiles(searchId, root, query, limit)`、`cancelFileSearch(searchId)`、`piarc_fs::fuzzy` | 检查搜索根所属工作区、按忽略规则列文件、对子序列匹配排序，返回相对路径和匹配位置。每个搜索框分配独立 ID，由 Core 取消已过期查询并限定结果数量 | T19 |
@@ -317,7 +316,7 @@ Vitest，测试文件与源文件放在一起，命名 `*.test.ts`（脚本为 `
 | 无障碍状态清单 | `apps/desktop/e2e/a11y/states.ts`（清单）、`e2e/a11y.ts` 的 `checkState`、`e2e/t43-a11y.e2e.ts`（旅程）、`e2e/a11y/states.test.ts`（覆盖） | 每个页面与组件状态一条，axe 亮暗两种主题零违规；新增设置页、面板、对话框、transcript 行类型要登记并接到旅程 | T43 |
 | transcript 行的可访问名称 | `apps/desktop/src/renderer/transcript/row-label.ts`（`rowLabel`、`rowKind`）、`src/shared/row-kinds.ts`（`ROW_KINDS`）、`RowView.tsx` 的 `useRowLabel`/`RowArticle` | 每种行一句描述，和可见文案共用 i18n；新增行类型在这里加 | T43 |
 | 节流播报 | `transcript/live-announcer.ts`（`ThrottledAnnouncer`，可注入时钟）、`transcript/LiveRegion.tsx`、`LIVE_ANNOUNCE`（`transcript/constants.ts`） | 进展至多每个间隔一次、结果立即且只一次；要播报的地方复用它，不另开 `aria-live` 区域逐条写 | T43 |
-| i18n 检查 | `scripts/ci/check-i18n.mjs`（verify 第 16 步；`readCatalog`、`catalogProblems`、`sourceProblems`） | 键集合、ICU 与占位符、复数类别、引用、硬编码文字与不带 locale 的格式化；固定文字用 `i18n-exempt:` 注释说明 | T43 |
+| i18n 检查 | `scripts/ci/check-i18n.mjs`（verify 第 15 步；`readCatalog`、`catalogProblems`、`sourceProblems`） | 键集合、ICU 与占位符、复数类别、引用、硬编码文字与不带 locale 的格式化；固定文字用 `i18n-exempt:` 注释说明 | T43 |
 | 按应用语言格式化 | `apps/desktop/src/renderer/app/app-context.tsx` 的 `format.number`、`format.dateTime` | 数字与日期按应用选择的语言（不是系统语言） | T43 |
 | 性能测量框架 | `scripts/perf/metrics.mjs`（`METRICS`、`EXCLUDED`、`budgetOf`）、`gate.mjs`（`judge`、`failures`、`machineClass`、`readBaselines`）、`run.mjs`（`PROBES`） | 第 11 章每项指标的预算、探针、流水线与两道判定；新指标在 `METRICS` 加一项、新探针在 `PROBES` 加一项（或写一个输出 `{ values, samples, detail }` 的 `probe-*.mjs`），不另写一套计时与判定 | T44 |
 | 性能打点与应用驱动 | `scripts/perf/lib.mjs`（`startMock`、`seedModels`、`launchApp`、`openWorkspace`、`startSession`、`childProcesses`、`appSnapshot`、`quantile`、`stats`） | 在临时数据目录里起严格 mock 与打包产物、打开工作区与会话、读各进程与 Agent Host 的内存、分位数；性能脚本与内存测量复用它 | T44 |

@@ -1,13 +1,13 @@
 # Harness capabilities of M1–M5 (architecture section 12.4). Format and rules:
 # docs/engineering/testing.md section 13. `docs/product/capabilities.md` is generated from this
-# file and the L2 report: node scripts/plan/check-capabilities.mjs --results <report> --doc write
+# file and the L2 report: node scripts/ci/check-capabilities.mjs --results <report> --doc write
 #
 # - id: CAP-<DOMAIN>-<CAPABILITY>-<NNN>, stable; never renumber or reuse.
 # - status: planned (no scenario needed), active (at least one L2 scenario covers it, else
 #   MISSING), blocked (needs `reason` and `link`).
 # - refs: requirement ids (FR-…) of docs/product/REQUIREMENTS.md chapter 4 and/or architecture
 #   sections (ARCH-<n>, ARCH-<n>.<m>, …) of docs/architecture/ARCHITECTURE.md.
-# - task: the task of docs/plan/PLAN.md that implements it (and moves it to active).
+# - task: the development task that implemented it (a label kept from the delivery history).
 # - client_only: requirements whose behavior lives in the client and is verified by L4, not
 #   L2. Every FR id of chapter 4 appears in a capability's refs or here.
 version: 1

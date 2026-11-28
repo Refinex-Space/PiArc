@@ -5,8 +5,8 @@
 // A run where every step passed on a clean tree records its commit in
 // target/verify/last-pass.json. `npm run verify -- --baseline` (a task's start check) reuses
 // that result when everything committed since touches only docs/: it then runs only the
-// steps those files can affect (Prettier on them, the acceptance list). Any other change, a
-// dirty tree or a missing record runs every step.
+// step those files can affect (Prettier on them). Any other change, a dirty tree or a missing
+// record runs every step.
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -79,7 +79,6 @@ export const STEPS = [
   { name: 'contract samples', command: nodeScript('scripts/ci/check-contract-samples.mjs') },
   { name: 'cargo-deny', command: cargoDeny },
   { name: 'crate dependency rules', command: nodeScript('scripts/ci/check-crate-deps.mjs') },
-  { name: 'acceptance list', command: nodeScript('scripts/plan/check-acceptance.mjs') },
   // Agent Host bundle, every L2 scenario, capability coverage and capabilities.md drift.
   { name: 'L2 scenarios + capabilities', command: nodeScript('scripts/ci/run-l2.mjs') },
   // Generated CSS and TS match design/tokens/, WCAG contrast in four modes, brand rules.
@@ -87,7 +86,7 @@ export const STEPS = [
   // Same keys in both catalogs, valid ICU with the same placeholders, no hard-coded text (T43).
   { name: 'i18n', command: nodeScript('scripts/ci/check-i18n.mjs') },
   // Every row of architecture section 10.1 mapped to existing tests, and threat-coverage.md
-  // matches the map and step 14's L2 report (T45).
+  // matches the map and step 13's L2 report (T45).
   {
     name: 'threat map',
     command: () => ({
@@ -134,7 +133,7 @@ const LAST_PASS = path.join(repoRoot, 'target', 'verify', 'last-pass.json');
 
 /**
  * Whether the files changed since the last fully passing run allow reusing it: all under
- * `docs/` (plans, ADRs, architecture, acceptance list), none elsewhere.
+ * `docs/` (ADRs, architecture, design addenda), none elsewhere.
  * @param {string[]} changed repository-relative paths with `/`
  */
 export function canReuse(changed) {
@@ -182,8 +181,6 @@ async function baselineSteps() {
       command: nodeBin('prettier', ['--check', ...formatted]),
     });
   }
-  const acceptance = STEPS.find((step) => step.name === 'acceptance list');
-  if (acceptance !== undefined) steps.push(acceptance);
   return steps;
 }
 

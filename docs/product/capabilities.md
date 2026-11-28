@@ -1,6 +1,6 @@
 # 能力清单
 
-> 由 `node scripts/plan/check-capabilities.mjs --results <L2 报告> --doc write` 根据 `tests/capabilities.yaml` 与 L2 场景结果生成，不要手工编辑。格式与规则见 `docs/engineering/testing.md` 第 13 节。
+> 由 `node scripts/ci/check-capabilities.mjs --results <L2 报告> --doc write` 根据 `tests/capabilities.yaml` 与 L2 场景结果生成，不要手工编辑。格式与规则见 `docs/engineering/testing.md` 第 13 节。
 
 状态：**已实现** = `active` 且至少一个 L2 场景覆盖；**计划中** = `planned`；**BLOCKED** = 因外部原因暂缓；**MISSING** = `active` 却没有场景；**失败** = 覆盖它的场景没有通过。
 

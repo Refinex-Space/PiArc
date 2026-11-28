@@ -7,7 +7,7 @@
 //   claude_code   Claude Code versions the entry applies to: space-separated comparators
 //                 such as ">=2.1.300 <2.2.0", or "*"
 //   reason        why PiArc differs on purpose (required)
-//   follow_up     the task that will revisit it (optional; listed in PLAN.md's registry)
+//   follow_up     the task that will revisit it (optional label)
 //   platforms     where the entry applies: [macos], [windows] or both (optional, default
 //                 both); Claude Code's tool set differs by platform (W2)
 // excluded: [{scenario, reason}]

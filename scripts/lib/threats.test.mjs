@@ -73,7 +73,6 @@ function inventory() {
         description: 'asks',
       },
     ],
-    tasks: new Map([['T50', '未开始']]),
   };
 }
 
@@ -142,14 +141,11 @@ describe('the threat map', () => {
     ]);
   });
 
-  it('fails when a row has no entry and when a deferred task is already done', () => {
+  it('fails when a row has no entry', () => {
     const { threats } = parseThreats(MAP);
-    const found = inventory();
-    found.tasks.set('T50', '已完成');
     const rows = [...threatRows(ARCHITECTURE), { name: '新威胁', measures: ['某对策'] }];
-    expect(checkThreats(threats, rows, found)).toEqual([
+    expect(checkThreats(threats, rows, inventory())).toEqual([
       'section 10.1 row "新威胁" has no THR entry with that title',
-      'THR-08 (更新流程): T50 is done; map the tests it added and drop "deferred"',
     ]);
   });
 

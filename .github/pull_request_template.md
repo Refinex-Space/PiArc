@@ -1,10 +1,14 @@
-## 改动
+## Summary
 
-<!-- 一两句话说明改了什么、为什么。关联的任务编号（Txx）或登记事项（Ixx）。 -->
+<!-- What changed and why, in a sentence or two. Link the issue it closes. -->
 
-## 检查项
+## How it was tested
 
-- [ ] <!-- source-and-license --> 来源与许可证：新增代码若参考了外部项目，已写明来源（仓库、路径、版本）与许可证；没有复制 `reference/claude-code`、`reference/OpenClaudeDesktop` 的代码、提示词或界面组件（ADR-0006）
-- [ ] <!-- dependency-review --> 新增依赖已评审：写明用途与替代方案，许可证在白名单内，精确锁定版本（npm 不用 `^`、`~`；Cargo 只在 `[workspace.dependencies]` 声明），`npm run audit:deps` 没有未处理的高危与严重问题；没有新增依赖时勾选
-- [ ] <!-- threat-map --> 新增或改变的安全对策已登记到 `tests/security/threats.yaml`，测试名带威胁编号（`docs/engineering/testing.md` 第 16 节）；不涉及安全对策时勾选
-- [ ] `npm run verify` 通过
+<!-- The commands you ran and what they showed; screenshots for visible changes. -->
+
+## Checklist
+
+- [ ] <!-- source-and-license --> Sources and licenses: code inspired by another project names its source (repository, path, version) and license; nothing is copied from `reference/claude-code` or `reference/OpenClaudeDesktop` (code, prompts or UI components, ADR-0006)
+- [ ] <!-- dependency-review --> New dependencies are reviewed: purpose and alternatives stated, license on the allowlist, version pinned exactly (no `^`/`~` in npm; Cargo only in `[workspace.dependencies]`), and `npm run audit:deps` reports no unhandled high or critical issue. Tick it when nothing was added
+- [ ] <!-- threat-map --> New or changed security countermeasures are mapped in `tests/security/threats.yaml` with tests named after the threat (`docs/engineering/testing.md` section 16). Tick it when no countermeasure is involved
+- [ ] `npm run verify` passes

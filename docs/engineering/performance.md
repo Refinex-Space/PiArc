@@ -180,7 +180,7 @@ Nightly 运行 1 小时的缩短版（`PIARC_LONG_RUN_HOURS=1`：预热 10 分�
 
 ### 5.2.1 R5 复测（2026-11-22）
 
-同一台机器、同一命令（不含体积两项），报告 `tmp/evidence/R5/perf-nightly-report.json`，逐行对照与环境说明在 [R5 评审](../reviews/R5-findings.md)第 1.2 节。超出预算的是主进程增量 35.6 MB、Agent Host 196 MB、流式帧 p99 16.2 ms；应用全部进程合计按 RSS 为 530 MB，ADR-0063 采纳后按物理占用另测 208 MB（3 次中位，`tmp/evidence/R5/app-memory-adr0063.txt`），达标，并按新口径更新了这一项的基线。3 会话 + 子 agent 场景（`npm run perf:m3`）：应用其余进程物理占用最大 264 MB（RSS 584 MB）、Agent Host 最大 229 MB，都在预算内（`tmp/evidence/R5/m3-memory.json`）。"打开工作区到 Agent Host 就绪"按改回的口径（10 次最大，R5 性能审查 P3）为 982 ms。测量时机器有负载（IDE 与远程桌面），冷启动 666 ms 与事件循环 5.0 ms 相对基线的回归未确认；没有更新基线。
+同一台机器、同一命令（不含体积两项），报告 `tmp/evidence/R5/perf-nightly-report.json`，逐行对照与环境说明在 R5 评审第 1.2 节。超出预算的是主进程增量 35.6 MB、Agent Host 196 MB、流式帧 p99 16.2 ms；应用全部进程合计按 RSS 为 530 MB，ADR-0063 采纳后按物理占用另测 208 MB（3 次中位，`tmp/evidence/R5/app-memory-adr0063.txt`），达标，并按新口径更新了这一项的基线。3 会话 + 子 agent 场景（`npm run perf:m3`）：应用其余进程物理占用最大 264 MB（RSS 584 MB）、Agent Host 最大 229 MB，都在预算内（`tmp/evidence/R5/m3-memory.json`）。"打开工作区到 Agent Host 就绪"按改回的口径（10 次最大，R5 性能审查 P3）为 982 ms。测量时机器有负载（IDE 与远程桌面），冷启动 666 ms 与事件循环 5.0 ms 相对基线的回归未确认；没有更新基线。
 
 ### 5.2.2 M4 性能收尾复核（2026-11-24）
 

@@ -1,5 +1,5 @@
 // Harness Kit: the transcript after an interrupted turn (architecture sections 6.1.2 and 6.15,
-// PLAN.md I18). Pi 1.5.2 leaves two gaps that this module closes when a turn settles aborted:
+// issue I18). Pi 1.5.2 leaves two gaps that this module closes when a turn settles aborted:
 //
 // 1. Tool calls the abort cut off before Pi created their result (calls not prepared yet when
 //    the abort came) have no tool result in the session file. pi-ai papers over that per request

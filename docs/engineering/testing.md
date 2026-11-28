@@ -12,13 +12,13 @@
 | L2 场景回放 | 无头运行 Core + 真实 Agent Host，模型侧接严格校验请求的 mock provider，按场景数据文件驱动 | `tests/scenarios/<场景 id>.yaml`，文件名与 `id` 一致；运行器在 `piarc-testkit`（`src/l2/`），驱动在 `piarc-devcli`；能力清单 `tests/capabilities.yaml`；见第 12、13 节 | `cargo test -p piarc-testkit --test scenarios`；全部（含能力检查）：`node scripts/ci/run-l2.mjs` | 每次提交 | T05、T15 |
 | L3 行为对齐 | 同一个严格 mock 同时服务 PiArc 与真实的 `claude -p`，录制两侧的请求结构与行为轨迹，归一化后做结构化 diff | 场景 `tests/l3/scenarios/<id>.yaml`（格式 `tests/l3/schema.json`），有意偏离与排除清单 `tests/l3-allowlist.yaml`，脚本在 `scripts/l3/`；见第 14 节 | `npm run l3`（`-- --repeat 2` 检查同侧可重复）；剥离检查的单测随 `npm test` | 每晚（`.github/workflows/l3-nightly.yml`）/ 手动 | T30 |
 | L4 客户端 | Playwright 驱动 Electron 应用（开发形态与打包产物）；关键组件视觉快照；录制事件流驱动渲染进程（假 Core） | `apps/desktop/e2e/*.e2e.ts`；见第 9 节 | 先 `npm run package:desktop -- --flavor development`，再 `npm run test:e2e -w @piarc/desktop` | 每次提交（CI `desktop` 作业）/ 每晚（UI 流程） | T03、T19 |
-| 安全回归 | 第 10.1 节每条威胁的对策（威胁映射 `tests/security/threats.yaml`，第 16 节）；XSS 载荷集在全部渲染面、preload 畸形参数与越权调用、外部导航拦截（架构第 10.3 节）；发布构建的运行时探测 | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance`、`t45-*` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；载荷集 `src/shared/xss-payloads.ts`（T09 起，T45 扩充）；打包产物：`scripts/ci/check-release-runtime.mjs`、`check-app-layout.mjs` | 映射与纯函数由 `npm run verify` 运行（第 17 步检查映射）；Electron 层同 L4；打包产物检查在 CI `desktop` 作业 | 每次提交 | T03 起，T45 |
+| 安全回归 | 第 10.1 节每条威胁的对策（威胁映射 `tests/security/threats.yaml`，第 16 节）；XSS 载荷集在全部渲染面、preload 畸形参数与越权调用、外部导航拦截（架构第 10.3 节）；发布构建的运行时探测 | Electron 层：L4 的 `csp`、`navigation`、`external-links`、`preload`、`permissions`、`app-instance`、`t45-*` 用例；纯函数（来源校验、外链白名单、CSP、资源路径）：`apps/desktop/src/main/**/*.test.ts`；载荷集 `src/shared/xss-payloads.ts`（T09 起，T45 扩充）；打包产物：`scripts/ci/check-release-runtime.mjs`、`check-app-layout.mjs` | 映射与纯函数由 `npm run verify` 运行（第 16 步检查映射）；Electron 层同 L4；打包产物检查在 CI `desktop` 作业 | 每次提交 | T03 起，T45 |
 | 性能 | 架构第 11 章的预算，两个平台分别测量：PR 冒烟、Nightly 完整测量、长跑；绝对预算与相对基线两道判定 | 框架 `scripts/perf/`（指标表 `metrics.mjs`、门禁 `gate.mjs`、入口 `run.mjs`、探针 `probe-*.mjs`、长跑 `long-run.mjs`），已有基准在 `scripts/bench/` 与 `e2e/t19.bench.ts` 作为探针；基线 `scripts/perf/baselines/`；见第 15 节与 `performance.md` | `node scripts/perf/run.mjs --lane pr\|nightly\|long`；第 11 章覆盖检查与门禁单测随 `npm test` | 每次提交（冒烟，CI `desktop` 作业）/ 每晚（`perf-nightly.yml`）/ 本机（8 小时长跑） | T04、T09、T10、T44 |
 | 多服务商 | 部分 L2 场景对真实服务商运行 | 与 L2 场景共用，按标记筛选 | 手动或每晚，需要密钥与预算（第 8 节） | 每晚，可选 | R2 起 |
 
 ## 2. 质量门禁
 
-`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 17 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
+`npm run verify`（`scripts/dev/verify.mjs`）按顺序执行全部 16 项检查，一步失败后继续执行后续步骤，最后打印汇总表，任一步失败则退出码非 0：
 
 | # | 步骤 | 单独运行 |
 |---|---|---|
@@ -34,11 +34,10 @@
 | 10 | 契约样本完整性 | `node scripts/ci/check-contract-samples.mjs` |
 | 11 | cargo-deny | `.tools/bin/cargo-deny check`（先运行 `node scripts/dev/install-tools.mjs`） |
 | 12 | crate 依赖规则 | `node scripts/ci/check-crate-deps.mjs` |
-| 13 | 验收清单一致性 | `node scripts/plan/check-acceptance.mjs` |
-| 14 | L2 场景与能力清单 | `node scripts/ci/run-l2.mjs`：构建 Agent Host bundle → 全部场景（`cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json`）→ 能力覆盖与 `capabilities.md` 漂移检查（第 12、13 节） |
-| 15 | 设计令牌 | `node scripts/ci/check-design-tokens.mjs`：生成物与 `design/tokens/` 一致、声明的前景 / 背景对在四种颜色模式下达到 WCAG、主色色相与表面色的品牌规则、不打包字体与音频（ADR-0029；试改令牌用 `--tokens <目录>`） |
-| 16 | i18n | `node scripts/ci/check-i18n.mjs`：两种语言键集合一致、ICU 有效且两种语言占位符一致、只用该语言有的复数类别、`t('…')` 引用的键存在、渲染进程与主进程没有硬编码的用户可见文字与不带 locale 的 `toLocaleString()`（T43，规则见 `accessibility.md`） |
-| 17 | 威胁映射 | `node scripts/ci/check-threats.mjs --results target/l2/results.json --doc check`：第 10.1 节每行都有 `THR` 条目、每个对策都被映射、每个测试 ID 在仓库里存在、待补项的任务未完成、以威胁编号命名的测试都已映射，`docs/security/threat-coverage.md` 与映射和第 14 步的 L2 报告一致（第 16 节，T45） |
+| 13 | L2 场景与能力清单 | `node scripts/ci/run-l2.mjs`：构建 Agent Host bundle → 全部场景（`cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json`）→ 能力覆盖与 `capabilities.md` 漂移检查（第 12、13 节） |
+| 14 | 设计令牌 | `node scripts/ci/check-design-tokens.mjs`：生成物与 `design/tokens/` 一致、声明的前景 / 背景对在四种颜色模式下达到 WCAG、主色色相与表面色的品牌规则、不打包字体与音频（ADR-0029；试改令牌用 `--tokens <目录>`） |
+| 15 | i18n | `node scripts/ci/check-i18n.mjs`：两种语言键集合一致、ICU 有效且两种语言占位符一致、只用该语言有的复数类别、`t('…')` 引用的键存在、渲染进程与主进程没有硬编码的用户可见文字与不带 locale 的 `toLocaleString()`（T43，规则见 `accessibility.md`） |
+| 16 | 威胁映射 | `node scripts/ci/check-threats.mjs --results target/l2/results.json --doc check`：第 10.1 节每行都有 `THR` 条目、每个对策都被映射、每个测试 ID 在仓库里存在、待补项写明补测试的任务、以威胁编号命名的测试都已映射，`docs/security/threat-coverage.md` 与映射和第 13 步的 L2 报告一致（第 16 节，T45） |
 
 CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-latest`（x64）上执行 `npm ci --ignore-scripts` 与 `npm run verify`。L3 不在 PR CI 中，由独立的 Nightly 工作流运行（第 14 节）；它的剥离检查单测（`scripts/l3/*.test.mjs`）属于第 5 步。后续任务新增的检查（L1 契约、L2 场景、schema 漂移等）都接进 verify，使本地与 CI 运行同一套检查。verify 作业结束后把 L2 报告（`target/l2/results.json`）上传为 artifact `l2-report-<os>`。
 
@@ -80,7 +79,7 @@ CI（`.github/workflows/ci.yml`）在 `macos-latest`（arm64）与 `windows-late
 ## 6. 测试证据
 
 - 验收证据（命令输出、截图、录屏、性能数据）放在 `tmp/evidence/<任务编号>/`，例如 `tmp/evidence/T09/`。`tmp/` 已被 `.gitignore` 排除，证据不入库。L4 的截图与日志在其下的 `l4/` 子目录（第 9.4 节）。
-- `docs/plan/acceptance.json` 的 `evidence` 字段写验证命令与关键输出，或证据文件路径。
+- PR 描述写验证命令与关键输出，或证据文件路径。
 - 证据中不得出现凭据、个人信息与用户的真实会话内容。
 
 ## 7. L1 契约
@@ -439,7 +438,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 
 ### 12.5 运行方式与取舍
 
-- **自定义 test harness**（`crates/piarc-testkit/tests/scenarios.rs`，`harness = false`）：每个场景文件是一个测试，按 id 筛选（`-- <id>`、`--exact`、`--list`、`--test-threads <n>`），输出 `test <id> ... ok|FAILED|ignored, 跳过（平台）: <原因>` 与汇总；`--results <文件>` 写 JSON 报告（相对路径按仓库根解析）。不引入数据驱动测试库：需要的只是筛选、并行与报告。该目标设了 `test = false`，不在 `cargo test --workspace` 中重复运行，由 verify 第 14 步运行。
+- **自定义 test harness**（`crates/piarc-testkit/tests/scenarios.rs`，`harness = false`）：每个场景文件是一个测试，按 id 筛选（`-- <id>`、`--exact`、`--list`、`--test-threads <n>`），输出 `test <id> ... ok|FAILED|ignored, 跳过（平台）: <原因>` 与汇总；`--results <文件>` 写 JSON 报告（相对路径按仓库根解析）。不引入数据驱动测试库：需要的只是筛选、并行与报告。该目标设了 `test = false`，不在 `cargo test --workspace` 中重复运行，由 verify 第 13 步运行。
 - **进程不复用**：每个场景一个新的临时根（路径含空格与中文）、一个新的 `CoreRuntime` 与 Agent Host，结束后删除临时根。实测单个场景（含 Core 与 Agent Host 冷启动）0.4–4 s，并行时偏长；换来会话、工作区、保险箱与 mock 步数的完全隔离；场景之间按线程并行（缺省半数核心、至多 4 个）补回总时长。
 - 场景一个失败不影响其他场景的执行与报告；同一场景连续运行两次结果相同（`l2_runner.rs` 检查），没有 sleep，等待只有 30 s 安全网。
 - `piarc-devcli` 用同一个运行器：`run <文件或目录> [--json <文件>]`（见 `crates/piarc-devcli/AGENTS.md`）。
@@ -452,7 +451,7 @@ expect: { events, files, fixtures, requests, request_counts, tool_batches, core_
 1. 在 `tests/capabilities.yaml` 找到能力 ID（没有时按第 13 节新增并在报告中说明）；实现了它的任务把状态改为 `active`。
 2. 写 `tests/scenarios/<id>.yaml`：先写 mock 的逐步响应，再写动作，最后写断言；名字与 `description` 和断言一致。
 3. 运行 `cargo test -p piarc-testkit --test scenarios -- <id> --exact`；故意改坏一条断言确认它会失败，再改回来。
-4. 运行 `node scripts/ci/run-l2.mjs`；能力状态变化后用 `node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc write` 重新生成 `docs/product/capabilities.md` 并提交。
+4. 运行 `node scripts/ci/run-l2.mjs`；能力状态变化后用 `node scripts/ci/check-capabilities.mjs --results target/l2/results.json --doc write` 重新生成 `docs/product/capabilities.md` 并提交。
 5. 只在一个平台上成立的场景写 `platforms` 与 `platform_reason`。
 
 ### 12.7 调试
@@ -499,10 +498,9 @@ client_only:                      # 行为全在客户端、由 L4 验证的需�
 
 | 命令 | 用途 |
 |---|---|
-| `node scripts/plan/check-capabilities.mjs` | 只检查清单 |
-| `node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc check` | 覆盖检查与文档漂移（verify 第 14 步） |
-| `node scripts/plan/check-capabilities.mjs --results target/l2/results.json --doc write` | 重新生成 `docs/product/capabilities.md` |
-| `node scripts/plan/check-capabilities.mjs --milestone M2` | 评审任务（R2–R6）用：列出 M2 及之前未完成的能力 |
+| `node scripts/ci/check-capabilities.mjs` | 只检查清单 |
+| `node scripts/ci/check-capabilities.mjs --results target/l2/results.json --doc check` | 覆盖检查与文档漂移（verify 第 13 步） |
+| `node scripts/ci/check-capabilities.mjs --results target/l2/results.json --doc write` | 重新生成 `docs/product/capabilities.md` |
 
 L2 报告来自 `cargo test -p piarc-testkit --test scenarios -- --results target/l2/results.json` 或 `cargo run -p piarc-devcli -- run tests/scenarios --json <文件>`。
 
@@ -583,7 +581,7 @@ approvals:                        # 按工具调用 id 作答；没有点名的�
 
 `tests/l3-allowlist.yaml`：
 
-- `differences`：`scenario`（id 或带 `*` 的模式）、`path`（字段路径模式：`*` 匹配一个键内的文字、`[*]` 任意下标、`**` 任意一段路径）、`claude_code`（适用的版本范围，空格分隔的比较式如 `>=2.1.318 <2.2.0`，或 `*`）、`reason`（必填）、`follow_up`（可选，后续处理的任务，同步写进 `PLAN.md` 登记事项）、`platforms`（可选，`[macos]`、`[windows]` 或两者，缺省两者都适用；只在所列平台上放行差异、判定过期，W2：Claude Code 的工具集因平台而不同）。
+- `differences`：`scenario`（id 或带 `*` 的模式）、`path`（字段路径模式：`*` 匹配一个键内的文字、`[*]` 任意下标、`**` 任意一段路径）、`claude_code`（适用的版本范围，空格分隔的比较式如 `>=2.1.318 <2.2.0`，或 `*`）、`reason`（必填）、`follow_up`（可选，后续处理的任务标签）、`platforms`（可选，`[macos]`、`[windows]` 或两者，缺省两者都适用；只在所列平台上放行差异、判定过期，W2：Claude Code 的工具集因平台而不同）。
 - `excluded`：对照领域（`perm-`、`policy-`、`hooks-`、`config-` 开头的 L2 场景）中没有 L3 场景对照的，写明 `claude -p` 无法复现的原因；也可以排除某个 L3 场景。每个这样的 L2 场景必须被对照或排除，否则命令失败。
 - 缺理由的条目、版本在范围内且所点名场景都跑过却没有匹配任何差异的条目，都让命令失败：修好的偏差要从清单删掉。Claude Code 升级后，新差异先分析，再修正或加条目（新条目的版本范围从新版本开始）。
 
@@ -614,7 +612,7 @@ approvals:                        # 按工具调用 id 作答；没有点名的�
 
 ## 16. 威胁映射与安全对策（T45）
 
-架构第 10.1 节的每条威胁在 `tests/security/threats.yaml` 有一个 `THR-NN` 条目（格式写在该文件头部，决定见 ADR-0062）。verify 第 17 步用 `scripts/ci/check-threats.mjs` 检查它，并生成 [`docs/security/threat-coverage.md`](../security/threat-coverage.md)（不要手改；`node scripts/ci/check-threats.mjs --results target/l2/results.json --doc write` 重写）。
+架构第 10.1 节的每条威胁在 `tests/security/threats.yaml` 有一个 `THR-NN` 条目（格式写在该文件头部，决定见 ADR-0062）。verify 第 16 步用 `scripts/ci/check-threats.mjs` 检查它，并生成 [`docs/security/threat-coverage.md`](../security/threat-coverage.md)（不要手改；`node scripts/ci/check-threats.mjs --results target/l2/results.json --doc write` 重写）。
 
 新增或改变安全对策时：
 
