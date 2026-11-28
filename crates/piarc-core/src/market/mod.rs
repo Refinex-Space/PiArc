@@ -136,6 +136,8 @@ struct Inner {
     events: EventSender,
     cancel: CancellationToken,
     syncing: AtomicBool,
+    /// Package kinds are being read (after a complete index; one reader at a time).
+    classifying: AtomicBool,
     installing: Mutex<HashSet<String>>,
     /// Why the last sync or live search failed (cleared by the next success).
     problem: Mutex<Option<MarketProblem>>,
@@ -205,6 +207,7 @@ impl Market {
                 events,
                 cancel,
                 syncing: AtomicBool::new(false),
+                classifying: AtomicBool::new(false),
                 installing: Mutex::default(),
                 problem: Mutex::default(),
                 details: DetailCache::default(),
@@ -286,10 +289,18 @@ impl Market {
         }
         let market = self.clone();
         tokio::spawn(async move {
-            market.run_sync(proxy).await;
+            let indexed = market.run_sync(proxy.clone()).await;
+            // The catalog is updated once its index is in; kinds are read afterwards.
             market.inner.syncing.store(false, Ordering::SeqCst);
             if let Ok(status) = market.status().await {
                 market.emit(&MarketEvent::Sync { status }).await;
+            }
+            if indexed && !market.inner.classifying.swap(true, Ordering::SeqCst) {
+                market.classify(proxy).await;
+                market.inner.classifying.store(false, Ordering::SeqCst);
+                if let Ok(status) = market.status().await {
+                    market.emit(&MarketEvent::Sync { status }).await;
+                }
             }
         });
         Ok(true)

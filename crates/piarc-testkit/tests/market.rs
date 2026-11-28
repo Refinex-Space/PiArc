@@ -483,3 +483,29 @@ async fn a_failed_first_sync_backs_off_and_a_refresh_recovers() {
     assert_eq!(names(&page).len(), 5);
     assert!(page["status"]["problem"].is_null(), "{}", page["status"]);
 }
+
+/// The catalog is updated once its index pages are in: reading package kinds afterwards does
+/// not keep the status at "syncing" (the page would show the last page forever).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_index_is_done_while_kinds_are_still_being_read() {
+    let rig = rig("kinds pending", None).await;
+    // Every version document waits: the kinds cannot be read yet.
+    rig.npm.hold("/pi-demo/");
+    let deadline = tokio::time::Instant::now() + WAIT;
+    let status = loop {
+        let page = rig.query(json!({ "limit": 50 })).await;
+        let status = page["status"].clone();
+        if status["syncedAt"].is_number() {
+            break status;
+        }
+        assert!(tokio::time::Instant::now() < deadline, "{status}");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    };
+    assert_eq!(status["state"], "idle", "{status}");
+    assert!(
+        status["classified"].as_u64() < status["indexed"].as_u64(),
+        "{status}"
+    );
+    rig.npm.release();
+    rig.settled().await;
+}

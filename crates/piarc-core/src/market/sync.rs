@@ -16,10 +16,11 @@ use crate::storage::now_ms;
 const CLASSIFY_BATCH: i64 = 64;
 
 impl Market {
-    pub(super) async fn run_sync(&self, proxy: Option<String>) {
+    /// Syncs the index pages; answers whether the whole index is in.
+    pub(super) async fn run_sync(&self, proxy: Option<String>) -> bool {
         let storage = &self.inner.storage;
         let Ok(Ok(previous)) = storage.run(|s| s.market_sync()).await else {
-            return;
+            return false;
         };
         let limits = self.inner.config.limits.clone();
         let mut sync = MarketSync {
@@ -79,9 +80,7 @@ impl Market {
             }
         }
         let _ = self.write_sync(&sync).await;
-        if sync.state == "idle" {
-            self.classify(proxy).await;
-        }
+        sync.state == "idle"
     }
 
     /// One page of the popularity index.
@@ -118,7 +117,7 @@ impl Market {
     }
 
     /// Reads manifests of index packages until none is left or a request fails.
-    async fn classify(&self, proxy: Option<String>) {
+    pub(super) async fn classify(&self, proxy: Option<String>) {
         let concurrency = self.inner.config.limits.classify_concurrency.max(1);
         loop {
             if self.inner.cancel.is_cancelled() {
