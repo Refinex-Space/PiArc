@@ -101,6 +101,12 @@ Keep each commit focused, and explain *why* in the body when it is not obvious.
 4. Open a pull request and fill in the template: what changed, how you tested it, and the checklist on sources, dependencies and security countermeasures.
 5. A maintainer reviews it. CI must pass on macOS and Windows before it is merged.
 
+## Changelog and releases
+
+If your change is visible to users, add a line under `## [Unreleased]` in both [CHANGELOG.md](CHANGELOG.md) and [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md) (or ask a maintainer to write the Chinese one). Write what users notice, not how it was built; the entries become the release notes shown in the app.
+
+Maintainers cut releases from `main` with a `v<version>` tag: the Release workflow builds all four targets, signs the release manifest in a protected environment and opens a draft release for review. The full process, the version policy and the changelog rules are in [docs/engineering/release.md](docs/engineering/release.md) (in Chinese).
+
 ## License
 
 PiArc is released under the [MIT License](LICENSE). By contributing, you agree that your contributions are licensed under the same terms.

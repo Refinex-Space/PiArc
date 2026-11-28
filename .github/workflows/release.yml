@@ -1,0 +1,327 @@
+# Release (docs/engineering/release.md, ADR-0018, ADR-0024, ADR-0111): a tag v<version> builds
+# the release flavor for macOS (arm64, x64) and Windows (x64, arm64), collects the artefacts
+# under the names of ADR-0111, writes the release notes, signs the manifest in the protected
+# `release` environment and opens a DRAFT GitHub release. A maintainer reviews and publishes it.
+#
+# workflow_dispatch is a dry run on any ref: the same builds and the same assembly, signed with
+# the test key and uploaded as a workflow artefact; no environment, no secret, no release.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: check version and changelogs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # A tag must name the version of apps/desktop/package.json; a dry run checks the
+      # version and changelogs of the ref only.
+      - name: Check the version, the lockfile and both changelogs
+        id: version
+        shell: bash
+        env:
+          TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
+        run: |
+          if [ -n "$TAG" ]; then
+            version=$(node scripts/release/version.mjs check --tag "$TAG")
+          else
+            version=$(node scripts/release/version.mjs check)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  package-macos:
+    name: package macOS (${{ matrix.arch }})
+    needs: check
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { arch: arm64, target: aarch64-apple-darwin }
+          - { arch: x64, target: x86_64-apple-darwin }
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain and the ${{ matrix.target }} target
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+          rustup show
+
+      # Release builds start from an empty cargo cache so nothing of another branch's build
+      # reaches the artefacts; the verified download caches below are content-addressed.
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.target }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
+      - name: Cache the bundled node, rg and fd (fetch-binaries.mjs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/binaries
+          key: binaries-${{ github.job }}-${{ matrix.arch }}-${{ hashFiles('third-party/binaries.lock.json') }}
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Package and make the release flavor (DMG and ZIP)
+        run: npm run package:desktop -- --flavor release --arch ${{ matrix.arch }} --make
+
+      - name: Check the fuses
+        run: npm run check:fuses -- --arch ${{ matrix.arch }}
+
+      - name: Check the layout and the signing layers
+        run: node scripts/ci/check-app-layout.mjs --flavor release --arch ${{ matrix.arch }}
+
+      - name: Upload the DMG and ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-macos-${{ matrix.arch }}
+          path: |
+            apps/desktop/out/release/make/dmg/${{ matrix.arch }}/*.dmg
+            apps/desktop/out/release/make/zip/darwin/${{ matrix.arch }}/*.zip
+          if-no-files-found: error
+
+  package-windows:
+    name: package Windows (${{ matrix.arch }})
+    needs: check
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc }
+          - { arch: arm64, target: aarch64-pc-windows-msvc }
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain and the ${{ matrix.target }} target
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+          rustup show
+
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.target }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
+      - name: Cache the bundled node, rg, fd and vpk (fetch-binaries.mjs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/binaries
+          key: binaries-${{ github.job }}-${{ matrix.arch }}-${{ hashFiles('third-party/binaries.lock.json') }}
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Package the release flavor
+        run: npm run package:desktop -- --flavor release --arch ${{ matrix.arch }}
+
+      - name: Check the fuses
+        run: npm run check:fuses -- --arch ${{ matrix.arch }}
+
+      - name: Check the layout
+        run: node scripts/ci/check-app-layout.mjs --flavor release --arch ${{ matrix.arch }}
+
+      # vpk is a .NET tool: the runner's .NET SDK installs the locked nupkg into .tools/vpk/.
+      - name: Build the Velopack installer and update package
+        run: >-
+          node scripts/release/pack-windows.mjs
+          --arch ${{ matrix.arch }} --flavor release --versions ${{ needs.check.outputs.version }}
+
+      # ADR-0018 rule 3: scan the unsigned installer with Microsoft Defender before release.
+      # MpCmdRun exits 2 when it finds a threat. A runner without Defender fails the job, so
+      # the scan is never silently skipped (release.md, section 5 has the manual fallback).
+      - name: Scan the installer with Microsoft Defender
+        shell: pwsh
+        run: |
+          $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          if (-not (Test-Path $mp)) { throw "MpCmdRun.exe not found; scan the installer manually (release.md)" }
+          & $mp -SignatureUpdate | Out-Host
+          $dir = "apps/desktop/out/release/velopack/win32-${{ matrix.arch }}"
+          Get-ChildItem $dir -File | Where-Object { $_.Name -like '*.exe' -or $_.Name -like '*.nupkg' } | ForEach-Object {
+            & $mp -Scan -ScanType 3 -File $_.FullName -DisableRemediation | Out-Host
+            if ($LASTEXITCODE -ne 0) { throw "Defender reported $($_.Name) (exit $LASTEXITCODE)" }
+          }
+
+      - name: Upload the Velopack release directory
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-windows-${{ matrix.arch }}
+          path: apps/desktop/out/release/velopack/win32-${{ matrix.arch }}
+          if-no-files-found: error
+
+  # Collects the release files and writes the notes; no secret is available here.
+  assemble:
+    name: assemble the release files
+    needs: [check, package-macos, package-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download the builds
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: build-*
+          path: ${{ runner.temp }}/builds
+
+      - name: Collect the release files under their release names
+        run: >-
+          node scripts/release/collect-artifacts.mjs --version "$VERSION"
+          --from "$RUNNER_TEMP/builds" --out "$RUNNER_TEMP/release"
+
+      - name: Write the release notes
+        run: >-
+          node scripts/release/release-notes.mjs --version "$VERSION"
+          --notes "$RUNNER_TEMP/release/piarc-release-notes.json"
+
+      # The dry run signs with the public test key to exercise the same steps; the real
+      # signature is only made in the publish job.
+      - name: Sign and verify with the test key (dry run)
+        if: github.event_name != 'push'
+        run: |
+          node scripts/release/release-manifest.mjs generate --version "$VERSION" \
+            --key scripts/release/test-keys/release-manifest.test.key \
+            --out "$RUNNER_TEMP/release/piarc-release-manifest.json" "$RUNNER_TEMP"/release/*
+          node scripts/release/release-manifest.mjs verify \
+            --pub scripts/release/test-keys/release-manifest.test.pub \
+            --files-dir "$RUNNER_TEMP/release" "$RUNNER_TEMP/release/piarc-release-manifest.json"
+
+      - name: Upload the release files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ needs.check.outputs.version }}
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+
+  # Signs the manifest with the release key and opens a draft release. The `release`
+  # environment requires a maintainer's approval and is limited to v* tags (release.md,
+  # section 6); its secret PIARC_RELEASE_SIGNING_KEY is the unencrypted minisign secret key.
+  publish:
+    name: sign and draft the GitHub release
+    if: github.event_name == 'push'
+    needs: [check, assemble]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      PUBLIC_KEY: scripts/release/piarc-release.pub
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download the release files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-${{ needs.check.outputs.version }}
+          path: ${{ runner.temp }}/release
+
+      - name: Sign the manifest
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.PIARC_RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::error::the release environment has no PIARC_RELEASE_SIGNING_KEY secret"
+            exit 1
+          fi
+          if [ ! -f "$PUBLIC_KEY" ]; then
+            echo "::error::$PUBLIC_KEY is missing; commit the release public key first (release.md, section 7)"
+            exit 1
+          fi
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          umask 077
+          printf '%s\n' "$SIGNING_KEY" > "$key_file"
+          node scripts/release/release-manifest.mjs generate --version "$VERSION" \
+            --key "$key_file" \
+            --out "$RUNNER_TEMP/release/piarc-release-manifest.json" "$RUNNER_TEMP"/release/*
+
+      # Verifies against the committed public key (the same key as BUILTIN_RELEASE_KEYS), so a
+      # wrong secret fails here instead of in users' apps.
+      - name: Verify the signature and every file against the committed public key
+        run: >-
+          node scripts/release/release-manifest.mjs verify --pub "$PUBLIC_KEY"
+          --files-dir "$RUNNER_TEMP/release" "$RUNNER_TEMP/release/piarc-release-manifest.json"
+
+      - name: Write the release text
+        run: >-
+          node scripts/release/release-notes.mjs --version "$VERSION"
+          --notes "$RUNNER_TEMP/notes-check.json" --body "$RUNNER_TEMP/release-body.md"
+          --pub "$PUBLIC_KEY"
+
+      - name: Create the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
+        run: |
+          flags=(--draft --verify-tag --title "PiArc $VERSION" --notes-file "$RUNNER_TEMP/release-body.md")
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          gh release create "v$VERSION" "${flags[@]}" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP"/release/*
