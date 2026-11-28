@@ -398,7 +398,7 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 - [x] 7. M5 主进程 IPC 与测试覆盖变量。
 - [x] 8. M6 设置页：已安装与市场视图、详情、安装与卸载、i18n、a11y。另修两处（先写失败测试）：源码树运行时 Agent Host 的 node 是裸名，npm 改按命令环境的 `PATH` 找（`plugins::fetch::locate_npm`）；从未同步成功时每次读取都会再起同步（离线时每几秒一轮），失败后 `MarketLimits::failure_backoff` 内只有用户刷新才再同步。L4 `market-browse`、`market-install`、t43 市场旅程通过；t37:155 仍是既有失败。
 - [x] 9. M7 审计"插件"类别、独立 skill 的"在访达中显示"。权限页审计的"包"类别不按工作区过滤（用户级安装没有工作区）；卸载审计写明删除的路径与清掉的声明（先写失败测试）；`revealSkill` 只显示 Core 列出的同名 skill 文件。
-- [ ] 10. M8 后半：威胁映射、架构与 egress、S10、AGENTS.md；L4、截图；全量 verify 与 `dev-flow:spec-reviewer` 复核。
+- [x] 10. M8 后半：威胁映射、架构与 egress、S10、AGENTS.md；L4、截图；全量 verify 与 `dev-flow:spec-reviewer` 复核。复核的高危项（市场包的更新绕过安装核对）与中等项（确认正文、代理连不上的错误码、`check_staged` 读不到文件时放行、审计脱敏、登记后失败的回滚）已修并补测试；verify 17 步中 16 步通过，`cargo test` 在主仓库目录偶发超时（I244）。
 
 ## 登记事项
 
@@ -649,6 +649,8 @@ macOS 任务结束时，凡是要靠 Windows CI 证明的验收项都会先标�
 | I241 | 语音输入（计划外） | `third-party/sources.json` 的 ONNX Runtime（sherpa-onnx 2.0.1 运行库包里带的 `libonnxruntime`、`onnxruntime.dll`，MIT）没有许可原文：运行库包里不带，写作时从 GitHub、npm 都取不到 | T50：生成 THIRD_PARTY_NOTICES 前补该版本的 LICENSE 与 ThirdPartyNotices，填 `licenseFile` |
 | I242 | 语音输入（计划外） | 空闲超时后模型已卸载（`engine_loaded` 为假），但进程 `phys_footprint` 仍比加载前高约 56–225 MiB（多次实测不等）：释放的内存留在系统分配器里没有归还（`voice-bench` 实测，`voice-idle-footprint` 预算 15 MiB 不达标）；不用语音时不加载，不受影响 | 语音输入后续：卸载后在 macOS 调 `malloc_zone_pressure_relief`（经登记的 FFI 封装）或让 ONNX Runtime 不用 arena，复测后再判 |
 | I243 | 语音输入（计划外） | 发布构建 arm64（2026-11-26）扣除 `speech/` 后安装后 462.8 MB，超出第 11 章 450 MB（11 月 22 日基线 447.6 MB）。语音改动只让 Core 模块（strip 后）从 39.01 MB 增至 40.57 MB；其余约 13.6 MB 来自此前合入的功能（推算：未单独测基线提交的安装包） | 体积治理：按 `probe-size` 的拆分逐项定位增长来源，裁剪或按 ADR 调整 |
+| I244 | Pi 包市场 M8 | `piarc-core` 的 `workspace_settings::tests::a_managed_change_is_reported_while_the_first_registration_runs` 在本机主仓库目录里稳定要 45–66 s（其中等注册完成的一段上限 30 s，verify 时超时失败），同一提交放到干净的 git worktree 里稳定 2 s，任务开始前的提交同样 2 s；代码相同，差别在目录（疑似 FSEvents 注册受主仓库下 300 GB 的 `target/` 影响）。另 `tool_io::policy::tests::automatic_decision_latency`（2 ms 预算）在全量并行时偶发超出、单独运行通过 | 下一个碰 `piarc-fs::watch` 或 verify 的任务定位注册慢的原因；计时预算用例考虑在负载下的口径 |
+| I245 | Pi 包市场 M8 | `apps/desktop/e2e/preload.e2e.ts` 的键快照缺 `browser`、`placeBrowser`（`a08613e7` 加入 preload 时未登记），"exactly the allowlisted functions" 用例失败 | 内置浏览器的后续任务补登记并核对 S10 报告 |
 
 ## 技术债
 
