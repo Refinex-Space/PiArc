@@ -905,4 +905,23 @@ mod tests {
                 .contains("expected an object")
         );
     }
+
+    /// ADR-0110: the first-run mark is a known boolean; anything else is reported.
+    #[test]
+    fn the_first_run_mark_is_a_boolean() {
+        assert!(
+            validate(
+                &json!({ "onboarding": { "completed": true } }),
+                &PIARC_SETTINGS
+            )
+            .is_empty()
+        );
+        let findings = validate(
+            &json!({ "onboarding": { "completed": "yes" } }),
+            &PIARC_SETTINGS,
+        );
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].pointer, "/onboarding/completed");
+        assert_eq!(findings[0].severity, Severity::Error);
+    }
 }

@@ -934,6 +934,9 @@ export function ConnectModel({
             }
             const owner = families.find((f) => f.variants.some((v) => v.id === picked.id));
             if (owner !== undefined) {
+              // The same family with another variant is a new target too: `pick` alone would
+              // keep the key typed for the variant shown before.
+              if (target !== picked.id) reset();
               pick({ kind: 'family', family: owner.id });
               setVariants((old) => ({ ...old, [owner.id]: picked.id }));
               return;

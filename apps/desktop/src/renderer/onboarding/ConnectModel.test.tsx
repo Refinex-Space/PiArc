@@ -177,6 +177,16 @@ describe('ConnectModel', () => {
     expect(saveProvider).not.toHaveBeenCalled();
   });
 
+  it('drops the key when "More providers" switches the chosen family’s variant', async () => {
+    await render();
+    click('onboarding-tile-family-glm');
+    typeKey('sk-for-zai');
+    click('onboarding-more');
+    click('provider-choice-zai-coding-cn');
+    expect(byTestId('onboarding-variant')?.textContent).toContain('Mainland China');
+    expect((byTestId('onboarding-key') as HTMLInputElement).value).toBe('');
+  });
+
   it('shows a failure as plain text and lets the user skip the test', async () => {
     testProvider.mockResolvedValue(
       JSON.stringify({ ok: false, message: '<b>401</b> bad key', network: false }),

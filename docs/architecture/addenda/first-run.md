@@ -47,6 +47,8 @@
 | C6 | 自定义端点的 id 由站点名推导（地址与 `localhost` 用 `custom`），本次引导保存过一次后固定不变 | L4 发现：失败后重试时重新推导出 `0-2`，新建了第二个服务商，会话仍用旧的错误密钥（`ConnectModel.test.tsx` 的复现用例） |
 | E7 | 内置服务商的保存与测试只在组件测试里覆盖，L4 不保存内置服务商 | 保存后会立即测试，请求真实厂商，违反 L4 不访问真实服务商 |
 | E10、E11、E12 | 减少动态效果、两个窗口、"获取密钥"的原生确认没有单独的 L4：减少动效走全局 CSS 规则，跨窗口关闭走偏好广播（`use-onboarding.tsx`），"获取密钥"只经 `openExternal` 打开写死地址（组件测试核对地址） | 机制都复用已有路径，各自已有 L4 覆盖 |
+| F1 | 启动目标（链接、拖入文件夹）在第一份工作区快照之后才到时，自动打开的引导层关闭，不写完成标记 | 复核发现的竞态：`takeLaunchTargets` 是异步的（`use-onboarding.test.tsx` 的复现用例） |
+| 5.3 | 基准与 perf 探针也经全新数据目录启动应用：`scripts/bench/s1-transcript.mjs` 的 `appCommand` 给 `--user-data-dir` 合并写入完成标记（`markFirstRunDone`），perf 的 `launchApp` 与各基准都经它 | 复核发现：否则 CI 的 perf PR 冒烟会被引导层挡住 |
 | 4.4 | 测试失败的回显已由 Agent Host 把本次密钥替换为 `[REDACTED]`（L4 的桩服务回显密钥，断言界面不含它），不需要另修 | — |
 
 ## 3. 需求与验收标准

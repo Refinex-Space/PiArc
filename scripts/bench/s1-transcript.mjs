@@ -189,11 +189,35 @@ export function summarizeFrames(recording) {
 }
 
 /**
- * The command that starts the app in `form`.
+ * Marks the first-run guide done in the user settings of `dataDir` (ADR-0110), keeping what
+ * the file holds: a fresh data directory would otherwise open the guide over the workbench.
+ * @param {string} dataDir
+ */
+export async function markFirstRunDone(dataDir) {
+  const file = path.join(dataDir, 'settings.json');
+  /** @type {unknown} */
+  let current = {};
+  try {
+    current = JSON.parse(await readFile(file, 'utf8'));
+  } catch {
+    // No settings yet.
+  }
+  const settings = isRecord(current) ? current : {};
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(file, JSON.stringify({ ...settings, onboarding: { completed: true } }));
+}
+
+/**
+ * The command that starts the app in `form`. A `--user-data-dir` among `args` gets the
+ * first-run mark (benchmarks and probes measure the workbench, not the guide).
  * @param {'dev' | 'packaged'} form
  * @param {string[]} args
  */
 export async function appCommand(form, args) {
+  for (const arg of args) {
+    if (arg.startsWith('--user-data-dir='))
+      await markFirstRunDone(arg.slice('--user-data-dir='.length));
+  }
   if (form === 'dev') {
     /** @type {unknown} */
     const binary = createRequire(path.join(desktopDir, 'package.json'))('electron');

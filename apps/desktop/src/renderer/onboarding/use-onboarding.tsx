@@ -41,10 +41,12 @@ export function useOnboarding(store: AppStore, settingsOpen: boolean): Onboardin
     decided.current = true;
     if (decision === 'show') setRequest({ step: 'welcome', from: 'auto', opener: null });
   }, [decision]);
-  // Done in another window (or this one): a guide that opened by itself closes.
+  // Done in another window (or this one), or a link or dropped folder that arrived after the
+  // first workspace snapshot: a guide that opened by itself closes (unfinished, so a later
+  // plain start still offers it).
   useEffect(() => {
-    if (completed) setRequest((current) => (current?.from === 'auto' ? null : current));
-  }, [completed]);
+    if (completed || launched) setRequest((current) => (current?.from === 'auto' ? null : current));
+  }, [completed, launched]);
 
   const close = useCallback((current: OnboardingRequest) => {
     setRequest(null);
