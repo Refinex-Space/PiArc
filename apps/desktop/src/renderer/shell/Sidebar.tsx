@@ -2,8 +2,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { displayKey, effectiveBindings } from '../../shared/keybindings.js';
+import { THEMES } from '../../shared/preferences.js';
 import { IconButton } from '../app/IconButton.js';
 import { useApp } from '../app/app-context.js';
+import { isManaged, parseManagedView } from '../settings/managed.js';
 import { useSessions, useStore, useWorkspaces } from '../store/hooks.js';
 import type { SessionEntry, WorkspaceEntry } from '../store/snapshots.js';
 import {
@@ -22,6 +24,7 @@ import { ProjectGroup, type ProjectSessions } from './ProjectGroup.js';
 import { WorkspaceSearch } from './WorkspaceSearch.js';
 import { sessionTitle } from './SessionRow.js';
 import { loadSidebarGroups, saveSidebarGroups, type SidebarGroups } from './layout.js';
+import { reason } from './errors.js';
 import { baseName, useUi } from './ui.js';
 
 function order(a: SessionEntry, b: SessionEntry): number {
@@ -97,6 +100,16 @@ export function Sidebar({
   const [groupLayout, setGroupLayout] = useState(loadSidebarGroups);
   const [dragging, setDragging] = useState<string | null>(null);
   const more = useMenu();
+  // Read when the identity menu opens; Core refuses a locked write regardless.
+  const [themeLocked, setThemeLocked] = useState(false);
+  const checkThemeLock = () => {
+    window.piarc
+      .managedSettings()
+      .then((raw) => {
+        setThemeLocked(isManaged(parseManagedView(raw), '/appearance/theme'));
+      })
+      .catch(() => undefined);
+  };
   const groups = useMemo(
     () =>
       groupSessions(
@@ -288,6 +301,7 @@ export function Sidebar({
       <footer className="sidebar-footer">
         <ChoiceButton
           className="sidebar-identity"
+          testId="sidebar-identity"
           label={identity + ' · ' + t('settings.providers')}
           items={[
             {
@@ -304,7 +318,36 @@ export function Sidebar({
                 void window.piarc.openSettings('usage');
               },
             },
+            {
+              id: 'theme',
+              label: t('settings.theme'),
+              testId: 'sidebar-theme',
+              submenu: THEMES.map((theme) => ({
+                id: theme,
+                label: t(`settings.theme.${theme}`),
+                testId: `sidebar-theme-${theme}`,
+                selected: preferences.appearance.theme === theme,
+                ...(themeLocked ? { disabled: true, hint: t('managed.badgeHint') } : {}),
+                run: () => {
+                  window.piarc
+                    .setPreference({ key: 'appearance.theme', value: theme })
+                    .catch((failure: unknown) => {
+                      ui.addToast({
+                        sessionId: '',
+                        text: t('settings.saveFailed', { reason: reason(failure) }),
+                        action: {
+                          label: t('settings.appearance'),
+                          run: () => {
+                            void window.piarc.openSettings('appearance');
+                          },
+                        },
+                      });
+                    });
+                },
+              })),
+            },
           ]}
+          onOpen={checkThemeLock}
         >
           <span className="piarc-mark" aria-hidden="true" />
           <span className="truncate">{identity}</span>

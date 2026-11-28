@@ -145,6 +145,26 @@ test('adjacent hovered and selected navigation rows keep a non-interactive gap',
   }
 });
 
+test('the sidebar identity menu switches the colour mode without opening settings', async ({
+  page,
+}, info) => {
+  const pick = async (theme: 'dark' | 'light') => {
+    await page.getByTestId('sidebar-identity').click();
+    await page.getByTestId('sidebar-theme').click();
+    await page.getByTestId('sidebar-theme-' + theme).click();
+    await expect(page.locator('html')).toHaveAttribute('data-color-mode', theme);
+  };
+  await pick('dark');
+  await page.getByTestId('sidebar-identity').click();
+  await page.getByTestId('sidebar-theme').click();
+  await expect(page.getByTestId('sidebar-theme-dark')).toHaveAttribute('aria-current', 'true');
+  await page.screenshot({ path: info.outputPath('sidebar-theme-menu.png') });
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await pick('light');
+  await expect(page.locator('.settings-view')).toHaveCount(0);
+});
+
 test('appearance: colour mode cards, segments with the reference geometry and one moving surface', async ({
   page,
 }, info) => {
