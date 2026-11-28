@@ -1,165 +1,203 @@
+<div align="center">
+
+<img src="design/brand/icon.iconset/icon_256x256.png" width="128" height="128" alt="PiArc">
+
 # PiArc
 
-[English](README.md) · **简体中文**
+**macOS 与 Windows 上的桌面编码智能体，基于 [Pi](https://github.com/earendil-works/pi) 构建。**
 
-基于 [Pi](https://github.com/earendil-works/pi) 构建的专业 AI 编码 Agent 桌面应用，支持 macOS 与 Windows。
+Claude Code 级别的智能体编排，任意模型服务商，一个快速的原生工作台。
 
-PiArc 想把三件事放在一起：
+[![CI](https://github.com/Refinex-Space/PiArc/actions/workflows/ci.yml/badge.svg)](https://github.com/Refinex-Space/PiArc/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Refinex-Space/PiArc?display_name=tag&sort=semver)](https://github.com/Refinex-Space/PiArc/releases/latest)
+[![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)](#下载)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-- **对标 Claude Code 的 Harness 专业度**：带严格编辑不变量的工具体系、权限模式与规则、hooks、子 agent、计划模式、任务清单、上下文工程、检查点与回退、skills、MCP、沙箱。
-- **Pi 的多服务商模型层**：Anthropic、OpenAI、Google、DeepSeek、Kimi、Qwen、GLM、OpenRouter、本地模型等，换服务商不换 Harness 行为。
-- **一套代码覆盖 macOS 与 Windows**：界面用 Electron + React，Agent 控制面在 Rust 编写的 Core 中。Windows 与 macOS 共用代码，最多晚一个里程碑。
+[下载](#下载) · [功能](#功能) · [快速上手](#快速上手) · [从源码构建](#从源码构建) · [文档](#文档) · [English](README.md)
 
-> **当前状态：预发布。** 应用可以从源码运行，也能在 macOS 与 Windows 上打包（见[本地开发与构建](#本地开发与构建)）。下面列出的功能在 macOS 上可用；发布流水线、Windows 为 Beta 补齐与 Beta 验收还没做（见[路线图](#路线图)）。还没有发布正式版本。
+</div>
+
+<br>
+
+<p align="center">
+  <img src=".github/assets/screenshot.jpg" alt="PiArc：会话、上下文卡片、文件浏览与内置终端" width="100%">
+</p>
+
+## 为什么是 PiArc
+
+- **完整的编排，而不只是聊天。** 严格的文件编辑不变量、权限模式与规则、hooks、子 agent、计划模式、检查点与回退、上下文工程、skills、MCP 与沙箱：换任何模型，智能体的行为都一致、都安全。
+- **模型由你选。** Anthropic、OpenAI、Gemini、DeepSeek、Kimi、通义千问、智谱 GLM、MiniMax、OpenRouter，任意 OpenAI 或 Anthropic 兼容端点，或者跑在你本机的模型。服务商提供订阅登录的，也可以直接登录。
+- **真正的桌面应用。** 一套 Electron + React 界面，智能体的控制面在 Rust Core 里，会话、终端与 diff 都保持流畅。macOS 与 Windows 出自同一份代码。
 
 ## 功能
 
-- 直接沿用已有的 Claude Code 配置：`CLAUDE.md` / `AGENTS.md`、权限规则、hooks、`.claude/agents`、skills、commands、`.mcp.json` 原样读取（PiArc 不会写入 `.claude/`）。
-- 按任务选模型，例如只读的探索子 agent 跑在便宜快速的模型上，主会话用更强的模型。
-- 结构化审批：带 diff 预览，支持本会话允许与持久规则，全部有审计记录。Auto 模式下由你选定的审查模型答复常规审批，拿不准的仍交给你。
-- 基于写前文件快照的确定性回退，支持按文件、按 hunk 丢弃改动。
-- 多会话并行，可选 git worktree 隔离；MCP server 按工作区共享，不随会话数复制。
-- 内置终端基于 libghostty，agent 也能读取后台终端的屏幕内容。
-- Git 工具：按 hunk 暂存，生成提交信息后提交，浏览历史，处理合并与变基冲突，经你自己的 `gh` 创建和审查 GitHub PR。
-- 内置浏览器：预览你的应用，agent 也能操作它，和其他工具走同一套审批。
-- 语音输入：识别在本机完成，支持中文、英文与中英混合的技术术语。
-- 跨会话的自动记忆，以及面向团队的托管设置。
-- 启动时间、内存、流式渲染帧时间等性能预算在 macOS 与 Windows 的 CI 中测量，回归会让构建失败。
+<table>
+<tr>
+<td width="50%" valign="top">
 
-## 架构概览
+#### 智能体
+
+- 读、改、写文件：先读后改、检测外部修改、保持编码与换行
+- Bash 与 PowerShell：结束整棵进程树、超时、后台任务
+- 子 agent 可用任意模型，比如探索交给便宜的快模型，主会话用更强的模型
+- 计划模式、任务清单、提问表单与下一步建议
+- 自动压缩，实时显示上下文用量
+- Skills、斜杠命令、输出风格、插件与 Pi 包
+- 每个工作区共享一份 MCP 连接，支持 OAuth 与按需加载工具
+
+</td>
+<td width="50%" valign="top">
+
+#### 工作台
+
+- 多会话并行，每个会话可以放进独立的 git worktree
+- 基于 libghostty 的终端，你共享后智能体也能读取
+- Git 工具：按块暂存、生成提交信息、历史、合并与变基，经你自己的 `gh` 处理 GitHub 拉取请求
+- 内置浏览器预览应用，智能体在审批之下也能操作它
+- 文件浏览、全局搜索、侧边对话、按模型统计用量与费用
+- 离线语音输入，支持中文、英文与中英混合的技术词汇
+- 中英文界面、明暗主题，键盘优先，适配读屏
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+#### 掌控与安全
+
+- 结构化审批卡：diff 预览、本会话与持久的规则、审计记录
+- 自动审查：由你选定的审查模型代答常规审批，拿不准的交还给你
+- 基于写入前快照的确定性回退，可按文件、按块丢弃
+- macOS 上的命令沙箱与网络白名单
+- 凭据存放在加密保险箱，不进环境变量，也不进配置文件
+- 面向团队的托管设置
+
+</td>
+<td width="50%" valign="top">
+
+#### 沿用你现有的配置
+
+- 直接读取 Claude Code 的配置：`CLAUDE.md` / `AGENTS.md`、权限规则、hooks、`.claude/agents`、skills、命令与 `.mcp.json`
+- 从不写入 `.claude/`
+- 可把 Claude Code 的自动记忆导入 PiArc
+- 没有遥测：只连接你配置的服务商与服务（[外连清单](docs/security/egress.md)）
+
+</td>
+</tr>
+</table>
+
+## 下载
+
+在 [Releases](https://github.com/Refinex-Space/PiArc/releases/latest) 页面下载最新版本。
+
+| 平台 | 安装包 | 更新方式 |
+|---|---|---|
+| macOS 13 及以上，Apple 芯片 | `.dmg`（arm64） | 应用内提示，手动安装 |
+| macOS 13 及以上，Intel | `.dmg`（x64） | 应用内提示，手动安装 |
+| Windows 11 | 安装程序 `.exe`（x64） | 自动更新 |
+
+Windows 10 可以运行 PiArc，但不在测试矩阵中。
+
+每个版本都附带用项目密钥签名的 SHA-256 校验清单，应用在更新前会核对它。
+
+<details>
+<summary><strong>首次启动：放行未签名的应用</strong></summary>
+
+<br>
+
+PiArc 免费开源，安装包没有经过 Apple 或 Microsoft 的签名与公证（[ADR-0018](docs/adr/0018-unsigned-distribution.md)）。第一次需要手动放行：
+
+- **macOS**：把 PiArc 拖进"应用程序"后打开。系统拒绝时，到 **系统设置 → 隐私与安全性**，选 **仍要打开**。如果没有这个按钮，运行 `xattr -dr com.apple.quarantine /Applications/PiArc.app`，它只解除 PiArc 的下载隔离。更新后 macOS 可能再问一次是否允许访问钥匙串。
+- **Windows**：出现 SmartScreen 时，选 **更多信息 → 仍要运行**。开启了"智能应用控制"的电脑会阻止未签名的应用。
+
+</details>
+
+## 快速上手
+
+1. **连接模型。** 第一次启动会带你完成：选一个服务商、粘贴密钥，PiArc 发一个很小的请求测试连接。也可以用订阅账号登录（ChatGPT、GitHub Copilot 等），或者填自定义、本地端点。更多服务商在 **设置 → 模型与服务商**。
+2. **打开项目。** 选一个文件夹。第一次打开时，PiArc 会先问你是否信任这个项目，然后才运行项目里的 hooks、MCP server 与允许规则。
+3. **描述任务。** 输入或说出你想做的事。逐个审批工具调用，熟悉后切换到"自动接受编辑"或"自动审查"；不满意的回合可以回退。
+
+## 工作原理
 
 ```
 PiArc（Electron）
-├── 渲染进程：React + TypeScript（界面、对话流、输入框、终端视图），沙箱隔离
-├── 主进程：TypeScript（窗口、菜单、通知、更新、事件转发）
-└── PiArc Core：Rust 原生模块（经 NAPI-RS），加载在主进程
-      权限与审批 · hooks · 工具 I/O · 文件快照 · 沙箱 · 配置 · 凭据 · 索引 · diff · 终端
-          │  AHP：版本化的 JSON-RPC，走 stdio
+├── 渲染进程    React + TypeScript：对话、输入框、终端视图、工具（沙箱化）
+├── 主进程      窗口、菜单、通知、更新、事件转发
+└── PiArc Core  Rust，经 NAPI-RS 加载
+      策略与审批 · hooks · 工具 I/O · 快照 · 沙箱 · 配置
+      凭据 · 索引 · diff · 终端 · git · 语音
+          │  AHP：基于 stdio 的版本化 JSON-RPC
           ▼
 Agent Host（每个工作区一个 Node 进程）
-└── Pi SDK + Harness Kit（PiArc 编写的 Pi 扩展）
-      agent 循环 · 模型服务商 · 上下文组装 · 压缩 · 子 agent · 计划 · 任务清单
+└── Pi SDK + Harness Kit
+      agent 循环 · 模型服务商 · 上下文组装 · 压缩 · 子 agent · MCP 连接池
 ```
 
-详细文档：
+智能体从不直接接触你的文件与进程：每一次读、写和命令都经过 Core，由 Core 套用权限规则、保存快照、运行 hooks。原因见[架构设计](docs/architecture/ARCHITECTURE.md)与[架构决策记录](docs/adr/README.md)。
 
-- [架构设计文档](docs/architecture/ARCHITECTURE.md)
-- [需求规格](docs/product/REQUIREMENTS.md)
-- [架构决策记录（ADR）](docs/adr/README.md)
-- [调研资料与参考源清单](docs/research/)
-- [交付计划：任务看板、执行协议与任务提示词](docs/plan/PLAN.md)
+## 从源码构建
 
-## 仓库结构
+<details>
+<summary><strong>环境要求</strong></summary>
 
-```
-apps/desktop/     Electron 应用：主进程、preload、React 渲染进程
-crates/           PiArc Core 的 Rust workspace，含 NAPI-RS 绑定
-agent-host/       基于 Pi SDK 的 TypeScript Agent Host 与 Harness Kit
-packages/         共享的 TypeScript 包，例如生成的协议类型
-design/tokens/    设计令牌，生成 CSS 变量
-design/brand/     应用图标与标记（打包、托盘、界面 logo 的单一来源）
-docs/             架构、ADR、需求、调研
-reference/        参考仓库的本地只读副本（已加入 gitignore）
-```
-
-## 本地开发与构建
-
-所有命令都在仓库根目录执行。完整命令表见 [AGENTS.md](AGENTS.md#命令)。
-
-### 环境要求
+<br>
 
 | | macOS | Windows |
 |---|---|---|
 | Node.js | 24（`.nvmrc`） | 24（`.nvmrc`） |
-| Rust | 安装 [rustup](https://rustup.rs)；版本由 `rust-toolchain.toml` 锁定，cargo 会自动安装 | 同左 |
-| 原生工具链 | Xcode Command Line Tools；打发布包需要完整的 Xcode（快捷指令扩展） | Visual Studio Build Tools（MSVC 与 Windows SDK） |
-| 其他 | | Git for Windows（Git Bash）；出安装包需要 .NET 8 SDK |
+| Rust | [rustup](https://rustup.rs)；`rust-toolchain.toml` 锁定版本 | 同左 |
+| 原生工具链 | Xcode Command Line Tools（打发布包需要完整 Xcode） | Visual Studio Build Tools（MSVC 与 Windows SDK） |
+| 其他 | | Git for Windows；打安装包需要 .NET 8 SDK |
 
-第一次构建要联网：会下载 libghostty-vt 预编译产物和内置的 node、rg、fd，并校验哈希。
+第一次构建会下载 libghostty-vt 预编译产物与内置的 node、rg、fd，并校验哈希。
 
-### 安装依赖并从源码运行
+</details>
 
 ```bash
-npm ci --ignore-scripts                 # 按 lockfile 安装 npm 依赖（与 CI 相同）
-node node_modules/electron/install.js   # 下载 Electron 二进制（--ignore-scripts 不会下载）
-npm run build:core                      # 构建 Core 原生模块（开发版）
-npm run build:agent-host                # 构建 Agent Host bundle
-npm run start -w @piarc/desktop         # 启动应用（热更新）
+npm ci --ignore-scripts                 # 按 lockfile 安装依赖，与 CI 相同
+node node_modules/electron/install.js   # 下载 Electron 二进制
+npm run build:core                      # PiArc Core 开发构建
+npm run build:agent-host                # Agent Host bundle
+npm run start -w @piarc/desktop         # 启动应用，支持热重载
 ```
 
-改了 Rust 代码后重新运行 `npm run build:core`，改了 `agent-host/` 后重新运行 `npm run build:agent-host`。从源码运行时，Agent Host 用 PATH 上的 `node` 启动。
+改了 Rust 代码后重新构建 Core，改了 `agent-host/` 后重新构建 Agent Host。要跑一遍 CI 的全部检查，先运行一次 `node scripts/dev/install-tools.mjs`，再运行 `npm run verify`。
 
-在 macOS 上，从源码运行的应用跑在 `node_modules` 里 Electron 自带的 `Electron.app` 中：菜单栏显示 "Electron"，Dock 图标在应用启动后换成 PiArc 的。要看到发布时的样子（应用名、图标、内置 node 与签名分层），打一个开发构建再打开：
-
-```bash
-npm run package:desktop -- --flavor development
-open apps/desktop/out/development/PiArc-darwin-arm64/PiArc.app
-```
-
-### 检查
+打包：
 
 ```bash
-node scripts/dev/install-tools.mjs   # 首次：把 cargo-deny、cargo-audit、rg、fd 装进 .tools/
-npm run verify                       # 全部 17 项检查，结束时打印汇总表
-npm test                             # 只跑 Vitest；另有 npm run lint、npm run typecheck
-cargo test -p <crate>                # 只测一个 Rust crate
-```
-
-### 打包
-
-打包会先构建 Core 和 Agent Host bundle。`--flavor release`（默认）是给用户用的构建；`--flavor development` 保留端到端测试需要的测试钩子。
-
-**macOS**（DMG 与 ZIP 在 `apps/desktop/out/release/make/`）：
-
-```bash
+# macOS：DMG 与 ZIP 在 apps/desktop/out/release/make/
 npm run package:desktop -- --flavor release --arch arm64 --make
-# Intel 版：先 rustup target add x86_64-apple-darwin，再用 --arch x64
-```
 
-**Windows**（`*-Setup.exe` 在 `apps/desktop/out/release/velopack/win32-x64/`）：
-
-```bash
+# Windows：安装程序在 apps/desktop/out/release/velopack/win32-x64/
 npm run package:desktop -- --flavor release --arch x64
-node scripts/release/pack-windows.mjs --arch x64 --flavor release --versions 0.1.0
+node scripts/release/pack-windows.mjs --arch x64 --flavor release --versions <版本号>
 ```
 
-第二步把锁定版本的 Velopack `vpk` 装进 `.tools/vpk/`，需要 .NET SDK。只要免安装的程序目录时，第一步的 `apps/desktop/out/release/PiArc-win32-x64/PiArc.exe` 就能直接运行。
+仓库结构、测试与约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，全部命令见 [AGENTS.md](AGENTS.md)。
 
-## 路线图
+## 文档
 
-| 里程碑 | 范围 | 状态 |
-|---|---|---|
-| M0 | 两个平台上的技术验证：Rust Core 经 NAPI-RS 接入 Electron、流式对话渲染、多会话 Agent Host、凭据、签名与打包、libghostty 终端、沙箱、Electron 安全基线 | 已完成 |
-| M1 | 可行走骨架：会话、流式对话、经 Rust Core 执行的核心工具、基础审批、模型设置 | 两个平台已完成 |
-| M2 | Harness 核心：权限规则、计划模式、任务清单、hooks、检查点与回退、压缩、Changes 面板 | 两个平台已完成 |
-| M3 | 多会话并行、子 agent、后台任务、终端、worktree、MCP、skills 与命令 | 两个平台的功能已交付；内存预算待定 |
-| M4 | 沙箱、插件、无障碍、本地化、性能预算进入 CI | macOS 的功能已交付，部分性能预算还未达标；Windows 由 W4 跟进 |
-| M5 | macOS 与 Windows 同时 Beta：自动审查模式、自动记忆、企业托管配置、发布流水线 | macOS 已交付 Auto 模式、自动记忆、托管配置与侧边对话；发布流水线、Windows 同步与 Beta 验收待做 |
-
-每个里程碑由 macOS 先达标，Windows 最迟在下一个里程碑结束前达到同样的退出标准。Git 工具、内置浏览器与语音输入是里程碑之外追加的功能。实时的任务看板见 [docs/plan/PLAN.md](docs/plan/PLAN.md)。
-
-## 未签名构建
-
-PiArc 免费开源，发布包不做平台代码签名和公证（[ADR-0018](docs/adr/0018-unsigned-distribution.md)），第一次打开需要你手动放行：
-
-- **macOS**：把 PiArc 拖到"应用程序"文件夹，先打开一次，再到"系统设置 → 隐私与安全性"点**仍要打开**。没有这个按钮时，执行 `xattr -dr com.apple.quarantine /Applications/PiArc.app`，它只对 PiArc 跳过系统的来源检查。新版本会在应用内提示，需要手动下载替换；更新后系统可能再次请求钥匙串访问授权。
-- **Windows**：出现 SmartScreen 提示时选**更多信息 → 仍要运行**。之后的更新会自动安装。开启了"智能应用控制"的电脑会拦截未签名程序。
-
-每个版本都会发布一份 SHA-256 校验清单，并用项目自己的密钥签名，应用在更新前会先校验它。
-
-## 合规说明
-
-PiArc 是独立项目，与 Anthropic 无关联，也未获其认可。"Claude" 与 "Claude Code" 是 Anthropic 的商标。
-
-- PiArc **不提供** Claude.ai 订阅登录。使用 Anthropic 模型需要 API key、云厂商凭证（Amazon Bedrock、Google Vertex AI、Microsoft Foundry）或自配网关。
-- PiArc 按 clean-room 方式开发：参考项目只用于理解行为，不复制任何专有代码、提示词和品牌资产。见 [ADR-0006](docs/adr/0006-compliance-and-clean-room.md)。
+| | |
+|---|---|
+| [架构设计](docs/architecture/ARCHITECTURE.md) | 设计基线：进程、协议、编排、安全与性能预算 |
+| [架构决策记录](docs/adr/README.md) | 每一项架构决策及其理由 |
+| [需求](docs/product/REQUIREMENTS.md) · [能力清单](docs/product/capabilities.md) | PiArc 做什么，以及每项能力由哪些测试证明 |
+| [Hooks](docs/product/hooks.md) | PiArc 的 hooks 及其与 Claude Code 的差异 |
+| [安全](docs/security/threat-coverage.md) | 威胁模型覆盖、Electron 安全清单与外连清单 |
+| [工程规范](docs/engineering/coding-standards.md) | 编码、测试、无障碍与视觉规范 |
 
 ## 参与贡献
 
-项目处于早期阶段。提出改动前请先阅读[架构设计文档](docs/architecture/ARCHITECTURE.md)；其中第 4 章列出的决策只能通过新的 ADR 修改。提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)。
+欢迎提交问题、想法与 Pull Request。开始之前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，并遵守[行为准则](CODE_OF_CONDUCT.md)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
 
 ## 许可证
 
-[MIT](LICENSE)
+PiArc 以 [MIT 许可证](LICENSE)发布。第三方组件保留各自的许可证，见 [`third-party/`](third-party/)。
 
-PiArc 基于 Mario Zechner 及贡献者开发的 [Pi](https://github.com/earendil-works/pi)（MIT）构建。
+## 致谢
+
+PiArc 建立在 Mario Zechner 与贡献者们的 [Pi](https://github.com/earendil-works/pi) 之上；终端用到 [Ghostty](https://ghostty.org) 的 libghostty，语音输入用到 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)，服务商标记来自 [LobeHub Icons](https://github.com/lobehub/lobe-icons)。
+
+PiArc 是独立项目，与 Anthropic 没有隶属或背书关系。"Claude"与"Claude Code"是 Anthropic 的商标。PiArc 不提供 Claude.ai 订阅登录，并以 clean-room 方式编写（[ADR-0006](docs/adr/0006-compliance-and-clean-room.md)）。

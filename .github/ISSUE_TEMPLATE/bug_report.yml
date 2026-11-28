@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in PiArc does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Security issues go through the private form in [SECURITY.md](https://github.com/Refinex-Space/PiArc/blob/main/SECURITY.md), not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project with …
+        2. Ask the agent to …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PiArc version
+      description: Shown in the About window.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows 11 (x64)
+        - Windows 11 (arm64)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Model provider and model
+      placeholder: e.g. DeepSeek, deepseek-v4-pro
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove API keys and personal data first. A diagnostic bundle from Settings → Configuration diagnostics leaves out credentials and session content.
