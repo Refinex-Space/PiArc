@@ -6,6 +6,8 @@ Each version's entries are also the release notes shown in the app. How to write
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-28
+
 ### Added
 
 - First public release of PiArc, a desktop coding agent for macOS (Apple silicon and Intel) and Windows 11 (x64 and arm64), built on Pi.
@@ -19,3 +21,6 @@ Each version's entries are also the release notes shown in the app. How to write
 - **About and updates**: a Settings → About page with the app and component versions; PiArc checks for new versions, downloads them through your proxy, verifies the signed release manifest and installs on restart, on macOS and Windows.
 - English and Simplified Chinese, light and dark themes, keyboard-first and screen-reader friendly.
 - A first-run guide that connects a model in a minute.
+
+[Unreleased]: https://github.com/Refinex-Space/PiArc/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Refinex-Space/PiArc/releases/tag/v1.0.0

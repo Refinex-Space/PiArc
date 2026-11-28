@@ -6,6 +6,8 @@ PiArc 的重要变化按版本列在这里，新版本在前。格式遵循 [Kee
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-28
+
 ### 新增
 
 - PiArc 首个公开版本：基于 Pi 的桌面编码智能体，支持 macOS（Apple 芯片与 Intel）和 Windows 11（x64 与 arm64）。
@@ -19,3 +21,6 @@ PiArc 的重要变化按版本列在这里，新版本在前。格式遵循 [Kee
 - **关于与更新**：设置中新增"关于"页，显示应用与组件版本；PiArc 检查新版本，经你的代理下载，核对签名的发布清单后在重启时安装，macOS 与 Windows 都支持。
 - 英文与简体中文界面，浅色与深色主题，全键盘操作，支持屏幕阅读器。
 - 首次运行引导，一分钟内连好模型。
+
+[Unreleased]: https://github.com/Refinex-Space/PiArc/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Refinex-Space/PiArc/releases/tag/v1.0.0
