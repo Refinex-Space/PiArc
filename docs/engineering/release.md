@@ -234,8 +234,8 @@ node scripts/release/release-manifest.mjs verify --pub scripts/release/test-keys
    ```
 
    开 PR。
-7. **GitHub：演练**：Actions → **Release** → **Run workflow**，分支选 `chore/release-1.0.0`。完成后下载工件 `release-1.0.0`，核对 13 个文件（演练的签名是测试密钥）。有问题就在这个分支上修，再演练。
-8. **GitHub：合入 PR**，确认 `main` 上的 CI 全绿。
+7. **GitHub：合入 PR**（合并方式选 merge commit，保留历史），确认 `main` 上的 CI 全绿。
+8. **GitHub：演练**：GitHub 只允许手动运行默认分支上已有的工作流，首次发布时 `main` 还没有 `release.yml`，所以演练放在合入之后：Actions → **Release** → **Run workflow**，分支选 `main`（或 `gh workflow run release.yml --ref main`）。完成后下载工件 `release-1.0.0`，核对 13 个文件（演练的签名是测试密钥）。有问题就开修复 PR，合入后再演练。以后的版本 `main` 上已有工作流，按第 5.2 节在合入前演练。
 9. **本机：打标签**
 
    ```bash
