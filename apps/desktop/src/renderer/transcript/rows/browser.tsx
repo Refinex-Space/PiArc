@@ -59,7 +59,7 @@ function Shot({
   if (failed) return null;
   return (
     <span
-      className="browser-shot"
+      className="browser-run-shot"
       data-testid="browser-shot"
       data-state={url === undefined ? 'loading' : 'shown'}
       style={{ aspectRatio: `${String(image.width)} / ${String(image.height)}` }}

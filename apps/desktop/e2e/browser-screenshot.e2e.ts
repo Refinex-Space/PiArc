@@ -43,6 +43,15 @@ async function shotSize(page: Page): Promise<{ width: number; height: number }> 
     }));
 }
 
+/** Whether the element is on screen where it is drawn: not clipped or covered by anything else. */
+async function reachable(page: Page, testId: string): Promise<boolean> {
+  return page.getByTestId(testId).evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    return hit !== null && element.contains(hit);
+  });
+}
+
 test('visible, full page, region and element screenshots; copy, save and add', async ({
   app,
   page,
@@ -89,6 +98,29 @@ test('visible, full page, region and element screenshots; copy, save and add', a
     await shotMenu(page, 'full');
     await expect(page.getByTestId('browser-shot')).toHaveAttribute('data-kind', 'full');
     expect((await shotSize(page)).height).toBeGreaterThan(visible.height);
+    // The result shows all of itself: nothing clipped (the transcript's screenshot card once lent
+    // it a 160 × 120 box), and × where it is drawn closes it.
+    const bar = page.getByTestId('browser-shot');
+    expect(
+      await bar.evaluate(
+        (element) =>
+          element.scrollHeight <= element.clientHeight + 1 &&
+          element.scrollWidth <= element.clientWidth + 1,
+      ),
+    ).toBe(true);
+    for (const id of [
+      'browser-shot-copy',
+      'browser-shot-save',
+      'browser-shot-add',
+      'browser-shot-close',
+    ]) {
+      expect(await reachable(page, id), id).toBe(true);
+    }
+    await page.screenshot({ path: info.outputPath('screenshot-full.png') });
+    const close = await page.getByTestId('browser-shot-close').boundingBox();
+    if (close === null) throw new Error('No close button');
+    await page.mouse.click(close.x + close.width / 2, close.y + close.height / 2);
+    await expect(bar).toHaveCount(0);
 
     // Region: drag on the frozen page.
     await shotMenu(page, 'region');

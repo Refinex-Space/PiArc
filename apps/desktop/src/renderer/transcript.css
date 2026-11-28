@@ -2969,7 +2969,9 @@
   padding-inline-start: var(--piarc-session-text-inset);
 }
 
-.browser-shot {
+/* An agent's screenshot in a Browser run (its own name: the preview panel's screenshot result is
+   `.browser-shot`, and this stylesheet is global). */
+.browser-run-shot {
   display: block;
   width: 160px;
   max-height: 120px;
@@ -2979,7 +2981,7 @@
   background: var(--piarc-surface-panel);
 }
 
-.browser-shot img {
+.browser-run-shot img {
   display: block;
   width: 100%;
   height: 100%;
