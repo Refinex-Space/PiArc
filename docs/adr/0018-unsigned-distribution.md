@@ -1,6 +1,6 @@
 # 0018. 不做平台代码签名：macOS 只做 ad-hoc 签名，Windows 不签名，更新与凭据存储随之调整
 
-- 状态：已接受
+- 状态：已接受（第 2 条的"更新"一项被 [ADR-0111](0111-in-app-updates.md) 修订：两个平台都在应用内下载、校验并重启安装）
 - 日期：2026-11-14
 - 取代：[ADR-0016](0016-packaging-signing-updates.md)
 - 修订：[ADR-0015](0015-agent-host-runtime-bundled-node.md) 第 5 条（内置 node 的签名）

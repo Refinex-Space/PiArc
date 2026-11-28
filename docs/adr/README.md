@@ -124,5 +124,6 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0108](0108-pi-global-instructions.md) | Pi 的全局指令：Core 先于 `~/.claude/CLAUDE.md` 读取 `~/.pi/agent` 下第一个存在的候选文件（候选与顺序同 Pi），设置“智能体 › 指令”页查看并编辑它；保存核对读取时的哈希，保持编码、BOM 与换行，符号链接写到目标 | 已接受（修订 0033 第 3 条） |
 | [0109](0109-keep-awake-while-working.md) | 会话运行时防止系统休眠：偏好 `power.keepAwake`（默认开）且 Core 的 `core/activity` 报告有回合进行中时，主进程持有 `prevent-app-suspension` 阻止器，回合结束、关闭开关或退出时释放；只防闲置睡眠，后台命令与终端不计入 | 已接受 |
 | [0110](0110-first-run-guide.md) | 首次运行的欢迎屏与连接模型：全窗口两步引导（欢迎、连接模型），宫格按服务商家族与地区套餐变体（与 Pi 的 `builtinProviders` 取交集），先保存后测试，密钥只在表单 state；用户级偏好 `onboarding.completed`，有服务商、账号或工作区时推导为已完成 | 已接受 |
+| [0111](0111-in-app-updates.md) | 应用内更新：GitHub Releases 的最新正式版是唯一更新源（产物命名为契约，更新说明 `piarc-release-notes.json` 列在签名清单里），Core 经生效代理检测、下载并校验，主进程安装（macOS 自行替换应用包、Windows 经 Velopack 本地源）；设置"关于"页、菜单"检查更新…"与侧栏提示 | 已接受（修订 0018 第 2 条） |
 | [0100](0100-two-tier-composer-and-context-tray.md) | 两层输入卡片（编辑区在上、模式与模型等在卡片内的操作行）与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏 | 已接受（修订 0073 的 composer 范围） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |

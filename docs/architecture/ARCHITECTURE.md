@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.87（2026-11-28） |
+| 版本 | 2.88（2026-11-28） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -265,6 +265,7 @@ PiArc/
 | [0108](../adr/0108-pi-global-instructions.md) | Core 发现用户级 memory 时先读 Pi 的全局指令（`~/.pi/agent` 下第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`CLAUDE.md` 等，同 Pi），设置“智能体 › 指令”页经 Core 查看与编辑；保存核对读取时的哈希，保持编码与换行，符号链接写到目标 | 修订 ADR-0033 第 3 条；6.6 节 |
 | [0109](../adr/0109-keep-awake-while-working.md) | 会话运行时防止系统休眠：偏好 `power.keepAwake`（默认开）且 `core/activity` 报告有回合进行中时，主进程持有 `prevent-app-suspension` 阻止器，回合结束、关闭开关或退出时释放；只防闲置睡眠，后台命令与终端不计入 | 补充；8.1 节 |
 | [0110](../adr/0110-first-run-guide.md) | 首次运行的欢迎屏与连接模型：全窗口两步引导，宫格按服务商家族与变体，先保存后测试，密钥只在表单 state；用户级偏好 `onboarding.completed`，有服务商、账号或工作区时推导为已完成 | 补充；8.1 节 |
+| [0111](../adr/0111-in-app-updates.md) | 应用内更新：更新源是 GitHub Releases 的最新正式版（产物命名为契约），Core 经生效代理读签名清单与更新说明、下载并校验本平台产物，主进程安装（macOS 解压到同卷并核对包标识与版本后由分离脚本替换应用包，Windows 经 Velopack 本地源）；设置“关于”页与侧栏提示，用户级 `updates.autoCheck` | 修订 ADR-0018 第 2 条；13.2–13.4 节、10.1 节 |
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
@@ -313,11 +314,12 @@ PiArc/
 | [0019](../adr/0019-event-batches-copied-not-transferred.md) | 事件批次经主进程转发时复制，不转移 `ArrayBuffer` | Electron 主进程只能转移端口；实测 8 MiB 批次复制转发约 2 ms |
 | [0015](../adr/0015-agent-host-runtime-bundled-node.md) | Agent Host 继续单独内置 Node LTS | 要套 Seatbelt、走 stdio、给 npx 用，Electron 自带的 Node 都做不到 |
 | [0018](../adr/0018-unsigned-distribution.md) | Electron Forge 打包；macOS 只做 ad-hoc 签名、Windows 不签名；发布清单用项目密钥签名；不上应用商店 | 免费开源、零成本；用发布清单签名保住更新的完整性 |
+| [0111](../adr/0111-in-app-updates.md) | 两个平台都在应用内检测、下载、校验并重启安装；Core 经用户代理下载，清单签名之外再核对包标识与版本 | 安全修复及时到达；没有平台签名也有两道校验 |
 | [0024](../adr/0024-release-manifest-format.md) | 发布清单 `piarc-release-manifest/1`：产物名、大小、SHA-256，minisign 预哈希签名；Core 的 `release` 模块先验签后校验文件，没有内置公钥时一律拒绝 | 两个平台共用一份签名清单；签名覆盖版本号与产物列表，防混搭 |
 | [0017](../adr/0017-terminal-libghostty-vt.md) | 终端状态由 Core 中的 libghostty-vt 持有，渲染层可替换 | agent 读屏与用户所见一致；IPC 流量与输出量无关 |
 | [0023](../adr/0023-terminal-frames-as-pull-replies.md) | 终端帧作为拉取请求的返回值送达渲染进程，不经事件 MessagePort | 按键之后 MessagePort 消息被推迟到下一帧之后处理；改为回复后回显额外延迟 p95 从 16.2 ms 降到 0.77 ms |
 
-已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订；ADR-0014 第 4 条（大块数据转移）被 ADR-0019 修订；ADR-0017 第 3 条中帧的送达方式（经 MessagePort）被 ADR-0023 修订；ADR-0044 第 8 条（Changes 面板）被 ADR-0084 取代。
+已被取代的决策（原文保留在 `docs/adr/`）：0001、0007 → 0013；0008 → 0014；0003 → 0015；0012 → 0016 → 0018。ADR-0015 第 5 条（签名）被 ADR-0018 修订；ADR-0018 第 2 条的更新方式被 ADR-0111 修订；ADR-0014 第 4 条（大块数据转移）被 ADR-0019 修订；ADR-0017 第 3 条中帧的送达方式（经 MessagePort）被 ADR-0023 修订；ADR-0044 第 8 条（Changes 面板）被 ADR-0084 取代。
 
 ---
 
@@ -1558,7 +1560,7 @@ T13 落地（ADR-0025）：迁移按版本号顺序、每个一个事务，失�
 | 审批疲劳与误点 | 连续弹窗导致误允许 | 400 ms 防误触；长参数阅读闸门；"总是允许"规则可预览、可编辑、可撤销；审计可查 |
 | 多窗口审批错乱 | 两个窗口回答同一请求或过期请求 | 审批账本的 revision 与 connectionEpoch 校验 |
 | 供应链 | npm / crates 依赖被投毒 | 精确版本锁定；`npm ci --ignore-scripts`；`cargo-deny`、`cargo-audit`、`npm audit`；新增依赖需评审 |
-| 更新通道被劫持 | 恶意更新包 | 没有平台签名可依赖（ADR-0018）：HTTPS；每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新；私钥只在需要维护者审批的发布环境中使用；不防发布账号本身被攻破 |
+| 更新通道被劫持 | 恶意更新包 | 没有平台签名可依赖（ADR-0018）：HTTPS；每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新；私钥只在需要维护者审批的发布环境中使用；应用内更新（ADR-0111）只认验签通过的清单，更新说明与每个产物核对大小与 SHA-256 后才交给安装步骤，macOS 安装前核对解出应用包的标识与版本，Windows 的 Velopack 源文件本身在清单里；不防发布账号本身被攻破 |
 | 应用文件被篡改 | 替换应用内的 asar、bundle 或 node | app.asar 开启完整性校验与 `OnlyLoadAppFromAsar`，但没有平台签名时完整性信息本身不受保护，只能防意外损坏；对安装目录有写权限的本机攻击者可以篡改应用而不被发现，作为已接受的风险（ADR-0018）；安装位置使用系统默认目录，依靠文件系统权限 |
 | 同一用户的进程向 PiArc 注入代码 | 用 `DYLD_INSERT_LIBRARIES` 启动 PiArc，或调试器附加，借 PiArc 的代码身份读取钥匙串中的主密钥 | macOS 的 PiArc 自身在 ad-hoc 签名下开启 hardened runtime（只给 `allow-jit` 与 `disable-library-validation`，主程序另给语音输入用的 `device.audio-input`，ADR-0096），实测 `DYLD_INSERT_LIBRARIES` 不再生效（S6 报告第 3 节）；Core 以最小环境启动内置 node（不传 `DYLD_*`）；内置 node 保留 Node.js 官方签名，它自带 `get-task-allow` 与 `allow-dyld-environment-variables`，同一用户的进程仍可调试附加 Agent Host、读到其内存中的凭据，作为已接受的风险登记（I39） |
 | 渲染进程注入（XSS） | 模型输出、仓库文件、MCP 返回内容中嵌入 HTML、脚本或恶意链接，在渲染进程中执行，进而调用 preload 暴露的能力 | 渲染进程 sandbox + contextIsolation、无 Node；严格 CSP；Markdown 不走 `innerHTML`，原始 HTML 当文本；preload 白名单 + 主进程校验来源；有副作用的命令仍经 Core 的权限裁决；XSS 载荷回归测试（第 10.3 节） |
@@ -1781,7 +1783,7 @@ Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.un
   ──► 放入 Resources/agent-host/（内置 Node、rg、fd 按 third-party/binaries.lock.json 下载并校验 SHA-256；bundle、pi-assets）
   macOS：分层 ad-hoc 重签（第 10.3 节）──► DMG（hdiutil）+ ZIP
   Windows：vpk 打 Velopack 安装包与更新包（不签名，按用户安装，pack id 与快捷方式 AUMID 为应用标识）
-全部产物 ──► 发布清单（文件名 + 大小 + SHA-256）──► 项目 Ed25519 密钥签名（minisign，ADR-0024）──► GitHub Releases
+全部产物（按 ADR-0111 的契约命名）+ 由两份 CHANGELOG 生成的 piarc-release-notes.json ──► 发布清单（文件名 + 大小 + SHA-256）──► 项目 Ed25519 密钥签名（minisign，ADR-0024）──► GitHub Releases 草稿（`.github/workflows/release.yml`，流程见 docs/engineering/release.md）
 ```
 
 ### 13.3 CI
@@ -1790,12 +1792,12 @@ Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.un
 |---|---|
 | PR | rustfmt、clippy（`-D warnings`）、ESLint 与 `tsc`；L0–L2、L4 快照、安全回归；schema 与 `.d.ts` 漂移检查；**macOS 与 Windows runner 都完整运行**；性能冒烟 |
 | Nightly | L3 对齐；两个平台的完整性能测试与长跑内存测试；Playwright UI 流程；多服务商场景（有密钥时）；四个目标的打包冒烟 |
-| Release | 构建、ad-hoc 签名（macOS）、安装包、发布清单与清单签名、发布说明；检查产物的 fuse 状态；Defender 扫描 Windows 产物；清单签名私钥只在需要维护者审批的发布环境中使用 |
+| Release | 推送 `v*` 标签触发 `.github/workflows/release.yml`：构建、ad-hoc 签名（macOS）、安装包、发布清单与清单签名、发布说明，产出 GitHub Release 草稿，维护者核对后发布（docs/engineering/release.md）；检查产物的 fuse 状态；Defender 扫描 Windows 产物；清单签名私钥只在需要维护者审批的发布环境中使用 |
 | 依赖安全 | `cargo-deny`、`cargo-audit`、`npm audit`；订阅 Electron、Node、Chromium 的安全公告 |
 
 ### 13.4 版本、提交与升级节奏
 
-- 应用版本 SemVer；AHP 协议版本独立维护；"关于"页显示应用、协议、Electron、Pi、Node、libghostty-vt 版本。
+- 应用版本 SemVer，唯一来源是 `apps/desktop/package.json`，发布打 `v<版本>` 标签，变更写进中英两份 CHANGELOG（docs/engineering/release.md）；AHP 协议版本独立维护；设置的"关于"页显示应用、协议、Electron、Chromium、Pi、Node、libghostty-vt 版本，并检查与安装更新（ADR-0111）。
 - 提交信息遵循 Conventional Commits。
 - `main` 始终可构建；功能分支短生命周期；发布打 tag。
 - **Electron 升级**：每个 Electron 大版本支持期约 24 周。新大版本发布后 8 周内完成升级评估，至少每季度升级一次；升级时在四个目标上跑全套 L1/L2/L4 与性能测试，重点回归 NAPI 加载、fuses、更新流程。
@@ -1823,7 +1825,7 @@ Forge 打包 ──► 放入 .node 与 Windows 的 ghostty-vt.dll（app.asar.un
 | R14 | 双平台同步拖慢整体节奏 | 中 | Windows 最多滞后一个里程碑；两个平台 CI 全量运行；平台差异集中在适配层 | macOS 里程碑连续两次延期时，Windows 改为固定滞后一个里程碑（ADR-0013） |
 | R15 | libghostty-vt 刚发布 1.0，绑定与周边生态不成熟 | 中 | 直接对 C ABI 生成绑定；精确锁版本；保留 ADR-0017 中的退路。M0 S7 两个平台通过，走正式路线，不启用退路 | M0 S7 不通过时启用退路 |
 | R16 | Windows 到 Beta 没有 OS 级沙箱 | 中 | 权限规则 + Job Object 进程树管理；界面明确提示（需求 D7）；T39 评估后维持现状（ADR-0057） | ADR-0057 的重新评估条件之一出现（MXC 的 Git Bash 问题修复、遥测可关、ProcessContainer 覆盖主流版本等）时，安排 MXC ProcessContainer 的验证任务 |
-| R17 | Chromium 安全更新跟进不及时 | 中 | 只使用 Electron 仍在支持期内的大版本，按第 13.4 节的节奏升级；macOS 没有自动更新，应用内提示标明"安全更新" | 出现在野利用的高危漏洞时立即发版 |
+| R17 | Chromium 安全更新跟进不及时 | 中 | 只使用 Electron 仍在支持期内的大版本，按第 13.4 节的节奏升级；应用内更新（ADR-0111），安全更新在关于页与侧栏提示中标明 | 出现在野利用的高危漏洞时立即发版 |
 | R18 | 不做平台签名带来的安装摩擦、更新滞后与安全软件拦截 | 中 | 首次运行指引；发布清单签名；Defender 扫描与误报申诉；凭据保险箱把授权弹窗降到每次更新最多一次（ADR-0018） | 安装受阻或用户停留旧版本成为主要反馈时，先申请 SignPath 免费签名（Windows），再评估 Apple 开发者计划 |
 
 ---
@@ -1956,6 +1958,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.85 | 2026-11-28 | 第 4 章决策表加入 ADR-0108；6.6 节：用户级 memory 先读 Pi 的全局指令 `~/.pi/agent/AGENTS.md`，设置“指令”页可查看与编辑（修订 ADR-0033 第 3 条）。 |
 | 2.86 | 2026-11-28 | 第 4 章决策表加入 ADR-0109；8.1 节：会话运行时防止系统闲置睡眠。 |
 | 2.87 | 2026-11-28 | 第 4 章决策表加入 ADR-0110；8.1 节：首次运行的欢迎屏与连接模型。 |
+| 2.88 | 2026-11-28 | 第 4 章决策表加入 ADR-0111（修订 ADR-0018 第 2 条：应用内更新）；10.1 节"更新通道被劫持"的对策；13.2 节发布产物命名、更新说明与 Release 草稿；13.3 节 Release 流水线；13.4 节版本来源、CHANGELOG 与"关于"页；R17 改为应用内更新。设计增补 `addenda/about-and-updates.md`。 |
 | 2.80 | 2026-11-27 | 第 4 章决策表：计划审阅回到对话，计划卡改为决策栏，计划面板渲染 Markdown 并保持原文偏移锚点，窗口从会话快照接管错过的运行态（ADR-0103，修订 ADR-0042 第 2、3 条）。 |
 | 2.78 | 2026-11-27 | 第 8.2 节：设置改为工作台里的一个视图，按组导航，搜索结果在主区（ADR-0101）。 |
 | 2.77 | 2026-11-27 | 第 8.2 节：两层输入卡片与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏（ADR-0100）。 |

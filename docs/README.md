@@ -10,7 +10,7 @@ PiArc 的设计与决策文档都在这里。动手写代码前先读架构设�
 | [spikes/](spikes/README.md) | M0 技术验证的跟踪表与报告 | M0 期间；评审验证结论时 |
 | [perf/](perf/M3-memory.md) | 里程碑的性能测量报告（[M3 内存](perf/M3-memory.md)） | 复测性能预算时；评审里程碑退出标准时 |
 | [research/](research/README.md) | 调研快照与参考源清单 | 需要原始依据时（注意时效） |
-| [engineering/](engineering/coding-standards.md) | [编码规范](engineering/coding-standards.md)、[测试规范](engineering/testing.md)、[提示词原创性检查](engineering/prompt-originality.md)、[CLAUDE.md 规范](engineering/claude-md.md)、[无障碍与本地化](engineering/accessibility.md)、[视觉规范](engineering/visual-design.md) | 写任何代码前 |
+| [engineering/](engineering/coding-standards.md) | [编码规范](engineering/coding-standards.md)、[测试规范](engineering/testing.md)、[提示词原创性检查](engineering/prompt-originality.md)、[CLAUDE.md 规范](engineering/claude-md.md)、[无障碍与本地化](engineering/accessibility.md)、[视觉规范](engineering/visual-design.md)、[发布规范](engineering/release.md) | 写任何代码前；发版前读发布规范 |
 
 ## 文档约定
 
