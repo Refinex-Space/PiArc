@@ -40,8 +40,7 @@ import { requestDictationToggle } from '../composer/dictation/bus.js';
 import { toggleChangesPanel } from '../changes/panel-state.js';
 import { claimPanelCommand } from '../changes/git/focus.js';
 import { showPanel, togglePanel } from './registry.js';
-import { ShortcutsDialog } from './ShortcutsDialog.js';
-import { CommandPalette } from './CommandPalette.js';
+import { GlobalSearch, type SearchTab } from './GlobalSearch.js';
 import { requestCommand } from './command-requests.js';
 import { Sidebar } from './Sidebar.js';
 import { WorkbenchHeader } from './WorkbenchHeader.js';
@@ -197,7 +196,9 @@ export function Shell() {
   useEffect(() => {
     setSidebarPeek(false);
   }, [view]);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Global search, on the tab it shows; commands and shortcuts live in it (Mod+K, Mod+/).
+  const [search, setSearch] = useState<SearchTab | null>(null);
+  const shortcutsOpen = search !== null;
   const [settingsEntry, setSettingsEntry] = useState<number | null>(() =>
     isSettingsRoute() ? 0 : null,
   );
@@ -231,15 +232,20 @@ export function Shell() {
       window.removeEventListener('hashchange', sync);
     };
   }, []);
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const paletteOpener = useRef<HTMLElement | null>(null);
-  const dismissPalette = () => {
+  const searchOpener = useRef<HTMLElement | null>(null);
+  const openSearch = (tab: SearchTab) => {
+    if (search === null)
+      searchOpener.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSearch(tab);
+  };
+  const dismissSearch = () => {
     // Commands can immediately focus a workbench control. Release its inert ancestor first.
     flushSync(() => {
-      setPaletteOpen(false);
+      setSearch(null);
     });
-    if (paletteOpener.current?.isConnected) paletteOpener.current.focus({ preventScroll: true });
-    paletteOpener.current = null;
+    if (searchOpener.current?.isConnected) searchOpener.current.focus({ preventScroll: true });
+    searchOpener.current = null;
   };
   const [toasts, setToasts] = useState<readonly Toast[]>([]);
   const viewRef = useRef(view);
@@ -396,8 +402,9 @@ export function Shell() {
       toggleSidebar,
       homeTools,
       openShortcuts: () => {
-        setShortcutsOpen(true);
+        openSearch('shortcuts');
       },
+      openSearch,
       runCommand: (command) => {
         runRef.current(command);
       },
@@ -517,14 +524,10 @@ export function Shell() {
         break;
       }
       case 'help.shortcuts':
-        setShortcutsOpen(true);
+        openSearch('shortcuts');
         break;
       case 'app.commandPalette':
-        if (!shortcutsOpen) {
-          paletteOpener.current =
-            document.activeElement instanceof HTMLElement ? document.activeElement : null;
-          setPaletteOpen(true);
-        }
+        openSearch('all');
         break;
       case 'changes.toggle':
         if (toolSession) toggleChangesPanel();
@@ -545,8 +548,15 @@ export function Shell() {
     }
   };
   const dispatch = (command: AppCommand) => {
-    if (paletteOpen) {
-      if (command === 'app.commandPalette' || command === 'session.close') dismissPalette();
+    if (search !== null) {
+      // Mod+K closes it again; Mod+/ shows the shortcuts, or closes them when they show.
+      if (
+        command === 'session.close' ||
+        command === 'app.commandPalette' ||
+        (command === 'help.shortcuts' && search === 'shortcuts')
+      )
+        dismissSearch();
+      else if (command === 'help.shortcuts') setSearch('shortcuts');
       return;
     }
     run(command);
@@ -618,7 +628,7 @@ export function Shell() {
         <div
           className={`shell${collapsed ? ' is-collapsed' : ''}`}
           data-testid="app-shell"
-          inert={Boolean(trust) || shortcutsOpen || paletteOpen || settingsOpen}
+          inert={Boolean(trust) || shortcutsOpen || settingsOpen}
           data-settings={settingsOpen ? 'open' : undefined}
           onKeyDown={(event) => {
             if (
@@ -701,8 +711,10 @@ export function Shell() {
         <BrowserNotices />
         <AgentReveal />
         <TooltipLayer />
-        {paletteOpen && (
-          <CommandPalette
+        {search !== null && (
+          <GlobalSearch
+            tab={search}
+            onTab={setSearch}
             current={
               view.kind === 'session'
                 ? {
@@ -713,20 +725,14 @@ export function Shell() {
                 : undefined
             }
             run={run}
-            open={(id) => {
-              show({ kind: 'session', id });
+            open={(target) => {
+              if ('session' in target) show({ kind: 'session', id: target.session });
+              else show({ kind: 'home', workspace: target.project });
             }}
             command={(name) => {
               if (view.kind === 'session') requestCommand(view.id, name);
             }}
-            onClose={dismissPalette}
-          />
-        )}
-        {shortcutsOpen && (
-          <ShortcutsDialog
-            onClose={() => {
-              setShortcutsOpen(false);
-            }}
+            onClose={dismissSearch}
           />
         )}
         {trust !== undefined && (

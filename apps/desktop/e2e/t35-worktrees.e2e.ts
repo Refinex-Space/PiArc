@@ -7,6 +7,8 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { closeSettings, openSettings } from './settings-panel.js';
+
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import {
@@ -135,10 +137,15 @@ test('starts a session in its own worktree and asks before archiving its changes
   expect(existsSync(path.join(tree, 'draft.txt'))).toBe(true);
 
   // Restored and archived again, discarding: the worktree goes, its branch stays.
-  await page.getByTestId('sidebar-more').click();
-  await page.getByTestId('menu-archived').click();
-  await sessionMenu(page, id, 'Unarchive');
-  await expect(row(page, id).getByText('Archived')).toHaveCount(0);
+  const settings = await openSettings(page);
+  await settings.getByTestId('settings-nav-data').click();
+  await settings.getByTestId('data-open-archived').click();
+  await settings
+    .locator(`[data-testid="archived-session"][data-session-id="${id}"]`)
+    .getByTestId('archived-restore')
+    .click();
+  await closeSettings(settings);
+  await expect(row(page, id)).toBeVisible();
   await stubMessageBox(app, 1);
   await sessionMenu(page, id, 'Archive');
   await expect.poll(() => existsSync(tree)).toBe(false);
@@ -168,18 +175,18 @@ test('finds a message by its words and opens its session at that message', async
 
   // Mixed Chinese and English terms; the snippet marks both.
   await page.getByTestId('open-search').click();
-  await page.getByTestId('session-filter').fill('灯塔 lighthouse');
+  await page.getByTestId('global-search-input').fill('灯塔 lighthouse');
   const results = page.getByTestId('message-search');
   const hit = results.getByTestId('search-hit').first();
   await expect(hit).toBeVisible();
   await expect(hit.locator('mark')).toHaveText(['灯塔', 'lighthouse']);
   await expect(results.locator(`[data-session="${id}"]`)).toBeVisible();
   await page
-    .getByTestId('workspace-search')
+    .getByTestId('global-search')
     .screenshot({ path: info.outputPath('search-results.png') });
 
   // Two characters: below a trigram, still found.
-  await page.getByTestId('session-filter').fill('灯塔');
+  await page.getByTestId('global-search-input').fill('灯塔');
   await expect(results.getByTestId('search-hit').first().locator('mark')).toHaveText('灯塔');
   await results.getByTestId('search-hit').first().click();
   const located = page.locator('.transcript-row[data-located]');

@@ -1,0 +1,149 @@
+/* Data management (settings): the row that opens the archived sessions, the result lines under
+   the bulk actions, and the archived sessions grouped by project. Rows, not cards
+   (docs/engineering/visual-design.md). */
+
+/* The archived sessions row opens a sub-page: the whole row is the button. */
+.settings-surface .data-link-row {
+  width: 100%;
+  padding-inline: var(--piarc-space-2);
+  margin-inline: calc(-1 * var(--piarc-space-2));
+  box-sizing: content-box;
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.settings-surface .data-link-row:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+/* The hover surface reaches past the text; the divider stays in line with the other rows'. */
+.settings-surface .data-link-row {
+  position: relative;
+  border-block-end-color: transparent;
+}
+.settings-surface .data-link-row::after {
+  content: '';
+  position: absolute;
+  inset: auto var(--piarc-space-2) -1px;
+  height: 1px;
+  background: var(--settings-divider);
+  pointer-events: none;
+}
+.data-link-trail {
+  color: var(--piarc-text-secondary);
+}
+.data-link-trail .icon {
+  width: 16px;
+  height: 16px;
+}
+.data-count {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.data-note {
+  color: var(--piarc-text-success);
+}
+.data-note.is-error {
+  color: var(--piarc-text-danger);
+}
+
+/* The project filter beside the search field. */
+.settings-surface .catalog-toolbar .data-filter {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  max-width: 220px;
+  height: var(--piarc-size-control-height);
+  padding: 0 var(--piarc-space-3);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.settings-surface .catalog-toolbar .data-filter:hover:enabled {
+  background: var(--piarc-session-fill-hover);
+}
+.settings-surface .catalog-toolbar .data-filter .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--piarc-text-secondary);
+}
+
+/* One group per project: its name, how many, and its actions; then its sessions. */
+.data-archived {
+  display: grid;
+  gap: var(--piarc-space-5);
+  margin-top: var(--piarc-space-4);
+}
+.data-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: 32px;
+  padding-bottom: var(--piarc-space-2);
+  border-bottom: 1px solid var(--settings-divider);
+}
+.data-group-head > .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--piarc-text-secondary);
+}
+.data-group-head h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+}
+.data-group-head .icon-button {
+  flex: none;
+}
+.data-sessions {
+  display: grid;
+  gap: 2px;
+  margin: var(--piarc-space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.data-session {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-4);
+  min-height: 52px;
+  padding: var(--piarc-space-2) var(--piarc-space-2);
+  margin-inline: calc(-1 * var(--piarc-space-2));
+  border-radius: var(--piarc-radius-md);
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.data-session:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+.data-session-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.data-session-title {
+  color: var(--piarc-text-primary);
+}
+.data-session-when {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
+}
+.data-session-actions {
+  display: flex;
+  flex: none;
+  gap: var(--piarc-space-2);
+}

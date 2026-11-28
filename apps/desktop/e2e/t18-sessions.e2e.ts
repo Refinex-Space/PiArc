@@ -4,6 +4,8 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import { closeSettings, openSettings } from './settings-panel.js';
+
 import type { Page } from '@playwright/test';
 
 import { IPC_CHANNELS } from '../src/shared/ipc.js';
@@ -132,28 +134,33 @@ test('rename, pin, filter, archive and delete sessions; the result survives a re
 
   // Search session titles without leaving the conversation.
   await page.getByTestId('open-search').click();
-  await page.getByTestId('session-filter').fill('gamma');
-  const titles = page.getByTestId('workspace-search').getByTestId('search-title');
+  await page.getByTestId('global-search-input').fill('gamma');
+  const titles = page.getByTestId('global-search').getByTestId('search-title');
   await expect(titles).toHaveCount(1);
   await expect(titles).toHaveAttribute('data-session-id', gamma);
-  await page.getByTestId('session-filter').fill('');
+  await page.getByTestId('global-search-input').fill('');
   await expect(titles).toHaveCount(3);
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('open-search')).toBeFocused();
 
-  // Archive: hidden until "show archived"; its temporary directory is removed.
+  // Archive: it leaves the sidebar and is listed in Settings › Data management › Archived
+  // sessions; its temporary directory is removed.
   const temp = path.join(userDataDir, 'sessions', gamma);
   expect(existsSync(temp)).toBe(true);
   await row(page, gamma).click({ button: 'right' });
   await page.getByTestId('menu-archive').click();
   await expect(row(page, gamma)).toHaveCount(0);
   await expect.poll(() => existsSync(temp)).toBe(false);
-  await page.getByTestId('sidebar-more').click();
-  await page.getByTestId('menu-archived').click();
-  await expect(row(page, gamma)).toBeVisible();
-  await expect(row(page, gamma)).toContainText(/已归档|Archived/);
-  await page.getByTestId('sidebar-more').click();
-  await page.getByTestId('menu-archived').click();
+  const archived = async (on: Page) => {
+    const settings = await openSettings(on);
+    await settings.getByTestId('settings-nav-data').click();
+    await settings.getByTestId('data-open-archived').click();
+    await expect(
+      settings.locator(`[data-testid="archived-session"][data-session-id="${gamma}"]`),
+    ).toBeVisible();
+    await closeSettings(settings);
+  };
+  await archived(page);
 
   // Delete: the main process asks (stubbed native dialog), then the Pi file and the temporary
   // directory are gone.
@@ -186,9 +193,7 @@ test('rename, pin, filter, archive and delete sessions; the result survives a re
     await expect(row(next, alpha).getByTestId('session-title')).toHaveText('重命名的会话 Renamed');
     await expect(row(next, beta)).toHaveCount(0);
     await expect(row(next, gamma)).toHaveCount(0);
-    await next.getByTestId('sidebar-more').click();
-    await next.getByTestId('menu-archived').click();
-    await expect(row(next, gamma)).toBeVisible();
+    await archived(next);
     await next.screenshot({ path: testInfo.outputPath('after-restart.png') });
   } finally {
     await again.app.close();
@@ -276,14 +281,18 @@ test('project actions support drag ordering, keyboard access and project search'
   await expect(atlas.getByTestId('project-toggle')).toHaveAttribute('aria-expanded', 'false');
 
   await page.getByTestId('open-search').click();
-  await expect(page.getByTestId('session-filter')).toBeFocused();
-  await page.getByTestId('session-filter').fill('atlas');
-  await page.getByTestId('session-filter').press('ArrowDown');
-  await expect(page.getByTestId('search-project')).toBeFocused();
+  await expect(page.getByTestId('global-search-input')).toBeFocused();
+  await page.getByTestId('global-search-input').fill('atlas');
+  // The Projects tab; the arrows move the selection while the field keeps the focus.
+  await page.getByTestId('global-search-tab-project').click();
+  await expect(page.getByTestId('global-search-input')).toBeFocused();
+  await page.getByTestId('global-search-input').press('ArrowDown');
+  await page.getByTestId('global-search-input').press('ArrowUp');
+  await expect(page.getByTestId('search-project').first()).toHaveClass(/is-selected/u);
   await page
-    .getByTestId('workspace-search')
+    .getByTestId('global-search')
     .screenshot({ path: info.outputPath('project-search.png') });
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('workspace-search')).toHaveCount(0);
+  await expect(page.getByTestId('global-search')).toHaveCount(0);
   await expect(page.getByTestId('home-workspace')).toHaveAttribute('value', first);
 });

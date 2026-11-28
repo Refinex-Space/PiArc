@@ -1,6 +1,7 @@
 // The settings pages: General (language, notifications, memory), Appearance (theme, accent,
 // contrast, density, motion) and Keyboard Shortcuts (every registered command; changes take effect at
 // once in every window and in the menu; conflicts are refused with a message).
+import { DataPage } from './DataPage.js';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 
 import type { MessageId } from '../../shared/i18n/index.js';
@@ -679,6 +680,14 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.usage',
     order: 25,
     component: UsagePage,
+  });
+  registerSettingsPage({
+    id: 'data',
+    group: 'data',
+    description: 'settings.description.data',
+    title: 'settings.data',
+    order: 70,
+    component: DataPage,
   });
   registerSettingsPage({
     id: 'diagnostics',

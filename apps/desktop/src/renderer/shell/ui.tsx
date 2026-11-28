@@ -1,5 +1,6 @@
 // Presentation state of the main window (architecture section 8.3, rule 2): what is selected,
 // open dialogs and in-app reminders. Business facts stay in the store.
+import type { SearchTab } from './GlobalSearch.js';
 import type { AppCommand } from '../../shared/ipc.js';
 import { createContext, useContext } from 'react';
 
@@ -55,6 +56,8 @@ export interface Ui {
   readonly openFolder: () => Promise<string | undefined>;
   readonly toggleSidebar: () => void;
   readonly openShortcuts: () => void;
+  /** Opens global search on `tab` (sessions, projects, commands and shortcuts in one dialog). */
+  readonly openSearch: (tab: SearchTab) => void;
   /** Runs a registered command as its shortcut would (slash commands, the Mod+K palette). */
   readonly runCommand: (command: AppCommand) => void;
   /** The new-session view's draft session for its tools (ADR-0099). */

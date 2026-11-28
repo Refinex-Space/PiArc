@@ -30,6 +30,9 @@ const NO_PARAMETERS = new Set([
   'speechModels',
   'openMicrophoneSettings',
   'focusDictationOwner',
+  // Data management: the export asks where in the native save dialog (stubbed: cancelled).
+  'exportData',
+  'revealDataExport',
 ]);
 
 /** Synchronous preload functions (no IPC round trip). */

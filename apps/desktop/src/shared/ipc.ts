@@ -165,6 +165,9 @@ export const IPC_CHANNELS = {
   configDiagnostics: 'piarc:config.diagnostics',
   diagnosticsPrepare: 'piarc:diagnostics.prepare',
   diagnosticsExport: 'piarc:diagnostics.export',
+  sessionsBulk: 'piarc:sessions.bulk',
+  dataExport: 'piarc:data.export',
+  dataExportReveal: 'piarc:data.exportReveal',
   imageSave: 'piarc:image.save',
   proxyDetect: 'piarc:proxy.detect',
   worktreeBranches: 'piarc:worktree.branches',
@@ -1055,6 +1058,22 @@ export interface PiarcApi {
    * (`title` is what the dialog names). Resolves `false` when the user cancelled.
    */
   deleteSession(id: string, title: string): Promise<boolean>;
+  /**
+   * Archives, restores or deletes sessions `ids` (settings, Data management). Archiving and
+   * deleting first confirm in a native dialog shown by the main process, which lists the
+   * sessions from Core's index. Resolves `{done, failed}`, or null when the user cancelled.
+   */
+  bulkSessions(
+    op: 'archive' | 'unarchive' | 'delete',
+    ids: readonly string[],
+  ): Promise<{ done: number; failed: number } | null>;
+  /**
+   * Exports every session as a ZIP archive where the user picks in the main process's save
+   * dialog. Resolves Core's JSON `{path, bytes, sessions}`, or null when the user cancelled.
+   */
+  exportData(): Promise<string | null>;
+  /** Shows the file the last `exportData` wrote in the system's file manager. */
+  revealDataExport(): Promise<boolean>;
   /**
    * Items `start .. start + limit` of a session's persisted conversation (open or not), the
    * last `limit` when `start` is `null`, as JSON: `{ start, total, items: [{ entryId, item }] }`.

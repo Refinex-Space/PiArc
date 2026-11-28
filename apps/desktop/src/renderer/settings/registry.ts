@@ -7,7 +7,15 @@ import type { ComponentType } from 'react';
 import type { MessageId } from '../../shared/i18n/index.js';
 
 /** The navigation's groups, in order (ADR-0101). */
-export const SETTINGS_GROUPS = ['app', 'models', 'security', 'agents', 'tools', 'support'] as const;
+export const SETTINGS_GROUPS = [
+  'app',
+  'models',
+  'security',
+  'agents',
+  'tools',
+  'data',
+  'support',
+] as const;
 export type SettingsGroup = (typeof SETTINGS_GROUPS)[number];
 
 export interface SettingsPage {

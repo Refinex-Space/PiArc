@@ -116,7 +116,11 @@ test('built-in commands open their features and /output-style switches the style
   await expect(page.getByTestId('rewind-dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await send(page, '/help');
-  const help = page.getByTestId('shortcuts-dialog');
+  const help = page.getByTestId('global-search');
+  await expect(page.getByTestId('global-search-tab-shortcuts')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(help.getByTestId('help-commands')).toContainText('/output-style');
   await page.keyboard.press('Escape');
 
@@ -152,26 +156,41 @@ test('built-in commands open their features and /output-style switches the style
   await expect(page.getByTestId('home')).toBeVisible();
 });
 
-test('the toolbar palette dismisses to its opener and scrolls only its results', async ({
+test('global search dismisses to its opener and scrolls only its results', async ({
   page,
 }, info) => {
   await prefer(page, { key: 'language', value: 'en' });
-  await page.setViewportSize({ width: 680, height: 350 });
-  const opener = page
-    .locator('.main-titlebar')
-    .getByRole('button', { name: 'Command Palette', exact: true });
-  const dialog = page.getByTestId('command-palette');
-  const input = page.getByTestId('command-palette-input');
-  const list = page.getByTestId('command-palette-list');
-  await opener.click();
+  await page.setViewportSize({ width: 960, height: 350 });
+  // Short enough to scroll the results, wide enough to keep the sidebar and its search button.
+  const opener = page.getByTestId('open-search');
+  const openSearch = async () => {
+    await opener.click();
+  };
+  const dialog = page.getByTestId('global-search');
+  const input = page.getByTestId('global-search-input');
+  const list = page.getByTestId('global-search-results');
+  await openSearch();
   await expect(input).toBeFocused();
   await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+  // The commands tab lists every action: enough to scroll in a small window.
+  await page.getByTestId('global-search-tab-commands').click();
+  await expect(input).toBeFocused();
+  // A long tab fills the dialog: the results give way, the tabs are not squeezed or cut off.
+  const tabsFit = await dialog.evaluate((el) => {
+    const filters = el.querySelector('.workspace-search-filters');
+    const tab = el.querySelector('.workspace-search-tab');
+    if (!(filters instanceof HTMLElement) || !tab) return false;
+    const outer = filters.getBoundingClientRect();
+    const inner = tab.getBoundingClientRect();
+    return filters.scrollHeight <= filters.clientHeight && inner.top >= outer.top - 0.5;
+  });
+  expect(tabsFit).toBe(true);
   const headerTop = (await input.boundingBox())?.y;
   await input.press('ArrowUp');
-  await expect(list.getByRole('option').last()).toBeInViewport({ ratio: 1 });
+  await expect(list.locator('.search-destination').last()).toBeInViewport({ ratio: 1 });
   expect((await input.boundingBox())?.y).toBe(headerTop);
   const geometry = await list.evaluate((el) => {
-    const option = el.querySelector('[aria-selected="true"]');
+    const option = el.querySelector('.search-destination.is-selected');
     if (!option) throw new Error('No active command');
     return {
       scrolled: el.scrollTop,
@@ -182,20 +201,20 @@ test('the toolbar palette dismisses to its opener and scrolls only its results',
   expect(geometry.scrolled).toBeGreaterThan(0);
   expect(geometry.trailingSpace).toBeGreaterThanOrEqual(12);
   expect(geometry.dialogScroll).toBe(0);
-  await dialog.screenshot({ path: info.outputPath('scrolled-command-palette.png') });
+  await dialog.screenshot({ path: info.outputPath('scrolled-global-search.png') });
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
-  await opener.click();
+  await openSearch();
   await page.mouse.click(4, 4);
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
-  await opener.click();
+  await openSearch();
   await input.fill('no matching action');
   await input.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
-  await opener.click();
+  await openSearch();
   await page.keyboard.press(`${MOD}+KeyK`);
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
@@ -224,14 +243,18 @@ test('Mod+K runs actions, switches sessions and commands; its shortcut can chang
   await idle(page);
 
   await page.keyboard.press(`${MOD}+KeyK`);
-  const palette = page.getByTestId('command-palette');
+  const palette = page.getByTestId('global-search');
   await expect(palette).toBeVisible();
-  const list = page.getByTestId('command-palette-list');
+  await expect(page.getByTestId('global-search-tab-all')).toHaveAttribute('aria-selected', 'true');
+  // The commands tab: every action and the session's slash commands.
+  await page.getByTestId('global-search-tab-commands').click();
+  const list = page.getByTestId('global-search-results');
   await expect(list.locator('[data-entry="command:frontend:component"]')).toBeAttached();
   await page.keyboard.press('ArrowUp');
-  await expect(list.getByRole('option').last()).toHaveAttribute('aria-selected', 'true');
-  await expect(list.getByRole('option').last()).toBeInViewport({ ratio: 1 });
-  await expect(page.getByTestId('command-palette-input')).toBeFocused();
+  await expect(list.locator('.search-destination').last()).toHaveClass(/is-selected/u);
+  await expect(list.locator('.search-destination').last()).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId('global-search-input')).toBeFocused();
+  await page.getByTestId('global-search-tab-all').click();
   await page.keyboard.type('first sess');
   await shoot(page, info, 'mod-k-session');
   await page.keyboard.press('Enter');
@@ -240,7 +263,10 @@ test('Mod+K runs actions, switches sessions and commands; its shortcut can chang
   await page.keyboard.press(`${MOD}+KeyK`);
   await page.keyboard.type('keyboard shortcuts');
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('shortcuts-dialog')).toBeVisible();
+  await expect(page.getByTestId('global-search-tab-shortcuts')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await page.keyboard.press('Escape');
 
   await page.keyboard.press(`${MOD}+KeyK`);

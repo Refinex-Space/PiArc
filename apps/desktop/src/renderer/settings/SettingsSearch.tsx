@@ -52,6 +52,12 @@ export const SEARCH_FIELDS: Record<
     ['usage.overview', 'usage-summary'],
   ],
   agents: [['agents.title', 'agent-list']],
+  data: [
+    ['data.archived', 'data-open-archived'],
+    ['data.archiveAll', 'data-archive-all'],
+    ['data.deleteAll', 'data-delete-all'],
+    ['data.export', 'data-export-row'],
+  ],
   mcp: [
     ['mcp.title', 'mcp-servers'],
     ['mcp.issues', 'mcp-issues'],

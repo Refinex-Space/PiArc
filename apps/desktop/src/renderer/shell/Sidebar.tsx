@@ -14,14 +14,12 @@ import {
   ChevronRightIcon,
   FolderIcon,
   GearIcon,
-  MoreIcon,
   PlusIcon,
   SearchIcon,
   SidebarIcon,
 } from './icons.js';
-import { ChoiceButton, MenuPopup, useMenu } from './Menu.js';
+import { ChoiceButton } from './Menu.js';
 import { ProjectGroup, type ProjectSessions } from './ProjectGroup.js';
-import { WorkspaceSearch } from './WorkspaceSearch.js';
 import { sessionTitle } from './SessionRow.js';
 import { loadSidebarGroups, saveSidebarGroups, type SidebarGroups } from './layout.js';
 import { reason } from './errors.js';
@@ -95,11 +93,8 @@ export function Sidebar({
   const store = useStore();
   const workspaces = useWorkspaces();
   const sessions = useSessions();
-  const [searching, setSearching] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
   const [groupLayout, setGroupLayout] = useState(loadSidebarGroups);
   const [dragging, setDragging] = useState<string | null>(null);
-  const more = useMenu();
   // Read when the identity menu opens; Core refuses a locked write regardless.
   const [themeLocked, setThemeLocked] = useState(false);
   const checkThemeLock = () => {
@@ -111,16 +106,8 @@ export function Sidebar({
       .catch(() => undefined);
   };
   const groups = useMemo(
-    () =>
-      groupSessions(
-        workspaces,
-        sessions,
-        '',
-        showArchived,
-        t('session.untitled'),
-        groupLayout.order,
-      ),
-    [workspaces, sessions, showArchived, t, groupLayout.order],
+    () => groupSessions(workspaces, sessions, '', false, t('session.untitled'), groupLayout.order),
+    [workspaces, sessions, t, groupLayout.order],
   );
   const update = (next: SidebarGroups) => {
     setGroupLayout(next);
@@ -193,9 +180,8 @@ export function Sidebar({
           type="button"
           data-testid="open-search"
           aria-haspopup="dialog"
-          aria-expanded={searching}
           onClick={() => {
-            setSearching(true);
+            ui.openSearch('all');
           }}
         >
           <SearchIcon />
@@ -212,44 +198,6 @@ export function Sidebar({
           <FolderIcon />
           {t('sidebar.openFolder')}
         </button>
-        <button
-          className="nav-entry"
-          type="button"
-          data-testid="sidebar-more"
-          aria-haspopup="menu"
-          aria-expanded={more.open !== null}
-          onClick={(event) => {
-            const box = event.currentTarget.getBoundingClientRect();
-            more.openAt(box.left, box.bottom);
-          }}
-        >
-          <MoreIcon />
-          {t('nav.more')}
-        </button>
-        {more.open && (
-          <MenuPopup
-            at={more.open}
-            onClose={more.close}
-            label={t('nav.more')}
-            items={[
-              {
-                id: 'archived',
-                label: t(showArchived ? 'nav.hideArchived' : 'nav.showArchived'),
-                run: () => {
-                  setShowArchived(!showArchived);
-                },
-              },
-              {
-                id: 'commands',
-                label: t('palette.title'),
-                run: () => {
-                  ui.runCommand('app.commandPalette');
-                },
-              },
-              { id: 'shortcuts', label: t('shortcuts.title'), run: ui.openShortcuts },
-            ]}
-          />
-        )}
       </div>
       <div className="sidebar-list" data-testid="session-list">
         {loaded && groups.length === 0 && (
@@ -364,14 +312,6 @@ export function Sidebar({
         </IconButton>
       </footer>
       {resizer}
-      {searching && (
-        <WorkspaceSearch
-          showArchived={showArchived}
-          onClose={() => {
-            setSearching(false);
-          }}
-        />
-      )}
     </nav>
   );
 }

@@ -74,7 +74,11 @@ test('a changed shortcut works at once, the old one stops, the menu follows; con
   await closeSettings(settings);
   // Mod+/ lists the shortcuts.
   await page.keyboard.press(`${MOD}+Slash`);
-  await expect(page.getByTestId('shortcuts-dialog')).toBeVisible();
+  await expect(page.getByTestId('global-search-tab-shortcuts')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByTestId('shortcut-list')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('shortcut-list.png') });
 });
 
@@ -84,14 +88,14 @@ test('switching the language updates the window and the menu at once', async ({
 }, testInfo) => {
   const settings = await openSettings(page);
   await settings.getByTestId('setting-language').selectOption('en');
-  await expect(page.getByTestId('open-search')).toHaveText('Search');
+  await expect(page.getByTestId('open-search')).toHaveText('Global search');
   await expect(settings.getByTestId('settings-nav-general')).toHaveText('General');
   await expect.poll(() => topMenuLabels(app)).toContain('File');
   expect((await menuItem(app, 'session.new')).label).toBe('New Session');
   await page.screenshot({ path: testInfo.outputPath('language-en.png') });
 
   await settings.getByTestId('setting-language').selectOption('zh-CN');
-  await expect(page.getByTestId('open-search')).toHaveText('搜索');
+  await expect(page.getByTestId('open-search')).toHaveText('全局搜索');
   await expect(settings.getByTestId('settings-nav-general')).toHaveText('通用');
   await expect.poll(() => topMenuLabels(app)).toContain('文件');
   expect((await menuItem(app, 'session.new')).label).toBe('新建会话');

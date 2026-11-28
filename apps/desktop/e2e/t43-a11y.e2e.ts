@@ -230,12 +230,16 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await checkState(page, 'row:group');
 
   await page.keyboard.press(`${MOD}+K`);
-  await expect(page.getByTestId('command-palette')).toBeVisible();
-  await checkState(page, 'dialog:command-palette');
-  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('global-search')).toBeVisible();
+  await checkState(page, 'dialog:global-search');
+  await page.getByTestId('global-search-tab-commands').click();
+  await checkState(page, 'dialog:global-search-commands');
   await page.keyboard.press(`${MOD}+/`);
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await checkState(page, 'dialog:shortcuts');
+  await expect(page.getByTestId('global-search-tab-shortcuts')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await checkState(page, 'dialog:global-search-shortcuts');
   await page.keyboard.press('Escape');
 
   await railTab(page, 'context');
@@ -249,8 +253,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   await checkState(page, 'state:changes-empty');
 
   await page.getByTestId('open-search').click();
-  await checkState(page, 'dialog:workspace-search');
-  await page.getByTestId('session-filter').fill('Friday');
+  await page.getByTestId('global-search-input').fill('Friday');
   await expect(page.getByTestId('search-hit').first()).toBeVisible({ timeout: 20_000 });
   await checkState(page, 'window:message-search');
   await page.keyboard.press('Escape');
@@ -296,6 +299,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     'memory',
     'mcp',
     'usage',
+    'data',
     'diagnostics',
     'shortcuts',
   ] as const) {
@@ -303,6 +307,12 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     await expect(settings.getByTestId(`settings-page-${id}`)).toBeVisible();
     await checkState(settings, `settings:${id}`);
   }
+  // Data management: the archived sessions sub-page.
+  await settings.getByTestId('settings-nav-data').click();
+  await settings.getByTestId('data-open-archived').click();
+  await expect(settings.getByTestId('archived-search')).toBeVisible();
+  await checkState(settings, 'state:data-archived');
+  await settings.getByTestId('data-back').click();
   // ADR-0102: uninstalling asks once more in place.
   await settings.getByTestId('settings-nav-skills').click();
   await settings.getByTestId('skills-tab-plugins').check({ force: true });

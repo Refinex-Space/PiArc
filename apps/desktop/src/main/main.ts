@@ -28,6 +28,7 @@ import { registerPermissionHandlers } from './core/permissions-ipc.js';
 import { registerSandboxHandlers } from './core/sandbox-ipc.js';
 import { registerUsageHandlers } from './core/usage-ipc.js';
 import { registerDiagnosticsHandlers } from './core/diagnostics-ipc.js';
+import { registerDataHandlers } from './core/data-ipc.js';
 import { registerImageExportHandlers } from './core/image-export-ipc.js';
 import { registerProxyHandlers, SystemProxy } from './core/proxy-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
@@ -490,6 +491,7 @@ function start(dirs: DataDirs): void {
     registerSandboxHandlers(registerHandler, core.runtime, () => appShell.t());
     registerUsageHandlers(registerHandler, core.runtime);
     registerDiagnosticsHandlers(registerHandler, core.runtime, () => appShell.t());
+    registerDataHandlers(registerHandler, core.runtime, () => appShell.t());
     registerImageExportHandlers(registerHandler, () => appShell.t());
     // ADR-0082: the system's proxy for the Agent Hosts, resolved now and as windows come forward.
     const systemProxy = new SystemProxy(core.runtime, session.defaultSession);

@@ -646,6 +646,26 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionDelete, id, title)
       .then((value: unknown) => expectBoolean(value)),
+  bulkSessions: (op, ids) =>
+    ipcRenderer.invoke(IPC_CHANNELS.sessionsBulk, op, ids).then((value: unknown) => {
+      if (value === null) return null;
+      if (
+        typeof value === 'object' &&
+        'done' in value &&
+        'failed' in value &&
+        typeof value.done === 'number' &&
+        typeof value.failed === 'number'
+      ) {
+        return { done: value.done, failed: value.failed };
+      }
+      throw new TypeError('Unexpected bulk result');
+    }),
+  exportData: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.dataExport).then((value: unknown) => expectStringOrNull(value)),
+  revealDataExport: () =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.dataExportReveal)
+      .then((value: unknown) => expectBoolean(value)),
   transcriptWindow: (id, start, limit) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.sessionTranscript, id, start, limit)

@@ -76,6 +76,12 @@ const symbols: Record<string, ReactNode> = {
     </>
   ),
   diagnostics: <path d="M2 10h3l2.3-5.4 4.2 11 2.7-7 1.4 1.4H18" />,
+  data: (
+    <>
+      <ellipse cx="10" cy="4.6" rx="6.4" ry="2.4" />
+      <path d="M3.6 4.6v10.8c0 1.3 2.9 2.4 6.4 2.4s6.4-1.1 6.4-2.4V4.6 M3.6 10c0 1.3 2.9 2.4 6.4 2.4s6.4-1.1 6.4-2.4" />
+    </>
+  ),
   shortcuts: (
     <>
       <rect x="1.6" y="4" width="16.8" height="12" rx="2.4" />

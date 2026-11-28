@@ -70,7 +70,7 @@ it('retargets open settings on the same page and closes them before handling wor
     expect(host.querySelector('[data-testid="app-shell"]')?.hasAttribute('inert')).toBe(true);
 
     await send({ type: 'command', command: 'app.commandPalette' });
-    expect(host.querySelector('[data-testid="command-palette"]')).toBeNull();
+    expect(host.querySelector('[data-testid="global-search"]')).toBeNull();
     rememberMemoryTarget({ workspace: 'project', note: 'second' });
     await send({ type: 'launch', target: { kind: 'settings', page: 'memory' } });
     expect(host.querySelector('.settings-layer[data-open="true"]')).toBe(layer);

@@ -119,6 +119,17 @@ export const A11Y_STATES = [
     page: 'diagnostics',
     note: 'Configuration diagnostics',
   },
+  {
+    id: 'settings:data',
+    area: 'settings',
+    page: 'data',
+    note: 'Data management: archived sessions, archive or delete all, export',
+  },
+  {
+    id: 'state:data-archived',
+    area: 'state',
+    note: 'Data management: the archived sessions grouped by project, with search and filter',
+  },
   { id: 'settings:shortcuts', area: 'settings', page: 'shortcuts', note: 'Keyboard shortcuts' },
   // Transcript rows, one per row kind.
   { id: 'row:userMessage', area: 'row', row: 'userMessage', note: 'a sent message' },
@@ -344,19 +355,24 @@ export const A11Y_STATES = [
   },
   // Dialogs, one or more per file that renders `<Dialog>`.
   {
-    id: 'dialog:workspace-search',
+    id: 'dialog:global-search',
     area: 'dialog',
-    source: 'shell/WorkspaceSearch.tsx',
-    note: 'search projects and sessions',
+    source: 'shell/GlobalSearch.tsx',
+    note: 'global search on its All tab: sessions, projects, actions and messages (Mod+K)',
   },
   { id: 'dialog:trust', area: 'dialog', source: 'shell/TrustDialog.tsx', note: 'trust a folder' },
   {
-    id: 'dialog:command-palette',
+    id: 'dialog:global-search-commands',
     area: 'dialog',
-    source: 'shell/CommandPalette.tsx',
-    note: 'Mod+K',
+    source: 'shell/GlobalSearch.tsx',
+    note: 'global search on its Commands tab: actions with keys and the slash commands',
   },
-  { id: 'dialog:shortcuts', area: 'dialog', source: 'shell/ShortcutsDialog.tsx', note: 'Mod+/' },
+  {
+    id: 'dialog:global-search-shortcuts',
+    area: 'dialog',
+    source: 'shell/GlobalSearch.tsx',
+    note: 'global search on its Shortcuts tab (Mod+/, /help)',
+  },
   {
     id: 'dialog:output-style',
     area: 'dialog',

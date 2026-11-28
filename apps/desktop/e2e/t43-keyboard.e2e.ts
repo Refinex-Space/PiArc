@@ -172,7 +172,7 @@ test('everything with the keyboard: session, approvals, Changes, settings and th
   // A dialog gives focus back to what opened it.
   await page.getByTestId('composer-input').focus();
   await page.keyboard.press(`${MOD}+KeyK`);
-  await expect(page.getByTestId('command-palette')).toBeVisible();
+  await expect(page.getByTestId('global-search')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('composer-input')).toBeFocused();
 
@@ -291,7 +291,7 @@ test('pointer editing and keyboard navigation give exactly one visible focus ind
   const editor = page.getByTestId('composer-input');
   const box = page.locator('.composer-box');
   const attach = page.locator('.composer-attach');
-  const filter = page.getByTestId('session-filter');
+  const filter = page.getByTestId('global-search-input');
 
   for (const theme of ['light', 'dark'] as const) {
     await prefer(page, { key: 'appearance.theme', value: theme });
