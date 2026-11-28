@@ -9,11 +9,15 @@ import type {
   EffortLevel,
 } from '@piarc/protocol';
 import { failureKind, reason } from './errors.js';
+import type { MenuItem } from './Menu.js';
 
 export const EFFORTS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = EffortLevel;
 export type ModelChoice = CatalogModel;
-export type Catalog = Pick<ModelsListResult, 'models' | 'model' | 'effort'>;
+export type Catalog = Pick<ModelsListResult, 'models' | 'model' | 'effort'> & {
+  /** Providers' display names by id (the built-in catalog and the sign-in providers). */
+  readonly providerNames?: Readonly<Record<string, string>>;
+};
 export function keyOf(model: ModelRef): string {
   return `${model.provider}/${model.id}`;
 }
@@ -56,11 +60,64 @@ export function parseCatalog(text: string): Catalog {
       promptCache: m.promptCache,
     };
   });
+  const providerNames: Record<string, string> = {};
+  for (const list of [v.providers, v.loginProviders]) {
+    if (!Array.isArray(list)) continue;
+    for (const p of list as unknown[]) {
+      if (record(p) && typeof p.id === 'string' && typeof p.name === 'string' && p.name)
+        providerNames[p.id] ??= p.name;
+    }
+  }
   return {
     models,
+    providerNames,
     ...(modelRef(v.model) ? { model: v.model } : {}),
     ...(isEffort(v.effort) ? { effort: v.effort } : {}),
   };
+}
+
+/**
+ * The model rows of a model menu. With models from more than one provider each provider is a
+ * row whose submenu holds its models (the search still finds every model); with one provider
+ * the models are the rows.
+ */
+export function modelChoiceItems(
+  catalog: Catalog | undefined,
+  isSelected: (model: ModelChoice) => boolean,
+  choose: (model: ModelChoice) => void,
+): MenuItem[] {
+  const models = catalog?.models ?? [];
+  const groups = new Map<string, ModelChoice[]>();
+  for (const model of models) {
+    const group = groups.get(model.provider);
+    if (group) group.push(model);
+    else groups.set(model.provider, [model]);
+  }
+  const option = (model: ModelChoice, grouped: boolean): MenuItem => {
+    const hint = grouped ? (model.name === model.id ? undefined : model.id) : keyOf(model);
+    return {
+      id: keyOf(model),
+      testId: `model-option-${keyOf(model)}`,
+      label: model.name,
+      ...(hint === undefined ? {} : { hint }),
+      selected: isSelected(model),
+      run: () => {
+        choose(model);
+      },
+    };
+  };
+  if (groups.size < 2) return models.map((model) => option(model, false));
+  return [...groups].map(([provider, group]): MenuItem => {
+    const current = group.find(isSelected);
+    return {
+      id: `provider-${provider}`,
+      testId: `model-provider-${provider}`,
+      label: catalog?.providerNames?.[provider] ?? provider,
+      ...(current ? { hint: current.name, selected: true } : {}),
+      searchable: true,
+      submenu: group.map((model) => option(model, true)),
+    };
+  });
 }
 
 /** Failures that pass once the session or its Agent Host is ready: retried quietly first. */

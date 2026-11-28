@@ -5,6 +5,7 @@ import { choiceName, MenuPopup, useMenu } from './Menu.js';
 import {
   keyOf,
   isEffort,
+  modelChoiceItems,
   parsePreview,
   type Catalog,
   type ModelChoice,
@@ -153,16 +154,13 @@ export function ModelMenus({
           at={picker.open}
           onClose={picker.close}
           items={[
-            ...(catalog?.models ?? []).map((m) => ({
-              id: keyOf(m),
-              testId: `model-option-${keyOf(m)}`,
-              label: m.name,
-              hint: keyOf(m),
-              selected: current !== undefined && keyOf(m) === keyOf(current),
-              run: () => {
+            ...modelChoiceItems(
+              catalog,
+              (m) => current !== undefined && keyOf(m) === keyOf(current),
+              (m) => {
                 if (current === undefined || keyOf(m) !== keyOf(current)) void edit(m);
               },
-            })),
+            ),
             ...(effortItems.length
               ? [{ id: 'effort', label: t('models.effort'), submenu: effortItems }]
               : []),

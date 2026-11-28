@@ -31,6 +31,7 @@ test('a model switch hook can ask after the cost preview and either keep or swit
   });
   await openFolder(page, app, workspace);
   await page.getByTestId('home-model').click();
+  await page.getByTestId('model-provider-relay-a').click();
   await page.getByTestId('model-option-relay-a/first').click();
   await startSession(page, 'Read note.txt', 't21-models', 'trust');
   await expect(
@@ -39,6 +40,7 @@ test('a model switch hook can ask after the cost preview and either keep or swit
   await idle(page);
   const change = async () => {
     await page.getByTestId('session-model').click();
+    await page.getByTestId('model-provider-relay-b').click();
     await page.getByTestId('model-option-relay-b/second').click();
     await page.getByTestId('model-switch-confirm').click();
     const card = page

@@ -38,6 +38,11 @@ test('two configured endpoints complete tool turns; a text-only model refuses an
   });
   await openFolder(page, app, ws);
   await page.getByTestId('home-model').click();
+  // Models from several providers are grouped: one row per provider, its models in a submenu.
+  await expect(page.getByTestId('model-provider-relay-a')).toBeVisible();
+  await expect(page.getByTestId('model-option-relay-a/first')).toHaveCount(0);
+  await page.getByTestId('model-provider-relay-a').click();
+  await page.screenshot({ path: testInfo.outputPath('model-menu-grouped.png') });
   await page.getByTestId('model-option-relay-a/first').click();
   await startSession(page, 'Read note.txt', 't21-models');
   await expect(
@@ -46,6 +51,10 @@ test('two configured endpoints complete tool turns; a text-only model refuses an
   await idle(page);
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
   await page.keyboard.press(`${mod}+Shift+KeyI`);
+  // The search finds a model in any provider without opening its group.
+  await page.keyboard.type('second');
+  await expect(page.getByTestId('model-provider-relay-a')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('model-menu-search.png') });
   await page.getByTestId('model-option-relay-b/second').click();
   await expect(page.getByTestId('model-switch-confirm')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('switch-preview.png') });

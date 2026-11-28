@@ -12,7 +12,7 @@ import { coreMentions, draftOf } from '../composer/session-draft.js';
 import { useStore, useWorkspaces } from '../store/hooks.js';
 import { ComputerIcon, FolderIcon, GitBranchIcon } from './icons.js';
 import { ChoiceButton, type MenuItem } from './Menu.js';
-import { keyOf, useModelCatalog, type Effort } from './model-catalog.js';
+import { keyOf, modelChoiceItems, useModelCatalog, type Effort } from './model-catalog.js';
 import { permissionChoices } from './PermissionModeMenu.js';
 import { reason } from './errors.js';
 import { StartDeclined, startSession } from './start-session.js';
@@ -231,17 +231,14 @@ function HomeForm({
         setEffort(undefined);
       },
     },
-    ...(catalog?.models ?? []).map((m) => ({
-      id: keyOf(m),
-      testId: `model-option-${keyOf(m)}`,
-      label: m.name,
-      hint: keyOf(m),
-      selected: keyOf(m) === modelKey,
-      run: () => {
+    ...modelChoiceItems(
+      catalog,
+      (m) => keyOf(m) === modelKey,
+      (m) => {
         setModelKey(keyOf(m));
         setEffort(undefined);
       },
-    })),
+    ),
     ...(effortItems.length > 1
       ? [{ id: 'effort', label: t('models.effort'), submenu: effortItems }]
       : []),
@@ -359,6 +356,7 @@ function HomeForm({
                 className="composer-model"
                 items={modelItems}
                 heading={t('models.label')}
+                filterLabel={t('models.search')}
                 buttonRef={modelButton}
                 valueLabel={modelLabel}
                 disabled={!workspace || busy}

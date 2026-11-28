@@ -5,7 +5,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 
-import { MenuButton } from './Menu.js';
+import { ChoiceButton, MenuButton } from './Menu.js';
 
 it('gives the focus back to its button when Escape or an item closes it', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -94,6 +94,87 @@ it('moves into a submenu, returns to its parent, and dismisses the tree after a 
     expect(selected).toHaveBeenCalledOnce();
     expect(host.querySelectorAll('[role="menu"]')).toHaveLength(0);
     expect(document.activeElement).toBe(trigger);
+  } finally {
+    act(() => {
+      root.unmount();
+    });
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('searches into a searchable submenu and lists its matches with the parent in their hint', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const chosen = vi.fn();
+  const rows = () =>
+    [...host.querySelectorAll('.menu-item')].map((row) =>
+      [
+        row.querySelector('.menu-item-text')?.textContent,
+        row.querySelector('.menu-item-hint')?.textContent,
+      ]
+        .filter(Boolean)
+        .join(' | '),
+    );
+  const search = (text: string) => {
+    const field = host.querySelector('input');
+    if (!field) throw new Error('no search field');
+    act(() => {
+      // React tracks the value it set; the native setter makes the change visible to it.
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      descriptor?.set?.call(field, text);
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  try {
+    act(() => {
+      root.render(
+        <ChoiceButton
+          label="Model"
+          filterLabel="Search models"
+          testId="open"
+          items={[
+            {
+              id: 'p-deepseek',
+              label: 'DeepSeek',
+              searchable: true,
+              submenu: [
+                { id: 'chat', label: 'deepseek-chat', run: chosen },
+                { id: 'r1', label: 'deepseek-reasoner', run: chosen },
+              ],
+            },
+            {
+              id: 'p-openai',
+              label: 'OpenAI',
+              searchable: true,
+              submenu: [{ id: 'gpt', label: 'gpt-5', hint: 'GPT-5', run: chosen }],
+            },
+            {
+              id: 'effort',
+              label: 'Effort',
+              submenu: [{ id: 'high', label: 'High reasoner', run: chosen }],
+            },
+            { id: 'manage', label: 'Manage providers', run: chosen },
+          ]}
+        >
+          Model
+        </ChoiceButton>,
+      );
+    });
+    act(() => {
+      host.querySelector<HTMLButtonElement>('[data-testid="open"]')?.click();
+    });
+    expect(rows()).toEqual(['DeepSeek', 'OpenAI', 'Effort', 'Manage providers']);
+    // Models are found inside their provider; a submenu that is not searchable is not.
+    search('reason');
+    expect(rows()).toEqual(['deepseek-reasoner | DeepSeek']);
+    // The provider's name finds its models too.
+    search('openai');
+    expect(rows()).toEqual(['gpt-5 | OpenAI · GPT-5']);
+    search('');
+    expect(rows()).toEqual(['DeepSeek', 'OpenAI', 'Effort', 'Manage providers']);
   } finally {
     act(() => {
       root.unmount();

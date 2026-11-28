@@ -32,6 +32,9 @@ export type MenuItem = {
   readonly hint?: string;
   readonly tooltip?: string;
   readonly shortcut?: string;
+  /** A submenu the filter searches: a query lists its matching items in its place, each with
+   * this item's label in front of its hint. */
+  readonly searchable?: boolean;
 } & (
   | { readonly submenu: readonly MenuItem[]; readonly run?: never }
   | { readonly submenu?: never; readonly run: () => void }
@@ -114,10 +117,21 @@ export function MenuPopup({
   const back: MenuItem | undefined = backLabel
     ? { id: 'back-to-parent', label: backLabel, icon: <ChevronLeftIcon />, run: onClose }
     : undefined;
-  const filtered = query.trim()
-    ? choices.filter((item) =>
-        `${item.label} ${item.hint ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
-      )
+  const needle = query.trim().toLowerCase();
+  const matches = (item: MenuItem) =>
+    `${item.label} ${item.hint ?? ''}`.toLowerCase().includes(needle);
+  const filtered = needle
+    ? choices.flatMap((item): MenuItem[] => {
+        if (!item.searchable || !item.submenu) return matches(item) ? [item] : [];
+        return item.submenu.flatMap((child): MenuItem[] => {
+          if (child.submenu) return [];
+          const found: MenuItem = {
+            ...child,
+            hint: child.hint ? `${item.label} · ${child.hint}` : item.label,
+          };
+          return matches(found) ? [found] : [];
+        });
+      })
     : choices;
   const items = back ? [back, ...filtered] : filtered;
   const id = useId();
@@ -470,6 +484,7 @@ export function ChoiceButton({
   disabled,
   value,
   heading,
+  filterLabel,
   onOpen,
   above = true,
   className = '',
@@ -482,6 +497,8 @@ export function ChoiceButton({
   readonly testId?: string;
   readonly disabled?: boolean;
   readonly heading?: string;
+  /** Adds a search field with this label above the items. */
+  readonly filterLabel?: string;
   readonly value?: string | undefined;
   readonly above?: boolean;
   readonly className?: string;
@@ -517,6 +534,7 @@ export function ChoiceButton({
         <MenuPopup
           label={label}
           {...(heading ? { heading } : {})}
+          {...(filterLabel ? { filterLabel } : {})}
           at={menu.open}
           items={items}
           onClose={menu.close}
