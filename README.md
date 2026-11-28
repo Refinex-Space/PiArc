@@ -1,8 +1,9 @@
 <div align="center">
 
-<img src="design/brand/icon.iconset/icon_256x256.png" width="128" height="128" alt="PiArc">
-
-# PiArc
+<h1>
+  <img src="design/brand/icon.iconset/icon_128x128@2x.png" width="64" height="64" align="center" alt="">
+  PiArc
+</h1>
 
 **A desktop coding agent for macOS and Windows, built on [Pi](https://github.com/earendil-works/pi).**
 
@@ -120,19 +121,12 @@ PiArc is free and open source, and its builds are not signed or notarized by App
 
 ## How it works
 
-```
-PiArc (Electron)
-├── Renderer      React + TypeScript: transcript, composer, terminal view, tools (sandboxed)
-├── Main process  windows, menus, notifications, updates, event relay
-└── PiArc Core    Rust, loaded through NAPI-RS
-      policy and approvals · hooks · tool I/O · snapshots · sandbox · config
-      credentials · index · diff · terminal · git · speech
-          │  AHP: versioned JSON-RPC over stdio
-          ▼
-Agent Host (one Node process per workspace)
-└── Pi SDK + Harness Kit
-      agent loop · model providers · context assembly · compaction · subagents · MCP pool
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/architecture-dark.svg">
+    <img src=".github/assets/architecture.svg" alt="PiArc architecture: the Electron app holds the renderer, the main process and PiArc Core; Core talks to one Agent Host per workspace over AHP; the Agent Host calls the model providers; only Core touches your files and processes." width="100%">
+  </picture>
+</p>
 
 The agent never touches your files or processes directly: every read, write and command goes through Core, which applies the permission rules, takes snapshots and runs hooks. The [architecture document](docs/architecture/ARCHITECTURE.md) and the [decision records](docs/adr/README.md) explain why (in Chinese).
 

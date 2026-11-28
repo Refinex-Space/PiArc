@@ -1,8 +1,9 @@
 <div align="center">
 
-<img src="design/brand/icon.iconset/icon_256x256.png" width="128" height="128" alt="PiArc">
-
-# PiArc
+<h1>
+  <img src="design/brand/icon.iconset/icon_128x128@2x.png" width="64" height="64" align="center" alt="">
+  PiArc
+</h1>
 
 **macOS 与 Windows 上的桌面编码智能体，基于 [Pi](https://github.com/earendil-works/pi) 构建。**
 
@@ -120,19 +121,12 @@ PiArc 免费开源，安装包没有经过 Apple 或 Microsoft 的签名与公�
 
 ## 工作原理
 
-```
-PiArc（Electron）
-├── 渲染进程    React + TypeScript：对话、输入框、终端视图、工具（沙箱化）
-├── 主进程      窗口、菜单、通知、更新、事件转发
-└── PiArc Core  Rust，经 NAPI-RS 加载
-      策略与审批 · hooks · 工具 I/O · 快照 · 沙箱 · 配置
-      凭据 · 索引 · diff · 终端 · git · 语音
-          │  AHP：基于 stdio 的版本化 JSON-RPC
-          ▼
-Agent Host（每个工作区一个 Node 进程）
-└── Pi SDK + Harness Kit
-      agent 循环 · 模型服务商 · 上下文组装 · 压缩 · 子 agent · MCP 连接池
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/architecture-dark.svg">
+    <img src=".github/assets/architecture.svg" alt="PiArc 架构：Electron 应用包含渲染进程、主进程与 PiArc Core；Core 经 AHP 与每个工作区的 Agent Host 通信；Agent Host 调用模型服务商；只有 Core 接触你的文件与进程。" width="100%">
+  </picture>
+</p>
 
 智能体从不直接接触你的文件与进程：每一次读、写和命令都经过 Core，由 Core 套用权限规则、保存快照、运行 hooks。原因见[架构设计](docs/architecture/ARCHITECTURE.md)与[架构决策记录](docs/adr/README.md)。
 
