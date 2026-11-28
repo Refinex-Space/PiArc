@@ -74,8 +74,8 @@
 
 - V-2.1 状态机 `idle → preparing → recording → finalizing → completed → idle`，任何活跃态可到 `cancelled` 或 `error`；`error` 可重试。Core 是状态的唯一来源，渲染进程按 `{sessionId, sequence}` 跟随。
 - V-2.2 点击到界面有反应 ≤ 100 ms（按钮进入 preparing 样式）。preparing 超过 300 ms 时听写条显示"正在准备本地语音模型…"；首次的系统授权框不计时。
-- V-2.3 听写期间 composer 网格多一行听写条 `#composer-dictation`，位于附件货架与编辑行之间：左端取消 `#dictation-cancel`（×，`size="xs"`），状态文字（录音中：红点 + "录音中 / Listening" + `m:ss`；准备中；正在完成转录…；错误与操作），右侧是真实波形 Canvas（`aria-hidden`）。麦克风位变为停止听写 `#dictation-stop`（标签"停止听写"，Lucide `Square` 线框图标，`aria-pressed=true`），与 Agent 的停止（实心方块）在标签、提示、形状上都不同。
-- V-2.4 波形用 Core 送来的真实 envelope（每 40 ms 一个 `level` 事件，最多 8 个桶），rAF 绘制、按事件时间戳平滑；静音是近乎平的线；`prefers-reduced-motion` 时每 250 ms 重绘一次。录音 5 s 内 Composer 组件渲染次数 ≤ 状态变化次数 + 2。
+- V-2.3 听写期间（含错误与提示）听写条 `#composer-dictation` 占据 composer 的操作行（网格 `voice` 区域，从 `+` 到模型控件），这些控件暂时让位，听写结束即恢复；麦克风位与发送位不动。左端取消 `#dictation-cancel`（×，与 `+` 同尺寸、同位置），中间是真实波形 Canvas（`aria-hidden`）占满余下宽度，录音中右侧紧挨停止键的是红点与 `m:ss`（"录音中 / Listening"只给读屏）；准备中、正在完成转录、错误与操作、提示以文字出现在波形之前或替代波形。麦克风位变为停止听写 `#dictation-stop`（标签"停止听写"，Lucide `Square` 线框图标，中性淡底，`aria-pressed=true`），与 Agent 的停止（实心方块）在标签、提示、形状上都不同。
+- V-2.4 波形用 Core 送来的真实 envelope（每 40 ms 一个 `level` 事件，最多 8 个桶），每 80 ms 音频折成一根柱（取最响的桶），最新的在右侧、按墙钟在事件之间平滑左移（至多超前一个窗口）；分贝刻度，静音是一排淡色圆点，左端渐隐；rAF 绘制，`prefers-reduced-motion` 时只按整根柱移动、每 250 ms 重绘一次。录音 5 s 内 Composer 组件渲染次数 ≤ 状态变化次数 + 2。
 - V-2.5 文字出现在输入框内：未稳定的 partial 是光标处的 widget decoration（`.dictation-partial`，次要文字色、虚线下划），不改文档；端点后成为受跟踪的已确认片段写进文档。有 partial 时不显示占位文字。
 - V-2.6 完成后回到普通 composer，保留光标、选区、附件；无成功提示。
 - V-2.7 错误与占用：听写条内联显示原因与操作（重试、打开设置、打开系统麦克风设置、修复模型、切到正在录音的窗口），保留已确认文字与其他草稿。
@@ -370,7 +370,7 @@ NFKC、全角转半角、英文转小写、合并空白；计算前去掉标点�
 |---|---|---|---|---|
 | 1 | 听写中发送位会变成 Agent 停止、Esc 中止 Agent、placeholder 与 partial 叠加、交换保护吞点击 | 产品、测试 | 采纳 | `Composer.tsx:688`、`intents.ts`；V-4.2 |
 | 2 | 录音中发送的快照与精修竞争、可能重复发送 | 产品 | 采纳 | V-4.3：冻结所有权、只等基础结果、闩锁 |
-| 3 | 原型底栏不适用 PiArc 单行网格 | 产品 | 采纳 | 网格加 `mic` 列与听写条行，`+` 保持可用 |
+| 3 | 原型底栏不适用 PiArc 单行网格 | 产品 | 采纳 | 网格加 `mic` 列；听写条起初是编辑区上方的一行、`+` 保持可用，后按用户要求改为听写期间占据操作行（V-2.3） |
 | 4 | Qwen3 精修推迟到第二期 | 产品 | 不采纳 | 需求要求完整交付；增强默认关闭，实测不达标标阻塞 |
 | 5 | 质量门槛改为"基线不回退" | 产品、测试 | 部分采纳 | 门槛按原文保留并如实报告；否定、数字、版本、路径单列 |
 | 6 | 首次授权、拒绝后的系统设置入口、更新后重新授权、preparing 时可发送 | 产品 | 采纳 | V-2.7、V-4.4、4.8 |

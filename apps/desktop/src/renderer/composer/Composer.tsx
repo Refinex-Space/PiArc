@@ -78,6 +78,7 @@ import { isBlank, serializeDoc, type ComposerPayload } from './serialize.js';
 import { failureKind } from '../shell/errors.js';
 import {
   DictationBar,
+  dictationShown,
   MicButton,
   useDictation,
   type DictationTarget,
@@ -997,7 +998,7 @@ export function Composer({
         </div>
       )}
       <div
-        className={`composer-box${disabled ? ' is-disabled' : ''}${voice.controller === undefined ? '' : ' has-mic'}`}
+        className={`composer-box${disabled ? ' is-disabled' : ''}${voice.controller === undefined ? '' : ' has-mic'}${voice.controller !== undefined && dictationShown(voice.ui, voice.notice) ? ' is-dictating' : ''}`}
       >
         {voice.controller !== undefined && (
           <DictationBar

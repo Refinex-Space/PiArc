@@ -1,7 +1,8 @@
 // The live waveform (addendum V-2.4): Core's measured envelope drawn as rounded bars around the
-// middle line, redrawn on animation frames only when new levels arrived (at most every 250 ms
-// with reduced motion). It is decoration: hidden from assistive technology; the strip's text
-// says what is happening. React renders it once; drawing never goes through React state.
+// middle line, newest on the right, gliding left while recording; quiet stretches are a dotted
+// line. A held picture redraws only when levels changed (at most every 250 ms with reduced
+// motion), and with reduced motion it moves in whole bars. It is decoration: hidden from
+// assistive technology; the strip's text says what is happening. React renders it once; drawing never goes through React state.
 import { useEffect, useRef } from 'react';
 
 import type { Levels } from './levels.js';
@@ -16,9 +17,16 @@ export function loudness(peak: number): number {
   return Math.max(0, Math.min(1, (db - FLOOR_DB) / -FLOOR_DB));
 }
 
-/** Bar width and gap in CSS px. */
+/** Bar width and gap in CSS px; silence is a dot as wide as a bar. */
 const BAR = 2;
-const GAP = 2;
+const GAP = 3;
+const STEP = BAR + GAP;
+/** Below this loudness a bar is drawn as a faint dot: the line between words. */
+const QUIET = 0.08;
+/** Exponent applied to loudness for a bar's height. */
+const SHAPE = 1.6;
+/** Opacity of the dots. */
+const DOT_ALPHA = 0.45;
 const REDUCED_FRAME_MS = 250;
 
 export function Waveform({
@@ -41,6 +49,7 @@ export function Waveform({
     let frame = 0;
     let drawnVersion = -1;
     let drawnAt = 0;
+    let drawnDrift = Number.NaN;
     let width = 0;
     let height = 0;
     const resize = () => {
@@ -56,32 +65,43 @@ export function Waveform({
     resize();
     const draw = (now: number) => {
       frame = window.requestAnimationFrame(draw);
-      if (drawnVersion === levels.version) return;
-      if (state.current.reducedMotion && drawnVersion !== -1 && now - drawnAt < REDUCED_FRAME_MS) {
-        return;
-      }
+      const { live: moving, reducedMotion: reduced } = state.current;
+      // While recording the picture glides left on the wall clock between Core's events; with
+      // reduced motion, or when held, it moves only in whole bars and only when levels changed.
+      const glide = moving && !reduced;
+      const drift = glide ? levels.drift(now) : 0;
+      if (drawnVersion === levels.version && drift === drawnDrift) return;
+      if (reduced && drawnVersion !== -1 && now - drawnAt < REDUCED_FRAME_MS) return;
       const context = element.getContext('2d');
       if (context === null || width === 0) return;
       drawnVersion = levels.version;
+      drawnDrift = drift;
       drawnAt = now;
       const ratio = element.width / Math.max(1, width);
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.clearRect(0, 0, width, height);
-      const count = Math.max(1, Math.floor((width + GAP) / (BAR + GAP)));
+      // One bar more than fits, so the one sliding out on the left is drawn until it is gone.
+      const count = Math.max(1, Math.ceil(width / STEP) + 1);
       const values = levels.last(count);
       context.fillStyle = getComputedStyle(element).color;
       const middle = height / 2;
+      const right = width - BAR - drift * STEP;
       for (let i = 0; i < values.length; i += 1) {
+        const x = right - (values.length - 1 - i) * STEP;
+        if (x + BAR < 0 || x > width) continue;
         // Loudness on a decibel scale, as level meters draw it: a microphone's speech peaks
-        // around -30 to -10 dBFS, which a linear scale would flatten into the floor. A floor
-        // keeps silence visible as a flat line.
+        // around -30 to -10 dBFS, which a linear scale would flatten into the floor.
         const amplitude = loudness(values[i] ?? 0);
-        const bar = Math.max(BAR, amplitude * (height - 2));
-        const x = i * (BAR + GAP);
+        const quiet = amplitude < QUIET;
+        // The curve spreads the upper range, so ordinary speech keeps its rise and fall
+        // instead of every syllable reaching the top.
+        const bar = quiet ? BAR : Math.max(BAR * 2, amplitude ** SHAPE * height);
+        context.globalAlpha = quiet ? DOT_ALPHA : 1;
         context.beginPath();
         context.roundRect(x, middle - bar / 2, BAR, bar, BAR / 2);
         context.fill();
       }
+      context.globalAlpha = 1;
     };
     frame = window.requestAnimationFrame(draw);
     return () => {

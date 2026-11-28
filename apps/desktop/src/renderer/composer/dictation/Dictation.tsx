@@ -1,6 +1,6 @@
 // The composer's dictation controls (voice dictation addendum 3.2): the microphone button next
-// to send, which turns into "stop dictation" while recording, and the dictation strip above the
-// editor row with cancel, the state in words, the elapsed time and the live waveform. Errors stay
+// to send, which turns into "stop dictation" while recording, and the dictation strip that takes
+// the action row with cancel, the state in words, the live waveform and the elapsed time. Errors stay
 // in the strip with an action; the draft is never touched by them.
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { EditorView } from 'prosemirror-view';
@@ -249,7 +249,17 @@ function PreparingText({ since }: { readonly since: number }) {
   return shown ? <span>{t('dictation.preparing')}</span> : null;
 }
 
-/** The strip above the editor row while dictation is active or failed. */
+/** Whether the strip takes the composer's action row: while dictating, failed, or with a notice. */
+export function dictationShown(ui: DictationUi, notice: string | undefined): boolean {
+  return ui.kind !== 'idle' || (notice !== undefined && NOTICE_TEXT[notice] !== undefined);
+}
+
+/**
+ * The strip that takes the composer's action row while dictation is active or failed (the
+ * microphone and send keep their places): cancel where `+` was, the state in words when there is
+ * something to say, the live waveform across the row, and the recording mark with the elapsed time
+ * next to the stop button. Errors and notices replace the waveform with their text and action.
+ */
 export function DictationBar({
   controller,
   ui,
@@ -277,7 +287,7 @@ export function DictationBar({
         return (
           <>
             <span className="dictation-dot" aria-hidden="true" />
-            <span>{t('dictation.listening')}</span>
+            <span className="visually-hidden">{t('dictation.listening')}</span>
             <Elapsed since={ui.since} />
           </>
         );
@@ -287,12 +297,17 @@ export function DictationBar({
         return <span>{t(ERROR_TEXT[ui.code] ?? 'dictation.error.unknown')}</span>;
     }
   })();
+  const statusSpan = (
+    <span className="dictation-status" data-testid="dictation-status">
+      {status}
+    </span>
+  );
   const actions =
     ui.kind === 'error' ? <ErrorActions code={ui.code} controller={controller} /> : null;
-  const visible = ui.kind !== 'idle' || noticeId !== undefined;
+  const waving = ui.kind !== 'error' && ui.kind !== 'idle';
   return (
     <>
-      {visible && (
+      {dictationShown(ui, notice) && (
         <div
           className={`composer-dictation is-${ui.kind}`}
           data-testid="composer-dictation"
@@ -302,7 +317,7 @@ export function DictationBar({
             label={t(
               ui.kind === 'error' || ui.kind === 'idle' ? 'dictation.dismiss' : 'dictation.cancel',
             )}
-            size="xs"
+            size="sm"
             className="dictation-cancel"
             data-testid="dictation-cancel"
             onClick={() => {
@@ -310,22 +325,21 @@ export function DictationBar({
               else controller.cancel();
             }}
           >
-            <CloseGlyph size={12} />
+            <CloseGlyph />
           </IconButton>
-          <span className="dictation-status" data-testid="dictation-status">
-            {status}
-            {noticeId !== undefined && ui.kind !== 'error' && (
-              <span className="dictation-notice">{t(noticeId)}</span>
-            )}
-          </span>
+          {ui.kind !== 'recording' && statusSpan}
+          {noticeId !== undefined && ui.kind !== 'error' && (
+            <span className="dictation-notice">{t(noticeId)}</span>
+          )}
           {actions}
-          {ui.kind !== 'error' && ui.kind !== 'idle' && (
+          {waving && (
             <Waveform
               levels={controller.levels}
               live={ui.kind === 'recording'}
               reducedMotion={reducedMotion}
             />
           )}
+          {ui.kind === 'recording' && statusSpan}
         </div>
       )}
       <div className="visually-hidden" aria-live="polite" data-testid="dictation-live">

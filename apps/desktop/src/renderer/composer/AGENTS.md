@@ -1,6 +1,6 @@
 # Composer
 
-ProseMirror 处理编辑、候选面板和键盘意图。新会话与正式会话共用 `Composer`。卡片分两层（ADR-0100）：编辑区在上，操作行在下（`+`、`leading` 插槽放权限模式及其状态，`trailing` 插槽放模型、推理强度与用量环，然后是麦克风与发送）；`tray` 插槽是卡片上方的运行位置托盘（新会话页的本机或 worktree、文件夹与 worktree 字段，会话页只在 worktree 会话里显示）。首回合由 `shell/Home.tsx` 接线，经信任确认后创建会话、应用选定的模式及推理强度，再调用 `prepareOutgoing` 保存附件并发送。正式会话由 `shell/Conversation.tsx` 接线。输入协议与持久化见 [ADR-0030](../../../../../docs/adr/0030-transcript-and-composer.md)。
+ProseMirror 处理编辑、候选面板和键盘意图。新会话与正式会话共用 `Composer`。卡片分两层（ADR-0100）：编辑区在上，操作行在下（`+`、`leading` 插槽放权限模式及其状态，`trailing` 插槽放模型、推理强度与用量环，然后是麦克风与发送；听写期间听写条占据操作行，麦克风与发送不动）；`tray` 插槽是卡片上方的运行位置托盘（新会话页的本机或 worktree、文件夹与 worktree 字段，会话页只在 worktree 会话里显示）。首回合由 `shell/Home.tsx` 接线，经信任确认后创建会话、应用选定的模式及推理强度，再调用 `prepareOutgoing` 保存附件并发送。正式会话由 `shell/Conversation.tsx` 接线。输入协议与持久化见 [ADR-0030](../../../../../docs/adr/0030-transcript-and-composer.md)。
 
 ## 不变量
 
