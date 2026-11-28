@@ -17,23 +17,6 @@
 .main-row:has(.workbench-rail) {
   position: relative;
 }
-.panel-area.workbench-rail {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: max(35%, calc(100% - 340px));
-  background: var(--piarc-workbench-canvas);
-}
-.workbench-rail .rail-sections {
-  padding: 0 var(--piarc-space-4);
-  scrollbar-gutter: auto;
-}
-.rail-section {
-  padding: var(--piarc-space-2) 0;
-  border-bottom: 1px solid var(--piarc-border-subtle);
-}
-.rail-section:last-child {
-  border: 0;
-}
 .rail-environment-row {
   display: flex;
   align-items: center;
@@ -62,7 +45,7 @@
 :root[data-app]
   .rail-section
   :is(.context-panel, .usage-card, .changes-card, .bg-tasks-card, .task-panel) {
-  padding: var(--piarc-space-1) 0 var(--piarc-space-2);
+  padding: 0;
 }
 :root[data-app] .rail-section .context-summary {
   justify-content: space-between;
@@ -174,24 +157,4 @@
 .tool-header-slot .terminal-tabs {
   width: 100%;
   border: 0;
-}
-.rail-backdrop {
-  display: none;
-}
-@container session-frame (max-width: 659px) {
-  .main-row > .workbench-rail {
-    position: absolute;
-    inset: 0 0 0 auto;
-    max-width: min(100%, 420px);
-    box-shadow: var(--piarc-shadow-overlay);
-    z-index: 3;
-  }
-  .rail-backdrop {
-    display: block;
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    background: transparent;
-    border: 0;
-  }
 }

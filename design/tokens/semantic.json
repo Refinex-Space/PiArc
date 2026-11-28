@@ -43,6 +43,17 @@
       "dark": "base.chromeLightMuted",
       "lightHighContrast": "base.black",
       "darkHighContrast": "base.white"
+    },
+    "card": {
+      "light": "base.cardLight",
+      "dark": "base.cardDark",
+      "lightHighContrast": "base.white",
+      "darkHighContrast": "base.black"
+    },
+    "cardEdge": {
+      "light": "base.transparent",
+      "dark": "base.transparent",
+      "highContrast": "neutral.11"
     }
   },
   "text": {
@@ -181,6 +192,8 @@
     "workbench.editor": "Field",
     "workbench.ink": "CanvasText",
     "workbench.muted": "CanvasText",
+    "workbench.card": "Canvas",
+    "workbench.cardEdge": "CanvasText",
     "surface.app": "Canvas",
     "surface.sidebar": "Canvas",
     "surface.panel": "Canvas",

@@ -156,6 +156,8 @@
     "sidebarLight": "#fafafa",
     "sidebarDark": "#202020",
     "controlDark": "#303030",
+    "cardLight": "#f6f6f6",
+    "cardDark": "#222222",
     "chromeInk": "#191919",
     "chromeMuted": "#626262",
     "chromeLightInk": "#f1f1f1",

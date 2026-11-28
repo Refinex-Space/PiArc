@@ -1,8 +1,10 @@
-// The resizable session rail belongs to the conversation tile.
-import { useRef } from 'react';
+// The resizable session rail belongs to the conversation tile. It slides in from the window's
+// right edge and stays mounted until it has slid out (`usePresence`).
+import { useRef, useState, type CSSProperties } from 'react';
 import { useT } from '../app/app-context.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { RailContents } from './RailContents.js';
+import { usePresence } from './rail-motion.js';
 import { usePanelPresentation } from './WorkbenchPanels.js';
 import { panelsFor, usePanels, type useRequestedPanel, type PanelContext } from './registry.js';
 
@@ -14,7 +16,15 @@ interface AreaProps {
   readonly onResize: (size: number) => void;
 }
 
-function PanelDivider({ size, min, max, onResize }: Omit<AreaProps, 'context'>) {
+const RAIL_PROPERTIES = ['width', 'translate'] as const;
+
+function PanelDivider({
+  size,
+  min,
+  max,
+  onResize,
+  onDrag,
+}: Omit<AreaProps, 'context'> & { readonly onDrag: (dragging: boolean) => void }) {
   const t = useT();
   const drag = useRef<{ pointer: number; origin: number; size: number }>(undefined);
   return (
@@ -37,6 +47,7 @@ function PanelDivider({ size, min, max, onResize }: Omit<AreaProps, 'context'>) 
           origin: event.clientX,
           size,
         };
+        onDrag(true);
       }}
       onPointerMove={(event) => {
         if (drag.current?.pointer !== event.pointerId) return;
@@ -44,6 +55,7 @@ function PanelDivider({ size, min, max, onResize }: Omit<AreaProps, 'context'>) 
       }}
       onLostPointerCapture={() => {
         drag.current = undefined;
+        onDrag(false);
       }}
       onKeyDown={(event) => {
         if (isImeComposing(event.nativeEvent)) return;
@@ -62,8 +74,14 @@ export function RailArea({ context, ...sizing }: AreaProps) {
   const { railOpen, setRailOpen } = usePanelPresentation();
   const registered = usePanels();
   const handled = useRef<ReturnType<typeof useRequestedPanel>>(undefined);
+  const rail = useRef<HTMLElement>(null);
+  // Resizing follows the pointer directly; the width only eases when the rail opens or closes.
+  const [resizing, setResizing] = useState(false);
   const panels = panelsFor(registered, 'rail', context);
-  if (!railOpen || !context.sessionId || panels.length === 0) return null;
+  const available = context.sessionId !== undefined && panels.length > 0;
+  const phase = usePresence(railOpen && available, rail, RAIL_PROPERTIES);
+  if (!available || phase === 'closed') return null;
+  const state = phase === 'open' ? 'open' : 'closed';
   const close = () => {
     setRailOpen(false);
     document.querySelector<HTMLElement>('[data-testid="tool-rail"]')?.focus();
@@ -74,12 +92,17 @@ export function RailArea({ context, ...sizing }: AreaProps) {
         type="button"
         tabIndex={-1}
         className="rail-backdrop"
+        data-state={state}
         aria-label={t('panels.close')}
         onClick={close}
       />
       <aside
+        ref={rail}
         className="panel-area panel-area-rail workbench-rail"
-        style={{ width: sizing.size }}
+        style={{ '--rail-size': `${String(sizing.size)}px` } as CSSProperties}
+        data-state={state}
+        data-resizing={resizing || undefined}
+        inert={phase === 'closing'}
         aria-label={t('panels.rail')}
         id="session-rail"
         data-testid="panel-area-rail"
@@ -90,13 +113,15 @@ export function RailArea({ context, ...sizing }: AreaProps) {
           close();
         }}
       >
-        <PanelDivider {...sizing} />
-        <RailContents
-          key={context.sessionId}
-          context={context}
-          registered={registered}
-          handled={handled}
-        />
+        <div className="rail-sheet">
+          <PanelDivider {...sizing} onDrag={setResizing} />
+          <RailContents
+            key={context.sessionId}
+            context={context}
+            registered={registered}
+            handled={handled}
+          />
+        </div>
       </aside>
     </>
   );

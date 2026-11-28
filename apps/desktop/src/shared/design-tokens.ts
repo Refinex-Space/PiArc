@@ -23,6 +23,8 @@ export type ColorToken =
   | 'workbench.editor'
   | 'workbench.ink'
   | 'workbench.muted'
+  | 'workbench.card'
+  | 'workbench.cardEdge'
   | 'text.primary'
   | 'text.secondary'
   | 'text.disabled'
@@ -119,6 +121,7 @@ export const ACCENT_PAIRS: readonly {
   readonly bg: ColorToken;
   readonly kind: 'text' | 'large' | 'ui';
 }[] = [
+  { fg: 'border.focus', bg: 'workbench.card', kind: 'ui' },
   { fg: 'border.focus', bg: 'workbench.canvas', kind: 'ui' },
   { fg: 'border.focus', bg: 'workbench.navigation', kind: 'ui' },
   { fg: 'border.focus', bg: 'workbench.editor', kind: 'ui' },
@@ -336,6 +339,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'workbench.editor': '#ffffff',
     'workbench.ink': '#191919',
     'workbench.muted': '#626262',
+    'workbench.card': '#f6f6f6',
+    'workbench.cardEdge': '#00000000',
     'text.primary': '#1d2027',
     'text.secondary': '#5d626c',
     'text.disabled': '#858a94',
@@ -422,6 +427,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'workbench.editor': '#303030',
     'workbench.ink': '#f1f1f1',
     'workbench.muted': '#b3b3b3',
+    'workbench.card': '#222222',
+    'workbench.cardEdge': '#00000000',
     'text.primary': '#eceef2',
     'text.secondary': '#a9adb7',
     'text.disabled': '#6b707c',
@@ -508,6 +515,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'workbench.editor': '#ffffff',
     'workbench.ink': '#000000',
     'workbench.muted': '#000000',
+    'workbench.card': '#ffffff',
+    'workbench.cardEdge': '#5d626c',
     'text.primary': '#1d2027',
     'text.secondary': '#1d2027',
     'text.disabled': '#858a94',
@@ -594,6 +603,8 @@ export const COLORS: Readonly<Record<ColorMode, Readonly<Record<ColorToken, stri
     'workbench.editor': '#000000',
     'workbench.ink': '#ffffff',
     'workbench.muted': '#ffffff',
+    'workbench.card': '#000000',
+    'workbench.cardEdge': '#a9adb7',
     'text.primary': '#eceef2',
     'text.secondary': '#eceef2',
     'text.disabled': '#6b707c',
@@ -683,6 +694,8 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'workbench.editor': '--piarc-workbench-editor',
   'workbench.ink': '--piarc-workbench-ink',
   'workbench.muted': '--piarc-workbench-muted',
+  'workbench.card': '--piarc-workbench-card',
+  'workbench.cardEdge': '--piarc-workbench-card-edge',
   'text.primary': '--piarc-text-primary',
   'text.secondary': '--piarc-text-secondary',
   'text.disabled': '--piarc-text-disabled',

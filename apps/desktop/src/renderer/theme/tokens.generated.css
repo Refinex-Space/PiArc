@@ -164,6 +164,8 @@
   --piarc-workbench-editor: #ffffff;
   --piarc-workbench-ink: #191919;
   --piarc-workbench-muted: #626262;
+  --piarc-workbench-card: #f6f6f6;
+  --piarc-workbench-card-edge: #00000000;
   --piarc-text-primary: #1d2027;
   --piarc-text-secondary: #5d626c;
   --piarc-text-disabled: #858a94;
@@ -253,6 +255,8 @@
     --piarc-workbench-editor: #303030;
     --piarc-workbench-ink: #f1f1f1;
     --piarc-workbench-muted: #b3b3b3;
+    --piarc-workbench-card: #222222;
+    --piarc-workbench-card-edge: #00000000;
     --piarc-text-primary: #eceef2;
     --piarc-text-secondary: #a9adb7;
     --piarc-text-disabled: #6b707c;
@@ -342,6 +346,8 @@
   --piarc-workbench-editor: #ffffff;
   --piarc-workbench-ink: #191919;
   --piarc-workbench-muted: #626262;
+  --piarc-workbench-card: #f6f6f6;
+  --piarc-workbench-card-edge: #00000000;
   --piarc-text-primary: #1d2027;
   --piarc-text-secondary: #5d626c;
   --piarc-text-disabled: #858a94;
@@ -430,6 +436,8 @@
   --piarc-workbench-editor: #303030;
   --piarc-workbench-ink: #f1f1f1;
   --piarc-workbench-muted: #b3b3b3;
+  --piarc-workbench-card: #222222;
+  --piarc-workbench-card-edge: #00000000;
   --piarc-text-primary: #eceef2;
   --piarc-text-secondary: #a9adb7;
   --piarc-text-disabled: #6b707c;
@@ -518,6 +526,8 @@
   --piarc-workbench-editor: #ffffff;
   --piarc-workbench-ink: #000000;
   --piarc-workbench-muted: #000000;
+  --piarc-workbench-card: #ffffff;
+  --piarc-workbench-card-edge: #5d626c;
   --piarc-text-primary: #1d2027;
   --piarc-text-secondary: #1d2027;
   --piarc-text-disabled: #858a94;
@@ -606,6 +616,8 @@
   --piarc-workbench-editor: #000000;
   --piarc-workbench-ink: #ffffff;
   --piarc-workbench-muted: #ffffff;
+  --piarc-workbench-card: #000000;
+  --piarc-workbench-card-edge: #a9adb7;
   --piarc-text-primary: #eceef2;
   --piarc-text-secondary: #eceef2;
   --piarc-text-disabled: #6b707c;
@@ -1167,6 +1179,8 @@
     --piarc-workbench-editor: Field;
     --piarc-workbench-ink: CanvasText;
     --piarc-workbench-muted: CanvasText;
+    --piarc-workbench-card: Canvas;
+    --piarc-workbench-card-edge: CanvasText;
     --piarc-surface-app: Canvas;
     --piarc-surface-sidebar: Canvas;
     --piarc-surface-panel: Canvas;

@@ -1,49 +1,224 @@
+/* The session rail: a column of cards on the conversation's canvas (layers by fill, no strokes;
+   docs/engineering/visual-design.md). The rail eases its width open from the right edge while
+   its sheet, anchored to that edge, is revealed; a held card lifts and follows the pointer while
+   the others slide aside. */
+
+/* ---- The rail and its sheet ------------------------------------------------------------- */
+
+.panel-area.workbench-rail {
+  --rail-open: min(var(--rail-size), max(35cqw, calc(100cqw - 340px)));
+  position: relative;
+  flex: none;
+  width: var(--rail-open);
+  min-width: 0;
+  overflow: clip;
+  border: 0;
+  background: var(--piarc-workbench-canvas);
+  transition: width var(--piarc-motion-view) var(--piarc-motion-curve-snap);
+}
+.panel-area.workbench-rail[data-state='closed'] {
+  width: 0;
+}
+.panel-area.workbench-rail[data-resizing] {
+  transition: none;
+}
+.workbench-rail > .rail-sheet {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  flex-direction: column;
+  width: var(--rail-open);
+  transition:
+    opacity var(--piarc-motion-normal) var(--piarc-motion-easing),
+    translate var(--piarc-motion-view) var(--piarc-motion-curve-snap);
+}
+.workbench-rail[data-state='closed'] > .rail-sheet {
+  opacity: 0;
+  translate: var(--piarc-space-4) 0;
+}
+.workbench-rail > .rail-sheet > .resizer {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  width: 4px;
+  background: transparent;
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+/* The edge shows only while it is used: hovered (after a beat), focused or dragged. */
+.workbench-rail > .rail-sheet > .resizer:hover {
+  background: var(--piarc-session-line);
+  transition-delay: var(--piarc-motion-reveal-delay);
+}
+.workbench-rail > .rail-sheet > .resizer:focus-visible,
+.workbench-rail[data-resizing] > .rail-sheet > .resizer {
+  background: var(--piarc-border-focus);
+}
+.rail-backdrop {
+  display: none;
+}
+
+/* A narrow conversation: the rail slides over it from the right edge. */
+@container session-frame (max-width: 659px) {
+  .main-row > .panel-area.workbench-rail {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 3;
+    width: min(100%, 420px, var(--rail-size));
+    overflow: visible;
+    box-shadow: var(--piarc-shadow-overlay);
+    transition: translate var(--piarc-motion-view) var(--piarc-motion-curve-snap);
+  }
+  .main-row > .panel-area.workbench-rail[data-state='closed'] {
+    width: min(100%, 420px, var(--rail-size));
+    translate: 100% 0;
+    box-shadow: none;
+  }
+  .workbench-rail > .rail-sheet {
+    width: 100%;
+  }
+  .workbench-rail[data-state='closed'] > .rail-sheet {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .rail-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border: 0;
+    background: transparent;
+  }
+  .rail-backdrop[data-state='closed'] {
+    pointer-events: none;
+  }
+}
+
+/* ---- The column of cards ---------------------------------------------------------------- */
+
+.workbench-rail .rail-sections {
+  position: relative;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-2) var(--piarc-space-3) var(--piarc-space-4);
+  scrollbar-gutter: auto;
+  overscroll-behavior: contain;
+}
 .workbench-rail .rail-section {
   position: relative;
-  padding-block: var(--piarc-space-2);
-  border-color: color-mix(in srgb, var(--piarc-workbench-ink) 9%, transparent);
+  flex: none;
+  padding: 0 var(--piarc-space-4);
+  border: 0;
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-workbench-card);
+  box-shadow: 0 0 0 1px var(--piarc-workbench-card-edge);
+  transition:
+    transform var(--piarc-motion-normal) var(--piarc-motion-curve-snap),
+    scale var(--piarc-motion-normal) var(--piarc-motion-curve-snap),
+    box-shadow var(--piarc-motion-normal) var(--piarc-motion-easing),
+    opacity var(--piarc-motion-normal) var(--piarc-motion-easing);
+  isolation: isolate;
 }
+/* The lifted surface fades in over the card (a theme change does not animate the card). */
+.workbench-rail .rail-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--piarc-workbench-editor);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--piarc-motion-normal) var(--piarc-motion-easing);
+}
+.workbench-rail .rail-section[data-held]::before {
+  opacity: 1;
+}
+/* A card that appears later (a task list, background tasks) fades in. */
+@starting-style {
+  .workbench-rail .rail-section {
+    opacity: 0;
+  }
+}
+
+/* Held: the whole card lifts off the column. While the pointer holds it, its position follows
+   the pointer directly; from the keyboard it glides between slots. */
+.workbench-rail .rail-section[data-held] {
+  z-index: 2;
+  scale: 1.02;
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-popover-shadow);
+}
+.workbench-rail .rail-section[data-held='pointer'] {
+  transition-property: scale, box-shadow, opacity;
+}
+:root.is-rail-dragging,
+:root.is-rail-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* ---- A card's heading ------------------------------------------------------------------- */
+
 .rail-section .rail-heading {
   display: flex;
   align-items: center;
   gap: var(--piarc-space-1);
-  min-block-size: calc(var(--piarc-space-4) * 2);
+  min-block-size: calc(var(--piarc-space-5) * 2 - var(--piarc-space-2));
+  cursor: grab;
+  touch-action: none;
 }
 .rail-heading h2 {
-  margin: 0;
   flex: 1;
   min-width: 0;
+  margin: 0;
   font: inherit;
 }
 .rail-heading h2 > button {
   display: flex;
   align-items: center;
   gap: var(--piarc-space-1);
-  width: 100%;
+  max-width: 100%;
   min-height: calc(var(--piarc-space-4) * 2);
   padding: 0;
   border: 0;
   border-radius: var(--piarc-radius-sm);
   background: transparent;
-  color: var(--piarc-workbench-ink);
+  color: var(--piarc-workbench-muted);
   font: inherit;
   font-weight: var(--piarc-font-weight-medium);
   text-align: start;
   cursor: pointer;
+  transition: color var(--piarc-motion-fast);
+}
+.rail-heading h2 > button:hover {
+  color: var(--piarc-workbench-ink);
+}
+.rail-heading .rail-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rail-heading h2 svg {
+  flex: none;
   width: var(--piarc-space-3);
   height: var(--piarc-space-3);
-  color: var(--piarc-workbench-muted);
   opacity: 0;
   transition:
     opacity var(--piarc-motion-fast),
-    transform var(--piarc-motion-fast);
+    rotate var(--piarc-motion-normal) var(--piarc-motion-curve-snap);
+}
+.rail-heading h2 button[aria-expanded='false'] svg {
+  rotate: -90deg;
 }
 .rail-heading .rail-grip {
   flex: none;
   width: var(--piarc-space-5);
   height: var(--piarc-space-5);
+  color: var(--piarc-workbench-muted);
   opacity: 0;
   cursor: grab;
   transition: opacity var(--piarc-motion-fast);
@@ -57,6 +232,7 @@
   flex: none;
   align-items: center;
   gap: var(--piarc-space-1);
+  cursor: default;
 }
 .rail-heading .rail-actions > .icon-button {
   opacity: 0;
@@ -72,38 +248,48 @@
 .rail-heading .rail-actions > .icon-button[data-attention='critical'] {
   color: var(--piarc-text-danger);
 }
-.rail-heading:hover :is(.rail-grip, h2 svg, .rail-actions > .icon-button),
+.rail-section:hover .rail-heading :is(.rail-grip, h2 svg, .rail-actions > .icon-button),
 .rail-heading:focus-within :is(.rail-grip, h2 svg, .rail-actions > .icon-button),
-.rail-heading:has([aria-pressed='true']) .rail-grip {
+.rail-section[data-held] .rail-grip,
+.rail-section[data-collapsed] .rail-heading h2 svg {
   opacity: 1;
 }
-.rail-heading .rail-grip[aria-pressed='true'] {
-  cursor: grabbing;
+.rail-sections[data-moving] .rail-section:not([data-held]) .rail-heading :is(.rail-grip, h2 svg) {
+  opacity: 0;
 }
-.rail-section[data-insertion]::after {
-  content: '';
-  position: absolute;
-  inset-inline: 0;
-  height: 2px;
-  background: var(--piarc-text-accent);
-  border-radius: var(--piarc-radius-pill);
-  pointer-events: none;
-}
-.rail-section[data-insertion='before']::after {
-  top: 0;
-}
-.rail-section[data-insertion='after']::after {
-  bottom: 0;
-}
-.rail-heading h2 button[aria-expanded='false'] svg {
-  transform: rotate(-90deg);
+
+/* ---- A card's body: eases its height open and closed ------------------------------------ */
+
+.rail-section-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr;
   opacity: 1;
+  transition:
+    grid-template-rows var(--piarc-motion-normal) var(--piarc-motion-curve-snap),
+    opacity var(--piarc-motion-normal) var(--piarc-motion-easing);
+}
+.rail-section-body:not([data-phase='open']) {
+  grid-template-rows: 0fr;
+  opacity: 0;
 }
 .rail-section-body[hidden] {
   display: none;
 }
-.rail-section-body > .rail-environment-row {
+.rail-section-inner {
+  min-width: 0;
+  min-height: 0;
+  padding-bottom: var(--piarc-space-3);
+}
+.rail-section-body:not([data-phase='open']) > .rail-section-inner {
+  overflow: hidden;
+}
+
+/* ---- Card contents ---------------------------------------------------------------------- */
+
+.rail-section-body .rail-environment-row {
   min-height: calc(var(--piarc-space-4) * 2);
+  padding: 0;
 }
 .rail-environment-row small {
   min-width: 0;
@@ -114,7 +300,7 @@
 }
 :root[data-app] .rail-section .context-categories {
   gap: 0;
-  margin-block: var(--piarc-space-1);
+  margin-block: var(--piarc-space-1) 0;
 }
 :root[data-app] .rail-section .context-category {
   min-block-size: var(--piarc-space-5);
@@ -141,8 +327,18 @@
 }
 .rail-section .context-meter {
   border-radius: var(--piarc-radius-pill);
-  background: var(--piarc-surface-active);
+  background: color-mix(in srgb, var(--piarc-workbench-ink) 10%, transparent);
 }
+/* Background tasks are rows in their card, not cards of their own. */
+:root[data-app] .workbench-rail .bg-task {
+  padding: var(--piarc-space-2) 0;
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-app] .workbench-rail .bg-task + .bg-task {
+  border-top: 1px solid var(--piarc-session-line);
+}
+
 @media (hover: none) {
   .rail-heading .rail-grip,
   .rail-heading .rail-actions > .icon-button,
@@ -151,7 +347,10 @@
   }
 }
 @media (forced-colors: active) {
-  .rail-section[data-insertion]::after {
-    background: Highlight;
+  .workbench-rail .rail-section {
+    border: 1px solid CanvasText;
+  }
+  .workbench-rail .rail-section[data-held] {
+    border-color: Highlight;
   }
 }
