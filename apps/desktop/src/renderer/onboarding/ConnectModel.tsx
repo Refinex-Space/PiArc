@@ -25,7 +25,7 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import { reason } from '../shell/errors.js';
 import { ChevronRightIcon, ExternalGlyph, ProviderMark } from '../shell/icons.js';
 import { ChoiceButton } from '../shell/Menu.js';
-import { endpointId, hostOf, LOCAL_BASE_URL } from './endpoint.js';
+import { endpointId, LOCAL_BASE_URL } from './endpoint.js';
 import {
   availableFamilies,
   defaultVariant,
@@ -105,7 +105,7 @@ export function ConnectModel({
   readonly backLabel: MessageId;
 }) {
   const t = useT();
-  const { locale, platform } = useApp();
+  const { locale } = useApp();
   const titleId = useId();
   const keyId = useId();
   const [settings, setSettings] = useState<ProviderSettings>();
@@ -591,13 +591,6 @@ export function ConnectModel({
       : connected
         ? 'onboarding.connect.replace'
         : 'onboarding.connect.submit';
-  const host = isEndpoint ? hostOf(endpoint.baseUrl) : undefined;
-  const note: string | undefined =
-    current.kind === 'login'
-      ? undefined
-      : t(platform === 'darwin' ? 'onboarding.connect.noteMac' : 'onboarding.connect.notePc', {
-          name: isEndpoint ? (host ?? t('onboarding.connect.thisEndpoint')) : targetName,
-        });
 
   return (
     <section className="onboarding-connect" aria-labelledby={titleId}>
@@ -907,7 +900,6 @@ export function ConnectModel({
               </Button>
             )}
           </div>
-          {note === undefined || done ? null : <p className="onboarding-note">{note}</p>}
         </form>
       </div>
       {choosing ? (

@@ -1306,7 +1306,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 
 T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新窗口中打开"、托盘与文件菜单的"新建窗口"），最近获得焦点的一个负责菜单命令、系统通知与 Dock 角标；窗口的位置、大小与是否最大化写入数据目录的 `window-state.json`（移动与缩放防抖 500 ms、关闭时），新窗口沿用并错开 24 px，落在已不存在的显示器上时移回主显示器。主进程的窗口、启动目标、托盘与退出在 `src/main/app-shell.ts`、`launch.ts`、`platform/tray.ts`、`platform/window-state.ts`、`platform/quit.ts`、`platform/windows-shell.ts`。ADR-0109 起，有会话处在回合中且偏好 `power.keepAwake` 打开（默认）时，主进程持有 `prevent-app-suspension` 阻止器（`platform/keep-awake.ts`，运行数取自同一个 `core/activity`），系统不会因闲置睡眠；显示器、合盖与手动睡眠仍按系统处理。
 
-ADR-0110 起，首次运行（偏好 `onboarding.completed` 未完成、没有已知工作区、不是由启动目标打开）时主窗口先显示全窗口的引导层：欢迎屏（方块吉祥物、字标、"开始设置 / 稍后设置"）与"连接模型"（左侧按服务商家族与地区套餐变体排列的快速设置宫格，右侧的密钥、登录或端点表单，"测试并继续"先 `saveProvider` 后 `testProvider`）。引导层是工作台的兄弟节点，打开期间工作台 `inert`；完成、跳过测试或"稍后设置"写用户级偏好，设置页"快速设置…"与新会话页无模型时的"连接模型"再次打开"连接模型"。渲染进程在 `apps/desktop/src/renderer/onboarding/`，设计见 `addenda/first-run.md`。
+ADR-0110 起，首次运行（偏好 `onboarding.completed` 未完成、没有已知工作区、不是由启动目标打开）时主窗口先显示全窗口的引导层：欢迎屏（方块吉祥物、一句副标题、"开始设置 / 稍后设置"）与"连接模型"（左侧按服务商家族与地区套餐变体排列的快速设置宫格，右侧的密钥、登录或端点表单，"测试并继续"先 `saveProvider` 后 `testProvider`）。引导层是工作台的兄弟节点，打开期间工作台 `inert`；完成、跳过测试或"稍后设置"写用户级偏好，设置页"快速设置…"与新会话页无模型时的"连接模型"再次打开"连接模型"。渲染进程在 `apps/desktop/src/renderer/onboarding/`，设计见 `addenda/first-run.md`。
 
 ### 8.2 信息架构
 

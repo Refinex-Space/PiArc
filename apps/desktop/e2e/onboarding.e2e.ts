@@ -140,7 +140,7 @@ firstRun(
     await page.keyboard.press('Escape');
     await expect(guide).toHaveAttribute('data-step', 'welcome');
     await expect(page.getByTestId('onboarding-mascot')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'PiArc' })).toBeFocused();
+    await expect(page.getByTestId('onboarding-welcome-title')).toBeFocused();
     for (const language of ['en', 'zh-CN'] as const) {
       await prefer(page, { key: 'language', value: language });
       for (const theme of ['light', 'dark'] as const) {

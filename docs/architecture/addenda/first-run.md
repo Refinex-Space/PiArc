@@ -49,6 +49,7 @@
 | E10、E11、E12 | 减少动态效果、两个窗口、"获取密钥"的原生确认没有单独的 L4：减少动效走全局 CSS 规则，跨窗口关闭走偏好广播（`use-onboarding.tsx`），"获取密钥"只经 `openExternal` 打开写死地址（组件测试核对地址） | 机制都复用已有路径，各自已有 L4 覆盖 |
 | F1 | 启动目标（链接、拖入文件夹）在第一份工作区快照之后才到时，自动打开的引导层关闭，不写完成标记 | 复核发现的竞态：`takeLaunchTargets` 是异步的（`use-onboarding.test.tsx` 的复现用例） |
 | 5.3 | 基准与 perf 探针也经全新数据目录启动应用：`scripts/bench/s1-transcript.mjs` 的 `appCommand` 给 `--user-data-dir` 合并写入完成标记（`markFirstRunDone`），perf 的 `launchApp` 与各基准都经它 | 复核发现：否则 CI 的 perf PR 冒烟会被引导层挡住 |
+| W1、C9、V2 | 用户 2026-11-28 评审：欢迎页去掉"PiArc"字标、吉祥物缩小（每格 7 px），副标题作为标题；表单下方关于密钥存放与测试请求的说明去掉；选中的格子只用 `surface.active` 填充、不描边，输入框按 `.settings-search` 的约定只在键盘焦点时显示细环、点击后是一道淡边 | 弱边框规范（`docs/engineering/visual-design.md` 第 1、4 节）与少文字 |
 | 4.4 | 测试失败的回显已由 Agent Host 把本次密钥替换为 `[REDACTED]`（L4 的桩服务回显密钥，断言界面不含它），不需要另修 | — |
 
 ## 3. 需求与验收标准

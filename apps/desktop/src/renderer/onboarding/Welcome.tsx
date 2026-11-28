@@ -17,16 +17,16 @@ export function Welcome({
   return (
     <section className="onboarding-welcome" aria-labelledby="onboarding-welcome-title">
       <div className="onboarding-welcome-hero">
-        <Mascot block={10} testId="onboarding-mascot" className="onboarding-mascot" />
+        <Mascot block={7} testId="onboarding-mascot" className="onboarding-mascot" />
         <h1
           id="onboarding-welcome-title"
-          className="onboarding-wordmark"
+          className="onboarding-lede"
+          data-testid="onboarding-welcome-title"
           tabIndex={-1}
           data-focus-proxy
         >
-          {t('app.name')}
+          {t('onboarding.welcome.lede')}
         </h1>
-        <p className="onboarding-lede">{t('onboarding.welcome.lede')}</p>
       </div>
       <div className="onboarding-welcome-actions">
         <Button

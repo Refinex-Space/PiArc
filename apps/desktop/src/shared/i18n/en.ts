@@ -3535,11 +3535,6 @@ export const en = {
   'onboarding.connect.test': 'Test connection',
   'onboarding.connect.replace': 'Replace key and test',
   'onboarding.connect.start': 'Start using PiArc',
-  'onboarding.connect.noteMac':
-    'Your key is stored encrypted on this Mac and only sent to {name}. Testing sends one tiny request.',
-  'onboarding.connect.notePc':
-    'Your key is stored encrypted on this PC and only sent to {name}. Testing sends one tiny request.',
-  'onboarding.connect.thisEndpoint': 'this endpoint',
   'onboarding.connect.testing': 'Testing the connection…',
   'onboarding.connect.connected': 'Connected to {name}',
   'onboarding.connect.latency': '{ms} ms',

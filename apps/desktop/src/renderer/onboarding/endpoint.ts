@@ -35,13 +35,3 @@ export function endpointId(
     if (!taken.has(id)) return id;
   }
 }
-
-/** The host a key for `baseUrl` goes to, for the note under the form. */
-export function hostOf(baseUrl: string): string | undefined {
-  try {
-    const host = new URL(baseUrl).host;
-    return host === '' ? undefined : host;
-  } catch {
-    return undefined;
-  }
-}

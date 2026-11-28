@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { endpointId, hostOf } from './endpoint.js';
+import { endpointId } from './endpoint.js';
 
 it('names an endpoint after its site and keeps the id free', () => {
   const none = new Set<string>();
@@ -18,9 +18,4 @@ it('names an endpoint after its site and keeps the id free', () => {
   for (const id of ['example', 'custom', 'local-3']) {
     expect(id).toMatch(/^[a-z0-9][a-z0-9._-]{0,95}$/u);
   }
-});
-
-it('reads the host a key is sent to', () => {
-  expect(hostOf('https://api.example.com:8443/v1')).toBe('api.example.com:8443');
-  expect(hostOf('')).toBeUndefined();
 });

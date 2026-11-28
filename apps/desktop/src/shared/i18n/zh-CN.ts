@@ -3403,11 +3403,6 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'onboarding.connect.test': '测试连接',
   'onboarding.connect.replace': '替换密钥并测试',
   'onboarding.connect.start': '开始使用',
-  'onboarding.connect.noteMac':
-    '密钥加密保存在这台 Mac 上，只发给 {name}。测试会发送一个很小的请求。',
-  'onboarding.connect.notePc':
-    '密钥加密保存在这台电脑上，只发给 {name}。测试会发送一个很小的请求。',
-  'onboarding.connect.thisEndpoint': '这个端点',
   'onboarding.connect.testing': '正在测试连接…',
   'onboarding.connect.connected': '已连接 {name}',
   'onboarding.connect.latency': '{ms} 毫秒',
