@@ -86,6 +86,12 @@ impl RouteKey {
         Self(Arc::from(crate::market::MARKET_ROUTE))
     }
 
+    /// The route of the in-app update status snapshots (`core/updates`, ADR-0111).
+    #[must_use]
+    pub fn updates() -> Self {
+        Self(Arc::from(crate::updates::UPDATES_ROUTE))
+    }
+
     /// The route of the Git panel's progress and repository changes (`core/git`, ADR-0085).
     #[must_use]
     pub fn git() -> Self {

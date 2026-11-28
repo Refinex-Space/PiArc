@@ -34,6 +34,7 @@ mod plugins;
 mod sessions;
 mod state;
 mod terminals;
+mod updates;
 mod usage;
 
 use std::collections::HashMap;
@@ -134,6 +135,9 @@ pub struct CoreConfig {
     /// The Pi package market's registry and limits (ADR-0102); development builds and tests
     /// point it at a local registry.
     pub market: crate::market::MarketConfig,
+    /// In-app updates' feed, trusted keys and this build's version (ADR-0111); development
+    /// builds and tests point it at a local feed.
+    pub updates: crate::updates::UpdateConfig,
 }
 
 /// A credential store for the vault's master key and the key's name in it.
@@ -177,6 +181,7 @@ impl Default for CoreConfig {
             chrome: crate::browser::import::ChromeConfig::default(),
             speech: crate::dictation::SpeechConfig::default(),
             market: crate::market::MarketConfig::default(),
+            updates: crate::updates::UpdateConfig::default(),
         }
     }
 }
@@ -652,6 +657,37 @@ fn market_of(
     )
 }
 
+fn updates_of(
+    config: &CoreConfig,
+    storage: &Storage,
+    events: &EventSender,
+    cancel: &CancellationToken,
+) -> crate::updates::Updates {
+    let sender = events.clone();
+    let emit: crate::updates::Emit = Arc::new(move |status| {
+        match Event::from_json(RouteKey::updates(), status) {
+            Ok(event) => {
+                if let Err(error) = sender.try_send(event) {
+                    tracing::warn!(target: "piarc_core", %error, "an update status was not sent");
+                }
+            }
+            Err(error) => {
+                tracing::warn!(target: "piarc_core", %error, "an update status was not encoded");
+            }
+        }
+    });
+    crate::updates::Updates::new(
+        config.updates.clone(),
+        storage.dirs().cache(),
+        emit,
+        cancel.child_token(),
+    )
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "one flat assembly of the session layer's services, one line per service"
+)]
 fn open_state(
     dirs: DataDirs,
     config: &CoreConfig,
@@ -719,6 +755,7 @@ fn open_state(
         proxy: Arc::new(crate::network::Proxy::starting(&data)),
         npm_lock: Arc::default(),
         market: market_of(config, &storage, events, cancel),
+        updates: updates_of(config, &storage, events, cancel),
         git: Arc::default(),
         browser: Arc::clone(&proxies),
         chrome: crate::browser::import::ChromeImports::new(

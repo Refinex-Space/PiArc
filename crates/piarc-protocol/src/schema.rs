@@ -129,6 +129,9 @@ fn sort_keys(value: Value) -> Value {
 
 /// The Git panel types the desktop client reads (ADR-0084).
 fn git_types(generator: &mut schemars::SchemaGenerator) {
+    // In-app updates (ADR-0111) ride along: the export function is at its length limit.
+    generator.subschema_for::<crate::updates::UpdateStatus>();
+    generator.subschema_for::<crate::updates::UpdateInstall>();
     generator.subschema_for::<crate::git::GitCall>();
     generator.subschema_for::<crate::git::GitStatus>();
     generator.subschema_for::<crate::git::GitProbe>();

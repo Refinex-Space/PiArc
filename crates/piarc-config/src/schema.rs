@@ -728,6 +728,15 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             shape: Shape::Bool,
         }]),
     },
+    // In-app updates (ADR-0111): check for a newer release at start and daily; the desktop
+    // client reads it.
+    Field {
+        name: "updates",
+        shape: Shape::Object(&[Field {
+            name: "autoCheck",
+            shape: Shape::Bool,
+        }]),
+    },
     // The first-run guide was finished or skipped (ADR-0110); the desktop client reads it.
     Field {
         name: "onboarding",

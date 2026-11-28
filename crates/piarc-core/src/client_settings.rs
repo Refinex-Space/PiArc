@@ -21,6 +21,7 @@ use crate::error::{Error, Result};
 /// `voiceDictation` (ADR-0094): voice input, user-level only (`dictation::VoicePreferences`).
 /// `power` (ADR-0109): `keepAwake`, read by the main process's keep-awake controller.
 /// `onboarding` (ADR-0110): `completed`, whether the first-run guide was finished or skipped.
+/// `updates` (ADR-0111): `autoCheck`, read by the main process's update scheduler.
 pub const CLIENT_KEYS: &[&str] = &[
     "language",
     "appearance",
@@ -33,6 +34,7 @@ pub const CLIENT_KEYS: &[&str] = &[
     "voiceDictation",
     "power",
     "onboarding",
+    "updates",
 ];
 
 /// The user's settings file as a JSON object; `{}` when it does not exist.

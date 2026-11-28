@@ -21755,6 +21755,234 @@
       "required": ["jsonrpc", "id", "result"],
       "type": "object"
     },
+    "UpdateInstall": {
+      "description": "What the main process installs once the state is `ready`.",
+      "oneOf": [
+        {
+          "description": "The verified `PiArc-<version>-macos-<arch>.zip` (and the DMG's page for the manual way).",
+          "properties": {
+            "archive": {
+              "description": "Absolute path of the verified ZIP.",
+              "type": "string"
+            },
+            "platform": {
+              "const": "macos",
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": ["platform", "version", "archive"],
+          "type": "object"
+        },
+        {
+          "description": "The directory holding the verified `releases.win-<arch>.json` and its Full package: a\nVelopack `FileSource`.",
+          "properties": {
+            "feed": {
+              "description": "Absolute path of the directory.",
+              "type": "string"
+            },
+            "platform": {
+              "const": "windows",
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": ["platform", "version", "feed"],
+          "type": "object"
+        }
+      ]
+    },
+    "UpdateProblem": {
+      "description": "Why the last check or download failed.",
+      "properties": {
+        "code": {
+          "description": "Stable code: `network`, `proxy`, `tls`, `timeout`, `refused`, `integrity` (signature,\nsize or hash), `notFound` (no release published yet), `disk`, `diskFull`, `cancelled`.",
+          "type": "string"
+        },
+        "message": {
+          "description": "Technical detail (English), shown under the localized reason.",
+          "type": "string"
+        }
+      },
+      "required": ["code", "message"],
+      "type": "object"
+    },
+    "UpdateProgress": {
+      "description": "Download progress.",
+      "properties": {
+        "received": {
+          "description": "Bytes on disk.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "description": "Bytes in all.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["received", "total"],
+      "type": "object"
+    },
+    "UpdateRelease": {
+      "description": "A newer release.",
+      "properties": {
+        "date": {
+          "description": "Release date (`YYYY-MM-DD`).",
+          "type": "string"
+        },
+        "notes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Release notes in Markdown by locale (`en`, `zh-CN`); the client picks its language and\nfalls back to `en`.",
+          "type": "object"
+        },
+        "pageUrl": {
+          "description": "The release's page on GitHub.",
+          "type": "string"
+        },
+        "security": {
+          "description": "A security update (ADR-0018 rule 8).",
+          "type": "boolean"
+        },
+        "size": {
+          "description": "Bytes this platform downloads.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version": {
+          "description": "SemVer of the release.",
+          "type": "string"
+        }
+      },
+      "required": ["version", "date", "security", "notes", "size", "pageUrl"],
+      "type": "object"
+    },
+    "UpdateState": {
+      "description": "Where the update flow stands.",
+      "oneOf": [
+        {
+          "const": "idle",
+          "description": "Nothing checked yet in this run.",
+          "type": "string"
+        },
+        {
+          "const": "checking",
+          "description": "Reading the latest release.",
+          "type": "string"
+        },
+        {
+          "const": "upToDate",
+          "description": "The running version is the latest.",
+          "type": "string"
+        },
+        {
+          "const": "available",
+          "description": "A newer release exists and nothing is downloaded yet.",
+          "type": "string"
+        },
+        {
+          "const": "downloading",
+          "description": "The newer release is being downloaded.",
+          "type": "string"
+        },
+        {
+          "const": "ready",
+          "description": "The newer release is downloaded and verified: ready to install.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "The last check or download failed (`problem` says why).",
+          "type": "string"
+        }
+      ]
+    },
+    "UpdateStatus": {
+      "description": "The update flow's snapshot: answered by every `update*` call and sent on `core/updates`\nwhenever it changes.",
+      "properties": {
+        "checkedAt": {
+          "description": "Milliseconds since the Unix epoch of the last completed check.",
+          "format": "int64",
+          "type": ["integer", "null"]
+        },
+        "current": {
+          "description": "The running version.",
+          "type": "string"
+        },
+        "problem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpdateProblem"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpdateProgress"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "While `downloading`."
+        },
+        "release": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpdateRelease"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The newer release (`available`, `downloading`, `ready`, and `failed` after one was\nfound)."
+        },
+        "state": {
+          "$ref": "#/$defs/UpdateState"
+        },
+        "unavailable": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UpdateUnavailable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present when updates cannot work in this build."
+        }
+      },
+      "required": ["state", "current"],
+      "type": "object"
+    },
+    "UpdateUnavailable": {
+      "description": "Why updates cannot work in this build at all.",
+      "oneOf": [
+        {
+          "const": "noTrustedKey",
+          "description": "The build trusts no release key (ADR-0024 rule 5), so nothing can verify.",
+          "type": "string"
+        },
+        {
+          "const": "platform",
+          "description": "No artefact is published for this operating system and architecture.",
+          "type": "string"
+        }
+      ]
+    },
     "UploadPart": {
       "description": "One piece of a text sent in several requests.",
       "properties": {

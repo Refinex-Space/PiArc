@@ -56,8 +56,14 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 ## 发布清单（`release`，ADR-0024）
 
 - `verify_manifest` 先验签后解析，只接受预哈希签名；`verify_file` 先比大小再流式算 SHA-256。所有失败是 `ReleaseError`，类别 `releaseIntegrity`（读不了文件为 `ioError`），`details.reason` 区分原因，调用方一律拒绝更新。
-- `BUILTIN_RELEASE_KEYS` 在 T50 之前为空：没有信任的公钥时任何清单都被拒绝。不要把 `scripts/release/test-keys/` 的测试公钥放进去。
+- `BUILTIN_RELEASE_KEYS` 是正式发布公钥（ID `C4CF81A1515C0A9F`，与 `scripts/release/piarc-release.pub` 同一把，`tests/release.rs` 核对两处一致）；轮换时新旧两把同时列出（`docs/engineering/release.md` 第 7 节）。列表为空时任何清单都被拒绝，`updates` 报告"不可用"。不要把 `scripts/release/test-keys/` 的测试公钥放进去。
 - 测试样本由 Node 的 `scripts/release/release-manifest.mjs` 签名（`tests/fixtures/release/`，`.gitattributes` 设为 `-text` 保持字节不变），换测试密钥后按该目录 README 重写。
+
+## 应用内更新（`updates`，ADR-0111）
+
+- `Updates`（Hub 的 `Ctx.updates`，`CoreConfig.updates`）：`check` 取 `latest_url` 下的清单与签名（`piarc_web::get`，至多 1 MiB），`release::verify_manifest` 后比版本（`updates::feed::is_newer`，只认正式版），再取 `piarc-release-notes.json` 与 Windows 的 `releases.win-<arch>.json`，都按清单核对（`feed::verify_bytes`）；`download` 单飞、可取消，用 `piarc_web::download` 写 `<缓存>/updates/<版本>/` 并逐个 `release::verify_file`；`install_plan` 再校验一遍才答 `UpdateInstall`。每次状态变化经 `Emit` 发 `core/updates`（进度至多 200 ms 一次）。请求一律带生效代理，本机地址（`network::NO_PROXY`）直连；主机只认 `UpdateConfig::hosts`。
+- 产物名只在 `updates::feed`（`mac_archive`、`windows_feed`，Velopack 的包名从它的源文件读），与发布脚本 `scripts/release/collect-artifacts.mjs` 是同一份契约。
+- 测试：`cargo test -p piarc-core --lib updates` 与 `cargo test -p piarc-testkit --test updates`（`piarc-mock-releases` 模拟 GitHub 的下载重定向，清单由 Node 脚本用测试密钥签名）。开发构建的 `createForTests` 读 `PIARC_TEST_UPDATE_FEED`（没设时指向 `https://updates.invalid/releases`）、`PIARC_TEST_UPDATE_CA`、`PIARC_TEST_UPDATE_HOSTS`、`PIARC_TEST_UPDATE_KEY`。
 
 ## 终端（`terminal`，T10、T33，ADR-0017、ADR-0050）
 

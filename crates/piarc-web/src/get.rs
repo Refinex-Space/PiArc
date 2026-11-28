@@ -18,7 +18,7 @@ use hyper::body::Bytes;
 use hyper_util::rt::TokioIo;
 use tokio_util::sync::CancellationToken;
 
-use crate::connect::{Connector, STALL, host_header, platform_tls, target};
+use crate::connect::{Connector, STALL, host_header, platform_tls, target, trusting_tls};
 use crate::download::{DownloadError, MAX_REDIRECTS};
 use crate::fetch::{Resolve, SystemResolver};
 use crate::ssrf::Allowlist;
@@ -185,25 +185,8 @@ impl Getter {
         resolver: Arc<dyn Resolve>,
         allow: Allowlist,
     ) -> Result<Self, GetError> {
-        use rustls::pki_types::CertificateDer;
-        use rustls::pki_types::pem::PemObject as _;
-        let mut roots = rustls::RootCertStore::empty();
-        for cert in CertificateDer::pem_slice_iter(ca_pem) {
-            let cert = cert.map_err(|e| GetError::Tls(e.to_string()))?;
-            roots.add(cert).map_err(|e| GetError::Tls(e.to_string()))?;
-        }
-        if roots.is_empty() {
-            return Err(GetError::Tls("no certificate".into()));
-        }
-        let mut tls = rustls::ClientConfig::builder_with_provider(Arc::new(
-            rustls::crypto::ring::default_provider(),
-        ))
-        .with_safe_default_protocol_versions()
-        .map_err(|e| GetError::Tls(e.to_string()))?
-        .with_root_certificates(roots)
-        .with_no_client_auth();
-        tls.alpn_protocols = vec![b"http/1.1".to_vec()];
-        Ok(Self::with_parts(resolver, Arc::new(tls), allow))
+        let tls = trusting_tls(ca_pem).map_err(GetError::Tls)?;
+        Ok(Self::with_parts(resolver, tls, allow))
     }
 
     /// `GET job.url`, answering the body of the final successful response.
