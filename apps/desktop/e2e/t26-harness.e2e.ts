@@ -164,12 +164,37 @@ test('question form: single, multiple and own answers reach the model structured
 }, info) => {
   await openSession(app, page, workspaces, 'questions', 't26-ask', 'Set up the project');
   const form = page.locator('[data-approval-card="question"]');
-  await expect(form.getByTestId('question')).toHaveCount(3);
-  await form.getByLabel('Postgres').check();
+  const question = form.getByTestId('question');
+  const position = form.getByTestId('question-position');
+  // One question at a time, with a pager.
+  await expect(question).toHaveCount(1);
+  await expect(question).toContainText('Which database?');
+  await expect(position).toHaveText('1 / 3');
+  await expect(form.getByTestId('question-submit')).toBeDisabled();
+  await shoot(page, info, 'question-form');
+  // A click on a single-select option moves on by itself.
+  await form.getByText('Postgres', { exact: true }).click();
+  await expect(question).toContainText('Which platforms?');
+  await expect(position).toHaveText('2 / 3');
+  // Several choices stay on the page; Next moves on.
   await form.getByLabel('macOS').check();
   await form.getByLabel('Windows').check();
-  await form.getByTestId('question').nth(2).getByTestId('question-other').fill('PiArc Desktop');
-  await shoot(page, info, 'question-form');
+  await expect(question).toContainText('Which platforms?');
+  await shoot(page, info, 'question-form-multiple');
+  await form.getByTestId('question-submit').click();
+  await expect(question).toContainText('What should the project be called?');
+  // The own answer's field shows once Other is chosen.
+  await expect(form.getByTestId('question-other')).toHaveCount(0);
+  await form.getByTestId('question-other-choice').check();
+  await expect(form.getByTestId('question-other')).toBeFocused();
+  await page.keyboard.type('PiArc Desktop');
+  await expect(form.getByTestId('question-submit')).toHaveText(/Submit answers/u);
+  // The pager goes back with the answers kept.
+  await form.getByTestId('question-prev').click();
+  await expect(form.getByLabel('Windows')).toBeChecked();
+  await form.getByTestId('question-next-page').click();
+  await expect(form.getByTestId('question-other')).toHaveValue('PiArc Desktop');
+  await shoot(page, info, 'question-form-other');
   await form.getByTestId('question-submit').click();
   await idle(page);
   await expect(page.getByTestId('question-row')).toContainText('PiArc Desktop');
