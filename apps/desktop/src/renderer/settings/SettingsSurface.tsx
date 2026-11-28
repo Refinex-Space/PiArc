@@ -1,11 +1,11 @@
 // Settings as a workbench view (ADR-0101): the navigation takes the sidebar's column, the page
 // takes the main area. Registered pages, hash routes and links to a field stay as they were.
-import { Fragment, useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { useApp } from '../app/app-context.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { ManagedBanner, ManagedProvider } from './managed.js';
-import { PageHeadSlot } from './page-head.js';
+import { PageHeadingSlot, PageHeadSlot } from './page-head.js';
 import { SETTINGS_GROUPS, settingsPages } from './registry.js';
 import { SettingsIcon } from './SettingsIcon.js';
 import { searchSettings, SettingsResults, SettingsSearchField } from './SettingsSearch.js';
@@ -38,7 +38,16 @@ export function SettingsSurface({ onClose }: { readonly onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [headSlot, setHeadSlot] = useState<HTMLElement | null>(null);
+  const [headingSlot, setHeadingSlot] = useState<HTMLElement | null>(null);
+  const [headingClaims, setHeadingClaims] = useState(0);
+  const claimHeading = useCallback((on: boolean) => {
+    setHeadingClaims((n) => Math.max(0, n + (on ? 1 : -1)));
+  }, []);
   const content = useRef<HTMLElement>(null);
+  const heading = useMemo(
+    () => ({ slot: headingSlot, claim: claimHeading }),
+    [headingSlot, claimHeading],
+  );
   const results = searchSettings(pages, query, t);
   const searching = query.trim() !== '';
   const chosen = Math.max(0, Math.min(active, results.length - 1));
@@ -216,15 +225,22 @@ export function SettingsSurface({ onClose }: { readonly onClose: () => void }) {
               {page && (
                 <div className="settings-page-body" hidden={searching} key={page.id}>
                   <header className="settings-page-head">
-                    <div className="settings-page-heading">
+                    <div className="settings-page-heading" hidden={headingClaims > 0}>
                       <h2 className="settings-title">{t(page.title)}</h2>
                       <p>{t(page.description)}</p>
                     </div>
+                    <div
+                      className="settings-page-heading"
+                      ref={setHeadingSlot}
+                      hidden={headingClaims === 0}
+                    />
                     <div className="settings-page-actions" ref={setHeadSlot} />
                   </header>
                   <ManagedBanner />
                   <PageHeadSlot.Provider value={headSlot}>
-                    <page.component />
+                    <PageHeadingSlot.Provider value={heading}>
+                      <page.component />
+                    </PageHeadingSlot.Provider>
                   </PageHeadSlot.Provider>
                 </div>
               )}

@@ -1,7 +1,7 @@
 import type { MarketEntry } from '@piarc/protocol';
 import { describe, expect, it } from 'vitest';
 
-import { routeOf } from '../SkillsPage.js';
+import { hashOf, routeOf } from '../SkillsPage.js';
 import { actionOf, parseDetail, parseEvents, parsePage } from './market-data.js';
 
 const entry = (over: Partial<MarketEntry> = {}): MarketEntry => ({
@@ -133,13 +133,29 @@ describe('the entry’s button', () => {
 });
 
 describe('the page address', () => {
-  it('reads the view and the package', () => {
-    expect(routeOf('#/settings/skills')).toEqual({ view: 'installed' });
+  it('reads the view, the tab, the item and the package, and writes them back', () => {
+    expect(routeOf('#/settings/skills')).toEqual({ view: 'installed', tab: 'skills' });
+    expect(routeOf('#/settings/skills?tab=plugins&item=pi-tools')).toEqual({
+      view: 'installed',
+      tab: 'plugins',
+      item: 'pi-tools',
+    });
+    expect(routeOf('#/settings/skills?tab=bogus')).toEqual({ view: 'installed', tab: 'skills' });
     expect(routeOf('#/settings/skills?view=market')).toEqual({ view: 'market' });
     expect(routeOf('#/settings/skills?view=market&package=%40scope%2Fpi-tools')).toEqual({
       view: 'market',
       pkg: '@scope/pi-tools',
     });
-    expect(routeOf('#/settings/skills?view=other&package=x')).toEqual({ view: 'installed' });
+    for (const route of [
+      { view: 'installed', tab: 'skills' },
+      { view: 'installed', tab: 'prompts', item: 'fix it' },
+      { view: 'market', pkg: '@scope/pi-tools' },
+    ] as const) {
+      expect(routeOf(hashOf(route))).toEqual(route);
+    }
+    // The settings view's route accepts every address the page writes.
+    expect(hashOf({ view: 'market', pkg: '@scope/pi-tools' })).toMatch(
+      /^#\/settings\/skills\?[a-zA-Z0-9=&.%_~-]*$/u,
+    );
   });
 });

@@ -1,46 +1,29 @@
-// One market package (ADR-0102): what it is, what it brings, what to watch out for, and its
-// README, read from the registry when it opens (offline: what the catalog cached). Links open
-// through the main process's confirmation; the README renders through `MarkdownView` only (raw
-// HTML stays text, remote images stay host cards).
-import type { MarketDetail as Detail, MarketKind } from '@piarc/protocol';
+// One market package (ADR-0102): its head (kind tile, name, publisher and version, uninstall and
+// the primary action), what to watch out for, its facts and its README, read from the registry
+// when it opens (offline: what the catalog cached). Links open through the main process's
+// confirmation; the README renders through `MarkdownView` only (raw HTML stays text, remote
+// images stay host cards).
+import type { MarketDetail as Detail } from '@piarc/protocol';
 import { useContext, useEffect, useMemo, useState } from 'react';
 
 import { useApp } from '../../app/app-context.js';
 import { Button } from '../../app/Button.js';
-import { ChevronLeftIcon } from '../../shell/icons.js';
 import { reason } from '../../shell/errors.js';
+import { UiContext } from '../../shell/ui.js';
+import { SessionTranscript } from '../../store/transcript.js';
 import { MarkdownView } from '../../transcript/markdown/MarkdownView.js';
+import { parseMarkdown } from '../../transcript/markdown/incremental.js';
+import { revealBidi as reveal } from '../../transcript/reveal.js';
 import {
   createTranscriptServices,
   TranscriptContext,
   type TranscriptView,
 } from '../../transcript/services.js';
-import { UiContext } from '../../shell/ui.js';
-import { SessionTranscript } from '../../store/transcript.js';
-import { parseMarkdown } from '../../transcript/markdown/incremental.js';
-import { revealBidi as reveal } from '../../transcript/reveal.js';
-import { SettingsRow, SettingsSection } from '../layout.js';
+import { DetailHead, InfoSection, type InfoItem } from '../catalog.js';
 import { hintId, UninstallButton } from '../PluginsSection.js';
 import { MarketAction, type MarketRun, type MarketTarget } from './MarketAction.js';
+import { entryTile, kindsText } from './market-kinds.js';
 import { parseDetail } from './market-data.js';
-
-const KIND_ORDER: readonly MarketKind[] = ['extension', 'skill', 'prompt', 'theme'];
-
-export function KindBadges({ kinds }: { readonly kinds: readonly MarketKind[] }) {
-  const { t } = useApp();
-  if (kinds.length === 0) {
-    return <span className="market-kind is-unknown">{t('market.kindUnknown')}</span>;
-  }
-  return (
-    <>
-      {KIND_ORDER.filter((k) => kinds.includes(k)).map((k) => (
-        <span key={k} className={`market-kind is-${k}`} data-kind={k}>
-          {t(`market.kind.${k}`)}
-        </span>
-      ))}
-    </>
-  );
-}
 
 function Readme({ text, truncated }: { readonly text: string; readonly truncated: boolean }) {
   const { t } = useApp();
@@ -65,7 +48,7 @@ function Readme({ text, truncated }: { readonly text: string; readonly truncated
           <MarkdownView blocks={blocks} />
         </TranscriptContext.Provider>
       </div>
-      {truncated && <p className="market-note">{t('market.detail.readmeTruncated')}</p>}
+      {truncated && <p className="catalog-note">{t('market.detail.readmeTruncated')}</p>}
       {long && (
         <Button
           variant="ghost"
@@ -88,7 +71,6 @@ export function MarketDetail({
   busy,
   run,
   revision,
-  onBack,
 }: {
   readonly name: string;
   readonly target: MarketTarget;
@@ -96,7 +78,6 @@ export function MarketDetail({
   readonly run: MarketRun;
   /** Changes when the market changed (installs, kinds): the details are read again. */
   readonly revision: number;
-  readonly onBack: () => void;
 }) {
   const { t, format } = useApp();
   const [detail, setDetail] = useState<Detail | undefined>(undefined);
@@ -120,11 +101,21 @@ export function MarketDetail({
     };
   }, [name, target.workspace, revision]);
   const entry = detail?.entry;
+  if (entry === undefined) {
+    return error === '' ? (
+      <p className="catalog-notice is-plain">{t('market.detail.loading')}</p>
+    ) : (
+      <p className="catalog-notice is-danger" role="alert">
+        {error}
+      </p>
+    );
+  }
   const link = (url: string | null | undefined, label: string, testId: string) =>
     url == null ? null : (
-      <Button
-        variant="ghost"
-        size="small"
+      <button
+        key={testId}
+        type="button"
+        className="catalog-link"
         data-testid={testId}
         data-tooltip={url}
         onClick={() => {
@@ -132,136 +123,146 @@ export function MarketDetail({
         }}
       >
         {label}
-      </Button>
-    );
-  return (
-    <div className="market-detail" data-testid="market-detail" data-name={name}>
-      <button type="button" className="market-back" data-testid="market-back" onClick={onBack}>
-        <ChevronLeftIcon />
-        {t('market.back')}
       </button>
-      {error !== '' && (
-        <p className="error-text" role="alert">
-          {error}
+    );
+  const links = [
+    link(detail?.npmUrl, t('market.detail.npm'), 'market-link-npm'),
+    link(detail?.repositoryUrl, t('market.detail.repository'), 'market-link-repository'),
+    link(detail?.homepageUrl, t('market.detail.homepage'), 'market-link-homepage'),
+  ].filter((l) => l !== null);
+  const keywords = detail?.keywords ?? [];
+  const facts: InfoItem[] = [
+    { label: t('market.detail.kinds'), value: kindsText(t, entry) || t('market.kindUnknown') },
+    { label: t('catalog.about.version'), value: entry.version },
+    { label: t('market.detail.publisher'), value: reveal(entry.publisher) || '—' },
+    { label: t('market.detail.downloads'), value: format.number(entry.downloadsMonthly) },
+    ...(entry.updated > 0
+      ? [{ label: t('catalog.about.updated'), value: format.dateTime(entry.updated) }]
+      : []),
+    { label: t('market.detail.license'), value: detail?.license ?? '—' },
+    {
+      label: t('market.detail.dependencies'),
+      value: (
+        <span
+          data-tooltip={detail?.dependencies.length ? detail.dependencies.join(', ') : undefined}
+        >
+          {t('market.dependencies', { count: detail?.dependencies.length ?? 0 })}
+        </span>
+      ),
+    },
+    ...(keywords.length > 0
+      ? [
+          {
+            label: t('market.detail.keywords'),
+            value: (
+              <span className="catalog-chips">
+                {keywords.slice(0, 12).map((k) => (
+                  <span key={k} className="catalog-chip">
+                    {reveal(k)}
+                  </span>
+                ))}
+              </span>
+            ),
+          },
+        ]
+      : []),
+    ...(links.length > 0
+      ? [{ label: t('market.detail.links'), value: <span className="catalog-links">{links}</span> }]
+      : []),
+  ];
+  const warnings: { text: string; danger: boolean }[] = [];
+  if (detail?.problem != null) warnings.push({ text: t('market.detail.offline'), danger: false });
+  if (entry.insecure) warnings.push({ text: t('market.insecure'), danger: true });
+  if (entry.deprecated) {
+    warnings.push({
+      text: t('market.warn.deprecated', { message: reveal(detail?.deprecatedMessage ?? '') }),
+      danger: true,
+    });
+  }
+  if ((detail?.foreignDependencies.length ?? 0) > 0) {
+    warnings.push({
+      text: t('market.warn.foreign', { list: detail?.foreignDependencies.join(', ') ?? '' }),
+      danger: true,
+    });
+  }
+  if ((detail?.installScripts.length ?? 0) > 0) {
+    warnings.push({
+      text: t('market.warn.scripts', { list: detail?.installScripts.join(', ') ?? '' }),
+      danger: false,
+    });
+  }
+  if (entry.kinds.includes('theme')) warnings.push({ text: t('market.warn.theme'), danger: false });
+  return (
+    <div className="catalog-detail" data-testid="market-detail" data-name={name}>
+      <DetailHead
+        kind={entryTile(entry)}
+        title={reveal(entry.name)}
+        subtitle={[
+          reveal(entry.publisher),
+          `v${entry.version}`,
+          entry.updated > 0
+            ? t('market.updatedAgo', { when: format.relative(entry.updated, Date.now()) })
+            : '',
+        ]
+          .filter((part) => part !== '')
+          .join(' · ')}
+        actions={
+          <>
+            {entry.installed != null && (
+              <UninstallButton
+                name={entry.installed.id}
+                sure={sure}
+                busy={busy || entry.installing}
+                onSure={setSure}
+                onUninstall={() => {
+                  const id = entry.installed?.id ?? '';
+                  run(name, t('market.uninstalling', { name }), async () => {
+                    await window.piarc.uninstallPackage(id, target.workspace);
+                    return t('market.uninstalled', { name });
+                  });
+                }}
+              />
+            )}
+            <MarketAction entry={entry} target={target} busy={busy} run={run} size="page" />
+          </>
+        }
+      />
+      {sure && entry.installed != null && (
+        <p
+          className="package-uninstall-hint"
+          id={hintId(entry.installed.id)}
+          data-testid="package-uninstall-hint"
+        >
+          {t('plugins.uninstallConfirmHint')}
         </p>
       )}
-      {entry === undefined ? (
-        error === '' && <p className="market-note">{t('market.detail.loading')}</p>
-      ) : (
-        <>
-          <header className="market-detail-head">
-            <div className="market-detail-title">
-              <h2>{reveal(entry.name)}</h2>
-              <p>{reveal(entry.description)}</p>
-              <p className="market-meta">
-                {[
-                  `v${entry.version}`,
-                  reveal(entry.publisher),
-                  entry.updated > 0
-                    ? t('market.updatedAgo', { when: format.relative(entry.updated, Date.now()) })
-                    : null,
-                ]
-                  .filter((part) => part !== null && part !== '')
-                  .join(' · ')}
-              </p>
-            </div>
-            <span className="market-detail-actions">
-              {entry.installed != null && (
-                <UninstallButton
-                  name={entry.installed.id}
-                  sure={sure}
-                  busy={busy || entry.installing}
-                  onSure={setSure}
-                  onUninstall={() => {
-                    const id = entry.installed?.id ?? '';
-                    run(name, t('market.uninstalling', { name }), async () => {
-                      await window.piarc.uninstallPackage(id, target.workspace);
-                      return t('market.uninstalled', { name });
-                    });
-                  }}
-                />
-              )}
-              <MarketAction entry={entry} target={target} busy={busy} run={run} size="regular" />
-            </span>
-          </header>
-          {sure && entry.installed != null && (
-            <p
-              className="package-uninstall-hint"
-              id={hintId(entry.installed.id)}
-              data-testid="package-uninstall-hint"
-            >
-              {t('plugins.uninstallConfirmHint')}
-            </p>
-          )}
-          <ul className="market-warnings" data-testid="market-warnings">
-            {detail?.problem != null && <li>{t('market.detail.offline')}</li>}
-            {entry.insecure && <li className="is-danger">{t('market.insecure')}</li>}
-            {entry.deprecated && (
-              <li className="is-danger">
-                {t('market.warn.deprecated', {
-                  message: reveal(detail?.deprecatedMessage ?? ''),
-                })}
-              </li>
-            )}
-            {(detail?.foreignDependencies.length ?? 0) > 0 && (
-              <li className="is-danger">
-                {t('market.warn.foreign', { list: detail?.foreignDependencies.join(', ') ?? '' })}
-              </li>
-            )}
-            {(detail?.installScripts.length ?? 0) > 0 && (
-              <li>{t('market.warn.scripts', { list: detail?.installScripts.join(', ') ?? '' })}</li>
-            )}
-            {entry.kinds.includes('theme') && <li>{t('market.warn.theme')}</li>}
-          </ul>
-          <SettingsSection title={t('market.detail.about')} testId="market-facts">
-            <SettingsRow label={t('market.detail.kinds')}>
-              <span className="market-kinds">
-                <KindBadges kinds={entry.kinds} />
-              </span>
-            </SettingsRow>
-            <SettingsRow label={t('market.detail.downloads')}>
-              <span className="market-fact">{format.number(entry.downloadsMonthly)}</span>
-            </SettingsRow>
-            <SettingsRow label={t('market.detail.license')}>
-              <span className="market-fact">{detail?.license ?? '—'}</span>
-            </SettingsRow>
-            <SettingsRow label={t('market.detail.dependencies')}>
-              <span
-                className="market-fact"
-                data-tooltip={
-                  detail?.dependencies.length ? detail.dependencies.join(', ') : undefined
-                }
-              >
-                {t('market.dependencies', { count: detail?.dependencies.length ?? 0 })}
-              </span>
-            </SettingsRow>
-            <SettingsRow label={t('market.detail.links')}>
-              <span className="market-links">
-                {link(detail?.npmUrl, t('market.detail.npm'), 'market-link-npm')}
-                {link(
-                  detail?.repositoryUrl,
-                  t('market.detail.repository'),
-                  'market-link-repository',
-                )}
-                {link(detail?.homepageUrl, t('market.detail.homepage'), 'market-link-homepage')}
-              </span>
-            </SettingsRow>
-          </SettingsSection>
-          <SettingsSection title={t('market.detail.readme')} testId="market-readme-section">
-            {detail?.readme != null ? (
-              <Readme text={detail.readme} truncated={detail.readmeTruncated} />
-            ) : (
-              <p className="market-note">
-                {t(
-                  detail?.readmeTooLarge === true
-                    ? 'market.detail.readmeTooLarge'
-                    : 'market.detail.noReadme',
-                )}
-              </p>
-            )}
-          </SettingsSection>
-        </>
+      {entry.description !== '' && (
+        <p className="catalog-detail-description">{reveal(entry.description)}</p>
       )}
+      {warnings.length > 0 && (
+        <ul
+          className={`catalog-warnings${warnings.some((w) => w.danger) ? ' is-danger' : ''}`}
+          data-testid="market-warnings"
+        >
+          {warnings.map((w) => (
+            <li key={w.text}>{w.text}</li>
+          ))}
+        </ul>
+      )}
+      <InfoSection title={t('catalog.section.info')} items={facts} testId="market-facts" />
+      <InfoSection title={t('market.detail.readme')} testId="market-readme-section">
+        {detail?.readme != null ? (
+          <Readme text={detail.readme} truncated={detail.readmeTruncated} />
+        ) : (
+          <p className="catalog-note">
+            {t(
+              detail?.readmeTooLarge === true
+                ? 'market.detail.readmeTooLarge'
+                : 'market.detail.noReadme',
+            )}
+          </p>
+        )}
+      </InfoSection>
     </div>
   );
 }

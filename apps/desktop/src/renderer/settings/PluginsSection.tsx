@@ -1,7 +1,8 @@
-// Extension packages on the "Skills & plugins" page (T40): what is installed, where it applies,
-// what it brings and what PiArc does not support; installing from a folder, a git URL or an
-// npm spec; turning a package on or off (the main process confirms its source and executable
-// items natively first), reviewing items an update added, updating and uninstalling.
+// Extension packages on the "Skills & plugins" page (T40, ADR-0102): the installed packages as
+// rows (on or off at a glance), a package's page (what it brings, where it came from, what PiArc
+// does not support; update, uninstall, review new items), the Pi extensions they bring, and the
+// install dialog (a folder, a git URL or an npm spec). Turning a package on goes through the main
+// process's native confirmation of its source and executable items.
 import type {
   PackageComponents,
   PackageExecutable,
@@ -15,12 +16,17 @@ import type { MessageId } from '../../shared/i18n/index.js';
 import { useApp } from '../app/app-context.js';
 import { ManagedBadge, pointerToken, useIsManaged } from './managed.js';
 import { Button } from '../app/Button.js';
-import { SettingsInfo, SettingsSection } from './layout.js';
 import { reason } from '../shell/errors.js';
 import { Dialog } from '../shell/Dialog.js';
-import { ChevronDownIcon, PlusIcon } from '../shell/icons.js';
 import { SegmentedControl } from '../app/SegmentedControl.js';
-import { RowMenu } from './ConnectionList.js';
+import {
+  CatalogEmpty,
+  CatalogList,
+  CatalogRow,
+  DetailHead,
+  InfoSection,
+  type InfoItem,
+} from './catalog.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -75,6 +81,8 @@ function packageOf(raw: unknown): PackageInfo | undefined {
   const text = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
   const commit = text(source.commit);
   const version = text(source.version);
+  const integrity = text(source.integrity);
+  const npmName = text(source.npmName);
   const description = text(raw.description);
   return {
     id: raw.id,
@@ -85,6 +93,9 @@ function packageOf(raw: unknown): PackageInfo | undefined {
       location,
       ...(commit === undefined ? {} : { commit }),
       ...(version === undefined ? {} : { version }),
+      ...(integrity === undefined ? {} : { integrity }),
+      ...(npmName === undefined ? {} : { npmName }),
+      installScripts: strings(source.installScripts),
     },
     path: raw.path,
     ...(scope === undefined ? {} : { scope }),
@@ -129,13 +140,6 @@ const COMPONENT_LABELS: readonly [keyof PackageComponents, MessageId][] = [
 
 function shortCommit(commit: string | undefined): string {
   return commit === undefined ? '' : commit.slice(0, 10);
-}
-
-interface RowProps {
-  readonly pkg: PackageInfo;
-  readonly busy: boolean;
-  readonly act: (label: string, run: () => Promise<string>, done?: (ok: boolean) => void) => void;
-  readonly workspace: string | null;
 }
 
 export const hintId = (name: string) => `uninstall-hint-${name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
@@ -214,134 +218,435 @@ export function UninstallButton({
   );
 }
 
-function PackageRow({ pkg, busy, act, workspace }: RowProps) {
+export type PackageAct = (
+  label: string,
+  run: () => Promise<string>,
+  done?: (ok: boolean) => void,
+) => void;
+
+/** The installed packages for `workspace` (the user settings when null) and the one way to act on
+ * them: one operation at a time, its outcome as a status line, the list read again after it. */
+export function usePackages(workspace: string | null) {
   const { t } = useApp();
-  const [sure, setSure] = useState(false);
-  const pending = (pkg.executables ?? []).filter((e) => !e.confirmed);
-  const state = pkg.active
+  const [list, setList] = useState<PackagesList | undefined>(undefined);
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const [operation, setOperation] = useState<string>();
+  const load = useCallback(() => {
+    window.piarc
+      .listPackages(workspace)
+      .then((raw) => {
+        setList(parsePackages(raw));
+        setError('');
+      })
+      .catch((e: unknown) => {
+        setError(t('plugins.failed', { reason: reason(e) }));
+      });
+  }, [workspace, t]);
+  useEffect(load, [load]);
+  const act: PackageAct = useCallback(
+    (label, run, done) => {
+      setOperation(label);
+      setStatus('');
+      run()
+        .then((raw) => {
+          if (isCancelled(raw)) {
+            setStatus(t('plugins.cancelled'));
+            done?.(false);
+            return;
+          }
+          done?.(true);
+          const value: unknown = JSON.parse(raw);
+          if (isRecord(value) && isRecord(value.package)) {
+            const pkg = packageOf(value.package);
+            const from =
+              typeof value.previousCommit === 'string'
+                ? shortCommit(value.previousCommit)
+                : typeof value.previousVersion === 'string'
+                  ? value.previousVersion
+                  : undefined;
+            if (pkg !== undefined) {
+              setStatus(
+                from === undefined
+                  ? t('plugins.installed', { id: pkg.id })
+                  : t('plugins.updated', {
+                      id: pkg.id,
+                      from,
+                      to: shortCommit(pkg.source.commit ?? undefined) || (pkg.source.version ?? ''),
+                    }),
+              );
+            }
+            const notes = strings(value.notes);
+            if (notes.length > 0) setStatus((s) => `${s} ${notes.join(' ')}`);
+          }
+        })
+        .catch((e: unknown) => {
+          setStatus(`${label}: ${reason(e)}`);
+          done?.(false);
+        })
+        .finally(() => {
+          setOperation(undefined);
+          load();
+        });
+    },
+    [load, t],
+  );
+  return { list, error, status, operation, busy: operation !== undefined, act, load };
+}
+
+export type Packages = ReturnType<typeof usePackages>;
+
+/** What the switch of a package says for the workspace shown. */
+export function packageState(t: (id: MessageId) => string, pkg: PackageInfo): string {
+  return pkg.active
     ? t('plugins.state.on')
     : pkg.enabled
       ? t('plugins.state.waiting')
       : pkg.scope === undefined
         ? t('plugins.state.undeclared')
         : t('plugins.state.off');
-  const scope: PackageScope = pkg.scope ?? 'user';
-  const where = scope === 'project' ? workspace : null;
-  const source = [
-    t(`plugins.kind.${pkg.source.kind}`),
-    pkg.source.location,
-    shortCommit(pkg.source.commit ?? undefined),
-    pkg.source.version ?? '',
-  ]
-    .filter((part) => part !== '')
-    .join(' · ');
+}
+
+/** The status line of the last operation and the list's error, above the rows. */
+export function PackageNotices({ packages }: { readonly packages: Packages }) {
+  return (
+    <>
+      {packages.status !== '' && (
+        <p className="catalog-notice is-plain" data-testid="package-status" role="status">
+          {packages.status}
+        </p>
+      )}
+      {packages.error !== '' && (
+        <p className="catalog-notice is-danger" role="alert">
+          {packages.error}
+        </p>
+      )}
+    </>
+  );
+}
+
+function PackageSwitch({
+  pkg,
+  packages,
+  workspace,
+}: {
+  readonly pkg: PackageInfo;
+  readonly packages: Packages;
+  readonly workspace: string | null;
+}) {
+  const { t } = useApp();
   // T47: a package the organization's settings switch on or off stays as they say.
   const managed = useIsManaged(`/plugins/${pointerToken(pkg.id)}`);
+  const scope: PackageScope = pkg.scope ?? 'user';
+  const where = scope === 'project' ? workspace : null;
   return (
-    <li
-      className="package-row"
-      data-testid="package-row"
-      data-id={pkg.id}
-      data-active={pkg.active || undefined}
-    >
-      <details className="package-details">
-        <summary className="package-summary">
-          <span className="package-text">
-            <span className="package-name">
-              <span className="mono-text">{pkg.id}</span>
-              <span className="settings-badge" data-testid="package-type">
-                {t(`plugins.type.${pkg.kind}`)}
-              </span>
-              {managed && <ManagedBadge testId="managed-package" />}
-            </span>
-            {pkg.description == null ? null : (
-              <span className="package-description">{pkg.description}</span>
-            )}
-            <span className="package-meta">
-              <span data-testid="package-state">{state}</span>
-              {' · '}
-              {t(scope === 'project' ? 'plugins.scope.project' : 'plugins.scope.user')}
-              {' · '}
-              {t(`plugins.kind.${pkg.source.kind}`)}
-            </span>
-          </span>
-          <span className="diagnostics-chevron">
-            <ChevronDownIcon />
-          </span>
-        </summary>
-        <div className="package-body">
-          <p className="mono-text package-source" data-testid="package-source">
-            {source}
-          </p>
-          <ul className="package-components" data-testid="package-components">
-            {COMPONENT_LABELS.flatMap(([key, label]) => {
-              const names = pkg.components[key] ?? [];
-              return names.length === 0
-                ? []
-                : [
-                    <li key={key}>
-                      {t(label)}: {names.join(', ')}
-                    </li>,
-                  ];
-            })}
-          </ul>
-          {(pkg.unsupported ?? []).length === 0 ? null : (
-            <p className="package-note" data-testid="package-unsupported">
-              {t('plugins.unsupported', { list: (pkg.unsupported ?? []).join(', ') })}
-            </p>
-          )}
-        </div>
-      </details>
-      <div className="package-actions">
-        {pending.length === 0 || !pkg.enabled ? null : (
-          <Button
-            size="small"
-            data-testid="package-review"
-            disabled={busy}
-            onClick={() => {
-              act(pkg.id, () => window.piarc.confirmPackage(pkg.id, where));
+    <>
+      {managed && <ManagedBadge testId="managed-package" />}
+      <input
+        type="checkbox"
+        className="preference-switch"
+        checked={pkg.enabled}
+        disabled={packages.busy || managed}
+        aria-label={t('plugins.enabledNamed', { id: pkg.id })}
+        data-testid={pkg.enabled ? 'package-off' : 'package-on'}
+        onChange={(e) => {
+          const on = e.currentTarget.checked;
+          packages.act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, on, scope, where));
+        }}
+      />
+    </>
+  );
+}
+
+/** The installed packages as rows: name, type, one line, state and switch; a row opens its page. */
+export function PackageRows({
+  packages,
+  workspace,
+  query,
+  onOpen,
+}: {
+  readonly packages: Packages;
+  readonly workspace: string | null;
+  readonly query: string;
+  readonly onOpen: (id: string) => void;
+}) {
+  const { t } = useApp();
+  const list = packages.list;
+  if (list === undefined) return null;
+  const needle = query.trim().toLowerCase();
+  const shown = list.packages.filter(
+    (p) =>
+      needle === '' ||
+      p.id.toLowerCase().includes(needle) ||
+      (p.description ?? '').toLowerCase().includes(needle),
+  );
+  if (list.packages.length === 0) {
+    return <CatalogEmpty testId="package-empty">{t('plugins.none')}</CatalogEmpty>;
+  }
+  if (shown.length === 0) return <CatalogEmpty>{t('catalog.noMatch')}</CatalogEmpty>;
+  return (
+    <CatalogList testId="package-list">
+      {shown.map((pkg) => {
+        const pending = (pkg.executables ?? []).filter((e) => !e.confirmed).length;
+        return (
+          <CatalogRow
+            key={pkg.id}
+            kind="package"
+            testId="package-row"
+            data={{ id: pkg.id, active: pkg.active ? 'true' : undefined }}
+            title={pkg.id}
+            note={
+              pending > 0 && pkg.enabled ? (
+                <span className="catalog-row-note is-attention" data-testid="package-pending-note">
+                  {t('plugins.pending', { count: pending })}
+                </span>
+              ) : (
+                <span data-testid="package-type">{t(`plugins.type.${pkg.kind}`)}</span>
+              )
+            }
+            description={
+              pkg.description ??
+              [t(`plugins.kind.${pkg.source.kind}`), pkg.source.version ?? '']
+                .filter((part) => part !== '')
+                .join(' · ')
+            }
+            openLabel={t('catalog.open', { name: pkg.id })}
+            onOpen={() => {
+              onOpen(pkg.id);
             }}
-          >
-            {t('plugins.review')}
-          </Button>
-        )}
-        <input
-          type="checkbox"
-          className="preference-switch"
-          checked={pkg.enabled}
-          disabled={busy || managed}
-          aria-label={t('plugins.enabledNamed', { id: pkg.id })}
-          data-testid={pkg.enabled ? 'package-off' : 'package-on'}
-          onChange={(e) => {
-            const on = e.currentTarget.checked;
-            act(pkg.id, () => window.piarc.setPackageEnabled(pkg.id, on, scope, where));
+            trailing={
+              <>
+                <span className="catalog-row-meta" data-testid="package-state">
+                  {packageState(t, pkg)}
+                </span>
+                <PackageSwitch pkg={pkg} packages={packages} workspace={workspace} />
+              </>
+            }
+          />
+        );
+      })}
+    </CatalogList>
+  );
+}
+
+/** The Pi extensions the installed packages bring; a row opens its package's page. */
+export function ExtensionRows({
+  packages,
+  query,
+  onOpen,
+}: {
+  readonly packages: Packages;
+  readonly query: string;
+  readonly onOpen: (id: string) => void;
+}) {
+  const { t } = useApp();
+  const list = packages.list;
+  if (list === undefined) return null;
+  const all = list.packages.flatMap((pkg) =>
+    (pkg.components.extensions ?? []).map((entry) => ({ pkg, entry })),
+  );
+  const needle = query.trim().toLowerCase();
+  const shown = all.filter(
+    ({ pkg, entry }) =>
+      needle === '' ||
+      entry.toLowerCase().includes(needle) ||
+      pkg.id.toLowerCase().includes(needle),
+  );
+  if (all.length === 0) {
+    return <CatalogEmpty testId="extension-empty">{t('catalog.extensions.none')}</CatalogEmpty>;
+  }
+  if (shown.length === 0) return <CatalogEmpty>{t('catalog.noMatch')}</CatalogEmpty>;
+  return (
+    <CatalogList testId="extension-list">
+      {shown.map(({ pkg, entry }) => (
+        <CatalogRow
+          key={`${pkg.id}/${entry}`}
+          kind="extension"
+          testId="extension-row"
+          data={{ name: entry, package: pkg.id }}
+          title={entry}
+          note={pkg.id}
+          description={pkg.description ?? t('catalog.extensions.from', { id: pkg.id })}
+          openLabel={t('catalog.open', { name: pkg.id })}
+          onOpen={() => {
+            onOpen(pkg.id);
           }}
+          trailing={<span className="catalog-row-meta">{packageState(t, pkg)}</span>}
         />
-        <UninstallButton
-          name={pkg.id}
-          sure={sure}
-          busy={busy}
-          onSure={setSure}
-          onUninstall={() => {
-            act(pkg.id, () => window.piarc.uninstallPackage(pkg.id, workspace));
-          }}
-        />
-        <RowMenu
-          label={t('plugins.more', { id: pkg.id })}
-          testId={`package-more-${pkg.id}`}
-          disabled={busy}
-          items={[
-            {
-              id: 'update',
-              testId: 'package-update',
-              label: t('plugins.update'),
-              run: () => {
-                act(pkg.id, () => window.piarc.updatePackage(pkg.id, where));
-              },
-            },
-          ]}
-        />
-      </div>
+      ))}
+    </CatalogList>
+  );
+}
+
+/** An npm package name (the ids the market can install). */
+const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+
+/** Packages the settings turn on that are not installed, with the market's install for npm names. */
+export function MissingPackages({
+  packages,
+  onMarket,
+}: {
+  readonly packages: Packages;
+  readonly onMarket: (name: string) => void;
+}) {
+  const { t } = useApp();
+  const missing = packages.list?.missing ?? [];
+  if (missing.length === 0) return null;
+  return (
+    <ul className="catalog-warnings package-missing" data-testid="package-missing">
+      {missing.map((id) => (
+        <li key={id} data-id={id}>
+          <span className="package-missing-text">{t('plugins.missingOne', { id })}</span>
+          {NPM_NAME.test(id) && (
+            <button
+              type="button"
+              className="catalog-link"
+              data-testid="package-missing-market"
+              onClick={() => {
+                onMarket(id);
+              }}
+            >
+              {t('plugins.installFromMarket')}
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A package's page: its head with update and uninstall, what it brings, where it came from. */
+export function PackageDetail({
+  id,
+  packages,
+  workspace,
+  onGone,
+}: {
+  readonly id: string;
+  readonly packages: Packages;
+  readonly workspace: string | null;
+  /** The package is no longer installed (uninstalled here or elsewhere). */
+  readonly onGone: () => void;
+}) {
+  const { t, format } = useApp();
+  const [sure, setSure] = useState(false);
+  const pkg = packages.list?.packages.find((p) => p.id === id);
+  useEffect(() => {
+    if (packages.list !== undefined && pkg === undefined) onGone();
+  }, [packages.list, pkg, onGone]);
+  if (pkg === undefined) return null;
+  const pending = (pkg.executables ?? []).filter((e) => !e.confirmed);
+  const scope: PackageScope = pkg.scope ?? 'user';
+  const where = scope === 'project' ? workspace : null;
+  const components = COMPONENT_LABELS.flatMap(([key, label]) => {
+    const names = pkg.components[key] ?? [];
+    return names.length === 0 ? [] : [{ label: t(label), value: names.join(', ') }];
+  });
+  const about: InfoItem[] = [
+    { label: t('catalog.about.type'), value: t(`plugins.type.${pkg.kind}`) },
+    {
+      label: t('catalog.about.source'),
+      value: (
+        <span>
+          {t(`plugins.kind.${pkg.source.kind}`)}
+          {' · '}
+          <span className="mono-text" data-testid="package-source">
+            {pkg.source.location}
+          </span>
+        </span>
+      ),
+    },
+    ...(pkg.source.version == null
+      ? []
+      : [{ label: t('catalog.about.version'), value: pkg.source.version }]),
+    ...(pkg.source.commit == null
+      ? []
+      : [
+          {
+            label: t('catalog.about.commit'),
+            value: <span className="mono-text">{shortCommit(pkg.source.commit)}</span>,
+          },
+        ]),
+    ...(pkg.source.integrity == null
+      ? []
+      : [
+          {
+            label: t('catalog.about.integrity'),
+            value: <span className="mono-text">{pkg.source.integrity}</span>,
+          },
+        ]),
+    {
+      label: t('catalog.about.scope'),
+      value:
+        pkg.scope === undefined
+          ? t('plugins.state.undeclared')
+          : t(pkg.scope === 'project' ? 'plugins.scope.project' : 'plugins.scope.user'),
+    },
+    ...(pkg.installedAt > 0
+      ? [{ label: t('catalog.about.installed'), value: format.dateTime(pkg.installedAt) }]
+      : []),
+    ...(pkg.updatedAt > 0 && pkg.updatedAt !== pkg.installedAt
+      ? [{ label: t('catalog.about.updated'), value: format.dateTime(pkg.updatedAt) }]
+      : []),
+    ...(pkg.path === pkg.source.location
+      ? []
+      : [
+          {
+            label: t('catalog.about.path'),
+            value: <span className="mono-text">{pkg.path}</span>,
+          },
+        ]),
+  ];
+  return (
+    <div className="catalog-detail" data-testid="package-detail" data-id={pkg.id}>
+      <DetailHead
+        kind="package"
+        title={pkg.id}
+        subtitle={[t(`plugins.type.${pkg.kind}`), pkg.description ?? '']
+          .filter((part) => part !== '')
+          .join(' · ')}
+        actions={
+          <>
+            {pending.length > 0 && pkg.enabled && (
+              <Button
+                size="small"
+                data-testid="package-review"
+                disabled={packages.busy}
+                onClick={() => {
+                  packages.act(pkg.id, () => window.piarc.confirmPackage(pkg.id, where));
+                }}
+              >
+                {t('plugins.review')}
+              </Button>
+            )}
+            <Button
+              size="small"
+              data-testid="package-update"
+              disabled={packages.busy}
+              onClick={() => {
+                packages.act(pkg.id, () => window.piarc.updatePackage(pkg.id, where));
+              }}
+            >
+              {t('plugins.update')}
+            </Button>
+            <UninstallButton
+              name={pkg.id}
+              sure={sure}
+              busy={packages.busy}
+              onSure={setSure}
+              onUninstall={() => {
+                packages.act(pkg.id, () => window.piarc.uninstallPackage(pkg.id, workspace));
+              }}
+            />
+            <span className="catalog-switch">
+              <span className="catalog-row-meta" data-testid="package-state">
+                {packageState(t, pkg)}
+              </span>
+              <PackageSwitch pkg={pkg} packages={packages} workspace={workspace} />
+            </span>
+          </>
+        }
+      />
       {sure && (
         <p
           className="package-uninstall-hint"
@@ -351,23 +656,38 @@ function PackageRow({ pkg, busy, act, workspace }: RowProps) {
           {t('plugins.uninstallConfirmHint')}
         </p>
       )}
-      {pending.length === 0 || !pkg.enabled ? null : (
-        <p className="package-alert" data-testid="package-pending">
-          {t('plugins.pending', { count: pending.length })}
-        </p>
+      <PackageNotices packages={packages} />
+      {(pending.length > 0 && pkg.enabled) || (pkg.issues ?? []).length > 0 ? (
+        <ul className={`catalog-warnings${(pkg.issues ?? []).length > 0 ? ' is-danger' : ''}`}>
+          {pending.length > 0 && pkg.enabled && (
+            <li data-testid="package-pending">{t('plugins.pending', { count: pending.length })}</li>
+          )}
+          {(pkg.issues ?? []).map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
+      ) : null}
+      {components.length > 0 && (
+        <InfoSection
+          title={t('catalog.section.brings')}
+          items={components}
+          testId="package-components"
+        />
       )}
-      {(pkg.issues ?? []).map((issue) => (
-        <p key={issue} className="package-alert">
-          {issue}
-        </p>
-      ))}
-    </li>
+      <InfoSection title={t('catalog.section.about')} items={about} testId="package-about">
+        {(pkg.unsupported ?? []).length > 0 && (
+          <p className="catalog-note" data-testid="package-unsupported">
+            {t('plugins.unsupported', { list: (pkg.unsupported ?? []).join(', ') })}
+          </p>
+        )}
+      </InfoSection>
+    </div>
   );
 }
 
 type SourceKind = 'directory' | 'git' | 'npm';
 
-function InstallDialog({
+export function InstallDialog({
   workspace,
   operation,
   act,
@@ -502,160 +822,5 @@ function InstallDialog({
         </div>
       </form>
     </Dialog>
-  );
-}
-
-/** The extension packages of the page, for `workspace` (or the user settings when null). */
-/** An npm package name (the ids the market can install). */
-const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
-
-export function PluginsSection({
-  workspace,
-  onMarket,
-}: {
-  readonly workspace: string | null;
-  /** Shows a package in the market (a declared package that is not installed). */
-  readonly onMarket?: (name: string) => void;
-}) {
-  const { t } = useApp();
-  const [list, setList] = useState<PackagesList | undefined>(undefined);
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
-  const [operation, setOperation] = useState<string>();
-  const [installing, setInstalling] = useState(false);
-  const busy = operation !== undefined;
-  const load = useCallback(() => {
-    window.piarc
-      .listPackages(workspace)
-      .then((raw) => {
-        setList(parsePackages(raw));
-        setError('');
-      })
-      .catch((e: unknown) => {
-        setError(t('plugins.failed', { reason: reason(e) }));
-      });
-  }, [workspace, t]);
-  useEffect(load, [load]);
-  const act = useCallback(
-    (label: string, run: () => Promise<string>, done?: (ok: boolean) => void) => {
-      setOperation(label);
-      setStatus('');
-      run()
-        .then((raw) => {
-          if (isCancelled(raw)) {
-            setStatus(t('plugins.cancelled'));
-            done?.(false);
-            return;
-          }
-          done?.(true);
-          const value: unknown = JSON.parse(raw);
-          if (isRecord(value) && isRecord(value.package)) {
-            const pkg = packageOf(value.package);
-            const from =
-              typeof value.previousCommit === 'string'
-                ? shortCommit(value.previousCommit)
-                : typeof value.previousVersion === 'string'
-                  ? value.previousVersion
-                  : undefined;
-            if (pkg !== undefined) {
-              setStatus(
-                from === undefined
-                  ? t('plugins.installed', { id: pkg.id })
-                  : t('plugins.updated', {
-                      id: pkg.id,
-                      from,
-                      to: shortCommit(pkg.source.commit ?? undefined) || (pkg.source.version ?? ''),
-                    }),
-              );
-            }
-            const notes = strings(value.notes);
-            if (notes.length > 0) setStatus((s) => `${s} ${notes.join(' ')}`);
-          }
-        })
-        .catch((e: unknown) => {
-          setStatus(`${label}: ${reason(e)}`);
-          done?.(false);
-        })
-        .finally(() => {
-          setOperation(undefined);
-          load();
-        });
-    },
-    [load, t],
-  );
-  return (
-    <SettingsSection
-      title={t('plugins.title')}
-      testId="plugins-section"
-      aside={<SettingsInfo text={t('plugins.hint')} />}
-    >
-      {status === '' ? null : (
-        <p className="muted small" data-testid="package-status" role="status">
-          {status}
-        </p>
-      )}
-      {error === '' ? null : (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
-      {list === undefined ? null : (
-        <>
-          {list.packages.length === 0 ? (
-            <p className="settings-row-note package-empty">{t('plugins.none')}</p>
-          ) : null}
-          <ul className="package-list" data-testid="package-list">
-            {list.packages.map((pkg) => (
-              <PackageRow key={pkg.id} pkg={pkg} busy={busy} act={act} workspace={workspace} />
-            ))}
-            <li className="mcp-add-row">
-              <button
-                type="button"
-                className="settings-add-link"
-                data-testid="package-install-open"
-                disabled={busy}
-                onClick={() => {
-                  setInstalling(true);
-                }}
-              >
-                <PlusIcon />
-                {t('plugins.installTitle')}
-              </button>
-            </li>
-          </ul>
-          {(list.missing ?? []).length === 0 ? null : (
-            <ul className="package-missing" data-testid="package-missing">
-              {(list.missing ?? []).map((id) => (
-                <li key={id} data-id={id}>
-                  <span className="package-missing-text">{t('plugins.missingOne', { id })}</span>
-                  {onMarket !== undefined && NPM_NAME.test(id) && (
-                    <Button
-                      variant="ghost"
-                      size="small"
-                      data-testid="package-missing-market"
-                      onClick={() => {
-                        onMarket(id);
-                      }}
-                    >
-                      {t('plugins.installFromMarket')}
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-      {installing ? (
-        <InstallDialog
-          workspace={workspace}
-          operation={operation}
-          act={act}
-          onClose={() => {
-            setInstalling(false);
-          }}
-        />
-      ) : null}
-    </SettingsSection>
   );
 }

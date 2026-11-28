@@ -62,13 +62,12 @@ it('shows a package, its warnings and its README as Markdown with raw HTML as te
           busy={false}
           run={() => undefined}
           revision={0}
-          onBack={() => undefined}
         />
       </AppProvider>,
     );
     await vi.advanceTimersByTimeAsync(0);
   });
-  expect(dom.querySelector('h2')?.textContent).toBe('pi-lint-skills');
+  expect(dom.querySelector('.catalog-detail-title h3')?.textContent).toBe('pi-lint-skills');
   const readme = dom.querySelector('[data-testid="market-readme"]');
   expect(readme?.textContent).toContain('Runs lint.');
   expect(readme?.textContent).toContain('<script>x</script>');

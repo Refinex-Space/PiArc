@@ -281,10 +281,16 @@ test('the Skills & plugins page lists skills with source, overrides and warnings
   const list = settings.getByTestId('skill-list');
   await expect(list.locator('[data-name="greet"]')).toBeVisible();
   const fix = list.locator('[data-name="fix"]');
-  await expect(fix.getByTestId('skill-allowed')).toContainText('Bash(git *)');
-  await expect(fix.getByTestId('skill-warnings')).toContainText('unknown-setting');
-  await expect(fix.getByTestId('skill-warnings')).not.toContainText('context');
-  await expect(fix.getByTestId('skill-warnings')).toContainText('!`command`');
-  await expect(settings.getByTestId('output-style-section')).toBeVisible();
+  await expect(fix.getByTestId('skill-warning-note')).toBeVisible();
   await settings.screenshot({ path: info.outputPath('skills-page.png'), fullPage: true });
+  // The skill's page: its pre-approved tools and what PiArc ignores.
+  await fix.getByTestId('skill-row-open').click();
+  const detail = settings.getByTestId('skill-detail');
+  await expect(detail.getByTestId('skill-allowed')).toContainText('Bash(git *)');
+  await expect(detail.getByTestId('skill-warnings')).toContainText('unknown-setting');
+  await expect(detail.getByTestId('skill-warnings')).not.toContainText('context');
+  await expect(detail.getByTestId('skill-warnings')).toContainText('!`command`');
+  await settings.getByTestId('skills-view-installed').click();
+  await settings.getByTestId('skills-tab-styles').check({ force: true });
+  await expect(settings.getByTestId('output-style-section')).toBeVisible();
 });

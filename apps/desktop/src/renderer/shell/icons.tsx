@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ArrowUp,
   Bot,
+  Box,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -27,6 +28,10 @@ import {
   FileCodeCorner,
   FileDiff,
   FileText,
+  Package,
+  Palette,
+  Puzzle,
+  Store,
   Folder,
   Globe,
   GripVertical,
@@ -223,6 +228,15 @@ export const MicIcon = glyph(Mic);
 export const StopDictationIcon = glyph(Square);
 
 // ---- Filled marks Lucide lacks ----
+
+// ---- Skills and packages (ADR-0102): one glyph per kind of thing a catalog lists ----
+
+export const SkillIcon = glyph(Box);
+export const ExtensionIcon = glyph(Puzzle);
+export const PackageIcon = glyph(Package);
+export const PromptIcon = glyph(FileText);
+export const StyleIcon = glyph(Palette);
+export const StoreIcon = glyph(Store);
 
 export const SidebarIcon = () => (
   <svg

@@ -54,10 +54,10 @@ test('browses categories, searches, opens details and comes back to the same lis
   await expect(marketRow(settings, 'pi-lint-skills')).toBeVisible();
 
   // Details: README rendered as Markdown, raw HTML stays text, links go through confirmation.
-  await marketRow(settings, 'pi-lint-skills').getByTestId('market-open').click();
+  await marketRow(settings, 'pi-lint-skills').getByTestId('market-row-open').click();
   const detail = settings.getByTestId('market-detail');
   await detail.waitFor();
-  await expect(detail.locator('h2')).toHaveText('pi-lint-skills');
+  await expect(detail.locator('.catalog-detail-title h3')).toHaveText('pi-lint-skills');
   await expect(settings.getByTestId('market-readme')).toContainText('Runs lint for you.');
   await expect(settings.getByTestId('market-link-repository')).toBeVisible();
   await expect(settings.getByTestId('market-facts')).toContainText('MIT');
@@ -67,7 +67,7 @@ test('browses categories, searches, opens details and comes back to the same lis
   await expect(marketRow(settings, 'pi-lint-skills')).toBeVisible();
 
   // Payloads stay text: nothing runs, the bidi override shows as its code point.
-  await marketRow(settings, 'pi-xss-probe').getByTestId('market-open').click();
+  await marketRow(settings, 'pi-xss-probe').getByTestId('market-row-open').click();
   await expect(settings.getByTestId('market-readme')).toContainText('<script>');
   expect(await page.evaluate(() => (window as { __xss?: number }).__xss)).toBeUndefined();
   await settings.getByTestId('market-back').click();

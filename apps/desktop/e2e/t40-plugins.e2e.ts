@@ -130,12 +130,16 @@ test('packages install off, turn on only after the native confirmation, and list
   const demo = row(settings, 'demo');
   await expect(demo.getByTestId('package-type')).toHaveText('Claude Code plugin');
   await expect(demo.getByTestId('package-state')).toHaveText('Off');
-  await expect(demo.getByTestId('package-components')).toContainText('Commands: demo:hello');
-  await expect(demo.getByTestId('package-components')).toContainText(
-    'MCP servers: plugin_demo_echo',
-  );
+  // The package's page: what it brings and what PiArc does not support.
+  await demo.getByTestId('package-row-open').click();
+  const page1 = settings.getByTestId('package-detail');
+  await expect(page1.getByTestId('package-components')).toContainText('Commands');
+  await expect(page1.getByTestId('package-components')).toContainText('demo:hello');
+  await expect(page1.getByTestId('package-components')).toContainText('plugin_demo_echo');
   // A07: mods and the bin directory are named; the rest of the plugin still loads.
-  await expect(demo.getByTestId('package-unsupported')).toHaveText('Not supported: mods, bin');
+  await expect(page1.getByTestId('package-unsupported')).toHaveText('Not supported: mods, bin');
+  await settings.screenshot({ path: path.join(EVIDENCE, 'package-page-light.png') });
+  await settings.getByTestId('skills-view-installed').click();
 
   // A02: cancelling the native confirmation turns nothing on and starts nothing.
   await answerNext(app, false);
@@ -165,7 +169,9 @@ test('packages install off, turn on only after the native confirmation, and list
   await install(settings, piPackage);
   const pi = row(settings, 'pi-demo');
   await expect(pi.getByTestId('package-type')).toHaveText('Pi package');
-  await expect(pi.getByTestId('package-unsupported')).toHaveText('Not supported: themes');
+  await pi.getByTestId('package-row-open').click();
+  await expect(settings.getByTestId('package-unsupported')).toHaveText('Not supported: themes');
+  await settings.getByTestId('skills-view-installed').click();
   await answerNext(app, true);
   await pi.getByTestId('package-on').click();
   await expect(pi.getByTestId('package-state')).toHaveText('On', { timeout: 15_000 });
@@ -185,7 +191,6 @@ test('packages install off, turn on only after the native confirmation, and list
   await settings.screenshot({ path: path.join(EVIDENCE, 'plugins-section-dark.png') });
   await prefer(page, { key: 'language', value: 'zh-CN' });
   await expect(demo.getByTestId('package-state')).toHaveText('已开启');
-  await expect(demo.getByTestId('package-unsupported')).toHaveText('不支持：mods, bin');
   await settings.screenshot({ path: path.join(EVIDENCE, 'plugins-section-zh-CN-dark.png') });
   await prefer(page, { key: 'appearance.theme', value: 'light' });
   await prefer(page, { key: 'language', value: 'en' });

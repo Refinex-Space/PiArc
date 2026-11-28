@@ -8,6 +8,7 @@ import path from 'node:path';
 import type { ElectronApplication } from '@playwright/test';
 
 import { expect, marketRow, openMarket, test } from './market.js';
+import { openSettings } from './settings-panel.js';
 import { focusMain, makeWorkspace, openFolder, startSession } from './sessions.js';
 import { idle, prefer } from './t19.js';
 
@@ -41,11 +42,13 @@ test('installs off, turns on through the native confirmation and uninstalls in t
   const action = settings.getByTestId('market-action-pi-lint-skills');
   await expect(action).toHaveAttribute('data-action', 'install');
 
-  // The menu offers this project only (the project is trusted).
+  // The package's page offers this project only in the install menu (the project is trusted).
+  await lint.getByTestId('market-row-open').click();
   await settings.getByTestId('market-action-pi-lint-skills-more').click();
   await expect(settings.getByTestId('market-action-pi-lint-skills-project')).toBeEnabled();
   await settings.screenshot({ path: path.join(EVIDENCE, 'install-menu-light-en.png') });
   await settings.keyboard.press('Escape');
+  await settings.getByTestId('market-back').click();
 
   await action.click();
   await expect(settings.getByTestId('market-notice')).toContainText('is installed', {
@@ -61,7 +64,8 @@ test('installs off, turns on through the native confirmation and uninstalls in t
   await action.click();
   await expect(action).toHaveAttribute('data-action', 'enabled', { timeout: 30_000 });
 
-  // Another package for this project only.
+  // Another package for this project only, from its page.
+  await marketRow(settings, '@demo/prompts').getByTestId('market-row-open').click();
   await settings.getByTestId('market-action-@demo/prompts-more').click();
   await settings.getByTestId('market-action-@demo/prompts-project').click();
   await expect(settings.getByTestId('market-action-@demo/prompts')).toHaveAttribute(
@@ -69,9 +73,10 @@ test('installs off, turns on through the native confirmation and uninstalls in t
     'enable',
     { timeout: 90_000 },
   );
+  await settings.getByTestId('market-back').click();
 
   // Uninstall from the details: the first click asks once more in place.
-  await lint.getByTestId('market-open').click();
+  await lint.getByTestId('market-row-open').click();
   await settings.getByTestId('package-uninstall-start').click();
   await expect(settings.getByTestId('package-uninstall-hint')).toHaveText(
     'Removes it from this computer; every project stops using it.',
@@ -88,15 +93,16 @@ test('installs off, turns on through the native confirmation and uninstalls in t
   );
   await settings.getByTestId('market-back').click();
 
-  // The installed view: the project package has a visible uninstall.
-  await settings.getByTestId('skills-view-installed').check({ force: true });
+  // The installed view: the project package's page has the uninstall.
+  await settings.getByTestId('skills-view-installed').click();
   const row = settings.locator('[data-testid="package-row"][data-id="@demo/prompts"]');
   await expect(row).toBeVisible();
   await expect(
     settings.locator('[data-testid="package-row"][data-id="pi-lint-skills"]'),
   ).toHaveCount(0);
-  await row.getByTestId('package-uninstall-start').click();
-  await row.getByTestId('package-uninstall').click();
+  await row.getByTestId('package-row-open').click();
+  await settings.getByTestId('package-uninstall-start').click();
+  await settings.getByTestId('package-uninstall').click();
   await expect(row).toHaveCount(0, { timeout: 30_000 });
 
   // M-22: the permissions page's audit lists the package rows.
@@ -134,10 +140,10 @@ test('a skill shows its own file in Finder, and only a skill Core lists', async 
       shown.push(file);
     };
   });
-  const settings = await openMarket(page);
-  await settings.getByTestId('skills-view-installed').check({ force: true });
+  const settings = await openSettings(page);
+  await settings.getByTestId('settings-nav-skills').click();
   const row = settings.locator('[data-testid="skill-row"][data-name="tidy"]');
-  await row.getByTestId('skill-more-tidy').click();
+  await row.getByTestId('skill-row-open').click();
   await settings.getByTestId('skill-reveal').click();
   await expect
     .poll(() => app.evaluate(() => (globalThis as { __piarcShown?: string[] }).__piarcShown ?? []))

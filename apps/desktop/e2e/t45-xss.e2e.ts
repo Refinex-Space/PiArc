@@ -264,6 +264,9 @@ test('THR-11 settings pages and a hook notice show names, values and messages as
     ['settings-nav-skills', 'package-row', 'evil'],
   ] as const) {
     await settings.getByTestId(nav).click();
+    // Packages list under their tab on "Skills & plugins" (ADR-0102).
+    if (row === 'package-row')
+      await settings.getByTestId('skills-tab-plugins').check({ force: true });
     await expect(settings.getByTestId(row).first()).toBeVisible();
     await expect(settingsWindow).toContainText(text ?? '');
     await expectInertDocument(settings, settingsUrl(), row);

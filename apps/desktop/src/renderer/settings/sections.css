@@ -200,7 +200,35 @@
 }
 
 .settings-detail-page .permission-audit {
-  overflow-x: auto;
+  min-width: 0;
+}
+
+/* The audit fits its column: fixed column widths, long tools and rules wrap inside their cell
+   instead of widening the table past the filters and the pager. */
+.settings-detail-page .permission-audit-table {
+  table-layout: fixed;
+}
+.settings-detail-page .permission-audit-table :is(th, td):nth-child(1) {
+  width: 11.5rem;
+}
+.settings-detail-page .permission-audit-table :is(th, td):nth-child(2) {
+  width: 5.5rem;
+}
+.settings-detail-page .permission-audit-table :is(th, td):nth-child(4) {
+  width: 7.5rem;
+}
+.settings-detail-page .permission-audit-table :is(th, td):nth-child(6) {
+  width: 4.5rem;
+}
+.settings-detail-page .permission-audit-table td {
+  overflow-wrap: anywhere;
+}
+.settings-detail-page .permission-audit-table td.permission-nowrap {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-detail-page .permission-audit-table td:nth-child(1) {
+  white-space: normal;
 }
 
 .settings-detail-page :is(.permission-audit-table, .diagnostics-table) :is(th, td) {

@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
+import type { MarketEntry } from '@piarc/protocol';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { DEFAULT_PREFERENCES } from '../../../shared/preferences.js';
 import { AppProvider } from '../../app/app-context.js';
+import { MarketAction } from './MarketAction.js';
 import { MarketView } from './MarketView.js';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -61,7 +63,11 @@ function mount(
           notificationsSupported: true,
         }}
       >
-        <MarketView target={{ workspace: '/w', trusted }} onPackage={() => undefined} />
+        <MarketView
+          target={{ workspace: '/w', trusted }}
+          onPackage={() => undefined}
+          onLeave={() => undefined}
+        />
       </AppProvider>,
     );
     await vi.advanceTimersByTimeAsync(0);
@@ -116,7 +122,7 @@ it('asks once per pause in typing and never shows an older answer over a newer o
   expect(names()).toEqual(['hit-slo']);
 });
 
-it('installs the catalog’s version for every project and keeps project-only behind trust', async () => {
+it('installs the catalog’s version for every project from a row', async () => {
   const install = vi.fn().mockResolvedValue('{}');
   await mount(vi.fn().mockResolvedValue(page('pi-tools')), { marketInstall: install }, false);
   const button = dom.querySelector<HTMLButtonElement>('[data-testid="market-action-pi-tools"]');
@@ -132,7 +138,45 @@ it('installs the catalog’s version for every project and keeps project-only be
     workspace: null,
   });
   expect(dom.querySelector('[data-testid="market-notice"]')?.textContent).toContain('installed');
+});
 
+it('keeps installing for this project alone behind the project’s trust on the package page', async () => {
+  Object.assign(window, { piarc: { onAppEvent: () => () => undefined } });
+  const entry: MarketEntry = {
+    name: 'pi-tools',
+    version: '1.0.0',
+    description: '',
+    publisher: '',
+    downloadsMonthly: 0,
+    updated: 0,
+    kinds: [],
+    kindsFromManifest: false,
+    insecure: false,
+    deprecated: false,
+    installing: false,
+  };
+  await act(async () => {
+    root.render(
+      <AppProvider
+        initial={{
+          platform: 'darwin',
+          preferences: DEFAULT_PREFERENCES,
+          locale: 'en',
+          focused: true,
+          notificationsSupported: true,
+        }}
+      >
+        <MarketAction
+          entry={entry}
+          target={{ workspace: '/w', trusted: false }}
+          busy={false}
+          run={() => undefined}
+          size="page"
+        />
+      </AppProvider>,
+    );
+    await vi.advanceTimersByTimeAsync(0);
+  });
   await act(async () => {
     dom.querySelector<HTMLButtonElement>('[data-testid="market-action-pi-tools-more"]')?.click();
     await vi.advanceTimersByTimeAsync(0);

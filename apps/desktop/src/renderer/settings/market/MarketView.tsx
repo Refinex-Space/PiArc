@@ -1,23 +1,43 @@
-// The Pi package market (ADR-0102): search, categories with counts, sort, a list that grows
-// page by page, and a package's details in place. Core answers from its cache at once and syncs
-// in the background; `core/market` events say when to read the list again. Offline, the cached
-// catalog stays with a line saying how old it is.
+// The Pi package market (ADR-0102) as a sub-page of "Skills & plugins": a trail back in place of
+// the page's title, search and refresh at the head, categories with counts and the sort on one
+// row, rows like the installed view's, and pages of 20 like the audit's. Core answers from its
+// cache at once and syncs in the background; `core/market` events say when to read again. The
+// sync's state is a line under the title; offline, the cached catalog stays with a notice.
 import type { MarketCategory, MarketEntry, MarketPage, MarketSort } from '@piarc/protocol';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { MessageId } from '../../../shared/i18n/index.js';
 import { useApp } from '../../app/app-context.js';
 import { Button } from '../../app/Button.js';
 import { IconButton } from '../../app/IconButton.js';
-import { SegmentedControl } from '../../app/SegmentedControl.js';
-import { ReloadIcon, SearchIcon } from '../../shell/icons.js';
 import { reason } from '../../shell/errors.js';
+import { ReloadIcon } from '../../shell/icons.js';
 import { revealBidi } from '../../transcript/reveal.js';
+import {
+  CatalogEmpty,
+  CatalogList,
+  CatalogPager,
+  CatalogRow,
+  CatalogSearch,
+  CatalogTabs,
+  CatalogToolbar,
+  Crumbs,
+} from '../catalog.js';
+import { PageHeadActions, PageHeading } from '../page-head.js';
 import { MarketAction, type MarketRun, type MarketTarget } from './MarketAction.js';
-import { KindBadges, MarketDetail } from './MarketDetail.js';
+import { MarketDetail } from './MarketDetail.js';
+import { entryTile, kindsText } from './market-kinds.js';
 import { parseEvents, parsePage } from './market-data.js';
 
-const PAGE = 50;
+const PAGE = 20;
 const CATEGORIES: readonly MarketCategory[] = ['all', 'extension', 'skill', 'prompt'];
+const CATEGORY_LABELS: Record<MarketCategory, MessageId> = {
+  all: 'market.category.all',
+  extension: 'market.category.extension',
+  skill: 'market.category.skill',
+  prompt: 'market.category.prompt',
+};
 
 function useDebounced<T>(value: T, ms: number): T {
   const [settled, setSettled] = useState(value);
@@ -32,15 +52,15 @@ function useDebounced<T>(value: T, ms: number): T {
   return settled;
 }
 
-function StatusLine({
+/** The sync's state in a line: how fresh the catalog is, or what it is doing. */
+function StatusText({
   page,
   onRetry,
 }: {
-  readonly page: MarketPage | undefined;
+  readonly page: MarketPage;
   readonly onRetry: () => void;
 }) {
   const { t, format } = useApp();
-  if (page === undefined) return null;
   const s = page.status;
   const when = s.syncedAt == null ? null : format.relative(s.syncedAt, Date.now());
   let text: string;
@@ -56,17 +76,17 @@ function StatusLine({
         ? t('market.status.classifying', { when, done: s.classified, total: s.indexed })
         : t('market.status.updated', { when });
   } else {
-    return null;
+    text = t('market.subtitle');
   }
   return (
-    <p className="market-status" data-testid="market-status" data-state={s.state} role="status">
+    <span className="market-status" data-testid="market-status" data-state={s.state} role="status">
       <span>{text}</span>
       {s.problem != null && s.state !== 'syncing' && (
-        <button type="button" className="market-link" onClick={onRetry}>
+        <button type="button" className="catalog-link" onClick={onRetry}>
           {t('market.retry')}
         </button>
       )}
-    </p>
+    </span>
   );
 }
 
@@ -84,67 +104,66 @@ function Row({
   readonly onOpen: () => void;
 }) {
   const { t, format } = useApp();
-  const meta = [
-    revealBidi(entry.publisher),
-    entry.downloadsMonthly > 0
-      ? t('market.downloads', {
-          count: format.number(entry.downloadsMonthly, { notation: 'compact' }),
-        })
-      : null,
-    entry.updated > 0
-      ? t('market.updatedAgo', { when: format.relative(entry.updated, Date.now()) })
-      : null,
-  ].filter((part): part is string => part !== null && part !== '');
+  const risky = entry.insecure
+    ? t('market.insecure')
+    : entry.deprecated
+      ? t('market.deprecated')
+      : '';
   return (
-    <li className="market-row" data-testid="market-row" data-name={entry.name}>
-      <div className="market-row-text">
-        <div className="market-row-name">
-          <button
-            type="button"
-            className="market-name mono-text"
-            data-testid="market-open"
-            onClick={onOpen}
-          >
-            {revealBidi(entry.name)}
-          </button>
-          <KindBadges kinds={entry.kinds.filter((k) => k !== 'theme')} />
-          {entry.insecure && <span className="market-kind is-danger">{t('market.insecure')}</span>}
-          {entry.deprecated && (
-            <span className="market-kind is-danger">{t('market.deprecated')}</span>
+    <CatalogRow
+      kind={entryTile(entry)}
+      testId="market-row"
+      data={{ name: entry.name }}
+      title={revealBidi(entry.name)}
+      note={
+        risky === '' ? (
+          kindsText(t, entry) || t('market.kindUnknown')
+        ) : (
+          <span className="catalog-row-note is-attention">{risky}</span>
+        )
+      }
+      description={revealBidi(entry.description)}
+      openLabel={t('catalog.open', { name: entry.name })}
+      onOpen={onOpen}
+      trailing={
+        <>
+          {entry.downloadsMonthly > 0 && (
+            <span className="catalog-row-meta">
+              {t('market.downloads', {
+                count: format.number(entry.downloadsMonthly, { notation: 'compact' }),
+              })}
+            </span>
           )}
-        </div>
-        {entry.description !== '' && (
-          <p className="market-description">{revealBidi(entry.description)}</p>
-        )}
-        <p className="market-meta">{meta.join(' · ')}</p>
-      </div>
-      <div className="market-row-action">
-        <MarketAction entry={entry} target={target} busy={busy} run={run} />
-      </div>
-    </li>
+          <MarketAction entry={entry} target={target} busy={busy} run={run} />
+        </>
+      }
+    />
   );
 }
 
 export function MarketView({
   target,
-  initialQuery,
+  headActions,
   initialPackage,
   onPackage,
+  onLeave,
 }: {
   readonly target: MarketTarget;
-  readonly initialQuery?: string;
+  /** The page's own head controls (the project picker), before the market's. */
+  readonly headActions?: ReactNode;
   /** The package `#/settings/skills?view=market&package=` asked for. */
   readonly initialPackage?: string;
   /** The package shown changed (`null`: back to the list). */
   readonly onPackage: (name: string | null) => void;
+  /** Back to "Skills & plugins". */
+  readonly onLeave: () => void;
 }) {
-  const { t, format } = useApp();
-  const searchId = useId();
-  const [text, setText] = useState(initialQuery ?? '');
+  const { t } = useApp();
+  const [text, setText] = useState('');
   const query = useDebounced(text.trim(), 250);
   const [category, setCategory] = useState<MarketCategory>('all');
   const [sort, setSort] = useState<MarketSort>('popular');
-  const [shown, setShown] = useState(PAGE);
+  const [pageIndex, setPageIndex] = useState(0);
   const [page, setPage] = useState<MarketPage | undefined>(undefined);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<{ text: string; failed: boolean } | null>(null);
@@ -156,27 +175,31 @@ export function MarketView({
 
   const load = useCallback(() => {
     const ticket = ++request.current;
-    const pages = Math.ceil(shown / PAGE);
-    const ask = (offset: number) =>
-      window.piarc
-        .marketQuery({ query, category, sort, offset, limit: PAGE, workspace: target.workspace })
-        .then(parsePage);
-    (async () => {
-      const first = await ask(0);
-      const entries = [...first.entries];
-      for (let i = 1; i < pages && entries.length < first.total; i++) {
-        entries.push(...(await ask(i * PAGE)).entries);
-      }
-      if (ticket === request.current) {
-        setPage({ ...first, entries });
-        setError('');
-      }
-    })().catch((e: unknown) => {
-      if (ticket === request.current) setError(reason(e));
-    });
-  }, [query, category, sort, shown, target.workspace]);
+    window.piarc
+      .marketQuery({
+        query,
+        category,
+        sort,
+        offset: pageIndex * PAGE,
+        limit: PAGE,
+        workspace: target.workspace,
+      })
+      .then(parsePage)
+      .then((answer) => {
+        if (ticket === request.current) {
+          setPage(answer);
+          setError('');
+        }
+      })
+      .catch((e: unknown) => {
+        if (ticket === request.current) setError(reason(e));
+      });
+  }, [query, category, sort, pageIndex, target.workspace]);
 
   useEffect(load, [load]);
+  useEffect(() => {
+    setPageIndex(0);
+  }, [query, category, sort]);
   /** Syncs the catalog now (Core answers at once and syncs in the background), then reads. */
   const refresh = useCallback(() => {
     setError('');
@@ -184,9 +207,6 @@ export function MarketView({
       setError(reason(e));
     });
   }, [load]);
-  useEffect(() => {
-    setShown(PAGE);
-  }, [query, category, sort]);
 
   // `core/market`: sync pages, kinds and installs change the list; read it again shortly after.
   useEffect(() => {
@@ -218,8 +238,7 @@ export function MarketView({
 
   const run: MarketRun = useCallback(
     (name, label, action) => {
-      const key = name;
-      setBusy((b) => new Set(b).add(key));
+      setBusy((b) => new Set(b).add(name));
       setNotice({ text: label, failed: false });
       action()
         .then((done) => {
@@ -231,7 +250,7 @@ export function MarketView({
         .finally(() => {
           setBusy((b) => {
             const next = new Set(b);
-            next.delete(key);
+            next.delete(name);
             return next;
           });
           load();
@@ -242,36 +261,57 @@ export function MarketView({
   );
 
   const show = (name: string | null) => {
-    if (name !== null)
-      listScroll.current = document.querySelector('.settings-page')?.scrollTop ?? 0;
+    const scroller = document.querySelector('.settings-page');
+    if (name !== null) listScroll.current = scroller?.scrollTop ?? 0;
     setOpen(name);
     onPackage(name);
-    if (name === null) {
-      requestAnimationFrame(() => {
-        const scroller = document.querySelector('.settings-page');
-        if (scroller !== null) scroller.scrollTop = listScroll.current;
-      });
-    }
+    requestAnimationFrame(() => {
+      if (scroller !== null) scroller.scrollTop = name === null ? listScroll.current : 0;
+    });
   };
+
+  const noticeLine = notice !== null && (
+    <p
+      className={notice.failed ? 'catalog-notice is-danger' : 'catalog-notice is-plain'}
+      role={notice.failed ? 'alert' : 'status'}
+      data-testid="market-notice"
+    >
+      {notice.text}
+    </p>
+  );
 
   if (open !== null) {
     return (
-      <MarketDetail
-        name={open}
-        target={target}
-        busy={busy.has(open)}
-        run={run}
-        revision={revision}
-        onBack={() => {
-          show(null);
-        }}
-      />
+      <>
+        <PageHeading>
+          <Crumbs
+            items={[
+              { label: t('settings.skills'), onClick: onLeave, testId: 'skills-view-installed' },
+              {
+                label: t('market.title'),
+                onClick: () => {
+                  show(null);
+                },
+                testId: 'market-back',
+              },
+              { label: revealBidi(open) },
+            ]}
+          />
+        </PageHeading>
+        <PageHeadActions>{headActions}</PageHeadActions>
+        {noticeLine}
+        <MarketDetail
+          name={open}
+          target={target}
+          busy={busy.has(open)}
+          run={run}
+          revision={revision}
+        />
+      </>
     );
   }
 
   const counts = page?.counts;
-  const countOf = (c: MarketCategory) =>
-    counts === undefined ? undefined : c === 'all' ? counts.all : counts[c];
   const entries = page?.entries ?? [];
   // Nothing to show and nothing cached: the registry (or the proxy) could not be reached.
   const unreachable =
@@ -287,118 +327,111 @@ export function MarketView({
       : t(page?.status.problem?.code === 'proxy' ? 'market.empty.proxy' : 'market.empty.offline');
   return (
     <div className="market" data-testid="market">
-      <label className="settings-search market-search" htmlFor={searchId}>
-        <SearchIcon />
-        <input
-          id={searchId}
-          type="search"
-          value={text}
-          placeholder={t('market.search')}
-          aria-label={t('market.search')}
-          spellCheck={false}
-          autoComplete="off"
-          data-testid="market-search"
-          onChange={(e) => {
-            setText(e.currentTarget.value);
-          }}
+      <PageHeading>
+        <Crumbs
+          items={[
+            { label: t('settings.skills'), onClick: onLeave, testId: 'skills-view-installed' },
+            { label: t('market.title') },
+          ]}
+          title={t('market.title')}
+          description={
+            page === undefined ? t('market.subtitle') : <StatusText page={page} onRetry={refresh} />
+          }
         />
-      </label>
-      <div className="market-toolbar">
-        <SegmentedControl<MarketCategory>
-          aria-label={t('market.category')}
-          name="market-category"
-          options={CATEGORIES}
+      </PageHeading>
+      <PageHeadActions>
+        {headActions}
+        <CatalogSearch
+          value={text}
+          label={t('market.search')}
+          testId="market-search"
+          onChange={setText}
+        />
+        <IconButton
+          size="sm"
+          label={t('market.refresh')}
+          data-testid="market-refresh"
+          disabled={page?.status.state === 'syncing'}
+          onClick={refresh}
+        >
+          <ReloadIcon />
+        </IconButton>
+      </PageHeadActions>
+      <CatalogToolbar>
+        <CatalogTabs
+          label={t('market.category')}
+          tabs={CATEGORIES.map((c) => ({
+            id: c,
+            label: t(CATEGORY_LABELS[c]),
+            count: counts === undefined ? undefined : c === 'all' ? counts.all : counts[c],
+          }))}
           value={category}
           testIdPrefix="market-category"
-          labelOf={(c) => {
-            const count = countOf(c);
-            return count === undefined
-              ? t(`market.category.${c}`)
-              : t('market.categoryCount', {
-                  label: t(`market.category.${c}`),
-                  count: format.number(count),
-                });
-          }}
           onChange={setCategory}
         />
-        <span className="market-toolbar-end">
-          <select
-            className="market-sort"
-            aria-label={t('market.sort')}
-            value={sort}
-            data-testid="market-sort"
-            onChange={(e) => {
-              setSort(e.currentTarget.value === 'updated' ? 'updated' : 'popular');
-            }}
-          >
-            <option value="popular">{t('market.sort.popular')}</option>
-            <option value="updated">{t('market.sort.updated')}</option>
-          </select>
-          <IconButton
-            size="sm"
-            label={t('market.refresh')}
-            data-testid="market-refresh"
-            disabled={page?.status.state === 'syncing'}
-            onClick={refresh}
-          >
-            <ReloadIcon />
-          </IconButton>
-        </span>
-      </div>
-      <StatusLine page={page} onRetry={refresh} />
-      {notice !== null && (
-        <p
-          className={notice.failed ? 'market-notice is-failed' : 'market-notice'}
-          role={notice.failed ? 'alert' : 'status'}
-          data-testid="market-notice"
+        <select
+          className="market-sort"
+          aria-label={t('market.sort')}
+          value={sort}
+          data-testid="market-sort"
+          onChange={(e) => {
+            setSort(e.currentTarget.value === 'updated' ? 'updated' : 'popular');
+          }}
         >
-          {notice.text}
-        </p>
-      )}
+          <option value="popular">{t('market.sort.popular')}</option>
+          <option value="updated">{t('market.sort.updated')}</option>
+        </select>
+      </CatalogToolbar>
+      {noticeLine}
       {page !== undefined && !page.live && query !== '' && page.status.problem != null && (
-        <p className="market-note">{t('market.status.searchCached')}</p>
+        <p className="catalog-notice">{t('market.status.searchCached')}</p>
       )}
       {failedEmpty ? (
-        <div className="market-empty" data-testid="market-error">
-          <p>{t('market.empty.failed')}</p>
-          <p className="market-note">{failure}</p>
-          <span className="market-empty-actions">
-            <Button size="small" onClick={refresh}>
-              {t('market.retry')}
-            </Button>
-            <Button
-              size="small"
-              variant="ghost"
-              onClick={() => {
-                window.location.hash = '#/settings/proxy';
-              }}
-            >
-              {t('market.proxySettings')}
-            </Button>
-          </span>
-        </div>
+        <CatalogEmpty
+          testId="market-error"
+          action={
+            <span className="market-empty-actions">
+              <Button size="small" onClick={refresh}>
+                {t('market.retry')}
+              </Button>
+              <Button
+                size="small"
+                variant="ghost"
+                onClick={() => {
+                  window.location.hash = '#/settings/proxy';
+                }}
+              >
+                {t('market.proxySettings')}
+              </Button>
+            </span>
+          }
+        >
+          {t('market.empty.failed')} {failure}
+        </CatalogEmpty>
       ) : page === undefined || (entries.length === 0 && page.status.state === 'syncing') ? (
-        <p className="market-empty" data-testid="market-loading">
-          {t('market.empty.loading')}
-        </p>
+        <CatalogEmpty testId="market-loading">{t('market.empty.loading')}</CatalogEmpty>
       ) : entries.length === 0 ? (
-        <div className="market-empty" data-testid="market-none">
-          <p>{t('market.empty.none')}</p>
-          {(query !== '' || category !== 'all') && (
-            <Button
-              size="small"
-              variant="ghost"
-              onClick={() => {
-                setText('');
-                setCategory('all');
-              }}
-            >
-              {t('market.clearFilters')}
-            </Button>
-          )}
-        </div>
+        <CatalogEmpty
+          testId="market-none"
+          action={
+            (query !== '' || category !== 'all') && (
+              <Button
+                size="small"
+                variant="ghost"
+                onClick={() => {
+                  setText('');
+                  setCategory('all');
+                }}
+              >
+                {t('market.clearFilters')}
+              </Button>
+            )
+          }
+        >
+          {t('market.empty.none')}
+        </CatalogEmpty>
       ) : (
-        <ul className="market-list" data-testid="market-list">
+        <CatalogList testId="market-list">
           {entries.map((entry) => (
             <Row
               key={entry.name}
@@ -411,19 +444,19 @@ export function MarketView({
               }}
             />
           ))}
-        </ul>
+        </CatalogList>
       )}
-      {page !== undefined && entries.length < page.total && (
-        <button
-          type="button"
-          className="settings-add-link"
-          data-testid="market-more"
-          onClick={() => {
-            setShown((n) => n + PAGE);
+      {page !== undefined && (
+        <CatalogPager
+          page={pageIndex}
+          size={PAGE}
+          total={page.total}
+          testId="market-pager"
+          onPage={(next) => {
+            setPageIndex(next);
+            document.querySelector('.settings-page')?.scrollTo({ top: 0 });
           }}
-        >
-          {t('usage.sessions.more', { count: Math.min(PAGE, page.total - entries.length) })}
-        </button>
+        />
       )}
     </div>
   );

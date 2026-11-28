@@ -305,11 +305,17 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
   }
   // ADR-0102: uninstalling asks once more in place.
   await settings.getByTestId('settings-nav-skills').click();
-  const installed = settings.locator('[data-testid="package-row"][data-id="demo"]');
+  await settings.getByTestId('skills-tab-plugins').check({ force: true });
+  await settings
+    .locator('[data-testid="package-row"][data-id="demo"]')
+    .getByTestId('package-row-open')
+    .click();
+  const installed = settings.getByTestId('package-detail');
   await installed.getByTestId('package-uninstall-start').click();
   await expect(installed.getByTestId('package-uninstall')).toBeFocused();
   await checkState(settings, 'state:package-uninstall');
   await installed.getByTestId('package-uninstall-cancel').click();
+  await settings.getByTestId('skills-view-installed').click();
   // ADR-0101: the add-server dialog of the MCP page.
   await settings.getByTestId('settings-nav-mcp').click();
   await settings.getByTestId('mcp-add').click();
@@ -728,7 +734,7 @@ marketTest.describe('the Pi package market', () => {
       await expect(settings.getByTestId('market-none')).toBeVisible({ timeout: 10_000 });
       await checkState(settings, 'state:market-empty');
       await settings.getByTestId('market-search').fill('');
-      await marketRow(settings, 'pi-lint-skills').getByTestId('market-open').click();
+      await marketRow(settings, 'pi-lint-skills').getByTestId('market-row-open').click();
       await expect(settings.getByTestId('market-readme')).toBeVisible();
       await checkState(settings, 'state:market-detail');
       await settings.getByTestId('market-back').click();

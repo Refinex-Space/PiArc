@@ -205,7 +205,7 @@ export { expect } from './sessions.js';
 export async function openMarket(page: Page): Promise<Page> {
   const settings = await openSettings(page);
   await settings.getByTestId('settings-nav-skills').click();
-  await settings.getByTestId('skills-view-market').check({ force: true });
+  await settings.getByTestId('skills-view-market').click();
   await settings.getByTestId('market').waitFor();
   return settings;
 }
