@@ -56,7 +56,7 @@
     "success": { "light": "success.11", "dark": "success.11", "highContrast": "success.12" }
   },
   "border": {
-    "subtle": "neutral.6",
+    "subtle": { "light": "base.black8", "dark": "base.white10", "highContrast": "neutral.11" },
     "default": { "light": "neutral.7", "dark": "neutral.7", "highContrast": "neutral.9" },
     "strong": { "light": "neutral.9", "dark": "neutral.9", "highContrast": "neutral.11" },
     "focus": { "light": "neutral.11", "dark": "neutral.11", "highContrast": "neutral.12" }

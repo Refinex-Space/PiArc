@@ -770,7 +770,6 @@ textarea.input {
   align-items: center;
   justify-content: space-between;
   padding: var(--piarc-space-2) var(--piarc-space-3);
-  border-top: 1px solid var(--piarc-border-subtle);
   color: var(--piarc-text-secondary);
 }
 
