@@ -87,7 +87,24 @@ impl Driver<'_> {
         let Some(browser) = &spec.browser else {
             return Ok(());
         };
-        self.browser_tick()?;
+        // A step's Core answer can land just after the turn ended (Windows runners are slower):
+        // keep playing the scripts until they finish or a short bound passes.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            self.browser_tick()?;
+            let finished = self.browser.runs.len() == browser.runs.len()
+                && self
+                    .browser
+                    .runs
+                    .iter()
+                    .zip(&browser.runs)
+                    .all(|(run, script)| run.step >= script.steps.len());
+            if finished || std::time::Instant::now() >= deadline {
+                break;
+            }
+            let notified = self.events.arrived.notified();
+            let _ = tokio::time::timeout(std::time::Duration::from_millis(100), notified).await;
+        }
         if self.browser.runs.len() != browser.runs.len() {
             return Err(format!(
                 "browser: the scenario scripts {} run(s), Core started {}",
