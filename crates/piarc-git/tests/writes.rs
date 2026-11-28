@@ -7,7 +7,7 @@ mod support;
 use std::path::Path;
 
 use piarc_git::branches::{self, CheckoutOutcome, DeleteOutcome};
-use piarc_git::commit::{self, CommitOutcome};
+use piarc_git::commit;
 use piarc_git::index::{self, HunkAction, HunkOutcome};
 use piarc_git::remote::{self, PushSpec, RemoteOutcome, Sequencer};
 use piarc_git::{Cancel, Reader, Writer};
@@ -145,7 +145,9 @@ async fn commits_run_hooks_and_report_identity() {
     let done = commit::commit(&writer, "feat: b\n\nbody", false, false, Cancel::new())
         .await
         .expect("commit");
-    assert!(matches!(&done, CommitOutcome::Committed { subject, .. } if subject == "feat: b"));
+    assert!(
+        matches!(&done, commit::CommitOutcome::Committed { subject, .. } if subject == "feat: b")
+    );
     assert!(repo.join("hook-ran").is_file());
 
     std::fs::write(&hook, "#!/bin/sh\necho 'lint failed' >&2\nexit 1\n").expect("hook");
@@ -154,14 +156,19 @@ async fn commits_run_hooks_and_report_identity() {
     let refused = commit::commit(&writer, "feat: c", false, false, Cancel::new())
         .await
         .expect("commit");
-    assert!(matches!(&refused, CommitOutcome::HookFailed(out) if out.contains("lint failed")));
+    assert!(
+        matches!(&refused, commit::CommitOutcome::HookFailed(out) if out.contains("lint failed"))
+    );
 
     // Another git holding the index lock is not a hook failure, even with hooks installed.
     std::fs::write(repo.join(".git/index.lock"), "").expect("lock");
     let locked = commit::commit(&writer, "feat: c", false, false, Cancel::new())
         .await
         .expect("commit");
-    assert!(matches!(&locked, CommitOutcome::Locked), "{locked:?}");
+    assert!(
+        matches!(&locked, commit::CommitOutcome::Locked),
+        "{locked:?}"
+    );
     std::fs::remove_file(repo.join(".git/index.lock")).expect("unlock");
 
     let anonymous = root.join("anonymous");
