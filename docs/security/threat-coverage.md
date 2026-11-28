@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|---|---|
 | THR-01 | 提示注入导致破坏性操作 | 7 | 7 | 0 | 0 | 0 | 23 |
 | THR-02 | 恶意项目配置 | 5 | 5 | 0 | 0 | 0 | 25 |
-| THR-03 | 恶意插件 / MCP server / Pi 包 | 5 | 4 | 0 | 1 | 0 | 14 |
+| THR-03 | 恶意插件 / MCP server / Pi 包 | 6 | 5 | 0 | 1 | 0 | 19 |
 | THR-04 | 凭据泄露 | 5 | 5 | 0 | 0 | 0 | 25 |
 | THR-05 | 沙箱逃逸 | 5 | 4 | 0 | 1 | 0 | 10 |
 | THR-06 | 审批疲劳与误点 | 5 | 5 | 0 | 0 | 0 | 13 |
@@ -18,7 +18,7 @@
 | THR-08 | 供应链 | 4 | 3 | 1 | 0 | 0 | 10 |
 | THR-09 | 更新通道被劫持 | 4 | 1 | 0 | 1 | 2 | 5 |
 | THR-10 | 应用文件被篡改 | 3 | 1 | 1 | 1 | 0 | 3 |
-| THR-11 | 渲染进程注入（XSS） | 7 | 7 | 0 | 0 | 0 | 28 |
+| THR-11 | 渲染进程注入（XSS） | 8 | 8 | 0 | 0 | 0 | 30 |
 | THR-12 | 应用被当作通用运行时滥用 | 3 | 3 | 0 | 0 | 0 | 10 |
 | THR-13 | 恶意链接与导航 | 4 | 4 | 0 | 0 | 0 | 15 |
 | THR-14 | 同一用户的进程向 PiArc 注入代码 | 3 | 2 | 0 | 1 | 0 | 4 |
@@ -59,6 +59,7 @@
 | Agent Host 及其子进程（MCP server、扩展、npm）只能写工作区与自己的目录（macOS） | 自动化 | Rust `crates/piarc-core/tests/agent_host_profile.rs` · the_agent_host_writes_only_its_places<br>Rust `crates/piarc-core/tests/agent_host_profile.rs` · thr03_the_agent_host_cannot_plant_code_in_pis_directory<br>Rust `crates/piarc-testkit/tests/sessions/sandbox.rs` · the_agent_host_profile_keeps_extensions_and_mcp_servers_in_their_places |
 | Windows 上 Agent Host 没有进程级隔离 | 已接受风险 | L2 CAP-SANDBOX-WINDOWS-001：`sandbox-windows-not-applied`（仅 windows）<br>理由：Windows 到 Beta 没有等价的 OS 沙箱，Agent Host 只用 Job Object 管理进程树，没有第二道防线；设置页、环境栏与配置诊断标明沙箱不生效<br>依据：ADR-0057、I180 |
 | Pi 自己设置里的包清单不由 Agent Host 安装或加载 | 自动化 | Vitest `agent-host/src/runtime/pi-settings.test.ts` · THR-03 hides every package source from Pi, so nothing installs, runs or loads<br>L2 CAP-SEC-PI-PACKAGES-001：`sec-pi-settings-packages` |
+| 页面只能给包名、精确版本与作用域；npm 只连固定 registry、不读用户 .npmrc、不运行安装脚本；装完的包与目录不符、依赖来自别处或只含主题时删除并拒绝；安装默认关闭，开启仍经原生确认；代理连不上不改直连 | 自动化 | Rust `crates/piarc-core/src/plugins/market.rs` · the_staged_install_must_be_what_the_catalog_described<br>Rust `crates/piarc-testkit/tests/market.rs` · installs_are_checked_stay_off_and_refusals_leave_nothing<br>Rust `crates/piarc-testkit/tests/market.rs` · the_users_proxy_carries_everything_and_its_refusal_is_not_a_direct_connection<br>Vitest `apps/desktop/src/main/core/market-ipc.test.ts` · builds install requests from a name, a version and a scope, never a location<br>L4 `apps/desktop/e2e/market-install.e2e.ts` · installs off, turns on through the native confirmation and uninstalls in two steps |
 
 ## THR-04 凭据泄露
 
@@ -129,6 +130,7 @@
 | 所有窗口 sandbox、contextIsolation，页面没有 Node 全局 | 自动化 | Vitest `apps/desktop/src/main/web-preferences.test.ts` · fixes the security-relevant preferences<br>L4 `apps/desktop/e2e/preload.e2e.ts` · require, process, module and Buffer are not defined in the page<br>L4 `apps/desktop/e2e/preload.e2e.ts` · the window renderer runs in the OS-level sandbox<br>L4 `apps/desktop/e2e/browser-basic.e2e.ts` · THR-11 guests reach neither the preload nor Node |
 | 主进程下发的 CSP 不允许内联脚本、eval 与外部资源 | 自动化 | Vitest `apps/desktop/src/main/security/csp.test.ts` · allows no inline code or eval<br>L4 `apps/desktop/e2e/csp.e2e.ts` · does not run an injected inline script<br>L4 `apps/desktop/e2e/csp.e2e.ts` · refuses eval and the Function constructor<br>L4 `apps/desktop/e2e/csp.e2e.ts` · blocks fetch to an external address |
 | 模型输出的原始 HTML 作为文本，链接只保留安全协议 | 自动化 | Vitest `apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts` · turns every XSS payload into text or a link without a dangerous target<br>Vitest `apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts` · drops every other target, including encoded ones<br>Vitest `apps/desktop/src/renderer/transcript/markdown/to-ir.test.ts` · keeps raw HTML as html nodes, verbatim |
+| Pi 包市场的包名、描述与 README 来自第三方：名称与描述只作文本、双向控制字符显示为码位，README 只经 MarkdownView（原始 HTML 当文本），链接经 openExternal 的原生确认（ADR-0102） | 自动化 | Vitest `apps/desktop/src/renderer/settings/market/MarketDetail.test.tsx` · shows a package, its warnings and its README as Markdown with raw HTML as text<br>L4 `apps/desktop/e2e/market-browse.e2e.ts` · browses categories, searches, opens details and comes back to the same list |
 | window.piarc 只有白名单函数，主进程按 senderFrame 的 origin 拒绝外来请求 | 自动化 | L4 `apps/desktop/e2e/preload.e2e.ts` · window.piarc exposes exactly the allowlisted functions<br>L4 `apps/desktop/e2e/preload.e2e.ts` · IPC from another origin is rejected<br>L4 `apps/desktop/e2e/preload.e2e.ts` · IPC from an origin that only starts with the app origin is rejected<br>Vitest `apps/desktop/src/main/ipc/sender.test.ts` · rejects origins that only start with the app origin<br>Vitest `apps/desktop/src/main/browser/browser-ipc.test.ts` · THR-11 rejects %j<br>L4 `apps/desktop/e2e/browser-picker.e2e.ts` · THR-11 a picked element with markup in its id and text shows it as text<br>L4 `apps/desktop/e2e/t45-ipc-hardening.e2e.ts` · THR-11 every window.piarc command answers malformed arguments with a structured error and the main process lives |
 | 终端写入要求真实输入；"总是允许"与 allow 规则经主进程原生确认 | 自动化 | Vitest `apps/desktop/src/main/core/terminal-ipc.test.ts` · refuses writes without recent real input; pointer moves need none<br>L4 `apps/desktop/e2e/t20-approvals.e2e.ts` · edits and confirms an exact rule, declines protected writes and restores the chosen mode<br>L4 `apps/desktop/e2e/t45-ipc-hardening.e2e.ts` · THR-11 allow rules, always-allow answers and sandbox loosening from the page wait for the native confirmation |
 | 发布构建的渲染进程不带测试页（事件探针、transcript 与终端原型） | 自动化 | Vitest `scripts/ci/check-app-layout.test.mjs` · finds the renderer's test-page chunk on both separators and nothing else<br>CI `scripts/ci/check-app-layout.mjs` |

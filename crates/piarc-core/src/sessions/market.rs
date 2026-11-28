@@ -213,7 +213,10 @@ impl Hub {
     ) -> Result<piarc_protocol::plugins::PackageInstallResult> {
         let plugins = self.plugins();
         let market = &self.ctx.market;
-        if !plugins.is_market_package(id, market.registry_base()).await? {
+        if !plugins
+            .is_market_package(id, market.registry_base())
+            .await?
+        {
             return plugins.update(id, workspace).await;
         }
         let row = market
