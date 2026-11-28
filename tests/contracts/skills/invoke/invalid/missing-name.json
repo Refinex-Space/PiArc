@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 72,
+  "method": "skills/invoke",
+  "params": {
+    "sessionId": "s1",
+    "toolCallId": "call_2"
+  }
+}

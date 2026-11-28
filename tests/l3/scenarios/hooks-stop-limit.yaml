@@ -1,0 +1,24 @@
+id: hooks-stop-limit
+area: hooks
+description: A Stop hook that always blocks keeps continuing the turn until the product's continuation limit ends it.
+mirrors: [hooks-stop-limit]
+workspace:
+  files:
+    .claude/settings.json: |
+      {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "node .l3/hook.mjs stop"}]}]}}
+  plans:
+    stop: { json: { decision: block, reason: Keep going. } }
+prompt: Finish the feature.
+steps:
+  - text: Answer 1.
+  - text: Answer 2.
+  - text: Answer 3.
+  - text: Answer 4.
+  - text: Answer 5.
+  - text: Answer 6.
+  - text: Answer 7.
+  - text: Answer 8.
+  - text: Answer 9.
+  - text: Answer 10.
+  - text: Answer 11.
+  - text: Answer 12.

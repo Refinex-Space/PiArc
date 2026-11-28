@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "result": {
+    "path": "/Users/dev/a.pdf",
+    "pageCount": 1,
+    "pages": [{ "text": "x" }]
+  }
+}

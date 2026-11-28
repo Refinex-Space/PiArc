@@ -1,0 +1,42 @@
+id: perm-auto-always-ask
+description: Critical deletions, protected path writes, reads outside the workspace and commands that cannot be analyzed still ask the user in Auto mode; none reaches the reviewer, while workspace edits run as in Accept edits (T46).
+capabilities: [CAP-PERM-AUTO-ORDER-001]
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+    'outside 外/f.txt': "outside\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: wipe, name: Bash, input: { command: 'rm -rf .' } }
+      - tool_calls:
+          - { id: protect, name: Write, input: { path: .claude/settings.json, content: '{}' } }
+      - tool_calls:
+          - { id: out, name: Read, input: { path: '{{workspace}}/../outside 外/f.txt' } }
+      - tool_calls:
+          - { id: dyn, name: Bash, input: { command: 'eval "$X"' } }
+      - tool_calls:
+          - { id: edit, name: Write, input: { path: ok.txt, content: "ok\n" } }
+      - text: Done.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - text: never used
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Clean up., turn: one }
+approvals:
+  - { tool: Bash, call: wipe, decision: deny, review: none }
+  - { tool: Write, call: protect, decision: deny, review: none }
+  - { tool: Read, call: out, decision: deny, review: none }
+  - { tool: Bash, call: dyn, decision: deny, review: none }
+expect:
+  request_counts: { main: 6, rev: 0 }
+  files:
+    ok.txt: "ok\n"
+    .claude/settings.json: null

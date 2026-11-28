@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 17,
+  "method": "fs/write",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "a.txt",
+    "content": 42
+  }
+}

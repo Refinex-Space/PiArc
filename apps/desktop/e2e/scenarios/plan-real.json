@@ -1,0 +1,29 @@
+{
+  "id": "plan-real",
+  "steps": [
+    { "text": "Hello. Ready when you are." },
+    {
+      "thinking": "The user wants a plan for the parser fix. I should look at the README and the parser before proposing anything, and keep to read-only tools while planning.",
+      "text": "Let me read the project first.",
+      "chunk_chars": 6,
+      "chunk_delay_ms": 80,
+      "tool_calls": [{ "id": "read1", "name": "Read", "input": { "file_path": "README.md" } }]
+    },
+    {
+      "thinking": "The README is short. The bug is an off-by-one in the loop bound; a failing test first, then the fix, then the full test run.",
+      "text": "I have enough to write the plan.",
+      "chunk_chars": 6,
+      "chunk_delay_ms": 80,
+      "tool_calls": [
+        {
+          "id": "exit1",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Fix the parser bound\n\n## Steps\n\n1. Add a **failing test** for the loop bound\n2. Fix the off-by-one in `parse()`\n3. Run the tests"
+          }
+        }
+      ]
+    },
+    { "text": "Plan approved; starting with the test." }
+  ]
+}

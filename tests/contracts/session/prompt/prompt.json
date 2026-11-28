@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 14,
+  "method": "session/prompt",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "requestId": "req-01",
+    "text": "Rename a b/中文.txt\u2028and report."
+  }
+}

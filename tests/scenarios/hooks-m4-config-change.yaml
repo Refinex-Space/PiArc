@@ -1,0 +1,58 @@
+id: hooks-m4-config-change
+description: ConfigChange hooks run when a settings file changes while the session is open, with the source as matcher; a hook that blocks keeps the change out of this session (the local deny rule does not apply, the file stays as written, the user is told) while an unblocked change to another source applies; the session checks its settings before each input, so the change is decided before that input's tool calls whether or not the file watcher saw it yet (T41).
+capabilities: [CAP-HOOK-CONFIGCHANGE-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    a.txt: "alpha\n"
+    # The directory exists from the start: its watch is in place before the changes.
+    .piarc/settings.json: '{}'
+    .claude/settings.json: |
+      {"hooks": {"ConfigChange": [
+        {"matcher": "local_settings", "hooks": [{"type": "command", "command": "node hook.mjs local"}]},
+        {"matcher": "project_settings", "hooks": [{"type": "command", "command": "node hook.mjs project"}]}
+      ]}}
+    hook-plans/local.json: '{"json": {"decision": "block", "reason": "Local overrides are frozen."}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Ready.
+      - tool_calls:
+          - { id: cat, name: Bash, input: { command: cat a.txt } }
+          - { id: head, name: Bash, input: { command: head -n 1 a.txt } }
+      - text: Done.
+actions:
+  - prompt: { text: Get ready., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - write_file:
+      { path: .piarc/settings.json, content: '{"permissions": {"deny": ["Bash(head:*)"]}}' }
+  - write_file:
+      { path: .piarc/settings.local.json, content: '{"permissions": {"deny": ["Bash(cat:*)"]}}' }
+  - prompt: { text: Print the first line twice., turn: two }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: cat, is_error: false, contains: alpha }
+        - { id: head, is_error: true }
+  events:
+    - method: core/notices
+      params:
+        type: hook
+        event: ConfigChange
+        level: message
+        message: 'The local_settings change is not applied in this session: Local overrides are frozen.'
+    - { method: turn/completed, turn: two, params: { status: completed } }
+  files:
+    .piarc/settings.local.json: '{"permissions": {"deny": ["Bash(cat:*)"]}}'
+  json_lines:
+    hook-log/local.jsonl:
+      - types: { session_id: string, transcript_path: string, cwd: string, file_path: string }
+        input: { hook_event_name: ConfigChange, source: local_settings }
+    hook-log/project.jsonl:
+      - types: { file_path: string }
+        input: { hook_event_name: ConfigChange, source: project_settings }

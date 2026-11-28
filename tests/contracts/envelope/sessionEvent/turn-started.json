@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn/started",
+  "params": {
+    "sessionId": "ses_01",
+    "seq": 1,
+    "ts": 1794643200001,
+    "turnId": "turn_01"
+  }
+}

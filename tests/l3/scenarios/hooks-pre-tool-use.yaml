@@ -1,0 +1,44 @@
+id: hooks-pre-tool-use
+area: hooks
+description: PreToolUse hooks decide before the rules - a JSON deny and an exit 2 refuse the call, an allow with updatedInput runs the rewritten command, and allow plus ask from two hooks ask.
+mirrors: [hooks-pre-tool-use]
+workspace:
+  files:
+    notes.txt: "one\ntwo\nthree\n"
+    .claude/settings.json: |
+      {"hooks": {"PreToolUse": [
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "node .l3/hook.mjs bash"}]},
+        {"matcher": "Write", "hooks": [{"type": "command", "command": "node .l3/hook.mjs allow"}, {"type": "command", "command": "node .l3/hook.mjs ask"}]}
+      ]}}
+  plans:
+    bash:
+      sequence:
+        - json:
+            {
+              hookSpecificOutput:
+                {
+                  hookEventName: PreToolUse,
+                  permissionDecision: deny,
+                  permissionDecisionReason: Use the fixture file instead.,
+                },
+            }
+        - { exit: 2, stderr: This command is not allowed here. }
+        - json:
+            hookSpecificOutput:
+              hookEventName: PreToolUse
+              permissionDecision: allow
+              updatedInput: { command: printf rewritten }
+              additionalContext: Commands run in CI mode.
+    allow:
+      { json: { hookSpecificOutput: { hookEventName: PreToolUse, permissionDecision: allow } } }
+    ask: { json: { hookSpecificOutput: { hookEventName: PreToolUse, permissionDecision: ask } } }
+prompt: Read the notes.
+steps:
+  - tool_calls: [{ id: denied, name: Bash, input: { command: touch one.txt } }]
+  - tool_calls: [{ id: blocked, name: Bash, input: { command: touch two.txt } }]
+  - tool_calls: [{ id: rewritten, name: Bash, input: { command: touch three.txt } }]
+  - tool_calls:
+      [{ id: merged, name: Write, input: { file_path: '{{workspace}}/out.txt', content: written } }]
+  - text: Done.
+approvals:
+  - { call: merged, decision: allow }

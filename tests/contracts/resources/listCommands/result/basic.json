@@ -1,0 +1,71 @@
+{
+  "jsonrpc": "2.0",
+  "id": 82,
+  "result": {
+    "commands": [
+      {
+        "name": "compact",
+        "kind": "builtIn",
+        "source": "builtIn",
+        "argumentHint": "[focus]",
+        "overrides": ["/工作区 a/.claude/commands/compact.md"]
+      },
+      {
+        "name": "clear",
+        "kind": "builtIn",
+        "source": "builtIn",
+        "aliases": ["reset", "new"]
+      },
+      {
+        "name": "fix-issue",
+        "kind": "skill",
+        "source": "projectClaude",
+        "description": "Fix a GitHub issue",
+        "path": "/工作区 a/.claude/skills/fix-issue/SKILL.md",
+        "argumentHint": "[issue] [branch]",
+        "arguments": ["issue", "branch"],
+        "allowedTools": ["Bash(git add *)", "Read"]
+      },
+      {
+        "name": "frontend:component",
+        "kind": "command",
+        "source": "projectClaude",
+        "description": "Make a component",
+        "path": "/工作区 a/.claude/commands/frontend/component.md",
+        "warnings": [
+          {
+            "kind": "ignoredField",
+            "field": "model"
+          }
+        ]
+      },
+      {
+        "name": "review",
+        "kind": "command",
+        "source": "projectPi",
+        "description": "Review",
+        "path": "/工作区 a/.pi/prompts/review.md"
+      }
+    ],
+    "outputStyles": [
+      {
+        "name": "Default",
+        "source": "builtIn"
+      },
+      {
+        "name": "Concise",
+        "source": "builtIn"
+      },
+      {
+        "name": "teacher",
+        "description": "Teaches",
+        "source": "projectClaude",
+        "path": "/工作区 a/.claude/output-styles/teacher.md",
+        "instructions": "Explain every step."
+      }
+    ],
+    "outputStyle": {
+      "name": "teacher"
+    }
+  }
+}

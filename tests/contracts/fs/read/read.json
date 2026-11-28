@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 14,
+  "method": "fs/read",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "notes/日志 1.txt",
+    "origin": {
+      "tool": "Read",
+      "toolCallId": "toolu_01"
+    }
+  }
+}

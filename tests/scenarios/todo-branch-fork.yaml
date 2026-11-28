@@ -1,0 +1,38 @@
+id: todo-branch-fork
+description: The task list follows the branch - forking at an earlier agent message gives the list as it was there, while the original session keeps the later list (T26).
+capabilities: [CAP-TODO-BRANCH-001]
+sessions:
+  main: { provider: main }
+  early: { provider: main, deferred: true }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: first
+            name: TodoWrite
+            input: { todos: [{ content: Investigate, status: in_progress }] }
+      - text: First list saved.
+      - tool_calls:
+          - id: second
+            name: TodoWrite
+            input:
+              todos:
+                - { content: Investigate, status: completed }
+                - { content: Fix, status: in_progress }
+      - text: Second list saved.
+actions:
+  - prompt: { session: main, text: Start., turn: t1 }
+  - wait: { session: main, method: turn/completed, turn: t1 }
+  - prompt: { session: main, text: Continue., turn: t2 }
+  - wait: { session: main, method: turn/completed, turn: t2 }
+  - fork: { session: main, at_text: First list saved., as: early }
+  - check_harness:
+      session: early
+      fields: { todos: [{ content: Investigate, status: inProgress }] }
+  - check_harness:
+      session: main
+      fields:
+        todos: [{ content: Investigate, status: completed }, { content: Fix, status: inProgress }]
+expect:
+  request_counts: { main: 4 }

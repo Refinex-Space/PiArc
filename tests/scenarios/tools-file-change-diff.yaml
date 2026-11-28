@@ -1,0 +1,82 @@
+id: tools-file-change-diff
+description: The fileChange items of an Edit and of a Write that creates a file carry the diff Core computed, whose hunks and unified text match the change made to the file.
+capabilities: [CAP-TOOL-DIFF-001]
+workspace:
+  files:
+    'src/main.rs': "fn main() {\n    let x = 1;\n    println!(\"{x}\");\n}\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read, name: Read, input: { path: src/main.rs } }
+      - tool_calls:
+          - {
+              id: toolu_edit,
+              name: Edit,
+              input:
+                { path: src/main.rs, edits: [{ oldText: 'let x = 1;', newText: 'let x = 2;' }] },
+            }
+          - {
+              id: toolu_write,
+              name: Write,
+              input: { path: 'docs/新.md', content: "# New\n\ntext" },
+            }
+      - text: 'Changed.'
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
+actions:
+  - prompt: { text: 'Bump x and add a note.', turn: t }
+expect:
+  events:
+    - any_order:
+        - method: item/completed
+          params:
+            item:
+              itemId: toolu_edit
+              type: fileChange
+              status: completed
+              path: src/main.rs
+              diff:
+                path: src/main.rs
+                added: 1
+                removed: 1
+                unified: "--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,4 +1,4 @@\n fn main() {\n-    let x = 1;\n+    let x = 2;\n     println!(\"{x}\");\n }\n"
+                hunks:
+                  - oldStart: 1
+                    oldLines: 4
+                    newStart: 1
+                    newLines: 4
+                    lines:
+                      - { kind: context, text: 'fn main() {' }
+                      - { kind: removed, text: '    let x = 1;' }
+                      - { kind: added, text: '    let x = 2;' }
+                      - { kind: context, text: '    println!("{x}");' }
+                      - { kind: context, text: '}' }
+        - method: item/completed
+          params:
+            item:
+              itemId: toolu_write
+              type: fileChange
+              status: completed
+              diff:
+                path: 'docs/新.md'
+                created: true
+                added: 3
+                removed: 0
+                unified: "--- /dev/null\n+++ b/docs/新.md\n@@ -0,0 +1,3 @@\n+# New\n+\n+text\n\\ No newline at end of file\n"
+                hunks:
+                  - oldStart: 0
+                    oldLines: 0
+                    newStart: 1
+                    newLines: 3
+                    lines:
+                      - { kind: added, text: '# New' }
+                      - { kind: added, text: '' }
+                      - { kind: added, text: 'text', noNewline: true }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  files:
+    'src/main.rs': "fn main() {\n    let x = 2;\n    println!(\"{x}\");\n}\n"
+    'docs/新.md': "# New\n\ntext"
+  request_counts: { main: 3 }

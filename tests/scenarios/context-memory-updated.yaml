@@ -1,0 +1,35 @@
+id: context-memory-updated
+description: Edited project instructions reach the next model request as a marked message while the initial system bytes and conversation stay intact.
+capabilities: [CAP-CTX-PROMPT-001, CAP-CTX-MEMORY-001]
+workspace:
+  files:
+    CLAUDE.md: Original project instruction.
+providers:
+  main:
+    wire: anthropic
+    validation:
+      cache_breakpoints: { max_message_level: 1, last_message_only: true }
+      required_system_sections: [Original project instruction.]
+    steps: [{ text: First answer. }, { text: Updated. }, { text: Done. }]
+actions:
+  - prompt: { text: Begin., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - write_file: { path: CLAUDE.md, content: Revised project instruction. }
+  - prompt: { text: Continue., turn: second }
+  - wait: { method: turn/completed, turn: second }
+  - prompt: { text: Finish. }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 0
+      not_contains: [Revised project instruction.]
+      body:
+        system:
+          - { type: text, cache_control: { type: ephemeral } }
+          - { type: text, cache_control: { type: ephemeral } }
+    - index: 1
+      same_system_as: 0
+      user_message_contains: ['[PiArc reminder]', Revised project instruction.]
+      occurrences: { Original project instruction.: 1, Revised project instruction.: 1 }
+      contains: [First answer.]
+    - { index: 2, same_system_as: 0, occurrences: { Revised project instruction.: 1 } }

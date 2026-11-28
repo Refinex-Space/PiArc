@@ -1,0 +1,2999 @@
+/* The transcript and the composer (architecture sections 8.2, 8.4): the session view of the app
+   and the prototype page share these rules. Colors, sizes and spacing come from the design
+   tokens only (ADR-0029); the session pane follows ADR-0078. Labels, buttons and chips'
+   decorations are not selectable, so copying a selection gets the conversation's text only
+   (section 8.4). */
+
+/* ---- the list ---- */
+
+.transcript {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  timeline-scope: --transcript-scroll;
+}
+
+.transcript-scroller {
+  height: 100%;
+  overflow-y: auto;
+  overflow-anchor: none;
+  outline: none;
+  user-select: text;
+  scroll-timeline: --transcript-scroll block;
+}
+
+/* A styled scrollbar is never an overlay scrollbar, so it stays visible and draggable on every
+   platform (macOS without a mouse and Windows 11 default to hidden overlay scrollbars). */
+.transcript-scroller::-webkit-scrollbar {
+  width: 12px;
+}
+
+.transcript-scroller::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-border-strong) padding-box;
+}
+
+.transcript-scroller::-webkit-scrollbar-thumb:hover {
+  background-color: var(--piarc-text-secondary);
+}
+
+/* Text fades under the edges once there is more to scroll to; the strips follow the scroll
+   position (a scroll-driven animation), so they cost nothing while nothing moves. */
+.conversation .transcript::before,
+.conversation .transcript::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0 12px;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: --transcript-scroll;
+}
+
+.conversation .transcript::before {
+  top: 0;
+  height: 32px;
+  background: linear-gradient(var(--piarc-workbench-canvas), transparent);
+  animation-name: transcript-fade-top;
+  animation-range: 0 32px;
+}
+
+.conversation .transcript::after {
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(transparent, var(--piarc-workbench-canvas));
+  animation-name: transcript-fade-bottom;
+  animation-range: calc(100% - 48px) 100%;
+}
+
+@keyframes transcript-fade-top {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes transcript-fade-bottom {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+:root[data-reduce-motion='true'] .transcript::before,
+:root[data-reduce-motion='true'] .transcript::after {
+  display: none;
+}
+
+@media (forced-colors: active) {
+  .conversation .transcript::before,
+  .conversation .transcript::after {
+    display: none;
+  }
+}
+
+.transcript-sizer {
+  position: relative;
+  width: 100%;
+}
+
+.transcript-sizer > .transcript-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+/* The loading chip and the jump to the end: small chips centred on the column. */
+.transcript-loading,
+.back-to-bottom {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  height: var(--piarc-session-row-small);
+  padding: 0 var(--piarc-session-pad-xs);
+  border: 0;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-surface-raised);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  transform: translateX(-50%);
+  user-select: none;
+  animation: transcript-chip-in var(--piarc-motion-fast) var(--piarc-motion-curve-out);
+}
+
+.transcript-loading {
+  top: var(--piarc-space-2);
+  padding-inline: var(--piarc-session-pad-sm);
+}
+
+.back-to-bottom {
+  bottom: var(--piarc-space-2);
+}
+
+.back-to-bottom:hover {
+  background-image: linear-gradient(
+    var(--piarc-session-ghost-hover),
+    var(--piarc-session-ghost-hover)
+  );
+  color: var(--piarc-text-primary);
+}
+
+.back-to-bottom[data-waiting='true'] {
+  padding-inline: var(--piarc-session-pad-sm) var(--piarc-session-pad-xs);
+  color: var(--piarc-text-primary);
+}
+
+.back-to-bottom-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--piarc-accent-solid);
+}
+
+@keyframes transcript-chip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- rows ---- */
+
+.row {
+  box-sizing: border-box;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--piarc-space-2) var(--piarc-space-5);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  color: var(--piarc-text-primary);
+}
+
+.row .muted,
+.row-status.muted {
+  color: var(--piarc-text-secondary);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+  margin-top: var(--piarc-space-1);
+  user-select: none;
+}
+
+.row-user > .row-actions {
+  justify-content: flex-end;
+}
+
+.row-action {
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-caption);
+  user-select: none;
+  cursor: pointer;
+}
+
+.row-action:hover:not(:disabled) {
+  background: var(--piarc-surface-hover);
+  color: var(--piarc-text-primary);
+}
+
+.row-action:enabled:active {
+  background-color: var(--piarc-action-pressed);
+}
+
+/* An inline text action ("Retry"): underlined in the surrounding ink. */
+.row-link {
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.row-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin-top: var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+  user-select: none;
+}
+
+.row-status.is-danger {
+  color: var(--piarc-text-danger);
+}
+
+.row-status.is-warning {
+  color: var(--piarc-text-warning);
+}
+
+.row-disclosure {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  max-width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+  text-align: left;
+  user-select: none;
+  cursor: pointer;
+}
+
+.row-disclosure:hover:not([aria-disabled='true']):not(:disabled) {
+  color: var(--piarc-text-primary);
+}
+
+.row-disclosure[aria-disabled='true'],
+.row-disclosure:disabled {
+  cursor: default;
+}
+
+.row-disclosure-mark {
+  width: 1em;
+  flex: none;
+  text-align: center;
+}
+
+.row-failed {
+  font-size: var(--piarc-font-size-small);
+  font-style: italic;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The session pane's rhythm: rows on the reading column, a block gap between the parts of a
+   turn and a wider gap before the user's next message. */
+.conversation .transcript-row > .row {
+  max-width: calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter));
+  padding: var(--piarc-session-block-gap) var(--piarc-session-gutter) 0;
+  font-size: var(--piarc-session-prose);
+  line-height: var(--piarc-session-prose-line);
+}
+
+.conversation .transcript-row > .row-user {
+  padding-top: var(--piarc-session-turn-gap);
+}
+
+.conversation .transcript-row[data-index='0'] > .row {
+  padding-top: 0;
+}
+
+:root:lang(zh) .conversation .transcript-row > .row {
+  line-height: var(--piarc-session-prose-line-cjk);
+}
+
+@container (max-width: 560px) {
+  .conversation .transcript-row > .row {
+    padding-inline: var(--piarc-session-gutter-narrow);
+  }
+}
+
+.conversation .row-status {
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.conversation .row-actions {
+  align-items: center;
+  gap: 3px;
+  margin-top: var(--piarc-space-1);
+}
+
+/* the user's message */
+
+.row-user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.row-user > .attachment-chips {
+  justify-content: flex-end;
+  margin: 0 0 var(--piarc-session-gap-xs);
+}
+
+.row-user-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  box-sizing: border-box;
+  max-width: min(100%, 640px);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-action-surface);
+}
+
+:is(.conversation, .home-pending) .row-user-bubble {
+  max-width: var(--piarc-session-bubble-max);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-session-fill);
+}
+
+.row-user.is-sending .row-user-bubble {
+  color: var(--piarc-text-secondary);
+}
+
+.row-user.is-undelivered .row-user-bubble {
+  box-shadow: inset 0 0 0 1px var(--piarc-state-danger);
+}
+
+.row-user-text {
+  max-width: 100%;
+  white-space: pre-wrap;
+  unicode-bidi: plaintext;
+}
+
+/* Eight lines show of a folded message (it folds above twelve, `messages.tsx`). */
+.row-user-text[data-folded='true'] {
+  max-height: 8lh;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 calc(100% - 48px), transparent);
+}
+
+.row-user-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  height: var(--piarc-session-row-small);
+  margin-inline-start: calc(-1 * var(--piarc-session-pad-xs));
+  padding: 0 var(--piarc-session-pad-xs);
+  border: 0;
+  border-radius: calc(var(--piarc-session-radius) - 2px);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  user-select: none;
+}
+
+.row-user-more:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+
+.mention-chip {
+  padding: 0 4px;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-selected);
+  color: var(--piarc-text-accent);
+  white-space: nowrap;
+}
+
+/* In the transcript a mention reads as a link-colored word that opens the file. */
+.conversation .row-user-text .mention-chip {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.conversation .row-user-text .mention-chip:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.attachment-chips,
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+  margin-top: var(--piarc-space-1);
+}
+
+/* An attachment: a file card with its kind's icon, name and size. */
+.attachment-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  min-width: 120px;
+  max-width: 240px;
+  height: var(--piarc-workbench-composer-height);
+  padding: 0 var(--piarc-session-pad-md) 0 var(--piarc-session-pad-sm);
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-workbench-editor);
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+  user-select: none;
+}
+
+.attachment-chip-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--piarc-session-composer-row);
+  height: var(--piarc-session-composer-row);
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+}
+
+.attachment-chip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.attachment-chip-name {
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-chip-size {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+  font-variant-numeric: tabular-nums;
+}
+
+.attachment-remove {
+  border: none;
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* the reply */
+
+.md-fallback {
+  white-space: pre-wrap;
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md-table-wrap,
+.md-code,
+.md-raw-html-block {
+  margin: 0 0 var(--piarc-space-3);
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  margin: var(--piarc-space-4) 0 var(--piarc-space-2);
+  line-height: 1.3;
+}
+
+.md-list {
+  padding-left: var(--piarc-space-5);
+}
+
+.md-task {
+  list-style: none;
+}
+
+.md-task > input {
+  margin: 0 6px 0 -20px;
+}
+
+.md blockquote {
+  padding-left: var(--piarc-space-3);
+  border-left: 3px solid var(--piarc-border-strong);
+  color: var(--piarc-text-secondary);
+}
+
+.md-inline-code,
+.md-code pre,
+.md-raw-html,
+.md-raw-html-block,
+.bash-command,
+.tool-output,
+.row-error-details,
+.diff-table {
+  font-family: var(--piarc-font-mono);
+  font-size: 0.92em;
+}
+
+.md-inline-code,
+.md-raw-html {
+  padding: 1px 4px;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-code-background);
+  color: var(--piarc-code-text);
+}
+
+.md-raw-html-block {
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-radius: var(--piarc-radius-md);
+  white-space: pre-wrap;
+  background: var(--piarc-code-background);
+}
+
+.md-code {
+  position: relative;
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-code-background);
+  color: var(--piarc-code-text);
+}
+
+.md-code pre {
+  margin: 0;
+  padding: 10px var(--piarc-space-3);
+  overflow-x: auto;
+  line-height: 1.45;
+}
+
+.md-code-lang {
+  padding: 4px var(--piarc-space-3) 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  user-select: none;
+}
+
+/* The copy button runs down the block's right edge and sticks while a tall block scrolls by. */
+.md-code-rail {
+  position: absolute;
+  inset: 0 var(--piarc-space-1) 0 auto;
+  z-index: 1;
+  padding-block: var(--piarc-space-1);
+  pointer-events: none;
+  /* Not part of a selection: copying across the block gives only its code. */
+  user-select: none;
+}
+
+.md-code-rail > .icon-button {
+  position: sticky;
+  top: var(--piarc-space-1);
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity var(--piarc-motion-surface) var(--piarc-motion-curve-snap);
+}
+
+.md-code:hover .md-code-rail > .icon-button,
+.md-code-rail > .icon-button:focus-visible,
+.md-code-rail > .icon-button[data-copied='true'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .md-code-rail > .icon-button {
+    opacity: 1;
+  }
+}
+
+.hl-italic {
+  font-style: italic;
+}
+
+.hl-bold {
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.hl-underline {
+  text-decoration: underline;
+}
+
+.hl-strike {
+  text-decoration: line-through;
+}
+
+.md-table-wrap {
+  overflow-x: auto;
+}
+
+.md table {
+  border-collapse: collapse;
+}
+
+.md th,
+.md td {
+  padding: 4px 10px;
+  border: 1px solid var(--piarc-border-default);
+}
+
+.md-align-left {
+  text-align: left;
+}
+
+.md-align-center {
+  text-align: center;
+}
+
+.md-align-right {
+  text-align: right;
+}
+
+.md-link {
+  color: var(--piarc-text-accent);
+}
+
+.md-link-blocked {
+  text-decoration: underline dotted;
+}
+
+/* A reply or message that arrives while the pane is open eases in; rows mounted by scrolling are
+   already complete and do not. */
+.conversation .row-agent.is-inProgress,
+.conversation .row-user.is-sending {
+  animation: row-arrive var(--piarc-motion-normal) var(--piarc-motion-curve-out);
+}
+
+@keyframes row-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---- the reply in the session pane: the prose scale (ADR-0078), F is the block flow ---- */
+
+.row-agent .md {
+  --md-flow: 0.75em;
+  --md-text-inset: var(--piarc-session-text-inset);
+  --md-text-stop: clamp(0px, (100% - 384px) * 0.175, 56px);
+}
+
+.row-agent .md :is(p, h1, h2, h3, h4, h5, h6, ul, ol) {
+  margin: var(--md-flow) 0 0;
+}
+
+.row-agent .md :is(p, h1, h2, h3, h4, h5, h6) {
+  padding-inline: var(--md-text-inset) var(--md-text-stop);
+}
+
+.row-agent .md > :first-child {
+  margin-top: 0;
+}
+
+.row-agent .md :is(h1, h2) {
+  font-size: calc(1em + 2px);
+  line-height: calc(var(--piarc-session-prose-line) + 3px);
+}
+
+.row-agent .md :is(h3, h4, h5, h6) {
+  font-size: 1em;
+  line-height: inherit;
+}
+
+.row-agent .md :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: var(--piarc-font-weight-semibold);
+  letter-spacing: normal;
+}
+
+.row-agent .md h1 {
+  margin-top: calc(var(--md-flow) * 3);
+}
+
+.row-agent .md h2 {
+  margin-top: calc(var(--md-flow) * 2.5);
+}
+
+.row-agent .md h3 {
+  margin-top: calc(var(--md-flow) * 2);
+}
+
+.row-agent .md :is(h4, h5, h6) {
+  margin-top: calc(var(--md-flow) * 1.667);
+}
+
+.row-agent .md h6 {
+  color: var(--piarc-text-secondary);
+}
+
+.row-agent .md :is(h1, h2, h3, h4, h5, h6) + * {
+  margin-top: calc(var(--md-flow) * 0.667);
+}
+
+.row-agent .md .md-list {
+  padding-inline-start: 2em;
+}
+
+.row-agent .md .md-list > li {
+  margin-top: calc(var(--md-flow) * 0.333);
+  padding-inline-start: 0.5em;
+}
+
+.row-agent .md .md-list > li::marker {
+  color: var(--piarc-text-secondary);
+}
+
+.row-agent .md .md-list > li > * {
+  margin-top: calc(var(--md-flow) * 0.333);
+}
+
+.row-agent .md .md-list > li > :not(.md-list) {
+  padding-inline: 0;
+}
+
+.row-agent .md .md-list > li > :first-child {
+  margin-top: 0;
+}
+
+.row-agent .md .md-task {
+  padding-inline-start: 0;
+}
+
+/* A reply's task box is read-only: drawn here, so a checked one reads done, not disabled. */
+.row-agent .md .md-task > input {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  box-sizing: border-box;
+  width: 0.95em;
+  height: 0.95em;
+  margin: 0 0.5em 0 -1.375em;
+  border: 1.5px solid var(--piarc-border-strong);
+  border-radius: 3px;
+  background: transparent;
+  translate: 0 0.12em;
+}
+
+.row-agent .md .md-task > input:checked {
+  border-color: var(--piarc-accent-solid);
+  background: var(--piarc-accent-solid);
+}
+
+.row-agent .md .md-task > input:checked::before {
+  width: 0.5em;
+  height: 0.26em;
+  border: solid var(--piarc-text-on-accent);
+  border-width: 0 0 1.5px 1.5px;
+  content: '';
+  transform: translateY(-0.06em) rotate(-45deg);
+}
+
+.row-agent .md :is(.md-list, .md-table-wrap, .md-code, blockquote, hr) + * {
+  margin-top: calc(var(--md-flow) * 2);
+}
+
+.row-agent .md blockquote {
+  margin: var(--md-flow) 0 0 0.5em;
+  padding-inline-start: 1em;
+  border-inline-start: 4px solid var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+}
+
+.row-agent .md blockquote > :first-child {
+  margin-top: 0;
+}
+
+.row-agent .md hr {
+  height: 0;
+  margin: calc(var(--md-flow) * 2) 0.375em 0;
+  border: 0;
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.row-agent .md strong {
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.row-agent .md .md-link {
+  color: var(--piarc-text-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--piarc-motion-surface) var(--piarc-motion-curve-out);
+}
+
+.row-agent .md .md-link:is(:hover, :focus-visible) {
+  text-decoration-color: currentColor;
+}
+
+.row-agent .md button.md-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+}
+
+.row-agent .md .md-inline-code {
+  padding: 0.125em 0.3em;
+  border-radius: 0.375em;
+  background: var(--piarc-session-inline-code-fill);
+  color: var(--piarc-session-inline-code);
+  font-size: 0.875em;
+  font-weight: var(--piarc-font-weight-medium);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.row-agent .md .md-link .md-inline-code {
+  background: none;
+  color: inherit;
+}
+
+.row-agent .md .md-table-wrap {
+  margin-top: var(--md-flow);
+  border-radius: var(--piarc-session-radius);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+}
+
+.row-agent .md table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.row-agent .md :is(th, td) {
+  min-width: 96px;
+  padding: 0.4375em 0.75em;
+  border: 0;
+  vertical-align: top;
+  text-align: start;
+}
+
+.row-agent .md th {
+  border-bottom: 1px solid var(--piarc-session-line);
+  background: var(--piarc-session-fill);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.row-agent .md tr:first-child > th:first-child {
+  border-start-start-radius: calc(var(--piarc-session-radius) - 1px);
+}
+
+.row-agent .md tr:first-child > th:last-child {
+  border-start-end-radius: calc(var(--piarc-session-radius) - 1px);
+}
+
+.row-agent .md tbody tr + tr > td {
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.row-agent .md :is(.md-align-center, .md-align-right) {
+  text-align: revert;
+}
+
+.row-agent .md .md-align-center {
+  text-align: center;
+}
+
+.row-agent .md .md-align-right {
+  text-align: end;
+}
+
+.row-agent .md .md-code {
+  margin-top: var(--md-flow);
+  border-radius: var(--piarc-session-radius);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  overflow: hidden;
+}
+
+/* A message's time in its actions (ADR-0080): quiet, the full date and time as its tooltip. */
+.row-time {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: var(--piarc-space-1);
+  line-height: var(--piarc-session-footnote-line);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Images in replies (ADR-0080): a project image inline with a hairline, a remote one as a card
+   that opens in the browser; a quiet placeholder while the preview address comes. */
+.md-reply-image {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.md-reply-image img {
+  max-height: 420px;
+  border-radius: 5px;
+  outline: 1px solid var(--piarc-session-line);
+  outline-offset: -1px;
+}
+
+.md-reply-image-pending {
+  display: block;
+  width: min(320px, 100%);
+  height: 120px;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  animation:
+    skeleton-reveal var(--piarc-motion-fast) var(--piarc-motion-curve-out) 0.3s backwards,
+    skeleton-breathe 2s ease-in-out 0.3s infinite;
+}
+
+:root[data-app] .md-remote-image {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  max-width: 100%;
+  margin: 2px 0;
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-md);
+  border: 0;
+  border-radius: var(--piarc-session-radius);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-align: start;
+  vertical-align: middle;
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+:root[data-app] .md-remote-image:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+
+.md-remote-image > .icon {
+  flex: none;
+  color: var(--piarc-text-secondary);
+}
+
+.md-remote-image-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.md-remote-image-name,
+.md-remote-image-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-remote-image-name {
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+
+.md-remote-image-host {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.tool-image {
+  display: block;
+  padding: var(--piarc-space-1) 0 var(--piarc-space-1) var(--piarc-session-text-inset);
+}
+
+.tool-image .md-reply-image img {
+  max-height: 360px;
+}
+
+@media (forced-colors: active) {
+  :root[data-app] .md-remote-image {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+
+/* Mermaid diagrams (ADR-0080): a hairline box with the language and its tools on top and the
+   drawn image centred below; while the fence streams or the image draws, a quiet placeholder. */
+.row-agent .md .md-diagram {
+  margin: var(--md-flow) 0 0;
+  border-radius: var(--piarc-session-radius);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  overflow: hidden;
+}
+
+.md-diagram-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-2);
+  min-height: var(--piarc-session-row);
+  padding: var(--piarc-space-1) var(--piarc-space-1) 0 calc(10px + 1ch);
+}
+
+.md-diagram-lang {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+  user-select: none;
+}
+
+.md-diagram-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.md-diagram-tools > .md-diagram-fix {
+  color: var(--piarc-text-accent);
+}
+
+.md-diagram-body {
+  display: flex;
+  justify-content: center;
+  padding: var(--piarc-session-pad-sm) var(--piarc-session-pad-lg) var(--piarc-session-pad-lg);
+  overflow-x: auto;
+}
+
+.md-diagram-placeholder {
+  height: 88px;
+  margin: var(--piarc-session-pad-sm) var(--piarc-session-pad-lg) var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  animation:
+    skeleton-reveal var(--piarc-motion-fast) var(--piarc-motion-curve-out) 0.3s backwards,
+    skeleton-breathe 2s ease-in-out 0.3s infinite;
+}
+
+.md-diagram-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: var(--piarc-space-1) var(--piarc-session-pad-lg) 0 calc(10px + 1ch);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.md-diagram-error > .icon {
+  flex: none;
+  margin-top: 0.5px;
+  color: var(--piarc-text-warning);
+}
+
+/* The source inside the box: the box is its frame, the head its language and copy. */
+.row-agent .md .md-diagram .md-code {
+  margin-top: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.md-diagram .md-code-lang,
+.md-diagram .md-code-rail {
+  display: none;
+}
+
+@media (forced-colors: active) {
+  .row-agent .md .md-diagram {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+
+.row-agent .md .md-code-lang {
+  padding: var(--piarc-space-2) calc(10px + 1ch) 0;
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+}
+
+.row-agent .md .md-code pre {
+  padding: var(--piarc-session-pad-md) calc(var(--piarc-session-row) + 1ch)
+    var(--piarc-session-pad-md) calc(10px + 1ch);
+  font-size: var(--piarc-session-code);
+  line-height: var(--piarc-session-code-line);
+}
+
+.row-agent .md .md-code-lang + pre,
+.row-agent .md .md-code-lang + .md-code-rail + pre {
+  padding-top: var(--piarc-space-1);
+}
+
+.row-agent .md :is(.markdown-display-math) {
+  display: block;
+  margin-top: var(--md-flow);
+  padding-block: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Math fonts run small beside the text (Cambria Math on Windows): a display formula steps up. */
+.row-agent .md .markdown-display-math math {
+  font-size: 1.2em;
+}
+
+/* Scrollbars inside tables and code: thin pills that do not crowd the text. */
+.row-agent .md :is(.md-table-wrap, .md-code pre)::-webkit-scrollbar {
+  height: 8px;
+}
+
+.row-agent .md :is(.md-table-wrap, .md-code pre)::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-border-strong) padding-box;
+}
+
+@media (forced-colors: active) {
+  .row-agent .md :is(.md-table-wrap, .md-code) {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* thinking: a step row with its duration; the text below in the secondary ink */
+
+.row-thinking-text {
+  padding-inline: var(--piarc-session-text-inset) var(--piarc-space-5);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.row-thinking .step-line[aria-disabled='true'] .step-caret {
+  visibility: hidden;
+}
+
+/* tools: step rows (session.css) with their bodies */
+
+.tool-status {
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+
+.tool-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--piarc-state-success);
+}
+
+.tool-status.is-inProgress .tool-status-dot {
+  background: var(--piarc-accent-solid);
+  animation: piarc-pulse 1.2s ease-in-out infinite;
+}
+
+.tool-status.is-failed .tool-status-dot {
+  background: var(--piarc-state-danger);
+}
+
+.tool-status.is-declined .tool-status-dot,
+.tool-status.is-interrupted .tool-status-dot {
+  background: var(--piarc-text-secondary);
+}
+
+/* Forced colors drop backgrounds: the status keeps a shape in system colors (filled when done,
+   highlighted while running, an outlined square when it did not succeed); its name is also in
+   the mark's text for screen readers and its title. */
+@media (forced-colors: active) {
+  .tool-status-dot {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  .tool-status.is-inProgress .tool-status-dot {
+    background: Highlight;
+  }
+  .tool-status.is-failed .tool-status-dot,
+  .tool-status.is-declined .tool-status-dot,
+  .tool-status.is-interrupted .tool-status-dot {
+    border: 2px solid CanvasText;
+    border-radius: 1px;
+    background: Canvas;
+  }
+}
+
+@keyframes piarc-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* A summary part's object, and a command or path shown in a step's line. */
+.step-object {
+  color: var(--piarc-text-primary);
+}
+
+/* A command in a step line: mono runs wide and dark, so one step smaller than the line's text. */
+.step-code {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-caption);
+}
+
+/* Several calls open into a card: a hairline ring, rows divided, no fill. */
+.tool-calls {
+  display: flex;
+  flex-direction: column;
+  margin-block: var(--piarc-session-pad-xs) var(--piarc-space-1);
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+}
+
+.tool-calls > * {
+  padding: var(--piarc-session-pad-sm) var(--piarc-session-pad-md);
+}
+
+.tool-calls > * + * {
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+/* Thinking, commands and web searches keep their own rows inside the group's cells. */
+.tool-calls > .row {
+  max-width: none;
+  margin: 0;
+}
+
+.tool-calls .step-head {
+  margin-inline: calc(-1 * var(--piarc-session-pad-xs));
+}
+
+.tool-calls .step-line {
+  min-height: var(--piarc-session-prose-line);
+}
+
+.tool-output,
+.row-error-details {
+  box-sizing: border-box;
+  max-height: 400px;
+  margin: 0;
+  padding: var(--piarc-session-pad-sm) var(--piarc-session-pad-md);
+  overflow: auto;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-code-background);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+  line-height: var(--piarc-session-code-line);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.tool-output.is-failed {
+  color: var(--piarc-text-danger);
+}
+
+.tool-output.is-live {
+  max-height: calc(var(--piarc-session-code-line) * 10 + 2 * var(--piarc-session-pad-sm));
+  margin-top: var(--piarc-session-pad-xs);
+}
+
+.tool-calls .tool-output {
+  max-height: 200px;
+}
+
+/* subagent card (T31): the run in a hairline card; its status and activity shimmer while it runs */
+.subagent-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  box-sizing: border-box;
+  max-width: var(--piarc-session-approval-width);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+.subagent-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  color: var(--piarc-text-secondary);
+}
+.subagent-title {
+  min-width: 0;
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.subagent-type,
+.subagent-badge {
+  flex: none;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-footnote-line);
+  white-space: nowrap;
+}
+.subagent-status {
+  flex: none;
+  margin-inline-start: auto;
+  font-size: var(--piarc-session-footnote);
+  white-space: nowrap;
+}
+.row-subagent.is-failed .subagent-status,
+.row-subagent.is-interrupted .subagent-status {
+  color: var(--piarc-text-danger);
+}
+.row-subagent.is-partial .subagent-status {
+  color: var(--piarc-text-warning);
+}
+.subagent-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-border-strong);
+}
+.subagent-dot[data-color='red'],
+.subagent-dot[data-color='pink'] {
+  background: var(--piarc-state-danger);
+}
+.subagent-dot[data-color='orange'],
+.subagent-dot[data-color='yellow'] {
+  background: var(--piarc-state-warning);
+}
+.subagent-dot[data-color='green'] {
+  background: var(--piarc-state-success);
+}
+.subagent-dot[data-color='blue'],
+.subagent-dot[data-color='purple'],
+.subagent-dot[data-color='cyan'] {
+  background: var(--piarc-accent-solid);
+}
+.subagent-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--piarc-space-3);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
+}
+.subagent-activity {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.subagent-warnings {
+  margin: 0;
+  padding-inline-start: 1.2em;
+  font-size: var(--piarc-session-footnote);
+}
+.subagent-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  margin-top: var(--piarc-space-1);
+}
+.subagent-actions:empty {
+  display: none;
+}
+.subagent-transcript {
+  max-height: 480px;
+  margin-top: var(--piarc-space-2);
+  padding-top: var(--piarc-space-2);
+  overflow: auto;
+  border-top: 1px solid var(--piarc-session-line);
+}
+.approval-origin {
+  font-size: var(--piarc-font-size-small);
+}
+
+/* shell commands: the command card and the output when the step is open */
+
+.bash-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-xs);
+}
+
+.bash-command-card {
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-code-background);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+}
+
+.bash-cwd {
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-md) 0;
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.bash-command {
+  margin: 0;
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-md);
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+  line-height: var(--piarc-session-code-line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bash-prompt {
+  color: var(--piarc-text-secondary);
+  user-select: none;
+}
+
+/* `CommandText`: a word moves to the next line whole; only one longer than the line breaks. */
+.command-word {
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-all;
+}
+
+/* the approval card's command and diff blocks share these */
+.approval-card .bash-command {
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-code-background);
+}
+
+/* a file change: its path, then Core's diff */
+
+.file-change-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+}
+
+.file-change-head {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Over the element resets (`:root[data-app] button`) and the files panel's `.file-path-action`:
+   the path is a quiet footnote, not the body's ink and size. */
+:root[data-app] .file-change-path {
+  min-width: 0;
+  min-block-size: 0;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-app] button.file-change-path:hover {
+  color: var(--piarc-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.diff {
+  max-height: 400px;
+  overflow: auto;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-code-background);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+  line-height: calc(var(--piarc-session-code-line) + 1px);
+}
+
+.diff-hunk-head td {
+  padding: var(--piarc-space-1) var(--piarc-session-pad-md);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  user-select: none;
+}
+
+.diff-gutter {
+  width: 1%;
+  min-width: 3ch;
+  white-space: nowrap;
+  padding: 0 1ch 0 calc(1ch + 5px);
+  color: var(--piarc-text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  vertical-align: top;
+  user-select: none;
+}
+
+.diff-text {
+  width: 100%;
+  padding-inline: 0 1ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-sign {
+  display: inline-block;
+  width: 2ch;
+  user-select: none;
+}
+
+.diff-line.is-added {
+  background: var(--piarc-diff-added-background);
+}
+
+.diff-line.is-added .diff-sign,
+.diff-line.is-added .diff-gutter {
+  color: var(--piarc-diff-added-text);
+}
+
+.diff-line.is-removed {
+  background: var(--piarc-diff-removed-background);
+}
+
+.diff-line.is-removed .diff-sign,
+.diff-line.is-removed .diff-gutter {
+  color: var(--piarc-diff-removed-text);
+}
+
+.diff-more {
+  display: block;
+  width: 100%;
+  height: var(--piarc-session-row);
+  border: 0;
+  border-top: 1px solid var(--piarc-session-line);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+}
+
+.diff-more:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+
+@media (forced-colors: active) {
+  .diff-line.is-added .diff-sign,
+  .diff-line.is-removed .diff-sign {
+    forced-color-adjust: none;
+    color: CanvasText;
+  }
+}
+
+/* status lines: compaction and permission mode changes, quiet lines on the text inset */
+
+.row-compaction,
+.row-mode-change {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: var(--piarc-session-row);
+  padding-inline-start: var(--piarc-session-text-inset);
+  color: var(--piarc-text-secondary);
+  user-select: none;
+}
+
+.conversation .transcript-row > :is(.row-compaction, .row-mode-change) {
+  padding-inline-start: calc(var(--piarc-session-gutter) + var(--piarc-session-text-inset));
+}
+
+.row-compaction.is-failed {
+  color: var(--piarc-text-danger);
+}
+
+/* system reminders (detailed view, T29) */
+
+.row-reminder {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+.row-reminder-body {
+  border-left: 2px dashed var(--piarc-border-subtle);
+  padding-left: var(--piarc-space-3);
+}
+
+.row-reminder-head {
+  font-weight: 600;
+}
+
+.row-reminder-text {
+  margin-top: var(--piarc-space-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* error and uncertain cards: a quiet strip with the icon and what went wrong, the hint, then the
+   details disclosure and the retry on the right */
+
+.row-error-box {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: min(480px, 100%);
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+
+.row-error-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-danger);
+}
+
+.row-error.is-uncertain .row-error-head {
+  color: var(--piarc-text-secondary);
+}
+
+.row-error-title {
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.row-error-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-sm);
+  padding: var(--piarc-session-pad-lg) var(--piarc-session-pad-lg) var(--piarc-session-pad-md);
+}
+
+.row-error-hint {
+  color: var(--piarc-text-secondary);
+  white-space: pre-line;
+}
+
+.row-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--piarc-session-gap-sm);
+  user-select: none;
+}
+
+.row-error-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-inline-end: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+}
+
+.row-error-more:hover {
+  color: var(--piarc-text-primary);
+}
+
+.row-error-more[aria-expanded='true'] .step-caret {
+  transform: rotate(90deg);
+}
+
+.row-error-details {
+  max-height: 240px;
+}
+
+/* working row: PiArc's mark at the start of the text column, the activity, then time, tokens and
+   retries */
+
+.row-working {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-sm);
+  min-height: var(--piarc-session-row);
+  color: var(--piarc-text-secondary);
+  user-select: none;
+}
+
+.conversation .transcript-row > .row-working {
+  padding-inline-start: calc(var(--piarc-session-gutter) + var(--piarc-session-text-inset));
+}
+
+.working-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--piarc-session-mark-size);
+  height: var(--piarc-session-mark-size);
+  animation: working-mark-in var(--piarc-motion-normal) var(--piarc-motion-curve-out)
+    calc(var(--piarc-motion-fast) + 30ms) backwards;
+}
+
+@keyframes working-mark-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.working-activity {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: working-label-in var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.working-activity.status-pill {
+  overflow: visible;
+}
+
+@keyframes working-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.working-facts {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+
+.working-elapsed,
+.working-tokens,
+.working-retry {
+  font-variant-numeric: tabular-nums;
+}
+
+.working-retry {
+  color: var(--piarc-text-warning);
+}
+
+/* The mark: ten cells that light up in drawing order; the wave's speed is the activity. */
+.activity-mark {
+  --mark-cycle: 1.8s;
+  --mark-step: 0.11s;
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--mark-size, 16px);
+  height: var(--mark-size, 16px);
+  color: var(--piarc-accent-solid);
+}
+
+.activity-mark[data-activity='tool'] {
+  --mark-cycle: 1s;
+  --mark-step: 0.06s;
+}
+
+.activity-mark-cell {
+  position: absolute;
+  width: 20%;
+  height: 20%;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.22;
+  will-change: opacity;
+  animation: activity-cell var(--mark-cycle) var(--piarc-motion-easing) infinite;
+  animation-delay: calc(var(--cell) * var(--mark-step));
+}
+
+@keyframes activity-cell {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+  18% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.22;
+  }
+}
+
+/* Waiting for the user: the whole mark holds and breathes in the warning ink. */
+.activity-mark[data-activity='blocked'] {
+  color: var(--piarc-state-warning);
+  animation: activity-breathe 2s ease-in-out infinite;
+}
+
+.activity-mark[data-activity='blocked'] .activity-mark-cell {
+  opacity: 1;
+  animation: none;
+}
+
+@keyframes activity-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+:root[data-reduce-motion='true'] .activity-mark,
+:root[data-reduce-motion='true'] .activity-mark-cell {
+  animation: none;
+}
+
+:root[data-reduce-motion='true'] .activity-mark-cell {
+  opacity: 0.85;
+}
+
+@media (forced-colors: active) {
+  /* The cells are backgrounds: keep them in the text color the system chose. */
+  .activity-mark {
+    color: CanvasText;
+    forced-color-adjust: none;
+  }
+}
+
+@keyframes piarc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- composer ---- */
+
+.composer {
+  position: relative;
+  box-sizing: border-box;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--piarc-space-2) var(--piarc-space-5) var(--piarc-space-3);
+}
+
+.composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-1);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-c-input-background);
+}
+
+.composer-box.is-disabled {
+  opacity: 0.6;
+}
+
+.composer-mount {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-mount[data-empty='true']::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  top: var(--piarc-space-2);
+  left: var(--piarc-space-3);
+  color: var(--piarc-text-disabled);
+  pointer-events: none;
+}
+
+.composer-editor {
+  max-height: 40vh;
+  min-height: 24px;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  overflow-y: auto;
+  outline: none;
+  color: var(--piarc-c-input-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.composer-editor p {
+  margin: 0;
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  user-select: none;
+}
+
+.composer-attach {
+  cursor: pointer;
+}
+
+.composer-hint {
+  margin-top: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  user-select: none;
+}
+
+.composer-problems {
+  margin-bottom: var(--piarc-space-1);
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-font-size-small);
+}
+
+.composer-popup {
+  position: absolute;
+  bottom: 100%;
+  left: var(--piarc-space-5);
+  z-index: 2;
+  min-width: min(320px, calc(100% - 2 * var(--piarc-space-5)));
+  max-width: calc(100% - 2 * var(--piarc-space-5));
+  max-height: 320px;
+  margin: 0 0 var(--piarc-space-1);
+  padding: var(--piarc-space-1);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  box-shadow: var(--piarc-shadow-overlay);
+  user-select: none;
+}
+
+.mention-option,
+.mention-empty {
+  display: flex;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  cursor: default;
+}
+
+.mention-option {
+  cursor: pointer;
+}
+
+.mention-path {
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the `/` palette's groups, argument hints and skill marks (T37) */
+.command-group {
+  padding: var(--piarc-space-1) var(--piarc-space-2) 2px;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: 600;
+}
+
+.command-hint {
+  color: var(--piarc-text-secondary);
+}
+
+.command-kind {
+  margin-left: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-1);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+
+/* the queue above the composer: a quiet band, the count folds the list away */
+
+.queue-band {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 var(--piarc-space-2);
+  overflow: hidden;
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-session-fill);
+  animation: session-band-in var(--piarc-motion-fast) var(--piarc-motion-curve-out);
+}
+
+@keyframes session-band-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.queue-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  min-height: calc(var(--piarc-session-row) + var(--piarc-space-4));
+  padding: 0 var(--piarc-session-pad-lg);
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+  text-align: start;
+  user-select: none;
+}
+
+.queue-head:hover {
+  background: var(--piarc-session-fill);
+}
+
+.queue-count {
+  flex: none;
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.queue-next {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-caret {
+  display: inline-grid;
+  place-items: center;
+  margin-inline-start: auto;
+  color: var(--piarc-text-secondary);
+  transition: transform var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+.queue-head[aria-expanded='true'] .queue-caret {
+  transform: rotate(90deg);
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  max-height: min(40vh, 352px);
+  margin: 0;
+  padding: 0 var(--piarc-session-pad-xs) var(--piarc-session-pad-xs);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.queue-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-session-gap-xs);
+  padding: var(--piarc-space-1) var(--piarc-session-pad-sm);
+  border-radius: var(--piarc-session-radius);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+
+.queue-item + .queue-item {
+  border-top: 1px solid var(--piarc-session-line);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.queue-kind {
+  flex: none;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-body-line);
+  user-select: none;
+}
+
+.queue-text {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.queue-editor {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+
+.queue-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-block: -2px;
+  user-select: none;
+}
+
+/* Approval cards (ADR-0078): the row stays transparent; the box is a hairline card on the
+   reading column, at most 480 px wide for tool requests, the decisions on the right with the
+   primary "Allow once" last. Plans, questions and MCP requests use the same box. */
+.approval-card {
+  outline: none;
+}
+
+.approval-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-md);
+  box-sizing: border-box;
+  max-width: var(--piarc-session-approval-width);
+  padding: var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card);
+  container-type: inline-size;
+  background: var(--piarc-workbench-canvas);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+  animation: approval-in 160ms var(--piarc-motion-curve-out);
+}
+
+/* The card takes focus when it appears: the box shows it, not the transparent row. */
+:root[data-app] .approval-card:focus-visible {
+  outline: none;
+}
+
+.approval-card:focus-visible > .approval-box {
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-c-focus-ring),
+    0 0 0 4px color-mix(in srgb, var(--piarc-c-focus-ring) 18%, transparent);
+}
+
+@media (forced-colors: active) {
+  .approval-card:focus-visible > .approval-box {
+    outline: 2px solid Highlight;
+    outline-offset: 0;
+  }
+}
+
+@keyframes approval-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.approval-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-xs);
+  min-width: 0;
+}
+
+.approval-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  margin: 0;
+  color: var(--piarc-text-primary);
+}
+
+.approval-title strong {
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.approval-tool {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+
+.approval-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+
+.approval-path,
+.approval-message,
+.approval-sandbox {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* T39: where an approved command runs; outside the sandbox stands out. */
+.approval-sandbox.is-outside {
+  color: var(--piarc-text-danger);
+}
+
+/* The request's value: the command or the change, read in full before it is allowed. */
+.approval-value {
+  max-height: 240px;
+  margin: 0;
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  overflow: auto;
+  border-radius: 5px;
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+  line-height: var(--piarc-session-code-line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approval-value.is-clipped {
+  mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+}
+
+.approval-card .diff {
+  max-height: 240px;
+}
+
+.approval-link {
+  align-self: flex-start;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-session-footnote);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.approval-link:hover {
+  color: var(--piarc-text-primary);
+  text-decoration-color: currentColor;
+}
+
+.approval-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+}
+
+.approval-field-label {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.approval-field input,
+.approval-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-sm);
+  border: 0;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-workbench-editor);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-primary);
+  font: inherit;
+}
+
+.approval-field textarea {
+  min-height: 44px;
+  max-height: 160px;
+  resize: vertical;
+}
+
+.approval-field textarea[data-testid='approval-rules'] {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-code);
+}
+
+.approval-decide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-sm);
+}
+
+.approval-gate {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-align: end;
+  text-wrap: balance;
+}
+
+/* Decline, the session and the once decisions stay together on the right; a lasting permission
+   sits on the left and takes its own line when both do not fit. */
+.approval-actions,
+.approval-main,
+.approval-persist {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-sm);
+}
+
+.approval-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  column-gap: var(--piarc-session-gap-md);
+}
+
+.approval-main {
+  flex-wrap: nowrap;
+  margin-inline-start: auto;
+}
+
+.approval-persist {
+  margin-inline-end: auto;
+}
+
+.approval-main > *,
+.approval-persist > * {
+  flex: none;
+}
+
+.approval-add-feedback {
+  align-self: flex-start;
+}
+
+.approval-keys {
+  display: inline-flex;
+  margin-inline-start: var(--piarc-space-1);
+}
+
+:root[data-app] .approval-keys .keycaps-visual kbd {
+  height: 18px;
+  min-width: 18px;
+  padding: 0 3px;
+  border-color: color-mix(in srgb, currentColor 22%, transparent);
+  background: transparent;
+  color: inherit;
+  font-size: var(--piarc-session-caption);
+  font-weight: var(--piarc-font-weight-regular);
+}
+
+.approval-keys .keycap-joiner {
+  color: inherit;
+  opacity: 0.6;
+}
+
+.approval-error {
+  margin: 0;
+  color: var(--piarc-text-danger);
+}
+
+/* A narrow card (measured on the card itself) stacks its decisions, each full width, the primary
+   last. */
+@container (max-width: 480px) {
+  .approval-actions,
+  .approval-main,
+  .approval-persist {
+    flex-direction: column;
+    align-items: stretch;
+    margin-inline: 0;
+  }
+  .approval-gate {
+    text-align: center;
+  }
+}
+
+/* The question card (one question at a time): a quiet head with the question and the pager,
+   divided option rows, then the answer. */
+.approval-box.is-question {
+  gap: 0;
+  padding: 0;
+}
+
+.approval-strip {
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  background: var(--piarc-session-fill);
+}
+
+.approval-box.is-question > .approval-origin,
+.approval-box.is-question > .approval-actions,
+.approval-box.is-question > .approval-error {
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+}
+
+.approval-box.is-question > .question-feedback {
+  margin: 0 1px;
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg) 0;
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.approval-box.is-question > .approval-strip {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* A new page slides in from the side it comes from. */
+.question-page {
+  animation: question-page-in var(--piarc-motion-fast) var(--piarc-motion-curve-out);
+}
+
+.question-page[data-direction='back'] {
+  animation-name: question-page-back;
+}
+
+@keyframes question-page-in {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+}
+
+@keyframes question-page-back {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+:root[data-reduce-motion='true'] .question-page {
+  animation: none;
+}
+
+.question {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The card's hairline is an inset shadow that a child's background would paint over: the head
+   and the option rows stay 1px inside it, and the head follows the card's top corners. */
+.question-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-session-gap-md);
+  margin: 1px 1px 0;
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  border-radius: calc(var(--piarc-session-radius-card) - 1px)
+    calc(var(--piarc-session-radius-card) - 1px) 0 0;
+  background: var(--piarc-session-fill);
+}
+
+.question-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--piarc-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.question-header {
+  margin-inline-end: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+}
+
+.question-hint {
+  color: var(--piarc-text-secondary);
+}
+
+/* "‹ 2 / 3 ›": quiet, on the question's first line. */
+.question-pager {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-block: -2px;
+  margin-inline-end: calc(-1 * var(--piarc-space-1));
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.question-position {
+  min-width: 3ch;
+  text-align: center;
+}
+
+.question-options {
+  display: flex;
+  flex-direction: column;
+  margin: 0 1px;
+}
+
+.approval-card .question-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-session-gap-sm);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+  color: var(--piarc-text-primary);
+  cursor: pointer;
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.approval-card .question-option + .question-option {
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.approval-card .question-option:hover {
+  background: var(--piarc-surface-hover);
+}
+
+.approval-card .question-option[data-selected] {
+  background: var(--piarc-surface-selected);
+}
+
+.question-option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--piarc-accent-solid);
+}
+
+.question-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.question-option-description {
+  color: var(--piarc-text-secondary);
+}
+
+/* The own answer sits under "Other", in line with the option text. */
+.question-other-row {
+  padding: 0 var(--piarc-session-pad-lg) var(--piarc-session-pad-md)
+    calc(var(--piarc-session-pad-lg) + 18px + var(--piarc-session-gap-sm));
+}
+
+.question-options > .question-other-row:first-child {
+  padding-top: var(--piarc-session-pad-md);
+  padding-inline-start: var(--piarc-session-pad-lg);
+}
+
+.question-other {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--piarc-session-pad-xs) var(--piarc-session-pad-sm);
+  border: 0;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-workbench-editor);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-primary);
+  font: inherit;
+}
+
+/* A plan reads as Markdown in its row: the start of it (faded) until the user shows it whole; the
+   plan panel holds it with comments (ADR-0103). The row is the card: no fill box inside it. */
+.plan-preview {
+  margin: 0;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+  overflow-wrap: anywhere;
+}
+
+.plan-preview[data-expanded='false'] {
+  max-height: 240px;
+  overflow: hidden;
+}
+
+.plan-preview[data-expanded='false'][data-overflows='true'] {
+  mask-image: linear-gradient(#000 calc(100% - 48px), transparent);
+}
+
+.plan-preview .md > :last-child {
+  margin-bottom: 0;
+}
+
+/* Headings on the reply's scale: a plan's title is not a page title. */
+.plan-preview .md :is(h1, h2, h3, h4, h5, h6) {
+  margin: var(--piarc-space-3) 0 var(--piarc-space-1);
+  font-size: 1em;
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: inherit;
+}
+
+.plan-preview .md :is(h1, h2) {
+  font-size: calc(1em + 2px);
+}
+
+.plan-preview .md > :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+
+.plan-expand {
+  margin-top: calc(var(--piarc-space-1) * -1);
+}
+
+/* The plan card (ADR-0103): a decision bar under the plan's row. One line of guidance, the inline
+   comments (quote over comment, on the session fill), then stop and revise on the left, the two
+   approvals on the right. */
+.plan-card-hint {
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+.plan-card-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 176px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.plan-card-comments li {
+  display: flex;
+  align-items: flex-start;
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  transition: background-color 120ms var(--piarc-motion-curve-out);
+}
+
+.plan-card-comments li:hover {
+  background: var(--piarc-surface-hover);
+}
+
+.plan-card-comment {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--piarc-session-pad-sm) var(--piarc-session-pad-md);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.plan-card-quote {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+}
+
+.plan-card-quote > .icon {
+  flex: none;
+}
+
+.plan-card-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.plan-card-remove {
+  margin: var(--piarc-space-1) var(--piarc-space-1) 0 0;
+  opacity: 0;
+  transition: opacity 120ms var(--piarc-motion-curve-out);
+}
+
+.plan-card-comments li:hover .plan-card-remove,
+.plan-card-remove:focus-visible {
+  opacity: 1;
+}
+
+.approval-title-end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin-inline-start: auto;
+}
+
+.approval-hint {
+  display: inline-flex;
+  border-radius: 3px;
+  color: var(--piarc-text-secondary);
+  cursor: help;
+}
+
+.approval-hint:hover {
+  color: var(--piarc-text-primary);
+}
+
+.approval-hint:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+
+/* T46: the Auto mode reviewer on approval cards and on the calls it decided. */
+.approval-review {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+}
+.approval-review.is-reviewing {
+  font-style: italic;
+}
+.approval-review-reason {
+  color: var(--piarc-text-primary);
+}
+.tool-review {
+  margin-block-start: var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+}
+.tool-review summary {
+  cursor: pointer;
+}
+.tool-review-badge {
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.tool-review-badge.is-deny {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.tool-review-reason {
+  margin: var(--piarc-space-1) 0 0;
+  color: var(--piarc-text-secondary);
+}
+
+/* T26: host tool rows (task card, plan, answered questions, next steps) and the plan and
+   question approval cards. */
+/* Host tool rows (T26): the task list, the submitted plan, the answered questions and the next
+   steps, each a hairline card on the reading column (ADR-0078). */
+.harness-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  padding: var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+  animation: harness-in 300ms cubic-bezier(0.25, 0.1, 0.35, 1);
+}
+
+@keyframes harness-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .harness-box,
+  .approval-box,
+  .approval-field input,
+  .approval-field textarea,
+  .row-error-box,
+  .subagent-box,
+  .tool-calls,
+  .bash-command-card,
+  .conversation .row-user-bubble {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+
+.harness-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+}
+
+.harness-title strong {
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.harness-status {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+
+.harness-link {
+  margin-inline-start: auto;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+}
+
+.task-list ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-space-2);
+}
+
+.task-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: var(--piarc-session-body-line);
+  color: var(--piarc-text-secondary);
+}
+
+.task-inProgress .task-mark {
+  color: var(--piarc-text-primary);
+}
+
+.task-completed .task-text {
+  color: var(--piarc-text-secondary);
+}
+
+.task-count {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+
+/* Answered questions: question and answer pairs, divided. */
+.harness-box.answers {
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.harness-box.answers > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-lg);
+}
+
+.harness-box.answers > div + div {
+  border-top: 1px solid var(--piarc-session-line);
+}
+
+.harness-box.answers dt {
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.harness-box.answers dd {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+}
+
+/* Next steps: each suggestion with its prompt and what to do with it. */
+.next-steps ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.next-step-title {
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.next-step-prompt {
+  color: var(--piarc-text-secondary);
+}
+
+.next-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-session-gap-xs);
+  margin-top: var(--piarc-space-2);
+}
+
+/* T27: automatic compaction stopped (circuit breaker). */
+.row-compaction-stopped {
+  display: block;
+  color: var(--piarc-text-warning);
+}
+
+/* A row reached from a search result (T35), marked for a moment. */
+.transcript-sizer > .transcript-row[data-located] {
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-accent-subtle);
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+
+/* web search (T38) */
+
+.web-search-query {
+  color: var(--piarc-text-primary);
+}
+
+.web-search-sources {
+  margin: 0;
+  padding-inline-start: calc(var(--piarc-session-text-inset) + 1.5em);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+
+.web-search-source {
+  margin: var(--piarc-space-1) 0;
+}
+
+.web-search-host,
+.web-search-backend,
+.web-search-empty {
+  color: var(--piarc-text-secondary);
+}
+
+/* The built-in browser's runs (ADR-0089, ADR-0093): the label, then the screenshots. */
+
+.browser-run-label {
+  color: var(--piarc-text-primary);
+}
+
+.browser-run-shots,
+.browser-run-blocked {
+  color: var(--piarc-text-secondary);
+}
+
+.browser-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+  margin: var(--piarc-space-1) 0 0;
+  padding-inline-start: var(--piarc-session-text-inset);
+}
+
+/* An agent's screenshot in a Browser run (its own name: the preview panel's screenshot result is
+   `.browser-shot`, and this stylesheet is global). */
+.browser-run-shot {
+  display: block;
+  width: 160px;
+  max-height: 120px;
+  overflow: hidden;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-panel);
+}
+
+.browser-run-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+/* T47: a `Memory` call links to its note on the settings window's memory page. */
+.tool-call-link {
+  margin-inline-start: var(--piarc-space-1);
+}

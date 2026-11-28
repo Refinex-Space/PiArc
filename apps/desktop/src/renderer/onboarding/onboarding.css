@@ -1,0 +1,463 @@
+/* The first-run guide (ADR-0110): a full-window surface over the inert workbench. Layers by
+   fill, no stroked boxes (docs/engineering/visual-design.md); fields inside the card draw no
+   box of their own: the field strip is the surface and shows the focus. */
+.onboarding,
+.onboarding-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: var(--piarc-workbench-canvas);
+  color: var(--piarc-text-primary);
+}
+.onboarding[hidden] {
+  display: none;
+}
+.onboarding-drag,
+.onboarding-cover::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 44px;
+  -webkit-app-region: drag;
+}
+.onboarding-scroll {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* Welcome: the mascot and the name in the middle, the actions near the bottom. */
+.onboarding-welcome {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100%;
+  padding: 44px var(--piarc-space-4) 48px;
+  animation: onboarding-in var(--piarc-motion-slow) var(--piarc-motion-curve-out) backwards;
+}
+.onboarding-welcome-hero {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  text-align: center;
+}
+.onboarding-mascot {
+  margin-block-end: var(--piarc-space-5);
+}
+.onboarding-lede:focus {
+  outline: none;
+}
+.onboarding-lede {
+  margin: 0;
+  font-weight: var(--piarc-font-weight-regular);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-title);
+  text-wrap: balance;
+}
+.onboarding-welcome-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--piarc-space-2);
+  width: min(400px, 100%);
+}
+:root[data-app] .onboarding .button.onboarding-wide {
+  height: 40px;
+  font-size: var(--piarc-font-size-title);
+}
+
+/* Connect a model. */
+.onboarding-connect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  width: min(960px, 100%);
+  margin: auto;
+  padding: 56px var(--piarc-space-4) 40px;
+  animation: onboarding-in var(--piarc-motion-slow) var(--piarc-motion-curve-out) backwards;
+}
+.onboarding-title {
+  margin: 0;
+  font-size: var(--piarc-font-size-hero);
+  font-weight: var(--piarc-font-weight-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-align: center;
+}
+.onboarding-title:focus {
+  outline: none;
+}
+.onboarding-subtitle {
+  margin: 0 0 var(--piarc-space-4);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-body);
+  text-align: center;
+  text-wrap: balance;
+}
+.onboarding-loading {
+  margin: var(--piarc-space-5) 0;
+}
+.onboarding-card {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: 32px;
+  width: 100%;
+  padding: 28px;
+  border-radius: calc(var(--piarc-settings-radius) * 1.5);
+  background: var(--piarc-workbench-card);
+}
+@media (max-width: 880px) {
+  .onboarding-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--piarc-space-5);
+    padding: var(--piarc-space-5) var(--piarc-space-4);
+  }
+}
+@media (forced-colors: active) {
+  .onboarding-card {
+    outline: 1px solid CanvasText;
+  }
+}
+.onboarding-section-label {
+  margin: 0 0 var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+/* Tiles: filled buttons on the card; the chosen one has an accent ring. */
+.onboarding-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .onboarding-tile,
+:root[data-app] .onboarding-login {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px var(--piarc-space-3);
+  border: 0;
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-workbench-canvas);
+  color: var(--piarc-text-primary);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    box-shadow var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+:root[data-app] .onboarding-tile:hover:not(:disabled),
+:root[data-app] .onboarding-login:hover:not(:disabled) {
+  background: var(--piarc-surface-hover);
+}
+/* Chosen by fill, not by a stroke (docs/engineering/visual-design.md). */
+:root[data-app] .onboarding-tile[aria-checked='true'],
+:root[data-app] .onboarding-tile[aria-checked='true']:hover:not(:disabled) {
+  background: var(--piarc-surface-active);
+}
+:root[data-app] .onboarding-tile:disabled,
+:root[data-app] .onboarding-login:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.onboarding-tile-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-workbench-card);
+  color: var(--piarc-text-primary);
+}
+.onboarding-tile-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.onboarding-tile-name,
+.onboarding-tile-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onboarding-tile-name {
+  font-size: var(--piarc-font-size-body);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.onboarding-tile-detail {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+.onboarding-tile[data-connected] .onboarding-tile-detail {
+  color: var(--piarc-text-success);
+}
+:root[data-app] .onboarding-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-block-start: var(--piarc-space-3);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  cursor: pointer;
+}
+:root[data-app] .onboarding-more:hover:not(:disabled) {
+  background: var(--piarc-surface-hover);
+  color: var(--piarc-text-primary);
+}
+
+/* The chosen tile's form. */
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-4);
+  min-width: 0;
+}
+.onboarding-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-4);
+  animation: onboarding-fade var(--piarc-motion-normal) var(--piarc-motion-easing) backwards;
+}
+.onboarding-form-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: 32px;
+}
+.onboarding-form-mark {
+  display: inline-grid;
+  place-items: center;
+}
+.onboarding-form-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--piarc-font-size-title);
+  font-weight: var(--piarc-font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .onboarding .choice-button.onboarding-variant {
+  margin-inline-start: auto;
+  background: var(--piarc-workbench-canvas);
+}
+.onboarding-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.onboarding-field-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+.onboarding-label {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.onboarding-input {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 var(--piarc-space-3);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-workbench-canvas);
+  transition: outline-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+/* The field strip shows focus as `.settings-search` does (app.css): the fine keyboard ring, or
+   one quiet edge after a click. */
+:root[data-app] .onboarding-input:has(input:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+:root[data-app][data-pointer-focus] .onboarding-input:has(input:focus) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-border-default);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+.onboarding-field[data-invalid] .onboarding-input {
+  box-shadow: inset 0 0 0 1px var(--piarc-text-danger);
+}
+:root[data-app] .onboarding-input input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  font-size: var(--piarc-font-size-body);
+  outline: none;
+}
+:root[data-app] .onboarding-input input::placeholder {
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .onboarding-input input.onboarding-mono {
+  font-family: var(--piarc-font-mono);
+}
+:root[data-app] .onboarding .choice-button.onboarding-select {
+  justify-content: space-between;
+  width: 100%;
+  height: 36px;
+  padding-inline: var(--piarc-space-3);
+  background: var(--piarc-workbench-canvas);
+}
+:root[data-app] .onboarding-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-accent);
+  font-size: var(--piarc-font-size-small);
+  cursor: pointer;
+}
+:root[data-app] .onboarding-link:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+:root[data-app] .onboarding-link:disabled {
+  color: var(--piarc-text-disabled);
+  cursor: default;
+}
+.onboarding-alt {
+  align-self: flex-start;
+}
+.onboarding-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+  margin-block-start: calc(-1 * var(--piarc-space-2));
+}
+:root[data-app] .onboarding-chip {
+  padding: 2px var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-session-radius-chip);
+  background: var(--piarc-workbench-canvas);
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  cursor: pointer;
+}
+:root[data-app] .onboarding-chip:hover:not(:disabled) {
+  background: var(--piarc-surface-hover);
+}
+:root[data-app] .onboarding-chip[aria-selected='true'] {
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+}
+:root[data-app] .onboarding-disclosure {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  cursor: pointer;
+}
+.onboarding-disclosure .icon {
+  transition: transform var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.onboarding-disclosure[aria-expanded='true'] .icon {
+  transform: rotate(90deg);
+}
+.onboarding-logins {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The test's answer, the actions and the one-line note. */
+.onboarding-outcome {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 10px var(--piarc-space-3);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-workbench-canvas);
+  font-size: var(--piarc-font-size-body);
+  animation: onboarding-fade var(--piarc-motion-normal) var(--piarc-motion-easing) backwards;
+}
+.onboarding-outcome-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.onboarding-ok-mark {
+  display: inline-grid;
+  place-items: center;
+  color: var(--piarc-text-success);
+}
+.onboarding-failed {
+  align-items: flex-start;
+  color: var(--piarc-text-danger);
+}
+.onboarding-outcome-actions {
+  display: flex;
+  flex: none;
+  gap: var(--piarc-space-3);
+}
+.onboarding-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--piarc-space-2);
+  margin-block-start: auto;
+}
+@keyframes onboarding-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes onboarding-fade {
+  from {
+    opacity: 0;
+  }
+}
+/* Short windows (the main window's 600 px minimum): tighter rows, so the card mostly fits. */
+@media (max-height: 760px) {
+  .onboarding-connect {
+    padding-block-start: 32px;
+  }
+  .onboarding-subtitle {
+    margin-block-end: var(--piarc-space-2);
+  }
+  .onboarding-card {
+    padding: var(--piarc-space-5);
+  }
+  :root[data-app] .onboarding-tile {
+    padding-block: 6px;
+  }
+  .onboarding-tile-mark {
+    width: 28px;
+    height: 28px;
+  }
+}

@@ -1,62 +1,129 @@
-# Xcode
-#
-# gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
+# PiArc .gitignore
+# Monorepo: Electron desktop app (apps/desktop), Rust core (cargo + NAPI-RS),
+# agent host (TypeScript/Node). Keep rules grouped by toolchain.
 
-## User settings
+# ---------------------------------------------------------------------------
+# Local read-only reference repositories (see docs/research/REFERENCES.md).
+# Cloned locally for design study; never committed, never copied into source.
+# ---------------------------------------------------------------------------
+/reference/
+
+# ---------------------------------------------------------------------------
+# OS / editors
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+*.code-workspace
+.fleet/
+.zed/
+
+# ---------------------------------------------------------------------------
+# Secrets & local config (never commit credentials)
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+AuthKey_*.p8
+# Local overrides for Claude Code / Pi / PiArc tooling
+.claude/settings.local.json
+.piarc/settings.local.json
+.pi/settings.local.json
+
+# ---------------------------------------------------------------------------
+# Electron desktop app (apps/desktop)
+# ---------------------------------------------------------------------------
+# Forge / Vite build and packaging output
+.vite/
+apps/desktop/out/
+apps/desktop/release/
+# Compiled NAPI-RS native modules (built per target in CI)
+*.node
+# Release packaging output
+*.dmg
+# ...except the fake artefacts the release manifest tests verify
+!crates/piarc-core/tests/fixtures/release/*.dmg
+*.pkg
+*.blockmap
+*.nupkg
+# Notarization scratch
+notarization-*.json
+
+# Platform-specific native helpers (apps/desktop/native), if any are written in Swift
 xcuserdata/
-
-## Obj-C/Swift specific
-*.hmap
-
-## App packaging
-*.ipa
-*.dSYM.zip
-*.dSYM
-
-## Playgrounds
-timeline.xctimeline
-playground.xcworkspace
-
-# Swift Package Manager
-#
-# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
-# Packages/
-# Package.pins
-# Package.resolved
-# *.xcodeproj
-#
-# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
-# hence it is not needed unless you have added a package configuration file to your project
-# .swiftpm
-
+DerivedData/
 .build/
+.swiftpm/
+*.dSYM
+*.dSYM.zip
 
-# CocoaPods
-#
-# We recommend against adding the Pods directory to your .gitignore. However
-# you should judge for yourself, the pros and cons are mentioned at:
-# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
-#
-# Pods/
-#
-# Add this line if you want to avoid checking in source code from the Xcode workspace
-# *.xcworkspace
+# ---------------------------------------------------------------------------
+# Rust (crates/)
+# ---------------------------------------------------------------------------
+target/
+**/*.rs.bk
+*.pdb
+# Cargo.lock is committed: this workspace ships binaries/libraries inside an app.
 
-# Carthage
-#
-# Add this line if you want to avoid checking in source code from Carthage dependencies.
-# Carthage/Checkouts
+# ---------------------------------------------------------------------------
+# Node / TypeScript (agent-host/, scripts/)
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+out/
+.turbo/
+.cache/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+# Bundled sidecar runtime artifacts (produced by the build, not hand-edited)
+agent-host/runtime/
+agent-host/bin/
 
-Carthage/Build/
+# ---------------------------------------------------------------------------
+# Windows packaging output and tooling
+# ---------------------------------------------------------------------------
+.vs/
+*.msix
+*.msixbundle
+*.appx
 
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo.
-# Instead, use fastlane to re-generate the screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/#source-control
+# ---------------------------------------------------------------------------
+# Logs, test and profiling output
+# ---------------------------------------------------------------------------
+*.log
+logs/
+*.trace
+*.profraw
+*.profdata
+test-results/
+.artifacts/
+tmp/
 
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
+# Repository-local developer tools (scripts/dev/install-tools.mjs)
+/.tools/

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 22,
+  "result": {
+    "fromModel": { "provider": "anthropic", "id": "claude-sonnet-4-6" },
+    "promptCacheWarm": true,
+    "cacheTtl": 300,
+    "contextTokens": 1200,
+    "cacheInvalidated": true,
+    "cacheWriteUsd": 0.0045,
+    "dropsThinking": false
+  }
+}

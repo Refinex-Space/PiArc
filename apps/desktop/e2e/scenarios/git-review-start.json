@@ -1,0 +1,4 @@
+{
+  "id": "git-review-start",
+  "steps": [{ "text": "Ready." }, { "text": "I fixed the wording." }, { "text": "Checked." }]
+}

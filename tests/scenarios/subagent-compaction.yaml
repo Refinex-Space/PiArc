@@ -1,0 +1,70 @@
+id: subagent-compaction
+description: A subagent compacts its own context - on a 32,000-token window a reply reporting 14,904 input tokens compacts it between two steps of its run, with PiArc's summary request on its own endpoint - while the main session's history stays as it was, with the subagent's report only as the Agent call's result (T31).
+capabilities: [CAP-AGENT-RUN-001, CAP-CTX-COMPACT-001]
+workspace:
+  trusted: true
+  files:
+    notes.txt: "alpha\nbeta\n"
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    .claude/agents/surveyor.md: "---\nname: surveyor\ndescription: Surveys notes.\nmodel: mock-small/mock-model\n---\nSurvey what you are given.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Survey the notes,
+                  prompt: Read notes.txt and report.,
+                  subagent_type: surveyor,
+                },
+            },
+          ]
+      - text: The survey is done.
+      - text: Nothing else to add.
+  small:
+    wire: anthropic
+    context_window: 32000
+    max_tokens: 4096
+    steps:
+      - tool_calls: [{ id: read-notes, name: Read, input: { path: notes.txt } }]
+        usage: { input_tokens: 14904 }
+      - text: 'Summary of the survey so far.'
+      - text: 'Survey report: the notes say alpha and beta.'
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Start the survey., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - prompt: { text: Anything else?, turn: two }
+expect:
+  request_counts: { main: 3, small: 3 }
+  requests:
+    # The subagent's second request is PiArc's summary request; its third carries the summary.
+    - provider: small
+      index: 1
+      contains: ['You write handover notes for a coding session.', 'Read notes.txt and report.']
+    - provider: small
+      index: 2
+      contains: ['Summary of the survey so far.']
+      user_message_contains: ['The conversation above was compacted into a summary.']
+    # The main session: its own messages in order, the report as the Agent result, no trace of
+    # the subagent's compaction.
+    - provider: main
+      index: 1
+      tool_results:
+        [{ id: agent-1, is_error: false, contains: 'Survey report: the notes say alpha and beta.' }]
+    - provider: main
+      index: 2
+      user_texts: [Start the survey., Anything else?]
+      tool_results: [{ id: agent-1 }]
+      not_contains:
+        ['Summary of the survey so far.', 'You write handover notes', 'compacted into a summary']
+  events:
+    - method: subagent/completed
+      params:
+        { itemId: agent-1, subagent: { agentType: surveyor, status: completed, toolCalls: 1 } }

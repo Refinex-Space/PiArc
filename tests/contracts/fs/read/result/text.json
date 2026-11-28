@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 14,
+  "result": {
+    "path": "/Users/dev/work space/项目/notes/日志 1.txt",
+    "size": 27,
+    "offset": 0,
+    "bytesRead": 27,
+    "eof": true,
+    "text": "第一行\nsecond line\r\n"
+  }
+}

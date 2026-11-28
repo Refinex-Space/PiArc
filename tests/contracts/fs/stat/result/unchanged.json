@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "result": {
+    "path": "/Users/dev/work space/项目/src/main 主.ts",
+    "kind": "file",
+    "size": 120,
+    "modifiedMs": 1763200000000,
+    "readonly": false,
+    "unchanged": true
+  }
+}

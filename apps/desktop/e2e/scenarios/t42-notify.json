@@ -1,0 +1,32 @@
+{
+  "id": "t42-notify",
+  "steps": [
+    {
+      "tool_calls": [
+        { "name": "Bash", "input": { "command": "env sleep 3", "description": "Wait" } }
+      ]
+    },
+    {
+      "tool_calls": [
+        { "name": "Bash", "input": { "command": "printenv HOME", "description": "Home" } }
+      ]
+    },
+    {
+      "tool_calls": [
+        { "name": "Bash", "input": { "command": "printenv PATH", "description": "Path" } }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "name": "Bash",
+          "input": {
+            "command": "printenv LONG_VARIABLE_NAME_THAT_IS_HERE_ONLY_TO_MAKE_THIS_COMMAND_LONGER_THAN_A_NOTIFICATION_SHOWS_AND_SO_LONGER_THAN_THE_LIMIT_OF_ONE_HUNDRED_AND_SIXTY_CHARACTERS_X",
+            "description": "Long"
+          }
+        }
+      ]
+    },
+    { "text": "Done." }
+  ]
+}

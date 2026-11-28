@@ -1,0 +1,107 @@
+id: subagent-model-aliases
+description: A subagent's model resolves through the alias table - fast, strong and an opus set on its own go to their models, haiku follows fast, sonnet follows balanced, which is not set (the parent's model, with a warning), provider/model names a model directly and inherit keeps the parent's; each run's requests reach that model (T31).
+capabilities: [CAP-MODEL-ALIAS-001]
+workspace:
+  files:
+    .claude/agents/direct.md: "---\nname: direct\ndescription: Direct model.\nmodel: mock-e/model-e\n---\nDirect.\n"
+  run_files:
+    data 数据/settings.json: '{"modelAliases":{"fast":"mock-a/model-a","strong":"mock-c/model-c","opus":"mock-d/model-d"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [{ id: fast, name: Agent, input: { description: Fast, prompt: Run fast., model: fast } }]
+      - tool_calls:
+          [
+            {
+              id: haiku,
+              name: Agent,
+              input: { description: Haiku, prompt: Run haiku., model: haiku },
+            },
+          ]
+      - tool_calls:
+          [
+            {
+              id: strong,
+              name: Agent,
+              input: { description: Strong, prompt: Run strong., model: strong },
+            },
+          ]
+      - tool_calls:
+          [{ id: opus, name: Agent, input: { description: Opus, prompt: Run opus., model: opus } }]
+      - tool_calls:
+          [
+            {
+              id: sonnet,
+              name: Agent,
+              input: { description: Sonnet, prompt: Run sonnet., model: sonnet },
+            },
+          ]
+      - text: sonnet ran here.
+      - tool_calls:
+          [
+            {
+              id: inherit,
+              name: Agent,
+              input: { description: Inherit, prompt: Run inherit., model: inherit },
+            },
+          ]
+      - text: inherit ran here.
+      - tool_calls:
+          [
+            {
+              id: direct,
+              name: Agent,
+              input: { description: Direct, prompt: Run direct., subagent_type: direct },
+            },
+          ]
+      - text: All ran.
+  a:
+    wire: anthropic
+    model: model-a
+    steps:
+      - text: fast ran.
+      - text: haiku ran.
+  c:
+    wire: openai
+    model: model-c
+    steps:
+      - text: strong ran.
+  d:
+    wire: anthropic
+    model: model-d
+    steps:
+      - text: opus ran.
+  e:
+    wire: openai
+    model: model-e
+    steps:
+      - text: direct ran.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Try every model., turn: one }
+expect:
+  request_counts: { main: 10, a: 2, c: 1, d: 1, e: 1 }
+  events:
+    - method: subagent/started
+      params: { itemId: opus, subagent: { model: { provider: mock-d, id: model-d } } }
+    - method: subagent/started
+      params:
+        {
+          itemId: sonnet,
+          subagent:
+            {
+              model: { provider: mock-main, id: mock-model },
+              warnings: [{ kind: aliasFallback, value: sonnet }],
+            },
+        }
+  requests:
+    - { provider: a, index: 0, user_texts: [Run fast.], body: { model: model-a } }
+    - { provider: a, index: 1, user_texts: [Run haiku.], body: { model: model-a } }
+    - { provider: c, index: 0, user_texts: [Run strong.], body: { model: model-c } }
+    - { provider: d, index: 0, user_texts: [Run opus.], body: { model: model-d } }
+    - { provider: e, index: 0, user_texts: [Run direct.], body: { model: model-e } }
+    - { provider: main, index: 5, user_texts: [Run sonnet.], body: { model: mock-model } }
+    - { provider: main, index: 7, user_texts: [Run inherit.], body: { model: mock-model } }

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "fs/memory",
+  "params": {
+    "sessionId": "session-a",
+    "toolCallId": "scan-2",
+    "turnId": "turn-1",
+    "directories": ["src"],
+    "files": ["/work/src/api/client.ts"],
+    "rules": ["/work/.claude/rules/testing.md"]
+  }
+}

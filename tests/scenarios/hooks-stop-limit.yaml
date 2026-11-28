@@ -1,0 +1,47 @@
+id: hooks-stop-limit
+description: A Stop hook that always blocks continues the turn 8 times in a row; the 9th block is overridden, the turn ends and the user is told (T25).
+capabilities: [CAP-HOOK-STOP-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "node hook.mjs stop"}]}]}}
+    hook-plans/stop.json: '{"exit": 2, "stderr": "Keep going."}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'Answer 1.'
+      - text: 'Answer 2.'
+      - text: 'Answer 3.'
+      - text: 'Answer 4.'
+      - text: 'Answer 5.'
+      - text: 'Answer 6.'
+      - text: 'Answer 7.'
+      - text: 'Answer 8.'
+      - text: 'Answer 9.'
+actions:
+  - prompt: { text: 'Keep working.', turn: t }
+expect:
+  request_counts: { main: 9 }
+  events:
+    - method: core/notices
+      params:
+        type: hook
+        event: Stop
+        level: error
+        message: 'Stop hooks continued the turn 8 times in a row; PiArc ended the turn.'
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  json_lines:
+    hook-log/stop.jsonl:
+      - input: { stop_hook_active: false }
+      - input: { stop_hook_active: true }
+      - input: { stop_hook_active: true }
+      - input: { stop_hook_active: true }
+      - input: { stop_hook_active: true }
+      - input: { stop_hook_active: true }
+      - input: { stop_hook_active: true }
+      - input: { stop_hook_active: true }
+      - input: { stop_hook_active: true, last_assistant_message: 'Answer 9.' }

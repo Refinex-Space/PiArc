@@ -1,0 +1,37 @@
+id: browser-bypass
+description: In bypassPermissions mode a page of a Browser run reaches a public host for the run without a card, and the decision is audited with step mode (design addendum browser.md B2.6.3).
+capabilities: [CAP-BROWSER-SITE-001]
+workspace:
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableBypassPermissions":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input:
+              { script: 'await (await taskSpace("t").newPage()).goto("https://example.com/");' }
+      - text: 'Opened.'
+sessions:
+  main: { provider: main, mode: bypassPermissions }
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        - site:
+            url: 'https://example.com/'
+            host: example.com
+            decision: { allowed: true, scope: run }
+        - answer: { output: 'opened' }
+actions:
+  - prompt: { text: 'Open example.com.', turn: one }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  request_counts: { main: 2 }
+  audit:
+    - kind: browser
+      count: 1
+      detail: { approval: site, hosts: [example.com], step: mode, conclusion: allow }

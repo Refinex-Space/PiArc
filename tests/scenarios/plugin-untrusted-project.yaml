@@ -1,0 +1,39 @@
+id: plugin-untrusted-project
+description: A plugin and a Pi package declared in an untrusted project's .piarc/settings.json do not load, though installed and confirmed; no hook runs, no MCP server connects, no extension loads, and their commands are not offered (T40).
+capabilities: [CAP-PLUGIN-TRUST-001]
+workspace:
+  run_files:
+    pkgs/demo/.claude-plugin/plugin.json: '{"name": "demo"}'
+    pkgs/demo/commands/hello.md: "---\ndescription: Say hello\n---\nHello.\n"
+    pkgs/demo/hooks/hooks.json: '{"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node -e \"process.stdout.write(String.fromCharCode(72,79,79,75))\""}]}]}}'
+    pkgs/demo/.mcp.json: '{"mcpServers":{"echo":{"command":"node","args":["{{mcp_echo}}","demo"]}}}'
+    pkgs/pi-demo/package.json: '{"name": "pi-demo", "pi": {"extensions": ["./probe.ts"]}}'
+    pkgs/pi-demo/probe.ts: |
+      export default function (pi: any) {
+        pi.registerTool({
+          name: 'package_probe',
+          label: 'Package probe',
+          description: 'Registered by the pi-demo package.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe' }], details: {} };
+          },
+        });
+      }
+packages:
+  - { path: pkgs/demo, scope: project }
+  - { path: pkgs/pi-demo, scope: project }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Nothing from the packages.
+actions:
+  - check_commands: { absent: ['demo:hello'] }
+  - prompt: { text: Anything loaded?, turn: t }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      tools_exclude: [package_probe, mcp__plugin_demo_echo__echo]
+      not_contains: [HOOK]

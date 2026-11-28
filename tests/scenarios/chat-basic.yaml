@@ -1,0 +1,22 @@
+id: chat-basic
+description: A prompt starts a turn whose streamed answer reaches the client and whose request carries the prompt.
+capabilities: [CAP-SESSION-TURN-001, CAP-PROVIDER-ANTHROPIC-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'Hello from the mock.'
+actions:
+  - prompt: { text: 'Say hello.', turn: first }
+expect:
+  events:
+    - { method: turn/started, turn: first }
+    - { method: item/completed, params: { item: { type: userMessage, text: 'Say hello.' } } }
+    - {
+        method: item/completed,
+        params: { item: { type: agentMessage, text: 'Hello from the mock.' } },
+      }
+    - { method: turn/completed, turn: first, params: { status: completed } }
+  requests:
+    - { index: 0, roles: [user], user_texts: ['Say hello.'] }
+  request_counts: { main: 1 }

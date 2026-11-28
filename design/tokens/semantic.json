@@ -1,0 +1,249 @@
+{
+  "$description": "Semantic colors (layer 3), the only colors components read. A value is a reference: `<role>.<step>` (a ramp step, resolved in the mode's light or dark ladder) or `base.<name>`. An object gives per-mode values: `light`, `dark`, `highContrast` (both high-contrast modes), `lightHighContrast`, `darkHighContrast`; missing high-contrast values fall back to the base mode. `forcedColors` maps a token to a CSS system color for Windows forced colors.",
+  "surface": {
+    "app": {
+      "light": "neutral.1",
+      "dark": "neutral.1",
+      "lightHighContrast": "base.white",
+      "darkHighContrast": "base.black"
+    },
+    "sidebar": "neutral.2",
+    "panel": "neutral.2",
+    "raised": { "light": "base.white", "dark": "neutral.3" },
+    "input": { "light": "base.white", "dark": "neutral.2" },
+    "hover": { "light": "neutral.3", "dark": "neutral.5" },
+    "active": { "light": "neutral.4", "dark": "neutral.6" },
+    "selected": "accent.4"
+  },
+  "workbench": {
+    "canvas": {
+      "light": "base.white",
+      "dark": "base.canvasDark",
+      "darkHighContrast": "base.black"
+    },
+    "navigation": {
+      "light": "base.sidebarLight",
+      "dark": "base.sidebarDark",
+      "lightHighContrast": "base.white",
+      "darkHighContrast": "base.black"
+    },
+    "editor": {
+      "light": "base.white",
+      "dark": "base.controlDark",
+      "darkHighContrast": "base.black"
+    },
+    "ink": {
+      "light": "base.chromeInk",
+      "dark": "base.chromeLightInk",
+      "lightHighContrast": "base.black",
+      "darkHighContrast": "base.white"
+    },
+    "muted": {
+      "light": "base.chromeMuted",
+      "dark": "base.chromeLightMuted",
+      "lightHighContrast": "base.black",
+      "darkHighContrast": "base.white"
+    },
+    "card": {
+      "light": "base.cardLight",
+      "dark": "base.cardDark",
+      "lightHighContrast": "base.white",
+      "darkHighContrast": "base.black"
+    },
+    "cardEdge": {
+      "light": "base.transparent",
+      "dark": "base.transparent",
+      "highContrast": "neutral.11"
+    }
+  },
+  "text": {
+    "primary": "neutral.12",
+    "secondary": { "light": "neutral.11", "dark": "neutral.11", "highContrast": "neutral.12" },
+    "disabled": "neutral.9",
+    "accent": { "light": "accent.11", "dark": "accent.11", "highContrast": "accent.12" },
+    "onAccent": { "light": "base.white", "dark": "base.white", "darkHighContrast": "neutral.1" },
+    "danger": { "light": "danger.11", "dark": "danger.11", "highContrast": "danger.12" },
+    "warning": { "light": "warning.11", "dark": "warning.11", "highContrast": "warning.12" },
+    "success": { "light": "success.11", "dark": "success.11", "highContrast": "success.12" }
+  },
+  "border": {
+    "subtle": { "light": "base.black8", "dark": "base.white10", "highContrast": "neutral.11" },
+    "default": { "light": "neutral.7", "dark": "neutral.7", "highContrast": "neutral.9" },
+    "strong": { "light": "neutral.9", "dark": "neutral.9", "highContrast": "neutral.11" },
+    "focus": { "light": "neutral.11", "dark": "neutral.11", "highContrast": "neutral.12" }
+  },
+  "action": {
+    "surface": { "light": "base.black5", "dark": "base.white15" },
+    "hover": { "light": "base.black8", "dark": "base.white22" },
+    "pressed": { "light": "base.ink10", "dark": "base.white28" },
+    "edge": { "light": "base.ink10", "dark": "base.transparent", "highContrast": "neutral.11" },
+    "primaryPressed": {
+      "light": "accent.11",
+      "dark": "accent.7",
+      "lightHighContrast": "accent.12",
+      "darkHighContrast": "accent.11"
+    },
+    "danger": { "light": "danger.10", "dark": "danger.11", "highContrast": "danger.12" },
+    "dangerHover": { "light": "danger.11", "dark": "danger.10", "highContrast": "danger.12" },
+    "dangerPressed": { "light": "danger.12", "dark": "danger.9", "highContrast": "danger.12" },
+    "onDanger": { "light": "base.white", "dark": "neutral.1" }
+  },
+  "segment": {
+    "track": { "light": "base.ink5", "dark": "base.white5" },
+    "thumb": { "light": "base.white", "dark": "base.white10" },
+    "edge": { "light": "base.ink5", "dark": "base.white20", "highContrast": "neutral.11" }
+  },
+  "accent": {
+    "solid": {
+      "light": "accent.9",
+      "dark": "accent.9",
+      "lightHighContrast": "accent.11",
+      "darkHighContrast": "accent.12"
+    },
+    "solidHover": {
+      "light": "accent.10",
+      "dark": "accent.8",
+      "lightHighContrast": "accent.12",
+      "darkHighContrast": "accent.11"
+    },
+    "subtle": "accent.3",
+    "subtleHover": "accent.4"
+  },
+  "state": {
+    "danger": "danger.9",
+    "dangerSubtle": "danger.3",
+    "warning": "warning.9",
+    "warningSubtle": "warning.3",
+    "success": "success.9",
+    "successSubtle": "success.3"
+  },
+  "agentStatus": {
+    "error": "danger.9",
+    "awaiting": { "light": "warning.10", "dark": "warning.9" },
+    "running": { "light": "link.9", "dark": "link.11" },
+    "unread": { "light": "link.9", "dark": "link.11" },
+    "idle": "neutral.8"
+  },
+  "diff": {
+    "addedBackground": "success.3",
+    "addedText": { "light": "success.11", "dark": "success.11", "highContrast": "success.12" },
+    "removedBackground": "danger.3",
+    "removedText": { "light": "danger.11", "dark": "danger.11", "highContrast": "danger.12" }
+  },
+  "graph": {
+    "lane0": { "light": "link.9", "dark": "link.11" },
+    "lane1": { "light": "success.10", "dark": "success.9" },
+    "lane2": { "light": "warning.10", "dark": "warning.9" },
+    "lane3": { "light": "danger.9", "dark": "danger.10" },
+    "lane4": { "light": "neutral.10", "dark": "neutral.9" },
+    "lane5": { "light": "link.11", "dark": "link.9" },
+    "lane6": { "light": "success.11", "dark": "success.11" },
+    "lane7": { "light": "warning.11", "dark": "warning.11" }
+  },
+  "code": {
+    "background": {
+      "light": "neutral.2",
+      "dark": "neutral.2",
+      "lightHighContrast": "base.white",
+      "darkHighContrast": "base.black"
+    },
+    "text": "neutral.12"
+  },
+  "overlay": {
+    "scrim": { "light": "base.scrimLight", "dark": "base.scrimDark" }
+  },
+  "session": {
+    "fill": { "light": "base.black5", "dark": "base.white5" },
+    "fillHover": { "light": "base.ink10", "dark": "base.white10" },
+    "ghostHover": { "light": "base.black5", "dark": "base.white8" },
+    "line": { "light": "base.black8", "dark": "base.white10", "highContrast": "neutral.11" },
+    "inlineCode": "neutral.12",
+    "inlineCodeFill": { "light": "neutral.4", "dark": "neutral.6", "highContrast": "neutral.5" },
+    "tooltip": {
+      "light": "neutral.12",
+      "dark": "base.controlDark",
+      "darkHighContrast": "base.black"
+    },
+    "tooltipInk": { "light": "base.white", "dark": "neutral.12", "darkHighContrast": "base.white" }
+  },
+  "themePreview": {
+    "lightCanvas": "base.white",
+    "lightNavigation": "base.sidebarLight",
+    "lightLine": "base.black8",
+    "lightInk": "base.chromeMuted",
+    "darkCanvas": "base.canvasDark",
+    "darkNavigation": "base.sidebarDark",
+    "darkCard": "base.controlDark",
+    "darkLine": "base.white10",
+    "darkInk": "base.chromeLightMuted"
+  },
+  "forcedColors": {
+    "themePreview.lightCanvas": "Canvas",
+    "themePreview.lightNavigation": "Canvas",
+    "themePreview.lightLine": "CanvasText",
+    "themePreview.lightInk": "CanvasText",
+    "themePreview.darkCanvas": "Canvas",
+    "themePreview.darkNavigation": "Canvas",
+    "themePreview.darkCard": "Canvas",
+    "themePreview.darkLine": "CanvasText",
+    "themePreview.darkInk": "CanvasText",
+    "workbench.canvas": "Canvas",
+    "workbench.navigation": "Canvas",
+    "workbench.editor": "Field",
+    "workbench.ink": "CanvasText",
+    "workbench.muted": "CanvasText",
+    "workbench.card": "Canvas",
+    "workbench.cardEdge": "CanvasText",
+    "surface.app": "Canvas",
+    "surface.sidebar": "Canvas",
+    "surface.panel": "Canvas",
+    "surface.raised": "Canvas",
+    "surface.input": "Field",
+    "surface.hover": "Canvas",
+    "surface.active": "Canvas",
+    "surface.selected": "Highlight",
+    "text.primary": "CanvasText",
+    "text.secondary": "CanvasText",
+    "text.disabled": "GrayText",
+    "text.accent": "LinkText",
+    "text.onAccent": "ButtonText",
+    "text.danger": "CanvasText",
+    "text.warning": "CanvasText",
+    "text.success": "CanvasText",
+    "border.subtle": "CanvasText",
+    "border.default": "CanvasText",
+    "border.strong": "CanvasText",
+    "border.focus": "Highlight",
+    "action.surface": "ButtonFace",
+    "action.hover": "ButtonFace",
+    "action.pressed": "ButtonFace",
+    "action.edge": "ButtonText",
+    "action.primaryPressed": "ButtonFace",
+    "action.danger": "ButtonFace",
+    "action.dangerHover": "ButtonFace",
+    "action.dangerPressed": "ButtonFace",
+    "action.onDanger": "ButtonText",
+    "segment.track": "Canvas",
+    "segment.thumb": "ButtonFace",
+    "segment.edge": "ButtonText",
+    "accent.solid": "ButtonFace",
+    "accent.solidHover": "Highlight",
+    "accent.subtle": "Canvas",
+    "accent.subtleHover": "Canvas",
+    "agentStatus.error": "CanvasText",
+    "agentStatus.awaiting": "CanvasText",
+    "agentStatus.running": "Highlight",
+    "agentStatus.unread": "Highlight",
+    "agentStatus.idle": "GrayText",
+    "code.background": "Canvas",
+    "code.text": "CanvasText",
+    "session.fill": "Canvas",
+    "session.fillHover": "Canvas",
+    "session.ghostHover": "Canvas",
+    "session.line": "CanvasText",
+    "session.inlineCode": "CanvasText",
+    "session.inlineCodeFill": "Canvas",
+    "session.tooltip": "Canvas",
+    "session.tooltipInk": "CanvasText"
+  }
+}

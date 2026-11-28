@@ -1,0 +1,162 @@
+{
+  "description": "T42: NotebookEdit cases shared by piarc-fs (crates/piarc-fs/src/notebook/tests.rs) and the Agent Host (agent-host/src/tools/notebook.test.ts). Expected files are compared byte for byte; regenerate with PIARC_UPDATE_NOTEBOOK=1 cargo test -p piarc-fs notebook and review every diff.",
+  "cases": [
+    {
+      "name": "replace a code cell clears its outputs",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "replace",
+        "cellId": "load",
+        "newSource": "import sys\nprint(sys.version)\n",
+        "seed": "call-1"
+      },
+      "expected": "base-replace-load.ipynb"
+    },
+    {
+      "name": "replace changes a markdown cell to code",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "replace",
+        "cellId": "intro",
+        "newSource": "x = 2",
+        "cellType": "code",
+        "seed": "call-2"
+      },
+      "expected": "base-replace-intro-code.ipynb"
+    },
+    {
+      "name": "insert after a cell gets a derived id",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "insert",
+        "cellId": "load",
+        "newSource": "## Plot\nBelow.",
+        "cellType": "markdown",
+        "seed": "call-3"
+      },
+      "expected": "base-insert-after-load.ipynb"
+    },
+    {
+      "name": "insert without a cell id goes first",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "insert",
+        "newSource": "",
+        "cellType": "code",
+        "seed": "call-4"
+      },
+      "expected": "base-insert-first.ipynb"
+    },
+    {
+      "name": "delete the last cell",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "delete",
+        "cellId": "plot",
+        "newSource": "",
+        "seed": "call-5"
+      },
+      "expected": "base-delete-plot.ipynb"
+    },
+    {
+      "name": "delete the first cell",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "delete",
+        "cellId": "intro",
+        "newSource": "",
+        "seed": "call-6"
+      },
+      "expected": "base-delete-intro.ipynb"
+    },
+    {
+      "name": "an unknown cell id is an error",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "replace",
+        "cellId": "nope",
+        "newSource": "x",
+        "seed": "call-7"
+      },
+      "error": "cellNotFound"
+    },
+    {
+      "name": "insert needs a cell type",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "insert",
+        "cellId": "load",
+        "newSource": "x",
+        "seed": "call-8"
+      },
+      "error": "missingCellType"
+    },
+    {
+      "name": "replace needs a cell id",
+      "notebook": "base.ipynb",
+      "edit": {
+        "mode": "replace",
+        "newSource": "x",
+        "seed": "call-9"
+      },
+      "error": "missingCellId"
+    },
+    {
+      "name": "a notebook without ids is addressed by position",
+      "notebook": "legacy.ipynb",
+      "edit": {
+        "mode": "replace",
+        "cellId": "cell-1",
+        "newSource": "Updated 注释\n",
+        "seed": "call-10"
+      },
+      "expected": "legacy-replace-1.ipynb"
+    },
+    {
+      "name": "a new cell in a notebook without ids has no id",
+      "notebook": "legacy.ipynb",
+      "edit": {
+        "mode": "insert",
+        "cellId": "0",
+        "newSource": "y = 2",
+        "cellType": "code",
+        "seed": "call-11"
+      },
+      "expected": "legacy-insert-after-0.ipynb"
+    },
+    {
+      "name": "CRLF and a two-space indent are kept",
+      "notebook": "fixtures/crlf/crlf.ipynb",
+      "edit": {
+        "mode": "insert",
+        "cellId": "cell-0",
+        "newSource": "z = 3\nprint(z)",
+        "cellType": "code",
+        "seed": "call-12"
+      },
+      "expected": "fixtures/crlf/crlf-insert.ipynb"
+    },
+    {
+      "name": "delete the only cell leaves an empty list, insert into it",
+      "notebook": "fixtures/crlf/crlf.ipynb",
+      "edit": {
+        "mode": "delete",
+        "cellId": "cell-1",
+        "newSource": "",
+        "seed": "call-13"
+      },
+      "expected": "fixtures/crlf/crlf-delete-1.ipynb"
+    },
+    {
+      "name": "text that is not a notebook is an error",
+      "notebook": "not-json.ipynb",
+      "edit": {
+        "mode": "delete",
+        "cellId": "cell-0",
+        "newSource": "",
+        "seed": "call-14"
+      },
+      "error": "invalid"
+    }
+  ]
+}

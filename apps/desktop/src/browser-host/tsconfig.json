@@ -1,0 +1,17 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  // Script host (ADR-0089): a sandboxed page with DOM types and no Node types. It runs the
+  // browser SDK (sdk/, ported from ego-browser, ADR-0091) and the model's script, and reaches
+  // the main process only through `window.piarcBrowserHost` (src/shared/browser-host.ts).
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": "../../dist/browser-host",
+    "tsBuildInfoFile": "../../dist/browser-host/.tsbuildinfo",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["**/*.ts"],
+  "references": [{ "path": "../shared" }]
+}

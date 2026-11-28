@@ -1,0 +1,17 @@
+{
+  "id": "plan-stop",
+  "steps": [
+    { "text": "Hello. Ready when you are." },
+    {
+      "text": "Here is the plan.",
+      "tool_calls": [
+        {
+          "id": "exit1",
+          "name": "ExitPlanMode",
+          "input": { "plan": "# Rename the helper\n\n1. Rename `helper`\n2. Update the callers" }
+        }
+      ]
+    },
+    { "text": "Stopped. Tell me what you would like instead." }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 19,
+  "method": "fs/mkdir",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": ["notes"]
+  }
+}

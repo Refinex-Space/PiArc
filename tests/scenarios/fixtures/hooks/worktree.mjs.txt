@@ -1,0 +1,19 @@
+// Worktree hook used in isolated test workspaces. An explicit marker makes the handler fail.
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import path from 'node:path';
+const input = JSON.parse(readFileSync(0, 'utf8'));
+const create = input.hook_event_name === 'WorktreeCreate';
+const action = create ? 'create' : 'remove';
+if (existsSync(`fail-${action}`) && readFileSync(`fail-${action}`, 'utf8') !== 'off') {
+  process.stderr.write(`fixture ${action} failed`);
+  process.exitCode = 9;
+} else if (create) {
+  const directory = path.resolve('.piarc', 'worktrees', `isolated-${input.name}`);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(path.join(directory, 'created.txt'), input.name);
+  process.stdout.write(directory);
+} else {
+  const directory = path.resolve(input.worktree_path);
+  if (path.dirname(directory) !== path.resolve('.piarc', 'worktrees')) throw new Error('unexpected fixture directory');
+  rmSync(directory, { recursive: true });
+}

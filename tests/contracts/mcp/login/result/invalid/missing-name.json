@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 74,
+  "result": {
+    "scope": "user",
+    "source": "s",
+    "transport": "http",
+    "state": "connected",
+    "tools": 5,
+    "sessions": 1
+  }
+}

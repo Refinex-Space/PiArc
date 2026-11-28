@@ -1,0 +1,39 @@
+id: skill-index
+description: Skills from the project's .claude/skills, .piarc/skills and Pi's .agents/skills and from the user's ~/.claude/skills appear in system prompt section 5 as name and description only; a disable-model-invocation skill and the bodies stay out, a project skill wins over a user skill of the same name, and the session offers the Skill tool (T37).
+capabilities: [CAP-SKILL-001, CAP-SKILL-INDEX-001]
+workspace:
+  files:
+    .claude/skills/fix-issue/SKILL.md: "---\ndescription: Fix a reported issue end to end\nwhen_to_use: When the user names an issue number\n---\nBODY-FIX: read the issue, reproduce, fix, test.\n"
+    .claude/skills/release/SKILL.md: "---\ndescription: Cut a release\ndisable-model-invocation: true\n---\nBODY-RELEASE\n"
+    .piarc/skills/style-guide/SKILL.md: "---\ndescription: The project's writing style\n---\nBODY-STYLE\n"
+    .agents/skills/pi-skill/SKILL.md: "---\ndescription: A skill in Pi's directory\n---\nBODY-PI\n"
+    .claude/skills/shared/SKILL.md: "---\ndescription: Project version of shared\n---\nBODY-SHARED-PROJECT\n"
+  run_files:
+    'home 家/.claude/skills/personal/SKILL.md': "---\ndescription: A user skill\n---\nBODY-PERSONAL\n"
+    'home 家/.claude/skills/shared/SKILL.md': "---\ndescription: User version of shared\n---\nBODY-SHARED-USER\n"
+providers:
+  main:
+    wire: anthropic
+    validation:
+      ordered_system_sections: ['<project_context>', '<skills>', '<environment>']
+    steps:
+      - text: Done.
+actions:
+  - prompt: { text: What can you do? }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      tools_include: [Skill, Read]
+      contains:
+        - '- fix-issue: Fix a reported issue end to end When the user names an issue number'
+        - "- style-guide: The project's writing style"
+        - "- pi-skill: A skill in Pi's directory"
+        - '- personal: A user skill'
+        - '- shared: Project version of shared'
+      not_contains:
+        - release
+        - BODY-FIX
+        - BODY-STYLE
+        - BODY-PERSONAL
+        - User version of shared

@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32000,
+    "message": "protocol major version mismatch: local speaks 1.0, remote speaks 2.0; update the older side so both use the same major version",
+    "data": {
+      "kind": "protocolVersionMismatch",
+      "retryable": false,
+      "details": {
+        "local": "1.0",
+        "remote": "2.0"
+      }
+    }
+  }
+}

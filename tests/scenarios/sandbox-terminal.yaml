@@ -1,0 +1,28 @@
+id: sandbox-terminal
+description: A command the model runs with terminal goes through the same sandbox as the other launch paths - typed into the session's PiArc terminal, its write outside the workspace is refused (T39).
+capabilities: [CAP-SANDBOX-PATHS-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: term
+            name: Bash
+            input:
+              command: '(printf x > "$HOME/term.txt") 2>/dev/null && printf written > term.txt || printf refused > term.txt'
+              terminal: true
+      - text: It runs in a terminal.
+actions:
+  - prompt: { text: Go., turn: t }
+  - wait: { method: turn/completed, turn: t }
+  # The command ended (exit code 0 from the fallback printf); the terminal runs on.
+  - wait: { method: core/tasks, params: { kind: terminal, status: running, exitCode: 0 } }
+expect:
+  files:
+    term.txt: refused

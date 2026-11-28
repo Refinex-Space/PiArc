@@ -1,0 +1,80 @@
+id: rewind-code-and-conversation
+description: Rewinding code and conversation to before a turn removes the file the turn created, gives the turn's message back for the input box and continues before it; the original branch stays and switching back restores its messages and task list (T28).
+capabilities: [CAP-CKPT-001, CAP-CKPT-REWIND-001, CAP-SESSION-FORK-001]
+workspace:
+  files:
+    notes.txt: "alpha\n"
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: read1, name: Read, input: { path: notes.txt } }
+      - tool_calls:
+          - id: edit1
+            name: Edit
+            input: { path: notes.txt, edits: [{ oldText: alpha, newText: beta }] }
+      - tool_calls:
+          - id: todo1
+            name: TodoWrite
+            input: { todos: [{ content: Rename, status: in_progress }] }
+      - text: First turn done.
+      - tool_calls:
+          - { id: write2, name: Write, input: { path: made.txt, content: "made\n" } }
+      - tool_calls:
+          - id: todo2
+            name: TodoWrite
+            input:
+              todos:
+                - { content: Rename, status: completed }
+                - { content: Add a file, status: in_progress }
+      - text: Second turn done.
+      - text: A different second turn.
+      - text: Back on the first branch.
+actions:
+  - prompt: { text: Rename alpha., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - prompt: { text: Add a file., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+  - check_files: { files: { notes.txt: "beta\n", made.txt: "made\n" } }
+  - rewind:
+      turn: t2
+      scope: codeAndConversation
+      preview: { made.txt: delete }
+      outcomes: { made.txt: deleted }
+      text: Add a file.
+  - check_files: { files: { notes.txt: "beta\n", made.txt: null } }
+  - check_branch:
+      texts: [Rename alpha., First turn done.]
+      branches: [{ options: [{ preview: Add a file. }] }]
+  - check_harness: { fields: { todos: [{ content: Rename, status: inProgress }] } }
+  - prompt: { text: Do something else., turn: t3 }
+  - wait: { method: turn/completed, turn: t3 }
+  - check_branch:
+      texts: [Rename alpha., First turn done., Do something else., A different second turn.]
+      branches:
+        - index: 1
+          options: [{ preview: Add a file. }, { preview: Do something else. }]
+  - switch_branch: { to: Add a file. }
+  - check_branch:
+      texts: [Rename alpha., First turn done., Add a file., Second turn done.]
+      branches: [{ index: 0 }]
+  - check_harness:
+      fields:
+        todos: [{ content: Rename, status: completed }, { content: Add a file, status: inProgress }]
+  - prompt: { text: Continue there., turn: t4 }
+  - wait: { method: turn/completed, turn: t4 }
+expect:
+  request_counts: { main: 9 }
+  requests:
+    - index: 7
+      contains: [Rename alpha., First turn done., Do something else.]
+      not_contains: [Add a file., Second turn done.]
+    - index: 8
+      contains: [Rename alpha., Add a file., Second turn done., Continue there.]
+      not_contains: [Do something else., A different second turn.]
+  files:
+    notes.txt: "beta\n"
+    made.txt: null

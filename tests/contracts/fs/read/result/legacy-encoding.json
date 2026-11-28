@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 13,
+  "result": {
+    "path": "/Users/dev/work space/项目/旧文件.txt",
+    "size": 6,
+    "offset": 0,
+    "bytesRead": 6,
+    "eof": true,
+    "text": "中文\r\n",
+    "encoding": "GBK"
+  }
+}

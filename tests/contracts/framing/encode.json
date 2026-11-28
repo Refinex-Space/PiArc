@@ -1,0 +1,32 @@
+{
+  "$comment": "Cases for the LF frame encoder, shared by the Rust and TypeScript tests. `expect` is the exact frame bytes as UTF-8 text.",
+  "cases": [
+    {
+      "name": "a message whose string holds a newline",
+      "value": {
+        "jsonrpc": "2.0",
+        "method": "log",
+        "params": {
+          "m": "a\nb"
+        }
+      },
+      "expect": {
+        "utf8": "{\"jsonrpc\":\"2.0\",\"method\":\"log\",\"params\":{\"m\":\"a\\nb\"}}\n"
+      }
+    },
+    {
+      "name": "U+2028 and U+2029 are written raw",
+      "value": "a\u2028b\u2029c",
+      "expect": {
+        "utf8": "\"a\u2028b\u2029c\"\n"
+      }
+    },
+    {
+      "name": "non-ASCII text is written as UTF-8",
+      "value": ["中文", 1, null, true],
+      "expect": {
+        "utf8": "[\"中文\",1,null,true]\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+id: sandbox-auto-allow
+description: With the sandbox's auto-approval on, a Bash command that is not read-only runs without a card, inside the sandbox - its write to the workspace lands and its write outside is refused (T39).
+capabilities: [CAP-SANDBOX-AUTO-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: write, name: Bash, input: { command: 'printf auto > auto.txt' } }
+      - tool_calls:
+          - { id: escape, name: Bash, input: { command: 'printf x > "$HOME/escape.txt"' } }
+      - text: Done.
+actions:
+  - prompt: { text: Go., turn: t }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: write, is_error: false }
+        - { id: escape, is_error: true, contains: "PiArc's sandbox refused writing" }
+  files:
+    auto.txt: auto

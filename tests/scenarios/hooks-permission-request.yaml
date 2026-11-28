@@ -1,0 +1,61 @@
+id: hooks-permission-request
+description: PermissionRequest hooks answer before an approval card - an allow runs the call and saves a session rule that allows the next one without asking, a deny refuses with its message (T25).
+capabilities: [CAP-HOOK-PERM-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    notes.txt: "one\ntwo\n"
+    .claude/settings.json: |
+      {"hooks": {"PermissionRequest": [
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs bash"}]},
+        {"matcher": "Write", "hooks": [{"type": "command", "command": "node hook.mjs write"}]}
+      ]}}
+    hook-plans/bash.json: |
+      {"json": {"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow",
+        "updatedPermissions": [{"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "sed -n *"}], "behavior": "allow", "destination": "session"}]}}}}
+    hook-plans/write.json: |
+      {"json": {"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "deny", "message": "Writes wait for review."}}}}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: first, name: Bash, input: { command: sed -n 1p notes.txt } }]
+      - tool_calls: [{ id: second, name: Bash, input: { command: sed -n 2p notes.txt } }]
+      - tool_calls: [{ id: write, name: Write, input: { path: out.txt, content: x } }]
+      - text: 'Done.'
+actions:
+  - prompt: { text: 'Read the notes.', turn: t }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 1
+      tool_results: [{ id: first, is_error: false, contains: one }]
+    - index: 2
+      tool_results: [{ id: first }, { id: second, is_error: false, contains: two }]
+    - index: 3
+      tool_results:
+        - { id: first }
+        - { id: second }
+        - { id: write, is_error: true, contains: 'Writes wait for review.' }
+  files: { out.txt: null }
+  json_lines:
+    hook-log/bash.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            permission_mode: string,
+            tool_input: object,
+            permission_suggestions: array,
+          }
+        input:
+          {
+            hook_event_name: PermissionRequest,
+            tool_name: Bash,
+            tool_input: { command: sed -n 1p notes.txt },
+          }
+    hook-log/write.jsonl:
+      - input: { hook_event_name: PermissionRequest, tool_name: Write }

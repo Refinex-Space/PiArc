@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://piarc.cn/schemas/l3-scenario.json",
+  "title": "L3 behavior-alignment scenario",
+  "description": "One scenario that runs on PiArc (through the L2 runner) and on Claude Code (claude -p) against the same strict mock; docs/engineering/testing.md section 14.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "area", "description", "mirrors", "prompt", "steps"],
+  "properties": {
+    "id": {
+      "description": "Equals the file name without .yaml.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "area": {
+      "enum": ["permissions", "hooks"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mirrors": {
+      "description": "The L2 scenarios (tests/scenarios/<id>.yaml) whose behavior this one compares.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      }
+    },
+    "mode": {
+      "description": "Permission mode of the session (Claude Code: --permission-mode; bypassPermissions also enables it in PiArc's user settings).",
+      "enum": ["default", "acceptEdits", "plan", "bypassPermissions"]
+    },
+    "trusted": {
+      "description": "Whether the project is trusted (default true): PiArc trusts it, Claude Code finds hasTrustDialogAccepted for the workspace.",
+      "type": "boolean"
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "description": "Workspace files by relative path (/-separated), UTF-8 text; .claude/settings.json drives both sides.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "user_settings": {
+          "description": "The user-level Claude Code settings (~/.claude/settings.json) of both sides.",
+          "type": "object"
+        },
+        "plans": {
+          "description": "Hook plans by hook name, written to .l3/plans/<name>.json for .l3/hook.mjs.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "steps": {
+      "description": "The mock's script (docs/engineering/testing.md section 10.3). Tool inputs use Claude Code's parameter names; {{workspace}} is the workspace's absolute path.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object"
+      }
+    },
+    "approvals": {
+      "description": "Answers to permission prompts, each naming the tool call it answers; a prompt no answer names is refused.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["call", "decision"],
+        "properties": {
+          "call": {
+            "description": "The scripted tool call id the prompt is for.",
+            "type": "string"
+          },
+          "decision": {
+            "enum": ["allow", "deny"]
+          },
+          "feedback": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

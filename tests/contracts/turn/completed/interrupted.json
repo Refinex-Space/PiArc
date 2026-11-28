@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn/completed",
+  "params": {
+    "sessionId": "ses_01",
+    "seq": 5,
+    "ts": 1794643200005,
+    "turnId": "turn_02",
+    "status": "interrupted"
+  }
+}

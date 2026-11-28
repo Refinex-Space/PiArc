@@ -1,0 +1,60 @@
+id: hooks-m5-model-switch
+description: A matched PreModelSwitch denial leaves the old model selected. A later ask opens a user question, PostModelSwitch runs only for the confirmed change, and the next provider request carries its additional context.
+capabilities: [CAP-HOOK-PREMODELSWITCH-001, CAP-HOOK-POSTMODELSWITCH-001, CAP-HOOK-M5-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .piarc/settings.json: '{"hooks":{"PreModelSwitch":[{"matcher":"other","hooks":[{"type":"command","command":"node hook.mjs pre"}]}],"PostModelSwitch":[{"matcher":"other","hooks":[{"type":"command","command":"node hook.mjs post"}]}]}}'
+    hook-plans/pre.json: '{"sequence":[{"json":{"decision":"block","reason":"Pinned for review."}},{"json":{"hookSpecificOutput":{"hookEventName":"PreModelSwitch","permissionDecision":"ask","permissionDecisionReason":"Confirm the destination."}}}]}'
+    hook-plans/post.json: '{"json":{"hookSpecificOutput":{"hookEventName":"PostModelSwitch","additionalContext":"Continue using the glossary."}}}'
+providers:
+  first:
+    wire: anthropic
+    model: initial
+    steps:
+      - text: Ready.
+      - text: Still here.
+  second:
+    wire: openai
+    model: other
+    steps:
+      - text: Switched.
+sessions:
+  main: { provider: first }
+actions:
+  - prompt: { text: Start., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - set_model:
+      { provider: second, preview: { cacheInvalidated: true }, rejected: Pinned for review. }
+  - prompt: { text: Confirm the first model., turn: still }
+  - wait: { method: turn/completed, turn: still }
+  - set_model: { provider: second, preview: { cacheInvalidated: true } }
+  - prompt: { text: Continue., turn: switched }
+approvals:
+  - tool: PreModelSwitch
+    kind: question
+    decision: allow
+    answers: [{ selected: [mock-second/other] }]
+expect:
+  request_counts: { first: 2, second: 1 }
+  requests:
+    - { provider: first, index: 1, not_contains: [Continue using the glossary.] }
+    - { provider: second, index: 0, contains: [Continue using the glossary.] }
+  json_lines:
+    hook-log/pre.jsonl:
+      - types:
+          { context_tokens: number, prompt_cache_warm: boolean, estimated_cache_write_usd: number }
+        input:
+          {
+            hook_event_name: PreModelSwitch,
+            from_model: initial,
+            to_model: other,
+            requested_model: other,
+            source: picker,
+          }
+      - input: { hook_event_name: PreModelSwitch, from_model: initial, to_model: other }
+    hook-log/post.jsonl:
+      - input:
+          { hook_event_name: PostModelSwitch, from_model: initial, to_model: other, source: picker }

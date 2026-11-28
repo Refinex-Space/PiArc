@@ -1,0 +1,46 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/completed",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 3,
+    "ts": 1763200000100,
+    "turnId": "turn-7c1f",
+    "item": {
+      "type": "userMessage",
+      "itemId": "turn-7c1f:user:1",
+      "status": "completed",
+      "text": "Review @src/a b/main.ts against the spec.",
+      "mentions": [
+        {
+          "path": "src/a b/main.ts",
+          "start": 7,
+          "end": 22
+        }
+      ],
+      "attachments": [
+        {
+          "kind": "image",
+          "name": "截图 1.png",
+          "mimeType": "image/png",
+          "blob": {
+            "path": "/data/sessions/019a8f3e/attachments/9f86d081.png",
+            "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+            "size": 2048
+          }
+        },
+        {
+          "kind": "pdf",
+          "name": "spec.pdf",
+          "mimeType": "application/pdf",
+          "blob": {
+            "path": "/data/sessions/019a8f3e/attachments/60303ae2.pdf",
+            "sha256": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
+            "size": 40960
+          },
+          "pageCount": 12
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "t41-usage",
+  "steps": [
+    {
+      "text": "First answer.",
+      "usage": {
+        "input_tokens": 1000,
+        "output_tokens": 200,
+        "cache_read_tokens": 5000,
+        "cache_write_tokens": 300
+      }
+    },
+    {
+      "text": "Second answer.",
+      "usage": {
+        "input_tokens": 1000,
+        "output_tokens": 200,
+        "cache_read_tokens": 5000,
+        "cache_write_tokens": 300
+      }
+    },
+    {
+      "text": "Third answer.",
+      "usage": {
+        "input_tokens": 1000,
+        "output_tokens": 200,
+        "cache_read_tokens": 5000,
+        "cache_write_tokens": 300
+      }
+    }
+  ]
+}

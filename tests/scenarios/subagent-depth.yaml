@@ -1,0 +1,74 @@
+id: subagent-depth
+description: Subagents nest at most three levels below the main session by default; the third level gets no Agent tool, the levels above keep it (T31).
+capabilities: [CAP-AGENT-LIMIT-001]
+workspace:
+  files:
+    .claude/agents/one.md: "---\nname: one\ndescription: Level one.\nmodel: mock-l1/mock-model\n---\nLevel one.\n"
+    .claude/agents/two.md: "---\nname: two\ndescription: Level two.\nmodel: mock-l2/mock-model\n---\nLevel two.\n"
+    .claude/agents/three.md: "---\nname: three\ndescription: Level three.\nmodel: mock-l3/mock-model\n---\nLevel three.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: a1,
+              name: Agent,
+              input: { description: Go deep, prompt: Start level two., subagent_type: one },
+            },
+          ]
+      - text: Deep done.
+  l1:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: a2,
+              name: Agent,
+              input: { description: Level two, prompt: Start level three., subagent_type: two },
+            },
+          ]
+      - text: Level one done.
+  l2:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: a3,
+              name: Agent,
+              input: { description: Level three, prompt: Report., subagent_type: three },
+            },
+          ]
+      - text: Level two done.
+  l3:
+    wire: anthropic
+    steps:
+      - text: Level three done.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Go three levels down., turn: one }
+expect:
+  request_counts: { main: 2, l1: 2, l2: 2, l3: 1 }
+  requests:
+    - provider: l1
+      index: 0
+      tools_include: [Agent]
+    - provider: l2
+      index: 0
+      tools_include: [Agent]
+    - provider: l2
+      index: 1
+      tool_results: [{ id: a3, is_error: false, contains: Level three done. }]
+    - provider: l3
+      index: 0
+      tools_exclude: [Agent]
+    - provider: l1
+      index: 1
+      tool_results: [{ id: a2, is_error: false, contains: Level two done. }]
+    - provider: main
+      index: 1
+      tool_results: [{ id: a1, is_error: false, contains: Level one done. }]

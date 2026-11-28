@@ -1,0 +1,51 @@
+id: mcp-subagent-servers
+description: A subagent definition naming the .mcp.json server alpha and defining scratch inline; the subagent's alpha call goes to the pool's process the main session started (alpha starts once), scratch starts for the subagent only and its tools are not offered to the main session (T36).
+capabilities: [CAP-MCP-SUBAGENT-001]
+workspace:
+  trusted: true
+  files:
+    .mcp.json: '{"mcpServers":{"alpha":{"command":"node","args":["{{mcp_echo}}","alpha"],"env":{"MCP_ECHO_START_LOG":"mcp-starts.jsonl"}}}}'
+    .claude/agents/db.md: "---\nname: db\ndescription: Talks to the servers.\nmcpServers:\n  - alpha\n  - scratch: { command: node, args: [\"{{mcp_echo}}\", scratch], env: { MCP_ECHO_START_LOG: mcp-starts.jsonl } }\n---\nUse the MCP tools you are given.\n"
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__alpha__*","mcp__scratch__*"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: parent-echo, name: mcp__alpha__echo, input: { text: parent } }]
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                { description: Use the servers, prompt: Call both servers., subagent_type: db },
+            },
+          ]
+      # The subagent's requests come next on this endpoint.
+      - tool_calls:
+          - { id: child-echo, name: mcp__alpha__echo, input: { text: child } }
+          - { id: child-scratch, name: mcp__scratch__echo, input: { text: inline } }
+      - text: Both answered.
+      - text: The subagent used both servers.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Use the db subagent., turn: one }
+expect:
+  request_counts: { main: 5 }
+  json_lines:
+    mcp-starts.jsonl: [{ server: alpha }, { server: scratch }]
+  requests:
+    - provider: main
+      index: 0
+      tools_include: [mcp__alpha__echo]
+      tools_exclude: [mcp__scratch__echo]
+    - provider: main
+      index: 2
+      tools_include: [mcp__alpha__echo, mcp__scratch__echo]
+    - provider: main
+      index: 3
+      tool_results:
+        - { id: child-echo, is_error: false, contains: 'alpha echoes "child"' }
+        - { id: child-scratch, is_error: false, contains: 'scratch echoes "inline"' }

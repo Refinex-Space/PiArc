@@ -1,0 +1,49 @@
+id: browser-output-spill
+description: Output longer than the 30,000-character inline budget is cut for the model, and the whole text goes to a file in the session's temporary directory that the result names; Read of that file gives the part that was cut (design addendum browser.md B2.1.2).
+capabilities: [CAP-BROWSER-RUN-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: b1
+            name: Browser
+            input: { script: 'console.log(document.body.innerText);' }
+      - tool_calls:
+          - id: read
+            name: Read
+            # The data directory's path has spaces: take everything up to " (read it".
+            input:
+              path: '{{result:b1:the whole text is in (.+?\.txt) \(read it}}'
+              offset: 600
+              limit: 100
+      - text: 'The page ends with the marker.'
+browser:
+  runs:
+    - run: { toolCallId: b1 }
+      steps:
+        # 640 lines of 50 characters (32,000), then the marker on line 641.
+        - answer:
+            output: "padding line of the page text, 0123456789 abcdefg\n"
+            repeat: 640
+            output_end: 'END-OF-BROWSER-OUTPUT'
+actions:
+  - prompt: { text: 'Print the page text.', turn: one }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: b1, is_error: false, contains: 'The output was cut; the whole text is in ' }
+      contains: ['browser-b1.txt (read it with Read)']
+      not_contains: [END-OF-BROWSER-OUTPUT]
+    - index: 2
+      tool_results:
+        - { id: b1 }
+        - { id: read, is_error: false, contains: END-OF-BROWSER-OUTPUT }
+  request_counts: { main: 3 }
+  audit:
+    - kind: browser
+      count: 1
+      detail: { tool: Browser, toolCallId: b1, outcome: ok }

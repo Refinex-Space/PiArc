@@ -1,0 +1,47 @@
+id: sandbox-launch-paths
+description: Every way the agent starts a command runs it in the sandbox - a foreground command, a run_in_background command and a Monitor each try to write outside the workspace and are refused (T39).
+capabilities: [CAP-SANDBOX-PATHS-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+workspace:
+  trusted: true
+  run_files:
+    # Monitor's output does not wake the idle session: the run checks files, not turns.
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true},"monitor":{"wakeIdleSession":false}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: fg
+            name: Bash
+            input:
+              {
+                command: '(printf x > "$HOME/fg.txt") 2>/dev/null && printf written > fg.txt || printf refused > fg.txt',
+              }
+      - tool_calls:
+          - id: bg
+            name: Bash
+            input:
+              command: '(printf x > "$HOME/bg.txt") 2>/dev/null && printf written > bg.txt || printf refused > bg.txt'
+              run_in_background: true
+      - tool_calls:
+          - id: mon
+            name: Monitor
+            input:
+              command: '(printf x > "$HOME/mon.txt") 2>/dev/null && printf written > mon.txt || printf refused > mon.txt; echo checked'
+              description: the write check
+      - text: Done.
+# Monitor commands are never auto-approved (T32): the card is answered.
+approvals:
+  - { tool: Monitor, decision: allow }
+actions:
+  - prompt: { text: Go., turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - wait: { method: core/tasks, params: { kind: command, status: completed } }
+  - wait: { method: core/tasks, params: { kind: monitor, status: completed } }
+expect:
+  files:
+    fg.txt: refused
+    bg.txt: refused
+    mon.txt: refused

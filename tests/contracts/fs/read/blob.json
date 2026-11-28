@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 16,
+  "method": "fs/read",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "logo.png",
+    "mode": "blob",
+    "origin": {
+      "tool": "Read",
+      "toolCallId": "toolu_01"
+    }
+  }
+}

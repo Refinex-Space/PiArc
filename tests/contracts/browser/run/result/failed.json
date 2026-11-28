@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "output": "",
+    "truncated": false,
+    "error": {
+      "name": "EgoError",
+      "message": "The task is under user control",
+      "code": "EGO_TASK_SPACE_USER_IN_CONTROL"
+    }
+  }
+}

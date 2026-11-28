@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 51,
+  "result": {
+    "ok": true,
+    "model": "deepseek-chat",
+    "latencyMs": 412
+  }
+}

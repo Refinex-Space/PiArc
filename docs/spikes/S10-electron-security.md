@@ -1,0 +1,133 @@
+# S10 Electron 安全基线
+
+- 任务：T03（2026-11-14）
+- 范围：S10 中 CSP、导航、IPC、fuses 这一层。Markdown 渲染路径上的 XSS 载荷集由 T09 完成（结果见 `S01-transcript-composer.md` 第 5 节），S10 的整体结论由 R1 汇总。
+- 结论：macOS 上 T03 负责的部分**通过**；Windows（W0）**通过**：本机按 CI `desktop` 作业的步骤运行，开发构建打包、L4 两种形态（含全部安全用例）、发布构建打包与 fuse 校验都通过（第 8 节）。
+
+## 1. 验证环境
+
+| 项 | 版本 |
+|---|---|
+| 系统 | macOS 26.5.2（25F84），arm64 |
+| Electron | 45.3.2（npm `latest`；受支持大版本 45、44、43），Chromium 156.0.8078.100，内置 Node 24.22.2（与 `.nvmrc` 一致） |
+| Electron Forge | 8.0.1（`plugin-vite`、`plugin-fuses`），`@electron/fuses` 2.1.3 |
+| Vite / React | 8.3.8 / 19.3.1，`@vitejs/plugin-react` 6.3.0 |
+| Playwright | `@playwright/test` 1.65.1（Electron 支持，不下载浏览器） |
+| 本机 Node | 24.14.1（运行脚本与测试；CI 用 `.nvmrc` 的 24.22.2） |
+
+## 2. 做了什么
+
+- `apps/desktop` 三部分工程：主进程、sandboxed preload、React 渲染进程，外加只含 IPC 契约的 `src/shared`。四个 TS 工程分开配置：主进程与 preload 不含 DOM 类型，渲染进程不含 Node 类型。
+- 按架构第 10.3 节落实渲染进程加固、preload 白名单、IPC 来源校验、单实例锁与 fuses，位置见第 3 节清单。
+- L4 基座：Playwright 驱动两种形态，开发形态（node_modules 中的 Electron + `.vite/` 生产构建，经 `app://` 加载）与开发构建的打包产物；每个用例独立启动、独立 user-data 目录。
+- `scripts/ci/check-fuses.mjs`：读打包产物的实际 fuse，与 `apps/desktop/fuses.mjs` 的发布配置逐项比对。
+- 变异对照：临时放开 CSP、导航守卫、权限、IPC 来源校验与外链协议白名单，重新打包后运行安全用例，确认用例能发现回退；之后还原。
+- 对发布构建做运行时探测：`ELECTRON_RUN_AS_NODE`、`--inspect`、`NODE_OPTIONS`、`--remote-debugging-port`。
+
+## 3. Electron 官方安全清单逐条
+
+清单原文见 `docs/research/electron-stack.md` 第 3 节。"L4"指 `apps/desktop/e2e/` 下的 Playwright 用例，两种形态都运行；"单元"指与源文件同目录的 Vitest 用例。
+
+| # | 清单项 | 落实方式 | 测试或检查 |
+|---|---|---|---|
+| 1 | 只加载安全内容 | 界面只从 `app://piarc` 加载（注册为 `secure`）；CSP 禁止加载任何远程资源；应用不加载远程页面 | L4 `csp.e2e.ts`（外部 fetch、外部图片被拦）、`app-instance.e2e.ts`（`isSecureContext` 为 true） |
+| 2 | 不对远程内容开启 Node 集成 | `nodeIntegration`、`nodeIntegrationInWorker`、`nodeIntegrationInSubFrames` 固定为 false | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（`require`、`process`、`module`、`Buffer` 均为 `undefined`） |
+| 3 | 所有渲染进程开启上下文隔离 | `contextIsolation: true` 固定在窗口工厂 | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（页面只看到 `window.piarc`，扫描不到 `ipcRenderer`） |
+| 4 | 开启进程沙箱 | `sandbox: true`，并在 `ready` 前调用 `app.enableSandbox()` 全局强制 | 单元 `web-preferences.test.ts`；L4 `preload.e2e.ts`（`app.getAppMetrics()` 报告窗口渲染进程 `sandboxed: true`） |
+| 5 | 所有会话设置权限处理器 | `setPermissionRequestHandler`、`setPermissionCheckHandler` 默认拒绝，`setDevicePermissionHandler` 返回 false；放行清单 `PERMISSION_ALLOWLIST` 集中定义，T03 时为空，T09 加入 `clipboard-sanitized-write`（"复制本条消息"按钮用 `navigator.clipboard.writeText`；只写、由 Chromium 净化，读剪贴板仍拒绝）；`session-created` 时对新会话同样安装 | 单元 `permissions.test.ts`（放行清单只有这一项且有理由，`clipboard-read` 等仍拒绝）；L4 `permissions.e2e.ts`（通知、摄像头、地理位置被拒，权限查询为 `denied`）与 `transcript-copy.e2e.ts`（复制按钮写入剪贴板） |
+| 6 | 不关闭 `webSecurity` | 固定为 true；`new BrowserWindow` 只允许出现在窗口工厂（ESLint） | 单元 `web-preferences.test.ts`；ESLint `no-restricted-syntax` |
+| 7 | 定义 CSP | 主进程在 `protocol.handle` 的每个响应上发送 `Content-Security-Policy` 响应头：`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`，另加 `X-Content-Type-Options: nosniff` | 单元 `csp.test.ts`；L4 `csp.e2e.ts`（响应头存在；注入的内联脚本、内联事件属性、`eval`、`new Function` 都不执行；外部 fetch 与图片触发 `connect-src`、`img-src` 违规） |
+| 8 | 不开启 `allowRunningInsecureContent` | 固定为 false | 单元 `web-preferences.test.ts` |
+| 9 | 不开启实验特性 | `experimentalFeatures: false` | 单元 `web-preferences.test.ts` |
+| 10 | 不使用 `enableBlinkFeatures` | 不设置该项 | 单元 `web-preferences.test.ts`（断言不存在该键） |
+| 11 | `<webview>` 不用 `allowpopups` | 不适用：不使用 `<webview>`。`webviewTag: false`，且全局 `will-attach-webview` 一律 `preventDefault` | 单元 `web-preferences.test.ts`；代码 `security/navigation.ts` |
+| 12 | `<webview>` 校验选项与参数 | 不适用：同上，任何 `<webview>` 都不允许挂载 | 同上 |
+| 13 | 禁止或限制导航 | `will-navigate` 与 `will-redirect` 中解析 origin 后与可信 origin 整串比较，不用前缀；在 `app.on('web-contents-created')` 中给所有 webContents 安装。子框架的导航不经 `will-navigate`：T03 时由 CSP 的 `frame-ancestors` 与渲染进程不建 `<iframe>` 挡住，T45 补上同样规则的 `will-frame-navigate`（I52，[复核](../security/electron-checklist.md)） | 单元 `navigation.test.ts`、`origin.test.ts`；L4 `navigation.e2e.ts`（改 `location`、点击链接、重定向都被拦，窗口留在 `app://piarc/index.html`；同源导航放行） |
+| 14 | 禁止或限制新窗口 | `setWindowOpenHandler` 一律返回 `deny`，同样经全局钩子安装 | L4 `external-links.e2e.ts`（`window.open` 与 `target=_blank` 链接被拒，窗口数仍为 1） |
+| 15 | 不对不可信内容调用 `shell.openExternal` | 只经 `window.piarc.openExternal`：只放行 `https:`、`http:`、`mailto:`，长度上限 8192，拒绝带用户信息的地址；每个窗口同一时刻最多一个确认框（R1-E5）；主进程弹原生确认框显示规范化后的完整地址（国际化域名显示为 punycode），确认后才打开；对话框与 `shell.openExternal` 经 `ExternalLinkPort` 调用 | 单元 `external-links.test.ts`（端口替身）；L4 `external-links.e2e.ts`（主进程中替换为记录替身：确认后才打开、取消不打开、`javascript:`、`file:`、`data:` 等不弹框直接拒绝） |
+| 16 | 使用当前版本的 Electron | 锁定 45.3.2（最新稳定版）；升级节奏按 ADR-0018 第 8 条 | `apps/desktop/package.json` 与 `npm view electron dist-tags` |
+| 17 | 校验所有 IPC 消息的发送方 | 所有 `ipcMain.handle` 经 `createIpcRegistrar` 注册（ESLint 禁止 `ipcMain.<方法>`；T45 起另禁止 `webContents.ipc`、`ipcMain` 的别名与经模块对象的访问，I52）；先校验 `senderFrame` 非空且 `origin` 与可信 origin 整串相等，否则拒绝并记录日志 | 单元 `sender.test.ts`（空 frame、其他 origin、`app://piarcx` 等前缀相似 origin）；L4 `preload.e2e.ts`（合法调用通过；`data:` 页面与 `app://piarcx` 页面加载同一 preload 后调用被拒） |
+| 18 | 不用 `file://`，改用自定义协议 | `protocol.registerSchemesAsPrivileged`（`standard`、`secure`、`supportFetchAPI`，不 `bypassCSP`、不允许 service worker）+ `protocol.handle` 从 `.vite/renderer/main_window`（打包后在 app.asar 内）提供文件，拒绝越出目录的路径；`GrantFileProtocolExtraPrivileges` fuse 关闭 | 单元 `asset-path.test.ts`（路径穿越、编码绕过、错误 host）；L4 `app-instance.e2e.ts`（`location.protocol` 为 `app:`）；`npm run check:fuses` |
+| 19 | 检查可修改的 fuses | 发布配置见第 4 节；`strictlyRequireAllFuses: true`；`check-fuses.mjs` 读产物比对 | 单元 `check-fuses.test.mjs`；`npm run check:fuses`；第 5.4 节的运行时探测 |
+| 20 | 不向不可信页面暴露 Electron API | preload 经 `contextBridge` 只暴露 `getAppVersion`、`openExternal` 两个函数，不暴露 `ipcRenderer`；返回值在 preload 中校验类型；本任务没有事件 API，以后新增时必须剥掉 Electron 的 event 对象（`apps/desktop/CLAUDE.md`）；preload 只能 `require('electron')`（ESLint 禁止导入 Node 内置模块）。T10 加入六个终端函数：`createTerminal` 只能启动用户的登录 shell（程序、参数、环境不由页面决定，测试用的其他程序只能经开发构建的主进程测试钩子创建）；其余命令在主进程校验参数（尺寸 1–1000、按键消息的字段与长度、输入文本 ≤ 64 Ki 字符）并且只允许操作本窗口创建的终端，窗口销毁、渲染进程崩溃或页面重载时关闭它的终端（R1-E2），终端的事件路由 `term/<id>` 也只有所属窗口能订阅（R1-E4）；帧是拉取请求的返回值（preload 校验为 `Uint8Array`，ADR-0023），事件回调只收到数据，没有 event 对象。T18 加入会话、工作区、信任、偏好、设置窗口与通知计数的 21 个函数（白名单见 `e2e/preload.e2e.ts`，共 31 个）：主进程逐个校验参数（会话 id 按 Core 规则、绝对路径、标题 ≤ 200 字符、偏好只接受白名单键与值、计数 0–9999）；删除会话由主进程弹原生确认框，页面无法绕过；应用事件（`piarc:app.event`：偏好、菜单命令、打开会话、窗口焦点）经 `onAppEvent` 交给页面，同样剥掉 event 对象。信任决定没有原生确认，登记 I79。T19 加入 composer 的 10 个函数（`steer`、`followUp`、`abort`、`compact`、`editQueueItem`、`deleteQueueItem`、`storeAttachment`、`searchFiles`、`cancelFileSearch`、`composerInfo`，共 41 个）：输入在主进程按形状与大小校验（请求键与条目 id 为 1–128 个 `[A-Za-z0-9._:-]`、文本 ≤ 1,000,000 个 UTF-16 码元、提及 ≤ 100、附件 ≤ 10、附件字节 ≤ 33 MiB、搜索根为绝对路径），含义由 Core 校验（提及在文本范围内、附件必须是本会话 `attachments/` 下 Core 存过的文件、附件类型按内容核对、搜索根必须在已知工作区内）。T20 新增 `setPermissionMode`、`answerApproval`（共 43 个）。主进程校验模式与答复字段，永久授权将本次提交的规则、目录逐项列入原生确认框，默认和取消按钮都取消；Core 按会话、请求、版本、连接代次核对并保存。T21 增加 9 个窄方法，用于服务商配置、目录刷新、工作区与会话模型目录、切换预览、模型与 effort 选择。保存时凭据单独传入，页面只查询非密钥元数据；删除服务商由主进程弹出带服务商 ID 的原生确认框。T23 增加权限页的 4 个方法（`permissionRules`、`checkPermissionRule`、`updatePermissionRule`、`auditEvents`，共 56 个）：主进程校验工作区为绝对路径、来源层只能是 PiArc 的可写文件、规则单行且不超过 4,096 字符、审计查询的取值范围；新增或修改 allow 规则先弹主进程原生确认，页面无法绕过。`setPermissionMode` 切换到跳过权限前同样弹原生确认，Core 另核对用户级开关；"总是允许"的原生确认逐行列出全部规则。T24 增加只读的 `configDiagnostics`（共 57 个）：主进程校验工作区为绝对路径，Core 只读取设置文件、不写任何文件。T27 增加只读的 `contextUsage`，`compact` 增加可选的重点说明（主进程按输入文本同样的长度上限校验）。T28 增加 7 个方法（`rewindPreview`、`rewind`、`undoRewind`、`sessionChanges`、`discardChange`、`switchBranch`、`forkSession`，共 65 个）：主进程校验会话 id、回合与条目 id 为 1–128 个 `[A-Za-z0-9._:-]`、回退范围为四个取值之一、文件路径为 Core 给出的不超过 4,096 字符的字符串、版本为 64 位十六进制或 `absent`、hunk 为非负整数；文件是否属于该会话的记录、版本是否仍是当前内容由 Core 在路径锁内核对，回退可经 `undoRewind` 撤销，所以不另弹原生确认。T29 增加 4 个方法（`setModelPreferences`、`startLogin`、`answerLogin`、`logoutProvider`，共 69 个）：主进程校验服务商与登录 id 为 1–128 个 `[A-Za-z0-9._:-]`、偏好与答复为不超过输入文本上限的字符串，偏好的取值范围由 Core 校验；退出登录由主进程弹出带服务商 ID 的原生确认框；登录页不在应用窗口加载，"在浏览器中打开"经 `openExternal` 的原生确认交给系统浏览器，页面拿不到令牌（只收到 `core/login` 上的步骤与结果）。T31 增加 3 个方法（`listAgents`、`stopSubagent`、`subagentTranscript`，共 72 个）：主进程校验工作区为绝对路径、会话 id 按 Core 规则、窗口范围同 `transcriptWindow`；子会话是否属于该父会话的工作区由 Core 经父会话定位，只读转录与停止都不改动文件。T32 增加 2 个方法（`stopTask`、`readTaskOutput`，共 74 个）：主进程校验任务 id 为 `bg-` 加 12 位十六进制、偏移为非负安全整数、长度为 1–65536 或 null；读取由 Core 限制在 64 KiB 一段，页面拿不到整份输出；停止与 KillShell 走同一 Core 入口，只结束任务的进程树或子 agent，不改动文件。T34 去掉 `createTerminal`（没有会话的终端只能经开发构建的测试钩子创建），增加终端面板的 13 个方法（`openSessionTerminal`、`shareTerminal`、`terminalMouse`、`terminalFocus`、`terminalPaste`、`terminalScroll`、`terminalColors`、`terminalClearSelection`、`terminalSelectionText`、`terminalLinkAt`、`terminalSearch`、`terminalScreenText`、`terminalInfo`，共 86 个）与应用事件 `visibility`（ADR-0051）：会话终端归会话，任何窗口可用；写入（输入、按键、粘贴、鼠标按下与松开）、打开会话终端与共享给 agent 都要求该窗口 5 秒内有 Electron 报告的真实输入（`input-event`，页面脚本无法伪造），每会话至多 16 个终端，每窗口每终端一个在途拉帧；主进程校验鼠标消息（动作、按键 1–11、修饰位、有限坐标、点击 1–3）、滚动目标、颜色（`0xRRGGBB`）、粘贴 ≤ 1 MiB 字符、查询 ≤ 1,000 字符、单元格 0–1000，并检查 Core 返回的 JSON 后才交给页面。T35 增加 8 个方法（`worktreeBranches`、`ignoreWorktrees`、`removeSessionWorktree`、`keepSessionWorktree`、`searchSessions`、`openSessionWindow`、`takeLaunchTargets`、`pathForFile`，共 94 个），`createSession` 多一个可选的 worktree 参数、`setSessionArchived` 改为答复是否归档，应用事件新增 `launch`：主进程校验工作区为绝对路径、会话 id 按 Core 规则、worktree 名为 1–64 个 `[A-Za-z0-9._-]`（Core 再按分支名规则核对）、基础分支 ≤ 256 字符且无控制字符、搜索词 1–200 字符；归档有未提交改动的 worktree 会话、删除清理时仍有改动的 worktree 都先由主进程弹原生确认（丢弃改动的选择只能在原生对话框里点），页面无法绕过；`pathForFile` 只是 Electron `webUtils.getPathForFile`，把用户拖入的文件夹换成路径，打开仍经 `openWorkspace` 由 Core 校验；启动目标（`piarc://`、拖入与第二次启动的文件夹）只做定位，不带可执行的内容。T36 增加 MCP 设置页的 4 个方法（`mcpStatus`、`mcpReconnect`、`mcpSetEnabled`、`mcpLogin`，共 98 个，ADR-0053）：主进程校验工作区为绝对路径、server 名为 1–64 个 `[A-Za-z0-9_-]`、启停为布尔值；server 是否属于该工作区、项目是否受信任由 Core 核对，停用与启用只改 PiArc 自己记录的选择、不写任何配置文件；登录沿用 T29 的路径（授权页经 `openExternal` 的原生确认在系统浏览器打开，令牌只进保险箱，页面只收到 `core/login` 的步骤与结果）。T38 增加网页搜索设置的 3 个方法（`webSearchSettings`、`setWebSearchBackend`、`setWebSearchKey`，连同 T37 的 3 个共 104 个，ADR-0055）：主进程校验后端 id 为 1–32 个 `[a-z0-9-]`（Core 再核对是已知后端）、key 为 1–512 字符或 null；key 只写不读，Core 存进保险箱的 `websearch/` 键（Agent Host 读不到），设置读取只答是否已保存；搜索结果的来源链接与模型输出的链接一样经 `openExternal` 的原生确认。T39 增加沙箱设置页的 2 个方法（`sandboxSettings`、`setSandboxSettings`，共 106 个）：主进程校验工作区为绝对路径或 null、修改只接受 `enabled`、`autoAllow`、`allowedDomains`、`denyRead` 四个字段且类型正确、列表至多 256 条单行字符串；打开沙箱内自动批准与新增允许域名先弹主进程原生确认，页面无法绕过；Core 再校验域名语法、只写用户级 `settings.json`。`answerApproval` 的"总是允许"可带网络域名卡的 `domain`，原生确认列出该域名，Core 核对它与卡片一致。 T40 增加扩展包的 6 个方法（`listPackages`、`installPackage`、`updatePackage`、`setPackageEnabled`、`confirmPackage`、`uninstallPackage`，共 112 个，ADR-0058）：主进程校验包 id 为 1–256 个无控制字符的字符、来源为文件夹（绝对路径）、git 地址或 npm 规格（单行，≤ 4,096 字符）、作用域为 `user` 或 `project`（后者要求绝对路径的工作区）；开启扩展包与允许更新带来的新增可执行项先由主进程弹原生确认，列出来源（路径；git 地址与提交；npm 版本与完整性值）与每个可执行项（hook、MCP server、Pi 扩展入口，并说明 Pi 扩展在 Agent Host 进程内运行、拥有与 agent 相同的权限），只有确认框列出的项交给 Core 记为已确认，页面无法绕过。开发构建的测试钩子 `answerConfirm` 可代答下一个确认框（Playwright 点不到原生对话框），发布构建的 Core 没有测试导出、主进程不安装测试钩子，`scripts/ci/check-app-layout.mjs --flavor release` 核对这一点。安装只取文件（npm 一律 `--ignore-scripts`），不运行包里的代码。 T41 增加用量的 3 个方法（`usageReport`、`sessionUsage`、`setModelPrice`，共 115 个）：主进程校验工作区为绝对路径或 null、会话 id 按 Core 规则、服务商 id 与模型 id 为 1–256 个无控制字符的字符（服务商 id 不含 `/`）、价格只接受 `input`、`output`、`cacheRead`、`cacheWrite` 四个 0–1,000,000 的有限数或 null；价格只写用户级 `settings.json` 的 `modelPrices`，只影响成本估算，不改动任何会话或请求。T47 新增 4 个方法（白名单共 121 个）。`managedSettings` 读取托管来源和锁定视图；`memoryView` 和 `memoryEdit` 要求绝对工作区路径，编辑请求是最多 65,536 个 UTF-16 码元的 JSON 文本，Core 校验操作、记忆名、内容上限和开关的锁定状态。`revealMemory` 只接收工作区，主进程用 Core 返回的记忆目录调用 `shell.showItemInFolder`。 ADR-0083 增加服务商的 5 个方法（`setProviderEnabled`、`testProvider`、`discoverModels`、`useProviderAccount`、`removeProviderAccount`，白名单共 138 个）：主进程校验服务商与账号 id 为 1–128 个 `[A-Za-z0-9._:-]`、启停为布尔值、模型列表请求与密钥为不超过输入文本上限的字符串；地址、协议与密钥由 Core 再校验，没填密钥时只有地址与协议都与已存配置相同才用已存密钥，带密钥的明文 HTTP 只允许回环地址；移除账号由主进程弹原生确认，账号名从 Core 的设置读取而不是页面给的；其他账号的令牌在 Core 专用的 `account/` 键下，页面与 Agent Host 都拿不到。 ADR-0098 增加 `removeWorkspace`：主进程校验工作区为绝对路径，先向 Core 取该项目运行中的会话与后台任务数，有运行中的工作时弹原生确认并写明数量，页面无法绕过；Core 只标记工作区记录，不删除文件夹、会话文件与索引，用户再次打开该文件夹即恢复。 ADR-0099 增加 `createDraftSession`、`discardDraftSession`：主进程校验绝对路径与会话 id，按窗口记录草稿并在页面重载、崩溃、关闭时丢弃；Core 只丢弃没有接受过输入的草稿，页面无法借此删除对话。 ADR-0102 增加 Pi 包市场的 4 个方法（`marketQuery`、`marketDetail`、`marketRefresh`、`marketInstall`）：主进程校验查询不超过 200 字符且无控制字符、类别与排序为枚举、偏移 0–20000、条数 1–100、工作区为绝对路径；包名按 npm 规则（≤214、小写、URL 安全、可带 `@scope/`）、版本只收精确 semver，安装请求只有名称、版本、作用域与工作区，页面传不了规格、URL 或路径，所以不能借安装让 npm 连别处；Core 再核对该版本在它取到的目录里、依赖都来自 registry，npm 只连固定的 registry（不读用户 `.npmrc`），装完核对包名、版本、完整性值与锁文件来源，不符即删除。安装不运行包的代码、默认关闭，开启仍经 `setPackageEnabled` 的原生确认。`revealSkill` 只接收工作区与 skill 名，主进程向 Core 取该工作区的 skill 列表，只对列表里同名 skill 的文件调用 `shell.showItemInFolder`，页面给不了路径。 ADR-0101 增加 `mcpAddServer`：主进程校验工作区为绝对路径、作用域为 `user` 或 `projectLocal`、server 名为 1–64 个 `[A-Za-z0-9_-]` 且不含 `__`、stdio 的命令与参数为不含 NUL 的字符串（至多 64 个参数、64 个环境变量，变量名为 `[A-Za-z_][A-Za-z0-9_]*`）、HTTP 地址为 `http(s)://`，不接受 `headers`、`cwd` 等其他字段；写入前由主进程弹原生确认，列出写入位置、要运行的完整命令或要连接的地址与环境变量名（不显示值），页面无法绕过；Core 再按合并规则校验定义、拒绝任何来源已用的名字，只写用户级 `settings.json` 或项目的 `.piarc/settings.local.json`，后者把这一项并入已有的信任决定（用户刚在原生确认里看过它）。 数据管理增加 3 个方法（`bulkSessions`、`exportData`、`revealDataExport`）：主进程校验操作为 `archive`、`unarchive`、`delete` 之一、会话 id 为 1–10,000 个按 Core 规则的 id；归档与删除先弹原生确认，列出 Core 索引里前 8 个会话的标题与总数（删除写明无法撤销），页面无法绕过，恢复不弹确认；批量归档只归档、不丢弃 worktree 的改动。`exportData` 不收参数，只写到用户在原生保存对话框里选的位置，由 Core 读 `pi/sessions/` 下的会话文件生成 ZIP（不在其下的不读）；`revealDataExport` 不收参数，只显示本次导出写出的那个文件。 ADR-0108 增加指令页的 2 个方法（`piInstructions`、`savePiInstructions`）：读取不收参数；保存只收内容（至多 4 Mi 个 UTF-16 码元）与读取时的 SHA-256（64 位十六进制或 null），页面给不了路径，Core 只写 `~/.pi/agent` 下 Pi 加载的那个文件，内容变过则拒绝（`fileModified`）。 | L4 `t47-memory.e2e.ts`、`workspace-remove.e2e.ts`、`home-tools.e2e.ts`、`preload.e2e.ts`（键集合与快照一致、扫描不到 Electron 对象）；ESLint `no-restricted-imports`；单元 `terminal-ipc.test.ts`（无真实输入时写入被拒、会话终端跨窗口与重载可用、页面终端只属本页并随页面关闭、会话上限、在途拉帧上限、非法参数被拒、帧原样作为返回值）；L4 `t34-terminal.e2e.ts` |
+
+## 4. 开发构建与发布构建的差异
+
+会话主块对标（ADR-0080）给 preload 白名单增加 `saveImage`：页面交出图片字节与建议的文件名，主进程核对类型（SVG 的开头或 PNG 的签名）、大小（≤ 16 MiB）与文件名（一段、去掉控制字符和路径分隔符），只写到用户在原生保存对话框里选的位置，取消时不写任何文件（单元 `image-export-ipc.test.ts`）。
+
+代理设置（ADR-0082）给 preload 白名单增加 `detectProxy`：没有参数，主进程经 Electron 的 `session.resolveProxy` 重新解析系统代理（系统设置与 PAC），只把 Node 能用的 HTTP/HTTPS 代理交给 Core 并答复页面，页面不能指定地址；手动地址经偏好通道写入，主进程与 Core 都只接受不含用户名、密码与路径的 `http(s)://主机[:端口]`（单元 `proxy-ipc.test.ts`、`network.rs`）。
+
+内置浏览器（ADR-0088、ADR-0089、ADR-0093）：工作台 preload 增加 `sessionImage`，页面交出会话 id 与 64 位十六进制的 blob 名，主进程读 Core 数据目录里该会话 `blobs/` 下的文件（≤ 8 MiB），按内容签名只认 PNG 与 JPEG，给出归发送页面所有的短期 `piarc-document://session-images/<uuid>` 地址（每页至多 128 个、64 MiB，页面销毁、崩溃或整页导航即失效），响应带 `sandbox` CSP 与 `nosniff`；渲染进程的 CSP 不变。智能体的脚本宿主是另一个 preload（`src/preload/browser-host.ts`），只暴露 `window.piarcBrowserHost`：一个 invoke 通道 `piarc:browserHost` 由 `registerHostHandler` 注册，只应答正在运行的那次调用的宿主 webContents（工作台页面与运行结束后的宿主都被拒），每个请求按 `host-bindings.ts` 的形状与大小校验；宿主在自己的内存分区里，除自身协议外的请求全部取消，CSP 不允许连接（L4 `browser-agent.e2e.ts` 的 THR-05 用例）。
+
+内置浏览器的面板（ADR-0088）给同一 preload 白名单增加 `browser`、`placeBrowser`：会话 id 按 Core 规则，请求的 `op` 与各字段、摆放的矩形与可见性由 `src/main/browser/browser-ipc.ts` 逐项校验，畸形参数抛 `TypeError`（T45 的 `t45-ipc-hardening` 逐个调用）。从 Chrome 导入登录（ADR-0090，设计增补 B5）给同一 preload 白名单增加 `chromeProfiles`、`chromeSites`、`chromeImport`、`browserImports`、`forgetBrowserImport`、`clearBrowserData`。主进程校验配置文件名（1–128 个字符，不含路径分隔符、冒号与控制字符）、站点名（小写主机名或 IP 字面量，1–50 个、去重）与绝对路径的工作区；导入先由主进程弹原生确认（列出配置文件、每个站点、智能体会以用户身份访问、导入的是副本，macOS 上建议钥匙串选"允许"），页面无法绕过，"退出即清空"模式下直接答 `unavailable`。Core 解密后把明文经 NAPI 交给主进程写入工作区的持久分区，页面只收到每站点的条数与跳过原因，永远拿不到 cookie 值；移除站点先删分区里的 cookie 再删 Core 的记录。开发构建的 `createForTests` 读 `PIARC_TEST_CHROME_ROOT` 并固定使用测试密钥，发布构建没有这条路径。
+
+语音输入（ADR-0094–0097，[设计增补](../architecture/addenda/voice-dictation.md)）给 preload 白名单增加 `dictationStart`、`dictationStop`、`dictationCancel`、`dictationStatus`、`speechDevices`、`speechModels`、`speechModelAction`、`openMicrophoneSettings`、`focusDictationOwner`（`src/main/core/dictation-ipc.ts`）。录音在 Core（CPAL）里进行，渲染进程的 `media` 权限照旧拒绝、页面不调 `getUserMedia`；主进程从发送者取窗口号（不收页面给的），开始要求窗口可见且 5 秒内有真实输入，系统麦克风授权只在这次点击之后请求，拒绝后不再弹出；听写事件只走 `dictation/<webContentsId>`，路由授权器拒绝其他窗口订阅；会话号、停止方式、模型号与操作按固定格式与取值校验，删除增强模型先弹原生确认。错误只带 kind 与 `speech:<code>`。开发构建的 `createForTests` 读 `PIARC_TEST_SPEECH_SOURCE`（WAV 文件代替麦克风），发布构建没有这条路径（`check-app-layout` 按标记扫描 `.node`）。macOS 上只有主程序带 `com.apple.security.device.audio-input`，helper 不带（THR-18）。L4：`voice-dictation.e2e.ts`、`t45-ipc-hardening.e2e.ts`（无参命令表）与 `preload.e2e.ts`（白名单快照）。
+
+T49 给同一 preload 白名单增加 `askSideChat` 和 `controlSideChat`。主进程验证会话、面板、问题和控制参数，按发送窗口分配 Host 侧的面板编号。窗口销毁、渲染进程退出或整页导航会触发释放。Host 用内存会话生成回答，模型的工具请求只能得到本地拒绝结果。外部草稿的导航约束见 ADR-0069。
+
+Git 面板（ADR-0084、0085）给同一 preload 白名单增加 `git` 和 `cancelGit`。一个通道承载全部 Git 请求：主进程按操作逐个校验成员（会话 id 按 Core 规则；路径 1–4,096 字符、不含 NUL；分支、修订、远端与 hunk 标识 ≤ 255 字符、不以 `-` 开头、无控制字符；提交信息 ≤ 64 KiB，提交指令 ≤ 8 KiB），只保留已知成员；写操作要求窗口或该会话的 Git 弹出窗口 5 秒内有真实输入（`input-event`）；回滚、丢弃改动的检出、强制推送、删除未完全合并的分支先请 Core 给出事实（文件、分支、远端、新旧 oid、未合并提交数），由主进程原生确认，双向控制字符显示为转义，取消时 Core 不执行；强推带上确认框里的远端 oid 作为租约。Core 再按 ADR-0085 校验参数、只接受已配置的远端名、在受信任项目里才写、同一文件根有会话运行时拒绝改写文件的操作。提交信息的语言由主进程按界面语言填入，页面给的值被覆盖。
+
+| 项 | 发布构建 | 开发构建（`--flavor development` 打包） | 开发服务器模式（`electron-forge start`） |
+|---|---|---|---|
+| `EnableNodeCliInspectArguments` | 关 | 开（调试打包产物；Playwright 依赖它连接主进程） | 不写 fuse（node_modules 中的 Electron） |
+| 其余 8 个 fuse | `RunAsNode` 关、`EnableCookieEncryption` 开、`EnableNodeOptionsEnvironmentVariable` 关、`EnableEmbeddedAsarIntegrityValidation` 开、`OnlyLoadAppFromAsar` 开、`LoadBrowserProcessSpecificV8Snapshot` 关、`GrantFileProtocolExtraPrivileges` 关、`WasmTrapHandlers` 开 | 与发布构建相同 | 不写 fuse |
+| 界面来源 | `app://piarc` | `app://piarc` | Vite 开发服务器 `http://localhost:<端口>` |
+| CSP | 生产策略 | 生产策略 | 放宽三项：`script-src` 加 `'unsafe-inline'`（React Refresh 预加载脚本）、`style-src` 加 `'unsafe-inline'`（Vite 注入 `<style>`）、`connect-src` 加 `ws://<开发服务器 host>`（HMR） |
+| 可信 origin（导航、IPC） | `app://piarc` | `app://piarc` | `app://piarc` 与开发服务器 origin |
+
+- 开发服务器模式的放宽全部在 `apps/desktop/src/main/dev-server.ts`，主进程只在 `import.meta.env.DEV` 为真时调用。打包时它是常量 false，打包工具删掉这些分支：发布构建的 `.vite/build/main.cjs` 中 `unsafe-inline` 出现 0 次（改用编译期常量之前是 1 次，代码不可达但字符串仍在包里）。
+- L4 安全用例一律针对生产渲染产物运行，不在开发服务器模式下运行。
+- 开发构建与发布构建只差一个 fuse，由单元测试 `check-fuses.test.mjs` 断言，打包后由 `check-fuses.mjs` 分别比对。
+
+## 5. 实测数据
+
+### 5.1 测试
+
+| 检查 | 结果 |
+|---|---|
+| L4（`npm run test:e2e -w @piarc/desktop`） | 58 项通过：29 个用例 × 开发形态与打包形态，约 50 s |
+| 单元（`apps/desktop/src/main/**/*.test.ts`、`scripts/ci/check-fuses.test.mjs`） | 42 项通过，1 项按平台跳过（Windows 反斜杠穿越用例，只在 Windows 运行） |
+| ESLint 进程边界规则 | 临时违规文件触发全部 8 条预期错误：两种 `new BrowserWindow`、`ipcMain.handle`、`ipcMain.on`、preload 导入 `node:fs` 与 `path`、渲染进程导入 `electron` 与 `../main/` |
+| CI 工作流 | actionlint 1.7.12 无发现 |
+
+### 5.2 变异对照
+
+同时放开五处控制后重新打包，开发形态的 25 个安全用例中 17 个失败：
+
+- 失败（17）：CSP 6 项、导航拦截 3 项、新窗口与非白名单协议 2 项、权限 4 项、外来 origin 与前缀相似 origin 的 IPC 2 项；
+- 通过（8）：确认后打开、取消不打开、同源导航、`window.piarc` 键集合、扫描 Electron 对象、Node 全局不可用、OS 沙箱、合法 IPC。这些用例对应的控制没有被放开。
+
+### 5.3 fuses
+
+`npm run check:fuses` 读取 `out/release/PiArc-darwin-arm64/PiArc.app`，9 个 fuse 全部与发布配置一致。临时把配置中的 `EnableCookieEncryption` 改为 false 后重跑，脚本退出码 1，并输出 `EnableCookieEncryption: expected disabled, found enabled`；还原后退出码 0。开发构建产物与开发配置比对同样 9 项一致。打包后 macOS 产物为 ad-hoc 签名（`Signature=adhoc`），`resetAdHocDarwinSignature` 生效。
+
+### 5.4 发布构建的运行时探测
+
+| 探测 | 结果 |
+|---|---|
+| `ELECTRON_RUN_AS_NODE=1 PiArc -e '…'` | 没有以 Node 运行（未输出标记），正常启动应用 |
+| `PiArc --inspect=0` | 没有 `Debugger listening` 输出 |
+| `NODE_OPTIONS='--require <不存在的文件>'` | 被忽略，没有模块加载错误 |
+| `PiArc --remote-debugging-port=9333` | **生效**：`/json/version` 返回 HTTP 200，见第 6 节第 2 条 |
+
+## 6. 发现
+
+1. **Node 的 URL 解析器不认识 Chromium 的标准协议。** 主进程中 `new URL('app://piarc/index.html').origin` 是 `'null'`，而 Chromium 给页面的 origin 是 `app://piarc`。直接用 `URL.origin` 会让导航守卫拦掉应用内导航。已在 `security/origin.ts` 中对应用协议按 Chromium 的元组 origin 计算，导航与权限判断都经它；IPC 校验用的 `senderFrame.origin` 来自 Chromium，不受影响。
+2. **发布构建仍接受 Chromium 的 `--remote-debugging-port`。** 这个开关不受任何 fuse 控制。能以这个参数启动 PiArc 的本机进程可以通过 CDP 在页面中执行脚本，进而调用 `window.piarc`。前提是攻击者已经能以当前用户身份运行程序，与 ADR-0018 已接受的"本机攻击者可篡改应用"属同一威胁等级；有副作用的操作仍要经 Core 的权限裁决。缓解方向是发布构建在启动时拒绝或移除该开关，可行性待验证。登记为 I10，建议 T45 处理。
+3. **Playwright 驱动 Electron 依赖 `--inspect`。** 它等待 `Debugger listening` 输出后连接主进程，所以发布构建（`EnableNodeCliInspectArguments` 关闭）无法用 Playwright 驱动。L4 的打包形态因此运行开发构建，它与发布构建只差这一个 fuse；发布构建的 fuse 由 `check:fuses` 与第 5.4 节的探测覆盖。
+4. **被拦截的导航会让 Playwright 的定位器一直等待"导航完成"。** L4 用例在拦截之后改为在页面内检查 DOM，可能触发导航的点击用 `page.mouse.click`。写法已记入 `docs/engineering/testing.md` 第 9 节。
+
+## 7. ADR 触发条件
+
+ADR-0013 的触发条件"威胁模型中的某项对策必须放松 Electron 安全基线才能实现"：未触发。开发服务器模式的 CSP 放宽只存在于开发构建，发布构建不含相关代码。
+
+## 8. 后续
+
+- Windows（W0，Windows 11 专业版 25H2，机器见 S2 报告第 8 节）：
+  - CI 运行 43827342553 的 Windows `desktop` 作业中，安全与冒烟用例全部通过，只有三个复制用例因剪贴板 CRLF 在两种形态下失败（共 6 项），fuse 校验步骤因此没有运行。
+  - 本机修复读剪贴板的辅助函数后（提交 9d6b01b），按同款步骤运行：`package:desktop -- --flavor development`；`test:e2e` 两种形态 138 项全部通过，含新改为 Windows 程序的终端用例与 `agent-host-kill.e2e.ts`；`package:desktop` 发布构建后 `check:fuses` 9 项一致。
+  - 下一次推送后 CI 复核。
+- T09：Markdown 渲染路径的 XSS 载荷集（已完成：`src/shared/xss-payloads.ts`、`e2e/transcript-security.e2e.ts`；ESLint 禁止渲染进程使用 `innerHTML` 等 HTML 字符串入口）。
+- T12：应用标识（D2）确定后，协议名 `app` 与 bundle id（当前为打包工具默认的 `com.github.Electron`）随之确定；签名与安装包。
+- T18：替换 Electron 默认菜单；权限放行清单按功能需要增加时，在 `PERMISSION_ALLOWLIST` 中写理由并补用例。
+- T45：第 6 节第 2 条（I10）。

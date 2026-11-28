@@ -1,0 +1,39 @@
+{
+  "$comment": [
+    "The libghostty-vt prebuilt artefacts that build.rs downloads and links (ADR-0017).",
+    "This file is a supply-chain entry point: the version, URLs, SHA-256 digests and the minisign public key all live here and nowhere else. Changes need review.",
+    "Facts come from https://lib.ghostty.org/vt/installing.html (public key) and https://release.files.ghostty.org/libghostty-vt/1.0.1/SHA256SUMS (digests), checked 2026-11-15.",
+    "Every artefact is verified twice before use: its SHA-256 against the digest below, and its detached <file>.minisig against the public key. Either mismatch fails the build."
+  ],
+  "version": "1.0.1",
+  "baseUrl": "https://release.files.ghostty.org/libghostty-vt/1.0.1/",
+  "minisignPublicKey": "RWQlAjJC23149WL2sEpT/l0QKy7hMIFhYdQOFy0Z7z7PbneUgvlsnYcV",
+  "artifacts": [
+    {
+      "file": "ghostty-vt-1.0.1.xcframework.zip",
+      "sha256": "c0f9631277f726154c8f521954d17cdc41aac4626fc0df8cf925a19ee58e829b",
+      "targets": ["aarch64-apple-darwin", "x86_64-apple-darwin"],
+      "link": "static",
+      "libDir": "ghostty-vt.xcframework/macos-arm64_x86_64",
+      "includeDir": "ghostty-vt.xcframework/macos-arm64_x86_64/Headers"
+    },
+    {
+      "file": "ghostty-vt-1.0.1-x86_64-windows-gnu.zip",
+      "sha256": "8e2eb9e1822e85d786b456c8beb86f49d09c318c91f0c2913f91e7ffa12cda29",
+      "targets": ["x86_64-pc-windows-msvc"],
+      "link": "dll",
+      "libDir": "ghostty-vt-1.0.1-x86_64-windows-gnu/lib",
+      "includeDir": "ghostty-vt-1.0.1-x86_64-windows-gnu/include",
+      "dll": "ghostty-vt-1.0.1-x86_64-windows-gnu/bin/ghostty-vt.dll"
+    },
+    {
+      "file": "ghostty-vt-1.0.1-aarch64-windows-gnu.zip",
+      "sha256": "cc61da5f968ea0b08639bdf019c6b7da46bad1d985774fd8a2de57af32862892",
+      "targets": ["aarch64-pc-windows-msvc"],
+      "link": "dll",
+      "libDir": "ghostty-vt-1.0.1-aarch64-windows-gnu/lib",
+      "includeDir": "ghostty-vt-1.0.1-aarch64-windows-gnu/include",
+      "dll": "ghostty-vt-1.0.1-aarch64-windows-gnu/bin/ghostty-vt.dll"
+    }
+  ]
+}

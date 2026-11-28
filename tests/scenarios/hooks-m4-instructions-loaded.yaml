@@ -1,0 +1,47 @@
+id: hooks-m4-instructions-loaded
+description: InstructionsLoaded hooks run when a memory file enters the session's context, with the load reason as matcher - the project CLAUDE.md at session start and a subdirectory's CLAUDE.md when a Read reaches that directory; the hook has no decision and the turn goes on (T41).
+capabilities: [CAP-HOOK-INSTRUCTIONS-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    CLAUDE.md: "Use tabs.\n"
+    pkg/CLAUDE.md: "The pkg directory is generated.\n"
+    pkg/a.txt: "alpha\n"
+    .claude/settings.json: |
+      {"hooks": {"InstructionsLoaded": [
+        {"matcher": "session_start", "hooks": [{"type": "command", "command": "node hook.mjs start"}]},
+        {"matcher": "nested_traversal", "hooks": [{"type": "command", "command": "node hook.mjs nested"}]}
+      ]}}
+    hook-plans/start.json: '{"json": {"decision": "block", "reason": "ignored"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: r, name: Read, input: { path: pkg/a.txt } }]
+      - text: Read it.
+actions:
+  - prompt: { text: Read pkg/a.txt., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 0
+      contains: [Use tabs.]
+    - index: 1
+      contains: [The pkg directory is generated.]
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  json_lines:
+    hook-log/start.jsonl:
+      - types: { session_id: string, transcript_path: string, cwd: string, file_path: string }
+        input:
+          { hook_event_name: InstructionsLoaded, memory_type: Project, load_reason: session_start }
+    hook-log/nested.jsonl:
+      - types: { file_path: string }
+        input:
+          {
+            hook_event_name: InstructionsLoaded,
+            memory_type: Project,
+            load_reason: nested_traversal,
+          }

@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "fs/glob",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "/Users/dev/work space/项目",
+    "pattern": "**/*.ts",
+    "exclude": ["**/node_modules/**", "**/.git/**"],
+    "limit": 1001,
+    "origin": {
+      "tool": "Glob",
+      "toolCallId": "toolu_03"
+    }
+  }
+}

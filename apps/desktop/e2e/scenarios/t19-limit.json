@@ -1,0 +1,37 @@
+{
+  "id": "t19-limit",
+  "validation": {
+    "rules": {
+      "role_order": false
+    }
+  },
+  "steps": [
+    {
+      "error": {
+        "kind": "rate_limit",
+        "message": "the mock is rate limited"
+      }
+    },
+    {
+      "error": {
+        "kind": "rate_limit",
+        "message": "the mock is rate limited"
+      }
+    },
+    {
+      "error": {
+        "kind": "rate_limit",
+        "message": "the mock is rate limited"
+      }
+    },
+    {
+      "error": {
+        "kind": "rate_limit",
+        "message": "the mock is rate limited"
+      }
+    },
+    {
+      "text": "Answered after the retry."
+    }
+  ]
+}

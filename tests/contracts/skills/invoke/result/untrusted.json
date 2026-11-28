@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 73,
+  "result": {
+    "name": "deploy",
+    "content": "Deploy.",
+    "dir": "/工作区 a/.claude/skills/deploy",
+    "warnings": [
+      {
+        "kind": "untrusted"
+      }
+    ]
+  }
+}

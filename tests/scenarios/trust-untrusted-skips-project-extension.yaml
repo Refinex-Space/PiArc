@@ -1,0 +1,33 @@
+id: trust-untrusted-skips-project-extension
+description: In a workspace Core does not trust, the project's Pi extension is not loaded, so its tool is never offered to the model.
+capabilities: [CAP-TRUST-PROJECT-001]
+workspace:
+  files:
+    '.pi/extensions/probe-tool.ts': |
+      export default function (pi: any) {
+        pi.registerTool({
+          name: 'fixture_probe',
+          label: 'Fixture probe',
+          description: 'Registered by the project extension fixture.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe answered' }], details: {} };
+          },
+        });
+      }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'No extension here.'
+actions:
+  - prompt: { text: 'Which tools do you have?', turn: t }
+expect:
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - {
+        index: 0,
+        tools_include: [Read, Write, Edit, Bash, Glob, Grep],
+        tools_exclude: [fixture_probe],
+      }

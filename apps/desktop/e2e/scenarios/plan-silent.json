@@ -1,0 +1,30 @@
+{
+  "id": "plan-silent",
+  "steps": [
+    { "text": "Hello. Ready when you are." },
+    {
+      "thinking": "The user wants a plan. I will list the project files first and read the README before deciding anything, keeping to read-only tools while planning.",
+      "chunk_chars": 6,
+      "chunk_delay_ms": 80,
+      "tool_calls": [
+        { "id": "glob1", "name": "Glob", "input": { "pattern": "**/*.md" } },
+        { "id": "read1", "name": "Read", "input": { "file_path": "README.md" } }
+      ]
+    },
+    {
+      "thinking": "The README is short and names the parser. A failing test first, then the fix, then the full test run. That is the plan to submit.",
+      "chunk_chars": 6,
+      "chunk_delay_ms": 80,
+      "tool_calls": [
+        {
+          "id": "exit1",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Fix the parser bound\n\n## Steps\n\n1. Add a **failing test** for the loop bound\n2. Fix the off-by-one in `parse()`\n3. Run the tests"
+          }
+        }
+      ]
+    },
+    { "text": "Plan approved; starting with the test." }
+  ]
+}

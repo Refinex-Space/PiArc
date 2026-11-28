@@ -1,0 +1,46 @@
+id: bg-run-in-background
+description: A command started with run_in_background answers at once with its task id and output file (T32); once the task ended, the model reads that file with Read and gets everything the command printed.
+capabilities: [CAP-BG-COMMAND-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_bg
+            name: Bash
+            input: { command: "printf 'built 中文\\nall done\\n'", run_in_background: true }
+      - text: 'It runs in the background.'
+      - tool_calls:
+          - id: toolu_read
+            name: Read
+            # The data directory's path has spaces: take everything up to "; read it".
+            input: { path: '{{result:toolu_bg:output goes to (.+?\.log); read it}}' }
+      - text: 'The build printed two lines.'
+# printf is a read-only command: no approval (T23).
+actions:
+  - prompt: { text: 'Build in the background.', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - wait: { method: core/tasks, params: { kind: command, status: completed, exitCode: 0 } }
+  - prompt: { text: 'What did it print?', turn: two }
+expect:
+  events:
+    - method: item/completed
+      turn: one
+      params:
+        item:
+          itemId: toolu_bg
+          type: commandExecution
+          status: completed
+          execution: { outcome: success, task: { reason: requested } }
+    - { method: turn/completed, turn: two, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - id: toolu_bg
+          is_error: false
+          contains: 'The command is running in the background as task bg-'
+    - index: 3
+      tool_results:
+        - { id: toolu_bg }
+        - { id: toolu_read, is_error: false, contains: "1\tbuilt 中文\n     2\tall done" }
+  request_counts: { main: 4 }

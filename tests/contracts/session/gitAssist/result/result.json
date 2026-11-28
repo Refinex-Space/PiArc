@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "summary": "The form is not validated before it is sent.",
+    "findings": [
+      {
+        "path": "src/login.ts",
+        "line": 2,
+        "severity": "high",
+        "title": "Empty passwords are accepted",
+        "body": "Check that the password is not empty before calling the API."
+      }
+    ],
+    "model": { "provider": "mock-main", "id": "mock-model" }
+  }
+}

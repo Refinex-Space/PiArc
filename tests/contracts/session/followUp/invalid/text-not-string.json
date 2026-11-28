@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 24,
+  "method": "session/followUp",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "requestId": "req-03",
+    "text": null
+  }
+}

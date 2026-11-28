@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "fs/spill",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "content": "x"
+  }
+}

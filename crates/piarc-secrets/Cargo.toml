@@ -1,0 +1,31 @@
+[package]
+name = "piarc-secrets"
+description = "Credential vault: encrypted file plus master key in the system credential store (keyring-core)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+aes-gcm.workspace = true
+getrandom.workspace = true
+keyring-core.workspace = true
+piarc-ports.workspace = true
+piarc-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+zeroize.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store.workspace = true
+# Only to read the OSStatus behind a keyring-core platform error (denied vs locked).
+security-framework.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store.workspace = true
+
+[lints]
+workspace = true

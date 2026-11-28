@@ -1,0 +1,63 @@
+id: ctx-compact-breaker
+description: With a 19,000-token window the threshold (1,904 tokens) is below what the system prompt and tool definitions alone take, so every automatic compaction leaves the context above it; after the third the compaction item says automatic compaction stopped (ineffective), the next reply over the threshold is not compacted, and a manual /compact still runs and turns it back on (T27).
+capabilities: [CAP-CTX-COMPACT-002]
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+providers:
+  main:
+    wire: anthropic
+    context_window: 19000
+    max_tokens: 4096
+    steps:
+      - { text: 'Answer one.', usage: { input_tokens: 3000 } }
+      - { text: 'Summary one.' }
+      - { text: 'Answer two.', usage: { input_tokens: 3000 } }
+      - { text: 'Summary two.' }
+      - { text: 'Answer three.', usage: { input_tokens: 3000 } }
+      - { text: 'Summary three.' }
+      - { text: 'Answer four.', usage: { input_tokens: 3000 } }
+      - { text: 'Summary on request.' }
+actions:
+  - prompt: { text: 'Question one.', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - prompt: { text: 'Question two.', turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - prompt: { text: 'Question three.', turn: three }
+  - wait: { method: turn/completed, turn: three }
+  - check_usage: { fields: { autoCompact: stopped, autoCompactStopped: ineffective } }
+  - prompt: { text: 'Question four.', turn: four }
+  - wait: { method: turn/completed, turn: four }
+  - compact: {}
+  - wait: { method: turn/completed, count: 5 }
+  - check_usage: { fields: { autoCompact: 'on' } }
+expect:
+  request_counts: { main: 8 }
+  requests:
+    - { index: 1, contains: ['You write handover notes for a coding session.'] }
+    - { index: 3, contains: ['You write handover notes for a coding session.'] }
+    - { index: 5, contains: ['You write handover notes for a coding session.'] }
+    - { index: 6, not_contains: ['You write handover notes for a coding session.'] }
+    - { index: 7, contains: ['You write handover notes for a coding session.'] }
+  events:
+    - method: item/completed
+      turn: one
+      params: { item: { type: contextCompaction, status: completed, reason: threshold } }
+    - method: item/completed
+      turn: two
+      params: { item: { type: contextCompaction, status: completed, reason: threshold } }
+    - method: item/completed
+      turn: three
+      params:
+        item:
+          {
+            type: contextCompaction,
+            status: completed,
+            reason: threshold,
+            autoCompactStopped: ineffective,
+          }
+    - method: session/usage
+      params: { usage: { autoCompact: stopped, autoCompactStopped: ineffective } }
+    - method: item/completed
+      params: { item: { type: contextCompaction, status: completed, reason: manual } }

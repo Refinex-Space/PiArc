@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "fs/memory",
+  "params": {
+    "sessionId": "session-a",
+    "toolCallId": "scan-1",
+    "offset": 1048576
+  }
+}

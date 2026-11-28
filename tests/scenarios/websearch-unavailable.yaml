@@ -1,0 +1,31 @@
+id: websearch-unavailable
+description: With a model that has no native search and no search service configured, the session's tools do not include WebSearch; a deny rule takes it away from a model that does search natively (T38).
+capabilities: [CAP-TOOL-WEBSEARCH-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"mock-native/mock-model":{"nativeWebSearch":true}}},"permissions":{"deny":["WebSearch"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: No web search here.
+  native:
+    wire: anthropic
+    steps:
+      - text: Search is denied by a rule.
+sessions:
+  main: { provider: main }
+  denied: { provider: native }
+actions:
+  - prompt: { session: main, text: Search the web., turn: one }
+  - prompt: { session: denied, text: Search the web., turn: two }
+expect:
+  request_counts: { main: 1, native: 1 }
+  requests:
+    - provider: main
+      index: 0
+      tools_include: [WebFetch]
+      tools_exclude: [WebSearch]
+    - provider: native
+      index: 0
+      tools_exclude: [WebSearch]

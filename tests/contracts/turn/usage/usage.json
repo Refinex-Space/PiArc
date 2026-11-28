@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn/usage",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 12,
+    "ts": 1763200000500,
+    "turnId": "turn-7c1f",
+    "usage": {
+      "inputTokens": 1200,
+      "outputTokens": 96,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0042
+    }
+  }
+}

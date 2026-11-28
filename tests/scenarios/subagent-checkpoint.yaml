@@ -1,0 +1,54 @@
+id: subagent-checkpoint
+description: Files a subagent changes go into the main session's checkpoint of the turn that started it; rewinding the main session's code to before that turn restores them and removes the file it created (T31).
+capabilities: [CAP-AGENT-CHECKPOINT-001, CAP-CKPT-REWIND-001]
+workspace:
+  files:
+    notes.txt: "alpha\n"
+    .claude/agents/editor.md: "---\nname: editor\ndescription: Edits files.\nmodel: mock-child/mock-model\n---\nEdit as asked.\n"
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Nothing to do yet.
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Edit notes,
+                  prompt: Change alpha to beta and add made.txt.,
+                  subagent_type: editor,
+                },
+            },
+          ]
+      - text: The subagent edited the files.
+  child:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: r, name: Read, input: { path: notes.txt } }]
+      - tool_calls:
+          - {
+              id: e,
+              name: Edit,
+              input: { path: notes.txt, edits: [{ oldText: alpha, newText: beta }] },
+            }
+          - { id: w, name: Write, input: { path: made.txt, content: "made\n" } }
+      - text: Done editing.
+actions:
+  - prompt: { text: Start., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - prompt: { text: Edit through a subagent., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+  - check_files: { files: { notes.txt: "beta\n", made.txt: "made\n" } }
+  - rewind:
+      turn: t2
+      scope: code
+      preview: { notes.txt: restore, made.txt: delete }
+      outcomes: { notes.txt: restored, made.txt: deleted }
+  - check_files: { files: { notes.txt: "alpha\n", made.txt: null } }
+expect:
+  request_counts: { main: 3, child: 3 }

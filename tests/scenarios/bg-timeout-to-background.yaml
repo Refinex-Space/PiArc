@@ -1,0 +1,59 @@
+id: bg-timeout-to-background
+description: A foreground command that reaches its timeout moves to the background without being restarted - the same process (its PID unchanged) keeps running, the tool result says it moved and names the task and output file, and the task ends on its own (T32).
+capabilities: [CAP-BG-TIMEOUT-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_slow
+            name: Bash
+            input:
+              timeout: 5
+              command: >-
+                echo $$ > shell.pid; echo started;
+                while [ ! -e release.flag ]; do sleep 0.05; done; echo released
+      - tool_calls:
+          - id: toolu_check
+            name: Bash
+            input:
+              command: >-
+                p=$(cat shell.pid); if kill -0 $p 2>/dev/null; then echo "alive:same"; fi;
+                touch release.flag
+      - text: 'It is still the same process.'
+approvals:
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: 'Run the slow command.', turn: t }
+  - wait: { method: item/updated, params: { item: { itemId: toolu_slow, output: "started\n" } } }
+  - advance_clock: { seconds: 5 }
+  - wait:
+      {
+        method: core/tasks,
+        params: { kind: command, status: completed, tail: [started, released] },
+      }
+expect:
+  events:
+    - method: item/completed
+      params:
+        item:
+          itemId: toolu_slow
+          type: commandExecution
+          status: completed
+          execution: { timedOut: true, timeoutMs: 5000, task: { reason: timeout } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - id: toolu_slow
+          is_error: false
+          contains: 'still running after its timeout of 5 seconds, so it moved to the background as task bg-'
+    - index: 1
+      tool_results:
+        - { id: toolu_slow, contains: 'instead of being stopped; it keeps running.' }
+    - index: 2
+      tool_results:
+        - { id: toolu_slow }
+        - { id: toolu_check, is_error: false, contains: 'alive:same' }
+  request_counts: { main: 3 }

@@ -1,0 +1,29 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/completed",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 43,
+    "ts": 1763200000000,
+    "turnId": "turn-7c1f",
+    "item": {
+      "type": "webSearch",
+      "itemId": "toolu_06",
+      "status": "completed",
+      "tool": "WebSearch",
+      "arguments": {
+        "query": "pi coding agent"
+      },
+      "query": "pi coding agent",
+      "backend": "native",
+      "sources": [
+        {
+          "title": "Pi",
+          "url": "https://example.com/pi",
+          "snippet": "A minimal coding agent."
+        }
+      ],
+      "output": "1. Pi — https://example.com/pi"
+    }
+  }
+}

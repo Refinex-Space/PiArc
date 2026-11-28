@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "result": {
+    "context": "Formatted with prettier.",
+    "feedback": "Lint found 2 warnings.",
+    "updatedOutput": "[redacted]",
+    "stop": { "reason": "Build failed" }
+  }
+}

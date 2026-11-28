@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "exec/output",
+  "params": {
+    "requestId": "exec-0b8e",
+    "stream": "stderr",
+    "seq": 2,
+    "data": "warning: \u2028 separated\n"
+  }
+}

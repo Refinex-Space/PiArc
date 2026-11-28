@@ -1,0 +1,34 @@
+[package]
+name = "piarc-fs"
+description = "File read/write, file state table, glob and grep, file watching."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64.workspace = true
+cap-std.workspace = true
+cap-fs-ext.workspace = true
+chardetng.workspace = true
+encoding_rs.workspace = true
+globset.workspace = true
+grep-matcher.workspace = true
+grep-regex.workspace = true
+grep-searcher.workspace = true
+ignore.workspace = true
+image.workspace = true
+quick-xml.workspace = true
+serde.workspace = true
+url.workspace = true
+notify.workspace = true
+lopdf.workspace = true
+piarc-checkpoint.workspace = true
+piarc-protocol.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

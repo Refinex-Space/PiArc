@@ -1,0 +1,29 @@
+id: ctx-server-openai
+description: An OpenAI-wire endpoint with a stale Anthropic preference falls back to client compaction, reports why, and never sends Anthropic request parameters.
+capabilities: [CAP-CX-COMPACT-SERVER-001]
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"mock-main/mock-model":{"serverContextEdit":"compact"}}}}'
+providers:
+  main:
+    wire: openai
+    context_window: 32000
+    steps:
+      - { text: Long answer., usage: { input_tokens: 20000 } }
+      - { text: Client summary. }
+actions:
+  - prompt: { text: First., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_usage: { fields: { serverFallback: true, autoCompact: 'on' } }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - { index: 0, not_contains: [context_management] }
+    - {
+        index: 1,
+        contains: ['You write handover notes for a coding session.'],
+        not_contains: [context_management],
+      }

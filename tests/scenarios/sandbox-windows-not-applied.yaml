@@ -1,0 +1,34 @@
+id: sandbox-windows-not-applied
+description: On Windows, settings that turn the sandbox and its auto-approval on have no effect - a command that is not read-only still asks, and the configuration diagnostics say the values do not apply on this platform (T39, requirement D7).
+capabilities: [CAP-SANDBOX-WINDOWS-001]
+platforms: [windows]
+platform_reason: Windows has no command sandbox (requirement D7); this checks that its settings change nothing there.
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: write, name: Bash, input: { command: 'printf w > w.txt' } }
+      - text: Done.
+approvals:
+  - { tool: Bash, decision: deny }
+actions:
+  - prompt: { text: Go., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: write, is_error: true }
+  files:
+    w.txt: null
+  config_diagnostics:
+    files:
+      user:
+        ignored:
+          - { pointer: /sandbox/autoAllowBashIfSandboxed, reason: platform }
+          - { pointer: /sandbox/enabled, reason: platform }

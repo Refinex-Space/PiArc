@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 40,
+  "result": {
+    "url": "https://example.com/old",
+    "status": 301,
+    "redirect": {
+      "url": "https://www.example.org/new",
+      "status": 301
+    },
+    "format": "text",
+    "content": "",
+    "bytes": 0,
+    "bodyTruncated": false,
+    "totalChars": 0,
+    "contentTruncated": false
+  }
+}

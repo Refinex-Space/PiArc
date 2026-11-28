@@ -1,0 +1,95 @@
+name: Performance Nightly
+
+# Architecture chapter 11 and section 13.3 (T44): every measured budget on macOS and Windows,
+# each probe's median over its runs (scripts/perf/metrics.mjs), judged against the baseline of
+# this runner class (scripts/perf/baselines/); then the shortened long run (one hour of a busy
+# session) for memory growth. The full eight-hour run is local or on a self-hosted runner
+# (docs/engineering/performance.md). Hosted runners are not the reference machines: absolute
+# budgets are checked on those, regressions of more than 10% here. A runner class without a
+# baseline fails (R5): record one from the perf-nightly-<os> artifact with --from-report and
+# --update-baseline.
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 03:00 Beijing time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  perf:
+    name: performance (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # Hosted jobs stop at 6 hours: the full measurement takes about one, the long run one more.
+    timeout-minutes: 240
+    env:
+      CARGO_TERM_COLOR: always
+      PIARC_EVIDENCE_TASK: perf
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download the Electron binary (skipped by --ignore-scripts)
+        run: node node_modules/electron/install.js
+
+      - name: Package the development flavor (the measured app)
+        run: npm run package:desktop -- --flavor development
+
+      - name: Build the release installer (macOS DMG)
+        if: runner.os == 'macOS'
+        run: npm run package:desktop -- --flavor release --arch arm64 --make
+
+      - name: Build the release installer (Windows Velopack)
+        if: runner.os == 'Windows'
+        run: |
+          npm run package:desktop -- --flavor release --arch x64
+          node scripts/release/pack-windows.mjs --arch x64 --flavor release --versions 0.0.1
+
+      - name: Full measurement
+        run: node scripts/perf/run.mjs --lane nightly
+
+      - name: Shortened long run (one hour)
+        if: always()
+        env:
+          PIARC_LONG_RUN_HOURS: '1'
+        run: node scripts/perf/run.mjs --lane long
+
+      - name: Upload the performance reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-nightly-${{ matrix.os }}
+          path: tmp/perf
+          if-no-files-found: ignore

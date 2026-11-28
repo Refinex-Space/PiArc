@@ -1,0 +1,36 @@
+{
+  "jsonrpc": "2.0",
+  "method": "session/queueChanged",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 20,
+    "ts": 1763200002000,
+    "items": [
+      {
+        "itemId": "queue-1",
+        "kind": "followUp",
+        "text": "Then check @README.md",
+        "mentions": [
+          {
+            "path": "README.md",
+            "start": 11,
+            "end": 21
+          }
+        ],
+        "attachments": [
+          {
+            "kind": "pdf",
+            "name": "spec.pdf",
+            "mimeType": "application/pdf",
+            "blob": {
+              "path": "/data/sessions/019a8f3e/attachments/60303ae2.pdf",
+              "sha256": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
+              "size": 40960
+            },
+            "pageCount": 12
+          }
+        ]
+      }
+    ]
+  }
+}

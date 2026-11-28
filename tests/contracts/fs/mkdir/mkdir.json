@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 19,
+  "method": "fs/mkdir",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "/Users/dev/work space/项目/notes/新 目录",
+    "origin": {
+      "tool": "Write",
+      "toolCallId": "toolu_02"
+    }
+  }
+}

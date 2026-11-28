@@ -1,0 +1,31 @@
+{
+  "id": "t19-steer",
+  "validation": {
+    "rules": {
+      "role_order": false
+    }
+  },
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "toolu_wait",
+          "name": "Bash",
+          "input": {
+            "command": "env sleep 3",
+            "description": "Wait"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Took the steer into account."
+    },
+    {
+      "text": "Answered the queued follow-up."
+    },
+    {
+      "text": "Spare."
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+id: hooks-m4-expansion
+description: UserPromptExpansion hooks run before a slash command file, a skill or an MCP prompt becomes the input, with the command name as matcher - exit 2 or decision block refuses the input with the reason, plain stdout is context for the model, and a refused command turns nothing on (T41).
+capabilities: [CAP-HOOK-EXPANSION-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/commands/deploy.md: "Deploy $ARGUMENTS now.\n"
+    .claude/commands/review.md: "Review the $1 module.\n"
+    .claude/skills/ship/SKILL.md: "---\ndescription: Ship a release\n---\nShip version $ARGUMENTS.\n"
+    .mcp.json: '{"mcpServers":{"docs":{"command":"node","args":["{{mcp_echo}}","docs"],"env":{"MCP_ECHO_PROMPTS":"1"}}}}'
+    .claude/settings.json: |
+      {"hooks": {"UserPromptExpansion": [
+        {"matcher": "deploy", "hooks": [{"type": "command", "command": "node hook.mjs deploy"}]},
+        {"matcher": "ship", "hooks": [{"type": "command", "command": "node hook.mjs ship"}]},
+        {"matcher": "review", "hooks": [{"type": "command", "command": "node hook.mjs review"}]},
+        {"matcher": "mcp__docs__.*", "hooks": [{"type": "command", "command": "node hook.mjs mcp"}]}
+      ]}}
+    hook-plans/deploy.json: '{"exit": 2, "stderr": "Deploys are frozen today."}'
+    hook-plans/ship.json: '{"json": {"decision": "block", "reason": "Shipping needs a review first."}}'
+    hook-plans/review.json: '{"stdout": "The api module has no tests yet."}'
+    hook-plans/mcp.json: '{"json": {"hookSpecificOutput": {"hookEventName": "UserPromptExpansion", "additionalContext": "Greet briefly."}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Reviewed.
+      - text: Hello Ada.
+actions:
+  - check_commands: { present: [mcp__docs__greet] }
+  - prompt: { text: '/deploy prod', rejected: 'Deploys are frozen today.' }
+  - prompt: { text: '/ship 1.2.0', rejected: 'Shipping needs a review first.' }
+  - prompt: { text: '/review api', turn: r }
+  - wait: { method: turn/completed, turn: r }
+  - prompt: { text: '/mcp__docs__greet Ada', turn: g }
+  - wait: { method: turn/completed, turn: g }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 0
+      contains: [Review the api module., The api module has no tests yet.]
+      not_contains: [Deploy prod now., Ship version 1.2.0.]
+    - index: 1
+      contains: [Greet briefly.]
+  json_lines:
+    hook-log/deploy.jsonl:
+      - types: { session_id: string, transcript_path: string, cwd: string, command_source: string }
+        input:
+          hook_event_name: UserPromptExpansion
+          expansion_type: slash_command
+          command_name: deploy
+          command_args: prod
+          prompt: Deploy prod now.
+    hook-log/ship.jsonl:
+      - input:
+          {
+            hook_event_name: UserPromptExpansion,
+            expansion_type: skill,
+            command_name: ship,
+            command_args: 1.2.0,
+          }
+    hook-log/review.jsonl:
+      - input: { expansion_type: slash_command, command_name: review, command_args: api }
+    hook-log/mcp.jsonl:
+      - input:
+          {
+            hook_event_name: UserPromptExpansion,
+            expansion_type: mcp_prompt,
+            command_name: mcp__docs__greet,
+          }

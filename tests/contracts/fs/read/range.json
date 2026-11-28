@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 15,
+  "method": "fs/read",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "big.log",
+    "offset": 1048576,
+    "length": 1048576,
+    "mode": "text"
+  }
+}

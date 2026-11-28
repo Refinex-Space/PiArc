@@ -1,0 +1,233 @@
+/* Only spatial placement belongs to the layout; each pane owns its body and scroll container. */
+.tool-tiles {
+  position: relative;
+  isolation: isolate;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+  background: var(--piarc-workbench-canvas);
+}
+.tile-primary,
+.tool-tile-slot {
+  position: absolute;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+}
+.tile-primary {
+  display: flex;
+  flex-direction: column;
+}
+.tile-primary[hidden],
+.tool-tile-slot[hidden] {
+  display: none;
+}
+.tool-tile {
+  container: tool / inline-size;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--piarc-workbench-canvas);
+}
+.tool-surface-content {
+  display: contents;
+}
+body[data-tool-window] > #tool-root {
+  height: 100dvh;
+}
+.tool-tile-header {
+  position: relative;
+  flex: none;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-height: var(--piarc-size-row-height);
+  padding: calc(var(--piarc-space-1) / 2) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  background: var(--piarc-workbench-canvas);
+  color: var(--piarc-workbench-ink);
+  user-select: none;
+  touch-action: none;
+}
+.tool-tile-slot[data-window-top='true'] .tool-tile-header {
+  min-height: var(--piarc-c-window-titlebar-height);
+  border-bottom: 0;
+}
+.tool-tile-header:has([data-tile-grip]:enabled) {
+  cursor: grab;
+}
+.tool-tile-header:active:has([data-tile-grip]:enabled) {
+  cursor: grabbing;
+}
+.tool-tile-header > [data-tile-grip] {
+  order: 1;
+  margin-inline-start: auto;
+  opacity: 0;
+  flex: none;
+  color: var(--piarc-text-secondary);
+  cursor: grab;
+}
+.tool-tile-header .icon-button {
+  width: calc(var(--piarc-space-4) + var(--piarc-space-3));
+  height: calc(var(--piarc-space-4) + var(--piarc-space-3));
+}
+.tool-tile-header .icon {
+  stroke-width: 1;
+}
+.tool-tile-title {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  font: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-tile-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--piarc-space-1);
+  margin-inline-start: auto;
+}
+.tool-tile-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.tool-tile-body:has(> .terminal-panel),
+.tool-tile-body:has(> .side-chat) {
+  overflow: hidden;
+}
+.tool-tile[data-detached='true'] .tool-tile-header {
+  -webkit-app-region: drag;
+}
+.tool-tile[data-detached='true'] .tool-tile-header button {
+  -webkit-app-region: no-drag;
+}
+:root[data-platform='windows'] .tool-tile-slot[data-overlay-edge='true'] .tool-tile-header {
+  padding-inline-end: 148px;
+}
+:root[data-platform='windows'] .tool-tiles[data-has-tools='true'] .tile-primary .main-titlebar {
+  padding-inline-end: var(--piarc-space-2);
+}
+:root[data-platform='windows']
+  .tool-tile-slot[data-overlay-edge='true'][data-compact-caption='true']
+  .tool-tile-header {
+  padding-inline-end: var(--piarc-space-2);
+  padding-block-start: 34px;
+}
+:root[data-platform='mac'] .is-collapsed .tool-tile-slot[data-top-left='true'] .tool-tile-header {
+  padding-inline-start: 80px;
+}
+.tile-divider {
+  position: absolute;
+  z-index: 3;
+  background: var(--piarc-border-subtle);
+  touch-action: none;
+}
+.tile-divider::after {
+  content: '';
+  position: absolute;
+}
+.tile-divider[data-axis='x'] {
+  cursor: col-resize;
+}
+.tile-divider[data-axis='y'] {
+  cursor: row-resize;
+}
+.tile-divider[data-axis='x']::after {
+  inset: 0 -4px;
+}
+.tile-divider[data-axis='y']::after {
+  inset: -4px 0;
+}
+.tile-divider:hover,
+.tile-divider:focus-visible,
+.tile-divider:active {
+  background: var(--piarc-border-focus);
+}
+.tile-divider:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 0;
+}
+.tile-drop-zone {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+}
+.tile-drop-zone > div {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 2px solid var(--piarc-accent-solid);
+  border-radius: var(--piarc-radius-md);
+  background: color-mix(in srgb, var(--piarc-accent-solid) 12%, transparent);
+}
+.tile-drop-zone[data-edge='left'] > div {
+  right: 50%;
+}
+.tile-drop-zone[data-edge='right'] > div {
+  left: 50%;
+}
+.tile-drop-zone[data-edge='above'] > div {
+  bottom: 50%;
+}
+.tile-drop-zone[data-edge='below'] > div {
+  top: 50%;
+}
+.tile-mini-nav {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  box-sizing: border-box;
+  padding-inline: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  -webkit-app-region: drag;
+}
+.tile-mini-nav button,
+.tile-mini-nav [role='menu'] {
+  -webkit-app-region: no-drag;
+}
+:root[data-platform='mac'] .is-collapsed .tile-mini-nav {
+  padding-inline-start: 80px;
+}
+:root[data-platform='windows'] .tile-mini-nav {
+  padding-inline-end: 148px;
+}
+.tool-tile-header > [data-tile-grip]:disabled {
+  display: none;
+}
+.tool-tile-header:hover > [data-tile-grip],
+.tool-tile-header:focus-within > [data-tile-grip] {
+  opacity: 1;
+}
+.tool-tile-header > .tool-tile-actions {
+  order: 2;
+}
+.tool-tile-header:has(> [data-tile-grip]:enabled) > .tool-tile-actions {
+  margin-inline-start: 0;
+}
+
+/* On a short title row the project sidebar still provides the history controls. */
+@container session-frame (max-width: 460px) {
+  .workbench-header .history-buttons > button:not(:first-child) {
+    display: none;
+  }
+  /* Tight, but a hover or pressed fill never touches its neighbour. */
+  .workbench-header,
+  .session-tools {
+    gap: 2px;
+  }
+  .workbench-header .view-control > button {
+    min-width: var(--piarc-space-5);
+  }
+}

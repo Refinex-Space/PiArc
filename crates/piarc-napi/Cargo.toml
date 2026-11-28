@@ -1,0 +1,33 @@
+[package]
+name = "piarc-napi"
+description = "Thin NAPI-RS export layer producing the per-platform .node modules (ADR-0014)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+# Exports for tests and benchmarks only: demo event sources, the synchronous echo call,
+# event counters and panic triggers. Development builds of the desktop app enable it;
+# shipping builds do not (scripts/dev/build-core.mjs).
+testing = ["piarc-core/testing"]
+
+[dependencies]
+napi.workspace = true
+napi-derive.workspace = true
+piarc-core.workspace = true
+piarc-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# The Chrome import answer is handed to V8 from a zeroizing buffer (ADR-0090).
+zeroize.workspace = true
+
+[build-dependencies]
+napi-build.workspace = true
+
+[lints]
+workspace = true

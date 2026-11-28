@@ -1,0 +1,65 @@
+id: subagent-approval
+description: A subagent's call that needs approval shows its card in the main session, naming the subagent's type and task; refusing it refuses that call only, the next call asks again. A project definition asking for bypassPermissions still runs in the main session's Manual mode (T31).
+capabilities: [CAP-AGENT-APPROVAL-001, CAP-PERM-APPROVAL-001]
+workspace:
+  files:
+    .claude/agents/runner.md: "---\nname: runner\ndescription: Runs commands.\nmodel: mock-child/mock-model\npermissionMode: bypassPermissions\n---\nRun what you are asked.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Print two lines,
+                  prompt: Print one then two.,
+                  subagent_type: runner,
+                },
+            },
+          ]
+      - text: The subagent printed two.
+  child:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: c1, name: Bash, input: { command: env echo one } }]
+      - tool_calls: [{ id: c2, name: Bash, input: { command: env echo two } }]
+      - text: Printed two; one was refused.
+sessions:
+  main: { provider: main }
+approvals:
+  - {
+      tool: Bash,
+      decision: deny,
+      feedback: Not that one.,
+      subagent: { type: runner, description: Print two lines },
+    }
+  - { tool: Bash, decision: allow, subagent: { type: runner } }
+actions:
+  - prompt: { text: Print lines through the runner., turn: one }
+expect:
+  request_counts: { main: 2, child: 3 }
+  events:
+    - method: subagent/started
+      params:
+        {
+          itemId: agent-1,
+          subagent:
+            {
+              warnings:
+                [{ kind: projectModeIgnored, field: permissionMode, value: bypassPermissions }],
+            },
+        }
+  requests:
+    - provider: child
+      index: 1
+      tool_results: [{ id: c1, is_error: true, contains: Not that one. }]
+    - provider: child
+      index: 2
+      tool_results: [{ id: c1, is_error: true }, { id: c2, is_error: false, contains: two }]
+    - provider: main
+      index: 1
+      tool_results: [{ id: agent-1, is_error: false, contains: Printed two; one was refused. }]

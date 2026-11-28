@@ -1,0 +1,39 @@
+{
+  "jsonrpc": "2.0",
+  "method": "subagent/completed",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 61,
+    "ts": 1763200000500,
+    "itemId": "call_agent_1",
+    "subagent": {
+      "sessionId": "019a9f10-2c3d-7e40-8a51-6b7c8d9e0f12",
+      "agentType": "Explore",
+      "description": "Find the parser",
+      "color": "blue",
+      "model": {
+        "provider": "mock-child",
+        "id": "mock-model"
+      },
+      "effort": "low",
+      "status": "failed",
+      "startedAt": 1763200000000,
+      "toolCalls": 2,
+      "tokens": {
+        "input": 900,
+        "output": 120,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "transcriptPath": "/data/pi/sessions/x/child.jsonl",
+      "warnings": [
+        {
+          "kind": "aliasFallback",
+          "value": "fast"
+        }
+      ],
+      "durationMs": 4200,
+      "error": "The provider refused the request."
+    }
+  }
+}

@@ -1,0 +1,240 @@
+[
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-<id:1>"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Start something long. [[piarc-scenario:golden-abort-tools]]"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Start something long. [[piarc-scenario:golden-abort-tools]]"
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_hang",
+        "status": "inProgress",
+        "tool": "Bash",
+        "arguments": {
+          "command": "sleep 30"
+        },
+        "command": "sleep 30"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_hang",
+        "status": "interrupted",
+        "tool": "Bash",
+        "arguments": {
+          "command": "sleep 30"
+        },
+        "output": "Operation aborted",
+        "command": "sleep 30"
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_after",
+        "status": "inProgress",
+        "tool": "Read",
+        "arguments": {
+          "path": "notes/x.txt"
+        }
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_after",
+        "status": "interrupted",
+        "tool": "Read",
+        "arguments": {
+          "path": "notes/x.txt"
+        }
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "status": "interrupted",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-<id:2>"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:2>:user:1",
+        "status": "completed",
+        "text": "Continue."
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:2>:user:1",
+        "status": "completed",
+        "text": "Continue."
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:3>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "itemId": "<id:3>#0",
+      "delta": "Answered a"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "itemId": "<id:3>#0",
+      "delta": "fter the in"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "itemId": "<id:3>#0",
+      "delta": "terruption."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:3>#0",
+        "status": "completed",
+        "text": "Answered after the interruption."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-<id:2>",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  }
+]

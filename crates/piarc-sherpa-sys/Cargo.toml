@@ -1,0 +1,24 @@
+[package]
+# Published as sherpa-onnx-sys so `[patch.crates-io]` in the root manifest replaces the upstream
+# crate under the `sherpa-onnx` safe wrapper (ADR-0094). The directory is piarc-sherpa-sys.
+name = "sherpa-onnx-sys"
+version = "2.0.1"
+description = "Run-time bindings to the sherpa-onnx C API: upstream declarations called through a library loaded on first use (ADR-0094)."
+edition.workspace = true
+# Generated from sherpa-onnx-sys 2.0.1 (Apache-2.0); see LICENSE and NOTICE.
+license = "Apache-2.0"
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+# The upstream crate's link modes; the safe wrapper forwards one of them. Linking never
+# happens here, so both are empty.
+default = []
+static = []
+shared = []
+
+[dependencies]
+libloading.workspace = true
+
+[lints]
+workspace = true

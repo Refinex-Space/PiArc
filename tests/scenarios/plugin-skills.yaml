@@ -1,0 +1,25 @@
+id: plugin-skills
+description: An enabled plugin's skill is in the skill index as <plugin>:<name>, and the Skill tool loads its body with ${CLAUDE_PLUGIN_ROOT} replaced (T40).
+capabilities: [CAP-PLUGIN-SKILLS-001]
+workspace:
+  trusted: true
+  run_files:
+    pkgs/demo/.claude-plugin/plugin.json: '{"name": "demo"}'
+    pkgs/demo/skills/review/SKILL.md: "---\nname: review\ndescription: Reviews a change with the demo checklist\n---\nReview against ${CLAUDE_PLUGIN_ROOT}/checklist.md for $ARGUMENTS.\n"
+packages:
+  - { path: pkgs/demo }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: load, name: Skill, input: { skill: 'demo:review', args: the parser } }]
+      - text: Reviewed.
+actions:
+  - prompt: { text: Review the parser., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - { index: 0, contains: ['demo:review', 'Reviews a change with the demo checklist'] }
+    - index: 1
+      tool_results:
+        - { id: load, is_error: false, contains: 'demo/checklist.md for the parser.' }

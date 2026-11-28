@@ -1,0 +1,52 @@
+id: context-memory-file-tools
+description: Concurrent Glob and Grep matches and an approved Write load their directories once; a denied Write leaves its directory memory unread.
+capabilities: [CAP-CTX-MEMORY-001]
+workspace:
+  files:
+    pattern/CLAUDE.md: Globbed directory directive.
+    pattern/matched.txt: sample
+    search/CLAUDE.md: Searched directory directive.
+    search/target.log: spot-this-line
+    created/CLAUDE.md: Written directory directive.
+    refused/CLAUDE.md: Refused directory directive.
+providers:
+  main:
+    wire: openai
+    steps:
+      - tool_calls:
+          - { id: glob, name: Glob, input: { pattern: '**/matched.txt' } }
+          - { id: grep, name: Grep, input: { pattern: spot-this-line } }
+      - tool_calls:
+          - { id: write, name: Write, input: { path: created/new.txt, content: created } }
+      - tool_calls:
+          - { id: denied, name: Write, input: { path: refused/new.txt, content: declined } }
+      - text: Done.
+approvals:
+  - { tool: Write, decision: allow }
+  - { tool: Write, decision: deny }
+actions:
+  - prompt: { text: Search and save. }
+expect:
+  request_counts: { main: 4 }
+  files: { created/new.txt: created, refused/new.txt: null }
+  requests:
+    - index: 0
+      not_contains:
+        [Globbed directory directive., Searched directory directive., Written directory directive.]
+    - index: 1
+      same_system_as: 0
+      occurrences:
+        {
+          Globbed directory directive.: 1,
+          Searched directory directive.: 1,
+          Written directory directive.: 0,
+        }
+    - index: 3
+      same_system_as: 0
+      occurrences:
+        {
+          Globbed directory directive.: 1,
+          Searched directory directive.: 1,
+          Written directory directive.: 1,
+          Refused directory directive.: 0,
+        }

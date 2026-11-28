@@ -1,0 +1,56 @@
+id: hooks-stop
+description: A Stop hook that blocks continues the turn with its reason as the next model input, twice, with stop_hook_active set after the first continuation; then it lets the turn end (T25).
+capabilities: [CAP-HOOK-STOP-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "node hook.mjs stop"}]}]}}
+    hook-plans/stop.json: |
+      {"sequence": [
+        {"json": {"decision": "block", "reason": "Run the tests before finishing."}},
+        {"exit": 2, "stderr": "Also update the changelog."},
+        {}
+      ]}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'First answer.'
+      - text: 'Tests pass.'
+      - text: 'Changelog updated.'
+actions:
+  - prompt: { text: 'Finish the feature.', turn: t }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 1
+      roles: [user, assistant, user]
+      contains: ['Run the tests before finishing.']
+    - index: 2
+      contains: ['Also update the changelog.']
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  json_lines:
+    hook-log/stop.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            permission_mode: string,
+            stop_hook_active: boolean,
+            last_assistant_message: string,
+            background_tasks: array,
+            session_crons: array,
+          }
+        input:
+          {
+            hook_event_name: Stop,
+            stop_hook_active: false,
+            last_assistant_message: 'First answer.',
+          }
+      - input: { stop_hook_active: true, last_assistant_message: 'Tests pass.' }
+      - input: { stop_hook_active: true, last_assistant_message: 'Changelog updated.' }

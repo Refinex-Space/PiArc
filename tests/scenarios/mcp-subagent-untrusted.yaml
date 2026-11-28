@@ -1,0 +1,36 @@
+id: mcp-subagent-untrusted
+description: In an untrusted project, a project subagent definition's inline server is not started; the subagent's call to it fails as an unknown tool and the start log stays empty (T36).
+capabilities: [CAP-MCP-SUBAGENT-001, CAP-MCP-TRUST-001]
+workspace:
+  files:
+    .claude/agents/db.md: "---\nname: db\ndescription: Talks to the servers.\nmcpServers:\n  - scratch: { command: node, args: [\"{{mcp_echo}}\", scratch], env: { MCP_ECHO_START_LOG: mcp-starts.jsonl } }\n---\nUse the MCP tools you are given.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input: { description: Use the server, prompt: Call scratch., subagent_type: db },
+            },
+          ]
+      - tool_calls: [{ id: child-scratch, name: mcp__scratch__echo, input: { text: inline } }]
+      - text: It was not there.
+      - text: The subagent could not reach scratch.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Use the db subagent., turn: one }
+expect:
+  request_counts: { main: 4 }
+  json_lines:
+    mcp-starts.jsonl: []
+  requests:
+    - provider: main
+      index: 1
+      tools_exclude: [mcp__scratch__echo]
+    - provider: main
+      index: 2
+      tool_results: [{ id: child-scratch, is_error: true }]

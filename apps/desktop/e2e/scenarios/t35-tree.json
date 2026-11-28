@@ -1,0 +1,15 @@
+{
+  "id": "t35-tree",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "draft",
+          "name": "Write",
+          "input": { "path": "draft.txt", "content": "work in progress" }
+        }
+      ]
+    },
+    { "text": "Left a draft in the worktree." }
+  ]
+}

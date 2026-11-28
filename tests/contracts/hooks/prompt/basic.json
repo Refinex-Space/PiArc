@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "hooks/prompt",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "prompt": "Is the work complete? {\"hook_event_name\":\"Stop\"}",
+    "model": "fast",
+    "timeoutMs": 30000
+  }
+}

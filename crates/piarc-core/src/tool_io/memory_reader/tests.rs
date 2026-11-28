@@ -1,0 +1,552 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use super::*;
+
+// Fields drop in declaration order: the scope's directory handles close before the tree is
+// removed. Windows refuses to delete a directory that is open without shared delete.
+struct Tree {
+    scope: Scope,
+    root: TempRoot,
+}
+
+struct TempRoot(PathBuf);
+
+impl std::ops::Deref for TempRoot {
+    type Target = Path;
+
+    fn deref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TempRoot {
+    fn drop(&mut self) {
+        fs::remove_dir_all(&self.0).expect("remove temporary tree");
+    }
+}
+
+impl Tree {
+    fn new() -> Self {
+        let root = std::env::temp_dir().join(crate::sessions::new_session_id().expect("unique id"));
+        let ws = root.join("ws");
+        let cwd = ws.join("current");
+        fs::create_dir_all(&cwd).expect("workspace");
+        let scope = Scope::new(&ws, &cwd).expect("scope");
+        Self {
+            scope,
+            root: TempRoot(root),
+        }
+    }
+
+    fn file(&self, name: &str, text: impl AsRef<[u8]>) {
+        let path = self.root.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+
+    fn collect(&self, dirs: &[String], both: bool, decision: Option<ImportAccess>) -> Collection {
+        self.collect_rules(dirs, both, decision, &RuleQuery::default())
+    }
+
+    fn collect_rules(
+        &self,
+        dirs: &[String],
+        both: bool,
+        decision: Option<ImportAccess>,
+        query: &RuleQuery,
+    ) -> Collection {
+        collect(
+            &self.scope,
+            Some(&self.root.join("home")),
+            &self.root.join("data"),
+            &[],
+            dirs,
+            both,
+            query,
+            |_| decision.clone(),
+        )
+        .expect("collect fixture memory")
+    }
+
+    fn source<'a>(&self, result: &'a Collection, name: &str) -> &'a str {
+        let path = display(&self.root.join(name).canonicalize().unwrap());
+        &result
+            .files
+            .iter()
+            .find(|f| f.path == path)
+            .expect("source")
+            .content
+    }
+}
+
+#[test]
+fn user_and_project_sources_follow_precedence_and_nested_paths_load_once() {
+    let tree = Tree::new();
+    let names = [
+        "home/.claude/CLAUDE.md",
+        "data/MEMORY.md",
+        "CLAUDE.md",
+        "ws/CLAUDE.md",
+        "ws/.claude/CLAUDE.md",
+        "ws/AGENTS.md",
+        "ws/CLAUDE.local.md",
+        "ws/current/AGENTS.md",
+        "ws/current/deep/CLAUDE.md",
+        "ws/current/deep/child/AGENTS.md",
+    ];
+    for name in names {
+        tree.file(name, name);
+    }
+    let ours = |result: Collection| {
+        result
+            .files
+            .into_iter()
+            .filter(|f| names.contains(&f.content.as_str()))
+            .map(|f| f.content)
+            .collect::<Vec<_>>()
+    };
+    let initial = tree.collect(&[], false, None);
+    assert!(initial.pending.is_empty());
+    assert_eq!(
+        ours(initial),
+        [
+            names[0], names[1], names[2], names[3], names[4], names[6], names[7]
+        ]
+    );
+    assert_eq!(
+        ours(tree.collect(
+            &["deep/child".into(), "deep".into(), "../".into()],
+            true,
+            None
+        )),
+        names
+    );
+}
+
+#[test]
+fn imports_expand_in_place_with_sources_and_stop_at_cycles_and_four_edges() {
+    let tree = Tree::new();
+    tree.file("ws/CLAUDE.md", "before @docs/one.md after");
+    tree.file("ws/docs/one.md", "one: @../CLAUDE.md @two.md");
+    tree.file("ws/docs/two.md", "two: @three.md");
+    tree.file("ws/docs/three.md", "three: @four.md");
+    tree.file("ws/docs/four.md", "four: @five.md");
+    tree.file("ws/docs/five.md", "TOP-OF-FIFTH");
+    let all = tree.collect(&[], false, None);
+    let content = tree.source(&all, "ws/CLAUDE.md");
+    assert!(content.starts_with("before ") && content.ends_with(" after"));
+    for name in ["one", "two", "three", "four"] {
+        assert_eq!(content.matches(&format!("{name}:")).count(), 1);
+        let path = tree
+            .root
+            .join(format!("ws/docs/{name}.md"))
+            .canonicalize()
+            .unwrap();
+        assert!(content.contains(&display(&path)));
+    }
+    assert!(!content.contains("TOP-OF-FIFTH"));
+    assert_eq!(content.matches("before ").count(), 1);
+}
+
+#[test]
+fn only_prose_imports_expand_and_block_comments_are_removed() {
+    let input = concat!(
+        "<!--\n@secret.md\nhidden -->\n",
+        "Plain @one.md, then `@inline.md` and `a\n@multiline.md`.\n",
+        "Inline <!-- @quiet.md --> remains.\n",
+        "````rust\n@fenced.md\n```\n@still-code.md\n````\n",
+        "> ~~~\n> @quoted.md\n> ~~~\n",
+        "    @indented.md\n",
+        "An unmatched ` still allows @two.md. mail@example.test and \\@escaped.md.\n",
+        "@\"name with spaces.md\"",
+    );
+    let mut references = Vec::new();
+    let rendered = markdown::expand(input, |p| {
+        references.push(p.to_owned());
+        Ok(Some("INSERT".into()))
+    })
+    .unwrap();
+    assert_eq!(references, ["one.md", "two.md", "name with spaces.md"]);
+    assert_eq!(rendered.matches("INSERT").count(), 3);
+    assert!(!rendered.contains("hidden") && !rendered.contains("@secret"));
+    assert!(rendered.contains("<!-- @quiet.md -->") && rendered.contains("`@inline.md`"));
+}
+
+#[test]
+fn external_import_decisions_are_bound_to_the_resolved_file() {
+    let tree = Tree::new();
+    tree.file("ws/CLAUDE.md", "@../outside.md");
+    tree.file("outside.md", "outside-only-marker");
+    let expected = tree.root.join("outside.md").canonicalize().unwrap();
+    let pending = tree.collect(&[], false, None);
+    assert_eq!(pending.pending, [expected]);
+    assert!(
+        tree.source(&pending, "ws/CLAUDE.md")
+            .contains("Memory import not approved")
+    );
+    let denied = tree.collect(&[], false, Some(ImportAccess::Denied(None)));
+    assert!(denied.pending.is_empty());
+    assert!(
+        tree.source(&denied, "ws/CLAUDE.md")
+            .contains("Memory import denied")
+    );
+    for result in [&pending, &denied] {
+        assert!(
+            !tree
+                .source(result, "ws/CLAUDE.md")
+                .contains("outside-only-marker")
+        );
+    }
+    let allowed = tree.collect(&[], false, Some(ImportAccess::Allowed));
+    assert!(
+        tree.source(&allowed, "ws/CLAUDE.md")
+            .contains("outside-only-marker")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn conventional_names_and_lazy_directory_symlinks_do_not_bypass_approval() {
+    use std::os::unix::fs::symlink;
+    let tree = Tree::new();
+    tree.file("other/CLAUDE.md", "outside-only-marker");
+    symlink(
+        tree.root.join("other/CLAUDE.md"),
+        tree.root.join("ws/CLAUDE.md"),
+    )
+    .unwrap();
+    symlink(tree.root.join("other"), tree.root.join("ws/current/link")).unwrap();
+    let pending = tree.collect(&["link".into()], false, None);
+    assert_eq!(
+        pending.pending,
+        [tree.root.join("other/CLAUDE.md").canonicalize().unwrap()]
+    );
+    assert!(
+        pending
+            .files
+            .iter()
+            .all(|file| !file.content.contains("outside-only-marker"))
+    );
+}
+
+struct SkipLog(Arc<AtomicUsize>);
+impl tracing::Subscriber for SkipLog {
+    fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+        true
+    }
+    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+        tracing::span::Id::from_u64(1)
+    }
+    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+    fn enter(&self, _: &tracing::span::Id) {}
+    fn exit(&self, _: &tracing::span::Id) {}
+    fn event(&self, event: &tracing::Event<'_>) {
+        let fields = event.metadata().fields();
+        if fields.field("path").is_some() && fields.field("limit_bytes").is_some() {
+            self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+#[test]
+fn four_mib_is_read_and_one_extra_byte_skips_the_file_and_logs_its_path() {
+    let tree = Tree::new();
+    tree.file("ws/CLAUDE.md", vec![b'x'; FILE_LIMIT as usize]);
+    tree.file("ws/CLAUDE.local.md", vec![b'y'; FILE_LIMIT as usize + 1]);
+    let logged = Arc::new(AtomicUsize::new(0));
+    let result = tracing::subscriber::with_default(SkipLog(logged.clone()), || {
+        tree.collect(&[], false, None)
+    });
+    assert_eq!(
+        tree.source(&result, "ws/CLAUDE.md").len(),
+        FILE_LIMIT as usize
+    );
+    assert!(
+        result
+            .files
+            .iter()
+            .all(|f| !f.path.ends_with("CLAUDE.local.md"))
+    );
+    assert_eq!(logged.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn adjacent_block_comments_do_not_load_their_imports() {
+    let tree = Tree::new();
+    tree.file(
+        "ws/current/CLAUDE.md",
+        "<!-- first --> <!-- @hidden.md -->Visible.\n",
+    );
+    tree.file("ws/current/hidden.md", "Hidden comment import");
+    let result = tree.collect(&[], false, None);
+    assert_eq!(
+        tree.source(&result, "ws/current/CLAUDE.md").trim(),
+        "Visible."
+    );
+}
+
+#[test]
+fn pending_consent_preserves_sources_already_read_at_session_open() {
+    let tree = Tree::new();
+    tree.file(
+        "ws/current/CLAUDE.md",
+        "Opening instructions. @../../guide.md",
+    );
+    tree.file("guide.md", "Approved guide.");
+    let initial = tree.collect(&[], false, None);
+    assert!(
+        !tree
+            .source(&initial, "ws/current/CLAUDE.md")
+            .contains("Approved guide.")
+    );
+    tree.file("ws/current/CLAUDE.md", "Changed during approval.");
+    let frozen = initial
+        .inputs
+        .expect("a deferred import")
+        .expand(&tree.scope, Some(&tree.root.join("home")), |_| {
+            Some(ImportAccess::Allowed)
+        })
+        .unwrap();
+    let text = tree.source(&frozen, "ws/current/CLAUDE.md");
+    assert!(text.contains("Opening instructions.") && text.contains("Approved guide."));
+    assert!(!text.contains("Changed during approval."));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_moved_import_directory_requires_a_new_decision() {
+    let tree = Tree::new();
+    tree.file("ws/current/CLAUDE.md", "@../../guide/note.md");
+    tree.file("guide/note.md", "original guide");
+    let initial = tree.collect(&[], false, None);
+    let pending = initial.inputs.expect("deferred consent");
+    fs::rename(tree.root.join("guide"), tree.root.join("old-guide")).expect("move directory");
+    tree.file("guide/note.md", "new guide");
+    assert!(
+        pending
+            .expand(&tree.scope, Some(&tree.root.join("home")), |_| Some(
+                ImportAccess::Allowed
+            ))
+            .is_err()
+    );
+}
+
+fn rule_tree() -> Tree {
+    let tree = Tree::new();
+    tree.file("home/.claude/CLAUDE.md", "user memory");
+    tree.file(
+        "home/.claude/rules/style.md",
+        "---\ndescription: x\n---\nuser rule",
+    );
+    tree.file(
+        "home/.claude/rules/docs.md",
+        "---\npaths: [\"docs/**\"]\n---\nuser docs rule",
+    );
+    tree.file("data/MEMORY.md", "piarc memory");
+    tree.file("ws/CLAUDE.md", "root memory");
+    tree.file("ws/.claude/CLAUDE.md", "nested memory");
+    tree.file("ws/.claude/rules/always.md", "project rule");
+    tree.file(
+        "ws/.claude/rules/api/ts.md",
+        "---\npaths:\n  - \"src/**/*.ts\"\n---\nts rule",
+    );
+    tree.file(
+        "ws/.claude/rules/bad.md",
+        "---\npaths: [\"src/{a,b\"]\n---\nnever",
+    );
+    tree.file("ws/CLAUDE.local.md", "local memory");
+    tree.file("ws/current/src/a.ts", "x");
+    tree.file("ws/current/src/b.js", "x");
+    tree
+}
+
+/// T24-A07 (Core half): unconditional rules follow the user and root `.claude/CLAUDE.md`
+/// without their frontmatter; a conditional rule is included once a matching file was
+/// touched, and stays included when the Host names it.
+#[test]
+fn rules_follow_their_claude_md_and_paths_select_conditional_ones() {
+    let tree = rule_tree();
+    let order = |result: &Collection| -> Vec<String> {
+        result.files.iter().map(|f| f.content.clone()).collect()
+    };
+    let none = tree.collect(&[], false, None);
+    assert_eq!(
+        order(&none),
+        [
+            "user memory",
+            "user rule",
+            "piarc memory",
+            "root memory",
+            "nested memory",
+            "project rule",
+            "local memory"
+        ]
+    );
+    assert!(none.inactive_rules);
+    assert!(none.files.iter().all(|f| f.paths.is_none()));
+}
+
+/// T24-A07 (Core half): conditional rules follow touched files and the Host's list.
+#[test]
+fn conditional_rules_load_for_matching_files_and_stay_when_named() {
+    let tree = rule_tree();
+    // The session cwd is `ws/current`; globs are relative to the workspace root `ws`.
+    let root_relative = |name: &str| tree.root.join("ws").join(name);
+    let unrelated = tree.collect_rules(
+        &[],
+        false,
+        None,
+        &RuleQuery {
+            files: vec![root_relative("current/src/b.js")],
+            active: Vec::new(),
+        },
+    );
+    assert_eq!(unrelated.files.len(), 7);
+    let touched = RuleQuery {
+        files: vec![tree.root.join("ws/current/../src/a.ts")],
+        active: Vec::new(),
+    };
+    tree.file("ws/src/a.ts", "x");
+    let matched = tree.collect_rules(&[], false, None, &touched);
+    let ts = matched
+        .files
+        .iter()
+        .find(|f| f.content == "ts rule")
+        .expect("conditional rule included");
+    assert_eq!(ts.paths.as_deref(), Some(&["src/**/*.ts".to_owned()][..]));
+    assert!(!ts.content.contains("paths:"));
+    assert!(matched.inactive_rules, "the docs rule is still inactive");
+    let position = |result: &Collection, text: &str| {
+        result
+            .files
+            .iter()
+            .position(|f| f.content == text)
+            .expect(text)
+    };
+    assert!(position(&matched, "ts rule") > position(&matched, "project rule"));
+    assert!(position(&matched, "ts rule") < position(&matched, "local memory"));
+
+    // Named by the Host as delivered: included without a touched file.
+    let active = tree.collect_rules(
+        &[],
+        false,
+        None,
+        &RuleQuery {
+            files: Vec::new(),
+            active: vec![ts.path.clone()],
+        },
+    );
+    assert!(active.files.iter().any(|f| f.content == "ts rule"));
+    // A user-level conditional rule matches against the workspace root as well.
+    let docs = tree.collect_rules(
+        &[],
+        false,
+        None,
+        &RuleQuery {
+            files: vec![root_relative("docs/guide/x.md"), root_relative("src/a.ts")],
+            active: Vec::new(),
+        },
+    );
+    assert!(docs.files.iter().any(|f| f.content == "user docs rule"));
+    assert!(
+        !docs.inactive_rules,
+        "the invalid glob never loads and is not pending"
+    );
+}
+
+/// T47: the organization's managed `CLAUDE.md` comes first and is marked, before the user's
+/// files; a missing one is skipped.
+#[test]
+fn managed_instructions_lead_the_documents() {
+    let tree = Tree::new();
+    tree.file("home/.claude/CLAUDE.md", "user");
+    tree.file("CLAUDE.md", "project");
+    tree.file("admin/PiArc/CLAUDE.md", "organization");
+    let managed = [
+        tree.root.join("admin/PiArc/CLAUDE.md"),
+        tree.root.join("admin/ClaudeCode/CLAUDE.md"),
+    ];
+    let collection = collect(
+        &tree.scope,
+        Some(&tree.root.join("home")),
+        &tree.root.join("data"),
+        &managed,
+        &[],
+        false,
+        &RuleQuery::default(),
+        |_| None,
+    )
+    .expect("collect");
+    let texts: Vec<(&str, Option<MemoryKind>)> = collection
+        .files
+        .iter()
+        .map(|f| (f.content.as_str(), f.kind))
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            ("organization", Some(MemoryKind::Managed)),
+            ("user", None),
+            ("project", None)
+        ]
+    );
+}
+
+#[test]
+fn pi_global_instructions_lead_the_user_documents() {
+    let tree = Tree::new();
+    tree.file("home/.pi/agent/AGENTS.md", "pi global");
+    tree.file("home/.claude/CLAUDE.md", "claude user");
+    tree.file("data/MEMORY.md", "piarc user");
+    let contents = |result: Collection| {
+        result
+            .files
+            .into_iter()
+            .map(|f| f.content)
+            .filter(|c| {
+                [
+                    "pi global",
+                    "pi override",
+                    "pi claude",
+                    "claude user",
+                    "piarc user",
+                ]
+                .contains(&c.as_str())
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        contents(tree.collect(&[], false, None)),
+        ["pi global", "claude user", "piarc user"]
+    );
+    // Pi takes the first of its candidates in the agent directory, as Pi itself does.
+    tree.file("home/.pi/agent/AGENTS.override.md", "pi override");
+    assert_eq!(
+        contents(tree.collect(&[], false, None)),
+        ["pi override", "claude user", "piarc user"]
+    );
+}
+
+#[test]
+fn pi_global_instructions_fall_back_to_claude_md_in_the_agent_directory() {
+    let tree = Tree::new();
+    tree.file("home/.pi/agent/CLAUDE.md", "pi claude");
+    let result = tree.collect(&[], false, None);
+    assert_eq!(
+        tree.source(&result, "home/.pi/agent/CLAUDE.md"),
+        "pi claude"
+    );
+    assert_eq!(
+        crate::pi_instructions::global_file(&tree.root.join("home"))
+            .ok()
+            .flatten(),
+        Some(
+            tree.root
+                .join("home/.pi/agent/CLAUDE.md")
+                .canonicalize()
+                .unwrap()
+        )
+    );
+}

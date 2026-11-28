@@ -1,0 +1,21 @@
+[package]
+name = "piarc-config"
+description = "Layered settings loading and merging (PiArc and Claude Code compatibility), project trust, configuration diagnostics."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ignore.workspace = true
+piarc-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-saphyr.workspace = true
+# Fingerprints of launch configurations (`launch`).
+sha2.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

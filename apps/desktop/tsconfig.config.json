@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // Build and test configuration files that run in Node: Forge, Vite, Playwright and the
+  // shared fuse settings.
+  "compilerOptions": {
+    "composite": true,
+    "allowJs": true,
+    "checkJs": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": ".",
+    "outDir": "dist/config",
+    "tsBuildInfoFile": "dist/config/.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": [
+    "forge.config.ts",
+    "vite.*.config.ts",
+    "playwright.config.ts",
+    "fuses.mjs",
+    "core-binary.mjs",
+    "app-identity.mjs",
+    "app-identity.test.mjs",
+    "packaging/*.mjs"
+  ]
+}

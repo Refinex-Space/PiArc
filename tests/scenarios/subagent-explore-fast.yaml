@@ -1,0 +1,87 @@
+id: subagent-explore-fast
+description: The main session hands a question to the built-in Explore subagent, which runs on the model the fast alias names, in a context of its own (only the task, no memory files or git status) with read-only tools; its final message is the Agent call's result (T31).
+capabilities: [CAP-AGENT-RUN-001, CAP-AGENT-FILTER-001, CAP-MODEL-ALIAS-001]
+workspace:
+  files:
+    CLAUDE.md: 'Project memory: always answer in haiku.'
+    src/parse.rs: 'fn parse() {}'
+  run_files:
+    data 数据/settings.json: '{"modelAliases":{"fast":"mock-child/fast-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Earlier answer.
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Find the parser,
+                  prompt: Where is the parser defined? Answer with the path.,
+                  subagent_type: Explore,
+                },
+            },
+          ]
+      - text: The parser is in src/parse.rs.
+  child:
+    wire: anthropic
+    model: fast-model
+    steps:
+      - tool_calls: [{ id: look, name: Grep, input: { pattern: 'fn parse' } }]
+      - text: 'Found it: src/parse.rs defines parse.'
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Say something first., turn: zero }
+  - wait: { method: turn/completed, turn: zero }
+  - prompt: { text: Find the parser for me., turn: one }
+expect:
+  request_counts: { main: 3, child: 2 }
+  events:
+    - method: subagent/started
+      params:
+        {
+          itemId: agent-1,
+          subagent:
+            {
+              agentType: Explore,
+              status: running,
+              model: { provider: mock-child, id: fast-model },
+            },
+        }
+    - method: subagent/completed
+      params: { itemId: agent-1, subagent: { agentType: Explore, status: completed, toolCalls: 1 } }
+    - method: item/completed
+      turn: one
+      params:
+        {
+          item:
+            {
+              type: subagent,
+              itemId: agent-1,
+              status: completed,
+              output: 'Found it: src/parse.rs defines parse.',
+            },
+        }
+  requests:
+    # The subagent's first request: the task alone, read-only tools, no project context.
+    - provider: child
+      index: 0
+      roles: [user]
+      user_texts: [Where is the parser defined? Answer with the path.]
+      tools: [Read, Bash, Glob, Grep, WebFetch]
+      tools_windows: [Read, Bash, PowerShell, Glob, Grep, WebFetch]
+      body: { model: fast-model }
+      not_contains:
+        ['Project memory', 'Earlier answer', 'Git status at session start', 'Say something first']
+      contains: ['PiArc exploration subagent']
+    - provider: child
+      index: 1
+      tool_results: [{ id: look, is_error: false, contains: src/parse.rs }]
+    - provider: main
+      index: 2
+      tool_results:
+        [{ id: agent-1, is_error: false, contains: 'Found it: src/parse.rs defines parse.' }]

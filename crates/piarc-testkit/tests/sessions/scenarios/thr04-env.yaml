@@ -1,0 +1,6 @@
+# T45-A07 (credential_leaks.rs): the model prints the command environment.
+id: thr04-env
+steps:
+  - tool_calls:
+      - { id: toolu_env, name: Bash, input: { command: env } }
+  - text: 'Printed.'

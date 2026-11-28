@@ -1,0 +1,28 @@
+id: ctx-server-fallback
+description: A rejected Anthropic request switches the session to client compaction; Pi's retry uses the full context and the usage card reports the fallback.
+capabilities: [CAP-CX-COMPACT-SERVER-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"anthropic/claude-sonnet-4-6":{"serverContextEdit":"compact"}}}}'
+providers:
+  builtin-anthropic:
+    wire: anthropic
+    model: claude-sonnet-4-6
+    steps:
+      - { error: { kind: server_error } }
+      - text: Recovered.
+sessions:
+  main: { provider: builtin-anthropic }
+actions:
+  - prompt: { text: Try., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_usage: { fields: { serverFallback: true, autoCompact: 'on' } }
+expect:
+  request_counts: { builtin-anthropic: 2 }
+  requests:
+    - { provider: builtin-anthropic, index: 0, contains: [compact_20260112] }
+    - {
+        provider: builtin-anthropic,
+        index: 1,
+        not_contains: [context_management, compact_20260112],
+      }

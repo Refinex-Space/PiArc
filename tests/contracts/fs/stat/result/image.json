@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "result": {
+    "path": "/Users/dev/work space/项目/logo.png",
+    "kind": "file",
+    "size": 5120,
+    "modifiedMs": 1763190000000,
+    "readonly": false,
+    "imageMimeType": "image/png"
+  }
+}

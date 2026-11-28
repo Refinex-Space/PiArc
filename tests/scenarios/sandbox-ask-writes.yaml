@@ -1,0 +1,50 @@
+id: sandbox-ask-writes
+description: With the sandbox on in its default mode, Bash commands still ask and, approved, run in Seatbelt - writing the workspace works, while writing outside it, writing a protected path and reading a denyRead path fail and the result names the refused path (T39).
+capabilities: [CAP-SANDBOX-MACOS-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+workspace:
+  trusted: true
+  files:
+    secret.txt: "top secret\n"
+    .piarc/settings.json: '{"sandbox":{"filesystem":{"denyRead":["secret.txt"]}}}'
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: inside, name: Bash, input: { command: 'printf ok > made.txt' } }
+      - tool_calls:
+          - { id: outside, name: Bash, input: { command: 'printf x > "$HOME/escape.txt"' } }
+      - tool_calls:
+          - {
+              id: protected,
+              name: Bash,
+              input: { command: 'mkdir -p .vscode && printf x > .vscode/tasks.json' },
+            }
+      - tool_calls:
+          - { id: secret, name: Bash, input: { command: 'cat secret.txt' } }
+      - text: Done.
+# cat is read-only: it runs unasked, still in the sandbox.
+approvals:
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: Go., turn: t }
+expect:
+  request_counts: { main: 5 }
+  events:
+    - { method: core/sessions, params: { approvals: [{ tool: Bash, sandbox: sandbox }] } }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: inside, is_error: false }
+        - { id: outside, is_error: true, contains: "PiArc's sandbox refused writing" }
+        - { id: protected, is_error: true, contains: '.vscode' }
+        - { id: secret, is_error: true, contains: "PiArc's sandbox refused reading" }
+  files:
+    made.txt: ok
+    .vscode/tasks.json: null

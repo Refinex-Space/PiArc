@@ -1,0 +1,44 @@
+{
+  "id": "t23-permissions",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "compound",
+          "name": "Bash",
+          "input": {
+            "command": "awk 'NR==1' notes.txt && printenv HOME",
+            "description": "Two commands"
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "saved",
+          "name": "Bash",
+          "input": {
+            "command": "ls && awk 'NR==2' notes.txt; printenv PATH",
+            "description": "Saved prefixes"
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "critical",
+          "name": "Bash",
+          "input": {
+            "command": "rm -rf ~",
+            "description": "Critical"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Done."
+    }
+  ]
+}

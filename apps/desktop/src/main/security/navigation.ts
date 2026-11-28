@@ -1,0 +1,78 @@
+// Navigation, redirect and new-window rules applied to every webContents
+// (architecture section 10.3, Electron security checklist items 13 and 14).
+import type { HandlerDetails, WebContents, WindowOpenHandlerResponse } from 'electron';
+
+import { originOf } from './origin.js';
+
+/**
+ * True when `url` parses and its origin is one of `trustedOrigins`. Compares parsed origins,
+ * never string prefixes, so `app://piarc.evil` does not pass for `app://piarc`.
+ */
+export function isTrustedUrl(url: string, trustedOrigins: readonly string[]): boolean {
+  const origin = originOf(url);
+  return origin !== 'null' && trustedOrigins.includes(origin);
+}
+
+/** Origin of `url` for log lines; never logs paths or query strings, which may hold secrets. */
+export function originForLog(url: string): string {
+  const origin = originOf(url);
+  if (origin !== 'null') {
+    return origin;
+  }
+  try {
+    return new URL(url).protocol;
+  } catch {
+    return '<invalid url>';
+  }
+}
+
+/**
+ * Blocks navigation and redirects away from `trustedOrigins`, denies unbound new windows and
+ * every `<webview>`. Installed on all webContents from `app.on('web-contents-created')`, so
+ * no window or embedded contents can miss it.
+ */
+export function guardWebContents(
+  contents: WebContents,
+  trustedOrigins: readonly string[],
+  toolWindow?: (details: HandlerDetails) => WindowOpenHandlerResponse | undefined,
+  previewFrame?: (url: string, parent?: string, initiator?: string) => boolean,
+  followPreviewLink?: (from: string | undefined, to: string) => void,
+): void {
+  contents.on('will-navigate', (event) => {
+    if (!isTrustedUrl(event.url, trustedOrigins)) {
+      event.preventDefault();
+      console.warn(`[security] blocked navigation to ${originForLog(event.url)}`);
+    }
+  });
+  // Subframes navigate without `will-navigate` (T45, I52): the CSP's `frame-ancestors` and the
+  // renderer's lack of `<iframe>` keep them out today, this keeps a frame off foreign pages too.
+  // The main frame stays with `will-navigate` (this event comes first and would pre-empt it).
+  contents.on('will-frame-navigate', (event) => {
+    if (
+      !event.isMainFrame &&
+      !isTrustedUrl(event.url, trustedOrigins) &&
+      !previewFrame?.(event.url, event.frame?.parent?.url, event.initiator?.url)
+    ) {
+      event.preventDefault();
+      followPreviewLink?.(event.initiator?.url, event.url);
+      console.warn(`[security] blocked frame navigation to ${originForLog(event.url)}`);
+    }
+  });
+  contents.on('will-redirect', (event) => {
+    if (!isTrustedUrl(event.url, trustedOrigins)) {
+      event.preventDefault();
+      console.warn(`[security] blocked redirect to ${originForLog(event.url)}`);
+    }
+  });
+  contents.setWindowOpenHandler((details) => {
+    const tool = toolWindow?.(details);
+    if (tool) return tool;
+    const { url } = details;
+    console.warn(`[security] denied new window for ${originForLog(url)}`);
+    return { action: 'deny' };
+  });
+  contents.on('will-attach-webview', (event) => {
+    event.preventDefault();
+    console.warn('[security] denied <webview>');
+  });
+}

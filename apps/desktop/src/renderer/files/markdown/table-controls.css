@@ -1,0 +1,375 @@
+/* Only the painted table clips its corners. Control rails remain outside it
+   and both the editor and reader can reflow without a horizontal scrollport. */
+.cm-editor .md-live-table[data-table-widget] {
+  box-sizing: border-box;
+  position: relative;
+  margin: var(--piarc-space-1) 0;
+  padding: var(--piarc-space-5) 0;
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap) {
+  container-type: inline-size;
+  min-width: 0;
+  overflow: visible;
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap) > table {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+  overflow: clip;
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap) :is(th, td) {
+  border: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap)
+  :is(th, td)
+  + :is(th, td) {
+  border-inline-start: 1px solid var(--piarc-border-subtle);
+}
+:is(.md-live-table .md-table-scroller, .markdown-reader .md .md-table-wrap)
+  :is(tr + tr, thead + tbody > tr:first-child)
+  > :is(th, td) {
+  border-block-start: 1px solid var(--piarc-border-subtle);
+}
+.markdown-reader .md .md-table-wrap :is(td, th) {
+  padding-inline: min(var(--piarc-space-3), 1cqi);
+}
+.cm-editor .md-live-table table {
+  font: inherit;
+}
+.cm-editor .md-live-table :is(td, th) {
+  padding: 0;
+}
+.cm-editor .md-live-table th {
+  background: var(--piarc-surface-hover);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.cm-editor .md-table-cell {
+  display: grid;
+  grid-template-columns: minmax(min-content, 1fr);
+}
+.cm-editor .md-table-cell > :is(textarea, .md-cell-display) {
+  box-sizing: border-box;
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: var(--piarc-size-control-height);
+  padding: var(--piarc-space-1) min(var(--piarc-space-2), 1cqi);
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cm-editor .md-table-cell textarea {
+  field-sizing: content;
+  contain: inline-size;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  resize: none;
+  background: transparent;
+}
+.cm-editor .md-table-cell textarea:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+.cm-editor .md-table-cell:not(:focus-within) textarea {
+  opacity: 0;
+}
+.cm-editor .md-cell-display {
+  pointer-events: none;
+}
+.cm-editor .md-table-cell:focus-within .md-cell-display {
+  visibility: hidden;
+}
+/* Keep short columns usable before giving the remaining space to long prose. */
+:is(.md-table-scroller, .markdown-reader .md-table-wrap) table :is(td, th) {
+  min-width: min(8ch, calc(72cqi / sibling-count()));
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-tight] :is(td, th),
+.md-table-scroller[data-table-tight] .md-table-cell > :is(textarea, .md-cell-display) {
+  min-width: 0;
+  padding-inline: 0;
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-bands]
+  :is(table, thead, tbody) {
+  display: block;
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-bands] tr {
+  display: grid;
+  grid-template-columns: repeat(var(--md-table-band-columns), minmax(0, 1fr));
+}
+:is(.md-table-scroller, .markdown-reader .md .md-table-wrap)[data-table-bands]
+  table
+  tr
+  > :is(td, th) {
+  min-width: 0;
+  border: 0;
+  border-block-start: 1px solid var(--piarc-border-subtle);
+  border-inline-start: 1px solid var(--piarc-border-subtle);
+}
+:is(.md-table-scroller, .markdown-reader .md .md-table-wrap)[data-table-bands]
+  table
+  tr
+  > [data-band-start] {
+  border-inline-start-width: 0;
+}
+:is(.md-table-scroller, .markdown-reader .md .md-table-wrap)[data-table-bands]
+  table
+  tr
+  > [data-band-top] {
+  border-block-start-width: 0;
+}
+.markdown-reader .md .md-table-wrap[data-table-bands] :is(td, th),
+.md-table-scroller[data-table-bands] .md-table-cell > :is(textarea, .md-cell-display) {
+  padding-inline: var(--piarc-space-1);
+}
+:is(.md-table-scroller, .markdown-reader .md-table-wrap)[data-table-bands] td::before {
+  content: attr(data-table-heading) / '';
+  display: block;
+  color: var(--piarc-workbench-muted);
+  font-size: var(--piarc-font-size-caption);
+  line-height: 1.4;
+  text-align: start;
+}
+.md-table-scroller[data-table-bands] td::before {
+  padding: var(--piarc-space-1) var(--piarc-space-1) 0;
+}
+.cm-editor .md-table-grip {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-workbench-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+.cm-editor .md-table-grip[hidden],
+.md-table-popover[hidden] {
+  display: none;
+}
+.cm-editor .md-table-grip::before {
+  content: '';
+  box-sizing: border-box;
+  border-radius: var(--piarc-radius-sm);
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+}
+.cm-editor .md-table-grip:is(:hover, :focus-visible)::before {
+  background: var(--piarc-surface-active);
+}
+.cm-editor .md-table-grip::after {
+  content: '';
+  position: absolute;
+}
+.cm-editor .md-table-grip[data-table-control='row']::after,
+.cm-editor .md-table-grip[data-table-control='column']::after,
+.cm-editor .md-table-grip[data-table-control='corner']::after {
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1.4px);
+  background-size: 4px 4px;
+}
+.cm-editor .md-table-grip[data-table-control='row']::after {
+  width: 8px;
+  height: 12px;
+}
+.cm-editor .md-table-grip[data-table-control='column']::after {
+  width: 12px;
+  height: 8px;
+}
+.cm-editor .md-table-grip[data-table-control='corner']::after {
+  width: 8px;
+  height: 8px;
+}
+.cm-editor
+  .md-table-grip:is(
+    [data-table-control='append-row'],
+    [data-table-control='append-column']
+  )::after {
+  content: '+';
+  font: var(--piarc-font-size-body) var(--piarc-font-ui);
+}
+.cm-editor .md-table-grip[data-table-control='append-row']::before {
+  width: 100%;
+  height: 12px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip[data-table-control='append-column']::before {
+  height: 100%;
+  width: 12px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip:is(:focus-visible, :hover) {
+  color: var(--piarc-text-accent);
+}
+.cm-editor .md-live-table [data-table-selected],
+.cm-editor .md-live-table[data-table-hover-axis='row'] [data-hover-row] :is(th, td),
+.cm-editor .md-live-table[data-table-hover-axis='column'] [data-hover-column],
+.cm-editor .md-live-table[data-table-hover-axis='corner'] :is(th, td) {
+  background: var(--piarc-surface-selected);
+}
+.cm-editor .md-live-table [data-table-drop='row'] :is(th, td) {
+  box-shadow: inset 0 2px var(--piarc-accent-solid);
+}
+.cm-editor .md-live-table [data-table-drop='column'] {
+  box-shadow: inset 2px 0 var(--piarc-accent-solid);
+}
+.md-table-popover {
+  position: fixed;
+  inset: auto;
+  z-index: 50;
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 8px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+  min-width: min(188px, calc(100vw - 8px));
+  margin: 0;
+  padding: var(--piarc-space-1);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-body);
+  line-height: 1.4;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-workbench-menu-radius);
+  box-shadow: var(--piarc-shadow-overlay);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-workbench-ink);
+}
+.md-table-popover .md-table-menu-tabs {
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-hover);
+  margin-bottom: var(--piarc-space-1);
+}
+.md-table-menu-tabs button,
+.md-table-menu-item,
+.md-table-size button {
+  font: inherit;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.md-table-menu-tabs button {
+  font-size: var(--piarc-font-size-small);
+  min-height: 24px;
+  border-radius: var(--piarc-radius-sm);
+  padding: 0 var(--piarc-space-1);
+  flex: 1;
+  white-space: nowrap;
+}
+.md-table-menu-tabs button[aria-pressed='true'] {
+  background: var(--piarc-surface-raised);
+  box-shadow: var(--piarc-shadow-button);
+}
+.md-table-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--piarc-size-button-height);
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  text-align: start;
+}
+.md-table-menu-item:disabled {
+  color: var(--piarc-text-disabled);
+  cursor: default;
+}
+.md-table-menu-item:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--piarc-surface-hover);
+}
+.md-table-menu-item:focus-visible,
+.md-table-menu-tabs button:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+.md-table-menu-item[data-danger='true'] {
+  color: var(--piarc-text-danger);
+}
+.md-table-menu-item[aria-haspopup='menu']::after {
+  content: '›';
+  margin-inline-start: auto;
+}
+.md-table-menu-item[aria-checked='true']::after {
+  content: '✓';
+  margin-inline-start: auto;
+}
+.md-table-popover hr {
+  height: 1px;
+  border: 0;
+  margin: var(--piarc-space-1) var(--piarc-space-2);
+  background: var(--piarc-border-subtle);
+}
+.md-table-size-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  margin: var(--piarc-space-1);
+}
+.md-table-size-grid button {
+  height: 14px;
+  background: var(--piarc-surface-app);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: 2px;
+}
+.md-table-size-grid button[data-fill='true'] {
+  background: var(--piarc-surface-selected);
+  border-color: var(--piarc-c-focus-ring);
+}
+.md-table-size {
+  display: flex;
+  gap: var(--piarc-space-1);
+  align-items: end;
+  padding: var(--piarc-space-1);
+}
+.md-table-size label {
+  display: grid;
+  gap: 2px;
+  font-size: var(--piarc-font-size-small);
+}
+.md-table-size input {
+  width: 5ch;
+  height: 24px;
+  color: inherit;
+  background: var(--piarc-surface-input);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+}
+.md-table-size button {
+  min-height: 24px;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-active);
+}
+
+.cm-editor .md-table-grip[data-table-control='row']::before {
+  width: 10px;
+  height: calc(100% - 2px);
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip[data-table-control='column']::before {
+  width: calc(100% - 2px);
+  height: 10px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor .md-table-grip[data-table-control='corner']::before {
+  height: 14px;
+  width: 14px;
+  background: var(--piarc-surface-hover);
+}
+.cm-editor
+  .md-table-grip[data-table-control]:is(:hover, :focus-visible, [aria-expanded='true'])::before {
+  background: var(--piarc-surface-active);
+}

@@ -1,0 +1,1404 @@
+{
+  "$comment": "Generated from the piarc-protocol crate by `npm run gen:protocol`; do not edit.",
+  "contracts": [
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/request",
+      "schema": "Request"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/response",
+      "schema": "SuccessResponse"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/errorResponse",
+      "schema": "ErrorResponse"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "jsonrpc/notification",
+      "schema": "Notification"
+    },
+    {
+      "kind": "message",
+      "method": null,
+      "name": "envelope/sessionEvent",
+      "schema": "SessionEventNotification"
+    },
+    {
+      "kind": "request",
+      "method": "host/hello",
+      "name": "host/hello",
+      "schema": "HostHelloRequest"
+    },
+    {
+      "kind": "response",
+      "method": "host/hello",
+      "name": "core/welcome",
+      "schema": "HostHelloResponse"
+    },
+    {
+      "kind": "request",
+      "method": "host/ping",
+      "name": "host/ping",
+      "schema": "HostPingRequest"
+    },
+    {
+      "kind": "response",
+      "method": "host/ping",
+      "name": "host/ping/result",
+      "schema": "HostPingResponse"
+    },
+    {
+      "kind": "request",
+      "method": "host/shutdown",
+      "name": "host/shutdown",
+      "schema": "HostShutdownRequest"
+    },
+    {
+      "kind": "response",
+      "method": "host/shutdown",
+      "name": "host/shutdown/result",
+      "schema": "HostShutdownResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/create",
+      "name": "session/create",
+      "schema": "SessionCreateRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/create",
+      "name": "session/create/result",
+      "schema": "SessionCreateResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/resume",
+      "name": "session/resume",
+      "schema": "SessionResumeRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/resume",
+      "name": "session/resume/result",
+      "schema": "SessionResumeResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/close",
+      "name": "session/close",
+      "schema": "SessionCloseRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/close",
+      "name": "session/close/result",
+      "schema": "SessionCloseResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/abort",
+      "name": "session/abort",
+      "schema": "SessionAbortRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/abort",
+      "name": "session/abort/result",
+      "schema": "SessionAbortResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/prompt",
+      "name": "session/prompt",
+      "schema": "SessionPromptRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/prompt",
+      "name": "session/prompt/result",
+      "schema": "SessionPromptResponse"
+    },
+    {
+      "kind": "request",
+      "method": "policy/inputChunk",
+      "name": "policy/inputChunk",
+      "schema": "PolicyInputChunkRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/inputChunk",
+      "name": "policy/inputChunk/result",
+      "schema": "PolicyInputChunkResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "policy/pending",
+      "name": "policy/pending",
+      "schema": "PolicyPendingNotification"
+    },
+    {
+      "kind": "request",
+      "method": "policy/cancel",
+      "name": "policy/cancel",
+      "schema": "PolicyCancelRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/cancel",
+      "name": "policy/cancel/result",
+      "schema": "PolicyCancelResponse"
+    },
+    {
+      "kind": "request",
+      "method": "policy/recover",
+      "name": "policy/recover",
+      "schema": "PolicyRecoverRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/recover",
+      "name": "policy/recover/result",
+      "schema": "PolicyRecoverResponse"
+    },
+    {
+      "kind": "request",
+      "method": "policy/tools",
+      "name": "policy/tools",
+      "schema": "PolicyToolsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/tools",
+      "name": "policy/tools/result",
+      "schema": "PolicyToolsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/list",
+      "name": "models/list",
+      "schema": "ModelsListRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/list",
+      "name": "models/list/result",
+      "schema": "ModelsListResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/reload",
+      "name": "models/reload",
+      "schema": "ModelsReloadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/reload",
+      "name": "models/reload/result",
+      "schema": "ModelsReloadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/previewModelSwitch",
+      "name": "session/previewModelSwitch",
+      "schema": "SessionPreviewModelSwitchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/previewModelSwitch",
+      "name": "session/previewModelSwitch/result",
+      "schema": "SessionPreviewModelSwitchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/setModel",
+      "name": "session/setModel",
+      "schema": "SessionSetModelRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/setModel",
+      "name": "session/setModel/result",
+      "schema": "SessionSetModelResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/setEffort",
+      "name": "session/setEffort",
+      "schema": "SessionSetEffortRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/setEffort",
+      "name": "session/setEffort/result",
+      "schema": "SessionSetEffortResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/credential",
+      "name": "models/credential",
+      "schema": "ModelsCredentialRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/credential",
+      "name": "models/credential/result",
+      "schema": "ModelsCredentialResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/credentialStatus",
+      "name": "models/credentialStatus",
+      "schema": "ModelsCredentialStatusRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/credentialStatus",
+      "name": "models/credentialStatus/result",
+      "schema": "ModelsCredentialStatusResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/setPermissionMode",
+      "name": "session/setPermissionMode",
+      "schema": "SessionSetPermissionModeRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/setPermissionMode",
+      "name": "session/setPermissionMode/result",
+      "schema": "SessionSetPermissionModeResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/sideChatAsk",
+      "name": "session/sideChatAsk",
+      "schema": "SideChatAskRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/sideChatAsk",
+      "name": "session/sideChatAsk/result",
+      "schema": "SideChatAskResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/sideChatControl",
+      "name": "session/sideChatControl",
+      "schema": "SideChatControlRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/sideChatControl",
+      "name": "session/sideChatControl/result",
+      "schema": "SideChatControlResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/commitMessage",
+      "name": "session/commitMessage",
+      "schema": "SessionCommitMessageRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/commitMessage",
+      "name": "session/commitMessage/result",
+      "schema": "SessionCommitMessageResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/title",
+      "name": "session/title",
+      "schema": "SessionTitleRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/title",
+      "name": "session/title/result",
+      "schema": "SessionTitleResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/gitAssist",
+      "name": "session/gitAssist",
+      "schema": "SessionGitAssistRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/gitAssist",
+      "name": "session/gitAssist/result",
+      "schema": "SessionGitAssistResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/compact",
+      "name": "session/compact",
+      "schema": "SessionCompactRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/compact",
+      "name": "session/compact/result",
+      "schema": "SessionCompactResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/fork",
+      "name": "session/fork",
+      "schema": "SessionForkRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/fork",
+      "name": "session/fork/result",
+      "schema": "SessionForkResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/steer",
+      "name": "session/steer",
+      "schema": "SessionSteerRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/steer",
+      "name": "session/steer/result",
+      "schema": "SessionSteerResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/followUp",
+      "name": "session/followUp",
+      "schema": "SessionFollowUpRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/followUp",
+      "name": "session/followUp/result",
+      "schema": "SessionFollowUpResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/queue/edit",
+      "name": "session/queue/edit",
+      "schema": "QueueEditRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/queue/edit",
+      "name": "session/queue/edit/result",
+      "schema": "QueueEditResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/queue/delete",
+      "name": "session/queue/delete",
+      "schema": "QueueDeleteRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/queue/delete",
+      "name": "session/queue/delete/result",
+      "schema": "QueueDeleteResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/queue/reorder",
+      "name": "session/queue/reorder",
+      "schema": "QueueReorderRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/queue/reorder",
+      "name": "session/queue/reorder/result",
+      "schema": "QueueReorderResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/getEntries",
+      "name": "session/getEntries",
+      "schema": "SessionGetEntriesRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/getEntries",
+      "name": "session/getEntries/result",
+      "schema": "SessionGetEntriesResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/history",
+      "name": "session/history",
+      "schema": "SessionHistoryRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/history",
+      "name": "session/history/result",
+      "schema": "SessionHistoryResponse"
+    },
+    {
+      "kind": "request",
+      "method": "policy/evaluate",
+      "name": "policy/evaluate",
+      "schema": "PolicyEvaluateRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/evaluate",
+      "name": "policy/evaluate/result",
+      "schema": "PolicyEvaluateResponse"
+    },
+    {
+      "kind": "request",
+      "method": "policy/review",
+      "name": "policy/review",
+      "schema": "PolicyReviewRequest"
+    },
+    {
+      "kind": "response",
+      "method": "policy/review",
+      "name": "policy/review/result",
+      "schema": "PolicyReviewResponse"
+    },
+    {
+      "kind": "request",
+      "method": "trust/get",
+      "name": "trust/get",
+      "schema": "TrustGetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "trust/get",
+      "name": "trust/get/result",
+      "schema": "TrustGetResponse"
+    },
+    {
+      "kind": "request",
+      "method": "hooks/run",
+      "name": "hooks/run",
+      "schema": "HooksRunRequest"
+    },
+    {
+      "kind": "response",
+      "method": "hooks/run",
+      "name": "hooks/run/result",
+      "schema": "HooksRunResponse"
+    },
+    {
+      "kind": "request",
+      "method": "hooks/prompt",
+      "name": "hooks/prompt",
+      "schema": "HooksPromptRequest"
+    },
+    {
+      "kind": "response",
+      "method": "hooks/prompt",
+      "name": "hooks/prompt/result",
+      "schema": "HooksPromptResponse"
+    },
+    {
+      "kind": "request",
+      "method": "hooks/mcpTool",
+      "name": "hooks/mcpTool",
+      "schema": "HooksMcpToolRequest"
+    },
+    {
+      "kind": "response",
+      "method": "hooks/mcpTool",
+      "name": "hooks/mcpTool/result",
+      "schema": "HooksMcpToolResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/memory",
+      "name": "fs/memory",
+      "schema": "FsMemoryRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/memory",
+      "name": "fs/memory/result",
+      "schema": "FsMemoryResponse"
+    },
+    {
+      "kind": "request",
+      "method": "memory/status",
+      "name": "memory/status",
+      "schema": "MemoryStatusRequest"
+    },
+    {
+      "kind": "response",
+      "method": "memory/status",
+      "name": "memory/status/result",
+      "schema": "MemoryStatusResponse"
+    },
+    {
+      "kind": "request",
+      "method": "memory/apply",
+      "name": "memory/apply",
+      "schema": "MemoryApplyRequest"
+    },
+    {
+      "kind": "response",
+      "method": "memory/apply",
+      "name": "memory/apply/result",
+      "schema": "MemoryApplyResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/stat",
+      "name": "fs/stat",
+      "schema": "FsStatRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/stat",
+      "name": "fs/stat/result",
+      "schema": "FsStatResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/read",
+      "name": "fs/read",
+      "schema": "FsReadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/read",
+      "name": "fs/read/result",
+      "schema": "FsReadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/write",
+      "name": "fs/write",
+      "schema": "FsWriteRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/write",
+      "name": "fs/write/result",
+      "schema": "FsWriteResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/spill",
+      "name": "fs/spill",
+      "schema": "FsSpillRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/spill",
+      "name": "fs/spill/result",
+      "schema": "FsSpillResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/pdf",
+      "name": "fs/pdf",
+      "schema": "FsPdfRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/pdf",
+      "name": "fs/pdf/result",
+      "schema": "FsPdfResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/mkdir",
+      "name": "fs/mkdir",
+      "schema": "FsMkdirRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/mkdir",
+      "name": "fs/mkdir/result",
+      "schema": "FsMkdirResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/list",
+      "name": "fs/list",
+      "schema": "FsListRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/list",
+      "name": "fs/list/result",
+      "schema": "FsListResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/glob",
+      "name": "fs/glob",
+      "schema": "FsGlobRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/glob",
+      "name": "fs/glob/result",
+      "schema": "FsGlobResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/grep",
+      "name": "fs/grep",
+      "schema": "FsGrepRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/grep",
+      "name": "fs/grep/result",
+      "schema": "FsGrepResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/run",
+      "name": "exec/run",
+      "schema": "ExecRunRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/run",
+      "name": "exec/run/result",
+      "schema": "ExecRunResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/kill",
+      "name": "exec/kill",
+      "schema": "ExecKillRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/kill",
+      "name": "exec/kill/result",
+      "schema": "ExecKillResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/shells",
+      "name": "exec/shells",
+      "schema": "ExecShellsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/shells",
+      "name": "exec/shells/result",
+      "schema": "ExecShellsResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "exec/output",
+      "name": "exec/output",
+      "schema": "ExecOutputNotification"
+    },
+    {
+      "kind": "request",
+      "method": "exec/monitor",
+      "name": "exec/monitor",
+      "schema": "ExecMonitorRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/monitor",
+      "name": "exec/monitor/result",
+      "schema": "ExecMonitorResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/background/list",
+      "name": "exec/background/list",
+      "schema": "TaskListMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/background/list",
+      "name": "exec/background/list/result",
+      "schema": "TaskListMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/background/read",
+      "name": "exec/background/read",
+      "schema": "TaskReadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/background/read",
+      "name": "exec/background/read/result",
+      "schema": "TaskReadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "exec/background/kill",
+      "name": "exec/background/kill",
+      "schema": "TaskKillRequest"
+    },
+    {
+      "kind": "response",
+      "method": "exec/background/kill",
+      "name": "exec/background/kill/result",
+      "schema": "TaskKillResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/getAll",
+      "name": "secrets/getAll",
+      "schema": "SecretsGetAllRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/getAll",
+      "name": "secrets/getAll/result",
+      "schema": "SecretsGetAllResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/get",
+      "name": "secrets/get",
+      "schema": "SecretsGetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/get",
+      "name": "secrets/get/result",
+      "schema": "SecretsGetResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/set",
+      "name": "secrets/set",
+      "schema": "SecretsSetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/set",
+      "name": "secrets/set/result",
+      "schema": "SecretsSetResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/delete",
+      "name": "secrets/delete",
+      "schema": "SecretsDeleteRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/delete",
+      "name": "secrets/delete/result",
+      "schema": "SecretsDeleteResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/lock",
+      "name": "secrets/lock",
+      "schema": "SecretsLockRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/lock",
+      "name": "secrets/lock/result",
+      "schema": "SecretsLockResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/renew",
+      "name": "secrets/renew",
+      "schema": "SecretsRenewRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/renew",
+      "name": "secrets/renew/result",
+      "schema": "SecretsRenewResponse"
+    },
+    {
+      "kind": "request",
+      "method": "secrets/unlock",
+      "name": "secrets/unlock",
+      "schema": "SecretsUnlockRequest"
+    },
+    {
+      "kind": "response",
+      "method": "secrets/unlock",
+      "name": "secrets/unlock/result",
+      "schema": "SecretsUnlockResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "secrets/changed",
+      "name": "secrets/changed",
+      "schema": "SecretsChangedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/started",
+      "name": "turn/started",
+      "schema": "TurnStartedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/completed",
+      "name": "turn/completed",
+      "schema": "TurnCompletedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/started",
+      "name": "item/started",
+      "schema": "ItemStartedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/updated",
+      "name": "item/updated",
+      "schema": "ItemUpdatedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/completed",
+      "name": "item/completed",
+      "schema": "ItemCompletedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/agentMessage/delta",
+      "name": "item/agentMessage/delta",
+      "schema": "ItemAgentMessageDeltaNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "item/reasoning/delta",
+      "name": "item/reasoning/delta",
+      "schema": "ItemReasoningDeltaNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/retrying",
+      "name": "turn/retrying",
+      "schema": "TurnRetryingNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "turn/usage",
+      "name": "turn/usage",
+      "schema": "TurnUsageReportNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "session/queueChanged",
+      "name": "session/queueChanged",
+      "schema": "QueueChangedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "harness/entry",
+      "name": "harness/entry",
+      "schema": "HarnessEntryNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "harness/todo",
+      "name": "harness/todo",
+      "schema": "HarnessTodoNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "harness/plan",
+      "name": "harness/plan",
+      "schema": "HarnessPlanNotification"
+    },
+    {
+      "kind": "request",
+      "method": "ui/ask",
+      "name": "ui/ask",
+      "schema": "UiAskRequest"
+    },
+    {
+      "kind": "response",
+      "method": "ui/ask",
+      "name": "ui/ask/result",
+      "schema": "UiAskResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "session/usage",
+      "name": "session/usage",
+      "schema": "SessionUsageNotification"
+    },
+    {
+      "kind": "request",
+      "method": "session/getContextUsage",
+      "name": "session/getContextUsage",
+      "schema": "SessionGetContextUsageRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/getContextUsage",
+      "name": "session/getContextUsage/result",
+      "schema": "SessionGetContextUsageResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/remind",
+      "name": "session/remind",
+      "schema": "SessionRemindRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/remind",
+      "name": "session/remind/result",
+      "schema": "SessionRemindResponse"
+    },
+    {
+      "kind": "request",
+      "method": "context/settings",
+      "name": "context/settings",
+      "schema": "ContextSettingsGetRequest"
+    },
+    {
+      "kind": "response",
+      "method": "context/settings",
+      "name": "context/settings/result",
+      "schema": "ContextSettingsGetResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/changes",
+      "name": "fs/changes",
+      "schema": "FsChangesRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/changes",
+      "name": "fs/changes/result",
+      "schema": "FsChangesResponse"
+    },
+    {
+      "kind": "request",
+      "method": "fs/forgetReads",
+      "name": "fs/forgetReads",
+      "schema": "FsForgetReadsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "fs/forgetReads",
+      "name": "fs/forgetReads/result",
+      "schema": "FsForgetReadsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "web/fetch",
+      "name": "web/fetch",
+      "schema": "WebFetchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "web/fetch",
+      "name": "web/fetch/result",
+      "schema": "WebFetchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "browser/run",
+      "name": "browser/run",
+      "schema": "BrowserRunRequest"
+    },
+    {
+      "kind": "response",
+      "method": "browser/run",
+      "name": "browser/run/result",
+      "schema": "BrowserRunResponse"
+    },
+    {
+      "kind": "request",
+      "method": "web/search",
+      "name": "web/search",
+      "schema": "WebSearchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "web/search",
+      "name": "web/search/result",
+      "schema": "WebSearchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "web/searchBackend",
+      "name": "web/searchBackend",
+      "schema": "WebSearchBackendRequest"
+    },
+    {
+      "kind": "response",
+      "method": "web/searchBackend",
+      "name": "web/searchBackend/result",
+      "schema": "WebSearchBackendResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/login/start",
+      "name": "models/login/start",
+      "schema": "ModelsLoginStartRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/login/start",
+      "name": "models/login/start/result",
+      "schema": "ModelsLoginStartResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/test",
+      "name": "models/test",
+      "schema": "ModelsTestRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/test",
+      "name": "models/test/result",
+      "schema": "ModelsTestResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/discover",
+      "name": "models/discover",
+      "schema": "ModelsDiscoverRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/discover",
+      "name": "models/discover/result",
+      "schema": "ModelsDiscoverResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/login/cancel",
+      "name": "models/login/cancel",
+      "schema": "ModelsLoginCancelRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/login/cancel",
+      "name": "models/login/cancel/result",
+      "schema": "ModelsLoginCancelResponse"
+    },
+    {
+      "kind": "request",
+      "method": "models/logout",
+      "name": "models/logout",
+      "schema": "ModelsLogoutRequest"
+    },
+    {
+      "kind": "response",
+      "method": "models/logout",
+      "name": "models/logout/result",
+      "schema": "ModelsLogoutResponse"
+    },
+    {
+      "kind": "request",
+      "method": "ui/loginInteraction",
+      "name": "ui/loginInteraction",
+      "schema": "UiLoginInteractionRequest"
+    },
+    {
+      "kind": "response",
+      "method": "ui/loginInteraction",
+      "name": "ui/loginInteraction/result",
+      "schema": "UiLoginInteractionResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/rewind",
+      "name": "session/rewind",
+      "schema": "SessionRewindRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/rewind",
+      "name": "session/rewind/result",
+      "schema": "SessionRewindResponse"
+    },
+    {
+      "kind": "request",
+      "method": "session/switchBranch",
+      "name": "session/switchBranch",
+      "schema": "SessionSwitchBranchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "session/switchBranch",
+      "name": "session/switchBranch/result",
+      "schema": "SessionSwitchBranchResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "session/branches",
+      "name": "session/branches",
+      "schema": "SessionBranchesNotification"
+    },
+    {
+      "kind": "request",
+      "method": "agents/list",
+      "name": "agents/list",
+      "schema": "AgentsListMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "agents/list",
+      "name": "agents/list/result",
+      "schema": "AgentsListMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/listAgents",
+      "name": "resources/listAgents",
+      "schema": "ResourcesListAgentsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/listAgents",
+      "name": "resources/listAgents/result",
+      "schema": "ResourcesListAgentsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "subagent/start",
+      "name": "subagent/start",
+      "schema": "SubagentStartRequest"
+    },
+    {
+      "kind": "response",
+      "method": "subagent/start",
+      "name": "subagent/start/result",
+      "schema": "SubagentStartResponse"
+    },
+    {
+      "kind": "request",
+      "method": "subagent/finish",
+      "name": "subagent/finish",
+      "schema": "SubagentFinishRequest"
+    },
+    {
+      "kind": "response",
+      "method": "subagent/finish",
+      "name": "subagent/finish/result",
+      "schema": "SubagentFinishResponse"
+    },
+    {
+      "kind": "request",
+      "method": "subagent/stop",
+      "name": "subagent/stop",
+      "schema": "SubagentStopRequest"
+    },
+    {
+      "kind": "response",
+      "method": "subagent/stop",
+      "name": "subagent/stop/result",
+      "schema": "SubagentStopResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "subagent/started",
+      "name": "subagent/started",
+      "schema": "SubagentStartedNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "subagent/progress",
+      "name": "subagent/progress",
+      "schema": "SubagentProgressNotification"
+    },
+    {
+      "kind": "notification",
+      "method": "subagent/completed",
+      "name": "subagent/completed",
+      "schema": "SubagentCompletedNotification"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/servers",
+      "name": "mcp/servers",
+      "schema": "McpServersMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/servers",
+      "name": "mcp/servers/result",
+      "schema": "McpServersMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/status",
+      "name": "mcp/status",
+      "schema": "McpStatusMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/status",
+      "name": "mcp/status/result",
+      "schema": "McpStatusMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/reconnect",
+      "name": "mcp/reconnect",
+      "schema": "McpReconnectRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/reconnect",
+      "name": "mcp/reconnect/result",
+      "schema": "McpReconnectResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/setEnabled",
+      "name": "mcp/setEnabled",
+      "schema": "McpSetEnabledRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/setEnabled",
+      "name": "mcp/setEnabled/result",
+      "schema": "McpSetEnabledResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/cancelElicitation",
+      "name": "mcp/cancelElicitation",
+      "schema": "McpCancelElicitationRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/cancelElicitation",
+      "name": "mcp/cancelElicitation/result",
+      "schema": "McpCancelElicitationResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/elicit",
+      "name": "mcp/elicit",
+      "schema": "McpElicitRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/elicit",
+      "name": "mcp/elicit/result",
+      "schema": "McpElicitResponse"
+    },
+    {
+      "kind": "request",
+      "method": "mcp/login",
+      "name": "mcp/login",
+      "schema": "McpLoginRequest"
+    },
+    {
+      "kind": "response",
+      "method": "mcp/login",
+      "name": "mcp/login/result",
+      "schema": "McpLoginResponse"
+    },
+    {
+      "kind": "notification",
+      "method": "mcp/statusChanged",
+      "name": "mcp/statusChanged",
+      "schema": "McpStatusChangedNotification"
+    },
+    {
+      "kind": "request",
+      "method": "skills/list",
+      "name": "skills/list",
+      "schema": "SkillsListMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "skills/list",
+      "name": "skills/list/result",
+      "schema": "SkillsListMethodResponse"
+    },
+    {
+      "kind": "request",
+      "method": "skills/invoke",
+      "name": "skills/invoke",
+      "schema": "SkillsInvokeRequest"
+    },
+    {
+      "kind": "response",
+      "method": "skills/invoke",
+      "name": "skills/invoke/result",
+      "schema": "SkillsInvokeResponse"
+    },
+    {
+      "kind": "request",
+      "method": "skills/match",
+      "name": "skills/match",
+      "schema": "SkillsMatchRequest"
+    },
+    {
+      "kind": "response",
+      "method": "skills/match",
+      "name": "skills/match/result",
+      "schema": "SkillsMatchResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/listSkills",
+      "name": "resources/listSkills",
+      "schema": "ResourcesListSkillsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/listSkills",
+      "name": "resources/listSkills/result",
+      "schema": "ResourcesListSkillsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/listCommands",
+      "name": "resources/listCommands",
+      "schema": "ResourcesListCommandsRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/listCommands",
+      "name": "resources/listCommands/result",
+      "schema": "ResourcesListCommandsResponse"
+    },
+    {
+      "kind": "request",
+      "method": "resources/reload",
+      "name": "resources/reload",
+      "schema": "ResourcesReloadRequest"
+    },
+    {
+      "kind": "response",
+      "method": "resources/reload",
+      "name": "resources/reload/result",
+      "schema": "ResourcesReloadResponse"
+    },
+    {
+      "kind": "request",
+      "method": "plugins/extensions",
+      "name": "plugins/extensions",
+      "schema": "PluginsExtensionsMethodRequest"
+    },
+    {
+      "kind": "response",
+      "method": "plugins/extensions",
+      "name": "plugins/extensions/result",
+      "schema": "PluginsExtensionsMethodResponse"
+    }
+  ],
+  "protocolVersion": "1.0"
+}

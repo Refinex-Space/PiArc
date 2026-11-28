@@ -1,0 +1,46 @@
+[package]
+name = "piarc-exec"
+description = "Process management (process groups / Job Object, implements ProcessSpawner) and shell commands: timeouts, output spooling, exit code meaning, environment, working directory."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+piarc-ports.workspace = true
+piarc-protocol.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["process", "io-util"] }
+tokio-util.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+# killpg for ProcessTreeSpawner and TerminalTree, getpgid for TerminalTree.
+nix = { workspace = true, features = ["signal", "process"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# proc_listpids for the processes of a terminal (the `tty_processes` module).
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# Job Objects for ProcessTreeSpawner (`job`), the listening sockets of process trees
+# (`tcp_table`); with `tty_processes` on macOS and `session` on Unix the crate's only unsafe
+# code.
+windows-sys = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_Security",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["process", "io-util"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+# Tests detach from their console to start children the way a GUI process does.
+windows-sys = { workspace = true, features = ["Win32_System_Console"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,10 @@
+{
+  "id": "t29-views",
+  "steps": [
+    {
+      "thinking": "The notes live in the sub directory. I will read them before answering.",
+      "tool_calls": [{ "id": "read1", "name": "Read", "input": { "path": "sub/notes.txt" } }]
+    },
+    { "text": "The notes say the release is on Friday." }
+  ]
+}

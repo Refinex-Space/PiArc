@@ -1,0 +1,376 @@
+/* The Git tool's log view, commit details, image diffs and the G3 dialogs (design addendum
+   9.1). Colors, spacing and type come from tokens only. */
+
+.git-log {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.git-log[data-split] > .git-log-list-pane {
+  flex: 0 0 52%;
+  border-inline-end: 1px solid var(--piarc-border-subtle);
+}
+
+.git-log-list-pane,
+.git-log-detail-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.git-log-detail-pane {
+  overflow: auto;
+}
+
+.git-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+
+.git-log-search {
+  display: flex;
+  flex: 1 1 140px;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 var(--piarc-space-1);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-input);
+  color: var(--piarc-text-secondary);
+}
+
+:root[data-app] .git-log-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+}
+
+/* The rounded field shows focus with its own border. The inner input draws nothing: the global
+   inset outline would be a square-cornered frame inside the rounded box. The attribute selector
+   outweighs the global text-field rule, which `app.css` declares after this file. */
+:root[data-app] .git-log-search input[type='search']:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .git-log-search input[type='search']:focus {
+  outline: none;
+}
+
+.git-log-search:has(input:focus) {
+  border-color: var(--piarc-c-focus-ring);
+}
+
+:root[data-app] .git-log-revs {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  max-width: 180px;
+  min-height: 24px;
+  padding: 0 var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-small);
+  cursor: pointer;
+}
+
+.git-log-revs-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-log-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.git-log-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 7rem) auto;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: 28px;
+  padding-inline: var(--piarc-space-2);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-small);
+  cursor: default;
+}
+
+.git-log-row.is-stash {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 7rem) auto;
+}
+
+.git-log-row:hover {
+  background: var(--piarc-surface-hover);
+}
+
+.git-log-row.is-selected {
+  background: var(--piarc-surface-selected);
+}
+
+.git-log-graph {
+  display: flex;
+  align-self: stretch;
+  flex: none;
+}
+
+.git-graph {
+  display: block;
+  flex: none;
+}
+
+.git-log-subject {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+}
+
+.git-log-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-log-author,
+.git-log-time {
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-log-more {
+  margin: var(--piarc-space-2) auto;
+}
+
+.git-log-back {
+  align-self: flex-start;
+  margin: var(--piarc-space-1) var(--piarc-space-2);
+}
+
+.git-ref {
+  flex: none;
+  max-width: 12rem;
+  overflow: hidden;
+  padding: 0 var(--piarc-space-1);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-sm);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-ref.is-local,
+.git-ref.is-head {
+  border-color: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+}
+
+.git-ref.is-current {
+  background: var(--piarc-accent-subtle);
+}
+
+.git-ref.is-remote {
+  color: var(--piarc-text-secondary);
+}
+
+.git-ref.is-tag {
+  border-color: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
+.git-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+}
+
+.git-detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-space-1);
+}
+
+.git-detail-subject {
+  flex: 1;
+  margin: 0;
+  font-size: var(--piarc-font-size-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.git-detail-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+}
+
+.git-detail-meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  margin: 0;
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-detail-meta dt {
+  color: var(--piarc-text-secondary);
+}
+
+.git-detail-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.git-detail-sha {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-detail-parents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+  font-family: var(--piarc-font-mono);
+}
+
+.git-detail-body {
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--piarc-font-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.git-detail-line,
+.git-detail-count {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+}
+
+.git-detail-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+}
+
+.git-image-diff {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--piarc-space-3);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+}
+
+.git-image-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  margin: 0;
+}
+
+.git-image-caption,
+.git-image-meta {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+/* A checkerboard shows transparency. */
+.git-image-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background-color: var(--piarc-surface-panel);
+  background-image:
+    linear-gradient(45deg, var(--piarc-surface-hover) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--piarc-surface-hover) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--piarc-surface-hover) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--piarc-surface-hover) 75%);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.git-image-frame img {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.git-dialog-subject {
+  margin: 0 0 var(--piarc-space-2);
+  overflow-wrap: anywhere;
+}
+
+.git-dialog-modes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.git-dialog-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-1);
+  border-radius: var(--piarc-radius-md);
+}
+
+.git-dialog-mode > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.git-dialog-mode-name {
+  font-weight: 600;
+}
+
+:root[data-app] .git-dialog-textarea {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-input);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  resize: vertical;
+}
+
+.git-setting-select {
+  max-width: 220px;
+}

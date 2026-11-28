@@ -1,0 +1,90 @@
+/* The "Voice input" settings page (ADR-0094, addendum V-7). */
+.voice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+.voice-row > .input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+/* `.setting` stacks its children; the test button and its waveform share one row. */
+.setting.voice-test {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.voice-test .dictation-waveform {
+  flex: 1 1 8rem;
+  min-width: 0;
+  block-size: var(--piarc-space-5);
+  color: var(--piarc-text-accent);
+}
+.voice-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+  margin: 0 0 var(--piarc-space-2);
+  padding: 0;
+  list-style: none;
+}
+.voice-term {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding-inline-start: var(--piarc-space-2);
+  border: 1px solid var(--piarc-session-line);
+  border-radius: var(--piarc-radius-pill);
+}
+/* The "Models" block: the mode and each model as settings rows (`.preference-row`). */
+.voice-model-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.voice-model-state {
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.voice-model-state.is-success {
+  background: var(--piarc-state-success-subtle);
+  color: var(--piarc-text-success);
+}
+.voice-model-state.is-progress {
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+}
+.voice-model-state.is-danger {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.voice-model-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--piarc-space-2);
+}
+.voice-model-ok {
+  color: var(--piarc-text-success);
+}
+.voice-progress {
+  inline-size: 100%;
+  max-inline-size: 24rem;
+  margin-block-start: var(--piarc-space-1);
+  accent-color: var(--piarc-accent-solid);
+}
+.voice-privacy {
+  margin-block-start: var(--piarc-space-4);
+}

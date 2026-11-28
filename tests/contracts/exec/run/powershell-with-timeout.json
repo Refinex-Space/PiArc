@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 28,
+  "method": "exec/run",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "requestId": "exec-91c2",
+    "command": "Get-ChildItem | Select-Object -First 3",
+    "shell": "powershell",
+    "timeoutMs": 900000,
+    "origin": {
+      "tool": "PowerShell",
+      "toolCallId": "toolu_09"
+    }
+  }
+}

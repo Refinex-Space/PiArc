@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "id": 25,
+  "method": "exec/run",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "requestId": "exec-0b8e",
+    "command": "ls -la && echo \"完成\"",
+    "cwd": "/Users/dev/work space/项目",
+    "env": {
+      "PI_MODEL": "mock-large",
+      "PI_SESSION_ID": "sess-7f3a"
+    },
+    "origin": {
+      "tool": "Bash",
+      "toolCallId": "toolu_05"
+    }
+  }
+}

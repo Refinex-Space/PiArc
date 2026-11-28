@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 29,
+  "result": {
+    "exitCode": 0,
+    "killed": false,
+    "output": {
+      "head": "ok\n"
+    }
+  }
+}

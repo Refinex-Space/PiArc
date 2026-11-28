@@ -1,0 +1,11 @@
+# T19: the rate limit outlasts the automatic retries.
+id: limit
+steps:
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }
+  - error: { kind: rate_limit, retry_after_secs: 1, message: 'the mock is rate limited' }

@@ -1,0 +1,67 @@
+id: term-agent-command
+description: A command the model runs with terminal goes into a PiArc terminal of the session (its directory) as a background task (T33, ADR-0050). When the command ends the task shows its exit code and runs on, the next turn gets a reminder with the exit code and the last lines of the screen, and Read of the task's file gives the screen as text under a header naming the last command and how it ended - with no window showing the terminal.
+capabilities: [CAP-TERM-READ-001, CAP-TERM-SCREEN-001]
+workspace:
+  files:
+    notes.txt: "alpha\nbeta\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_term
+            name: Bash
+            input:
+              {
+                command: "ls; printf 'built 中文\\nall done\\n'; grep needle notes.txt",
+                terminal: true,
+              }
+      - text: 'It runs in a terminal.'
+      - tool_calls:
+          - id: toolu_read
+            name: Read
+            # The data directory's path has spaces: take everything up to "; read it".
+            input: { path: '{{result:toolu_term:are in (.+?\.log); read it}}' }
+      - text: 'It built; grep found nothing.'
+# ls, printf and grep are read-only commands: no approval (T23).
+actions:
+  - prompt: { text: 'Build in a terminal.', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  # The exit code shows once the reminder waits for the session.
+  - wait: { method: core/tasks, params: { kind: terminal, status: running, exitCode: 1 } }
+  - prompt: { text: 'How did it go?', turn: two }
+expect:
+  events:
+    - method: item/completed
+      turn: one
+      params:
+        item:
+          itemId: toolu_term
+          type: commandExecution
+          status: completed
+          execution: { task: { reason: requested } }
+    - { method: turn/completed, turn: two, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - id: toolu_term
+          is_error: false
+          contains: 'The command is running in a PiArc terminal as background task bg-'
+    - index: 2
+      contains:
+        - '[PiArc reminder]'
+        - 'has finished.\nCommand: ls; printf'
+        - 'Status: exit code 1'
+        - 'The terminal stays open.'
+        - 'Last lines on the screen:'
+        - 'all done'
+    - index: 3
+      tool_results:
+        - { id: toolu_term }
+        - { id: toolu_read, is_error: false, contains: "\tbuilt 中文\n" }
+      # The body as sent: the header, then ls's listing of the session's directory.
+      contains:
+        - 'ended with exit code 1.\n     3\tScreen and scrollback below, oldest first:'
+        - '\tnotes.txt\n'
+        - '\tall done\n'
+  request_counts: { main: 4 }

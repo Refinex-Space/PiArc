@@ -1,0 +1,76 @@
+id: hooks-m4-stop-failure
+description: StopFailure hooks run when a turn ends with a model API error after its retries, with the error type as matcher (rate_limit for 429, overloaded for 529, server_error for 5xx, authentication_failed without retry); their output is ignored and the turn still fails (T41).
+capabilities: [CAP-HOOK-STOPFAILURE-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"StopFailure": [
+        {"matcher": "rate_limit", "hooks": [{"type": "command", "command": "node hook.mjs rate"}]},
+        {"matcher": "overloaded", "hooks": [{"type": "command", "command": "node hook.mjs overloaded"}]},
+        {"matcher": "server_error", "hooks": [{"type": "command", "command": "node hook.mjs server"}]},
+        {"matcher": "authentication_failed", "hooks": [{"type": "command", "command": "node hook.mjs auth"}]}
+      ]}}
+    hook-plans/rate.json: '{"json": {"decision": "block", "reason": "Try again.", "continue": false, "stopReason": "ignored"}}'
+    hook-plans/auth.json: '{"exit": 2, "stderr": "ignored too"}'
+providers:
+  limit:
+    wire: anthropic
+    steps:
+      - error: { kind: rate_limit }
+      - error: { kind: rate_limit }
+      - error: { kind: rate_limit }
+      - error: { kind: rate_limit }
+  busy:
+    wire: anthropic
+    steps:
+      - error: { kind: overloaded }
+      - error: { kind: overloaded }
+      - error: { kind: overloaded }
+      - error: { kind: overloaded }
+  broken:
+    wire: anthropic
+    steps:
+      - error: { kind: server_error }
+      - error: { kind: server_error }
+      - error: { kind: server_error }
+      - error: { kind: server_error }
+  denied:
+    wire: anthropic
+    steps:
+      - error: { kind: unauthorized, message: 'Authentication failed.' }
+sessions:
+  rate: { provider: limit }
+  over: { provider: busy }
+  server: { provider: broken }
+  auth: { provider: denied }
+actions:
+  - prompt: { session: rate, text: Try it., turn: r }
+  - prompt: { session: over, text: Try it., turn: o }
+  - prompt: { session: server, text: Try it., turn: s }
+  - prompt: { session: auth, text: Try it., turn: a }
+expect:
+  request_counts: { limit: 4, busy: 4, broken: 4, denied: 1 }
+  events:
+    - { session: rate, method: turn/completed, turn: r, params: { status: failed } }
+    - { session: over, method: turn/completed, turn: o, params: { status: failed } }
+    - { session: server, method: turn/completed, turn: s, params: { status: failed } }
+    - {
+        session: auth,
+        method: turn/completed,
+        turn: a,
+        params: { status: failed, errorKind: auth },
+      }
+  json_lines:
+    hook-log/rate.jsonl:
+      - types: { session_id: string, transcript_path: string, cwd: string, error_details: string }
+        input: { hook_event_name: StopFailure, error: rate_limit }
+    hook-log/overloaded.jsonl:
+      - input: { hook_event_name: StopFailure, error: overloaded }
+    hook-log/server.jsonl:
+      - input: { hook_event_name: StopFailure, error: server_error }
+    hook-log/auth.jsonl:
+      - types: { error_details: string }
+        input: { hook_event_name: StopFailure, error: authentication_failed }

@@ -1,0 +1,27 @@
+id: plugin-hooks
+description: An enabled plugin's hooks/hooks.json runs on its event once the user confirmed it, with ${CLAUDE_PLUGIN_ROOT} replaced in the command; a plugin whose items were not confirmed loads its other components but its hook does not run (T40).
+capabilities: [CAP-PLUGIN-HOOKS-001]
+workspace:
+  trusted: true
+  run_files:
+    pkgs/demo/.claude-plugin/plugin.json: '{"name": "demo"}'
+    pkgs/demo/hooks/hooks.json: '{"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/context.mjs\""}]}]}}'
+    pkgs/demo/context.mjs: "process.stdout.write('Plugin context: ticket PIA-77');\n"
+    pkgs/quiet/.claude-plugin/plugin.json: '{"name": "quiet"}'
+    pkgs/quiet/hooks/hooks.json: '{"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node -e \"process.stdout.write(String.fromCharCode(85,78,67,79,78,70,73,82,77,69,68))\""}]}]}}'
+packages:
+  - { path: pkgs/demo }
+  - { path: pkgs/quiet, confirm: false }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Working on PIA-77.
+actions:
+  - prompt: { text: Fix the build., turn: t }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      user_message_contains: ['Fix the build.', 'Plugin context: ticket PIA-77']
+      not_contains: [UNCONFIRMED]

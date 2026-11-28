@@ -1,0 +1,67 @@
+id: ctx-compact-focus
+description: A manual /compact with a focus sends PiArc's sectioned summary request with the focus as written and the PreCompact hook's stdout as instructions; PostCompact receives the summary, and the context a SessionStart (compact) hook adds reaches the next request with the restored state (T27).
+capabilities: [CAP-CTX-COMPACT-001, CAP-HOOK-COMPACT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    .claude/settings.json: |
+      {"hooks": {
+        "PreCompact": [{"matcher": "manual", "hooks": [{"type": "command", "command": "node hook.mjs pre"}]}],
+        "PostCompact": [{"matcher": "manual", "hooks": [{"type": "command", "command": "node hook.mjs post"}]}],
+        "SessionStart": [{"matcher": "compact", "hooks": [{"type": "command", "command": "node hook.mjs start"}]}]
+      }}
+    hook-plans/pre.json: '{"stdout": "Keep the API decisions.\n"}'
+    hook-plans/start.json: '{"json": {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "Context from the start hook after compaction."}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'We agreed to keep the REST API.'
+      - text: 'Summary: the REST API stays.'
+      - text: 'Continuing.'
+actions:
+  - prompt: { text: 'Decide on the API.', turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - compact: { instructions: 'Keep the error messages verbatim.' }
+  - wait: { method: turn/completed, count: 2 }
+  - prompt: { text: 'Go on.', turn: after }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 1
+      contains:
+        - 'You write handover notes for a coding session.'
+        - '## Task goal'
+        - '## Current progress'
+        - 'Focus requested by the user: Keep the error messages verbatim.'
+        - 'Instructions from PreCompact hooks: Keep the API decisions.'
+    - index: 2
+      contains: ['Summary: the REST API stays.']
+      user_message_contains:
+        - '[PiArc reminder]'
+        - 'The conversation above was compacted into a summary.'
+        - 'Context from a SessionStart hook:'
+        - 'Context from the start hook after compaction.'
+  events:
+    - method: item/completed
+      params: { item: { type: contextCompaction, status: completed, reason: manual } }
+  json_lines:
+    hook-log/pre.jsonl:
+      - input:
+          {
+            hook_event_name: PreCompact,
+            trigger: manual,
+            custom_instructions: 'Keep the error messages verbatim.',
+          }
+    hook-log/post.jsonl:
+      - input:
+          {
+            hook_event_name: PostCompact,
+            trigger: manual,
+            compact_summary: 'Summary: the REST API stays.',
+          }
+    hook-log/start.jsonl:
+      - input: { hook_event_name: SessionStart, source: compact }

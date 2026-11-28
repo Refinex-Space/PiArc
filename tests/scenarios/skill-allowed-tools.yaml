@@ -1,0 +1,46 @@
+id: skill-allowed-tools
+description: A skill's allowed-tools allow its commands without asking in the turn that loads it; a deny rule and an ask rule still come first, and the next turn asks again (T37).
+capabilities: [CAP-SKILL-ALLOWED-001]
+workspace:
+  trusted: true
+  files:
+    .claude/skills/env/SKILL.md: "---\ndescription: Show environment values\nallowed-tools: Bash(printenv *)\n---\nPrint what is asked.\n"
+    .piarc/settings.json: '{"permissions":{"deny":["Bash(printenv SECRET_TOKEN)"],"ask":["Bash(printenv USER)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: load, name: Skill, input: { skill: env } }]
+      - tool_calls: [{ id: granted, name: Bash, input: { command: 'printenv HOME' } }]
+      - tool_calls: [{ id: denied, name: Bash, input: { command: 'printenv SECRET_TOKEN' } }]
+      - tool_calls: [{ id: asked, name: Bash, input: { command: 'printenv USER' } }]
+      - text: First turn done.
+      - tool_calls: [{ id: next, name: Bash, input: { command: 'printenv HOME' } }]
+      - text: Second turn done.
+actions:
+  - prompt: { text: Show the environment., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - prompt: { text: Again. }
+approvals:
+  - { tool: Bash, decision: deny, feedback: Not USER. }
+  - { tool: Bash, decision: deny, feedback: Asked again. }
+expect:
+  request_counts: { main: 7 }
+  requests:
+    - index: 4
+      tool_results:
+        - {
+            id: load,
+            is_error: false,
+            contains: 'Until this turn ends, these need no approval: Bash(printenv *).',
+          }
+        - { id: granted, is_error: false }
+        - { id: denied, is_error: true, contains: 'Bash(printenv SECRET_TOKEN)' }
+        - { id: asked, is_error: true, contains: Not USER. }
+    - index: 6
+      tool_results:
+        - { id: load, is_error: false }
+        - { id: granted, is_error: false }
+        - { id: denied, is_error: true }
+        - { id: asked, is_error: true }
+        - { id: next, is_error: true, contains: Asked again. }

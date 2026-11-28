@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 71,
+  "method": "skills/list",
+  "params": {
+    "cwd": "/工作区 a/src"
+  }
+}

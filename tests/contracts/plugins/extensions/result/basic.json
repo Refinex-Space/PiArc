@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 91,
+  "result": {
+    "extensions": [
+      {
+        "package": "pi-demo",
+        "path": "/Users/ada/Library/Application Support/PiArc/pi/git/github.com/acme/pi-demo/ext/index.ts"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 11,
+  "method": "session/resume",
+  "params": {
+    "sessionId": 42,
+    "cwd": "/repo"
+  }
+}

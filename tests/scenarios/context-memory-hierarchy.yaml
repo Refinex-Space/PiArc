@@ -1,0 +1,42 @@
+id: context-memory-hierarchy
+description: User and ancestor memory precede cwd instructions, default selection prefers CLAUDE.md, and an untrusted project's content appears once.
+capabilities: [CAP-CTX-MEMORY-001]
+workspace:
+  trusted: false
+  run_files:
+    home 家/.claude/CLAUDE.md: User compatibility instruction.
+    data 数据/MEMORY.md: User PiArc instruction.
+    CLAUDE.md: Above workspace instruction.
+  files:
+    CLAUDE.md: Workspace instruction.
+    AGENTS.md: Omitted sibling instruction.
+    .claude/CLAUDE.md: Nested configuration instruction.
+    CLAUDE.local.md: Workspace local instruction.
+    app/AGENTS.md: Only agents instruction.
+    app/ui/CLAUDE.md: Session cwd instruction.
+providers:
+  main:
+    wire: anthropic
+    validation:
+      ordered_system_sections:
+        - '<project_context>'
+        - User compatibility instruction.
+        - User PiArc instruction.
+        - Above workspace instruction.
+        - Workspace instruction.
+        - Nested configuration instruction.
+        - Workspace local instruction.
+        - Only agents instruction.
+        - Session cwd instruction.
+        - '<environment>'
+    steps: [{ text: Ready. }]
+sessions:
+  active: { cwd: app/ui, provider: main }
+actions:
+  - prompt: { text: Identify the project context. }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      occurrences:
+        { Workspace instruction.: 1, Session cwd instruction.: 1, Omitted sibling instruction.: 0 }

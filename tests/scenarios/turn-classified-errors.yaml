@@ -1,0 +1,59 @@
+id: turn-classified-errors
+description: Authentication fails without retry, exhausting the three rate-limit retries reports a retryable failure, and repeating a client request id never duplicates the input.
+capabilities: [CAP-TURN-ERROR-001, CAP-TURN-STATUS-001]
+providers:
+  auth:
+    wire: anthropic
+    steps:
+      - error: { kind: unauthorized, message: 'Authentication failed.' }
+  limit:
+    wire: anthropic
+    steps:
+      - error: { kind: rate_limit }
+      - error: { kind: rate_limit }
+      - error: { kind: rate_limit }
+      - error: { kind: rate_limit }
+sessions:
+  denied: { provider: auth }
+  throttled: { provider: limit }
+actions:
+  - prompt: { session: denied, text: 'Check my input.', request_id: retry-key, turn: refused }
+  - wait: { session: denied, method: turn/completed, turn: refused }
+  - prompt: { session: denied, text: 'Check my input.', request_id: retry-key }
+  - prompt: { session: throttled, text: 'Try the request.', turn: limited }
+expect:
+  events:
+    - {
+        session: denied,
+        method: turn/completed,
+        turn: refused,
+        params: { status: failed, errorKind: auth, retryable: false },
+      }
+    - {
+        session: throttled,
+        method: turn/retrying,
+        turn: limited,
+        params: { attempt: 1, maxAttempts: 3 },
+      }
+    - {
+        session: throttled,
+        method: turn/retrying,
+        turn: limited,
+        params: { attempt: 2, maxAttempts: 3 },
+      }
+    - {
+        session: throttled,
+        method: turn/retrying,
+        turn: limited,
+        params: { attempt: 3, maxAttempts: 3 },
+      }
+    - {
+        session: throttled,
+        method: turn/completed,
+        turn: limited,
+        params: { status: failed, errorKind: rateLimit, retryable: true },
+      }
+  requests:
+    - { provider: auth, index: 0, roles: [user], user_texts: ['Check my input.'] }
+    - { provider: limit, index: 3, roles: [user], user_texts: ['Try the request.'] }
+  request_counts: { auth: 1, limit: 4 }

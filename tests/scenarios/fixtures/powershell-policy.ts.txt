@@ -1,0 +1,17 @@
+// Exercise the Core decision on macOS. Windows uses its real registered tool.
+export default function register(pi) {
+  if (process.platform === 'win32') return;
+  pi.registerTool({
+    name: 'PowerShell',
+    label: 'PowerShell policy fixture',
+    description: 'Checks whether a rejected command reaches execution.',
+    parameters: {
+      type: 'object',
+      properties: { command: { type: 'string' } },
+      required: ['command'],
+    },
+    async execute() {
+      throw new Error('A refused PowerShell invocation reached execution.');
+    },
+  });
+}

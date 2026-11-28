@@ -1,0 +1,38 @@
+id: tools-write-serial
+description: Three calls in one response that write the same file (Write, Edit, Write) run one after another in response order, the Edit sees the first Write without a Read, and the file ends with the last Write's text.
+capabilities: [CAP-TOOL-WRITE-SERIAL-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_w1, name: Write, input: { path: log.txt, content: "first\n" } }
+          - {
+              id: toolu_e1,
+              name: Edit,
+              input: { path: log.txt, edits: [{ oldText: 'first', newText: 'second' }] },
+            }
+          - { id: toolu_w2, name: Write, input: { path: log.txt, content: "third\n" } }
+      - text: 'Written three times.'
+approvals:
+  - { tool: Write, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
+actions:
+  - prompt: { text: 'Write the log.', turn: t }
+expect:
+  events:
+    - { method: item/completed, params: { item: { itemId: toolu_w1, status: completed } } }
+    - { method: item/completed, params: { item: { itemId: toolu_e1, status: completed } } }
+    - { method: item/completed, params: { item: { itemId: toolu_w2, status: completed } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  tool_batches: [[toolu_w1], [toolu_e1], [toolu_w2]]
+  files:
+    'log.txt': "third\n"
+  requests:
+    - index: 1
+      tool_results:
+        - { id: toolu_w1, is_error: false }
+        - { id: toolu_e1, is_error: false, contains: 'Successfully replaced 1 block(s)' }
+        - { id: toolu_w2, is_error: false }
+  request_counts: { main: 2 }

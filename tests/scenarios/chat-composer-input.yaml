@@ -1,0 +1,83 @@
+id: chat-composer-input
+description: A mention and two attached fixtures retain their display data while the model receives the path, exact image and PDF text, and /compact starts a summary turn.
+capabilities: [CAP-CHAT-MENTION-001, CAP-CHAT-ATTACH-001, CAP-TURN-STATUS-001]
+workspace:
+  trusted: true
+  files:
+    '.pi/settings.json': '{"compaction":{"keepRecentTokens":1}}'
+    'src/a b.ts': 'export {}'
+providers:
+  main:
+    wire: anthropic
+    vision: true
+    steps:
+      - text: 'Checking the source.'
+        usage: { input_tokens: 111, output_tokens: 22 }
+        tool_calls:
+          - { id: read_source, name: Read, input: { path: 'src/a b.ts' } }
+      - text: 'Compared the image and the report.'
+      - text: 'Summary of the requested comparison.'
+actions:
+  - prompt:
+      text: 'Compare @src/a b.ts with the attachments.'
+      mentions: [{ path: 'src/a b.ts', start: 8, end: 19 }]
+      attachments:
+        - { fixture: pixel.png, mime_type: image/png }
+        - { fixture: report.pdf, mime_type: application/pdf }
+      turn: compare
+  - wait: { method: turn/completed, turn: compare }
+  - compact: {}
+expect:
+  events:
+    - method: item/completed
+      turn: compare
+      params:
+        item:
+          type: userMessage
+          text: 'Compare @src/a b.ts with the attachments.'
+          mentions: [{ path: 'src/a b.ts', start: 8, end: 19 }]
+          attachments:
+            - { kind: image, name: pixel.png, mimeType: image/png }
+            - { kind: pdf, name: report.pdf, mimeType: application/pdf, pageCount: 12 }
+    - any_order:
+        - {
+            method: turn/usage,
+            turn: compare,
+            params: { usage: { inputTokens: 111, outputTokens: 22 } },
+          }
+        - {
+            method: item/started,
+            turn: compare,
+            params: { item: { tool: Read, itemId: read_source } },
+          }
+    - { method: turn/completed, turn: compare, params: { status: completed } }
+    - {
+        method: item/started,
+        params: { item: { type: contextCompaction, status: inProgress, reason: manual } },
+      }
+    - {
+        method: item/completed,
+        params: { item: { type: contextCompaction, status: completed, reason: manual } },
+      }
+  requests:
+    - index: 0
+      roles: [user]
+      body:
+        messages:
+          - role: user
+            content:
+              - { type: text }
+              - type: image
+                source:
+                  {
+                    type: base64,
+                    media_type: image/png,
+                    data: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQUDD4DwACBAFgjby7cQAAAABJRU5ErkJggg==,
+                  }
+      contains: ['Compare @src/a b.ts with the attachments.', 'Report page 12']
+    - index: 1
+      tool_results: [{ id: read_source, is_error: false, contains: 'export {}' }]
+    - index: 2
+      contains: ['Compare @src/a b.ts with the attachments.']
+      not_contains: ['/compact']
+  request_counts: { main: 3 }

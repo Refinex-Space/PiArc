@@ -1,0 +1,53 @@
+id: policy-shell-boundary
+description: Ambiguous shell syntax and targets outside the workspace require individual review.
+capabilities:
+  - CAP-PERM-MODE-001
+sessions:
+  main:
+    provider: main
+    mode: acceptEdits
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: meta
+            name: Bash
+            input:
+              command: mkdir one; eval "mkdir two"
+      - tool_calls:
+          - id: escape
+            name: Bash
+            input:
+              command: cp file ../outside
+      - tool_calls:
+          - id: sub
+            name: Bash
+            input:
+              command: cp file $(pwd)/copy
+      - text: Finished.
+actions:
+  - prompt:
+      text: Check permissions.
+      turn: first
+approvals:
+  - &id001
+    tool: Bash
+    decision: deny
+  - *id001
+  - *id001
+expect:
+  request_counts:
+    main: 4
+  requests:
+    - index: 3
+      tool_results:
+        - id: meta
+          is_error: true
+        - id: escape
+          is_error: true
+        - id: sub
+          is_error: true
+  files:
+    one: null
+    two: null

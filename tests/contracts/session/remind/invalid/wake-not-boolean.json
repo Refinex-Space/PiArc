@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 33,
+  "method": "session/remind",
+  "params": {
+    "sessionId": "s",
+    "type": "monitorOutput",
+    "source": "x",
+    "text": "y",
+    "wake": "now"
+  }
+}

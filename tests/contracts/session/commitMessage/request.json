@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "method": "session/commitMessage",
+  "params": {
+    "sessionId": "main",
+    "language": "zh-CN",
+    "instructions": "Use Conventional Commits.",
+    "branch": "feature/login",
+    "recentSubjects": ["feat: add sign-in form"],
+    "files": [
+      { "path": "src/login.ts", "status": "modified", "added": 3, "removed": 1 },
+      { "path": ".env", "status": "added", "withheld": "sensitive" }
+    ],
+    "diff": "diff --git a/src/login.ts b/src/login.ts\n@@ -1 +1,3 @@\n-old\n+new\n"
+  }
+}

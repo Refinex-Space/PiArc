@@ -1,0 +1,10 @@
+piarc-sherpa-sys (package name sherpa-onnx-sys)
+
+This crate is generated from sherpa-onnx-sys 2.0.1 (https://github.com/k2-fsa/sherpa-onnx,
+Apache License 2.0, LICENSE in this directory) by scripts/dev/gen-sherpa-sys.mjs.
+
+Modifications: the `extern "C"` declarations were replaced by functions of the same names and
+signatures that call through a function table resolved at run time (src/table.rs, generated);
+the build script, which downloaded and linked prebuilt libraries, was removed; src/loader.rs
+(written for PiArc) loads the libraries by absolute path. Struct definitions, constants and
+module layout are unchanged.

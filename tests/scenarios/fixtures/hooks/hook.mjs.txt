@@ -1,0 +1,38 @@
+// L2 hook fixture (T25): records the hook's stdin and answers as its plan says. Scenarios copy
+// it into the workspace as hook.mjs and run it with `node hook.mjs <name>` (macOS and Windows).
+//
+// - Appends {"types": {key: type of its value}, "input": <stdin JSON>} as one line to
+//   hook-log/<name>.jsonl in the working directory (types: string, number, boolean, null,
+//   array, object), so a scenario can require a field whose value it cannot know.
+// - `node hook.mjs <name> <ms>` first waits <ms> milliseconds: a slow hook (T30).
+// - Reads hook-plans/<name>.json: one plan, or {"sequence": [plan, ...]} where run n uses plan
+//   n (the last plan after that). A plan: {"exit": 0, "json": {...}, "stdout": "text",
+//   "stderr": "text"}; no plan file means exit 0 with no output.
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+
+const name = process.argv[2] ?? 'hook';
+const delay = Number(process.argv[3] ?? 0);
+if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+const chunks = [];
+for await (const chunk of process.stdin) chunks.push(chunk);
+const input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+mkdirSync('hook-log', { recursive: true });
+const log = path.join('hook-log', `${name}.jsonl`);
+const runs = existsSync(log)
+  ? readFileSync(log, 'utf8').split('\n').filter((line) => line.length > 0).length
+  : 0;
+const types = Object.fromEntries(
+  Object.entries(input).map(([key, value]) => [
+    key,
+    value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value,
+  ]),
+);
+appendFileSync(log, `${JSON.stringify({ types, input })}\n`);
+const planFile = path.join('hook-plans', `${name}.json`);
+let plan = existsSync(planFile) ? JSON.parse(readFileSync(planFile, 'utf8')) : {};
+if (Array.isArray(plan.sequence)) plan = plan.sequence[Math.min(runs, plan.sequence.length - 1)];
+if (plan.json !== undefined) process.stdout.write(JSON.stringify(plan.json));
+if (plan.stdout !== undefined) process.stdout.write(plan.stdout);
+if (plan.stderr !== undefined) process.stderr.write(plan.stderr);
+process.exitCode = plan.exit ?? 0;

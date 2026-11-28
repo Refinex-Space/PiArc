@@ -1,0 +1,70 @@
+id: monitor-wake-idle
+description: Monitor feeds its command's new lines to the model (T32) - while the session is idle a new line wakes it with a marked reminder as the turn's input; within the wake interval a new line only waits for the next turn (the user's prompt carries it), and once the interval passed on the task manager's clock the next line wakes the session again.
+capabilities: [CAP-BG-MONITOR-001, CAP-MONITOR-WAKE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_mon
+            name: Monitor
+            input:
+              description: errors in the log
+              command: >-
+                while [ ! -e one.flag ]; do sleep 0.05; done; echo 'error: disk full';
+                while [ ! -e two.flag ]; do sleep 0.05; done; echo 'error: disk still full';
+                while [ ! -e three.flag ]; do sleep 0.05; done; echo 'error: disk third time';
+                while [ ! -e stop.flag ]; do sleep 0.05; done
+      - text: I am watching the log.
+      - text: The disk is full.
+      - text: Still full.
+      - text: Full for the third time.
+approvals:
+  - { tool: Monitor, decision: allow }
+actions:
+  - prompt: { text: Watch the log for errors., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  # Idle: the first line wakes the session at once.
+  - write_file: { path: one.flag, content: '' }
+  - wait: { method: turn/completed, count: 2 }
+  # Within the wake interval: the line waits; the user's next prompt takes it along.
+  - write_file: { path: two.flag, content: '' }
+  - wait:
+      method: core/tasks
+      params: { kind: monitor, tail: ['error: disk full', 'error: disk still full'] }
+  - prompt: { text: Anything new?, turn: three }
+  - wait: { method: turn/completed, turn: three }
+  - write_file: { path: three.flag, content: '' }
+  - wait:
+      method: core/tasks
+      params:
+        {
+          kind: monitor,
+          tail: ['error: disk full', 'error: disk still full', 'error: disk third time'],
+        }
+  # The interval passes: the waiting line wakes the session.
+  - advance_clock: { seconds: 30 }
+  - wait: { method: turn/completed, count: 4 }
+expect:
+  events:
+    - method: item/completed
+      params:
+        item:
+          type: reminder
+          reminders: [{ type: monitorOutput }]
+  requests:
+    - index: 1
+      tool_results:
+        - id: toolu_mon
+          is_error: false
+          contains: 'Monitor started as task bg-'
+    - index: 2
+      contains: ['(errors in the log): 1 new line.\nerror: disk full']
+      # The command text names every line; the reminders must not carry the later ones yet.
+      not_contains: ['1 new line.\nerror: disk still full']
+    - index: 3
+      contains: ['1 new line.\nerror: disk still full', 'Anything new?']
+      not_contains: ['1 new line.\nerror: disk third time']
+    - index: 4
+      contains: ['1 new line.\nerror: disk third time']
+  request_counts: { main: 5 }

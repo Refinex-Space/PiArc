@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 43,
+  "method": "models/logout",
+  "params": {
+    "provider": "github-copilot"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "answer": {
+      "verdict": "deny",
+      "reason": "Publishing a package changes a shared registry the user did not mention.",
+      "category": "sharedSystems"
+    },
+    "model": "anthropic/claude-haiku-4-5",
+    "usage": { "input": 3200, "output": 61, "cacheRead": 2900, "cacheWrite": 0 },
+    "inputHash": "9f2c1e0b7a6d5c4b3a291807f6e5d4c3b2a1908f7e6d5c4b3a2918070f6e5d4c",
+    "inputChars": 12840,
+    "promptId": "4be1c0a9d812"
+  }
+}

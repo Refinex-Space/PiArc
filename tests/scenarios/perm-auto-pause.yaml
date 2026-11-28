@@ -1,0 +1,47 @@
+id: perm-auto-pause
+description: After three refusals in a row the reviewer is paused - the next call goes straight to the user with the reason and no review request; the user's allow resumes review for the call after it (T46).
+capabilities: [CAP-PERM-AUTO-PAUSE-001]
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: c1, name: Bash, input: { command: 'printenv HOME' } }]
+      - tool_calls: [{ id: c2, name: Bash, input: { command: 'printenv PATH' } }]
+      - tool_calls: [{ id: c3, name: Bash, input: { command: 'printenv HOME' } }]
+      - tool_calls: [{ id: c4, name: Bash, input: { command: 'printenv PATH' } }]
+      - tool_calls: [{ id: c5, name: Bash, input: { command: 'printenv HOME' } }]
+      - text: Done.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - tool_calls: [{ id: r1, name: record_review, input: { verdict: deny, reason: Not needed. } }]
+      - tool_calls: [{ id: r2, name: record_review, input: { verdict: deny, reason: Not needed. } }]
+      - tool_calls: [{ id: r3, name: record_review, input: { verdict: deny, reason: Not needed. } }]
+      - tool_calls: [{ id: r4, name: record_review, input: { verdict: allow, reason: Harmless. } }]
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Show some variables., turn: one }
+approvals:
+  - { tool: Bash, call: c4, decision: allow, review: pausedConsecutive }
+expect:
+  request_counts: { main: 6, rev: 4 }
+  requests:
+    - provider: main
+      index: 3
+      contains: ['Automatic review is paused for this session']
+    - provider: main
+      index: 5
+      tool_results:
+        - { id: c1, is_error: true }
+        - { id: c2, is_error: true }
+        - { id: c3, is_error: true }
+        - { id: c4, is_error: false }
+        - { id: c5, is_error: false }
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }

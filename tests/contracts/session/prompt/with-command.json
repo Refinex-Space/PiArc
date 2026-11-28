@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 8,
+  "method": "session/prompt",
+  "params": {
+    "sessionId": "s-1",
+    "requestId": "r-2",
+    "text": "Fix issue 42 on main.",
+    "command": {
+      "name": "fix-issue",
+      "kind": "skill",
+      "source": "projectClaude",
+      "arguments": "42 main",
+      "input": "/fix-issue 42 main"
+    }
+  }
+}

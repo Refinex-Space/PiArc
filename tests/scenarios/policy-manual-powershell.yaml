@@ -1,0 +1,39 @@
+id: policy-manual-powershell
+description: PowerShell requires approval in default mode.
+capabilities:
+  - CAP-PERM-MODE-001
+workspace:
+  trusted: true
+  fixtures:
+    '.pi/extensions/powershell-policy.ts': powershell-policy.ts.txt
+sessions:
+  main:
+    provider: main
+    mode: default
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: shell
+            name: PowerShell
+            input:
+              command: Write-Output tested
+      - text: Finished.
+actions:
+  - prompt:
+      text: Check permissions.
+      turn: first
+approvals:
+  - tool: PowerShell
+    decision: deny
+    feedback: Check the script first.
+expect:
+  request_counts:
+    main: 2
+  requests:
+    - index: 1
+      tool_results:
+        - id: shell
+          is_error: true
+          contains: Check the script first.

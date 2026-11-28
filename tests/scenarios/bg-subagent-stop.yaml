@@ -1,0 +1,57 @@
+id: bg-subagent-stop
+description: A background subagent is a task of its main session in Core's task manager (T32); the stop button ends the run, the task is recorded as killed, and the subagent's own reminder tells the main session it was interrupted.
+capabilities: [CAP-BG-SUBAGENT-001]
+workspace:
+  files:
+    .claude/agents/scout.md: "---\nname: scout\ndescription: Scouts.\nmodel: mock-bg/mock-model\n---\nScout.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Scout ahead,
+                  prompt: Look around.,
+                  subagent_type: scout,
+                  run_in_background: true,
+                },
+            },
+          ]
+      - text: The scout is out.
+      - text: The scout was stopped.
+  bg:
+    wire: anthropic
+    steps:
+      # The subagent's reply never finishes: only the stop button ends it.
+      - { text: 'Looking around the whole repository', stall_after_events: 3 }
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Send a scout., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - wait:
+      method: core/tasks
+      params:
+        {
+          kind: subagent,
+          status: running,
+          agentType: scout,
+          title: Scout ahead,
+          toolCallId: agent-1,
+        }
+  - stop_task: { kind: subagent }
+  - wait: { method: core/tasks, params: { kind: subagent, status: killed } }
+  - wait:
+      { method: subagent/completed, params: { itemId: agent-1, subagent: { status: interrupted } } }
+  - prompt: { text: Where is the scout?, turn: two }
+expect:
+  request_counts: { main: 3, bg: 1 }
+  requests:
+    - provider: main
+      index: 2
+      contains: ['The background scout subagent \"Scout ahead\" ended (interrupted).']

@@ -1,0 +1,53 @@
+id: subagent-degrade
+description: A subagent follows its own model's capabilities - on a keyless local model (low tool reliability) it gets the conservative Tool Profile, and an effort that model does not support falls back to its default with a warning on the run (T31).
+capabilities: [CAP-MODEL-DEGRADE-001, CAP-MODEL-ALIAS-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"modelAliases":{"fast":"mock-local/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Quick look,
+                  prompt: 'List the files. [[piarc-scenario:subagent-degrade]]',
+                  subagent_type: Explore,
+                  effort: high,
+                },
+            },
+          ]
+      - text: Done.
+  local:
+    wire: openai
+    configure_as: local
+    steps:
+      - text: There are no files.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Look quickly., turn: one }
+expect:
+  request_counts: { main: 2, local: 1 }
+  events:
+    - method: subagent/started
+      params:
+        {
+          itemId: agent-1,
+          subagent:
+            {
+              model: { provider: mock-local },
+              warnings: [{ kind: effortUnsupported, value: high }],
+            },
+        }
+  requests:
+    - provider: local
+      index: 0
+      tools: [Read, Bash, Glob, Grep]
+      tools_windows: [Read, Bash, PowerShell, Glob, Grep]
+      contains: [Do not use it to read or edit files]

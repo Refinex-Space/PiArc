@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 74,
+  "result": {
+    "name": "docs",
+    "scope": "user",
+    "source": "/data/settings.json",
+    "transport": "http",
+    "state": "connected",
+    "tools": 5,
+    "sessions": 1,
+    "oauth": true
+  }
+}

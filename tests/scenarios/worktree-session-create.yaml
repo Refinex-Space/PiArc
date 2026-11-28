@@ -1,0 +1,56 @@
+id: worktree-session-create
+description: A session created in its own worktree works in .piarc/worktrees/<name>/ on the new branch piarc/<name> from the chosen base branch; the ignored files .worktreeinclude lists are copied, other ignored files are not; its commands run and its edits land in the worktree, not in the main checkout; full-text search finds its messages (T35).
+capabilities: [CAP-WT-SESSION-001, CAP-SESSION-SEARCH-001]
+workspace:
+  git: true
+  git_commit: true
+  git_branches: [release-1]
+  files:
+    .gitignore: ".env\nbuild/\n"
+    .worktreeinclude: ".env\n"
+    .env: "KEY=1\n"
+    build/out.txt: "built\n"
+    'src 源码/app.txt': "app\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: where, name: Bash, input: { command: pwd } }]
+      - tool_calls: [{ id: write, name: Write, input: { path: new.txt, content: made here } }]
+      - text: 已在 worktree 中写好 new.txt。
+sessions:
+  main: { provider: main, mode: acceptEdits, worktree: { name: feature-one, base: release-1 } }
+actions:
+  - prompt: { text: 请在这个 worktree 里写一个文件, turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_worktree:
+      fields:
+        {
+          path: .piarc/worktrees/feature-one,
+          branch: piarc/feature-one,
+          exists: true,
+          removed: false,
+        }
+  - check_git: { args: [branch, --list, 'piarc/*'], contains: [piarc/feature-one], lines: 1 }
+  - check_git: { args: [worktree, list], contains: ['[piarc/feature-one]'], lines: 2 }
+  - check_git: { args: [status, --porcelain], contains: ['?? .piarc/'] }
+  - search: { query: worktree 里写, sessions: [main], snippets: [worktree 里写] }
+  - search: { query: 写好, sessions: [main] }
+  - search: { query: nothing-like-this, sessions: [] }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 1
+      tool_results: [{ id: where, is_error: false, contains: .piarc/worktrees/feature-one }]
+    - index: 2
+      tool_results:
+        [
+          { id: where, is_error: false, contains: .piarc/worktrees/feature-one },
+          { id: write, is_error: false },
+        ]
+  files:
+    .piarc/worktrees/feature-one/.env: "KEY=1\n"
+    '.piarc/worktrees/feature-one/src 源码/app.txt': "app\n"
+    .piarc/worktrees/feature-one/build/out.txt: null
+    .piarc/worktrees/feature-one/new.txt: made here
+    new.txt: null

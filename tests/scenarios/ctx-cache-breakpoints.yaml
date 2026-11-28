@@ -1,0 +1,53 @@
+id: ctx-cache-breakpoints
+description: Every Anthropic request keeps two cached system blocks (static prefix, session context) and at most one message-level cache breakpoint, in the last message, before and after a reminder is appended and before and after a compaction; the summary request writes no cache (T27).
+capabilities: [CAP-CTX-CACHE-001]
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    CLAUDE.md: Cached project memory.
+providers:
+  main:
+    wire: anthropic
+    validation:
+      cache_breakpoints: { max_message_level: 1, last_message_only: true }
+    steps:
+      - text: One.
+      - text: Two.
+      - text: Summary of one and two.
+      - text: Three.
+actions:
+  - prompt: { text: First., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - set_mode: { mode: plan }
+  - prompt: { text: Second., turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - compact: {}
+  - wait: { method: turn/completed, count: 3 }
+  - prompt: { text: Third., turn: three }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 0
+      body:
+        system:
+          - { type: text, cache_control: { type: ephemeral } }
+          - { type: text, cache_control: { type: ephemeral } }
+    - index: 1
+      same_system_as: 0
+      user_message_contains: ['[PiArc reminder]', Plan mode is on.]
+      body:
+        system:
+          - { type: text, cache_control: { type: ephemeral } }
+          - { type: text, cache_control: { type: ephemeral } }
+    - index: 2
+      contains: ['You write handover notes for a coding session.']
+      not_contains: [cache_control]
+    - index: 3
+      same_system_as: 0
+      user_message_contains:
+        ['[PiArc reminder]', 'The conversation above was compacted into a summary.']
+      body:
+        system:
+          - { type: text, cache_control: { type: ephemeral } }
+          - { type: text, cache_control: { type: ephemeral } }

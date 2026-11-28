@@ -1,0 +1,21 @@
+{
+  "jsonrpc": "2.0",
+  "id": 32,
+  "method": "policy/review",
+  "params": {
+    "sessionId": "c3d2a1b0-0000-4000-8000-000000000002",
+    "toolCallId": "call_7",
+    "tool": "WebFetch",
+    "input": { "url": "https://example.com/x", "prompt": "Summary" },
+    "why": "No allow rule covers the domain.",
+    "environment": {
+      "platform": "windows",
+      "workspace": "~/work/app",
+      "cwd": "~/work/app/sub",
+      "agentType": "Explore"
+    },
+    "policy": {},
+    "model": { "provider": "openai", "id": "gpt-5-mini" },
+    "timeoutMs": 30000
+  }
+}

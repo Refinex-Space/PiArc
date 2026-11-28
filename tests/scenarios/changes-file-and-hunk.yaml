@@ -1,0 +1,55 @@
+id: changes-file-and-hunk
+description: The Changes view lists the session's file with its line counts; discarding one hunk reverts only that change and keeps CRLF and the byte order mark, an outdated version is refused, the agent must read the file again, and discarding the file gives back its original bytes (T28).
+capabilities: [CAP-RV-CHANGES-001, CAP-RV-DISCARD-001, CAP-CHANGES-HUNK-001]
+workspace:
+  fixtures:
+    crlf.txt: changes/crlf-bom.txt
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: read1, name: Read, input: { path: crlf.txt } }
+      - tool_calls:
+          - id: edit1
+            name: Edit
+            input:
+              path: crlf.txt
+              edits:
+                - { oldText: 'row-02: two', newText: 'row-02: TWO' }
+                - { oldText: 'row-11: eleven', newText: 'row-11: ELEVEN' }
+      - text: Edited.
+      - tool_calls:
+          - id: edit2
+            name: Edit
+            input: { path: crlf.txt, edits: [{ oldText: 'row-02: TWO', newText: 'row-02: 2' }] }
+      - text: The edit needs a read.
+actions:
+  - prompt: { text: Edit two rows., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - check_changes:
+      fields:
+        files: [{ label: crlf.txt, kind: modified, added: 2, removed: 2 }]
+        added: 2
+        removed: 2
+  - discard: { path: crlf.txt, hunk: 1, stale: true }
+  - discard: { path: crlf.txt, hunk: 1 }
+  - check_files:
+      files:
+        crlf.txt: "﻿row-01: one\r\nrow-02: TWO\r\nrow-03: three\r\nrow-04: four\r\nrow-05: five\r\nrow-06: six\r\nrow-07: seven\r\nrow-08: eight\r\nrow-09: nine\r\nrow-10: ten\r\nrow-11: eleven\r\nrow-12: twelve\r\n"
+  - check_changes:
+      fields:
+        files: [{ label: crlf.txt, kind: modified, added: 1, removed: 1 }]
+  - prompt: { text: Edit again., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+  - discard: { path: crlf.txt }
+  - check_changes: { fields: { files: [], added: 0, removed: 0 } }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      contains: [has not been read in this session]
+  fixtures:
+    crlf.txt: changes/crlf-bom.txt

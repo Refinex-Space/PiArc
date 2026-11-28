@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 8,
+  "result": {
+    "closedSessions": 0
+  },
+  "error": {
+    "code": -32603,
+    "message": "x",
+    "data": {
+      "kind": "internalError",
+      "retryable": false
+    }
+  }
+}

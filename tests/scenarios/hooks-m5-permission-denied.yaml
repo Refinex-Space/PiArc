@@ -1,0 +1,63 @@
+id: hooks-m5-permission-denied
+description: A PermissionDenied hook sees the refused call and offers a retry without executing it (T48).
+capabilities: [CAP-HOOK-PERMISSIONDENIED-001, CAP-HOOK-M5-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks":{"PermissionDenied":[{"matcher":"Bash","hooks":[{"type":"command","command":"node hook.mjs denial"}]}]}}
+    hook-plans/denial.json: |
+      {"json":{"hookSpecificOutput":{"hookEventName":"PermissionDenied","retry":true}}}
+    notes.txt: "keep\n"
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: "sed -i.bak 's/keep/gone/' notes.txt" } }
+      - text: Understood.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - tool_calls:
+          - id: r1
+            name: record_review
+            input:
+              {
+                verdict: deny,
+                reason: Rewrites a file the user only asked to read.,
+                category: outOfScope,
+              }
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: What does notes.txt say?, turn: one }
+expect:
+  request_counts: { main: 2, rev: 1 }
+  files:
+    notes.txt: "keep\n"
+    notes.txt.bak: null
+  json_lines:
+    hook-log/denial.jsonl:
+      - input:
+          hook_event_name: PermissionDenied
+          tool_name: Bash
+          tool_input: { command: "sed -i.bak 's/keep/gone/' notes.txt" }
+          tool_use_id: cmd
+          reason: Rewrites a file the user only asked to read.
+  requests:
+    - provider: main
+      index: 1
+      contains: ['You may retry this tool call.']
+      tool_results:
+        - { id: cmd, is_error: true, contains: 'Rewrites a file the user only asked to read.' }
+  events:
+    - method: item/completed
+      params:
+        { item: { itemId: cmd, status: declined, review: { verdict: deny, category: outOfScope } } }
+    - { method: turn/completed, turn: one, params: { status: completed } }

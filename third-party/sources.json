@@ -1,0 +1,342 @@
+{
+  "$comment": [
+    "Third-party code and binaries that reach PiArc's release artefacts without a package manager, so Cargo and npm metadata cannot list them (architecture section 10.4).",
+    "T50's scripts/release/gen-notices.mjs reads this file, together with the Cargo and npm dependency trees, to generate THIRD_PARTY_NOTICES. Every entry names its license text in this repository.",
+    "Add an entry in the same change that vendors code or links a prebuilt binary."
+  ],
+  "components": [
+    {
+      "id": "libghostty-vt",
+      "name": "libghostty-vt",
+      "version": "1.0.1",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/libghostty-vt-1.0.1.LICENSE",
+      "copyright": "Copyright (c) 2024 Mitchell Hashimoto, Ghostty contributors",
+      "source": {
+        "repository": "https://github.com/ghostty-org/ghostty",
+        "tag": "vt-1.0.1",
+        "commit": "108cacb17ed8990840cd14abfce43d8ed8503ca1",
+        "artefacts": "https://release.files.ghostty.org/libghostty-vt/1.0.1/ (locked in crates/piarc-ghostty-sys/ghostty-vt.lock.json)"
+      },
+      "usedBy": "crates/piarc-ghostty-sys: linked statically into the macOS Core module; ghostty-vt.dll ships next to the Windows Core module",
+      "addedBy": "T10",
+      "notes": "The library bundles simdutf, Highway and Wuffs (permissive licenses, no copyleft; docs/research/terminal-libghostty.md section 1.1). T50 checks their license texts against the release's source tarball when generating the notices."
+    },
+    {
+      "id": "ghostty-web-canvas-renderer",
+      "name": "ghostty-web CanvasRenderer (fork)",
+      "version": "0.4.0-21-g640db46",
+      "license": "MIT",
+      "licenseFile": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/LICENSE",
+      "copyright": "Copyright (c) 2025 Coder",
+      "source": {
+        "repository": "https://github.com/coder/ghostty-web",
+        "path": "lib/renderer.ts",
+        "commit": "640db4617c69a73ccebce437cebc598c7f73cdb7"
+      },
+      "usedBy": "apps/desktop/src/renderer/terminal/vendor/ghostty-web/renderer.ts (modified; changes listed in README.md next to it): the terminal panel's renderer (T34)",
+      "addedBy": "T10",
+      "changedBy": ["T34"]
+    },
+    {
+      "id": "openai-codex-seatbelt-base-policy",
+      "name": "OpenAI Codex Seatbelt base policy",
+      "version": "main@aea4c6e",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/openai-codex.LICENSE",
+      "copyright": "Copyright 2025 OpenAI",
+      "source": {
+        "repository": "https://github.com/openai/codex",
+        "path": "codex-rs/sandboxing/src/seatbelt_base_policy.sbpl",
+        "commit": "aea4c6ee4b652d84b416731b11c2b8299d767209"
+      },
+      "usedBy": "crates/piarc-sandbox/src/seatbelt/base.sbpl (copied unmodified after a PiArc header comment; compiled into the Core module with include_str!)",
+      "addedBy": "T11",
+      "notes": "Codex's NOTICE reads \"OpenAI Codex / Copyright 2025 OpenAI\" (its Ratatui note concerns code PiArc does not use); T50 reproduces it in THIRD_PARTY_NOTICES."
+    },
+    {
+      "id": "nodejs",
+      "name": "Node.js runtime (node, npm, npx)",
+      "version": "24.22.3",
+      "license": "MIT AND others (see the licence file: Node.js bundles npm and third-party code under their own permissive licences)",
+      "licenseFile": "third-party/licenses/nodejs-24.22.3.LICENSE",
+      "copyright": "Copyright Node.js contributors. All rights reserved.",
+      "source": {
+        "repository": "https://github.com/nodejs/node",
+        "tag": "v24.22.3",
+        "artefacts": "https://nodejs.org/dist/v24.22.3/ (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Resources/agent-host/node/ of the packaged app: runs the Agent Host and the MCP servers it starts (ADR-0015); node keeps the Node.js Foundation signature on macOS",
+      "addedBy": "T12",
+      "notes": "Only bin/node, bin/npm, bin/npx, lib/node_modules/npm and LICENSE ship (node.exe, npm, npx and node_modules/npm on Windows); headers, docs and corepack are left out by scripts/dev/fetch-binaries.mjs."
+    },
+    {
+      "id": "ripgrep",
+      "name": "ripgrep (rg)",
+      "version": "15.2.0",
+      "license": "MIT OR Unlicense",
+      "licenseFile": "third-party/licenses/ripgrep-15.2.0.LICENSE",
+      "copyright": "Copyright (c) 2015 Andrew Gallant",
+      "source": {
+        "repository": "https://github.com/BurntSushi/ripgrep",
+        "tag": "15.2.0",
+        "artefacts": "GitHub release assets (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Resources/agent-host/bin/rg: preinstalled so Pi never downloads it at run time (ADR-0015 rule 7); ad-hoc signed on macOS",
+      "addedBy": "T12"
+    },
+    {
+      "id": "fd",
+      "name": "fd",
+      "version": "10.5.0",
+      "license": "MIT OR Apache-2.0",
+      "licenseFile": "third-party/licenses/fd-10.5.0.LICENSE",
+      "copyright": "Copyright (c) 2017-present The fd developers",
+      "source": {
+        "repository": "https://github.com/sharkdp/fd",
+        "tag": "v10.5.0",
+        "artefacts": "GitHub release assets (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Resources/agent-host/bin/fd: preinstalled so Pi never downloads it at run time (ADR-0015 rule 7); ad-hoc signed on macOS",
+      "addedBy": "T12"
+    },
+    {
+      "id": "velopack-update",
+      "name": "Velopack installer and Update.exe",
+      "version": "1.2.161",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/velopack-1.2.161.LICENSE",
+      "copyright": "Copyright © 2021 Caelan Sayler; Copyright © 2024 Velopack Ltd.",
+      "source": {
+        "repository": "https://github.com/velopack/velopack",
+        "tag": "1.2.161",
+        "commit": "92d6a1c91716729d449034df5c50307dcce39493",
+        "artefacts": "vpk 1.2.161 from nuget.org (locked in third-party/binaries.lock.json)"
+      },
+      "usedBy": "Windows installers built by vpk pack: Setup.exe and the Update.exe it installs next to PiArc (the npm package velopack, the main-process binding, is covered by npm metadata)",
+      "addedBy": "T12"
+    },
+    {
+      "id": "pi-source-ports",
+      "name": "Pi (earendil-works/pi) source ported into PiArc",
+      "version": "1.5.2",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/pi-1.5.2.LICENSE",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "source": {
+        "repository": "https://github.com/earendil-works/pi",
+        "tag": "v1.5.2",
+        "commit": "b4afdddf44e059c67ccf5097e5317d913521b470",
+        "path": "packages/coding-agent/src/utils/paths.ts, src/core/tools/path-utils.ts, src/core/tools/grep.ts (output formatting), src/core/tools/edit-diff.ts (matching and preservation of unchanged lines), src/utils/mime.ts, src/core/tools/powershell.ts (UTF-8 output prefix and Windows PowerShell 5.1 exit code suffix)"
+      },
+      "usedBy": "agent-host/src/tools/paths.ts and grep.ts (bundled into agent-host.mjs); crates/piarc-fs/src/image.rs, crates/piarc-exec/src/shells.rs and crates/piarc-core/src/tool_io/policy/edit.rs (compiled into the Core module). Each file's header names the functions it ports and what changed.",
+      "addedBy": "T07 (registered in R1)",
+      "notes": "Pi itself is an npm dependency and is listed from the npm tree; this entry covers only the code ported at source level. agent-host/src/runtime/credentials.test.ts adapts Pi's tests but does not ship."
+    },
+    {
+      "id": "thesvg-pi-mark",
+      "name": "Pi mark (thesvg.org icon)",
+      "version": "main",
+      "license": "MIT",
+      "licenseFile": "design/brand/mark.LICENSE",
+      "copyright": "Copyright (c) 2025 thesvg.org",
+      "source": {
+        "repository": "https://github.com/GLINCKER/thesvg",
+        "path": "public/icons/pi/default.svg"
+      },
+      "usedBy": "design/brand/mark.svg, source of menu bar and tray icons (T35, T50)",
+      "addedBy": "T12 (registered in R1)",
+      "notes": "The licence covers the SVG file only, not the Pi name or logo as trademarks; see design/brand/README.md (requirement D3)."
+    },
+    {
+      "id": "lobe-icons-provider-marks",
+      "name": "LobeHub Icons (model provider marks)",
+      "version": "1.106.0",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/lobe-icons.LICENSE",
+      "copyright": "Copyright (c) 2023 LobeHub",
+      "source": {
+        "repository": "https://github.com/lobehub/lobe-icons",
+        "package": "@lobehub/icons-static-svg@1.106.0 (icons/, mono variants)",
+        "artefacts": "https://registry.npmjs.org/@lobehub/icons-static-svg/-/icons-static-svg-1.106.0.tgz (sha512 and per-file SHA-256 in design/brand/providers/sources.json)"
+      },
+      "usedBy": "design/brand/providers/*.svg (copied unmodified), generated into apps/desktop/src/renderer/shell/provider-marks.generated.ts by scripts/dev/gen-provider-marks.mjs: provider marks in the service chooser, connection list and model menus (ADR-0107)",
+      "addedBy": "provider marks (ADR-0107)",
+      "notes": "The licence covers the SVG files only; each mark is its owner's trademark, used to identify that provider (design/brand/README.md)."
+    },
+    {
+      "id": "marklyra-image-validation",
+      "name": "Marklyra local image asset validation",
+      "version": "0.3.2",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/marklyra.LICENSE",
+      "copyright": "Marklyra contributors (refinex)",
+      "source": {
+        "repository": "https://github.com/Refinex-Space/marklyra",
+        "path": "crates/image-assets/src/validation.rs",
+        "commit": "e7c2175246443ca1fbdc1195ca3960b8a7beb6a5"
+      },
+      "usedBy": "crates/piarc-fs/src/project/images/validation.rs",
+      "addedBy": "Markdown file editing",
+      "notes": "Adapted to PiArc file errors, BMP support, and cumulative animation decoding bounds."
+    },
+    {
+      "id": "marklyra-editor-interactions",
+      "name": "Marklyra Markdown authoring interactions",
+      "version": "0.3.2",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/marklyra.LICENSE",
+      "copyright": "Marklyra contributors (refinex)",
+      "source": {
+        "repository": "https://github.com/Refinex-Space/marklyra",
+        "path": "packages/editor-runtime/src/runtime/{table-controls,table-controls-actions,table-controls-style,table-formatting,context-menu-items,context-menu-selection,slash-commands,editing-commands}.ts; packages/editor-runtime/src/engine/modules/render/code-fences.js",
+        "commit": "e7c2175246443ca1fbdc1195ca3960b8a7beb6a5"
+      },
+      "usedBy": "apps/desktop/src/renderer/files/markdown/",
+      "addedBy": "Markdown file editing",
+      "notes": "Adapted contextual table editing, selection-aware menu actions and Chinese command aliases to CodeMirror transactions, the project Files menu and PiArc design tokens."
+    },
+    {
+      "id": "markdown-studio-document-editor",
+      "name": "Markdown Studio document editing and preview syntax",
+      "version": "0.2.0",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/markdown-studio.LICENSE",
+      "copyright": "Markdown Studio contributors (Refinex)",
+      "source": {
+        "repository": "https://github.com/Refinex-Space/markdown-studio",
+        "path": "web/core/editor/core/cm/markdownLang.ts; web/core/features/viewers/markdown/livePreview/{commands,catalog,table,tableModel,inline,blocks,slash,toolbar,codeBlocks,theme}.ts; web/core/features/viewers/markdown/livePreview/SlashMenu.tsx; web/core/features/viewers/markdown/{render.ts,media/MediaViewerDialog.tsx}; web/core/features/viewers/{imageZoom,panZoom}.ts",
+        "commit": "e6ebd0c015b0c53d4091a8fcd3e76c6c95d91c21"
+      },
+      "usedBy": "apps/desktop/src/renderer/files/markdown/",
+      "addedBy": "Markdown file editing",
+      "notes": "Adapted formatting and block insertion, grouped slash commands, selection toolbar, GFM table operations, document syntax and local image/diagram pan and zoom. PiArc supplies session-scoped editing, menu hosts, file grants, and passive graph rendering."
+    },
+    {
+      "id": "khroma-license",
+      "name": "khroma (Mermaid colour utilities)",
+      "version": "2.1.0",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/khroma-2.1.0.LICENSE",
+      "copyright": "Copyright (c) 2019-present Fabio Spampinato, Andrew Maney",
+      "source": {
+        "repository": "https://github.com/fabiospampinato/khroma",
+        "path": "license"
+      },
+      "npm": {
+        "package": "khroma",
+        "integrity": "sha512-Ls993zuzfayK269Svk9hzpeGUKob/sIgZzyHYdjQoAdQetRKpOLj+k/QQQ/6Qi0Yz65mlROrfd+Ev+1+7dz9Kw==",
+        "licenseFile": "license"
+      },
+      "usedBy": "Mermaid document diagram engine",
+      "addedBy": "Markdown file editing",
+      "notes": "The npm tarball ships the complete MIT licence but omits the SPDX field. Match both the reviewed tarball integrity and the installed licence text before using this declaration."
+    },
+    {
+      "id": "ego-browser-sdk",
+      "name": "ego-browser SDK (ego-lite, typed port)",
+      "version": "0.1.0 (main@56589ea)",
+      "license": "MIT",
+      "licenseFile": "apps/desktop/src/browser-host/sdk/LICENSE",
+      "copyright": "Copyright (c) 2026 CitroLabs",
+      "source": {
+        "repository": "https://github.com/citrolabs/ego-lite",
+        "path": "package/ego-browser/src",
+        "commit": "56589ea8b98fd3b17a5d2316bfd8ff7b803d3293"
+      },
+      "usedBy": "apps/desktop/src/browser-host/sdk/ (modified; every file names its upstream path, and apps/desktop/src/browser-host/AGENTS.md lists the changes): the browser SDK the Browser tool script runs against in the script host (ADR-0089, ADR-0091)",
+      "addedBy": "Built-in browser (B2)",
+      "notes": "Ported file by file to strict TypeScript; the CLI, the frozen v1 helpers, learning/, update-notice, skill-migration, http, clipboard and env are not ported, and Node APIs are replaced by the script host bindings."
+    },
+    {
+      "id": "bippy-source-locations",
+      "name": "bippy stack parsing and source map lookup (adapted)",
+      "version": "main@fbafc40",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/bippy.LICENSE",
+      "copyright": "Copyright 2024-present Aiden Bai",
+      "source": {
+        "repository": "https://github.com/aidenybai/bippy",
+        "path": "packages/bippy/src/source/parse-stack.ts, parse-debug-stack.ts, constants.ts, symbolication.ts",
+        "commit": "fbafc407ca31ad82f391404c6c6539008f9e0d79"
+      },
+      "usedBy": "apps/desktop/src/main/browser/source-map.ts (adapted; the file header names the upstream files): the element picker's React 19 source locations (design addendum B3.2)",
+      "addedBy": "Built-in browser (B3)",
+      "notes": "Only the V8 frame parsing, the React bottom-frame rule and the mapping segment lookup are adapted; the VLQ decoder is PiArc's own (no @jridgewell/sourcemap-codec), and nothing runs in the page."
+    },
+    {
+      "id": "sherpa-onnx-runtime",
+      "name": "sherpa-onnx C API shared library",
+      "version": "2.0.1",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/sherpa-onnx-2.0.1.LICENSE",
+      "copyright": "Copyright (c) Xiaomi Corporation and sherpa-onnx contributors",
+      "source": {
+        "repository": "https://github.com/k2-fsa/sherpa-onnx",
+        "tag": "v2.0.1",
+        "artefacts": "the *-shared-no-tts-lib release archives (locked in third-party/speech-assets.lock.json)"
+      },
+      "usedBy": "Resources/speech/runtime/ (libsherpa-onnx-c-api.dylib, sherpa-onnx-c-api.dll), loaded by crates/piarc-sherpa-sys at run time",
+      "addedBy": "voice dictation (ADR-0094)",
+      "notes": "The no-TTS build: no espeak-ng (GPL). crates/piarc-sherpa-sys is generated from sherpa-onnx-sys 2.0.1 under the same license (its NOTICE lists the changes)."
+    },
+    {
+      "id": "onnxruntime",
+      "name": "ONNX Runtime shared library",
+      "version": "as bundled by sherpa-onnx 2.0.1",
+      "license": "MIT",
+      "licenseFile": null,
+      "copyright": "Microsoft Corporation",
+      "source": {
+        "repository": "https://github.com/microsoft/onnxruntime",
+        "artefacts": "inside the sherpa-onnx 2.0.1 runtime archives (third-party/speech-assets.lock.json)"
+      },
+      "usedBy": "Resources/speech/runtime/ (libonnxruntime.dylib, onnxruntime.dll)",
+      "addedBy": "voice dictation (ADR-0094)",
+      "notes": "The license text and the version's third-party notices are not in the runtime archive and could not be fetched while this was written (I241); T50 adds them before the notices are generated."
+    },
+    {
+      "id": "x-asr-zh-en-480ms-int8",
+      "name": "X-ASR-zh-en streaming model (480 ms, INT8, with punctuation)",
+      "version": "2026-06-05",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/x-asr.LICENSE",
+      "copyright": "X-ASR authors (https://github.com/Gilgamesh-J/X-ASR)",
+      "source": {
+        "repository": "https://github.com/Gilgamesh-J/X-ASR",
+        "artefacts": "sherpa-onnx's asr-models release sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05 (third-party/speech-assets.lock.json)"
+      },
+      "usedBy": "Resources/speech/models/x-asr-zh-en-480ms-int8/",
+      "addedBy": "voice dictation (ADR-0094)",
+      "notes": "bpe.vocab is derived from the archive's bpe.model by scripts/dev/fetch-speech-assets.mjs; the archive's test WAVs are used by tests only and not packaged."
+    },
+    {
+      "id": "silero-vad",
+      "name": "Silero VAD",
+      "version": "silero_vad.onnx as published by sherpa-onnx (SHA-256 in third-party/speech-assets.lock.json)",
+      "license": "MIT",
+      "licenseFile": "third-party/licenses/silero-vad.LICENSE",
+      "copyright": "Copyright (c) 2020-present Silero Team",
+      "source": {
+        "repository": "https://github.com/snakers4/silero-vad",
+        "artefacts": "sherpa-onnx's asr-models release silero_vad.onnx"
+      },
+      "usedBy": "Resources/speech/models/silero-vad/",
+      "addedBy": "voice dictation (ADR-0094)"
+    },
+    {
+      "id": "qwen3-asr-0.6b-int8",
+      "name": "Qwen3-ASR 0.6B (ONNX, INT8)",
+      "version": "pinned ModelScope revisions (crates/piarc-speech/models/qwen3-asr-0.6b-int8.json)",
+      "license": "Apache-2.0",
+      "licenseFile": "third-party/licenses/qwen3-asr.LICENSE",
+      "copyright": "Copyright 2026 Alibaba Cloud",
+      "source": {
+        "repository": "https://github.com/QwenLM/Qwen3-ASR",
+        "artefacts": "ModelScope zengshuishui/Qwen3-ASR-onnx, file by file at pinned revisions"
+      },
+      "usedBy": "not in release artefacts: downloaded at the user's request into the cache directory (ADR-0097)",
+      "addedBy": "voice dictation (ADR-0097)"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 12,
+  "method": "fs/stat",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "/Users/dev/work space/项目/logo.png",
+    "detectImage": true
+  }
+}

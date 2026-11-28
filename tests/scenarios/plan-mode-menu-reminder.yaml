@@ -1,0 +1,39 @@
+id: plan-mode-menu-reminder
+description: Turning plan mode on and off from the mode menu appends a reminder to the next request each time, refuses writes in between, and keeps system and tool definitions byte-identical (T26).
+capabilities: [CAP-PLAN-MODE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Ready.
+      - tool_calls: [{ id: write, name: Write, input: { path: c.txt, content: x } }]
+      - text: Planning.
+      - text: Back to work.
+actions:
+  - prompt: { text: Start., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - set_mode: { mode: plan }
+  - prompt: { text: Now plan., turn: t2 }
+  - wait: { method: turn/completed, turn: t2 }
+  - set_mode: { mode: default }
+  - prompt: { text: Go on., turn: t3 }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - { index: 0, not_contains: ['[PiArc reminder]'] }
+    - index: 1
+      same_system_as: 0
+      same_tools_as: 0
+      user_message_contains: ['[PiArc reminder]', 'Plan mode is on.', 'submit it with ExitPlanMode']
+    - index: 2
+      same_system_as: 0
+      same_tools_as: 0
+      tool_results: [{ id: write, is_error: true, contains: plan mode is on }]
+      occurrences: { '[PiArc reminder]': 1 }
+    - index: 3
+      same_system_as: 0
+      same_tools_as: 0
+      user_message_contains:
+        ['[PiArc reminder]', 'Plan mode is off. The permission mode is now Manual']
+  files:
+    c.txt: null

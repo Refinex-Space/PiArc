@@ -1,0 +1,212 @@
+/* G5 (design addendum 9.3): the Commit view's pull request band and its dialog, and the Changes
+   view's AI review (the bar, findings under their lines, the list). Colors, spacing and type come
+   from tokens only. */
+
+.git-pr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-pr.is-quiet,
+.git-pr-text {
+  color: var(--piarc-text-secondary);
+}
+
+:root[data-app] .git-pr-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-pr-state,
+.git-pr-review,
+.git-severity {
+  flex: none;
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-active);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+
+.git-pr-state.is-open {
+  background: var(--piarc-state-success-subtle);
+  color: var(--piarc-text-success);
+}
+
+.git-pr-state.is-merged {
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+}
+
+.git-pr-state.is-closed,
+.git-severity.is-high {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+
+.git-severity.is-medium {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
+.git-pr-checks {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+
+.git-pr-merge {
+  margin-inline-start: auto;
+}
+
+.git-pr-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-2);
+}
+
+:root[data-app] .git-pr-body {
+  min-height: 160px;
+}
+
+.git-pr-push-note {
+  margin: 0;
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+
+.git-review-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-review-count {
+  color: var(--piarc-text-primary);
+  font-weight: 600;
+}
+
+.git-review-summary,
+.git-review-note {
+  margin: 0;
+  font-size: var(--piarc-font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.git-review-note {
+  color: var(--piarc-text-secondary);
+}
+
+.git-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+}
+
+:root[data-app] .git-review-list ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:root[data-app] .git-review-path {
+  margin: 0 0 var(--piarc-space-1);
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A finding stands apart from a comment: a stripe in its severity's color on the start side. */
+:root[data-app] .git-finding > td {
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-block: 1px solid var(--piarc-border-subtle);
+  background: var(--piarc-surface-panel);
+  font-family: var(--piarc-font-ui);
+  white-space: normal;
+}
+
+.git-finding-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  background: var(--piarc-surface-panel);
+}
+
+.git-finding-body {
+  padding-inline-start: var(--piarc-space-2);
+  border-inline-start: 2px solid var(--piarc-border-strong);
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-finding:has(.git-severity.is-high) .git-finding-body {
+  border-inline-start-color: var(--piarc-state-danger);
+}
+
+.git-finding:has(.git-severity.is-medium) .git-finding-body {
+  border-inline-start-color: var(--piarc-state-warning);
+}
+
+.git-finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+
+:root[data-app] .git-finding-title {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.git-finding-line {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+
+.git-finding-spacer {
+  flex: 1;
+}
+
+:root[data-app] .git-finding-text {
+  margin: var(--piarc-space-1) 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+:root[data-app] .git-pr-field-head .button {
+  gap: var(--piarc-space-1);
+}
+
+/* 24 px targets (WCAG 2.5.8): the merge methods chevron and a notice's close button. */
+:root[data-app] .git-pr-merge .git-split-more,
+:root[data-app] .git-notice-dismiss {
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+}

@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 30,
+  "result": {
+    "bash": true,
+    "powershell": false
+  }
+}

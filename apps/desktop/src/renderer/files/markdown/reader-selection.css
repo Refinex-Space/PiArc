@@ -1,0 +1,31 @@
+.md-reader-selection {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 25;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: var(--piarc-space-1);
+  max-width: calc(100vw - 2 * var(--piarc-space-2));
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-button);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-workbench-ink);
+  box-shadow: var(--piarc-shadow-overlay);
+  font: var(--piarc-font-size-small) var(--piarc-font-ui);
+}
+.md-reader-selection button {
+  min-height: 24px;
+  padding: 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.md-reader-selection button:hover,
+.md-reader-selection button:focus-visible {
+  background: var(--piarc-surface-hover);
+}

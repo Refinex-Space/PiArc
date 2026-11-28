@@ -1,0 +1,516 @@
+/* The Skills & plugins views (ADR-0102): tabs with counts, one row shape, item pages with an
+   "About" list. Borderless: hairlines between rows, quiet fills under the pointer, the kind tile
+   as the only ornament. Tokens only. */
+
+/* ---- the page's own heading: a trail back, then the sub-page's title ---- */
+.catalog-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-block-end: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-button);
+}
+.catalog-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.catalog-crumb > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+.catalog-crumb > [aria-current='page'] {
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .catalog-crumb > button {
+  padding: 2px var(--piarc-space-1);
+  margin-inline: calc(-1 * var(--piarc-space-1));
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+:root[data-app] .catalog-crumb > button:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+
+/* ---- the toolbar: tabs leading, search or sort trailing ---- */
+.catalog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-2) var(--piarc-space-3);
+  margin-block-end: var(--piarc-space-2);
+}
+.catalog-toolbar-end {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+.catalog-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+}
+.catalog-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px var(--piarc-space-2);
+  border-radius: var(--piarc-radius-button);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-button);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.catalog-tab > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.catalog-tab:hover {
+  color: var(--piarc-text-primary);
+}
+.catalog-tab[data-selected] {
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+:root[data-app]:not([data-pointer-focus]) .catalog-tab:has(input:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+.catalog-tab-count {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-regular);
+  font-variant-numeric: tabular-nums;
+}
+.catalog-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  width: min(100%, 15rem);
+  height: 30px;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+}
+/* One quiet field: the input draws no ring of its own; the pill keeps its hairline under the
+   pointer and shows the keyboard ring around the whole field (visual-design.md section 4). */
+:root[data-app] .catalog-search > input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .catalog-search > input:focus {
+  outline: none;
+}
+:root[data-app] .catalog-search:has(> input:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+:root[data-app][data-pointer-focus] .catalog-search:has(> input:focus) {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--piarc-border-default);
+}
+.catalog-search > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+:root[data-app] .catalog-search > input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  outline: none;
+}
+.catalog-search > input::placeholder {
+  color: var(--piarc-text-secondary);
+}
+.settings-page-actions .catalog-search {
+  width: 14rem;
+}
+
+/* ---- rows ---- */
+.catalog-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.catalog-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--piarc-space-3);
+  min-height: 60px;
+  margin-inline: calc(-1 * var(--piarc-space-2));
+  padding: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-lg);
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.catalog-row::after {
+  position: absolute;
+  inset: auto var(--piarc-space-2) 0 calc(var(--piarc-space-2) + 24px + var(--piarc-space-3));
+  height: 1px;
+  background: var(--piarc-session-line);
+  content: '';
+  pointer-events: none;
+}
+.catalog-row:last-child::after {
+  display: none;
+}
+.catalog-row:has(.catalog-row-open:hover) {
+  background: var(--piarc-session-ghost-hover);
+}
+.catalog-row-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.catalog-row-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+.catalog-row-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-body);
+  font-weight: var(--piarc-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .catalog-row-open {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+}
+/* The tile, name and description all open the record; trailing controls stay their own. */
+:root[data-app] .catalog-row-open::after {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--piarc-radius-lg);
+  content: '';
+}
+:root[data-app]:not([data-pointer-focus]) .catalog-row-open:focus-visible {
+  outline: none;
+}
+:root[data-app]:not([data-pointer-focus]) .catalog-row-open:focus-visible::after {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: -1px;
+}
+.catalog-row-note {
+  flex: none;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  white-space: nowrap;
+}
+.catalog-row-note.is-attention {
+  color: var(--piarc-text-warning);
+}
+.catalog-row-description {
+  margin: 0;
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-button);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog-row-trailing {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.catalog-row-meta {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.catalog-row-chevron {
+  display: inline-flex;
+  color: var(--piarc-text-secondary);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.catalog-row-chevron > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.catalog-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 32px;
+  color: var(--piarc-text-secondary);
+}
+.catalog-tile > svg {
+  width: 18px;
+  height: 18px;
+}
+.catalog-tile.is-lg {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-session-fill);
+}
+.catalog-tile.is-lg > svg {
+  width: 22px;
+  height: 22px;
+}
+
+.catalog-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--piarc-space-2);
+  padding: calc(var(--piarc-space-5) + var(--piarc-space-4)) var(--piarc-space-4);
+  color: var(--piarc-text-secondary);
+  text-align: center;
+}
+.catalog-empty > p {
+  margin: 0;
+}
+.catalog-pager {
+  margin-block-start: var(--piarc-space-2);
+}
+.catalog-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  margin: 0 0 var(--piarc-space-2);
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-session-footnote);
+}
+.catalog-notice.is-plain {
+  color: var(--piarc-text-secondary);
+}
+.catalog-notice.is-danger {
+  color: var(--piarc-text-danger);
+}
+
+/* ---- an item's page ---- */
+.catalog-detail {
+  display: grid;
+  gap: calc(var(--piarc-space-5) + var(--piarc-space-1));
+  min-width: 0;
+}
+.catalog-detail-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--piarc-space-3);
+}
+.catalog-detail-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.catalog-detail-title > h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-heading);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.catalog-detail-title > p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-button);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalog-detail-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.catalog-detail-description {
+  margin: 0;
+  color: var(--piarc-text-primary);
+  overflow-wrap: anywhere;
+}
+.catalog-section {
+  display: grid;
+  min-width: 0;
+}
+.catalog-section-title {
+  margin: 0;
+  padding-block-end: var(--piarc-space-2);
+  border-block-end: 1px solid var(--piarc-session-line);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-button);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.catalog-info {
+  margin: 0;
+}
+.catalog-info-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--piarc-space-4);
+  min-height: 40px;
+  padding-block: var(--piarc-space-2);
+  border-block-end: 1px solid var(--piarc-session-line);
+  font-size: var(--piarc-font-size-button);
+}
+.catalog-info-row > dt {
+  color: var(--piarc-text-secondary);
+}
+.catalog-info-row > dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--piarc-text-primary);
+  overflow-wrap: anywhere;
+}
+.catalog-info-row .mono-text {
+  font-size: var(--piarc-session-footnote);
+  user-select: text;
+}
+.catalog-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-3);
+}
+:root[data-app] .catalog-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-accent);
+  font: inherit;
+  cursor: pointer;
+}
+:root[data-app] .catalog-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.catalog-warnings {
+  margin: 0;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  list-style: none;
+}
+.catalog-warnings.is-danger {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.catalog-warnings > li + li {
+  margin-block-start: var(--piarc-space-1);
+}
+.catalog-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+}
+.catalog-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catalog-row,
+  .catalog-tab {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .catalog-tab[data-selected] {
+    outline: 1px solid CanvasText;
+  }
+  .catalog-tile.is-lg {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---- small parts of item pages and the styles tab ---- */
+.catalog-note {
+  margin: var(--piarc-space-2) 0 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+}
+.catalog-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin-inline-start: var(--piarc-space-1);
+}
+.catalog-style-default {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--piarc-space-4);
+  padding-block: var(--piarc-space-2);
+}
+.catalog-style-default-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.catalog-style-default .input {
+  min-width: 12rem;
+}
+.catalog-view {
+  display: grid;
+  min-width: 0;
+}
+
+.catalog-link > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}

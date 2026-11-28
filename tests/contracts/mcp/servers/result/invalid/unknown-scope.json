@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 70,
+  "result": {
+    "servers": [
+      {
+        "name": "x",
+        "scope": "global",
+        "source": "s",
+        "transport": "stdio",
+        "availability": "ready"
+      }
+    ],
+    "idleTimeoutMs": 1,
+    "deferThreshold": 1
+  }
+}

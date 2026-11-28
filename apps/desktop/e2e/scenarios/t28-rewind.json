@@ -1,0 +1,71 @@
+{
+  "id": "t28-rewind",
+  "steps": [
+    {
+      "text": "Ready."
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "todo1",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "content": "Plan the work",
+                "status": "in_progress",
+                "activeForm": "Planning the work"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Planned."
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "write2",
+          "name": "Write",
+          "input": {
+            "path": "made.txt",
+            "content": "made\n"
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "todo2",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "content": "Plan the work",
+                "status": "completed",
+                "activeForm": "Planning the work"
+              },
+              {
+                "content": "Make the file",
+                "status": "in_progress",
+                "activeForm": "Making the file"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Made the file."
+    },
+    {
+      "text": "Another way."
+    },
+    {
+      "text": "Back on the first branch."
+    }
+  ]
+}

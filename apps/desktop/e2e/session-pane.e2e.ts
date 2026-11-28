@@ -1,0 +1,387 @@
+// The session pane's states for visual review: every section of the session gallery
+// (`#/session-gallery`, production rows in fixed states) in light and dark, both densities and
+// both languages, plus a narrow window, reduced motion and forced colors. Screenshots go to
+// tmp/evidence/<task>/gallery/<label>/ (label from PIARC_GALLERY_LABEL, default `current`);
+// PIARC_GALLERY_SECTIONS (comma-separated) and PIARC_GALLERY_QUICK=1 (light and dark, comfortable,
+// English) narrow a run while iterating. Each state is also checked for horizontal overflow.
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
+import type { ElectronApplication, Page } from '@playwright/test';
+
+import { GALLERY_SECTIONS, SESSION_GALLERY_HASH } from '../src/shared/transcript-lab.js';
+import type { PreferenceChange } from '../src/shared/preferences.js';
+import { IPC_CHANNELS } from '../src/shared/ipc.js';
+import { expectTestHooks } from './core.js';
+import { expect, test } from './fixtures.js';
+import {
+  focusMain,
+  makeWorkspace,
+  openFolder,
+  row,
+  startSession,
+  test as sessionTest,
+} from './sessions.js';
+
+const EVIDENCE = path.join(
+  import.meta.dirname,
+  '..',
+  '..',
+  '..',
+  'tmp',
+  'evidence',
+  process.env.PIARC_EVIDENCE_TASK ?? 'L4',
+  'gallery',
+  process.env.PIARC_GALLERY_LABEL ?? 'current',
+);
+
+const SECTIONS: readonly string[] =
+  process.env.PIARC_GALLERY_SECTIONS?.split(',').filter(Boolean) ?? GALLERY_SECTIONS;
+const QUICK = process.env.PIARC_GALLERY_QUICK === '1';
+
+async function prefer(page: Page, change: PreferenceChange): Promise<void> {
+  await page.evaluate((c) => window.piarc.setPreference(c), change);
+}
+
+async function resize(app: ElectronApplication, width: number, height: number): Promise<void> {
+  await app.evaluate(
+    ({ BrowserWindow }, size) => {
+      const window = BrowserWindow.getAllWindows().find((w) => !w.webContents.isDestroyed());
+      window?.setContentSize(size.width, size.height);
+    },
+    { width, height },
+  );
+}
+
+async function open(page: Page, section: string): Promise<void> {
+  await page.evaluate((hash) => {
+    window.location.hash = hash;
+    window.location.reload();
+  }, `${SESSION_GALLERY_HASH}?section=${section}`);
+  await page.getByTestId('session-gallery').waitFor();
+  // Markdown is parsed in a worker and code is highlighted after it: wait until no row shows its
+  // plain-text fallback and no code block is still waiting for its colors.
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll('.md-fallback').length === 0 &&
+      document.querySelectorAll('[data-testid="code-block"][data-highlight="pending"]').length ===
+        0 &&
+      // Diagrams and images draw after the text; the rows settle at their final heights.
+      document.querySelectorAll('[data-testid="md-diagram"][data-state="drawing"]').length === 0 &&
+      document.querySelectorAll('[data-testid="reply-image"][data-state="loading"]').length === 0,
+  );
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve();
+          });
+        });
+      }),
+  );
+}
+
+/** Elements inside the conversation column that are wider than their box (cut-off content). */
+function overflow(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const column = document.querySelector('.conversation');
+    if (column === null) return ['no conversation column'];
+    const box = column.getBoundingClientRect();
+    // Content an ancestor inside the column clips (an ellipsis, a scroller) is not cut off.
+    const clipped = (el: HTMLElement): boolean => {
+      for (let p = el.parentElement; p !== null && p !== column; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX === 'visible') continue;
+        const r = p.getBoundingClientRect();
+        if (r.right <= box.right + 1 && r.left >= box.left - 1) return true;
+      }
+      return false;
+    };
+    return [...column.querySelectorAll<HTMLElement>('*')]
+      .filter((el) => el.offsetParent !== null && !clipped(el))
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        const scrolls = ['auto', 'scroll'].includes(getComputedStyle(el).overflowX);
+        return !scrolls && (r.right > box.right + 1 || r.left < box.left - 1) && r.width > 0;
+      })
+      .slice(0, 5)
+      .map((el) => `${el.tagName.toLowerCase()}.${(el.getAttribute('class') ?? '').slice(0, 40)}`);
+  });
+}
+
+test('session pane states for review', async ({ app, page }) => {
+  test.setTimeout(900_000);
+  await mkdir(EVIDENCE, { recursive: true });
+  const problems: string[] = [];
+  const themes = ['light', 'dark'] as const;
+  const densities = QUICK ? (['comfortable'] as const) : (['comfortable', 'compact'] as const);
+  const languages = QUICK ? (['en'] as const) : (['en', 'zh-CN'] as const);
+  await resize(app, 1180, 820);
+  for (const language of languages) {
+    await prefer(page, { key: 'language', value: language });
+    for (const density of densities) {
+      await prefer(page, { key: 'appearance.density', value: density });
+      for (const theme of themes) {
+        await prefer(page, { key: 'appearance.theme', value: theme });
+        for (const section of SECTIONS) {
+          await open(page, section);
+          const name = `${section}-${theme}-${density}-${language}`;
+          await page.screenshot({ path: path.join(EVIDENCE, `${name}.png`) });
+          for (const p of await overflow(page)) problems.push(`${name}: ${p}`);
+        }
+      }
+    }
+  }
+  // The input's pickers and menus, open, in both themes.
+  await prefer(page, { key: 'language', value: 'en' });
+  await prefer(page, { key: 'appearance.density', value: 'comfortable' });
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'conversation');
+    const editor = page.locator('.composer-editor');
+    await editor.click();
+    await page.keyboard.type('/');
+    await page.getByTestId('command-popup').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `picker-commands-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('@');
+    await page.getByTestId('mention-popup').locator('[role="option"]').first().waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `picker-mentions-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Backspace');
+    await page.getByTestId('composer-add').click();
+    await page.screenshot({ path: path.join(EVIDENCE, `menu-add-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('permission-mode').click();
+    await page.screenshot({ path: path.join(EVIDENCE, `menu-mode-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('session-model').click();
+    await page.screenshot({ path: path.join(EVIDENCE, `menu-model-${theme}.png`) });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('composer-add').hover();
+    await page.locator('.tooltip[data-placed="true"]').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `tooltip-${theme}.png`) });
+  }
+  // Steps opened: the groups of calls, a failed command with its output, a file change's diff.
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'tools');
+    // Both groups open (the second holds the failed command), then the command's output.
+    for (const toggle of await page.getByTestId('tool-group-toggle').all()) await toggle.click();
+    await page.getByTestId('bash-output-toggle').first().click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `tools-open-${theme}.png`) });
+    await open(page, 'conversation');
+    for (const toggle of await page.getByTestId('tool-group-toggle').all()) await toggle.click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `conversation-open-${theme}.png`) });
+  }
+  // Scrolled away from the end: the jump back appears.
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'markdown');
+    await page.getByTestId('transcript-scroller').hover();
+    await page.mouse.wheel(0, -600);
+    await page.getByTestId('back-to-bottom').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, `jump-${theme}.png`) });
+  }
+  // Earlier task lists are lines naming the change; one opened (UI-14).
+  for (const theme of themes) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await open(page, 'cards');
+    await page.getByTestId('transcript-scroller').hover();
+    await page.mouse.wheel(0, -4000);
+    await page.getByTestId('task-update').first().locator('button').click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `tasks-history-${theme}.png`) });
+  }
+  // The working mark's wave, frame by frame (motion evidence), while a tool runs.
+  await prefer(page, { key: 'appearance.theme', value: 'light' });
+  await open(page, 'working');
+  const mark = page.locator('.working-mark');
+  for (let frame = 0; frame < 10; frame += 1) {
+    await mark.screenshot({ path: path.join(EVIDENCE, `mark-tool-${String(frame)}.png`) });
+    await page.waitForTimeout(100);
+  }
+  // A narrow column (the window cannot go below 960 px, so the gallery's column is held at
+  // 400 px: what a 960 px window with the sidebar and the rail open leaves), reduced motion and
+  // forced colors on the busiest sections.
+  await prefer(page, { key: 'appearance.theme', value: 'light' });
+  for (const section of SECTIONS.filter((s) => s !== 'thinking')) {
+    await open(page, section);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          document
+            .querySelector<HTMLElement>('.session-gallery > .main')
+            ?.style.setProperty('max-width', '400px');
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        }),
+    );
+    await page.screenshot({ path: path.join(EVIDENCE, `${section}-narrow.png`) });
+    for (const p of await overflow(page)) problems.push(`${section}-narrow: ${p}`);
+  }
+  await prefer(page, { key: 'appearance.reduceMotion', value: 'on' });
+  await page.emulateMedia({ forcedColors: 'active' });
+  for (const section of [
+    'conversation',
+    'tools',
+    'approval-command',
+    'working',
+    'input',
+    'cards',
+  ]) {
+    if (!SECTIONS.includes(section)) continue;
+    await open(page, section);
+    await page.screenshot({ path: path.join(EVIDENCE, `${section}-forced-colors.png`) });
+  }
+  await page.emulateMedia({ forcedColors: 'none' });
+  await prefer(page, { key: 'appearance.reduceMotion', value: 'system' });
+  expect(problems).toEqual([]);
+});
+
+// A real session (Core, Agent Host and the mock provider): the whole window with the title row,
+// in both themes and languages; then the history read held (the loading placeholder) and failed
+// (the error with its retry).
+sessionTest(
+  'a real session pane, and its loading and failed states',
+  async ({ app, page, workspaces }) => {
+    test.setTimeout(240_000);
+    await mkdir(EVIDENCE, { recursive: true });
+    const ws = await makeWorkspace(workspaces, 'session pane 会话', {
+      'notes.txt': 'The release is on Friday.\n',
+    });
+    await openFolder(page, app, ws);
+    const id = await startSession(page, 'Read the notes.', 't43-rows');
+    await focusMain(app);
+    await expect(page.getByTestId('composer')).toHaveAttribute('data-running', 'false', {
+      timeout: 30_000,
+    });
+    for (const language of ['en', 'zh-CN'] as const) {
+      await prefer(page, { key: 'language', value: language });
+      for (const theme of ['light', 'dark'] as const) {
+        await prefer(page, { key: 'appearance.theme', value: theme });
+        await page.mouse.move(0, 0);
+        await page.screenshot({ path: path.join(EVIDENCE, `real-${theme}-${language}.png`) });
+      }
+    }
+    await prefer(page, { key: 'language', value: 'en' });
+    await prefer(page, { key: 'appearance.theme', value: 'light' });
+    await page.getByTestId('conversation-title').hover();
+    await page.locator('.tooltip[data-placed="true"]').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-title-hover.png') });
+    await page.getByTestId('tool-terminal').hover();
+    await expect(page.locator('.tooltip[data-placed="true"]')).toContainText(/Terminal|终端/u);
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-tool-hover.png') });
+
+    // The history read held (the placeholder), then failed (the error); Retry reads it again.
+    await expectTestHooks(app);
+    await app.evaluate((_electron, channel) => {
+      globalThis.__piarcTestHooks?.holdNext(channel, 3_000);
+    }, IPC_CHANNELS.sessionTranscript);
+    await page.reload();
+    await row(page, id).getByTestId('session-title').click();
+    await expect(page.getByTestId('conversation-loading')).toBeVisible();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-loading.png') });
+    await expect(page.getByTestId('agent-message').last()).toContainText('Friday', {
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId('conversation-loading')).toHaveCount(0);
+    await app.evaluate((_electron, channel) => {
+      globalThis.__piarcTestHooks?.failNext(channel, 'unreadable');
+    }, IPC_CHANNELS.sessionTranscript);
+    await page.reload();
+    await row(page, id).getByTestId('session-title').click();
+    await expect(page.getByTestId('conversation-failed')).toBeVisible();
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-failed.png') });
+    await page.getByTestId('conversation-failed').getByRole('button').click();
+    await expect(page.getByTestId('agent-message').last()).toContainText('Friday');
+    await expect(page.getByTestId('conversation-failed')).toHaveCount(0);
+
+    // Read from the session file, the messages carry their times (ADR-0080).
+    await page.getByTestId('user-row').first().hover();
+    const sent = page.getByTestId('user-row').first().getByTestId('message-time');
+    await expect(sent).toBeVisible();
+    await expect(sent).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}T/u);
+    await sent.hover();
+    await page.locator('.tooltip[data-placed="true"]').waitFor();
+    await page.screenshot({ path: path.join(EVIDENCE, 'real-time-hover.png') });
+  },
+);
+
+// Images and diagrams in a real reply (ADR-0080): a project image inline, a remote one as a card,
+// a Mermaid diagram drawn with its tools and one that cannot be drawn with its fix; the image a
+// Read returned shows under the call.
+const CHART = [
+  '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160">',
+  '<rect width="320" height="160" fill="#f4f6ff"/>',
+  '<rect x="30" y="90" width="40" height="50" fill="#3b5bdb"/>',
+  '<rect x="100" y="60" width="40" height="80" fill="#3b5bdb"/>',
+  '<rect x="170" y="40" width="40" height="100" fill="#3b5bdb"/>',
+  '<rect x="240" y="20" width="40" height="120" fill="#3b5bdb"/>',
+  '</svg>',
+].join('');
+
+sessionTest('images and diagrams in a real reply', async ({ app, page, workspaces }) => {
+  test.setTimeout(240_000);
+  await mkdir(EVIDENCE, { recursive: true });
+  const ws = await makeWorkspace(workspaces, 'media 图', { 'chart.svg': CHART });
+  await openFolder(page, app, ws);
+  await startSession(page, 'Show me the release chart.', 'session-pane-media');
+  await focusMain(app);
+  await expect(page.getByTestId('composer')).toHaveAttribute('data-running', 'false', {
+    timeout: 30_000,
+  });
+  const reply = page.getByTestId('agent-message').last();
+  await expect(reply.getByTestId('reply-image')).toHaveAttribute('data-state', 'shown', {
+    timeout: 15_000,
+  });
+  await expect(reply.getByTestId('remote-image')).toContainText('example.com');
+  const diagrams = reply.getByTestId('md-diagram');
+  await expect(diagrams.first()).toHaveAttribute('data-state', 'drawn', { timeout: 20_000 });
+  await expect(diagrams.last()).toHaveAttribute('data-state', 'failed');
+  await expect(diagrams.last().getByTestId('diagram-error')).toBeVisible();
+  for (const theme of ['light', 'dark'] as const) {
+    await prefer(page, { key: 'appearance.theme', value: theme });
+    await expect(diagrams.first()).toHaveAttribute('data-state', 'drawn', { timeout: 20_000 });
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(EVIDENCE, `real-media-${theme}.png`) });
+    await diagrams.first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(EVIDENCE, `real-diagram-${theme}.png`) });
+  }
+  await prefer(page, { key: 'appearance.theme', value: 'light' });
+
+  // The source, and back; the download menu.
+  await diagrams.first().getByTestId('diagram-toggle').click();
+  await expect(diagrams.first().getByTestId('code-block')).toBeVisible();
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-diagram-source.png') });
+  await diagrams.first().getByTestId('diagram-toggle').click();
+  await diagrams.first().getByTestId('diagram-download').click();
+  await expect(page.getByTestId('diagram-download-png')).toBeVisible();
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-diagram-download.png') });
+  await page.keyboard.press('Escape');
+
+  // The Read's image under its line in the opened group.
+  await page.getByTestId('tool-group-toggle').first().click();
+  await expect(page.getByTestId('tool-group').first().getByTestId('reply-image')).toHaveAttribute(
+    'data-state',
+    'shown',
+  );
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-read-image.png') });
+
+  // Asking to fix the broken diagram sends a message with the reason and the source.
+  await diagrams.last().getByTestId('diagram-fix').click();
+  await expect(page.getByTestId('user-message').last()).toContainText('sequenceDiagram', {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('agent-message').last()).toContainText('corrected diagram', {
+    timeout: 30_000,
+  });
+  await page.screenshot({ path: path.join(EVIDENCE, 'real-diagram-fixed.png') });
+});

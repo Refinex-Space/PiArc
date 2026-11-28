@@ -1,0 +1,36 @@
+id: perm-auto-timeout
+description: A review that does not answer within the review limit (shortened to 300 ms here) goes to the user as an approval card; the call does not run without the user's answer (T46).
+capabilities: [CAP-PERM-AUTO-FALLBACK-001]
+review_timeout_ms: 300
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'printenv HOME' } }
+      - text: Stopped.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - text: thinking
+        stall_after_events: 1
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print the home directory., turn: one }
+approvals:
+  - { tool: Bash, call: cmd, decision: deny, review: timeout }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: cmd, is_error: true, contains: User denied Bash }
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }

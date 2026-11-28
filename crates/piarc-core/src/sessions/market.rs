@@ -1,0 +1,229 @@
+//! The settings window's Pi package market (ADR-0102): pages, details, refreshing and installs.
+//! The installed state comes from the extension package manager; an install is checked against
+//! the registry's own document of the version before npm runs, and every running Agent Host
+//! reads its resources again afterwards.
+
+use std::path::PathBuf;
+
+use piarc_protocol::ErrorKind;
+use piarc_protocol::market::{MarketInstallRequest, MarketInstalled, MarketProblem, MarketQuery};
+use serde::Serialize;
+use serde_json::Value;
+
+use super::Hub;
+use crate::error::{Error, Result};
+use crate::market::{InstalledByName, npm};
+use crate::plugins::MarketSpec;
+
+fn encode(value: &impl Serialize) -> Result<Value> {
+    serde_json::to_value(value).map_err(|e| Error::Internal {
+        reason: format!("cannot encode the market: {e}"),
+    })
+}
+
+fn refused(message: impl Into<String>) -> Error {
+    Error::Feature {
+        kind: ErrorKind::InvalidParams,
+        retryable: false,
+        message: message.into(),
+        details: None,
+    }
+}
+
+impl Hub {
+    fn proxy_now(&self) -> Option<String> {
+        self.ctx.proxy.effective(self.ctx.storage.dirs().data())
+    }
+
+    /// The installed packages a market entry may correspond to, by npm name, as `workspace`
+    /// sees them.
+    async fn market_installed(
+        &self,
+        workspace: Option<&std::path::Path>,
+    ) -> Result<InstalledByName> {
+        let plugins = self.plugins();
+        let names = plugins.npm_names().await?;
+        let list = plugins.list(workspace).await?;
+        Ok(list
+            .packages
+            .into_iter()
+            .filter_map(|p| {
+                let name = names.get(&p.id)?.clone();
+                Some((
+                    name,
+                    MarketInstalled {
+                        id: p.id,
+                        version: p.source.version,
+                        update: None,
+                        scope: p.scope,
+                        enabled: p.enabled,
+                    },
+                ))
+            })
+            .collect())
+    }
+
+    /// One page of the market.
+    pub async fn market_query(&self, query: MarketQuery) -> Result<Value> {
+        let workspace = query.workspace.as_deref().map(PathBuf::from);
+        let installed = self.market_installed(workspace.as_deref()).await?;
+        encode(
+            &self
+                .ctx
+                .market
+                .query(query, &installed, self.proxy_now())
+                .await?,
+        )
+    }
+
+    /// One package's details.
+    pub async fn market_detail(&self, name: String, workspace: Option<PathBuf>) -> Result<Value> {
+        let installed = self.market_installed(workspace.as_deref()).await?;
+        encode(
+            &self
+                .ctx
+                .market
+                .detail(&name, &installed, self.proxy_now())
+                .await?,
+        )
+    }
+
+    /// Syncs the catalog now (in the background); answers its status.
+    pub async fn market_refresh(&self) -> Result<Value> {
+        self.ctx.market.refresh(self.proxy_now(), true).await?;
+        encode(&self.ctx.market.status().await?)
+    }
+
+    /// Installs a market package (off).
+    pub async fn market_install(&self, request: MarketInstallRequest) -> Result<Value> {
+        if !npm::valid_name(&request.name) || !npm::valid_version(&request.version) {
+            return Err(Error::InvalidArgument {
+                field: "name",
+                reason: "an npm package name and an exact version".into(),
+            });
+        }
+        let market = &self.ctx.market;
+        if !market.begin_install(&request.name) {
+            return Err(Error::Feature {
+                kind: ErrorKind::Busy,
+                retryable: true,
+                message: format!("{} is being installed", request.name),
+                details: None,
+            });
+        }
+        market.started_install(&request.name).await;
+        let result = self.install_is_market_package(&request).await;
+        let problem = result.as_ref().err().map(|e| MarketProblem {
+            code: serde_json::to_value(e.kind())
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .unwrap_or_else(|| "internalError".into()),
+            message: e.to_string(),
+        });
+        market.end_install(&request.name, problem).await;
+        let result = result?;
+        self.packages_changed().await;
+        encode(&result)
+    }
+
+    async fn install_is_market_package(
+        &self,
+        request: &MarketInstallRequest,
+    ) -> Result<piarc_protocol::plugins::PackageInstallResult> {
+        if request.scope == piarc_protocol::plugins::PackageScope::Project {
+            let workspace = request
+                .workspace
+                .as_deref()
+                .ok_or_else(|| refused("the project scope needs a workspace"))?;
+            let settings = self
+                .ctx
+                .trust
+                .permission_settings(std::path::Path::new(workspace))
+                .await?;
+            if settings.trust() != piarc_config::TrustState::Trusted {
+                return Err(refused(
+                    "trust this project before installing a package for it alone",
+                ));
+            }
+        }
+        let spec = self.checked_spec(&request.name, &request.version).await?;
+        self.plugins()
+            .install_market(spec, request.scope, request.workspace.as_deref())
+            .await
+    }
+
+    /// The catalog's `name@version` as an install may fetch it: listed in the catalog at that
+    /// version, a sha512 integrity, every dependency from the registry, not themes only.
+    async fn checked_spec(&self, name: &str, version: &str) -> Result<MarketSpec> {
+        let market = &self.ctx.market;
+        let row = market
+            .row(name)
+            .await?
+            .ok_or_else(|| refused(format!("the market has no package {}", name)))?;
+        if row.listing.version != version {
+            return Err(refused(format!(
+                "the market lists {}@{}, not {}",
+                name, row.listing.version, version
+            )));
+        }
+        let proxy = self.proxy_now();
+        let info = market
+            .version(name, version, proxy.as_deref())
+            .await
+            .map_err(|p| Error::Feature {
+                kind: ErrorKind::IoError,
+                retryable: true,
+                message: p.message,
+                details: Some(serde_json::json!({ "reason": p.code }).to_string()),
+            })?;
+        let integrity = info
+            .integrity
+            .clone()
+            .ok_or_else(|| refused("the registry gives no sha512 integrity for this version"))?;
+        if !info.foreign.is_empty() {
+            return Err(refused(format!(
+                "dependencies outside the registry: {}",
+                info.foreign.join(", ")
+            )));
+        }
+        if info.kinds == Some(piarc_store::market::kind::THEME) {
+            return Err(refused(
+                "the package only brings themes, which PiArc does not use",
+            ));
+        }
+        Ok(MarketSpec {
+            name: name.to_owned(),
+            version: version.to_owned(),
+            integrity,
+            registry: market.registry_base().to_owned(),
+            ca_file: market
+                .config()
+                .test_net
+                .as_ref()
+                .and_then(|t| t.ca_file.clone()),
+        })
+    }
+
+    /// Updates package `id`: a market package installs the catalog's current version again
+    /// through the install's checks (ADR-0102, M-19); others update as T40 does.
+    pub(super) async fn update_package(
+        &self,
+        id: &str,
+        workspace: Option<&std::path::Path>,
+    ) -> Result<piarc_protocol::plugins::PackageInstallResult> {
+        let plugins = self.plugins();
+        let market = &self.ctx.market;
+        if !plugins
+            .is_market_package(id, market.registry_base())
+            .await?
+        {
+            return plugins.update(id, workspace).await;
+        }
+        let row = market
+            .row(id)
+            .await?
+            .ok_or_else(|| refused(format!("the market no longer lists {id}")))?;
+        let spec = self.checked_spec(id, &row.listing.version).await?;
+        plugins.update_with(id, workspace, Some(spec)).await
+    }
+}

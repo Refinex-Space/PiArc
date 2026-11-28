@@ -1,0 +1,21 @@
+id: perm-rules
+area: permissions
+description: Rules from the user and project Claude Code settings decide calls - deny before allow, an ask rule inside an allow rule asks, a whole-tool deny removes the tool.
+mirrors: [perm-rule-match, config-merge-order]
+workspace:
+  files:
+    notes.txt: "plain notes\nsecond line\n"
+    secrets/key.txt: "do not read\n"
+    .claude/settings.json: '{"permissions":{"deny":["Glob","Read(secrets/**)","Bash(git push *)"]}}'
+  user_settings:
+    { permissions: { allow: ['Bash(git *)', 'Bash(awk *)'], ask: ['Bash(awk NR==2 *)'] } }
+prompt: Check the rules.
+steps:
+  - tool_calls: [{ id: push, name: Bash, input: { command: git push origin main } }]
+  - tool_calls: [{ id: secret, name: Read, input: { file_path: '{{workspace}}/secrets/key.txt' } }]
+  - tool_calls: [{ id: notes, name: Read, input: { file_path: '{{workspace}}/notes.txt' } }]
+  - tool_calls: [{ id: allowed, name: Bash, input: { command: awk NR==1 notes.txt } }]
+  - tool_calls: [{ id: asked, name: Bash, input: { command: awk NR==2 notes.txt } }]
+  - text: Finished.
+approvals:
+  - { call: asked, decision: deny, feedback: Not that one. }

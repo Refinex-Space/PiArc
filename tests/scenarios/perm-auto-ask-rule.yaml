@@ -1,0 +1,34 @@
+id: perm-auto-ask-rule
+description: An ask rule shows the approval card in Auto mode without a review; the reviewer endpoint receives no request (T46).
+capabilities: [CAP-PERM-AUTO-ORDER-001]
+workspace:
+  trusted: true
+  files:
+    .piarc/settings.json: '{"permissions":{"ask":["Bash(printenv *)"]}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'printenv HOME' } }
+      - text: Done.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - text: never used
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print the home directory., turn: one }
+approvals:
+  - { tool: Bash, call: cmd, decision: allow, review: none }
+expect:
+  request_counts: { main: 2, rev: 0 }
+  requests:
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: cmd, is_error: false }

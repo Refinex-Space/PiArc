@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 15,
+  "method": "session/prompt",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "requestId": "req-02",
+    "text": "Look",
+    "attachments": [
+      {
+        "kind": "image",
+        "name": "a.png",
+        "mimeType": "image/png"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@piarc/agent-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PiArc Agent Host: hosts Pi SDK sessions and speaks AHP to the core.",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "1.5.2",
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-coding-agent": "1.5.2",
+    "@earendil-works/pi-mcp": "1.5.2",
+    "@piarc/protocol": "0.0.0",
+    "cross-spawn": "7.0.6",
+    "typebox": "1.3.27"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

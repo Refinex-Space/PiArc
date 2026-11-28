@@ -1,0 +1,11 @@
+# ADR-0087: the one auxiliary request that reviews a diff. A review has no instructions, so the
+# scenario marker sits in the changed file and reaches the request through the diff. Of the four
+# findings only the first names a file Core sent and a line that file has.
+id: git-review
+steps:
+  - text: >-
+      {"summary": "Adds a second export.", "findings": [
+      {"path": "login.ts", "line": 2, "severity": "high", "title": "b is never checked", "body": "Check it."},
+      {"path": "login.ts", "line": 999, "severity": "low", "title": "past the end", "body": ""},
+      {"path": "other.ts", "line": 1, "severity": "medium", "title": "not in the diff", "body": ""},
+      {"path": ".env", "line": 1, "severity": "high", "title": "withheld file", "body": ""}]}

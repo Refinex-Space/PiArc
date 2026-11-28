@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "session/previewModelSwitch",
+  "params": {
+    "model": {
+      "provider": "shop",
+      "id": "example"
+    },
+    "sessionId": "s"
+  }
+}

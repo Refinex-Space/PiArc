@@ -1,0 +1,30 @@
+id: sandbox-auto-critical-delete
+description: With the sandbox's auto-approval on, deleting a key path (the workspace root) still asks; declined, nothing is removed (T39).
+capabilities: [CAP-SANDBOX-AUTO-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+workspace:
+  trusted: true
+  files:
+    keep.txt: "keep\n"
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: wipe, name: Bash, input: { command: 'rm -rf .' } }
+      - text: Done.
+approvals:
+  - { tool: Bash, decision: deny }
+actions:
+  - prompt: { text: Go., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: wipe, is_error: true }
+  files:
+    keep.txt: "keep\n"

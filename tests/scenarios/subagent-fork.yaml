@@ -1,0 +1,68 @@
+id: subagent-fork
+description: A conversation fork shares the byte-identical parent loadout and prior conversation, refuses another fork, shows the child approval in the parent, and restores its edit when the parent rewinds.
+capabilities: [CAP-AGENT-FORK-001]
+workspace:
+  files: { CLAUDE.md: 'Use the project checklist.' }
+providers:
+  main:
+    wire: anthropic
+    validation:
+      cache_breakpoints: { max_message_level: 1, last_message_only: true }
+    steps:
+      - text: The parent found the label alder.
+      - tool_calls:
+          [
+            {
+              id: launch,
+              name: Agent,
+              input:
+                {
+                  description: Edit checklist,
+                  prompt: Follow up on the label.,
+                  subagent_type: fork,
+                  run_in_background: false,
+                },
+            },
+          ]
+      - tool_calls:
+          [
+            {
+              id: nested,
+              name: Agent,
+              input: { description: Deeper, prompt: Continue., subagent_type: fork },
+            },
+          ]
+      - tool_calls:
+          [{ id: write, name: Write, input: { path: checklist.txt, content: 'Alder checked.' } }]
+      - text: Finished the fork checklist.
+      - text: Verified.
+approvals:
+  - { tool: Write, decision: allow, subagent: { type: fork, description: Edit checklist } }
+actions:
+  - prompt: { text: Find the label., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - prompt: { text: Inspect the checklist., turn: second }
+  - wait: { method: turn/completed, turn: second }
+  - check_files: { files: { checklist.txt: 'Alder checked.' } }
+  - rewind:
+      {
+        turn: second,
+        scope: code,
+        preview: { checklist.txt: delete },
+        outcomes: { checklist.txt: deleted },
+      }
+  - check_files: { files: { checklist.txt: null } }
+expect:
+  request_counts: { main: 6 }
+  requests:
+    - index: 2
+      same_system_as: 1
+      same_tools_as: 1
+      message_prefix_as: 1
+      contains: [launch, Follow up on the label.]
+      body:
+        system:
+          - { type: text, cache_control: { type: ephemeral } }
+          - { type: text, cache_control: { type: ephemeral } }
+    - { index: 3, contains: [A fork cannot start another conversation fork.] }
+    - { index: 5, contains: [Finished the fork checklist.], not_contains: [Deeper] }

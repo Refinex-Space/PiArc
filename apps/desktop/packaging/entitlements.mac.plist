@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements of PiArc's own code under the hardened runtime (ad-hoc signed, ADR-0018 rule 2;
+  measurements in docs/spikes/S06-packaging-first-run.md section 3). Keep this list minimal:
+  - allow-jit: V8 in the main process and renderers (Electron 12+ needs no other memory
+    entitlement).
+  - disable-library-validation: ad-hoc signatures carry no Team ID, so library validation
+    rejects the app's own Electron Framework ("different Team IDs") and the Core module.
+  Not granted, so the runtime still blocks them: DYLD_* environment variables (code injection
+  into the process that holds the keychain grant), debugger attachment (get-task-allow),
+  unsigned executable memory.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>

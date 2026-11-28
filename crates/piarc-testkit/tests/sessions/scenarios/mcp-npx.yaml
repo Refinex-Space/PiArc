@@ -1,0 +1,10 @@
+# T36-A06: one call to the npx-started probe server.
+id: mcp-npx
+steps:
+  - tool_calls:
+      - {
+          id: probe,
+          name: mcp__probe__probe,
+          input: { workspace: '.', inside: '', outside: '', native: '' },
+        }
+  - text: 'Probed.'

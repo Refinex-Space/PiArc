@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "allowed": true,
+    "updatedInput": { "command": "npm test -- --silent" },
+    "context": "CI uses the silent reporter.",
+    "stop": { "reason": "Stop after this command." }
+  }
+}

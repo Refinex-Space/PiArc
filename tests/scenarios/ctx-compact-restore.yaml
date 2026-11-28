@@ -1,0 +1,76 @@
+id: ctx-compact-restore
+description: After a manual /compact the next request carries one restore reminder with the lazily loaded subdirectory memory, the approved plan, the task list and the current content of the most recently used files (at most 5); a recent file over the per-file limit gets only its path and the sixth most recent file is left out (T27).
+capabilities: [CAP-CTX-COMPACT-003]
+sessions:
+  main: { provider: main, mode: plan }
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+    sub/CLAUDE.md: 'Subdirectory memory for the restore.'
+    sub/note.txt: "note content\n"
+    old.txt: "old content\n"
+    a.txt: "alpha content\n"
+    b.txt: "beta content\n"
+    c.txt: "gamma content\n"
+    d.txt: "delta content\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: note, name: Read, input: { path: sub/note.txt } }]
+      - tool_calls:
+          - id: exit
+            name: ExitPlanMode
+            input: { plan: "1. Read the files.\n2. Report the totals." }
+      - tool_calls:
+          - id: todo
+            name: TodoWrite
+            input:
+              todos:
+                - { content: Read the files, status: completed }
+                - { content: Count the lines, status: in_progress }
+      - tool_calls:
+          - id: big
+            name: Bash
+            input:
+              {
+                command: 'node -e "require(''fs'').writeFileSync(''big.txt'', ''x''.repeat(90000))"',
+              }
+      - tool_calls:
+          - { id: r-old, name: Read, input: { path: old.txt } }
+          - { id: r-a, name: Read, input: { path: a.txt } }
+          - { id: r-b, name: Read, input: { path: b.txt } }
+          - { id: r-big, name: Read, input: { path: big.txt } }
+          - { id: r-c, name: Read, input: { path: c.txt } }
+          - { id: r-d, name: Read, input: { path: d.txt } }
+      - text: 'Read them all.'
+      - text: 'Summary.'
+      - text: 'Done.'
+actions:
+  - prompt: { text: 'Plan and read.', turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - compact: {}
+  - wait: { method: turn/completed, count: 2 }
+  - prompt: { text: 'Continue.', turn: after }
+approvals:
+  - { tool: ExitPlanMode, kind: plan, decision: allow, mode: acceptEdits }
+  - { tool: Bash, decision: allow }
+expect:
+  request_counts: { main: 8 }
+  requests:
+    - index: 7
+      user_message_contains:
+        - '[PiArc reminder]'
+        - 'Subdirectory memory for the restore.'
+        - 'The plan the user approved (the permission mode then became Accept edits'
+        - '2. Report the totals.'
+        - 'The task list as it stands:'
+        - '- [in progress] Count the lines'
+        - 'alpha content'
+        - 'beta content'
+        - 'gamma content'
+        - 'delta content'
+        - 'Also used recently, left out to save context'
+        - '- big.txt'
+      not_contains: ['old content', 'note content', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx']

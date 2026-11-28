@@ -1,0 +1,44 @@
+id: turn-follow-up
+description: A follow-up sent while a turn runs waits in the queue and starts its own turn once the running turn completed.
+capabilities: [CAP-TURN-FOLLOWUP-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'Waiting for the signal.'
+        tool_calls:
+          - {
+              id: toolu_wait,
+              name: Bash,
+              input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' },
+            }
+      - text: 'First turn done.'
+      - text: 'Summary done.'
+# The command only uses read-only commands: no approval (T23).
+actions:
+  - prompt: { text: 'Wait for the signal.', turn: t }
+  - wait: { method: item/started, params: { item: { itemId: toolu_wait } } }
+  - follow_up: { text: 'Then summarize.', item: f }
+  - wait:
+      {
+        method: session/queueChanged,
+        params: { items: [{ kind: followUp, text: 'Then summarize.' }] },
+      }
+  - write_file: { path: go, content: '' }
+  - wait: { method: turn/completed, count: 2 }
+expect:
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+    - { method: turn/started }
+    - { method: item/completed, params: { item: { type: userMessage, text: 'Then summarize.' } } }
+    - { method: item/completed, params: { item: { type: agentMessage, text: 'Summary done.' } } }
+    - { method: turn/completed, params: { status: completed } }
+  requests:
+    - { index: 1, user_texts: ['Wait for the signal.'], not_contains: ['Then summarize.'] }
+    - {
+        index: 2,
+        user_texts: ['Wait for the signal.', 'Then summarize.'],
+        roles: [user, assistant, user, assistant, user],
+        contains: ['First turn done.'],
+      }
+  request_counts: { main: 3 }

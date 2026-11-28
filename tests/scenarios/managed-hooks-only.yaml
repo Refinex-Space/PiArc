@@ -1,0 +1,56 @@
+id: managed-hooks-only
+description: With allowManagedHooksOnly the managed PreToolUse hook runs while the user's and the project's hooks for the same call do not; each skipped handler is one audit row saying why (T47).
+capabilities: [CAP-CONFIG-MANAGED-HOOKS-001]
+managed:
+  files:
+    PiArc/managed-settings.json: |
+      {"allowManagedHooksOnly": true, "hooks": {"PreToolUse": [
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs managed"}]}
+      ]}}
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    a.txt: "alpha\n"
+    .piarc/settings.json: |
+      {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs project"}]}]}}
+  run_files:
+    data 数据/settings.json: |
+      {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs user"}]}]}}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: cat, name: Bash, input: { command: cat a.txt } }]
+      - text: Done.
+actions:
+  - prompt: { text: Show the file., turn: one }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results: [{ id: cat, is_error: false, contains: alpha }]
+  json_lines:
+    hook-log/managed.jsonl:
+      - input: { hook_event_name: PreToolUse, tool_name: Bash }
+  files:
+    hook-log/project.jsonl: null
+    hook-log/user.jsonl: null
+  audit:
+    - kind: hook
+      detail:
+        {
+          event: PreToolUse,
+          layer: project,
+          decision: skipped,
+          skipped: managedOnly,
+          program: node,
+        }
+      count: 1
+    - kind: hook
+      detail: { event: PreToolUse, layer: user, decision: skipped, skipped: managedOnly }
+      count: 1
+    - kind: hook
+      detail: { event: PreToolUse, layer: enterprise, exitCode: 0 }
+      count: 1

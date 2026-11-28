@@ -1,0 +1,511 @@
+[
+  {
+    "method": "turn/started",
+    "payload": {
+      "turnId": "turn-<id:1>"
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Edit the notes. [[piarc-scenario:golden-tools]]"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "userMessage",
+        "itemId": "turn-<id:1>:user:1",
+        "status": "completed",
+        "text": "Edit the notes. [[piarc-scenario:golden-tools]]"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": "Working"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": " on the"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:2>#0",
+      "delta": " files."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:2>#0",
+        "status": "completed",
+        "text": "Working on the files."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "fileChange",
+        "itemId": "toolu_write",
+        "status": "inProgress",
+        "tool": "Write",
+        "arguments": {
+          "content": "first line\n",
+          "path": "notes/a b.txt"
+        },
+        "path": "notes/a b.txt"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_read",
+        "status": "inProgress",
+        "tool": "Read",
+        "arguments": {
+          "path": "notes/a b.txt"
+        }
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "fileChange",
+        "itemId": "toolu_edit",
+        "status": "inProgress",
+        "tool": "Edit",
+        "arguments": {
+          "edits": [
+            {
+              "newText": "1st",
+              "oldText": "first"
+            }
+          ],
+          "path": "notes/a b.txt"
+        },
+        "path": "notes/a b.txt"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_glob",
+        "status": "inProgress",
+        "tool": "Glob",
+        "arguments": {
+          "pattern": "**/*.txt"
+        }
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_bash",
+        "status": "inProgress",
+        "tool": "Bash",
+        "arguments": {
+          "command": "echo 中文 output"
+        },
+        "command": "echo 中文 output"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_grep",
+        "status": "inProgress",
+        "tool": "Grep",
+        "arguments": {
+          "pattern": "no-such-text-anywhere"
+        }
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_missing",
+        "status": "inProgress",
+        "tool": "Read",
+        "arguments": {
+          "path": "missing.txt"
+        }
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "webFetch",
+        "itemId": "toolu_fetch",
+        "status": "inProgress",
+        "tool": "WebFetch",
+        "arguments": {
+          "prompt": "Summarize.",
+          "url": "http://127.0.0.1:9/"
+        },
+        "url": "http://127.0.0.1:9/"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "fileChange",
+        "itemId": "toolu_write",
+        "status": "completed",
+        "tool": "Write",
+        "arguments": {
+          "content": "first line\n",
+          "path": "notes/a b.txt"
+        },
+        "output": "Successfully wrote to notes/a b.txt",
+        "path": "notes/a b.txt",
+        "diff": {
+          "added": 1,
+          "created": true,
+          "hunks": [
+            {
+              "lines": [
+                {
+                  "kind": "added",
+                  "text": "first line"
+                }
+              ],
+              "newLines": 1,
+              "newStart": 1,
+              "oldLines": 0,
+              "oldStart": 0
+            }
+          ],
+          "path": "notes/a b.txt",
+          "removed": 0,
+          "unified": "--- /dev/null\n+++ b/notes/a b.txt\n@@ -0,0 +1 @@\n+first line\n"
+        }
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_read",
+        "status": "completed",
+        "tool": "Read",
+        "arguments": {
+          "path": "notes/a b.txt"
+        },
+        "output": "     1\tfirst line\n"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "fileChange",
+        "itemId": "toolu_edit",
+        "status": "completed",
+        "tool": "Edit",
+        "arguments": {
+          "edits": [
+            {
+              "newText": "1st",
+              "oldText": "first"
+            }
+          ],
+          "path": "notes/a b.txt"
+        },
+        "output": "Successfully replaced 1 block(s) in notes/a b.txt.",
+        "path": "notes/a b.txt",
+        "diff": {
+          "added": 1,
+          "hunks": [
+            {
+              "lines": [
+                {
+                  "kind": "removed",
+                  "text": "first line"
+                },
+                {
+                  "kind": "added",
+                  "text": "1st line"
+                }
+              ],
+              "newLines": 1,
+              "newStart": 1,
+              "oldLines": 1,
+              "oldStart": 1
+            }
+          ],
+          "path": "notes/a b.txt",
+          "removed": 1,
+          "unified": "--- a/notes/a b.txt\n+++ b/notes/a b.txt\n@@ -1 +1 @@\n-first line\n+1st line\n"
+        }
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_glob",
+        "status": "completed",
+        "tool": "Glob",
+        "arguments": {
+          "pattern": "**/*.txt"
+        },
+        "output": "notes/a b.txt\nnotes/x.txt"
+      }
+    }
+  },
+  {
+    "method": "item/updated",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_bash",
+        "status": "inProgress",
+        "tool": "Bash",
+        "arguments": {
+          "command": "echo 中文 output"
+        },
+        "output": "中文 output\n",
+        "command": "echo 中文 output"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "commandExecution",
+        "itemId": "toolu_bash",
+        "status": "completed",
+        "tool": "Bash",
+        "arguments": {
+          "command": "echo 中文 output"
+        },
+        "output": "中文 output\n",
+        "command": "echo 中文 output",
+        "execution": {
+          "cwd": "/private/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 51360/ws a 甲",
+          "outcome": "success",
+          "durationMs": 3,
+          "timedOut": false,
+          "timeoutMs": 120000,
+          "truncated": false,
+          "exitCode": 0
+        }
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_missing",
+        "status": "failed",
+        "tool": "Read",
+        "arguments": {
+          "path": "missing.txt"
+        },
+        "output": "ENOENT: no such file or directory, access '/var/folders/0w/8y5fmh897_gc458bn5q2s7240000gp/T/piarc e2e golden 中文 51360/ws a 甲/missing.txt'"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "dynamicToolCall",
+        "itemId": "toolu_grep",
+        "status": "completed",
+        "tool": "Grep",
+        "arguments": {
+          "pattern": "no-such-text-anywhere"
+        },
+        "output": "No matches found"
+      }
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "webFetch",
+        "itemId": "toolu_fetch",
+        "status": "failed",
+        "tool": "WebFetch",
+        "arguments": {
+          "prompt": "Summarize.",
+          "url": "http://127.0.0.1:9/"
+        },
+        "output": "Refused to fetch 127.0.0.1: it resolves to 127.0.0.1, a loopback address. Only public addresses can be fetched.",
+        "url": "http://127.0.0.1:9/"
+      }
+    }
+  },
+  {
+    "method": "item/started",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:3>#0",
+        "status": "inProgress",
+        "text": ""
+      }
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:3>#0",
+      "delta": "D"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:3>#0",
+      "delta": "on"
+    }
+  },
+  {
+    "method": "item/agentMessage/delta",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "itemId": "<id:3>#0",
+      "delta": "e."
+    }
+  },
+  {
+    "method": "item/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "item": {
+        "type": "agentMessage",
+        "itemId": "<id:3>#0",
+        "status": "completed",
+        "text": "Done."
+      }
+    }
+  },
+  {
+    "method": "turn/usage",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  },
+  {
+    "method": "turn/completed",
+    "payload": {
+      "turnId": "turn-<id:1>",
+      "status": "completed",
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "cost": 0
+      }
+    }
+  }
+]

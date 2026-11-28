@@ -1,0 +1,33 @@
+{
+  "id": "t48-fork",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "fork-launch",
+          "name": "Agent",
+          "input": {
+            "description": "Review a checklist",
+            "prompt": "Check the checklist.",
+            "subagent_type": "fork",
+            "run_in_background": false
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "child-check",
+          "name": "Bash",
+          "input": {
+            "command": "env echo checklist verified",
+            "description": "Verify the checklist"
+          }
+        }
+      ]
+    },
+    { "text": "Checklist verified." },
+    { "text": "Fork finished." }
+  ]
+}

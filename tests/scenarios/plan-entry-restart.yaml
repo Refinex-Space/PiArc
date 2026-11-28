@@ -1,0 +1,38 @@
+id: plan-entry-restart
+description: An approved plan is saved as a session entry; after restarting Core and resuming the session, the branch's plan read through the injection interface is the same text (T26).
+capabilities: [CAP-PLAN-ENTRY-001]
+sessions:
+  main: { provider: main, mode: plan }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: exit
+            name: ExitPlanMode
+            input: { plan: "# 计划\n\n1. Read the parser\n2. Fix it" }
+      - text: Plan approved.
+actions:
+  - prompt: { text: Plan it., turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - check_harness:
+      fields:
+        {
+          plan:
+            { plan: "# 计划\n\n1. Read the parser\n2. Fix it", toolCallId: exit, mode: default },
+        }
+  - restart_core: {}
+  - resume: {}
+  - check_harness:
+      fields:
+        {
+          plan:
+            { plan: "# 计划\n\n1. Read the parser\n2. Fix it", toolCallId: exit, mode: default },
+        }
+approvals:
+  - { tool: ExitPlanMode, kind: plan, decision: allow, mode: default }
+expect:
+  request_counts: { main: 2 }
+  events:
+    - method: harness/plan
+      params: { toolCallId: exit, mode: default }

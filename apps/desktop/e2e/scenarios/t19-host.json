@@ -1,0 +1,13 @@
+{
+  "id": "t19-host",
+  "steps": [
+    {
+      "text": "Working on it, this takes a while",
+      "chunk_chars": 64,
+      "stall_after_events": 4
+    },
+    {
+      "text": "Answered after the restart."
+    }
+  ]
+}

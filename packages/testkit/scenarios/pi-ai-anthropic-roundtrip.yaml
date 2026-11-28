@@ -1,0 +1,17 @@
+# pi-ai round trip over Anthropic Messages (packages/testkit/src/pi-ai-roundtrip.test.ts).
+id: pi-ai-anthropic-roundtrip
+validation:
+  required_system_sections: ['<piarc-test-environment>']
+  cache_breakpoints:
+    max_message_level: 1
+    last_message_only: true
+steps:
+  - text: 'I will read the file.'
+    tool_calls:
+      - id: toolu_pi_ai_1
+        name: read_file
+        input: { path: 'dir with space/中文.txt', encoding: 'utf-8' }
+        fragments: 4
+    usage: { input_tokens: 50, output_tokens: 20, cache_write_tokens: 30 }
+  - text: 'The file says hello.'
+    usage: { input_tokens: 70, output_tokens: 8, cache_read_tokens: 30 }

@@ -1,0 +1,37 @@
+id: context-system-stable
+description: The complete OpenAI system messages stay byte-identical over ordinary turns and after editing memory and restoring the session.
+capabilities: [CAP-CTX-PROMPT-001, CAP-CTX-MEMORY-001]
+workspace:
+  files:
+    AGENTS.md: Opening memory revision.
+providers:
+  main:
+    wire: openai
+    validation:
+      ordered_system_sections:
+        [
+          '<identity>',
+          '<tool_guidance>',
+          '<project_context>',
+          Opening memory revision.,
+          '<environment>',
+        ]
+    steps: [{ text: First. }, { text: Second. }, { text: Third. }]
+actions:
+  - prompt: { text: Start., turn: initial }
+  - wait: { method: turn/completed, turn: initial }
+  - prompt: { text: Continue., turn: second }
+  - wait: { method: turn/completed, turn: second }
+  - write_file: { path: AGENTS.md, content: Restored memory revision. }
+  - restart_core: {}
+  - resume: {}
+  - prompt: { text: Continue after restart., turn: third }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - { index: 0, not_contains: [Restored memory revision.] }
+    - { index: 1, same_system_as: 0, not_contains: [Restored memory revision.] }
+    - index: 2
+      same_system_as: 0
+      user_message_contains: ['[PiArc reminder]', Restored memory revision.]
+      occurrences: { Opening memory revision.: 1, Restored memory revision.: 1 }

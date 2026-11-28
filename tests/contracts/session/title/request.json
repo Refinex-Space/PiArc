@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "method": "session/title",
+  "params": {
+    "sessionId": "main",
+    "text": "我想系统地学习 Spring Boot，请帮我规划一个四周的入门学习计划"
+  }
+}

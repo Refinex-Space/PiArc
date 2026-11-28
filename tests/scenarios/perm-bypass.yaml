@@ -1,0 +1,56 @@
+id: perm-bypass
+description: Bypass permissions, enabled in the user's settings, runs edits and commands without asking while deny and ask rules still apply; a project file cannot select it (T23).
+capabilities: [CAP-PERM-MODE-002]
+workspace:
+  trusted: true
+  files:
+    .piarc/settings.json: '{"permissions":{"defaultMode":"bypassPermissions","deny":["Bash(git push *)"],"ask":["Edit(locked.txt)"]}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableBypassPermissions":true}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: write, name: Write, input: { path: free.txt, content: "written\n" } }
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'sed -n 1p free.txt' } }
+      - tool_calls:
+          - { id: push, name: Bash, input: { command: 'git push origin main' } }
+      - tool_calls:
+          - { id: locked, name: Write, input: { path: locked.txt, content: x } }
+      - text: Finished.
+  other:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: plain, name: Write, input: { path: other.txt, content: x } }
+      - text: Finished.
+sessions:
+  main: { provider: main, mode: bypassPermissions }
+  second: { provider: other }
+actions:
+  - prompt: { session: main, text: Go., turn: t }
+  - wait: { session: main, method: turn/completed, turn: t }
+  - prompt: { session: second, text: Go., turn: u }
+approvals:
+  - { tool: Write, decision: deny }
+  - { tool: Write, decision: deny }
+expect:
+  request_counts: { main: 5, other: 2 }
+  requests:
+    - provider: main
+      index: 4
+      tool_results:
+        - { id: write, is_error: false }
+        - { id: cmd, is_error: false, contains: written }
+        - { id: push, is_error: true, contains: 'Bash(git push *)' }
+        - { id: locked, is_error: true }
+    - provider: other
+      index: 1
+      tool_results:
+        - { id: plain, is_error: true }
+  files:
+    free.txt: "written\n"
+    locked.txt: null
+    other.txt: null

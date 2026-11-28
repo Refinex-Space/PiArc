@@ -1,0 +1,11 @@
+{
+  "id": "t18-fail",
+  "steps": [
+    { "error": { "kind": "server_error", "message": "mock outage" } },
+    { "error": { "kind": "server_error", "message": "mock outage" } },
+    { "error": { "kind": "server_error", "message": "mock outage" } },
+    { "error": { "kind": "server_error", "message": "mock outage" } },
+    { "error": { "kind": "server_error", "message": "mock outage" } },
+    { "error": { "kind": "server_error", "message": "mock outage" } }
+  ]
+}

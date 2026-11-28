@@ -1,0 +1,42 @@
+id: webfetch-redirects-limits
+description: A same-site redirect is followed; a redirect to another host is not followed and its target goes back to the model, with no extraction call; a page over the 100K-character limit is cut and the extraction is told so (T29).
+capabilities: [CAP-TOOL-WEBFETCH-001]
+workspace:
+  run_files:
+    data 数据/settings.json: '{"permissions":{"allow":["WebFetch(domain:127.0.0.1)"]}}'
+web:
+  pages:
+    /old: { status: 302, location: /new }
+    /new: { content_type: text/plain, body: The new page. }
+    /moved: { status: 301, location: '{{web_alt}}/new' }
+    /big: { content_type: text/plain, body: 'abcdefghij', repeat: 12000 }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [{ id: same, name: WebFetch, input: { url: '{{web}}/old', prompt: What is it? } }]
+      - text: The new page.
+      - tool_calls:
+          [{ id: cross, name: WebFetch, input: { url: '{{web}}/moved', prompt: What is it? } }]
+      - tool_calls: [{ id: big, name: WebFetch, input: { url: '{{web}}/big', prompt: Letters? } }]
+      - text: Letters a to j, repeated.
+      - text: Done.
+actions:
+  - prompt: { text: Fetch., turn: one }
+expect:
+  request_counts: { main: 6 }
+  requests:
+    - index: 1
+      contains: [The new page.]
+    - index: 4
+      contains: [Only the first part of the page is included below; the rest was cut.]
+    - index: 5
+      tool_results:
+        - { id: same, is_error: false, contains: The new page. }
+        - {
+            id: cross,
+            is_error: false,
+            contains: 'redirected (HTTP 301) to a different host: http://localhost:',
+          }
+        - { id: big, is_error: false, contains: Letters a to j }

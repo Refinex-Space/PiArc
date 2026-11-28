@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 52,
+  "method": "models/test",
+  "params": {
+    "provider": "relay",
+    "model": "qwen3"
+  }
+}

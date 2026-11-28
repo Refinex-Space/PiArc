@@ -1,0 +1,9 @@
+{
+  "$description": "Light and dark ladders by role (layer 2): which palette family each role uses. Changing the visual direction means changing a family here (or its values in palette.json); components never change.",
+  "neutral": "slate",
+  "accent": "graphite",
+  "danger": "red",
+  "warning": "amber",
+  "success": "green",
+  "link": "indigo"
+}

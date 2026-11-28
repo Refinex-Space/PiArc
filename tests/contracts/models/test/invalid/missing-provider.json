@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 51,
+  "method": "models/test",
+  "params": {
+    "model": "qwen3"
+  }
+}

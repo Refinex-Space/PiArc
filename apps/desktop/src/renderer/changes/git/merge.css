@@ -1,0 +1,214 @@
+/* The merge view, the conflicts dialog and the interactive rebase dialog (design addendum 9.2).
+   Colors, spacing and type come from tokens only. */
+
+.git-merge {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.git-merge-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+
+.git-merge-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--piarc-font-size-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-merge-left {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-merge-spacer {
+  flex: 1;
+}
+
+.git-merge-grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+}
+
+.git-merge-colhead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  background: var(--piarc-surface-panel);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: 600;
+}
+
+/* A chunk spans the three columns; its cells line up. */
+.git-merge-row {
+  display: contents;
+}
+
+.git-merge-row > * {
+  min-width: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+
+.git-merge-row.is-yours > :nth-child(1),
+.git-merge-row.is-theirs > :nth-child(3),
+.git-merge-row.is-both > :nth-child(odd) {
+  background: var(--piarc-diff-added-background);
+}
+
+.git-merge-row.is-yours > :nth-child(2),
+.git-merge-row.is-theirs > :nth-child(2),
+.git-merge-row.is-both > :nth-child(2) {
+  background: var(--piarc-diff-added-background);
+}
+
+.git-merge-row.is-conflict > * {
+  background: var(--piarc-state-warning-subtle);
+}
+
+.git-merge-row.is-conflict.is-resolved > .is-result {
+  background: var(--piarc-diff-added-background);
+}
+
+.git-merge-lines {
+  margin: 0;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.git-merge-fold {
+  color: var(--piarc-text-secondary);
+  font-family: inherit;
+}
+
+.git-merge-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--piarc-space-1);
+}
+
+.git-merge-both {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+}
+
+.git-merge-unresolved {
+  margin: 0;
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-merge-whole {
+  padding: var(--piarc-space-3);
+}
+
+:root[data-app] .git-merge-editor {
+  flex: 1;
+  min-height: 0;
+  margin: var(--piarc-space-2);
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-input);
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  resize: none;
+}
+
+.git-conflicts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--piarc-font-size-small);
+}
+
+.git-conflicts-table th,
+.git-conflicts-table td {
+  padding: var(--piarc-space-1);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  text-align: start;
+}
+
+.git-conflicts-table th {
+  color: var(--piarc-text-secondary);
+  font-weight: 600;
+}
+
+.git-conflict-path {
+  font-family: var(--piarc-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.git-conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-1);
+}
+
+.git-rebase-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  max-height: 50vh;
+  margin: var(--piarc-space-2) 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.git-rebase-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-1);
+  border-radius: var(--piarc-radius-md);
+}
+
+.git-rebase-row.is-drop .git-rebase-commit {
+  color: var(--piarc-text-secondary);
+  text-decoration: line-through;
+}
+
+.git-rebase-commit {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  font-size: var(--piarc-font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.git-rebase-sha {
+  color: var(--piarc-text-secondary);
+  font-family: var(--piarc-font-mono);
+}
+
+.git-rebase-move {
+  display: inline-flex;
+}
+
+.git-rebase-message {
+  grid-column: 1 / -1;
+}

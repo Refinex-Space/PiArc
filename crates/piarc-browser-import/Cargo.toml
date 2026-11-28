@@ -1,0 +1,33 @@
+[package]
+name = "piarc-browser-import"
+description = "Chrome sign-in import (ADR-0090): profiles, the Cookies database copy and cookie decryption."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+aes-gcm.workspace = true
+base64.workspace = true
+cbc.workspace = true
+pbkdf2.workspace = true
+piarc-protocol.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+zeroize.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# The "Chrome Safe Storage" password in the login keychain, read once per import.
+security-framework.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# DPAPI (`CryptUnprotectData`) for the key in Chrome's `Local State`.
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,88 @@
+{
+  "id": "t19-rows",
+  "steps": [
+    {
+      "thinking": "The user wants a summary of the TODOs. I should read the file and search for markers first.",
+      "text": "I'll look at the project first.",
+      "tool_calls": [
+        {
+          "id": "toolu_read",
+          "name": "Read",
+          "input": {
+            "path": "src/main.ts"
+          }
+        },
+        {
+          "id": "toolu_grep",
+          "name": "Grep",
+          "input": {
+            "pattern": "TODO"
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 1200,
+        "output_tokens": 180
+      },
+      "chunk_chars": 6,
+      "chunk_delay_ms": 25
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "toolu_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sleep 2; env echo checked",
+            "description": "Check"
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 1500,
+        "output_tokens": 40
+      }
+    },
+    {
+      "error": {
+        "kind": "rate_limit",
+        "message": "the mock is rate limited"
+      }
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "toolu_edit",
+          "name": "Edit",
+          "input": {
+            "path": "src/main.ts",
+            "edits": [
+              {
+                "oldText": "// TODO: greet",
+                "newText": "// Greets the user."
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 1700,
+        "output_tokens": 60
+      }
+    },
+    {
+      "text": "Done. The file had one **TODO**, now resolved:\n\n```ts\n// Greets the user.\nexport const greet = (name: string) => `Hi ${name}`;\n```\n\n- read `src/main.ts`\n- edited one line",
+      "usage": {
+        "input_tokens": 1900,
+        "output_tokens": 120
+      },
+      "chunk_chars": 6,
+      "chunk_delay_ms": 25
+    },
+    {
+      "text": "Summary: the user asked to resolve a TODO in src/main.ts; it was replaced with a comment.",
+      "chunk_chars": 3,
+      "chunk_delay_ms": 40
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+id: hooks-m3-post-tool-batch
+description: PostToolBatch hooks run once per round of tool calls, after every result and before the next request - their context reaches that request, and a block stops the loop (no further request) with the reason left for the model's next input (T38).
+capabilities: [CAP-HOOK-SUBAGENT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    a.txt: "alpha\n"
+    b.txt: "beta\n"
+    c.txt: "gamma\n"
+    .claude/settings.json: '{"hooks": {"PostToolBatch": [{"hooks": [{"type": "command", "command": "node hook.mjs batch"}]}]}}'
+    hook-plans/batch.json: '{"sequence": [{"json": {"hookSpecificOutput": {"hookEventName": "PostToolBatch", "additionalContext": "Both files were read."}}}, {"json": {"decision": "block", "reason": "Stop after the third file."}}, {}]}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: ra, name: Read, input: { path: a.txt } }
+          - { id: rb, name: Read, input: { path: b.txt } }
+      - tool_calls: [{ id: rc, name: Read, input: { path: c.txt } }]
+      - text: I stopped as asked.
+actions:
+  - prompt: { text: Read the files., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - prompt: { text: Why did you stop?, turn: two }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 1
+      contains: [Both files were read.]
+    - index: 2
+      contains: [Stop after the third file., Why did you stop?]
+  json_lines:
+    hook-log/batch.jsonl:
+      - types: { tool_calls: array, session_id: string }
+        input:
+          hook_event_name: PostToolBatch
+          tool_calls:
+            - { tool_name: Read, tool_use_id: ra }
+            - { tool_name: Read, tool_use_id: rb }
+      - input: { tool_calls: [{ tool_name: Read, tool_use_id: rc }] }

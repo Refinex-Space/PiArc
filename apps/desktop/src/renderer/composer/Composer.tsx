@@ -1,0 +1,1277 @@
+// The composer (architecture sections 8.2 and 8.5): ProseMirror multi-line input with `@` mention
+// chips found by Core's fuzzy file search, the `/` command palette of Core's commands, image and
+// PDF attachments by drop or paste, the idle/running key semantics of intents.ts, and the input
+// method guard in front of every key and trigger. Pasting text inserts plain text only.
+import { baseKeymap, splitBlock } from 'prosemirror-commands';
+import { history, redo, undo } from 'prosemirror-history';
+import { keydownHandler, keymap } from 'prosemirror-keymap';
+import { Fragment, Slice } from 'prosemirror-model';
+import { EditorState, TextSelection, type Command } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+
+import { fileMentionPath, type MentionScope } from '../files/file-path.js';
+import { onFileAttachment, droppedFiles, FILE_DRAG_TYPE } from '../files/navigation.js';
+import type { EditorDraft } from './session-draft.js';
+import {
+  onBrowserContext,
+  pendingContext,
+  takeBrowserContexts,
+  withContexts,
+  type PendingBrowserContext,
+} from './browser-context.js';
+import { revealBidi } from '../transcript/reveal.js';
+import { IconButton } from '../app/IconButton.js';
+import {
+  CloseGlyph,
+  CommandIcon,
+  FileCodeCornerIcon,
+  FileGlyph,
+  GearIcon,
+  ImageGlyph,
+  LayoutFreeformIcon,
+  PaperclipIcon,
+  PlusIcon,
+  SendIcon,
+  StopIcon,
+  UnplugIcon,
+} from '../shell/icons.js';
+import { MenuPopup, useMenu, type MenuItem } from '../shell/Menu.js';
+import { revealListOption } from '../app/list-navigation.js';
+import type { MessageId } from '../../shared/i18n/index.js';
+import { useApp } from '../app/app-context.js';
+import { formatSize } from '../transcript/rows/common.js';
+import {
+  checkFiles,
+  type AttachmentLimits,
+  type AttachmentProblem,
+  type PendingAttachment,
+} from './attachments.js';
+import {
+  CLOSED_COMMANDS,
+  closeCommands,
+  commandKey,
+  commandPlugin,
+  filterCommands,
+  moveCommands,
+  openCommands,
+  continueCommand,
+  slashBefore,
+  type CommandState,
+  type PaletteCommand,
+} from './command-plugin.js';
+import { builtin } from './builtins.js';
+import { isImeComposing } from './ime-guard.js';
+import { COMPOSER_KEYS, intentFor, type ComposerKey } from './intents.js';
+import {
+  CLOSED_MENTION,
+  chooseMention,
+  closeMention,
+  mentionKey,
+  mentionPlugin,
+  moveMention,
+  openMention,
+  type MentionState,
+} from './mention-plugin.js';
+import { composerSchema, type MentionData, type SnippetData } from './schema.js';
+import { isBlank, serializeDoc, type ComposerPayload } from './serialize.js';
+import { failureKind } from '../shell/errors.js';
+import {
+  DictationBar,
+  dictationShown,
+  MicButton,
+  useDictation,
+  type DictationTarget,
+} from './dictation/Dictation.js';
+import { dictationPlugin, dictationState } from './dictation/plugin.js';
+
+/** What the composer hands over on Enter / Mod+Enter. */
+export interface ComposerSubmission extends ComposerPayload {
+  readonly attachments: readonly PendingAttachment[];
+}
+
+export interface ComposerHandlers {
+  /** Enter, Mod+Enter: send when idle; steer or queue while running. */
+  submit(
+    intent: 'send' | 'steer' | 'queue',
+    submission: ComposerSubmission,
+  ): boolean | Promise<boolean>;
+  /** Esc while running. */
+  stop(): void;
+  /** `/` typed into an empty composer opened the palette. */
+  command(): void;
+  /** A command was chosen in the palette. */
+  runCommand?(command: PaletteCommand): void;
+  /** `@` opened the mention picker. */
+  mentionOpened(): void;
+  /** A mention was inserted. */
+  mentionChosen(mention: MentionData): void;
+}
+
+/** Where `@` candidates come from (Core's file search; a fixed list on the prototype page). */
+export interface MentionSource {
+  /** The candidates for `query`; a newer call supersedes an older one. */
+  search(query: string): Promise<readonly MentionData[]>;
+  /** The picker closed: stop searching. */
+  cancel(): void;
+}
+
+/** Presses this soon after send and stop swapped places are ignored (ms). */
+const SWAP_GUARD_MS = 500;
+
+function emptyState(doc?: EditorState['doc']): EditorState {
+  return EditorState.create({
+    schema: composerSchema,
+    ...(doc ? { doc } : {}),
+    plugins: [
+      mentionPlugin(),
+      commandPlugin(),
+      dictationPlugin(),
+      history(),
+      keymap({ 'Mod-z': undo, 'Mod-Shift-z': redo, 'Mod-y': redo }),
+      keymap(baseKeymap),
+    ],
+  });
+}
+
+/**
+ * Puts a chip for `command` and a space in place of `from`–`to` (the typed `/query`), the
+ * cursor after them and the palette closed (ADR-0080). It is sent as `/name`.
+ */
+function insertCommand(view: EditorView, command: PaletteCommand, from: number, to: number): void {
+  const chip = composerSchema.nodes.command.create({
+    name: command.name,
+    kind: command.kind,
+    description: command.description,
+  });
+  const tr = view.state.tr.replaceWith(from, to, [chip, composerSchema.text(' ')]);
+  view.dispatch(
+    tr
+      .setSelection(TextSelection.create(tr.doc, from + 2))
+      .setMeta(commandKey, { type: 'close' })
+      .scrollIntoView(),
+  );
+  view.focus();
+}
+
+/** The commands the palette offers: built-in ones only for a `/` that starts the message. */
+function paletteChoices(
+  commands: readonly PaletteCommand[],
+  state: CommandState,
+): readonly PaletteCommand[] {
+  const offered = state.atStart ? commands : commands.filter((c) => c.kind !== 'builtIn');
+  return filterCommands(offered, state.query);
+}
+
+/** The palette's choices as runs of one source, with each run's index in the whole list. */
+function paletteSections(choices: readonly PaletteCommand[]) {
+  const sections: {
+    source: PaletteCommand['source'];
+    start: number;
+    choices: PaletteCommand[];
+  }[] = [];
+  choices.forEach((choice, index) => {
+    const last = sections.at(-1);
+    if (last?.source === choice.source) last.choices.push(choice);
+    else sections.push({ source: choice.source, start: index, choices: [choice] });
+  });
+  return sections;
+}
+
+function clearCommand(): Command {
+  return (state, dispatch) => {
+    dispatch?.(
+      state.tr.replaceWith(0, state.doc.content.size, composerSchema.nodes.paragraph.create()),
+    );
+    return true;
+  };
+}
+
+/** Plain-text paste: one paragraph per line, never the clipboard's HTML. */
+function pastePlainText(view: EditorView, text: string): void {
+  const paragraphs = text
+    .replace(/\r\n?/gu, '\n')
+    .split('\n')
+    .map((line) =>
+      composerSchema.node('paragraph', null, line === '' ? [] : [composerSchema.text(line)]),
+    );
+  view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(paragraphs), 1, 1)));
+}
+
+function insertFileMentions(
+  view: EditorView,
+  paths: readonly string[],
+  scope: MentionScope | undefined,
+) {
+  if (!paths.length) return;
+  const nodes = paths.flatMap((path) => [
+    composerSchema.node('mention', {
+      id: path,
+      label: path.split('/').at(-1) ?? path,
+      path: fileMentionPath(path, scope),
+    }),
+    composerSchema.text(' '),
+  ]);
+  view.dispatch(
+    view.state.tr.replaceSelection(new Slice(Fragment.from(nodes), 0, 0)).scrollIntoView(),
+  );
+  view.focus();
+}
+
+/** Files of a paste or drop. */
+function filesOf(transfer: DataTransfer | null): File[] {
+  return transfer === null ? [] : [...transfer.files];
+}
+
+export function Composer({
+  running,
+  savedDraft,
+  sessionId,
+  fileScope,
+  firstTurn = false,
+  disabled = false,
+  handlers,
+  mentions,
+  commands,
+  limits,
+  supportsImages = true,
+  above,
+  tray,
+  leading,
+  trailing,
+  error,
+  fill,
+  insert,
+  dictation,
+  placeholder,
+}: {
+  running: boolean;
+  savedDraft?: EditorDraft | undefined;
+  sessionId?: string;
+  fileScope?: MentionScope;
+  firstTurn?: boolean;
+  disabled?: boolean;
+  handlers: ComposerHandlers;
+  mentions: MentionSource;
+  commands: readonly PaletteCommand[];
+  /** What can be attached; without limits nothing can. */
+  limits: AttachmentLimits | undefined;
+  supportsImages?: boolean | undefined;
+  /** Shown above the input (the queue). */
+  above?: ReactNode;
+  /** Where the work runs (folder, environment, worktree): a tinted tray tucked behind the card's top. */
+  tray?: ReactNode;
+  /** The action row's controls after `+` (permission mode and its status). */
+  leading?: ReactNode;
+  /** The action row's controls before the microphone and send (model, effort, context usage). */
+  trailing?: ReactNode;
+  /** Why the last message was not sent. */
+  error?: string | undefined;
+  /**
+   * Text to put in the input in place of what is there (a rewound message, T28); a new `nonce`
+   * puts it again.
+   */
+  fill?: { readonly text: string; readonly nonce: number } | undefined;
+  /** Chips to insert at the cursor (T34: terminal selections); a new `nonce` inserts again. */
+  insert?: { readonly snippets: readonly SnippetData[]; readonly nonce: number } | undefined;
+  /** Voice dictation's owner and vocabulary source (ADR-0094); without it there is no microphone. */
+  dictation?: DictationTarget | undefined;
+  /** What the empty input says in place of the usual hint (a plan waiting for a reply). */
+  placeholder?: string | undefined;
+}) {
+  const { t, platform, preferences } = useApp();
+  const add = useMenu();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const saved = useRef(savedDraft);
+  const mount = useRef<HTMLDivElement | null>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const [mention, setMention] = useState<MentionState>(CLOSED_MENTION);
+  const [palette, setPalette] = useState<CommandState>(CLOSED_COMMANDS);
+  const [results, setResults] = useState<{ query: string; items: readonly MentionData[] }>({
+    query: '',
+    items: [],
+  });
+  const [pending, setPending] = useState<readonly PendingAttachment[]>(saved.current?.files ?? []);
+  // Browser context attachments (B3.5): page data the message carries after the typed text.
+  const [contexts, setContexts] = useState<readonly PendingBrowserContext[]>(
+    saved.current?.contexts ?? [],
+  );
+  const [openContext, setOpenContext] = useState<string>();
+  const currentContexts = useRef(contexts);
+  currentContexts.current = contexts;
+  const [problems, setProblems] = useState<readonly AttachmentProblem[]>([]);
+  const [empty, setEmpty] = useState(
+    !saved.current?.doc?.content.size || saved.current.doc.content.size === 2,
+  );
+  const currentFiles = useRef(pending);
+  currentFiles.current = pending;
+  const voiceOn = dictation !== undefined && preferences.voiceDictation.enabled;
+  const voice = useDictation(viewRef, voiceOn ? dictation : undefined);
+  const dictating = voice.controller?.active === true;
+  // The editor's callbacks are created once; they read the latest values through this ref.
+  const latest = useRef({
+    voice: voice.controller,
+    running,
+    disabled,
+    handlers,
+    mentions,
+    commands,
+    limits,
+    supportsImages,
+    sessionId,
+    fileScope,
+    results,
+    pending,
+  });
+  latest.current = {
+    voice: voice.controller,
+    running,
+    disabled,
+    handlers,
+    mentions,
+    commands,
+    limits,
+    supportsImages,
+    sessionId,
+    fileScope,
+    results,
+    pending,
+  };
+
+  const addFiles = (files: readonly File[]): void => {
+    const { limits: current, pending: attached } = latest.current;
+    if (latest.current.disabled || files.length === 0) {
+      return;
+    }
+    const { accepted, problems: refused } = checkFiles(
+      files,
+      attached.length,
+      current ?? { maxCount: 0, kinds: [] },
+      () => crypto.randomUUID(),
+      latest.current.supportsImages,
+    );
+    setPending((list) => [...list, ...accepted]);
+    setProblems(refused);
+  };
+  const addFilesRef = useRef(addFiles);
+  addFilesRef.current = addFiles;
+
+  const submitInput = (
+    intent: 'send' | 'steer' | 'queue',
+    state: EditorState,
+    view?: EditorView,
+  ) => {
+    const {
+      pending: attachments,
+      handlers: current,
+      disabled: locked,
+      supportsImages: vision,
+    } = latest.current;
+    const attachedContexts = currentContexts.current;
+    if (!vision) {
+      const refused = attachments
+        .filter((a) => a.kind === 'image')
+        .map((a) => ({ reason: 'vision' as const, name: a.name }));
+      if (refused.length) {
+        setProblems(refused);
+        return;
+      }
+    }
+    const typed = serializeDoc(state.doc);
+    if (locked || (isBlank(typed) && attachments.length === 0 && attachedContexts.length === 0)) {
+      return;
+    }
+    const payload = { ...typed, text: withContexts(typed.text, attachedContexts) };
+    const clear = () => {
+      if (savedDraft) {
+        delete savedDraft.doc;
+        delete savedDraft.files;
+        delete savedDraft.contexts;
+      }
+      if (!view || view.isDestroyed || view.state.doc !== state.doc) return;
+      clearCommand()(view.state, view.dispatch.bind(view), view);
+      currentFiles.current = [];
+      setPending([]);
+      currentContexts.current = [];
+      setContexts([]);
+      setProblems([]);
+    };
+    const result = current.submit(intent, { ...payload, attachments });
+    if (typeof result === 'boolean') {
+      if (result) clear();
+    } else
+      void result.then((sent) => {
+        if (sent) clear();
+      });
+  };
+  /**
+   * Sends `intent`; while dictating, stops first and waits (bounded) for the last segment, so
+   * the message is the editor as it stands once the words landed (addendum V-4.3).
+   */
+  const submitAfterDictation = (intent: 'send' | 'steer' | 'queue', view: EditorView): void => {
+    const controller = latest.current.voice;
+    if (!controller?.active) {
+      submitInput(intent, view.state, view);
+      return;
+    }
+    void controller.stopForSend().then((ready) => {
+      if (ready && !view.isDestroyed) submitInput(intent, view.state, view);
+    });
+  };
+  const send = useRef(submitAfterDictation);
+  send.current = submitAfterDictation;
+  useEffect(() => {
+    const element = mount.current;
+    if (element === null) {
+      return;
+    }
+    const command =
+      (key: ComposerKey): Command =>
+      (state, dispatch, view) => {
+        const intent = intentFor(key, latest.current.running);
+        switch (intent) {
+          case 'newline':
+            return splitBlock(state, dispatch);
+          case 'stop':
+            latest.current.handlers.stop();
+            return true;
+          case 'send':
+          case 'steer':
+          case 'queue':
+            if (view) send.current(intent, view);
+            return true;
+          case null:
+            return false;
+        }
+      };
+    const keys = keydownHandler(
+      Object.fromEntries(COMPOSER_KEYS.map((key) => [key, command(key)])),
+    );
+    const runPaletteCommand = (editor: EditorView, choice: PaletteCommand | undefined): void => {
+      const open = commandKey.getState(editor.state) ?? CLOSED_COMMANDS;
+      if (choice === undefined) {
+        editor.dispatch(closeCommands(editor.state));
+        return;
+      }
+      if (choice.kind !== 'builtIn') {
+        // A command file or skill becomes a chip sent as `/name`: at the start Core runs it with
+        // the text after it as arguments (T37); in the middle it is text for the model.
+        insertCommand(editor, choice, open.from, editor.state.selection.from);
+        return;
+      }
+      editor.dispatch(closeCommands(editor.state));
+      clearCommand()(editor.state, editor.dispatch.bind(editor), editor);
+      latest.current.handlers.runCommand?.(choice);
+    };
+
+    const view = new EditorView(element, {
+      state: emptyState(saved.current?.doc),
+      editable: () => !latest.current.disabled,
+      attributes: {
+        class: 'composer-editor',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': t(firstTurn ? 'home.placeholder' : 'composer.label'),
+        'data-testid': firstTurn ? 'home-input' : 'composer-input',
+      },
+      dispatchTransaction(tr) {
+        const next = view.state.apply(tr);
+        view.updateState(next);
+        setMention(mentionKey.getState(next) ?? CLOSED_MENTION);
+        setPalette(commandKey.getState(next) ?? CLOSED_COMMANDS);
+        setEmpty(
+          next.doc.childCount === 1 &&
+            next.doc.textContent === '' &&
+            next.doc.firstChild?.childCount === 0 &&
+            dictationState(next).partial === null,
+        );
+      },
+      handleDOMEvents: {
+        // Input method guard, ahead of everything ProseMirror does with a key: returning true
+        // skips its keydown handling (key bindings, base keymap, plugins) without
+        // preventDefault, so the key goes to the input method untouched. This also covers
+        // keyCode 229 keys that arrive before compositionstart, when ProseMirror itself does
+        // not consider the editor composing yet.
+        keydown: (editor, event) => isImeComposing(event, editor.composing),
+        drop: (editor, event) => {
+          const paths = droppedFiles(event.dataTransfer, latest.current.sessionId);
+          if (paths) {
+            event.preventDefault();
+            insertFileMentions(editor, paths, latest.current.fileScope);
+            return true;
+          }
+          const files = filesOf(event.dataTransfer);
+          if (files.length === 0) {
+            return false;
+          }
+          event.preventDefault();
+          addFilesRef.current(files);
+          return true;
+        },
+      },
+      handleKeyDown(editor, event) {
+        if (isImeComposing(event, editor.composing)) {
+          return false;
+        }
+        const picker = mentionKey.getState(editor.state) ?? CLOSED_MENTION;
+        if (picker.active) {
+          const matches =
+            latest.current.results.query === picker.query ? latest.current.results.items : [];
+          switch (event.key) {
+            case 'ArrowDown':
+            case 'ArrowUp':
+              editor.dispatch(moveMention(editor.state, event.key === 'ArrowDown' ? 1 : -1));
+              return true;
+            case 'Enter':
+            case 'Tab': {
+              const count = matches.length;
+              const choice =
+                count === 0 ? undefined : matches[((picker.index % count) + count) % count];
+              if (choice === undefined) {
+                editor.dispatch(closeMention(editor.state));
+              } else {
+                editor.dispatch(chooseMention(editor.state, choice));
+                latest.current.handlers.mentionChosen(choice);
+              }
+              latest.current.mentions.cancel();
+              return true;
+            }
+            case 'Escape':
+              editor.dispatch(closeMention(editor.state));
+              latest.current.mentions.cancel();
+              return true;
+            default:
+              break;
+          }
+        }
+        const open = commandKey.getState(editor.state) ?? CLOSED_COMMANDS;
+        if (open.active) {
+          const matches = paletteChoices(latest.current.commands, open);
+          const count = matches.length;
+          switch (event.key) {
+            case 'ArrowDown':
+            case 'ArrowUp':
+              editor.dispatch(moveCommands(editor.state, event.key === 'ArrowDown' ? 1 : -1));
+              return true;
+            case 'Enter':
+            case 'Tab':
+              runPaletteCommand(
+                editor,
+                count === 0 ? undefined : matches[((open.index % count) + count) % count],
+              );
+              return true;
+            case 'Escape':
+              editor.dispatch(closeCommands(editor.state));
+              return true;
+            default:
+              break;
+          }
+        }
+        // Escape while dictating stops it and keeps the text; only × cancels (addendum V-3.4).
+        if (event.key === 'Escape' && latest.current.voice?.active === true) {
+          latest.current.voice.stop();
+          return true;
+        }
+        return keys(editor, event);
+      },
+      handleTextInput(editor, from, to, text) {
+        // Text committed by an input method arrives here too; triggers only fire outside one.
+        if (editor.composing) {
+          return false;
+        }
+        if (text === '@') {
+          editor.dispatch(openMention(editor.state, from, to));
+          latest.current.handlers.mentionOpened();
+          return true;
+        }
+        if (
+          text === '/' &&
+          editor.state.doc.textContent === '' &&
+          editor.state.doc.childCount === 1
+        ) {
+          editor.dispatch(openCommands(editor.state, from, to));
+          latest.current.handlers.command();
+          return true;
+        }
+        // A name typed right after a `/` that starts a word opens the palette there.
+        const palette = commandKey.getState(editor.state) ?? CLOSED_COMMANDS;
+        if (!palette.active && /^[A-Za-z0-9_]$/u.test(text) && from === to) {
+          const slash = slashBefore(editor.state, from);
+          if (slash === from - 1) {
+            editor.dispatch(continueCommand(editor.state, slash, from, to, text));
+            latest.current.handlers.command();
+            return true;
+          }
+        }
+        return false;
+      },
+      handlePaste: (editor, event) => {
+        const files = filesOf(event.clipboardData);
+        if (files.length > 0) {
+          addFilesRef.current(files);
+          return true;
+        }
+        const text = event.clipboardData?.getData('text/plain') ?? '';
+        if (text !== '') {
+          pastePlainText(editor, text);
+        }
+        return true;
+      },
+    });
+    viewRef.current = view;
+    if (firstTurn && !latest.current.disabled) view.focus();
+    return () => {
+      // The hypothesis becomes text before the draft is kept; the dictation ends.
+      latest.current.voice?.detach();
+      if (savedDraft) {
+        if (isBlank(serializeDoc(view.state.doc))) delete savedDraft.doc;
+        else savedDraft.doc = view.state.doc;
+        if (currentFiles.current.length) savedDraft.files = currentFiles.current;
+        else delete savedDraft.files;
+        if (currentContexts.current.length) savedDraft.contexts = currentContexts.current;
+        else delete savedDraft.contexts;
+      }
+      viewRef.current = null;
+      view.destroy();
+    };
+    // The editor is created once; its name follows the language below.
+  }, []);
+
+  const editorLabel = t(firstTurn ? 'home.placeholder' : 'composer.label');
+  useEffect(() => {
+    viewRef.current?.setProps({
+      attributes: {
+        class: 'composer-editor',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': editorLabel,
+        'data-testid': firstTurn ? 'home-input' : 'composer-input',
+      },
+    });
+  }, [editorLabel, firstTurn]);
+
+  useEffect(() => {
+    viewRef.current?.setProps({ editable: () => !disabled });
+  }, [disabled]);
+
+  // A message given back for the input: plain text, one paragraph per line, then focus.
+  const fillText = fill?.text;
+  const fillNonce = fill?.nonce;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || fillText === undefined || fillNonce === undefined) return;
+    const paragraphs = fillText
+      .replace(/\r\n?/gu, '\n')
+      .split('\n')
+      .map((line) =>
+        composerSchema.node('paragraph', null, line === '' ? [] : [composerSchema.text(line)]),
+      );
+    // A dictation in progress ends first: nothing it hears belongs in the new text (V-3.5).
+    latest.current.voice?.abandon();
+    view.dispatch(view.state.tr.replaceWith(0, view.state.doc.content.size, paragraphs));
+    view.focus();
+  }, [fillText, fillNonce]);
+
+  // Snippets attached elsewhere in the window (the terminal panel) go in at the cursor.
+  useEffect(
+    () =>
+      sessionId
+        ? onFileAttachment(sessionId, (paths) => {
+            if (viewRef.current)
+              insertFileMentions(viewRef.current, paths, latest.current.fileScope);
+          })
+        : undefined,
+    [sessionId],
+  );
+  // Picks, annotations and screenshots from the preview (B3.5): the images join the attachments,
+  // the context becomes one attachment, and the input takes the focus.
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    const take = () => {
+      for (const draft of takeBrowserContexts(sessionId)) {
+        addFilesRef.current(
+          draft.images.map(
+            (image) => new File([image.blob], image.name, { type: image.blob.type }),
+          ),
+        );
+        setContexts((list) => [...list, pendingContext(crypto.randomUUID(), draft)]);
+        viewRef.current?.focus();
+      }
+    };
+    take();
+    return onBrowserContext(sessionId, take);
+  }, [sessionId]);
+  const insertNonce = insert?.nonce;
+  const insertSnippets = insert?.snippets;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || insertSnippets === undefined || insertNonce === undefined) return;
+    const nodes = insertSnippets.flatMap((snippet) => [
+      composerSchema.node('snippet', { ...snippet }),
+      composerSchema.text(' '),
+    ]);
+    view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(nodes), 0, 0)));
+    view.focus();
+  }, [insertSnippets, insertNonce]);
+
+  // Core's file search for the mention picker's query.
+  useEffect(() => {
+    if (!mention.active) {
+      return;
+    }
+    let current = true;
+    const query = mention.query;
+    mentions.search(query).then(
+      (items) => {
+        if (current) {
+          setResults({ query, items });
+        }
+      },
+      (failure: unknown) => {
+        // A newer search replaced this one: Core ends it as `cancelled`.
+        if (current && failureKind(failure) !== 'cancelled') {
+          console.error('[composer] the file search failed', failure);
+        }
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [mention.active, mention.query, mentions]);
+
+  const matches = mention.active && results.query === mention.query ? results.items : [];
+  const searching = mention.active && results.query !== mention.query;
+  const highlighted =
+    matches.length === 0
+      ? -1
+      : ((mention.index % matches.length) + matches.length) % matches.length;
+  const paletteMatches = palette.active ? paletteChoices(commands, palette) : [];
+  const paletteId = useId();
+  const paletteIndex =
+    paletteMatches.length === 0
+      ? -1
+      : ((palette.index % paletteMatches.length) + paletteMatches.length) % paletteMatches.length;
+  const queueKey = platform === 'darwin' ? '⌘↩' : 'Ctrl+Enter';
+  // Running with nothing typed, the button stops the turn; a draft turns it back into send (a
+  // steer). A press within SWAP_GUARD_MS of the swap is ignored: a double click does not do both.
+  // While dictating the button stays send: the words being spoken are the message.
+  const stopping = running && empty && pending.length === 0 && contexts.length === 0 && !dictating;
+  const swappedAt = useRef(Number.NEGATIVE_INFINITY);
+  const shownStop = useRef(stopping);
+  useEffect(() => {
+    if (shownStop.current !== stopping) swappedAt.current = performance.now();
+    shownStop.current = stopping;
+  }, [stopping]);
+  const swapGuard = () => performance.now() - swappedAt.current >= SWAP_GUARD_MS;
+  const problemText = (problem: AttachmentProblem): string => {
+    switch (problem.reason) {
+      case 'vision':
+        return t('composer.attachment.vision', { name: problem.name });
+      case 'type':
+        return t('composer.attachment.type', { name: problem.name });
+      case 'size':
+        return t('composer.attachment.size', {
+          name: problem.name,
+          limit: formatSize(problem.maxBytes),
+        });
+      case 'count':
+        return t('composer.attachment.count', { count: problem.maxCount });
+    }
+  };
+  const menuItems: MenuItem[] = [
+    {
+      id: 'attach',
+      label: t('composer.attach'),
+      icon: <PaperclipIcon />,
+      disabled: !limits?.kinds.length,
+      run: () => fileInput.current?.click(),
+    },
+    {
+      id: 'mention',
+      label: t('composer.mentions.label'),
+      icon: <FileCodeCornerIcon />,
+      run: () => {
+        const editor = viewRef.current;
+        if (!editor) return;
+        const { from, to } = editor.state.selection;
+        editor.dispatch(openMention(editor.state, from, to));
+        handlers.mentionOpened();
+        editor.focus();
+      },
+    },
+    {
+      id: 'commands',
+      label: t('composer.commands.label'),
+      icon: <CommandIcon />,
+      disabled: !empty,
+      run: () => {
+        const editor = viewRef.current;
+        if (!editor) return;
+        const { from, to } = editor.state.selection;
+        editor.dispatch(openCommands(editor.state, from, to));
+        handlers.command();
+        editor.focus();
+      },
+    },
+    ...(savedDraft !== undefined || firstTurn
+      ? [
+          {
+            id: 'skills',
+            label: t('skills.title'),
+            icon: <LayoutFreeformIcon />,
+            submenu: [
+              ...commands
+                .filter((c) => c.kind === 'skill')
+                .map((c) => ({
+                  id: c.name,
+                  label: c.name,
+                  tooltip: c.description,
+                  disabled: !empty,
+                  run: () => {
+                    const view = viewRef.current;
+                    if (view) insertCommand(view, c, 1, view.state.doc.content.size - 1);
+                  },
+                })),
+              {
+                id: 'manage-skills',
+                label: t('settings.skills'),
+                icon: <GearIcon />,
+                run: () => {
+                  void window.piarc.openSettings('skills');
+                },
+              },
+            ],
+          },
+          {
+            id: 'manage-connectors',
+            label: t('settings.mcp'),
+            icon: <UnplugIcon />,
+            run: () => {
+              void window.piarc.openSettings('mcp');
+            },
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div
+      className="composer"
+      data-testid="composer"
+      data-running={running}
+      onDragOver={(event) => {
+        if (
+          event.dataTransfer.types.includes('Files') ||
+          event.dataTransfer.types.includes(FILE_DRAG_TYPE)
+        ) {
+          event.preventDefault();
+        }
+      }}
+      onDrop={(event) => {
+        // A drop on the editor itself was taken by ProseMirror already.
+        if (event.defaultPrevented) {
+          return;
+        }
+        const paths = droppedFiles(event.dataTransfer, sessionId);
+        if (paths && viewRef.current) {
+          event.preventDefault();
+          insertFileMentions(viewRef.current, paths, latest.current.fileScope);
+          return;
+        }
+        const files = filesOf(event.dataTransfer);
+        if (files.length > 0) {
+          event.preventDefault();
+          addFiles(files);
+        }
+      }}
+    >
+      {above}
+      {mention.active ? (
+        <ul
+          className="interactive-list composer-popup mention-popup"
+          role="listbox"
+          data-testid="mention-popup"
+          aria-label={t('composer.mentions.label')}
+        >
+          {matches.length === 0 ? (
+            <li className="mention-empty">
+              {searching ? t('composer.mentions.searching') : t('composer.mentions.none')}
+            </li>
+          ) : (
+            matches.map((candidate, index) => (
+              <li
+                key={candidate.id}
+                role="option"
+                ref={index === highlighted ? revealListOption : undefined}
+                aria-selected={index === highlighted}
+                className={index === highlighted ? 'mention-option is-active' : 'mention-option'}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  const view = viewRef.current;
+                  if (view !== null) {
+                    view.dispatch(chooseMention(view.state, candidate));
+                    handlers.mentionChosen(candidate);
+                    mentions.cancel();
+                  }
+                }}
+              >
+                <FileCodeCornerIcon />
+                <span className="mention-label">{candidate.label}</span>
+                {/* A file at the root has no folder to add to its name. */}
+                {candidate.path === candidate.label ? null : (
+                  <span className="mention-path">{candidate.path}</span>
+                )}
+              </li>
+            ))
+          )}
+        </ul>
+      ) : null}
+      {palette.active ? (
+        <ul
+          className="interactive-list composer-popup command-popup"
+          data-tooltip-side="end"
+          role="listbox"
+          data-testid="command-popup"
+          aria-label={t('composer.commands.label')}
+        >
+          {paletteMatches.length === 0 ? (
+            <li className="mention-empty">{t('composer.commands.none')}</li>
+          ) : (
+            // One section per source: its heading stays at the top while its own commands
+            // scroll, and the next section's heading pushes it away.
+            paletteSections(paletteMatches).map(({ source, start: first, choices }) => (
+              <li
+                key={source}
+                className="command-section"
+                role="group"
+                aria-labelledby={`${paletteId}-${source}`}
+              >
+                <div
+                  id={`${paletteId}-${source}`}
+                  className="command-group"
+                  role="presentation"
+                  data-testid="command-group"
+                  data-source={source}
+                >
+                  <span className="command-group-label">{sourceLabel(t, source)}</span>
+                </div>
+                <ul className="command-section-list" role="none">
+                  {choices.map((choice, offset) => {
+                    const index = first + offset;
+                    const label = builtin(choice.name)?.label;
+                    return (
+                      <li
+                        key={choice.name}
+                        role="option"
+                        ref={index === paletteIndex ? revealListOption : undefined}
+                        aria-selected={index === paletteIndex}
+                        data-command={choice.name}
+                        data-kind={choice.kind}
+                        className={
+                          index === paletteIndex ? 'mention-option is-active' : 'mention-option'
+                        }
+                        data-tooltip={choice.description === '' ? undefined : choice.description}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          const view = viewRef.current;
+                          if (view === null) return;
+                          if (choice.kind !== 'builtIn') {
+                            insertCommand(view, choice, palette.from, view.state.selection.from);
+                            return;
+                          }
+                          view.dispatch(closeCommands(view.state));
+                          clearCommand()(view.state, view.dispatch.bind(view), view);
+                          handlers.runCommand?.(choice);
+                        }}
+                      >
+                        <span className="mention-label">
+                          /{choice.name}
+                          {choice.argumentHint === undefined ? null : (
+                            <span
+                              className="command-hint"
+                              data-testid="command-hint"
+                              title={t('composer.commands.args', { hint: choice.argumentHint })}
+                            >
+                              {' '}
+                              {choice.argumentHint}
+                            </span>
+                          )}
+                          {choice.kind === 'skill' ? (
+                            <span className="command-kind">
+                              {t('composer.commands.kind.skill')}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mention-path">
+                          {label === undefined ? choice.description : t(label)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))
+          )}
+        </ul>
+      ) : null}
+      {problems.length === 0 && error === undefined ? null : (
+        <div className="composer-problems" role="alert" data-testid="composer-problems">
+          {problems.map((problem, index) => (
+            <div key={index}>{problemText(problem)}</div>
+          ))}
+          {error === undefined ? null : <div>{error}</div>}
+        </div>
+      )}
+      {tray === undefined ? null : (
+        <div className="composer-tray" data-testid="composer-tray">
+          {tray}
+        </div>
+      )}
+      <div
+        className={`composer-box${disabled ? ' is-disabled' : ''}${voice.controller === undefined ? '' : ' has-mic'}${voice.controller !== undefined && dictationShown(voice.ui, voice.notice) ? ' is-dictating' : ''}`}
+      >
+        {voice.controller !== undefined && (
+          <DictationBar
+            controller={voice.controller}
+            ui={voice.ui}
+            notice={voice.notice}
+            announcement={voice.announcement}
+            reducedMotion={reducedMotion(preferences.appearance.reduceMotion)}
+          />
+        )}
+        {contexts.length === 0 && pending.length === 0 ? null : (
+          // One shelf for both kinds: two containers would share the grid's shelf area and
+          // draw over each other.
+          <div className="composer-attachments" data-testid="composer-attachments">
+            {contexts.map((context) => (
+              <BrowserContextChip
+                key={context.id}
+                context={context}
+                open={openContext === context.id}
+                onToggle={() => {
+                  setOpenContext((id) => (id === context.id ? undefined : context.id));
+                }}
+                onRemove={() => {
+                  setContexts((list) => list.filter((entry) => entry.id !== context.id));
+                }}
+              />
+            ))}
+            {pending.map((attachment) => (
+              <span
+                key={attachment.id}
+                className={`attachment-chip is-${attachment.kind}`}
+                data-testid="pending-attachment"
+                data-kind={attachment.kind}
+              >
+                <span className="attachment-chip-icon" aria-hidden="true">
+                  {attachment.kind === 'pdf' ? <FileGlyph size={20} /> : <ImageGlyph size={20} />}
+                </span>
+                <span className="attachment-chip-text">
+                  <span className="attachment-chip-name">{attachment.name}</span>
+                  <span className="attachment-chip-size">{formatSize(attachment.size)}</span>
+                </span>
+                <button
+                  type="button"
+                  className="attachment-remove"
+                  aria-label={t('composer.attachment.remove', { name: attachment.name })}
+                  data-tooltip={t('composer.attachment.remove', { name: attachment.name })}
+                  onClick={() => {
+                    setPending((list) => list.filter((entry) => entry.id !== attachment.id));
+                  }}
+                >
+                  <CloseGlyph size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <IconButton
+          label={t('composer.add')}
+          size="sm"
+          className="composer-attach"
+          data-testid="composer-add"
+          aria-haspopup="menu"
+          aria-expanded={add.open !== null}
+          disabled={disabled}
+          onClick={(event) => {
+            handlers.command();
+            add.openAbove(event.currentTarget);
+          }}
+        >
+          <PlusIcon />
+        </IconButton>
+        <input
+          ref={fileInput}
+          type="file"
+          hidden
+          aria-label={t('composer.attach')}
+          data-testid="composer-file-input"
+          accept={(limits?.kinds ?? []).flatMap((kind) => kind.mimeTypes).join(',')}
+          multiple
+          onChange={(event) => {
+            addFiles([...(event.currentTarget.files ?? [])]);
+            event.currentTarget.value = '';
+          }}
+        />
+        {add.open !== null && (
+          <MenuPopup
+            at={add.open}
+            onClose={add.close}
+            label={t('composer.add')}
+            items={menuItems}
+          />
+        )}
+        <div
+          ref={mount}
+          className="composer-mount"
+          data-empty={empty}
+          data-placeholder={
+            placeholder ??
+            (firstTurn
+              ? t('home.placeholder')
+              : running
+                ? t('composer.placeholder.running', { queue: queueKey })
+                : t('composer.placeholder'))
+          }
+        />
+        <div className="composer-lead">{leading}</div>
+        <div className="composer-trail">{trailing}</div>
+        {voice.controller !== undefined && (
+          <MicButton controller={voice.controller} ui={voice.ui} disabled={disabled} />
+        )}
+        {stopping ? (
+          <IconButton
+            key="stop"
+            label={t('composer.stop')}
+            keys="Escape"
+            size="sm"
+            className="composer-stop composer-swap"
+            data-testid="composer-stop"
+            onClick={() => {
+              if (swapGuard()) handlers.stop();
+            }}
+          >
+            <StopIcon />
+          </IconButton>
+        ) : (
+          <IconButton
+            key="send"
+            label={t(firstTurn ? 'home.send' : 'composer.send')}
+            keys="Enter"
+            size="sm"
+            className="composer-send composer-swap"
+            data-testid={firstTurn ? 'home-start' : 'composer-send'}
+            disabled={
+              disabled || (empty && pending.length === 0 && contexts.length === 0 && !dictating)
+            }
+            onClick={() => {
+              const editor = viewRef.current;
+              if (editor && swapGuard()) {
+                send.current(running ? 'steer' : 'send', editor);
+                editor.focus();
+              }
+            }}
+          >
+            <SendIcon />
+          </IconButton>
+        )}
+      </div>
+      <div className="visually-hidden" aria-live="polite">
+        {running ? t('composer.hint.running', { queue: queueKey }) : t('composer.hint.idle')}
+      </div>
+    </div>
+  );
+}
+
+/** Whether motion is reduced: the user's choice, or the system's when it follows the system. */
+function reducedMotion(choice: 'system' | 'on' | 'off'): boolean {
+  return (
+    choice === 'on' ||
+    (choice === 'system' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  );
+}
+
+const SOURCE_LABELS: Readonly<Record<string, MessageId>> = {
+  builtIn: 'composer.commands.source.builtIn',
+  projectPiarc: 'composer.commands.source.projectPiarc',
+  projectClaude: 'composer.commands.source.projectClaude',
+  projectPi: 'composer.commands.source.projectPi',
+  user: 'composer.commands.source.user',
+  userClaude: 'composer.commands.source.userClaude',
+  userPi: 'composer.commands.source.userPi',
+  plugin: 'composer.commands.source.plugin',
+  mcp: 'composer.commands.source.mcp',
+};
+
+/** The palette's group title of a command source. */
+export function sourceLabel(t: (id: MessageId) => string, source: string): string {
+  const id = Object.hasOwn(SOURCE_LABELS, source) ? SOURCE_LABELS[source] : undefined;
+  return id === undefined ? source : t(id);
+}
+
+/** A browser context attachment (B3.5): its page and item count, expandable to the items. */
+function BrowserContextChip({
+  context,
+  open,
+  onToggle,
+  onRemove,
+}: {
+  readonly context: PendingBrowserContext;
+  readonly open: boolean;
+  readonly onToggle: () => void;
+  readonly onRemove: () => void;
+}) {
+  const { t } = useApp();
+  const host = (() => {
+    try {
+      return new URL(context.url).host;
+    } catch {
+      return context.url;
+    }
+  })();
+  const label = t('composer.browserContext', {
+    host: revealBidi(host),
+    count: context.items.length,
+  });
+  const listId = `composer-browser-context-${context.id}`;
+  return (
+    <span className="attachment-chip is-browser" data-testid="pending-browser-context">
+      <button
+        type="button"
+        className="attachment-chip-text browser-context-toggle"
+        aria-expanded={open}
+        aria-controls={listId}
+        data-testid="pending-browser-context-toggle"
+        onClick={onToggle}
+      >
+        <span className="attachment-chip-name">{label}</span>
+      </button>
+      <button
+        type="button"
+        className="attachment-remove"
+        aria-label={t('composer.attachment.remove', { name: label })}
+        data-tooltip={t('composer.attachment.remove', { name: label })}
+        onClick={onRemove}
+      >
+        <CloseGlyph size={12} />
+      </button>
+      {open && (
+        <ol
+          id={listId}
+          className="browser-context-items"
+          data-testid="pending-browser-context-items"
+        >
+          {context.items.map((item) => (
+            <li key={item.n}>
+              <span className="browser-context-number">{item.n}</span>
+              <span className="browser-context-title">{revealBidi(item.title)}</span>
+              {item.comment.trim() === '' ? null : (
+                <span className="browser-context-comment">{item.comment}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </span>
+  );
+}

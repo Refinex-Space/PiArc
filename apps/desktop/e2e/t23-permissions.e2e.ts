@@ -1,0 +1,269 @@
+// T23-A08, A11, A12: "always allow" offers one prefix rule per subcommand, editable before
+// the native confirmation; a critical deletion offers none; Bypass permissions appears only
+// after it is enabled in settings (on the new-session view too) and still asks natively; the Permissions page adds, edits
+// and removes rules (allow rules behind the native confirmation) and filters the audit.
+// Screenshots go to tmp/evidence/T23/.
+import { openSettings, closeSettings } from './settings-panel.js';
+import { mkdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import type { ElectronApplication } from '@playwright/test';
+
+import { expect, makeWorkspace, openFolder, test } from './sessions.js';
+import { idle, openSession, prefer } from './t19.js';
+
+const EVIDENCE = path.join(import.meta.dirname, '..', '..', '..', 'tmp', 'evidence', 'T23');
+
+/** Answers every native message box with `responses` in turn and records each detail. */
+async function scriptDialogs(app: ElectronApplication, responses: number[]): Promise<void> {
+  await app.evaluate(({ dialog }, answers) => {
+    const seen: string[] = [];
+    (globalThis as { t23Dialogs?: string[] }).t23Dialogs = seen;
+    dialog.showMessageBox = (...args: unknown[]) => {
+      const options = args.at(-1) as { message?: string; detail?: string };
+      seen.push(`${options.message ?? ''}\n${options.detail ?? ''}`);
+      return Promise.resolve({ response: answers[seen.length - 1] ?? 1, checkboxChecked: false });
+    };
+  }, responses);
+}
+
+function dialogs(app: ElectronApplication): Promise<string[]> {
+  return app.evaluate(() => (globalThis as { t23Dialogs?: string[] }).t23Dialogs ?? []);
+}
+
+test('always allow saves one edited rule per subcommand; bypass needs settings and a native confirmation', async ({
+  page,
+  app,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  await mkdir(EVIDENCE, { recursive: true });
+  const { ws } = await openSession(
+    app,
+    page,
+    workspaces,
+    'permissions 权限',
+    't23-permissions',
+    'Check the rules',
+    { 'notes.txt': 'first line\nsecond line\n' },
+  );
+  const card = page.getByTestId('approval-card');
+  await expect(card).toContainText("awk 'NR==1' notes.txt && printenv HOME");
+  const rules = card.getByTestId('approval-rules');
+  await expect(rules).toHaveValue('Bash(awk *)\nBash(printenv *)');
+  await rules.fill('Bash(awk *)\nBash(printenv PATH *)\nBash(printenv HOME)');
+  // A short command shows whole and has no "Show full request" (I237: never wait for it).
+  const showFull = card.getByRole('button', { name: 'Show full request' });
+  if ((await showFull.count()) > 0) await showFull.click();
+  await card.screenshot({ path: path.join(EVIDENCE, 'always-allow-rules.png') });
+  await scriptDialogs(app, [0]);
+  await card.getByRole('button', { name: 'Always allow', exact: true }).click();
+  // The next command runs without a card: ls is read-only, the rest match the saved rules.
+  const critical = page.getByTestId('approval-card');
+  await expect(critical).toContainText('rm -rf ~');
+  expect(await dialogs(app)).toEqual([
+    'Save the permission rules below?\nRules to save (one per line)\nBash(awk *)\nBash(printenv PATH *)\nBash(printenv HOME)',
+  ]);
+  expect(
+    JSON.parse(await readFile(path.join(ws, '.piarc', 'settings.local.json'), 'utf8')),
+  ).toMatchObject({
+    permissions: { allow: ['Bash(awk *)', 'Bash(printenv PATH *)', 'Bash(printenv HOME)'] },
+  });
+  // A critical deletion cannot be allowed permanently.
+  await expect(critical.getByTestId('approval-rules')).toHaveCount(0);
+  await expect(critical.getByRole('button', { name: 'Always allow' })).toHaveCount(0);
+  await critical.screenshot({ path: path.join(EVIDENCE, 'critical-delete.png') });
+  await critical.getByRole('button', { name: 'Decline' }).click();
+  await idle(page);
+
+  // Bypass is not offered until the user enables it.
+  const modeButton = page.getByTestId('permission-mode');
+  await modeButton.click();
+  const menu = page.getByRole('menu', { name: 'Permission mode' });
+  await expect(menu.getByRole('menuitem', { name: /Plan/u })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: /Bypass permissions/u })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const settings = await openSettings(page);
+  await settings.getByTestId('settings-nav-permissions').click();
+  // A controlled checkbox: it turns on when the saved preference comes back.
+  await settings.getByTestId('setting-enable-bypass').click();
+  await expect(settings.getByTestId('setting-enable-bypass')).toBeChecked();
+  await settings.screenshot({ path: path.join(EVIDENCE, 'bypass-setting.png') });
+  await closeSettings(settings);
+  await scriptDialogs(app, [1, 0]);
+  await modeButton.click();
+  await menu.getByRole('menuitem', { name: /Bypass permissions/u }).click();
+  await expect(modeButton).toHaveText(/Manual/u);
+  await modeButton.click();
+  await menu.getByRole('menuitem', { name: /Bypass permissions/u }).click();
+  await expect(modeButton).toHaveText(/Bypass permissions/u);
+  await expect(page.getByTestId('mode-change-row').last()).toContainText('Bypass permissions');
+  const shown = await dialogs(app);
+  expect(shown).toHaveLength(2);
+  expect(shown[0]).toContain('Switch this session to Bypass permissions?');
+  await page.screenshot({ path: path.join(EVIDENCE, 'bypass-mode.png') });
+});
+
+test('the new-session view offers Bypass permissions once enabled and confirms it when sending', async ({
+  page,
+  app,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  await prefer(page, { key: 'language', value: 'en' });
+  const ws = await makeWorkspace(workspaces, 'bypass home 跳过', {});
+  await openFolder(page, app, ws);
+  const modeButton = page.getByTestId('home-mode');
+  await modeButton.click();
+  await expect(page.getByTestId('menu-plan')).toBeVisible();
+  await expect(page.getByTestId('menu-bypassPermissions')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const settings = await openSettings(page);
+  await settings.getByTestId('settings-nav-permissions').click();
+  await settings.getByTestId('setting-enable-bypass').click();
+  await expect(settings.getByTestId('setting-enable-bypass')).toBeChecked();
+  await closeSettings(settings);
+  await modeButton.click();
+  await page.getByTestId('menu-bypassPermissions').click();
+  await expect(modeButton).toHaveText(/Bypass permissions/u);
+
+  // Declining the native confirmation keeps the message on the new-session view, unsent.
+  await scriptDialogs(app, [1, 0]);
+  const message = 'Say hello [[piarc-scenario:t18-chat]]';
+  await page.getByTestId('home-input').fill(message);
+  await page.getByTestId('home-start').click();
+  await page.getByTestId('trust-accept').click();
+  await expect.poll(() => dialogs(app)).toHaveLength(1);
+  await expect(page.getByTestId('home')).toBeVisible();
+  await expect(page.getByTestId('conversation')).toHaveCount(0);
+  await expect(page.getByTestId('home-input')).toContainText('Say hello');
+  await expect(modeButton).toHaveText(/Bypass permissions/u);
+
+  // Confirming starts the session in Bypass permissions.
+  await page.getByTestId('home-start').click();
+  await expect(page.getByTestId('conversation')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('permission-mode')).toHaveText(/Bypass permissions/u);
+  await expect(page.getByTestId('agent-message')).toHaveText(/Done\./u, { timeout: 30_000 });
+  const shown = await dialogs(app);
+  expect(shown).toHaveLength(2);
+  expect(shown[1]).toContain('Switch this session to Bypass permissions?');
+  await page.screenshot({ path: path.join(EVIDENCE, 'bypass-new-session.png') });
+});
+
+test('the Permissions page edits rules by source behind a native confirmation and filters the audit', async ({
+  page,
+  app,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  await mkdir(EVIDENCE, { recursive: true });
+  const { ws } = await openSession(
+    app,
+    page,
+    workspaces,
+    'audit 审计',
+    't23-permissions',
+    'Check the rules',
+    { 'notes.txt': 'first line\nsecond line\n' },
+  );
+  // Decisions for the audit: decline the three cards of the turn.
+  const card = page.getByTestId('approval-card');
+  for (const command of ['printenv HOME', 'printenv PATH', 'rm -rf ~']) {
+    await expect(card).toContainText(command);
+    await card.getByRole('button', { name: 'Decline' }).click();
+  }
+  await idle(page);
+  const settings = await openSettings(page);
+  await settings.getByTestId('settings-nav-permissions').click();
+  const local = settings.getByTestId('permission-source-projectLocal');
+  await expect(local).toContainText('.piarc/settings.local.json');
+  await expect(settings.getByTestId('permission-source-user')).toBeVisible();
+  // The settings action has a soft painted surface inside a stable native hit target.
+  const add = local.getByTestId('permission-add-projectLocal');
+  const paint = () => add.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+  await expect(add).toHaveCSS('border-top-width', '0px');
+  await add.scrollIntoViewIfNeeded();
+  await settings.mouse.move(1, 1);
+  const rest = await paint();
+  expect(rest).not.toBe('rgba(0, 0, 0, 0)');
+  // Page scrolling can round the viewport position when the native button takes focus.
+  const localBounds = () =>
+    add.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      const parent = el.parentElement;
+      if (!parent) throw new Error('Missing rule section');
+      const section = parent.getBoundingClientRect();
+      return [rect.x - section.x, rect.y - section.y, rect.width, rect.height];
+    });
+  const bounds = await localBounds();
+  await add.hover();
+  await expect.poll(paint).not.toBe(rest);
+  await settings.mouse.down();
+  await expect(add).toBeFocused();
+  await expect
+    .poll(() => add.evaluate((el) => getComputedStyle(el, '::before').boxShadow))
+    .toBe('none');
+  expect(await localBounds()).toEqual(bounds);
+  // Release outside the button so the next click opens the rule editor.
+  await settings.mouse.move(1, 1);
+  await settings.mouse.up();
+  // Syntax is checked while typing; broad allow rules get a hint.
+  await local.getByTestId('permission-add-projectLocal').click();
+  const input = local.getByTestId('permission-rule-input');
+  await input.fill('Bash(git push *');
+  await expect(local.getByTestId('permission-check')).toContainText('Invalid');
+  await expect(local.getByTestId('permission-save')).toBeDisabled();
+  await input.fill('Bash(git *)');
+  await expect(local.getByTestId('permission-broad')).toBeVisible();
+  await settings.screenshot({ path: path.join(EVIDENCE, 'permissions-broad-hint.png') });
+  // A new allow rule asks natively; cancelling keeps the file unchanged.
+  await scriptDialogs(app, [1, 0, 0]);
+  await input.fill('Bash(git log *)');
+  await local.getByTestId('permission-save').click();
+  await expect.poll(() => dialogs(app)).toHaveLength(1);
+  await expect(local.getByTestId('permission-rule')).toHaveCount(0);
+  await local.getByTestId('permission-save').click();
+  await expect(local.getByTestId('permission-rule')).toHaveCount(1);
+  await expect(local.getByTestId('permission-rule')).toContainText('Bash(git log *)');
+  // Deny rules need no confirmation.
+  await local.getByTestId('permission-add-projectLocal').click();
+  await local.getByTestId('permission-behavior').selectOption('deny');
+  await local.getByTestId('permission-rule-input').fill('Read(.env)');
+  await local.getByTestId('permission-save').click();
+  await expect(local.getByTestId('permission-rule')).toHaveCount(2);
+  // Editing an allow rule asks again.
+  const allowRow = local.getByTestId('permission-rule').filter({ hasText: 'Bash(git log *)' });
+  await allowRow.getByRole('button', { name: 'Edit' }).click();
+  await local.getByTestId('permission-rule-input').fill('Bash(git log --oneline *)');
+  await local.getByTestId('permission-save').click();
+  await expect(local).toContainText('Bash(git log --oneline *)');
+  const shown = await dialogs(app);
+  expect(shown).toHaveLength(3);
+  expect(shown.every((d) => d.startsWith('Save this allow rule?'))).toBe(true);
+  expect(shown[2]).toContain('Replaces\nBash(git log *)');
+  expect(
+    JSON.parse(await readFile(path.join(ws, '.piarc', 'settings.local.json'), 'utf8')),
+  ).toMatchObject({
+    permissions: { allow: ['Bash(git log --oneline *)'], deny: ['Read(.env)'] },
+  });
+  const denyRow = local.getByTestId('permission-rule').filter({ hasText: 'Read(.env)' });
+  await denyRow.getByRole('button', { name: 'Remove' }).click();
+  await expect(local.getByTestId('permission-rule')).toHaveCount(1);
+  await settings.screenshot({ path: path.join(EVIDENCE, 'permissions-rules.png'), fullPage: true });
+  // The audit: filter by tool and outcome.
+  const audit = settings.getByTestId('permission-audit');
+  await audit.getByRole('button', { name: 'Refresh' }).click();
+  await expect(audit.getByTestId('audit-row').first()).toContainText('Bash');
+  await audit.getByTestId('audit-tool').fill('Bash');
+  await audit.getByTestId('audit-conclusion').selectOption('deny');
+  await expect(audit.getByTestId('audit-row')).toHaveCount(3);
+  await expect(audit.getByTestId('audit-row').first()).toContainText('Denied');
+  await audit.getByTestId('audit-conclusion').selectOption('allow');
+  await expect(audit.getByTestId('audit-row')).toHaveCount(0);
+  await audit.getByTestId('audit-tool').fill('');
+  await audit.getByTestId('audit-conclusion').selectOption('');
+  await audit.getByTestId('audit-session').fill('no-such-session');
+  await expect(audit.getByTestId('audit-row')).toHaveCount(0);
+  await audit.getByTestId('audit-session').fill('');
+  await expect(audit.getByTestId('audit-row').first()).toBeVisible();
+  await audit.screenshot({ path: path.join(EVIDENCE, 'permissions-audit.png') });
+});

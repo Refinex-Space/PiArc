@@ -1,0 +1,978 @@
+/* The blank workspace and transcript share one reading column and one bottom input surface. */
+.home.workbench-home {
+  overflow: auto;
+}
+.environment-stage {
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  min-height: min-content;
+  padding: var(--piarc-space-4);
+  padding-block-end: calc(var(--piarc-space-4) + min(5vh, 44px));
+}
+/* The new session page's hero: the mascot (shell/Mascot.tsx) over one line naming the project,
+   a little above the middle of the empty stage. The mascot's blocks are the working mark's ink;
+   its frames are switched by script, which holds still when this entrance animation is cut to
+   nothing ("reduce motion", app.css). */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--piarc-space-5);
+  max-width: 100%;
+  margin-block-end: min(8vh, 72px);
+}
+.home-mascot {
+  display: block;
+  max-width: 100%;
+  color: var(--piarc-accent-solid);
+  shape-rendering: crispEdges;
+  pointer-events: none;
+  user-select: none;
+  animation: mascot-enter var(--piarc-motion-slow) var(--piarc-motion-curve-out) both;
+}
+.home-mascot path {
+  fill: currentColor;
+}
+@keyframes mascot-enter {
+  from {
+    opacity: 0;
+  }
+}
+@media (forced-colors: active) {
+  .home-mascot {
+    color: CanvasText;
+  }
+}
+.home-greeting {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  max-width: 100%;
+  margin: 0;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-display);
+  font-weight: var(--piarc-font-weight-regular);
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+}
+/* The project in the sentence opens the project menu; it reads as part of the line. */
+:root[data-app] .home-greeting .choice-button.home-greeting-project {
+  min-width: 0;
+  max-width: 14em;
+  min-height: 0;
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--piarc-text-secondary);
+  text-underline-offset: 0.2em;
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+:root[data-app] .home-greeting .choice-button.home-greeting-project:hover,
+:root[data-app] .home-greeting .choice-button.home-greeting-project[aria-expanded='true'] {
+  background: var(--piarc-surface-hover);
+}
+/* The project menu opens inside the line: it keeps the menu's own type and alignment. */
+.home-greeting > :not(.choice-button) {
+  font-size: var(--piarc-font-size-body);
+  line-height: normal;
+  text-align: start;
+}
+@media (max-height: 560px) {
+  .home-mascot {
+    display: none;
+  }
+}
+.home[data-starting='true'] .environment-stage {
+  place-items: stretch center;
+  padding: 0 0 var(--piarc-space-2);
+}
+.home-pending {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: min(calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter)), 100%);
+  box-sizing: border-box;
+  padding: var(--piarc-session-block-gap) var(--piarc-session-gutter) 0;
+  font-size: var(--piarc-session-prose);
+  line-height: var(--piarc-session-prose-line);
+}
+/* The transcript's rows, without the generic row's centred measure (the column has it). */
+.home-pending > .row {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  line-height: inherit;
+}
+.home-pending > .row-working {
+  padding-inline-start: var(--piarc-session-text-inset);
+}
+@container (max-width: 560px) {
+  .home-pending {
+    padding-inline: var(--piarc-session-gutter-narrow);
+  }
+}
+.choice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  min-height: var(--piarc-space-5);
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  user-select: none;
+}
+.choice-button:is(:hover, [aria-expanded='true']):enabled {
+  background: var(--piarc-surface-hover);
+}
+.choice-button:disabled {
+  color: var(--piarc-text-disabled);
+}
+.choice-button > svg,
+.mention-option > svg {
+  flex-shrink: 0;
+}
+/* The input sits on the reading column: the measure plus the session gutters, narrower gutters in
+   a narrow pane. One row is 44 px (28 px controls in 8 px of padding) in either density. */
+.home,
+.conversation {
+  container-type: inline-size;
+}
+.home .conversation-composer,
+.conversation .conversation-composer {
+  flex: none;
+  box-sizing: border-box;
+  width: min(calc(var(--piarc-session-measure) + 2 * var(--piarc-session-gutter)), 100%);
+  min-width: 0;
+  margin-inline: auto;
+  padding: var(--piarc-space-2) var(--piarc-session-gutter) var(--piarc-space-4);
+  border: 0;
+  background: transparent;
+}
+@container (max-width: 560px) {
+  .home .conversation-composer,
+  .conversation .conversation-composer {
+    padding-inline: var(--piarc-session-gutter-narrow);
+  }
+}
+.conversation-composer .composer {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+.composer .composer-box {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'shelf shelf shelf shelf'
+    'editor editor editor editor'
+    'add lead trail send';
+  align-items: center;
+  gap: 0 var(--piarc-space-1);
+  padding: var(--piarc-session-composer-pad);
+  border: 0;
+  border-radius: var(--piarc-workbench-composer-radius);
+  background: var(--piarc-workbench-editor);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-workbench-composer-shadow);
+  cursor: text;
+  transition: box-shadow var(--piarc-motion-normal) var(--piarc-motion-easing);
+}
+:root[data-app] .composer-box:focus-within {
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-composer-shadow-focus);
+}
+/* Keep a composed draft readable while the user decides workspace trust. */
+.composer .composer-box.is-disabled {
+  opacity: 1;
+  cursor: default;
+}
+.composer-box > .composer-attach {
+  grid-area: add;
+}
+.composer-box > .composer-mount {
+  grid-area: editor;
+  align-self: stretch;
+}
+.composer-box > .composer-lead {
+  grid-area: lead;
+}
+.composer-box > .composer-trail {
+  grid-area: trail;
+  justify-content: flex-end;
+}
+.composer-box > .composer-swap {
+  grid-area: send;
+  animation: composer-swap-in var(--piarc-motion-fast) var(--piarc-motion-curve-out)
+    calc(var(--piarc-motion-fast) * 2 / 3) backwards;
+}
+@keyframes composer-swap-in {
+  from {
+    opacity: 0;
+  }
+}
+.composer-box .icon-button.is-sm {
+  --icon-button-size: var(--piarc-session-composer-row);
+  border-radius: var(--piarc-c-button-radius);
+  color: var(--piarc-text-primary);
+}
+.composer-box .icon-button.is-sm svg {
+  width: var(--piarc-session-icon-large);
+  height: var(--piarc-session-icon-large);
+}
+.composer-box .icon-button.is-sm:disabled {
+  color: var(--piarc-text-disabled);
+}
+@media (forced-colors: active) {
+  .composer-box,
+  .notice {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  .composer-box .composer-stop {
+    border: 1px solid ButtonText;
+  }
+}
+
+.composer-box > .icon-button.is-sm:is(.composer-swap, .composer-mic) {
+  border-radius: var(--piarc-radius-pill);
+}
+/* Send is the card's one filled control once there is something to send. */
+:root[data-app] .composer-box > .composer-send:enabled {
+  background: var(--piarc-c-button-primary-background);
+  color: var(--piarc-c-button-primary-text);
+}
+:root[data-app] .composer-box > .composer-send:enabled:hover {
+  background: var(--piarc-c-button-primary-background-hover);
+}
+.composer-box .composer-stop {
+  background: var(--piarc-session-fill-hover);
+}
+.composer-box .composer-stop svg {
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+.composer .composer-editor,
+.composer-mount[data-empty='true']::before,
+.home[data-starting='true'] .composer-mount::before {
+  font-size: var(--piarc-session-prose);
+  line-height: var(--piarc-session-prose-line);
+}
+.composer .composer-editor {
+  box-sizing: border-box;
+  min-height: calc(2 * var(--piarc-session-prose-line) + 2 * var(--piarc-space-2));
+  max-height: min(384px, 40vh);
+  padding: var(--piarc-space-2);
+}
+.home[data-starting='true'] .composer-mount::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  pointer-events: none;
+}
+.home[data-starting='true'] .composer .composer-editor {
+  max-height: calc(2 * var(--piarc-session-prose-line) + 2 * var(--piarc-space-2));
+  overflow: hidden;
+  opacity: 0;
+}
+.composer .composer-mount[data-empty='true']::before,
+.home[data-starting='true'] .composer .composer-mount::before {
+  top: var(--piarc-space-2);
+  left: var(--piarc-space-2);
+  right: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--piarc-text-secondary);
+}
+/* A mention in the editor reads as a link-colored word, a terminal snippet as a quiet chip. */
+.composer-editor .mention-chip {
+  margin-inline: 2px;
+  padding: 0;
+  border-radius: var(--piarc-radius-md);
+  background: none;
+  color: var(--piarc-text-accent);
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    box-shadow var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+.composer-editor .mention-chip:hover {
+  background: var(--piarc-session-ghost-hover);
+  box-shadow: 0 0 0 2px var(--piarc-session-ghost-hover);
+}
+/* A picked command or skill (ADR-0080): its name in the accent ink after a quiet slash, a soft
+   glow under the pointer; its description is the tooltip. */
+.composer-editor .command-chip {
+  margin-inline: 2px;
+  border-radius: var(--piarc-radius-md);
+  color: var(--piarc-text-accent);
+  font-weight: var(--piarc-font-weight-medium);
+  white-space: nowrap;
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    box-shadow var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+.composer-editor .command-chip:hover {
+  background: var(--piarc-session-ghost-hover);
+  box-shadow: 0 0 0 2px var(--piarc-session-ghost-hover);
+}
+.composer-editor .command-chip-slash {
+  opacity: 0.5;
+}
+.composer-editor .snippet-chip {
+  padding: 0 var(--piarc-space-1);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-primary);
+}
+/* Attachments waiting to be sent: file cards above the editor row. */
+.composer-box > .composer-attachments {
+  grid-area: shelf;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-session-gap-xs);
+  margin: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-1) calc(var(--piarc-space-2) + 2px);
+  cursor: default;
+}
+.composer-attachments .attachment-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  box-sizing: border-box;
+  min-width: 120px;
+  max-width: 240px;
+  height: var(--piarc-workbench-composer-height);
+  padding: 0 var(--piarc-session-pad-md) 0 var(--piarc-session-pad-sm);
+  border: 0;
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-workbench-editor);
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+}
+.composer-attachments .attachment-chip-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--piarc-session-composer-row);
+  height: var(--piarc-session-composer-row);
+  border-radius: var(--piarc-session-radius);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+}
+.attachment-chip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.composer-attachments .attachment-chip-name {
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-chip-size {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  line-height: var(--piarc-session-caption-line);
+  font-variant-numeric: tabular-nums;
+}
+.composer-attachments .attachment-remove {
+  position: absolute;
+  top: calc(-1 * var(--piarc-space-2));
+  right: calc(-1 * var(--piarc-space-2));
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--piarc-workbench-editor);
+  box-shadow:
+    inset 0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-lift-shadow);
+  color: var(--piarc-text-secondary);
+  opacity: 0;
+  transition: opacity var(--piarc-motion-fast) var(--piarc-motion-curve-snap);
+}
+.attachment-chip:hover > .attachment-remove,
+.attachment-remove:focus-visible {
+  opacity: 1;
+}
+.composer-attachments .attachment-remove:hover {
+  color: var(--piarc-text-primary);
+}
+@media (hover: none) {
+  .composer-attachments .attachment-remove {
+    opacity: 1;
+  }
+}
+/* The action row inside the card: + and the permission mode with its status at the start; the
+   model with its effort and the context ring before the microphone and send. */
+.composer-box > :is(.composer-lead, .composer-trail) {
+  display: flex;
+  align-items: center;
+  gap: 0 var(--piarc-space-1);
+  min-width: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+  cursor: default;
+}
+.composer-box > .composer-lead:empty,
+.composer-box > .composer-trail:empty {
+  display: none;
+}
+:is(.composer-lead, .composer-trail) .choice-button,
+.composer-tray .choice-button {
+  height: var(--piarc-session-composer-row);
+  min-height: 0;
+  max-width: var(--piarc-workbench-environment-width);
+  padding: 0 var(--piarc-session-pad-sm);
+  border-radius: var(--piarc-radius-pill);
+  overflow: hidden;
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-regular);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-curve-out),
+    color var(--piarc-motion-surface) var(--piarc-motion-curve-out);
+}
+:is(.composer-lead, .composer-trail, .composer-tray)
+  .choice-button:is(:hover, [aria-expanded='true']):enabled {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+.composer-trail .choice-button {
+  flex: 0 1 auto;
+}
+/* The model reads first and its effort follows as a quieter tail, as one label with two targets. */
+.composer-trail .choice-button.composer-model {
+  color: var(--piarc-text-primary);
+}
+.composer-trail .composer-model + .composer-effort {
+  margin-inline-start: calc(-1 * var(--piarc-space-1));
+}
+.composer-lead .choice-button[data-mode='bypassPermissions'] {
+  color: var(--piarc-text-warning);
+}
+.composer-trail .choice-button[data-top-tier] {
+  color: var(--piarc-text-accent);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.composer-lead .tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Where the work runs: a tinted tray inset from the card and tucked under its top edge. */
+.composer > .composer-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  margin: 0 var(--piarc-space-3) calc(-1 * var(--piarc-workbench-composer-radius));
+  padding: var(--piarc-space-1) var(--piarc-space-2)
+    calc(var(--piarc-workbench-composer-radius) + var(--piarc-space-1));
+  border-radius: var(--piarc-workbench-composer-radius) var(--piarc-workbench-composer-radius) 0 0;
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+.composer-tray .choice-button > svg,
+.composer-tray-item > svg {
+  flex: none;
+  width: var(--piarc-session-icon);
+  height: var(--piarc-session-icon);
+}
+.composer-tray .choice-button {
+  gap: var(--piarc-session-pad-xs);
+}
+.composer-tray-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-session-pad-xs);
+  min-width: 0;
+  height: var(--piarc-session-composer-row);
+  padding: 0 var(--piarc-session-pad-sm);
+}
+.composer-tray .worktree-fields {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  padding: 0 var(--piarc-session-pad-sm) var(--piarc-space-1);
+}
+.composer-tray .worktree-fields .field-row {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-1) var(--piarc-space-2);
+  min-width: 0;
+}
+.composer-tray .worktree-fields .input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  height: var(--piarc-session-composer-row);
+  border-color: var(--piarc-session-line);
+  background: var(--piarc-workbench-editor);
+  font-size: var(--piarc-session-footnote);
+}
+.composer-tray .worktree-fields .field-label {
+  flex: none;
+}
+@media (forced-colors: active) {
+  .composer > .composer-tray {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+}
+.composer-trail .usage-ring {
+  justify-content: center;
+  min-width: var(--piarc-session-composer-row);
+  height: var(--piarc-session-composer-row);
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: calc(var(--piarc-session-radius) - 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.composer-trail .usage-ring:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+.composer-trail .usage-ring[data-level='normal'] .usage-ring-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+/* Menus and the input's pickers share one frame: a hairline ring over the popover shadow. */
+.composer .composer-popup,
+.interactive-list.menu {
+  max-height: min(58vh, 32rem);
+  border: 0;
+  border-radius: var(--piarc-workbench-menu-radius);
+  box-shadow:
+    0 0 0 1px var(--piarc-session-line),
+    var(--piarc-session-popover-shadow);
+  background: var(--piarc-surface-raised);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+}
+.composer .composer-popup {
+  left: calc(var(--piarc-session-composer-pad) + var(--piarc-space-1));
+  max-width: calc(100% - 2 * var(--piarc-space-4));
+  max-height: min(384px, 58vh);
+  margin-bottom: var(--piarc-space-2);
+  padding: var(--piarc-session-pad-xs);
+  /* Neighbouring rows keep 2 px apart: a hovered row never merges with the selected one. */
+  row-gap: 2px;
+  z-index: 5;
+}
+.composer .command-popup {
+  width: max-content;
+  min-width: min(240px, 100%);
+  max-width: min(512px, calc(100% - 2 * var(--piarc-space-4)));
+}
+.composer .mention-popup {
+  width: min(420px, calc(100% - 2 * var(--piarc-space-4)));
+}
+.composer .mention-option,
+.composer .mention-empty {
+  align-items: center;
+  gap: var(--piarc-session-gap-xs);
+  min-height: var(--piarc-session-row);
+  box-sizing: border-box;
+  padding: calc((var(--piarc-session-row) - var(--piarc-session-body-line)) / 2)
+    calc(var(--piarc-session-pad-sm) + 2px);
+  border-radius: var(--piarc-session-radius);
+}
+.composer .mention-empty {
+  color: var(--piarc-text-secondary);
+}
+.composer-popup .mention-label {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  color: var(--piarc-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-popup .mention-path {
+  flex: 1;
+  min-width: 0;
+  margin-inline-start: auto;
+  padding-inline-start: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  text-align: end;
+}
+.composer .mention-popup .mention-path {
+  text-align: start;
+}
+/* One section per source. Its heading stays at the top while its own commands scroll under it
+   and the next section's heading pushes it away; a hairline across the list and some air
+   above it close the previous section. */
+.composer .command-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.composer .command-section + .command-section {
+  margin-top: var(--piarc-space-2);
+  border-top: 1px solid var(--piarc-session-line);
+  margin-inline: calc(-1 * var(--piarc-session-pad-xs));
+  padding-inline: var(--piarc-session-pad-xs);
+}
+.composer .command-section-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.composer .command-group {
+  position: sticky;
+  top: calc(-1 * var(--piarc-session-pad-xs));
+  z-index: 1;
+  margin-inline: calc(-1 * var(--piarc-session-pad-xs));
+  padding: 0;
+  container-type: scroll-state;
+}
+.composer .command-group-label {
+  display: block;
+  padding: var(--piarc-space-2)
+    calc(var(--piarc-session-pad-sm) + 2px + var(--piarc-session-pad-xs)) var(--piarc-space-1);
+  border-bottom: 1px solid transparent;
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: var(--piarc-session-footnote-line);
+  transition: border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.composer .command-section + .command-section .command-group-label {
+  padding-top: var(--piarc-space-3);
+}
+/* Stuck over scrolled commands, the heading ends in a hairline instead of cutting a row. */
+@container scroll-state(stuck: top) {
+  .composer .command-group-label {
+    border-bottom-color: var(--piarc-session-line);
+  }
+}
+.composer .command-hint {
+  color: var(--piarc-text-secondary);
+}
+.composer .command-kind {
+  margin-inline-start: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-caption);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.menu-item-line {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.menu-item-text {
+  flex: 1;
+}
+.menu-item-line svg {
+  flex-shrink: 0;
+}
+.composer .menu .icon,
+.composer .mention-popup .icon {
+  stroke-width: 1;
+}
+.menu-shortcut,
+.menu-heading {
+  font-size: var(--piarc-font-size-small);
+  color: var(--piarc-text-secondary);
+}
+.menu-heading {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+}
+.menu-filter {
+  display: block;
+  width: calc(100% + 2 * var(--piarc-space-1));
+  box-sizing: border-box;
+  margin: calc(var(--piarc-space-1) * -1) calc(var(--piarc-space-1) * -1) var(--piarc-space-1);
+  padding: var(--piarc-space-2);
+  border: 0;
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  appearance: none;
+}
+.interactive-list.menu {
+  --menu-edge: var(--piarc-space-2);
+  min-width: min(8rem, calc(100vw - 2 * var(--menu-edge)));
+  max-width: min(23rem, calc(100vw - 2 * var(--menu-edge)));
+  max-height: min(58vh, 32rem, calc(100vh - 2 * var(--menu-edge)));
+}
+.interactive-list.menu[hidden] {
+  display: none;
+}
+.interactive-list.menu .menu-item {
+  min-height: var(--piarc-session-row);
+  box-sizing: border-box;
+  border-radius: var(--piarc-session-radius);
+}
+.interactive-list.menu .menu-item.is-active,
+.composer .composer-popup .is-active {
+  background: var(--piarc-session-ghost-hover);
+}
+
+@media (forced-colors: active) {
+  :root[data-app] .composer-box .composer-send {
+    transition: none;
+    forced-color-adjust: none;
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+  :root[data-app] .composer-box .composer-send:disabled {
+    opacity: 1;
+    border: 1px dashed GrayText;
+  }
+}
+
+/* A browser context attachment (B3.5): page and item count, expandable to its numbered items. */
+.composer-attachments .attachment-chip.is-browser {
+  max-width: 320px;
+}
+.browser-context-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.browser-context-toggle:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 2px;
+}
+.browser-context-items {
+  position: absolute;
+  bottom: calc(100% + var(--piarc-space-1));
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  width: max-content;
+  max-width: 360px;
+  max-height: 240px;
+  margin: 0;
+  padding: var(--piarc-space-2);
+  overflow-y: auto;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-small);
+  list-style: none;
+}
+.browser-context-items li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--piarc-space-2);
+}
+.browser-context-number {
+  grid-row: 1 / span 2;
+  color: var(--piarc-text-accent);
+  font-variant-numeric: tabular-nums;
+}
+.browser-context-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-context-comment {
+  color: var(--piarc-text-secondary);
+}
+
+/* Voice dictation (ADR-0094, addendum V-2): the microphone sits between the editor and send (send
+   keeps its own place and look). While dictation is active, failed or has a notice, its strip
+   takes the action row from `+` to the model controls, which step aside until it ends: cancel
+   where `+` was, the waveform across the row, the recording mark and time beside stop. */
+.composer .composer-box.has-mic {
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas:
+    'shelf shelf shelf shelf shelf'
+    'editor editor editor editor editor'
+    'add lead trail mic send';
+}
+.composer .composer-box.has-mic.is-dictating {
+  grid-template-areas:
+    'shelf shelf shelf shelf shelf'
+    'editor editor editor editor editor'
+    'voice voice voice mic send';
+}
+.composer-box.is-dictating > :is(.composer-attach, .composer-lead, .composer-trail) {
+  display: none;
+}
+.composer-box > .composer-mic {
+  grid-area: mic;
+}
+.composer-box .composer-mic.is-recording {
+  background: var(--piarc-session-fill);
+}
+.composer-box .composer-mic.is-recording:hover {
+  background: var(--piarc-session-fill-hover);
+}
+.composer-box .composer-mic.is-busy {
+  color: var(--piarc-text-secondary);
+}
+.composer-box > .composer-dictation {
+  grid-area: voice;
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  min-height: var(--piarc-session-composer-row);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  cursor: default;
+  animation: dictation-in var(--piarc-motion-normal) var(--piarc-motion-curve-out) backwards;
+}
+@keyframes dictation-in {
+  from {
+    opacity: 0;
+  }
+}
+.composer-dictation .dictation-cancel {
+  flex: none;
+  border-radius: var(--piarc-radius-pill);
+}
+.composer-dictation.is-error {
+  color: var(--piarc-text-danger);
+}
+.composer-dictation .dictation-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  white-space: nowrap;
+}
+.composer-dictation.is-error .dictation-status {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The recording mark and the time stay put next to stop while the waveform moves. */
+.composer-dictation.is-recording .dictation-status {
+  padding-inline-end: var(--piarc-space-1);
+}
+.composer-dictation .dictation-dot {
+  inline-size: var(--piarc-space-2);
+  block-size: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-state-danger);
+  animation: dictation-pulse 1.2s var(--piarc-motion-easing) infinite alternate;
+}
+@keyframes dictation-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+.composer-dictation .dictation-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+.composer-dictation .dictation-notice {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Above `:root[data-app] button`, which would hand it the strip's ink and line height. */
+.composer-box > .composer-dictation .dictation-action {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  block-size: calc(var(--piarc-session-composer-row) - var(--piarc-space-1));
+  padding: 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+.composer-box > .composer-dictation .dictation-action:hover {
+  background: var(--piarc-session-fill-hover);
+}
+.composer-dictation .dictation-action:focus-visible {
+  outline: 2px solid var(--piarc-accent-solid);
+  outline-offset: 1px;
+}
+/* Neutral ink like the text around it; the older bars fade out on the left, the newest slide in
+   on the right. */
+.composer-dictation .dictation-waveform {
+  flex: 1 1 auto;
+  min-width: 0;
+  block-size: calc(var(--piarc-session-composer-row) - var(--piarc-space-1));
+  color: var(--piarc-text-secondary);
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 98%, transparent);
+}
+/* The running hypothesis at the insertion point, and text still being checked. */
+.composer .dictation-partial {
+  color: var(--piarc-text-secondary);
+}
+.composer .dictation-provisional {
+  text-decoration: underline dotted var(--piarc-text-secondary);
+  text-underline-offset: 3px;
+}
+@media (forced-colors: active) {
+  .composer-box .composer-mic.is-recording {
+    forced-color-adjust: none;
+    color: Highlight;
+    border: 1px solid Highlight;
+  }
+  .composer-dictation .dictation-waveform {
+    mask-image: none;
+  }
+  .composer-dictation .dictation-dot {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+}

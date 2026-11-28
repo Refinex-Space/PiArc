@@ -1,0 +1,17 @@
+{
+  "id": "t19-chat",
+  "steps": [
+    {
+      "text": "**First**."
+    },
+    {
+      "text": "Second."
+    },
+    {
+      "text": "Third."
+    },
+    {
+      "text": "Fourth."
+    }
+  ]
+}

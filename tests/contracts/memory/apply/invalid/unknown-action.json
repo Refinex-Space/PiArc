@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "memory/apply",
+  "params": { "sessionId": "session-a", "toolCallId": "call-7", "action": "append" }
+}

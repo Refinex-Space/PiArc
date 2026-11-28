@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/agentMessage/deltas",
+  "params": {
+    "sessionId": "ses_01",
+    "seq": 3,
+    "ts": 1794643200003,
+    "turnId": "turn_01",
+    "itemId": "item_01",
+    "delta": "Hel"
+  }
+}

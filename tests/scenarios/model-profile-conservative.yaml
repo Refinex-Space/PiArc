@@ -1,0 +1,33 @@
+id: model-profile-conservative
+description: A keyless local endpoint's model has low tool reliability and gets the conservative Tool Profile - a smaller tool set with step-by-step descriptions and a task list reminder after three rounds without a list - while permission rules still match canonical names (T29).
+capabilities: [CAP-MODEL-PROFILE-001]
+workspace:
+  files:
+    a.txt: "alpha\n"
+  run_files:
+    data 数据/settings.json: '{"permissions":{"allow":["Bash(sed -n 1p a.txt)"]}}'
+providers:
+  local:
+    wire: openai
+    configure_as: local
+    steps:
+      - tool_calls: [{ id: s, name: Bash, input: { command: sed -n 1p a.txt } }]
+      - tool_calls: [{ id: r, name: Read, input: { path: a.txt } }]
+      - tool_calls: [{ id: g, name: Glob, input: { pattern: '*.txt' } }]
+      - text: Done.
+sessions:
+  main: { provider: local }
+actions:
+  - prompt: { text: 'Check a.txt [[piarc-scenario:model-profile-conservative]]', turn: one }
+expect:
+  request_counts: { local: 4 }
+  requests:
+    - index: 0
+      tools_include: [Read, Write, Edit, Glob, Grep, TodoWrite]
+      tools_exclude: [WebFetch, EnterPlanMode, ExitPlanMode, AskUserQuestion, SuggestNextSteps]
+      contains:
+        [Make the list at the start of work with several steps, Do not use it to read or edit files]
+    - index: 1
+      tool_results: [{ id: s, contains: alpha }]
+    - index: 3
+      contains: [there is no task list yet]

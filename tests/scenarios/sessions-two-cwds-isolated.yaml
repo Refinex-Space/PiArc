@@ -1,0 +1,65 @@
+id: sessions-two-cwds-isolated
+description: Two sessions of one workspace with different working directories run at the same time; each tool resolves paths in its own directory and neither session sees the other's files or requests.
+capabilities: [CAP-SESSION-MULTI-001]
+workspace:
+  files:
+    'alpha dir/note.txt': "alpha note\n"
+    'beta 目录/note.txt': "beta note\n"
+providers:
+  one:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_a_read, name: Read, input: { path: note.txt } }
+      - tool_calls:
+          - { id: toolu_a_write, name: Write, input: { path: out.txt, content: "written by a\n" } }
+      - text: 'Session a done.'
+  two:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_b_read, name: Read, input: { path: note.txt } }
+      - tool_calls:
+          - { id: toolu_b_write, name: Write, input: { path: out.txt, content: "written by b\n" } }
+      - text: 'Session b done.'
+sessions:
+  a: { provider: one, cwd: 'alpha dir' }
+  b: { provider: two, cwd: 'beta 目录' }
+approvals:
+  - { tool: Write, decision: allow }
+  - { tool: Write, decision: allow }
+actions:
+  - prompt: { session: a, text: 'Copy the note.', turn: ta }
+  - prompt: { session: b, text: 'Copy the note.', turn: tb }
+expect:
+  events:
+    - {
+        session: a,
+        method: item/completed,
+        params: { item: { itemId: toolu_a_read, status: completed } },
+      }
+    - { session: a, method: turn/completed, turn: ta, params: { status: completed } }
+    - {
+        session: b,
+        method: item/completed,
+        params: { item: { itemId: toolu_b_read, status: completed } },
+      }
+    - { session: b, method: turn/completed, turn: tb, params: { status: completed } }
+  files:
+    'alpha dir/out.txt': "written by a\n"
+    'beta 目录/out.txt': "written by b\n"
+    'out.txt': null
+  requests:
+    - {
+        provider: one,
+        index: 1,
+        tool_results: [{ id: toolu_a_read, is_error: false, contains: alpha note }],
+        not_contains: [beta note, toolu_b_],
+      }
+    - {
+        provider: two,
+        index: 1,
+        tool_results: [{ id: toolu_b_read, is_error: false, contains: beta note }],
+        not_contains: [alpha note, toolu_a_],
+      }
+  request_counts: { one: 3, two: 3 }

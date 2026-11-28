@@ -1,0 +1,46 @@
+id: hooks-m5-worktree
+description: A trusted hook creates an isolated directory in a non-Git workspace. Cleanup waits for confirmation and a failing removal preserves the directory.
+capabilities: [CAP-HOOK-WORKTREE-001, CAP-HOOK-M5-001]
+workspace:
+  trusted: true
+  fixtures:
+    worktree.mjs: hooks/worktree.mjs.txt
+  files:
+    .piarc/settings.json: |
+      {"hooks":{"WorktreeCreate":[{"hooks":[{"type":"command","command":"node worktree.mjs"}]}],"WorktreeRemove":[{"hooks":[{"type":"command","command":"node worktree.mjs"}]}]}}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: nested
+            name: Agent
+            input:
+              {
+                description: Inspect,
+                prompt: Inspect.,
+                subagent_type: general-purpose,
+                isolation: worktree,
+              }
+      - text: The creation hook refused the second directory.
+sessions:
+  main: { provider: main, mode: acceptEdits, worktree: { name: review } }
+actions:
+  - write_file: { path: fail-create, content: fail }
+  - prompt: { text: Start., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - check_worktree: { fields: { path: .piarc/worktrees/isolated-review, exists: true } }
+  - set_prefs: { archived: true }
+  - advance_clock: { seconds: 2592001 }
+  - sweep_worktrees: { waiting: [main] }
+  - write_file: { path: fail-remove, content: fail }
+  - remove_worktree: { discard: true, succeeds: false }
+  - check_files: { files: { .piarc/worktrees/isolated-review/created.txt: review } }
+  - write_file: { path: fail-remove, content: 'off' }
+  - remove_worktree: { discard: true }
+  - check_worktree: { fields: { exists: false, removed: true } }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results: [{ id: nested, is_error: true, contains: fixture create failed }]

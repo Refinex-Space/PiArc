@@ -1,0 +1,29 @@
+id: exec-streaming-output
+description: A command's output reaches the client as item updates before the command ends; the completed item carries the command, its directory, exit code, outcome, duration and timeout.
+capabilities: [CAP-EXEC-STREAM-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_slow, name: Bash, input: { command: 'echo first; sleep 1; echo second' } }
+      - text: 'Done.'
+# echo and sleep are read-only commands: no approval (T23).
+actions:
+  - prompt: { text: 'Print slowly.', turn: t }
+expect:
+  events:
+    - method: item/updated
+      params: { item: { itemId: toolu_slow, status: inProgress, output: "first\n" } }
+    - method: item/completed
+      params:
+        item:
+          itemId: toolu_slow
+          type: commandExecution
+          status: completed
+          command: 'echo first; sleep 1; echo second'
+          output: "first\nsecond\n"
+          execution:
+            { exitCode: 0, outcome: success, timedOut: false, timeoutMs: 120000, truncated: false }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  request_counts: { main: 2 }

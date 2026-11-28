@@ -1,0 +1,30 @@
+id: config-diag-sources
+description: Configuration diagnostics list every kind of source the session loads, beside the settings files - the project's .mcp.json, memory file, rule, skill, command and subagent definition each have an entry with its status (T41, R5).
+capabilities: [CAP-CONFIG-DIAG-002]
+workspace:
+  trusted: true
+  files:
+    CLAUDE.md: Project notes for the agent.
+    .mcp.json: '{"mcpServers":{"local":{"command":"node","args":["server.mjs"]}}}'
+    .claude/rules/house.md: Follow the house style.
+    .claude/skills/greet/SKILL.md: "---\nname: greet\ndescription: Greets people\n---\nSay hello.\n"
+    .claude/commands/hello.md: "---\ndescription: Says hello\n---\nSay hello to $1.\n"
+    .claude/agents/helper.md: "---\nname: helper\ndescription: Helps with chores\n---\nYou help.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Ready.
+actions:
+  - prompt: { text: Hello., turn: t }
+expect:
+  request_counts: { main: 1 }
+  config_diagnostics:
+    trusted: true
+    files:
+      mcpJson: { status: loaded }
+      memory: { status: loaded }
+      rule: { status: loaded }
+      skill: { status: loaded }
+      command: { status: loaded }
+      agent: { status: loaded }

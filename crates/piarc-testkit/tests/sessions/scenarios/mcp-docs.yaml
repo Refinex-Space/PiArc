@@ -1,0 +1,9 @@
+# T36-A07: three turns that call the OAuth-protected HTTP server docs.
+id: mcp-docs
+steps:
+  - tool_calls: [{ id: echo_one, name: mcp__docs__echo, input: { text: one } }]
+  - text: 'First call done.'
+  - tool_calls: [{ id: echo_two, name: mcp__docs__echo, input: { text: two } }]
+  - text: 'Second call done.'
+  - tool_calls: [{ id: echo_three, name: mcp__docs__echo, input: { text: three } }]
+  - text: 'Third call done.'

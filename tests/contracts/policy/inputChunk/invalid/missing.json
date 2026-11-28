@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "method": "policy/inputChunk",
+  "params": {
+    "sessionId": "s",
+    "offset": 0,
+    "text": "hello"
+  }
+}

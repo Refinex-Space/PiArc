@@ -1,0 +1,25 @@
+id: sessions-persist-across-restart
+description: A session survives a Core restart; once resumed, its next request carries the whole earlier conversation.
+capabilities: [CAP-SESSION-PERSIST-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'First answer.'
+      - text: 'Second answer.'
+actions:
+  - prompt: { text: 'Question one.', turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - restart_core: {}
+  - resume: {}
+  - prompt: { text: 'Question two.', turn: second }
+expect:
+  events:
+    - { method: turn/completed, turn: first, params: { status: completed } }
+    - { method: turn/completed, turn: second, params: { status: completed } }
+  requests:
+    - index: 1
+      roles: [user, assistant, user]
+      user_texts: ['Question one.', 'Question two.']
+      contains: ['First answer.']
+  request_counts: { main: 2 }

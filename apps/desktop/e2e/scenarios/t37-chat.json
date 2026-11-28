@@ -1,0 +1,11 @@
+{
+  "id": "t37-chat",
+  "steps": [
+    { "text": "Hello there." },
+    { "text": "Component made." },
+    { "text": "Noted." },
+    { "text": "Again." },
+    { "text": "Once more." },
+    { "text": "Still here." }
+  ]
+}

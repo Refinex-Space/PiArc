@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "error": {
+    "code": -32700,
+    "message": "frame is not valid JSON: EOF while parsing an object at line 1 column 1",
+    "data": {
+      "kind": "parseError",
+      "retryable": false
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "id": "t39-network",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "once",
+          "name": "Bash",
+          "input": { "command": "curl -sSf -m 30 http://allowed.test/" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "saved",
+          "name": "Bash",
+          "input": { "command": "curl -sSf -m 30 http://allowed.test/" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "denied",
+          "name": "Bash",
+          "input": { "command": "curl -sSf -m 30 http://other.test/" }
+        }
+      ]
+    },
+    { "text": "Done." }
+  ]
+}

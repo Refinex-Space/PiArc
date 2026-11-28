@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": "c-2",
+  "method": "session/create",
+  "params": {
+    "cwd": "C:\\Users\\dev\\repo",
+    "model": {
+      "provider": "piarc-mock",
+      "id": "mock-small"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 22,
+  "method": "fs/glob",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": ".",
+    "pattern": "*.md"
+  }
+}

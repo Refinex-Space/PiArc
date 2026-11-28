@@ -1,0 +1,26 @@
+id: hooks-session-start-order
+description: UserPromptSubmit hooks run only after the session's SessionStart hooks have finished, even when a SessionStart hook is slow, as Claude Code orders them (found by L3, T30).
+capabilities: [CAP-HOOK-SESSION-001, CAP-HOOK-PROMPT-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {
+        "SessionStart": [{"hooks": [{"type": "command", "command": "node hook.mjs order 1500"}]}],
+        "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node hook.mjs order"}]}]
+      }}
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'Done.'
+actions:
+  - prompt: { text: 'Start working.', turn: t }
+expect:
+  request_counts: { main: 1 }
+  json_lines:
+    hook-log/order.jsonl:
+      - input: { hook_event_name: SessionStart, source: startup }
+      - input: { hook_event_name: UserPromptSubmit, prompt: 'Start working.' }

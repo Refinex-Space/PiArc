@@ -1,0 +1,62 @@
+id: subagent-background
+description: A background subagent returns at once with its task id; when it finishes, its report and transcript path reach the main session's next request as a background-task reminder (T31).
+capabilities: [CAP-AGENT-RUN-001, CAP-CTX-REMINDER-001]
+workspace:
+  files:
+    .claude/agents/scout.md: "---\nname: scout\ndescription: Scouts.\nmodel: mock-bg/mock-model\n---\nScout.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input:
+                {
+                  description: Scout ahead,
+                  prompt: Look around.,
+                  subagent_type: scout,
+                  run_in_background: true,
+                },
+            },
+          ]
+      - text: The scout is out.
+      - text: The scout found the door.
+  bg:
+    wire: anthropic
+    steps:
+      - text: 'Scout report: the door is open.'
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Send a scout., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - wait: { method: subagent/completed, params: { itemId: agent-1 } }
+  - prompt: { text: What did the scout find?, turn: two }
+expect:
+  request_counts: { main: 3, bg: 1 }
+  events:
+    - method: item/completed
+      turn: one
+      params:
+        {
+          item:
+            {
+              type: subagent,
+              itemId: agent-1,
+              status: completed,
+              subagent: { background: true, status: running },
+            },
+        }
+    - method: subagent/completed
+      params: { itemId: agent-1, subagent: { status: completed, background: true } }
+  requests:
+    - provider: main
+      index: 1
+      tool_results: [{ id: agent-1, is_error: false, contains: is working in the background }]
+    - provider: main
+      index: 2
+      contains:
+        ['The background scout subagent', 'Scout report: the door is open.', 'Its transcript:']

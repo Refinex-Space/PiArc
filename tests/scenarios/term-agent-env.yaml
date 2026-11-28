@@ -1,0 +1,39 @@
+id: term-agent-env
+description: A terminal the model opens has the environment of the session's commands (T17, ADR-0035) - the PATH the user's login shell sets, without the private variables its profile exports - and the screen shows what ran there (T33).
+capabilities: [CAP-TERM-SCREEN-001]
+platforms: [macos]
+platform_reason: Windows has no login shell to ask; Git Bash terminals inherit the filtered process environment, which the Core terminal tests cover.
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_term
+            name: Bash
+            input:
+              command: 'l2-login-tool; echo "private: ${L2_LOGIN_PROFILE-unset}"'
+              terminal: true
+      - text: 'It runs in a terminal.'
+      - tool_calls:
+          - id: toolu_read
+            name: Read
+            input: { path: '{{result:toolu_term:are in (.+?\.log); read it}}' }
+      - text: 'The login PATH reached the terminal.'
+approvals:
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: 'Run the tool from my PATH in a terminal.', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - wait: { method: core/tasks, params: { kind: terminal, status: running, exitCode: 0 } }
+  - prompt: { text: 'What did it print?', turn: two }
+expect:
+  requests:
+    - index: 3
+      tool_results:
+        - { id: toolu_term }
+        - { id: toolu_read, is_error: false, contains: "\tlogin PATH works\n" }
+      contains:
+        - 'ended with exit code 0.'
+        - '\tprivate: unset\n'
+      not_contains: ['synthetic-profile-secret']
+  request_counts: { main: 4 }

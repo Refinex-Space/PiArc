@@ -1,0 +1,43 @@
+{
+  "id": "t26-ask-timeout",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "ask",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "Which database?",
+                "options": [
+                  {
+                    "label": "SQLite",
+                    "default": true
+                  },
+                  {
+                    "label": "Postgres"
+                  }
+                ]
+              },
+              {
+                "question": "Which port?",
+                "options": [
+                  {
+                    "label": "5432"
+                  },
+                  {
+                    "label": "6543"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Going with the defaults."
+    }
+  ]
+}

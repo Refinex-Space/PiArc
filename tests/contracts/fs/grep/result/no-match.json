@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 24,
+  "result": {
+    "path": "/Users/dev/work space/项目/src/main 主.ts",
+    "isDirectory": false,
+    "lines": [],
+    "matchCount": 0,
+    "limitReached": false
+  }
+}

@@ -1,0 +1,67 @@
+id: subagent-tool-filter
+description: A project definition's tools list and disallowedTools pick the subagent's tools (disallowed wins, a Tool(specifier) entry removes the whole tool, AskUserQuestion is always removed); its first request declares only those, and calls to the removed tools are refused at the gate without running (T31).
+capabilities: [CAP-AGENT-FILTER-001, CAP-AGENT-DEF-001]
+workspace:
+  files:
+    notes.txt: 'alpha'
+    .claude/agents/reader.md: "---\nname: reader\ndescription: Reads files.\nmodel: mock-child/mock-model\ntools: Read, Grep, Write, AskUserQuestion, Bash\ndisallowedTools: [Write, 'Bash(rm *)']\nmemory: user\n---\nYou read files and report.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input: { description: Read notes, prompt: Read notes.txt., subagent_type: reader },
+            },
+          ]
+      - text: Done.
+  child:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            { id: w, name: Write, input: { path: out.txt, content: x } },
+            {
+              id: ask,
+              name: AskUserQuestion,
+              input:
+                {
+                  questions:
+                    [
+                      {
+                        question: Which?,
+                        header: Pick,
+                        multiSelect: false,
+                        options: [{ label: A, description: a }, { label: B, description: b }],
+                      },
+                    ],
+                },
+            },
+            { id: sh, name: Bash, input: { command: env echo hi } },
+          ]
+      - tool_calls: [{ id: r, name: Read, input: { path: notes.txt } }]
+      - text: notes.txt says alpha.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Read the notes through the reader., turn: one }
+expect:
+  request_counts: { main: 2, child: 3 }
+  files: { out.txt: null }
+  requests:
+    - provider: child
+      index: 0
+      tools: [Read, Grep]
+      contains: ['You read files and report.']
+    - provider: child
+      index: 1
+      tool_results:
+        - { id: w, is_error: true, contains: Write is not available to this subagent }
+        - { id: ask, is_error: true, contains: AskUserQuestion is not available to this subagent }
+        - { id: sh, is_error: true, contains: Bash is not available to this subagent }
+    - provider: main
+      index: 1
+      tool_results: [{ id: agent-1, is_error: false, contains: notes.txt says alpha. }]

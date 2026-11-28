@@ -1,0 +1,39 @@
+id: perm-auto-hooks-first
+description: In Auto mode a PermissionRequest hook answers before the reviewer; its allow runs the call and no review request is sent (T46).
+capabilities: [CAP-PERM-AUTO-ORDER-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"PermissionRequest": [
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs bash"}]}
+      ]}}
+    hook-plans/bash.json: |
+      {"json": {"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow"}}}}
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: cmd, name: Bash, input: { command: 'printenv HOME' } }
+      - text: Done.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - text: never used
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print the home directory., turn: one }
+expect:
+  request_counts: { main: 2, rev: 0 }
+  requests:
+    - provider: main
+      index: 1
+      tool_results:
+        - { id: cmd, is_error: false }

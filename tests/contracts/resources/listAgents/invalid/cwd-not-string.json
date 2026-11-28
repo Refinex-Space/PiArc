@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 50,
+  "method": "resources/listAgents",
+  "params": {
+    "cwd": 1
+  }
+}

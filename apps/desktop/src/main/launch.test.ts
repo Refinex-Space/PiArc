@@ -1,0 +1,117 @@
+import path from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { launchTargets, parseLaunchUrl } from './launch.js';
+
+describe('piarc:// links', () => {
+  it('open a folder or show a session', () => {
+    expect(parseLaunchUrl('piarc://open?path=%2Fwork%2F%E9%A1%B9%E7%9B%AE%20one')).toEqual({
+      kind: 'workspace',
+      path: '/work/项目 one',
+    });
+    expect(parseLaunchUrl('piarc://open?path=C%3A%5Cwork%5Crepo')).toEqual({
+      kind: 'workspace',
+      path: 'C:\\work\\repo',
+    });
+    expect(parseLaunchUrl('piarc://session/0a1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d')).toEqual({
+      kind: 'session',
+      sessionId: '0a1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d',
+    });
+  });
+
+  it('THR-13 open no network share or device path, which would make Core reach another host', () => {
+    for (const target of [
+      '%5C%5Cattacker.example%5Cshare',
+      '%5C%5C%3F%5CUNC%5Cattacker.example%5Cshare',
+      '%5C%5C%3F%5CC%3A%5Cwork',
+      '%5C%5C.%5Cpipe%5Cx',
+      '%2F%2Fattacker.example%2Fshare',
+    ]) {
+      expect(parseLaunchUrl(`piarc://open?path=${target}`), target).toBeUndefined();
+    }
+  });
+
+  it('accepts bounded plain text only on the dedicated draft route', () => {
+    const text = '/run <text> & 你好\nnext';
+    const link = 'piarc://draft?path=%2Fwork%20tree&text=' + encodeURIComponent(text);
+    const draft = { kind: 'draft', path: '/work tree', text };
+    expect(parseLaunchUrl(link + '&send=1')).toEqual(draft);
+    expect(launchTargets(['PiArc', link], false, '/')).toEqual([draft]);
+    expect(parseLaunchUrl('piarc://draft?path=%2Fw')).toEqual({
+      kind: 'draft',
+      path: '/w',
+      text: '',
+    });
+    expect(parseLaunchUrl('piarc://draft?path=%2Fw&text=' + '😀'.repeat(2048))?.kind).toBe('draft');
+    for (const invalid of [
+      'piarc://draft?path=%2Fw&text=' + '😀'.repeat(2049),
+      'piarc://draft?path=%2Fw&text=one%00two',
+      'piarc://draft?path=%5C%5Cremote%5Cshare',
+      'piarc://draft?path=%2F%2Fremote%2Fshare',
+      'piarc://draft?path=relative',
+    ])
+      expect(parseLaunchUrl(invalid)).toBeUndefined();
+  });
+
+  it('carry nothing that runs', () => {
+    // A prompt or a command in the link is ignored; only the folder is taken.
+    expect(parseLaunchUrl('piarc://open?path=%2Fw&prompt=rm%20-rf&run=1')).toEqual({
+      kind: 'workspace',
+      path: '/w',
+    });
+    for (const link of [
+      'piarc://run?command=ls',
+      'piarc://prompt?text=hello',
+      'piarc://open?path=relative/dir',
+      'piarc://open',
+      'piarc://open?path=%2Fw%00x',
+      'piarc://session/..%2F..%2Fetc',
+      'piarc://session/a%20b',
+      'piarc://oauth/callback?code=x',
+      'https://open?path=%2Fw',
+      'not a url',
+    ]) {
+      expect(parseLaunchUrl(link), link).toBeUndefined();
+    }
+  });
+});
+
+describe('command lines', () => {
+  it('take links and folders after the leading arguments, ignoring switches', () => {
+    const argv = [
+      '/Applications/PiArc.app/Contents/MacOS/PiArc',
+      '--user-data-dir=/tmp/x',
+      'piarc://session/abc',
+      'repo 仓库',
+      '/abs/dir',
+      '',
+    ];
+    expect(launchTargets(argv, false, '/home/me')).toEqual([
+      { kind: 'session', sessionId: 'abc' },
+      { kind: 'workspace', path: path.resolve('/home/me', 'repo 仓库') },
+      { kind: 'workspace', path: '/abs/dir' },
+    ]);
+  });
+
+  it('skip the app path when started as `electron <app>`, after any switches', () => {
+    expect(launchTargets(['electron', '.', 'piarc://session/s1'], true, '/x')).toEqual([
+      { kind: 'session', sessionId: 's1' },
+    ]);
+    // Playwright puts its switches before the app path.
+    const playwright = [
+      'electron',
+      '--inspect=0',
+      '--remote-debugging-port=0',
+      '/repo/apps/desktop',
+      '--user-data-dir=/d',
+    ];
+    expect(launchTargets(playwright, true, '/x')).toEqual([]);
+  });
+
+  it('accept the Windows shell verb argument', () => {
+    expect(launchTargets(['C:\\PiArc\\PiArc.exe', 'D:\\work\\repo'], false, 'C:\\')).toEqual([
+      { kind: 'workspace', path: 'D:\\work\\repo' },
+    ]);
+  });
+});

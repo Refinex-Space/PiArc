@@ -1,0 +1,160 @@
+.session-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  -webkit-app-region: no-drag;
+}
+.session-tools .icon,
+.titlebar-actions .icon,
+.history-buttons .icon,
+.view-control .icon,
+.sidebar-footer .icon-button .icon {
+  stroke-width: 1;
+}
+.session-tools button[aria-pressed='true'] {
+  background: var(--piarc-surface-active);
+}
+.main-row:has(.workbench-rail) {
+  position: relative;
+}
+.rail-environment-row {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-1) 0;
+  min-width: 0;
+}
+.rail-environment-row svg {
+  flex: none;
+  color: var(--piarc-text-secondary);
+}
+.rail-environment-row span,
+.rail-environment-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-environment-row span {
+  flex-shrink: 0;
+  max-width: 65%;
+}
+.rail-environment-row small {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app]
+  .rail-section
+  :is(.context-panel, .usage-card, .changes-card, .bg-tasks-card, .task-panel) {
+  padding: 0;
+}
+:root[data-app] .rail-section .context-summary {
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.context-window,
+.context-category .context-category-name {
+  color: var(--piarc-text-secondary);
+}
+.context-meter {
+  display: flex;
+  height: var(--piarc-space-1);
+  overflow: hidden;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-active);
+}
+.context-swatch {
+  background: var(--piarc-text-secondary);
+}
+.swatch-tools,
+.swatch-mcpTools {
+  background: var(--piarc-text-accent);
+}
+.swatch-conversation {
+  background: var(--piarc-state-success);
+}
+.swatch-toolResults,
+.swatch-skills {
+  background: var(--piarc-state-warning);
+}
+.swatch-systemPrompt,
+.swatch-memory {
+  background: var(--piarc-state-danger);
+}
+:root[data-app] .rail-section .context-categories {
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .rail-section .context-category {
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(3em, auto);
+}
+.context-category .context-swatch {
+  width: var(--piarc-space-2);
+  height: var(--piarc-space-2);
+  border-radius: 2px;
+}
+.context-share {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-app] .workbench-rail .bg-task,
+:root[data-app] .tool-tile .bg-task {
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--piarc-surface-app);
+  border-radius: var(--piarc-radius-lg);
+  padding: var(--piarc-space-3);
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .workbench-rail .bg-task-summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: var(--piarc-space-1);
+}
+.workbench-rail .bg-task-kind {
+  grid-row: 2;
+  grid-column: 1;
+}
+.workbench-rail .bg-task-duration {
+  grid-row: 2;
+  grid-column: 2;
+  text-align: end;
+}
+:root[data-app] .workbench-rail .bg-task-title {
+  font-family: inherit;
+  font-size: var(--piarc-font-size-body);
+}
+:root[data-app] .bg-tasks-panel .bg-task-list {
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .bg-task-history-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-bottom: var(--piarc-space-1);
+  padding: var(--piarc-space-1) 0;
+  border: 0;
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+}
+
+.workspace-primary-frame {
+  container: session-frame / inline-size;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--piarc-workbench-canvas);
+}
+.tool-header-slot {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+.tool-header-slot .terminal-tabs {
+  width: 100%;
+  border: 0;
+}

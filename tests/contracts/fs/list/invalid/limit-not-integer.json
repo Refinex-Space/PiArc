@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 20,
+  "method": "fs/list",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": ".",
+    "limit": "all"
+  }
+}

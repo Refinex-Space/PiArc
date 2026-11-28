@@ -1,0 +1,19 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "method": "session/gitAssist",
+  "params": {
+    "sessionId": "main",
+    "task": "review",
+    "language": "en",
+    "instructions": "",
+    "branch": "feature/login",
+    "base": "main",
+    "commits": ["feat: add sign-in form"],
+    "files": [
+      { "path": "src/login.ts", "status": "modified", "added": 3, "removed": 1 },
+      { "path": ".env", "status": "added", "withheld": "sensitive" }
+    ],
+    "diff": "diff --git a/src/login.ts b/src/login.ts\n@@ -1 +1,3 @@\n-old\n+new\n"
+  }
+}

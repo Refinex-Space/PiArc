@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "result": {
+    "path": "/Users/dev/work space/项目",
+    "matches": ["src/", "src/main 主.ts", "src/util.ts"],
+    "truncated": false
+  }
+}

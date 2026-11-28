@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "memory/apply",
+  "params": {
+    "sessionId": "session-a",
+    "toolCallId": "restore-1",
+    "action": "read",
+    "name": "prefers-pnpm",
+    "restore": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "tokens": 15400,
+    "contextWindow": 200000,
+    "autoCompactThreshold": 182904,
+    "categories": {
+      "systemPrompt": 2100,
+      "tools": 4800,
+      "mcpTools": 0,
+      "memory": 900,
+      "skills": 0,
+      "conversation": 3200,
+      "toolResults": 4100,
+      "unclassified": 300
+    },
+    "source": "guess",
+    "autoCompact": "on"
+  }
+}

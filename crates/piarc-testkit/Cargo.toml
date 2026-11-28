@@ -1,0 +1,60 @@
+[package]
+name = "piarc-testkit"
+description = "Test support: strict mock provider, scenario runner and event assertions."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "piarc-mock-provider"
+path = "src/bin/mock_provider.rs"
+
+[[bin]]
+name = "piarc-mock-auth"
+path = "src/bin/mock_auth.rs"
+
+[[bin]]
+name = "piarc-mock-npm"
+path = "src/bin/mock_npm.rs"
+
+[[bin]]
+name = "piarc-mock-proxy"
+path = "src/bin/mock_proxy.rs"
+
+# One test per L2 scenario (tests/scenarios/*.yaml). Not part of `cargo test --workspace`:
+# `npm run verify` runs it as its own step, `cargo test -p piarc-testkit --test scenarios`
+# runs it by hand.
+[[test]]
+name = "scenarios"
+path = "tests/scenarios.rs"
+harness = false
+test = false
+
+[dependencies]
+base64.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+jsonschema.workspace = true
+piarc-core.workspace = true
+piarc-ports.workspace = true
+piarc-protocol.workspace = true
+regex.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+sha2.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["net", "io-util", "io-std"] }
+tokio-rustls.workspace = true
+
+[dev-dependencies]
+hyper = { workspace = true, features = ["client"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

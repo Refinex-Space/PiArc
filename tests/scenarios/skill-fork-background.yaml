@@ -1,0 +1,52 @@
+id: skill-fork-background
+description: A fork skill defaults to background; the main session gets the task id at start and the completed result on its next request.
+capabilities: [CAP-SKILL-FORK-001]
+workspace:
+  files:
+    .claude/agents/scout.md: "---\nname: scout\ndescription: Investigates.\nmodel: mock-child/mock-model\n---\nFollow the task."
+    .claude/skills/investigate/SKILL.md: "---\ncontext: fork\nagent: scout\n---\nISOLATED-INSTRUCTIONS inspect $ARGUMENTS."
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: dispatch, name: Skill, input: { skill: investigate, args: 'outside' } }]
+      - text: The investigation is running.
+      - text: All done.
+  child:
+    wire: anthropic
+    steps:
+      - text: Background finding.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Use the investigator for PARENT-ONLY-FACT., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - wait: { method: subagent/completed, params: { itemId: dispatch } }
+  - prompt: { text: Report the outcome. }
+expect:
+  request_counts: { main: 3, child: 1 }
+  events:
+    - {
+        method: subagent/started,
+        params: { itemId: dispatch, subagent: { agentType: scout, background: true } },
+      }
+  requests:
+    - { provider: main, index: 0, not_contains: [ISOLATED-INSTRUCTIONS] }
+    - {
+        provider: main,
+        index: 1,
+        not_contains: [ISOLATED-INSTRUCTIONS],
+        tool_results: [{ id: dispatch, is_error: false, contains: background }],
+      }
+    - {
+        provider: main,
+        index: 2,
+        not_contains: [ISOLATED-INSTRUCTIONS],
+        contains: [Background finding.],
+      }
+    - {
+        provider: child,
+        index: 0,
+        contains: [ISOLATED-INSTRUCTIONS inspect outside.],
+        not_contains: [PARENT-ONLY-FACT],
+      }

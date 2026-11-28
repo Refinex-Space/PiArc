@@ -1,0 +1,22 @@
+{
+  "id": "t47-save",
+  "steps": [
+    {
+      "text": "Keeping a note for later sessions.",
+      "tool_calls": [
+        {
+          "id": "mem1",
+          "name": "Memory",
+          "input": {
+            "action": "save",
+            "name": "build",
+            "type": "project",
+            "description": "Run cargo check before committing",
+            "content": "Always run `cargo check --workspace` before a commit."
+          }
+        }
+      ]
+    },
+    { "text": "Saved the note." }
+  ]
+}

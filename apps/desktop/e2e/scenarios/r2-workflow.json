@@ -1,0 +1,26 @@
+{
+  "id": "r2-workflow",
+  "steps": [
+    {
+      "tool_calls": [
+        { "id": "source", "name": "Read", "input": { "path": "sum.cjs" } },
+        { "id": "testfile", "name": "Read", "input": { "path": "sum.test.cjs" } }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "fix",
+          "name": "Edit",
+          "input": { "path": "sum.cjs", "edits": [{ "oldText": "a - b", "newText": "a + b" }] }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        { "id": "check", "name": "Bash", "input": { "command": "node --test sum.test.cjs" } }
+      ]
+    },
+    { "text": "The sum test passed." }
+  ]
+}

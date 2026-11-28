@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 41,
+  "result": {
+    "findings": [{ "path": "a.ts", "line": 1, "severity": "urgent", "title": "x", "body": "y" }],
+    "model": { "provider": "mock-main", "id": "mock-model" }
+  }
+}

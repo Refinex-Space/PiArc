@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 72,
+  "result": {
+    "name": "fix-issue",
+    "content": "Fix issue 42 on feature x.",
+    "dir": "/工作区 a/.claude/skills/fix-issue",
+    "allowedTools": ["Bash(git add *)", "Read"],
+    "hooks": true
+  }
+}

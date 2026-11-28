@@ -1,0 +1,54 @@
+id: context-memory-lazy
+description: Reading a nested file delivers its ancestors' memory as a marked message once, through later reads and edits in the same directory.
+capabilities: [CAP-CTX-MEMORY-001]
+workspace:
+  files:
+    CLAUDE.md: Initial workspace policy.
+    lib/AGENTS.md: Library directory policy.
+    lib/util/CLAUDE.md: Utility directory policy.
+    lib/util/a.txt: first sample
+    lib/util/b.txt: second sample
+    elsewhere/CLAUDE.md: Unvisited directory policy.
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: first, name: Read, input: { path: lib/util/a.txt } }]
+      - tool_calls: [{ id: next, name: Read, input: { path: lib/util/b.txt } }]
+      - tool_calls:
+          - id: change
+            name: Edit
+            input:
+              { path: lib/util/a.txt, edits: [{ oldText: first sample, newText: edited sample }] }
+      - text: Finished.
+approvals:
+  - { tool: Edit, decision: allow }
+actions:
+  - prompt: { text: Inspect these files. }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - { index: 0, not_contains: [Library directory policy., Utility directory policy.] }
+    - index: 1
+      same_system_as: 0
+      user_message_contains: ['[PiArc reminder]', Utility directory policy.]
+      occurrences: { Library directory policy.: 1, Utility directory policy.: 1 }
+    - index: 2
+      same_system_as: 0
+      occurrences:
+        {
+          Library directory policy.: 1,
+          Utility directory policy.: 1,
+          Unvisited directory policy.: 0,
+        }
+      tool_results:
+        - { id: first, is_error: false, contains: first sample }
+        - { id: next, is_error: false, contains: second sample }
+    - index: 3
+      same_system_as: 0
+      occurrences: { Library directory policy.: 1, Utility directory policy.: 1 }
+      tool_results:
+        - { id: first, is_error: false, contains: first sample }
+        - { id: next, is_error: false, contains: second sample }
+        - { id: change, is_error: false }
+  files: { lib/util/a.txt: edited sample }

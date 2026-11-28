@@ -1,0 +1,33 @@
+id: rewind-bash-only
+description: A file only a command changed has no snapshot - the rewind preview and the Changes view list only what the file tools wrote, and rewinding leaves the command's file in place (T28).
+capabilities: [CAP-REWIND-BASH-001]
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: touch, name: Bash, input: { command: touch by-command.txt } }
+      - tool_calls:
+          - { id: write1, name: Write, input: { path: by-tool.txt, content: "tool\n" } }
+      - text: Done.
+actions:
+  - prompt: { text: Make two files., turn: t1 }
+  - wait: { method: turn/completed, turn: t1 }
+  - check_files: { files: { by-command.txt: '', by-tool.txt: "tool\n" } }
+  - check_changes:
+      fields:
+        files: [{ label: by-tool.txt, kind: created, added: 1, removed: 0 }]
+        added: 1
+        removed: 0
+  - rewind:
+      turn: t1
+      scope: code
+      preview: { by-tool.txt: delete }
+      outcomes: { by-tool.txt: deleted }
+expect:
+  request_counts: { main: 3 }
+  files:
+    by-command.txt: ''
+    by-tool.txt: null

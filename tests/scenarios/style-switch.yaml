@@ -1,0 +1,39 @@
+id: style-switch
+description: A new session puts the output style of the settings in system prompt section 3; switching the style through Core (/output-style) during the session reaches the model as an appended message before the next request, and the system prompt bytes stay the same; switching back to Default says so (T37).
+capabilities: [CAP-STYLE-001, CAP-STYLE-SWITCH-001]
+workspace:
+  files:
+    .piarc/settings.json: '{"outputStyle":"Concise"}'
+    .claude/output-styles/teacher.md: "---\nname: teacher\ndescription: Teaches as it goes\n---\nSTYLE-TEACHER: explain each step to a newcomer.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: First.
+      - text: Second.
+      - text: Third.
+actions:
+  - prompt: { text: One., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - set_output_style: { name: teacher }
+  - prompt: { text: Two., turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - set_output_style: {}
+  - prompt: { text: Three. }
+expect:
+  request_counts: { main: 3 }
+  requests:
+    - index: 0
+      contains: ['<output_style>', 'Output style: Concise', 'Put the outcome first']
+      not_contains: [STYLE-TEACHER]
+    - index: 1
+      same_system_as: 0
+      user_message_contains:
+        [
+          '[PiArc reminder]',
+          'The user switched the output style to "teacher"',
+          'STYLE-TEACHER: explain each step to a newcomer.',
+        ]
+    - index: 2
+      same_system_as: 0
+      user_message_contains: ['switched the output style to "Concise"']

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 25,
+  "method": "exec/run",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "requestId": "r",
+    "command": "true",
+    "env": {
+      "N": 1
+    }
+  }
+}

@@ -1,0 +1,62 @@
+id: notebook-edit-errors
+description: NotebookEdit refuses a notebook the session has not read, a notebook changed on disk since the Read, and a cell id that does not exist, each with an error that says what to do and the file left as it was; a notebook without cell ids (nbformat 4.4) is addressed by position (T42).
+capabilities: [CAP-TOOL-NOTEBOOK-ERRORS-001]
+workspace:
+  fixtures:
+    analysis.ipynb: notebook/base.ipynb
+    old.ipynb: notebook/legacy.ipynb
+sessions:
+  main: { provider: main, mode: acceptEdits }
+providers:
+  main:
+    wire: anthropic
+    validation: { rules: { role_order: false } }
+    steps:
+      - tool_calls:
+          - id: unread
+            name: NotebookEdit
+            input: { notebook_path: analysis.ipynb, cell_id: load, new_source: x = 1 }
+      - tool_calls: [{ id: read1, name: Read, input: { path: analysis.ipynb } }]
+      - tool_calls:
+          - id: missing
+            name: NotebookEdit
+            input: { notebook_path: analysis.ipynb, cell_id: nope, new_source: x = 1 }
+      - text: Read it.
+      - tool_calls:
+          - id: stale
+            name: NotebookEdit
+            input: { notebook_path: analysis.ipynb, cell_id: load, new_source: x = 1 }
+      - tool_calls: [{ id: read2, name: Read, input: { path: old.ipynb } }]
+      - tool_calls:
+          - id: call-10
+            name: NotebookEdit
+            input: { notebook_path: old.ipynb, cell_id: cell-1, new_source: "Updated 注释\n" }
+      - text: Done.
+actions:
+  - prompt: { text: Change the load cell., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - write_file:
+      {
+        path: analysis.ipynb,
+        content: "{\"cells\": [], \"metadata\": {}, \"nbformat\": 4, \"nbformat_minor\": 5}\n",
+      }
+  - prompt: { text: 'Try again, then fix the old notebook.', turn: second }
+expect:
+  files:
+    analysis.ipynb: "{\"cells\": [], \"metadata\": {}, \"nbformat\": 4, \"nbformat_minor\": 5}\n"
+  fixtures:
+    old.ipynb: notebook/legacy-replace-1.ipynb
+  requests:
+    - index: 3
+      tool_results:
+        - { id: unread, is_error: true, contains: Read }
+        - { id: read1, is_error: false }
+        - { id: missing, is_error: true, contains: Cell nope was not found }
+    - index: 7
+      tool_results:
+        - { id: unread }
+        - { id: read1 }
+        - { id: missing }
+        - { id: stale, is_error: true, contains: has changed since this session last read it }
+        - { id: read2, is_error: false }
+        - { id: call-10, is_error: false, contains: Replaced cell cell-1 of old.ipynb. }

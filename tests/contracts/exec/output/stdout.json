@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "exec/output",
+  "params": {
+    "requestId": "exec-0b8e",
+    "stream": "stdout",
+    "seq": 1,
+    "data": "total 8\n完成\n"
+  }
+}

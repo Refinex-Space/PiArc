@@ -1,0 +1,80 @@
+id: monitor-rate-limit
+description: A Monitor's batch carries at most its line and character limits - the newest lines, with the earlier ones summarized as omitted and the full output's file named - and once its total limit is reached it stops feeding the model and says so (T32; the scenario uses small limits).
+capabilities: [CAP-MONITOR-RATE-001]
+task_limits: { monitor_batch_lines: 3, monitor_batch_chars: 200, monitor_total_chars: 100 }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: toolu_mon
+            name: Monitor
+            input:
+              description: the build
+              command: >-
+                while [ ! -e go.flag ]; do sleep 0.05; done;
+                printf 'line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\n';
+                while [ ! -e more.flag ]; do sleep 0.05; done;
+                printf '%s\n' aaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+                ccccccccccccccccccccccccccccc ddddddddddddddddddddddddddddd;
+                while [ ! -e last.flag ]; do sleep 0.05; done; echo 'after the limit';
+                while [ ! -e stop.flag ]; do sleep 0.05; done
+      - text: Watching the build.
+      - text: Ten lines so far.
+      - text: The monitor stopped sending.
+approvals:
+  - { tool: Monitor, decision: allow }
+actions:
+  - prompt: { text: Watch the build., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - write_file: { path: go.flag, content: '' }
+  - wait: { method: turn/completed, count: 2 }
+  - write_file: { path: more.flag, content: '' }
+  - wait:
+      method: core/tasks
+      params:
+        {
+          kind: monitor,
+          tail:
+            [
+              'line 10',
+              aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+              bbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+              ccccccccccccccccccccccccccccc,
+              ddddddddddddddddddddddddddddd,
+            ],
+        }
+  - advance_clock: { seconds: 30 }
+  - wait: { method: turn/completed, count: 3 }
+  # After the total limit nothing more reaches the model, even after the wake interval.
+  - write_file: { path: last.flag, content: '' }
+  - wait:
+      method: core/tasks
+      params:
+        {
+          kind: monitor,
+          tail:
+            [
+              aaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+              bbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+              ccccccccccccccccccccccccccccc,
+              ddddddddddddddddddddddddddddd,
+              after the limit,
+            ],
+        }
+  - advance_clock: { seconds: 30 }
+expect:
+  requests:
+    - index: 2
+      contains:
+        - '(the build): 10 new lines.\n[7 earlier lines left out; the full output is in '
+        - '.log.]\nline 8\nline 9\nline 10'
+    - index: 3
+      contains:
+        - '(the build): 4 new lines.\n[2 earlier lines left out; the full output is in '
+        - 'ccccccccccccccccccccccccccccc\nddddddddddddddddddddddddddddd'
+        - 'This Monitor reached its limit of 100 characters for you; its further output is not sent.'
+      # The command text names the left-out line too; as a line of the reminder it would
+      # follow a line break.
+      not_contains: ['\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']
+  request_counts: { main: 4 }

@@ -1,0 +1,18 @@
+.markdown-editor-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.md-editor-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.md-editor-mount {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}

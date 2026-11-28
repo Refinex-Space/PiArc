@@ -1,0 +1,39 @@
+id: plugin-agents
+description: An enabled plugin's subagent definition is a type named <plugin>:<name>; the Agent tool runs it with the definition's body as the child's identity and ${CLAUDE_PLUGIN_ROOT} replaced (T40).
+capabilities: [CAP-PLUGIN-AGENTS-001]
+workspace:
+  trusted: true
+  run_files:
+    pkgs/demo/.claude-plugin/plugin.json: '{"name": "demo"}'
+    pkgs/demo/agents/checker.md: "---\nname: checker\ndescription: Checks a change against the demo rules.\nmodel: mock-child/mock-model\n---\nYou are the demo checker. Rules live in ${CLAUDE_PLUGIN_ROOT}/rules.\n"
+packages:
+  - { path: pkgs/demo }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: a1
+            name: Agent
+            input: { description: Check, prompt: Check the change., subagent_type: 'demo:checker' }
+      - text: The checker is done.
+  child:
+    wire: anthropic
+    steps:
+      - text: Checked; nothing found.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Check it with the plugin's checker., turn: t }
+expect:
+  request_counts: { main: 2, child: 1 }
+  requests:
+    - {
+        provider: main,
+        index: 0,
+        contains: ['demo:checker', 'Checks a change against the demo rules.'],
+      }
+    - { provider: child, index: 0, contains: ['You are the demo checker.', 'demo/rules'] }
+    - index: 1
+      provider: main
+      tool_results: [{ id: a1, is_error: false, contains: 'Checked; nothing found.' }]

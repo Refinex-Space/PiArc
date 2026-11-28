@@ -1,0 +1,11 @@
+# A rewind that summarizes waits for a slow summary; a prompt sent meanwhile is refused (R3).
+# After the rewind the summary is the first user message, so it carries the scenario marker;
+# the summary and the next input are adjacent user messages (as in rewind-summarize).
+id: rewind-busy
+validation: { rules: { role_order: false } }
+steps:
+  - text: 'First answer.'
+  - text: 'Summary of the work so far. [[piarc-scenario:rewind-busy]]'
+    chunk_chars: 4
+    chunk_delay_ms: 100
+  - text: 'After the rewind.'

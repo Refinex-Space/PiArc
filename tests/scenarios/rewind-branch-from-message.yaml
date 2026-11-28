@@ -1,0 +1,42 @@
+id: rewind-branch-from-message
+description: Branching from a user message opens a new session whose conversation and task list stop where that message's turn started; the original session keeps everything (T28).
+capabilities: [CAP-SESSION-FORK-001]
+sessions:
+  main: { provider: main }
+  branch: { provider: main, deferred: true }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: todo1
+            name: TodoWrite
+            input: { todos: [{ content: Plan, status: in_progress }] }
+      - text: Planned.
+      - tool_calls:
+          - id: todo2
+            name: TodoWrite
+            input:
+              {
+                todos:
+                  [{ content: Plan, status: completed }, { content: Build, status: in_progress }],
+              }
+      - text: Building.
+      - text: Branch reply.
+actions:
+  - prompt: { session: main, text: Make a plan., turn: t1 }
+  - wait: { session: main, method: turn/completed, turn: t1 }
+  - prompt: { session: main, text: Start building., turn: t2 }
+  - wait: { session: main, method: turn/completed, turn: t2 }
+  - fork: { session: main, before_turn: t2, as: branch }
+  - check_branch: { session: branch, texts: [Make a plan., Planned.] }
+  - check_harness: { session: branch, fields: { todos: [{ content: Plan, status: inProgress }] } }
+  - check_branch: { session: main, texts: [Make a plan., Planned., Start building., Building.] }
+  - prompt: { session: branch, text: Try another way., turn: b1 }
+  - wait: { session: branch, method: turn/completed, turn: b1 }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      contains: [Make a plan., Planned., Try another way.]
+      not_contains: [Start building.]

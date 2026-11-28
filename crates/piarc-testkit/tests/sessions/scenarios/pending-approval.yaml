@@ -1,0 +1,5 @@
+id: pending-approval
+steps:
+  - tool_calls:
+      - { id: waiting, name: Write, input: { path: pending.txt, content: approved } }
+  - text: 'Acknowledged.'

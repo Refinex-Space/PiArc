@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "policy/evaluate",
+  "params": {
+    "sessionId": "s",
+    "toolCallId": "c",
+    "tool": "Read"
+  }
+}

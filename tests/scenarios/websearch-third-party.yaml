@@ -1,0 +1,61 @@
+id: websearch-third-party
+description: The model has no native search, so WebSearch uses the user's Brave Search backend through Core - the key saved through Core's settings API stays in the vault (no file holds it), Manual mode asks, the PreToolUse hook runs, the domain filter drops a result and the sources reach the tool result (T38).
+capabilities: [CAP-TOOL-WEBSEARCH-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: '{"hooks": {"PreToolUse": [{"matcher": "WebSearch", "hooks": [{"type": "command", "command": "node hook.mjs search"}]}]}}'
+  run_files:
+    data 数据/settings.json: '{"webSearch":{"backend":"brave"}}'
+web:
+  pages:
+    /res/v1/web/search:
+      content_type: application/json
+      body: '{"web":{"results":[{"title":"Tokio","url":"https://tokio.rs/","description":"An <strong>async</strong> runtime for Rust"},{"title":"Elsewhere","url":"https://blog.example.com/tokio","description":"x"}]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: search
+            name: WebSearch
+            input: { query: tokio runtime, blocked_domains: [example.com] }
+      - text: 'Tokio is an async runtime. Sources: https://tokio.rs/'
+sessions:
+  main: { provider: main, deferred: true }
+actions:
+  - set_web_search_key: { backend: brave, key: brave-test-key-7f3a91c2 }
+  - prompt: { text: What is tokio?, turn: one }
+approvals:
+  - { tool: WebSearch, decision: allow }
+expect:
+  request_counts: { main: 2 }
+  events:
+    - method: item/completed
+      params:
+        item:
+          type: webSearch
+          status: completed
+          backend: brave
+          sources: [{ title: Tokio, url: 'https://tokio.rs/', snippet: An async runtime for Rust }]
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 0
+      tools_include: [WebSearch]
+    - index: 1
+      tool_results:
+        - id: search
+          is_error: false
+          contains: "Brave Search results for \"tokio runtime\":\n\n1. Tokio\n   https://tokio.rs/\n   An async runtime for Rust"
+      not_contains: ['blog.example.com', brave-test-key-7f3a91c2]
+  json_lines:
+    hook-log/search.jsonl:
+      - input:
+          {
+            hook_event_name: PreToolUse,
+            tool_name: WebSearch,
+            tool_input: { query: tokio runtime },
+          }
+  absent_on_disk: [brave-test-key-7f3a91c2]

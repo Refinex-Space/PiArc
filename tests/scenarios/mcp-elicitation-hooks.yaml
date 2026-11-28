@@ -1,0 +1,61 @@
+id: mcp-elicitation-hooks
+description: A server requests form input three times. An Elicitation hook answers the first, blocks the second, and lets the third reach the user. ElicitationResult rewrites the third answer before the server receives it.
+capabilities: [CAP-MCP-ELICITATION-001, CAP-HOOK-ELICITATION-001, CAP-HOOK-M5-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .mcp.json: '{"mcpServers":{"alpha":{"command":"node","args":["{{mcp_echo}}","alpha"],"env":{"MCP_ECHO_ELICIT":"1"}}}}'
+    .claude/settings.json: |
+      {"hooks":{"Elicitation":[{"matcher":"alpha","hooks":[{"type":"command","command":"node hook.mjs before"}]}],"ElicitationResult":[{"matcher":"alpha","hooks":[{"type":"command","command":"node hook.mjs after"}]}]}}
+    hook-plans/before.json: |
+      {"sequence":[{"json":{"hookSpecificOutput":{"hookEventName":"Elicitation","action":"accept","content":{"release":"automatic"}}}},{"exit":2,"stderr":"Not permitted"},{}]}
+    hook-plans/after.json: |
+      {"json":{"hookSpecificOutput":{"hookEventName":"ElicitationResult","action":"accept","content":{"release":"normalized"}}}}
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__alpha__*"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: one, name: mcp__alpha__elicit, input: { mode: form } }]
+      - tool_calls: [{ id: two, name: mcp__alpha__elicit, input: { mode: form } }]
+      - tool_calls: [{ id: three, name: mcp__alpha__elicit, input: { mode: form } }]
+      - text: Done.
+actions:
+  - prompt: { text: Request input from the client., turn: t1 }
+approvals:
+  - {
+      tool: alpha,
+      kind: elicitation,
+      decision: allow,
+      elicitation: { action: accept, content: { release: draft } },
+    }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 1
+      tool_results:
+        - &one { id: one, is_error: false, contains: '"release":"automatic"' }
+    - index: 2
+      tool_results:
+        - *one
+        - &two { id: two, is_error: false, contains: '"action":"decline"' }
+    - index: 3
+      tool_results:
+        - *one
+        - *two
+        - { id: three, is_error: false, contains: '"release":"normalized"' }
+  json_lines:
+    hook-log/after.jsonl:
+      - {
+          input:
+            {
+              hook_event_name: ElicitationResult,
+              mcp_server_name: alpha,
+              mode: form,
+              action: accept,
+              content: { release: draft },
+            },
+        }

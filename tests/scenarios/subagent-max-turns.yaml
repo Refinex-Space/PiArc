@@ -1,0 +1,38 @@
+id: subagent-max-turns
+description: A definition's maxTurns stops the subagent after that many model responses; the Agent result says the report may be incomplete (partial) and the run's state says partial (T31).
+capabilities: [CAP-AGENT-RUN-001]
+workspace:
+  files:
+    notes.txt: alpha
+    .claude/agents/brief.md: "---\nname: brief\ndescription: Brief.\nmodel: mock-child/mock-model\nmaxTurns: 1\n---\nBe brief.\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          [
+            {
+              id: agent-1,
+              name: Agent,
+              input: { description: Read briefly, prompt: Read notes.txt., subagent_type: brief },
+            },
+          ]
+      - text: It stopped early.
+  child:
+    wire: anthropic
+    steps:
+      - text: Reading notes.txt now.
+        tool_calls: [{ id: r, name: Read, input: { path: notes.txt } }]
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { text: Read briefly., turn: one }
+expect:
+  request_counts: { main: 2, child: 1 }
+  events:
+    - method: subagent/completed
+      params: { itemId: agent-1, subagent: { status: partial } }
+  requests:
+    - provider: main
+      index: 1
+      tool_results: [{ id: agent-1, is_error: false, contains: 'stopped after 1 turns' }]

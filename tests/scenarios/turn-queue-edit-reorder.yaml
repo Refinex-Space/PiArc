@@ -1,0 +1,55 @@
+id: turn-queue-edit-reorder
+description: Queued inputs are edited, deleted and reordered while a turn runs; the steering message and the follow-ups reach the model in the new order, each once, with their edited text.
+capabilities: [CAP-TURN-QUEUE-001]
+providers:
+  main:
+    wire: anthropic
+    # The steering message follows the tool results as a second user message (Pi 1.5.2).
+    validation: { rules: { role_order: false } }
+    steps:
+      - text: 'Waiting for the signal.'
+        tool_calls:
+          - {
+              id: toolu_wait,
+              name: Bash,
+              input: { command: 'while [ ! -f go ]; do sleep 0.05; done; echo go' },
+            }
+      - text: 'Turn one done.'
+      - text: 'Follow-up D done.'
+      - text: 'Follow-up C done.'
+      - text: 'Follow-up B2 done.'
+# The command only uses read-only commands: no approval (T23).
+actions:
+  - prompt: { text: 'Wait for the signal.', turn: t }
+  - wait: { method: item/started, params: { item: { itemId: toolu_wait } } }
+  - steer: { text: 'Steer S', item: s }
+  - follow_up: { text: 'Follow-up A', item: a }
+  - follow_up: { text: 'Follow-up B', item: b }
+  - follow_up: { text: 'Follow-up C', item: c }
+  - queue_edit: { item: s, text: 'Steer S2' }
+  - queue_edit: { item: b, text: 'Follow-up B2' }
+  - queue_delete: { item: a }
+  - follow_up: { text: 'Follow-up D', item: d }
+  - queue_reorder: { items: [s, d, c, b] }
+  - wait:
+      method: session/queueChanged
+      params:
+        items:
+          - { kind: steer, text: 'Steer S2' }
+          - { kind: followUp, text: 'Follow-up D' }
+          - { kind: followUp, text: 'Follow-up C' }
+          - { kind: followUp, text: 'Follow-up B2' }
+  - write_file: { path: go, content: '' }
+  - wait: { method: turn/completed, count: 4 }
+expect:
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+    - { method: session/queueChanged, params: { items: [] } }
+  requests:
+    - { index: 1, last_user_text: 'Steer S2' }
+    - { index: 2, last_user_text: 'Follow-up D' }
+    - { index: 3, last_user_text: 'Follow-up C' }
+    - index: 4
+      user_texts: ['Wait for the signal.', 'Steer S2', 'Follow-up D', 'Follow-up C', 'Follow-up B2']
+      not_contains: ['Follow-up A', '"Steer S"', '"Follow-up B"']
+  request_counts: { main: 5 }

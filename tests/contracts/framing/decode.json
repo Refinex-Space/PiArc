@@ -1,0 +1,561 @@
+{
+  "$comment": "Byte-level cases for the LF frame decoder, shared by crates/piarc-protocol/tests/framing.rs and packages/protocol/src/framing.test.ts. Each step feeds `input` (UTF-8 text or hex bytes) and expects the listed frames: a parsed `value` or an `error` kind. `maxFrameBytes` defaults to 8 MiB.",
+  "cases": [
+    {
+      "name": "a frame split across two inputs is buffered until its LF",
+      "category": "partial",
+      "steps": [
+        {
+          "input": {
+            "utf8": "{\"a\":"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "utf8": "1}\n"
+          },
+          "expect": [
+            {
+              "value": {
+                "a": 1
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a multi-byte character split inside its UTF-8 sequence",
+      "category": "partial",
+      "steps": [
+        {
+          "input": {
+            "hex": "22e4b8"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "hex": "ad220a"
+          },
+          "expect": [
+            {
+              "value": "中"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a frame delivered one byte at a time",
+      "category": "partial",
+      "steps": [
+        {
+          "input": {
+            "hex": "5b"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "hex": "31"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "hex": "2c"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "hex": "32"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "hex": "5d"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "hex": "0a"
+          },
+          "expect": [
+            {
+              "value": [1, 2]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "three frames in one input",
+      "category": "coalesced",
+      "steps": [
+        {
+          "input": {
+            "utf8": "1\n\"two\"\n{\"three\":3}\n"
+          },
+          "expect": [
+            {
+              "value": 1
+            },
+            {
+              "value": "two"
+            },
+            {
+              "value": {
+                "three": 3
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "complete frames followed by a partial tail",
+      "category": "coalesced",
+      "steps": [
+        {
+          "input": {
+            "utf8": "{\"a\":1}\n{\"b\":"
+          },
+          "expect": [
+            {
+              "value": {
+                "a": 1
+              }
+            }
+          ]
+        },
+        {
+          "input": {
+            "utf8": "2}\n3\n"
+          },
+          "expect": [
+            {
+              "value": {
+                "b": 2
+              }
+            },
+            {
+              "value": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an oversized frame in one input is reported and later frames decode",
+      "category": "oversized",
+      "maxFrameBytes": 8,
+      "steps": [
+        {
+          "input": {
+            "utf8": "\"0123456789\"\n1\n"
+          },
+          "expect": [
+            {
+              "error": "frameTooLarge"
+            },
+            {
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an oversized frame across inputs is reported once and discarded to the next LF",
+      "category": "oversized",
+      "maxFrameBytes": 8,
+      "steps": [
+        {
+          "input": {
+            "utf8": "\"0123456789"
+          },
+          "expect": [
+            {
+              "error": "frameTooLarge"
+            }
+          ]
+        },
+        {
+          "input": {
+            "utf8": "abcdef"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "utf8": "\"\n2\n"
+          },
+          "expect": [
+            {
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a frame exactly at the limit is accepted",
+      "category": "oversized",
+      "maxFrameBytes": 8,
+      "steps": [
+        {
+          "input": {
+            "utf8": "\"123456\"\n"
+          },
+          "expect": [
+            {
+              "value": "123456"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the limit counts bytes, not characters",
+      "category": "oversized",
+      "maxFrameBytes": 8,
+      "steps": [
+        {
+          "input": {
+            "utf8": "\"中文字\"\n[]\n"
+          },
+          "expect": [
+            {
+              "error": "frameTooLarge"
+            },
+            {
+              "value": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an invalid byte is a parse error and the next frame decodes",
+      "category": "invalidUtf8",
+      "steps": [
+        {
+          "input": {
+            "hex": "ff0a310a"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            },
+            {
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a truncated multi-byte sequence before the LF",
+      "category": "invalidUtf8",
+      "steps": [
+        {
+          "input": {
+            "hex": "22e4b80a"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        },
+        {
+          "input": {
+            "hex": "320a"
+          },
+          "expect": [
+            {
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an overlong encoding",
+      "category": "invalidUtf8",
+      "steps": [
+        {
+          "input": {
+            "hex": "c0af0a"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a UTF-16 surrogate encoded as UTF-8",
+      "category": "invalidUtf8",
+      "steps": [
+        {
+          "input": {
+            "hex": "22eda080220a"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a truncated object is a parse error and the next frame decodes",
+      "category": "invalidJson",
+      "steps": [
+        {
+          "input": {
+            "utf8": "{\"a\":\n7\n"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            },
+            {
+              "value": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "trailing garbage after a value",
+      "category": "invalidJson",
+      "steps": [
+        {
+          "input": {
+            "utf8": "{} x\n"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a UTF-8 byte order mark is not stripped",
+      "category": "invalidJson",
+      "steps": [
+        {
+          "input": {
+            "hex": "efbbbf7b7d0a"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NaN is not JSON",
+      "category": "invalidJson",
+      "steps": [
+        {
+          "input": {
+            "utf8": "NaN\n"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a lone high surrogate escape is rejected",
+      "category": "surrogates",
+      "steps": [
+        {
+          "input": {
+            "utf8": "\"a\\ud800b\"\n1\n"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            },
+            {
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a lone low surrogate escape is rejected",
+      "category": "surrogates",
+      "steps": [
+        {
+          "input": {
+            "utf8": "\"\\udc00\"\n"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a lone surrogate escape in a key is rejected",
+      "category": "surrogates",
+      "steps": [
+        {
+          "input": {
+            "utf8": "{\"\\ud800\":1}\n"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an escaped surrogate pair decodes",
+      "category": "surrogates",
+      "steps": [
+        {
+          "input": {
+            "utf8": "\"\\ud83d\\ude00\"\n"
+          },
+          "expect": [
+            {
+              "value": "😀"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nesting deeper than 127 levels is rejected",
+      "category": "nesting",
+      "steps": [
+        {
+          "input": {
+            "utf8": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]\n"
+          },
+          "expect": [
+            {
+              "error": "parseError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "raw U+2028 and U+2029 inside a string are not separators",
+      "category": "lineSeparators",
+      "steps": [
+        {
+          "input": {
+            "hex": "7b2274223a2261e280a862e280a963227d0a"
+          },
+          "expect": [
+            {
+              "value": {
+                "t": "a\u2028b\u2029c"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "U+2028 split across inputs",
+      "category": "lineSeparators",
+      "steps": [
+        {
+          "input": {
+            "hex": "2261e2"
+          },
+          "expect": []
+        },
+        {
+          "input": {
+            "hex": "80a862220a"
+          },
+          "expect": [
+            {
+              "value": "a\u2028b"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an escaped newline inside a string is not a separator",
+      "category": "lineSeparators",
+      "steps": [
+        {
+          "input": {
+            "utf8": "{\"t\":\"a\\nb\"}\n"
+          },
+          "expect": [
+            {
+              "value": {
+                "t": "a\nb"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "empty frames are skipped",
+      "category": "emptyFrames",
+      "steps": [
+        {
+          "input": {
+            "utf8": "\n\n1\n\n"
+          },
+          "expect": [
+            {
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a CR before the LF is JSON whitespace",
+      "category": "emptyFrames",
+      "steps": [
+        {
+          "input": {
+            "utf8": "1\r\n"
+          },
+          "expect": [
+            {
+              "value": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

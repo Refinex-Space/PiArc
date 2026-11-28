@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "session/branches",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "seq": 33,
+    "ts": 1763200004300,
+    "branches": [
+      {
+        "options": [{ "entryId": "a1b2c3d4", "turnId": "turn-1", "preview": "Add a CLI flag" }]
+      }
+    ]
+  }
+}

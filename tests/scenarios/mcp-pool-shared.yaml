@@ -1,0 +1,42 @@
+id: mcp-pool-shared
+description: Two sessions of a trusted workspace, one in a subdirectory, call the .mcp.json stdio server alpha through the workspace pool's one process (its start log has one line), each getting its own result; the tools are declared directly as mcp__alpha__*, and Pi's MCP extension, codemode and ToolSearch are not offered (T36).
+capabilities: [CAP-MCP-POOL-001, CAP-MCP-TRANSPORT-001]
+workspace:
+  trusted: true
+  files:
+    .mcp.json: '{"mcpServers":{"alpha":{"command":"node","args":["{{mcp_echo}}","alpha"],"env":{"MCP_ECHO_START_LOG":"mcp-starts.jsonl"}}}}'
+    sub/README.md: 'A subdirectory.'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__alpha__*"]}}'
+providers:
+  a:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: echo-a, name: mcp__alpha__echo, input: { text: from a } }]
+      - text: A heard back.
+  b:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: echo-b, name: mcp__alpha__echo, input: { text: from b } }]
+      - text: B heard back.
+sessions:
+  a: { provider: a }
+  b: { provider: b, cwd: sub }
+actions:
+  - prompt: { session: a, text: Echo from a., turn: ta }
+  - prompt: { session: b, text: Echo from b., turn: tb }
+expect:
+  request_counts: { a: 2, b: 2 }
+  json_lines:
+    mcp-starts.jsonl: [{ server: alpha }]
+  requests:
+    - provider: a
+      index: 0
+      tools_include: [mcp__alpha__echo, mcp__alpha__whoami, mcp__alpha__add_tool]
+      tools_exclude: [ToolSearch, tool_search, codemode]
+    - provider: a
+      index: 1
+      tool_results: [{ id: echo-a, is_error: false, contains: 'alpha echoes "from a"' }]
+    - provider: b
+      index: 1
+      tool_results: [{ id: echo-b, is_error: false, contains: 'alpha echoes "from b"' }]

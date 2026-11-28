@@ -1,0 +1,26 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "method": "policy/review",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "toolCallId": "toolu_01",
+    "tool": "Bash",
+    "input": { "command": "npm publish" },
+    "why": "The command is not read-only and no allow rule covers it.",
+    "environment": {
+      "platform": "macos",
+      "workspace": "~/src/app",
+      "cwd": "~/src/app",
+      "remotes": [{ "name": "origin", "url": "https://github.com/acme/app.git" }],
+      "sandboxed": true
+    },
+    "policy": {
+      "environment": ["github.com/acme"],
+      "allow": ["Publishing @acme packages"],
+      "hardDeny": ["Deleting cloud buckets"]
+    },
+    "model": { "provider": "anthropic", "id": "claude-haiku-4-5" },
+    "timeoutMs": 30000
+  }
+}

@@ -1,0 +1,39 @@
+id: worktree-session-rules
+description: A session in a worktree uses the main checkout's project trust and "always allow" rules (.piarc/settings.local.json is not in the worktree), and the rule it saves lands in the main checkout's file (T35).
+capabilities: [CAP-WT-SESSION-001, CAP-PERM-RULE-001]
+workspace:
+  trusted: true
+  git: true
+  git_commit: true
+  files:
+    .gitignore: ".piarc/settings.local.json\n.piarc/worktrees/\n"
+    a.txt: "alpha\n"
+    .piarc/settings.local.json: '{"permissions":{"allow":["Bash(sed -n *)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: known, name: Bash, input: { command: sed -n 1p a.txt } }]
+      - tool_calls: [{ id: asked, name: Bash, input: { command: sed -e s/a/z/ a.txt } }]
+      - tool_calls: [{ id: saved, name: Bash, input: { command: sed -e s/a/y/ a.txt } }]
+      - text: Finished.
+sessions:
+  main: { provider: main, worktree: { name: rules } }
+approvals:
+  - { tool: Bash, decision: always }
+actions:
+  - prompt: { text: Run them., turn: t }
+  - wait: { method: turn/completed, turn: t }
+  - check_worktree: { fields: { path: .piarc/worktrees/rules, branch: piarc/rules } }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - index: 3
+      tool_results:
+        - { id: known, is_error: false, contains: alpha }
+        - { id: asked, is_error: false, contains: zlpha }
+        - { id: saved, is_error: false, contains: ylpha }
+  files:
+    .piarc/settings.local.json: "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(sed -n *)\",\n      \"Bash(sed *)\"\n    ]\n  }\n}\n"
+    .piarc/worktrees/rules/.piarc/settings.local.json: null
+    .piarc/worktrees/rules/a.txt: "alpha\n"

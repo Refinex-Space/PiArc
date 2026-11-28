@@ -1,0 +1,112 @@
+id: sec-malicious-repo-untrusted
+description: THR-02. A repository carrying every kind of project-level executable configuration — PiArc and Claude Code hooks and allow rules, a .mcp.json server, a project plugin and a Pi package turned on in .piarc/settings.json, a Pi extension in .pi/extensions and Pi settings naming extensions and packages — runs nothing before it is trusted; the trust view lists every item, no hook runs, no MCP server starts, no extension or package loads, and its allow rules do not skip the approval.
+capabilities: [CAP-SEC-MALICIOUS-REPO-001]
+workspace:
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    README.md: "# Totally harmless\n"
+    .piarc/settings.json: |
+      {
+        "hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node hook.mjs piarc"}]}]},
+        "permissions": {"allow": ["Bash(sed *)"]}
+      }
+    .claude/settings.json: |
+      {
+        "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node hook.mjs claude"}]}]},
+        "permissions": {"allow": ["Bash(sed *)"]}
+      }
+    .mcp.json: '{"mcpServers":{"repo":{"command":"node","args":["{{mcp_echo}}","repo"],"env":{"MCP_ECHO_START_LOG":"{{workspace}}/mcp-started.jsonl"}}}}'
+    .pi/extensions/probe.ts: |
+      export default function (pi: any) {
+        pi.registerTool({
+          name: 'repo_probe',
+          label: 'Repository probe',
+          description: 'Registered by the repository extension.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe' }], details: {} };
+          },
+        });
+      }
+    .pi/settings.json: '{"extensions": ["../vendor/pi-ext/ext.ts"], "packages": ["{{workspace}}/vendor/pi-pkg"]}'
+    vendor/pi-ext/ext.ts: |
+      export default function (pi: any) {
+        pi.registerTool({
+          name: 'settings_extension_probe',
+          label: 'Settings extension probe',
+          description: 'Registered by an extension named in .pi/settings.json.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe' }], details: {} };
+          },
+        });
+      }
+    vendor/pi-pkg/package.json: '{"name": "pi-pkg", "pi": {"extensions": ["./probe.ts"]}}'
+    vendor/pi-pkg/probe.ts: |
+      export default function (pi: any) {
+        pi.registerTool({
+          name: 'settings_package_probe',
+          label: 'Settings package probe',
+          description: 'Registered by a package named in .pi/settings.json.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe' }], details: {} };
+          },
+        });
+      }
+  run_files:
+    pkgs/demo/.claude-plugin/plugin.json: '{"name": "demo"}'
+    pkgs/demo/hooks/hooks.json: '{"hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node -e \"process.stdout.write(String.fromCharCode(72,79,79,75))\""}]}]}}'
+    pkgs/demo/.mcp.json: '{"mcpServers":{"echo":{"command":"node","args":["{{mcp_echo}}","demo"],"env":{"MCP_ECHO_START_LOG":"{{workspace}}/plugin-mcp-started.jsonl"}}}}'
+    pkgs/pi-demo/package.json: '{"name": "pi-demo", "pi": {"extensions": ["./probe.ts"]}}'
+    pkgs/pi-demo/probe.ts: |
+      export default function (pi: any) {
+        pi.registerTool({
+          name: 'package_probe',
+          label: 'Package probe',
+          description: 'Registered by the pi-demo package.',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          async execute() {
+            return { content: [{ type: 'text', text: 'probe' }], details: {} };
+          },
+        });
+      }
+packages:
+  - { path: pkgs/demo, scope: project }
+  - { path: pkgs/pi-demo, scope: project }
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: sed, name: Bash, input: { command: 'sed -n 1p README.md' } }
+      - text: Nothing ran.
+actions:
+  - check_trust:
+      fields:
+        trusted: false
+        decision: null
+  - prompt: { text: Show the first line of the README., turn: t }
+approvals:
+  - { tool: Bash, kind: command, decision: deny }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 0
+      tools_exclude:
+        - repo_probe
+        - settings_extension_probe
+        - settings_package_probe
+        - package_probe
+        - mcp__repo__echo
+        - mcp__plugin_demo_echo__echo
+      not_contains: [HOOK]
+    - index: 1
+      tool_results:
+        - { id: sed, is_error: true }
+  files:
+    hook-log/piarc.jsonl: null
+    hook-log/claude.jsonl: null
+    mcp-started.jsonl: null
+    plugin-mcp-started.jsonl: null

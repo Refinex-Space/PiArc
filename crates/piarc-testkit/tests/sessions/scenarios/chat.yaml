@@ -1,0 +1,7 @@
+# Plain turns for the session lifecycle, gap backfill, idle reclaim and restart tests.
+id: chat
+steps:
+  - text: 'First answer.'
+  - text: 'Second answer.'
+  - text: 'Third answer.'
+  - text: 'Fourth answer.'

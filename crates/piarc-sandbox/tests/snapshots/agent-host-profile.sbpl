@@ -1,0 +1,84 @@
+; The Agent Host's Seatbelt profile (piarc-sandbox, T39): ADR-0004 rule 4 and ADR-0015, the
+; second line of defence of architecture section 10.3. Every process the Agent Host starts
+; inherits it: the MCP servers, npm, npx and anything a Pi extension runs.
+;
+; The text is fixed; PiArc's paths and the protected-path expressions reach it as sandbox-exec
+; -D parameters (crates/piarc-sandbox/src/seatbelt.rs, SeatbeltProfile::agent_host):
+;   WORKSPACE, WORKSPACE_RE  the workspace (a regex-escaped copy for the regex rules)
+;   PI_DIR, PI_RE            <data>/pi: Pi's agent directory (session files, settings, caches),
+;                            and a regex-escaped copy
+;   AGENT_HOST_DIR           <data>/agent-host: TMPDIR, npx's npm cache, XDG_CACHE_HOME
+;   DATA_RE                  <data>, regex-escaped: the sessions' temporary directories
+;   PROTECTED_RE, ANCHORS_RE the protected paths at any depth, and the directories that keep
+;                            them in place (piarc_sandbox::PROTECTED_PATHS)
+;
+; Seatbelt applies the last rule that matches, so every deny follows the allow it narrows.
+(version 1)
+
+; Reads, processes and the network stay as macOS allows them: the Agent Host reads broadly
+; (Pi's resources, the user's tools) and sends the model requests.
+(allow default)
+
+; Writes only where the Agent Host and its children work. The rest of PiArc's data directory
+; stays read-only to them: the user's settings, the database with the trust decisions and the
+; audit, the vault, the user's skills, agents and commands, the terminals' shell integration,
+; the checkpoints, the logs.
+(deny file-write*)
+(allow file-write*
+  (subpath (param "WORKSPACE"))
+  (subpath (param "PI_DIR"))
+  (subpath (param "AGENT_HOST_DIR"))
+  (regex (string-append "^" (param "DATA_RE") "/sessions/[^/]+/tmp(/.*)?$")))
+; The parts of Pi's agent directory that make code run stay read-only (R5, THR-03): Pi loads
+; every file under extensions/ and the `extensions` of settings.json into the Agent Host; Core
+; reads the user's skills and commands (allowed-tools and hooks, no trust needed) from skills/
+; and prompts/, and the confirmed packages from npm/ and git/; models.json names the
+; endpoints. Core writes them; a child of the Agent Host must not. settings.json.lock, Pi's
+; lock for reading its settings, stays writable.
+(deny file-write*
+  (regex (string-append "^" (param "PI_RE") "/(extensions|skills|prompts|npm|git)(/.*)?$"))
+  (regex (string-append "^" (param "PI_RE") "/(settings|models)\\.json$")))
+(allow file-write-data
+  (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr")
+  (literal "/dev/dtracehelper") (regex #"^/dev/tty") (regex #"^/dev/fd/[0-9]+$"))
+
+; The workspace's protected paths stay read-only at any depth, as for sandboxed commands
+; (architecture section 6.10): git hooks and configuration run code on the user's next git
+; command, project settings carry hooks and rules, editor tasks and shell startup files run
+; code. The directories that hold them cannot be renamed or removed either.
+(deny file-write*
+  (regex (string-append "^" (param "WORKSPACE_RE") (param "PROTECTED_RE"))))
+(deny file-write-unlink
+  (regex (string-append "^" (param "WORKSPACE_RE") (param "ANCHORS_RE"))))
+
+; Worktrees (.piarc/worktrees/<name>/, architecture section 6.12) are workspaces of their own:
+; writable, with the same protected paths.
+(allow file-write*
+  (regex (string-append "^" (param "WORKSPACE_RE") "/\\.piarc/worktrees/[^/]+/.+$")))
+(deny file-write*
+  (regex (string-append "^" (param "WORKSPACE_RE") "/\\.piarc/worktrees/[^/]+" (param "PROTECTED_RE"))))
+(deny file-write-unlink
+  (regex (string-append "^" (param "WORKSPACE_RE") "/\\.piarc/worktrees/[^/]+" (param "ANCHORS_RE"))))
+
+; Pi locks its project settings file even to read it: proper-lockfile creates the directory
+; .pi/settings.json.lock next to the file (Pi 1.5.2, SettingsManager). That one name stays
+; writable; the rest of .pi/ does not.
+(allow file-write*
+  (regex (string-append "^" (param "WORKSPACE_RE") "/(.*/)?\\.pi/settings\\.json\\.lock(/.*)?$")))
+
+; No microphone or camera (ADR-0096, THR-18): PiArc holds the microphone permission for voice
+; dictation in the main process only. The Agent Host and everything it starts (MCP servers, Pi
+; extensions, npx) are not to record, even though the permission belongs to the app; tccd asks
+; the sandbox about these operations for the requesting process.
+(deny device-microphone)
+(deny device-camera)
+
+;; params
+WORKSPACE=/Users/dev/项目 one
+WORKSPACE_RE=/Users/dev/项目 one
+PI_DIR=/Users/dev/Library/Application Support/PiArc/pi
+PI_RE=/Users/dev/Library/Application Support/PiArc/pi
+AGENT_HOST_DIR=/Users/dev/Library/Application Support/PiArc/agent-host
+DATA_RE=/Users/dev/Library/Application Support/PiArc
+PROTECTED_RE=/(.*/)?(\.git/hooks|\.git/config|\.git/config\.worktree|\.git/modules/.+/hooks|\.git/modules/.+/config|\.git/worktrees/[^/]+/config\.worktree|\.piarc|\.claude|\.pi|\.mcp\.json|\.vscode|\.idea|\.gitconfig|\.bashrc|\.bash_profile|\.bash_login|\.bash_logout|\.profile|\.zshrc|\.zshenv|\.zprofile|\.zlogin|\.zlogout)(/.*)?$
+ANCHORS_RE=/(.*/)?(\.git|\.git/modules|\.git/worktrees)$

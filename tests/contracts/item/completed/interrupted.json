@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "method": "item/completed",
+  "params": {
+    "sessionId": "ses_01",
+    "seq": 4,
+    "ts": 1794643200004,
+    "turnId": "turn_02",
+    "item": {
+      "type": "agentMessage",
+      "itemId": "item_02",
+      "status": "interrupted",
+      "text": "Partial"
+    }
+  }
+}

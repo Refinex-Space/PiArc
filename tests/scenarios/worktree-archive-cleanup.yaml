@@ -1,0 +1,57 @@
+id: worktree-archive-cleanup
+description: Archiving schedules a worktree's cleanup 30 days later on Core's clock; the cleanup removes a clean worktree and keeps its branch, and marks one with uncommitted changes to wait for the user, whose removal without discarding is refused; keeping it reschedules it, discarding removes it; reopening a session whose worktree was cleaned up adds it again on its branch (T35).
+capabilities: [CAP-WT-SESSION-001]
+workspace:
+  git: true
+  git_commit: true
+  files:
+    .gitignore: ".piarc/worktrees/\n"
+    README.md: "# repo\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Nothing to change.
+      - tool_calls:
+          [{ id: edit, name: Write, input: { path: draft.txt, content: work in progress } }]
+      - text: Left a draft.
+      - text: Back again.
+sessions:
+  clean: { provider: main, worktree: { name: clean-one } }
+  dirty: { provider: main, mode: acceptEdits, worktree: { name: dirty-one } }
+actions:
+  - prompt: { session: clean, text: Look around., turn: c1 }
+  - wait: { session: clean, method: turn/completed, turn: c1 }
+  - prompt: { session: dirty, text: Start a draft., turn: d1 }
+  - wait: { session: dirty, method: turn/completed, turn: d1 }
+  - set_prefs: { session: clean, archived: true }
+  - set_prefs: { session: dirty, archived: true }
+  - check_worktree: { session: clean, fields: { exists: true, cleanupDue: true, removed: false } }
+  # Not due yet.
+  - sweep_worktrees: { removed: [], waiting: [] }
+  - advance_clock: { seconds: 2592001 }
+  - sweep_worktrees: { removed: [clean], waiting: [dirty] }
+  - check_worktree: { session: clean, fields: { exists: false, removed: true } }
+  - check_git: { args: [branch, --list, piarc/clean-one], contains: [piarc/clean-one] }
+  - check_worktree: { session: dirty, fields: { exists: true, confirm: true, removed: false } }
+  - check_files: { files: { .piarc/worktrees/dirty-one/draft.txt: work in progress } }
+  # Asked again: nothing more until the user answers.
+  - sweep_worktrees: { removed: [], waiting: [] }
+  - remove_worktree: { session: dirty, discard: false, succeeds: false }
+  - check_files: { files: { .piarc/worktrees/dirty-one/draft.txt: work in progress } }
+  - keep_worktree: { session: dirty }
+  - check_worktree: { session: dirty, fields: { confirm: false, cleanupDue: true, exists: true } }
+  - sweep_worktrees: { removed: [], waiting: [] }
+  - remove_worktree: { session: dirty, discard: true }
+  - check_worktree: { session: dirty, fields: { exists: false, removed: true } }
+  - check_git: { args: [branch, --list, 'piarc/*'], contains: [piarc/clean-one, piarc/dirty-one] }
+  - set_prefs: { session: clean, archived: false }
+  - resume: { session: clean }
+  - check_worktree: { session: clean, fields: { exists: true, removed: false } }
+  - prompt: { session: clean, text: Continue., turn: c2 }
+  - wait: { session: clean, method: turn/completed, turn: c2 }
+expect:
+  request_counts: { main: 4 }
+  files:
+    .piarc/worktrees/dirty-one/draft.txt: null
+    .piarc/worktrees/clean-one/README.md: "# repo\n"

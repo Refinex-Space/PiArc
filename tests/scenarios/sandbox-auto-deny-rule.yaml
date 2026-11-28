@@ -1,0 +1,26 @@
+id: sandbox-auto-deny-rule
+description: With the sandbox's auto-approval on, a Bash deny rule still refuses the command without running it (T39).
+capabilities: [CAP-SANDBOX-AUTO-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+workspace:
+  trusted: true
+  run_files:
+    'data 数据/settings.json': '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true},"permissions":{"deny":["Bash(touch *)"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: denied, name: Bash, input: { command: 'touch denied.txt' } }
+      - text: Done.
+actions:
+  - prompt: { text: Go., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: denied, is_error: true, contains: 'Bash(touch *)' }
+  files:
+    denied.txt: null

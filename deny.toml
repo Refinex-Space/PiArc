@@ -1,0 +1,66 @@
+# cargo-deny configuration (cargo-deny 0.20, config format v2).
+# Run through `npm run verify`, or directly: .tools/bin/cargo-deny check
+# Install the pinned version with: node scripts/dev/install-tools.mjs
+
+[graph]
+# The four shipping targets (ADR-0014).
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc",
+]
+all-features = true
+
+[advisories]
+# Vulnerabilities are always errors. Unsound and unmaintained crates anywhere
+# in the tree, and yanked versions, are errors too.
+unsound = "all"
+unmaintained = "all"
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Allowlist: anything not listed fails, which keeps GPL, AGPL and LGPL (and
+# any other copyleft or unknown license) out of the dependency tree.
+# MPL-2.0 may be added when a dependency needs it; record the reason here.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.93
+# The allowlist is policy, not an inventory: unused entries are expected.
+unused-allowed-license = "allow"
+# Per-crate exceptions keep the global allowlist narrow.
+exceptions = [
+    # MIT-0 is MIT without the attribution clause (OSI approved, permissive).
+    # borrow-or-share reaches the tree only through jsonschema (via fluent-uri)
+    # in piarc-testkit, a test-only crate that is never shipped (T05).
+    { allow = ["MIT-0"], crate = "borrow-or-share" },
+    # CC0-1.0 is a public-domain dedication (OSI approved, permissive). notify is the file
+    # watcher architecture section 7.1 names for piarc-fs (T13: settings file changes).
+    { allow = ["CC0-1.0"], crate = "notify" },
+]
+
+[licenses.private]
+# Workspace crates are checked too (they are MIT).
+ignore = false
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace path dependencies carry no version; they are private and allowed.
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

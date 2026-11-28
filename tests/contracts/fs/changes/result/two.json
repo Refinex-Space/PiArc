@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 34,
+  "result": {
+    "files": [
+      {
+        "path": "/work/a 中文/src/lib.rs",
+        "change": "modified"
+      },
+      {
+        "path": "/work/a 中文/notes.md",
+        "change": "deleted"
+      }
+    ]
+  }
+}

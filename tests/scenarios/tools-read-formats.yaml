@@ -1,0 +1,74 @@
+id: tools-read-formats
+description: Read returns numbered lines for a line range, the pages of a PDF (asking for a page range on a long document), a notebook's cells with their outputs, and an image as an image block for a vision model but only the explanation for a text-only model.
+capabilities: [CAP-TOOL-READ-002]
+workspace:
+  fixtures:
+    'img/pixel 像素.png': pixel.png
+    'docs/report.pdf': report.pdf
+  files:
+    'notes.txt': "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\n"
+    'analysis.ipynb': '{"metadata":{"language_info":{"name":"python"}},"cells":[{"cell_type":"markdown","source":["# Analysis"]},{"cell_type":"code","execution_count":1,"source":["print(6 * 7)"],"outputs":[{"output_type":"stream","name":"stdout","text":["42\n"]}]}]}'
+providers:
+  vision:
+    wire: anthropic
+    vision: true
+    steps:
+      - tool_calls:
+          - { id: toolu_range, name: Read, input: { path: notes.txt, offset: 3, limit: 2 } }
+          - { id: toolu_pdf_all, name: Read, input: { path: docs/report.pdf } }
+          - { id: toolu_pdf_pages, name: Read, input: { path: docs/report.pdf, pages: '2-3' } }
+          - { id: toolu_notebook, name: Read, input: { path: analysis.ipynb } }
+          - { id: toolu_image, name: Read, input: { path: 'img/pixel 像素.png' } }
+      - text: 'Read everything.'
+  text:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_image_blind, name: Read, input: { path: 'img/pixel 像素.png' } }
+      - text: 'I cannot see images.'
+sessions:
+  see: { provider: vision }
+  blind: { provider: text }
+actions:
+  - prompt: { session: see, text: 'Read the files.', turn: seen }
+  - prompt: { session: blind, text: 'Read the image.', turn: unseen }
+expect:
+  events:
+    - { session: see, method: turn/completed, turn: seen, params: { status: completed } }
+    - { session: blind, method: turn/completed, turn: unseen, params: { status: completed } }
+  requests:
+    - provider: vision
+      index: 1
+      contains: ['"media_type":"image/png"']
+      tool_results:
+        - {
+            id: toolu_range,
+            is_error: false,
+            contains: "     3\tline 3\n     4\tline 4\n\n[3 more lines in file. Use offset=5 to continue.]",
+          }
+        - {
+            id: toolu_pdf_all,
+            is_error: true,
+            contains: 'has 12 pages, more than can be read at once',
+          }
+        - {
+            id: toolu_pdf_pages,
+            is_error: false,
+            contains: "PDF docs/report.pdf: 12 pages; pages 2-3 below.\n\n--- Page 2 ---\nReport page 2\n\n--- Page 3 ---\nReport page 3",
+          }
+        - {
+            id: toolu_notebook,
+            is_error: false,
+            contains: "[cell 2: code, run 1]\nprint(6 * 7)\n[outputs]\n42",
+          }
+        - { id: toolu_image, is_error: false, contains: 'Read image file [image/png]' }
+    - provider: text
+      index: 1
+      not_contains: ['"type":"image"']
+      tool_results:
+        - {
+            id: toolu_image_blind,
+            is_error: false,
+            contains: 'Current model does not support images',
+          }
+  request_counts: { vision: 2, text: 2 }

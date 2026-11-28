@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 40,
+  "method": "exec/monitor",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "requestId": "mon-01",
+    "command": "tail -f logs/app.log",
+    "description": "应用日志里的错误",
+    "timeoutMs": 600000,
+    "origin": {
+      "tool": "Monitor",
+      "toolCallId": "toolu_09"
+    }
+  }
+}

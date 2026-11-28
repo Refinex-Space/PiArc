@@ -1,0 +1,260 @@
+{
+  "description": "T41: request costs from pi-ai calculateCost (USD); Core must give the same totals (piarc-core usage_tests.rs) and agent-host/src/providers/usage-costs.test.ts checks they are still calculateCost's.",
+  "prices": {
+    "plain": {
+      "input": 3,
+      "output": 15,
+      "cacheRead": 0.3,
+      "cacheWrite": 3.75
+    },
+    "cheap": {
+      "input": 0.075,
+      "output": 0.3,
+      "cacheRead": 0.01875,
+      "cacheWrite": 0.09375
+    },
+    "tiered": {
+      "input": 1.25,
+      "output": 10,
+      "cacheRead": 0.125,
+      "cacheWrite": 1.625,
+      "tiers": [
+        {
+          "inputTokensAbove": 200000,
+          "input": 2.5,
+          "output": 15,
+          "cacheRead": 0.25,
+          "cacheWrite": 3.25
+        },
+        {
+          "inputTokensAbove": 128000,
+          "input": 2,
+          "output": 12,
+          "cacheRead": 0.2,
+          "cacheWrite": 2.5
+        }
+      ]
+    }
+  },
+  "vectors": [
+    {
+      "price": "plain",
+      "usage": {
+        "input": 1234,
+        "output": 567,
+        "cacheRead": 8910,
+        "cacheWrite": 1112
+      },
+      "total": 0.01905
+    },
+    {
+      "price": "plain",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "total": 0
+    },
+    {
+      "price": "plain",
+      "usage": {
+        "input": 15,
+        "output": 3,
+        "cacheRead": 0,
+        "cacheWrite": 2048,
+        "cacheWrite1h": 1024
+      },
+      "total": 0.010074
+    },
+    {
+      "price": "plain",
+      "usage": {
+        "input": 100000,
+        "output": 4000,
+        "cacheRead": 30000,
+        "cacheWrite": 0
+      },
+      "total": 0.369
+    },
+    {
+      "price": "plain",
+      "usage": {
+        "input": 150000,
+        "output": 9000,
+        "cacheRead": 60000,
+        "cacheWrite": 5000,
+        "cacheWrite1h": 5000
+      },
+      "total": 0.633
+    },
+    {
+      "price": "plain",
+      "usage": {
+        "input": 128000,
+        "output": 1,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "total": 0.384015
+    },
+    {
+      "price": "plain",
+      "usage": {
+        "input": 987654321,
+        "output": 123456789,
+        "cacheRead": 55555555,
+        "cacheWrite": 7777777,
+        "cacheWrite1h": 333
+      },
+      "total": 4860.6488775
+    },
+    {
+      "price": "cheap",
+      "usage": {
+        "input": 1234,
+        "output": 567,
+        "cacheRead": 8910,
+        "cacheWrite": 1112
+      },
+      "total": 0.0005339625
+    },
+    {
+      "price": "cheap",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "total": 0
+    },
+    {
+      "price": "cheap",
+      "usage": {
+        "input": 15,
+        "output": 3,
+        "cacheRead": 0,
+        "cacheWrite": 2048,
+        "cacheWrite1h": 1024
+      },
+      "total": 0.000251625
+    },
+    {
+      "price": "cheap",
+      "usage": {
+        "input": 100000,
+        "output": 4000,
+        "cacheRead": 30000,
+        "cacheWrite": 0
+      },
+      "total": 0.0092625
+    },
+    {
+      "price": "cheap",
+      "usage": {
+        "input": 150000,
+        "output": 9000,
+        "cacheRead": 60000,
+        "cacheWrite": 5000,
+        "cacheWrite1h": 5000
+      },
+      "total": 0.015825
+    },
+    {
+      "price": "cheap",
+      "usage": {
+        "input": 128000,
+        "output": 1,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "total": 0.009600299999999999
+    },
+    {
+      "price": "cheap",
+      "usage": {
+        "input": 987654321,
+        "output": 123456789,
+        "cacheRead": 55555555,
+        "cacheWrite": 7777777,
+        "cacheWrite1h": 333
+      },
+      "total": 112.88196275625
+    },
+    {
+      "price": "tiered",
+      "usage": {
+        "input": 1234,
+        "output": 567,
+        "cacheRead": 8910,
+        "cacheWrite": 1112
+      },
+      "total": 0.01013325
+    },
+    {
+      "price": "tiered",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "total": 0
+    },
+    {
+      "price": "tiered",
+      "usage": {
+        "input": 15,
+        "output": 3,
+        "cacheRead": 0,
+        "cacheWrite": 2048,
+        "cacheWrite1h": 1024
+      },
+      "total": 0.0042727500000000005
+    },
+    {
+      "price": "tiered",
+      "usage": {
+        "input": 100000,
+        "output": 4000,
+        "cacheRead": 30000,
+        "cacheWrite": 0
+      },
+      "total": 0.254
+    },
+    {
+      "price": "tiered",
+      "usage": {
+        "input": 150000,
+        "output": 9000,
+        "cacheRead": 60000,
+        "cacheWrite": 5000,
+        "cacheWrite1h": 5000
+      },
+      "total": 0.55
+    },
+    {
+      "price": "tiered",
+      "usage": {
+        "input": 128000,
+        "output": 1,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "total": 0.16001
+    },
+    {
+      "price": "tiered",
+      "usage": {
+        "input": 987654321,
+        "output": 123456789,
+        "cacheRead": 55555555,
+        "cacheWrite": 7777777,
+        "cacheWrite1h": 333
+      },
+      "total": 4360.15488425
+    }
+  ]
+}

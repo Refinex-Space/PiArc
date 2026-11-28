@@ -1,0 +1,39 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "result": {
+    "models": [
+      {
+        "provider": "local",
+        "id": "qwen",
+        "name": "Qwen local",
+        "contextWindow": 32768,
+        "maxOutput": 4096,
+        "vision": false,
+        "efforts": ["off"],
+        "promptCache": false,
+        "toolReliability": "low",
+        "defaultEffort": "off",
+        "toolProfile": "conservative"
+      }
+    ],
+    "providers": [],
+    "loginProviders": [
+      {
+        "id": "github-copilot",
+        "name": "GitHub Copilot",
+        "label": "Sign in with GitHub",
+        "subscription": true,
+        "signedIn": false
+      },
+      {
+        "id": "openai-codex",
+        "name": "OpenAI Codex",
+        "label": "ChatGPT Plus/Pro",
+        "subscription": true,
+        "signedIn": true,
+        "account": "dev@example.com"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "t35-wait",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "waiting",
+          "name": "Bash",
+          "input": {
+            "command": "env echo waits for you",
+            "description": "Waits for approval"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Approved later."
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "text": "Saved memory \"prefers-pnpm\". Its index line:\n- [prefers-pnpm](prefers-pnpm.md) (feedback, 2026-11-22) — Use pnpm in this repository",
+    "index": {
+      "path": "/data/auto-memory/repo-0123456789ab/MEMORY.md",
+      "content": "# Auto memory\n\n- [prefers-pnpm](prefers-pnpm.md) (feedback, 2026-11-22) — Use pnpm in this repository\n",
+      "kind": "autoMemory"
+    },
+    "changed": true
+  }
+}

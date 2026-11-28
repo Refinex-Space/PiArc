@@ -1,0 +1,89 @@
+{
+  "id": "t46-main",
+  "steps": [
+    { "text": "Ready." },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-home",
+          "name": "Bash",
+          "input": { "command": "printenv HOME", "description": "Home" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-rewrite",
+          "name": "Bash",
+          "input": { "command": "sed -i.bak 's/keep/gone/' notes.txt", "description": "Rewrite" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-script",
+          "name": "Bash",
+          "input": { "command": "bash run.sh", "description": "Script" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-slow",
+          "name": "Bash",
+          "input": { "command": "printenv PATH", "description": "Path" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-d1",
+          "name": "Bash",
+          "input": { "command": "printenv HOME", "description": "Again" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-d2",
+          "name": "Bash",
+          "input": { "command": "printenv PATH", "description": "Again" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-d3",
+          "name": "Bash",
+          "input": { "command": "printenv HOME", "description": "Again" }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-paused",
+          "name": "Bash",
+          "input": { "command": "printenv PATH", "description": "Paused" }
+        }
+      ]
+    },
+    { "text": "All done." },
+    {
+      "tool_calls": [
+        {
+          "id": "t46-gone",
+          "name": "Bash",
+          "input": { "command": "printenv HOME", "description": "No reviewer" }
+        }
+      ]
+    },
+    { "text": "Stopped." }
+  ]
+}

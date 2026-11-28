@@ -1,0 +1,78 @@
+id: mcp-elicitation
+description: A shared MCP server advertises one tool and requests a form or a browser visit during its call. All three answers round trip in both modes. The server rejects initialization unless both client capabilities are present.
+capabilities: [CAP-MCP-ELICITATION-001]
+workspace:
+  trusted: true
+  files:
+    .mcp.json: '{"mcpServers":{"alpha":{"command":"node","args":["{{mcp_echo}}","alpha"],"env":{"MCP_ECHO_ELICIT":"1"}}}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__alpha__*"]}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: form1, name: mcp__alpha__elicit, input: { mode: form } }]
+      - tool_calls: [{ id: url1, name: mcp__alpha__elicit, input: { mode: url } }]
+      - tool_calls: [{ id: form2, name: mcp__alpha__elicit, input: { mode: form } }]
+      - tool_calls: [{ id: url2, name: mcp__alpha__elicit, input: { mode: url } }]
+      - tool_calls: [{ id: form3, name: mcp__alpha__elicit, input: { mode: form } }]
+      - tool_calls: [{ id: url3, name: mcp__alpha__elicit, input: { mode: url } }]
+      - text: Done.
+sessions:
+  main: { provider: main }
+actions:
+  - prompt: { session: main, text: Request input from the client., turn: t1 }
+approvals:
+  - {
+      tool: alpha,
+      kind: elicitation,
+      decision: allow,
+      elicitation: { action: accept, content: { release: milestone } },
+    }
+  - { tool: alpha, kind: elicitation, decision: allow, elicitation: { action: accept } }
+  - { tool: alpha, kind: elicitation, decision: deny, elicitation: { action: decline } }
+  - { tool: alpha, kind: elicitation, decision: deny, elicitation: { action: decline } }
+  - { tool: alpha, kind: elicitation, decision: deny, elicitation: { action: cancel } }
+  - { tool: alpha, kind: elicitation, decision: deny, elicitation: { action: cancel } }
+expect:
+  request_counts: { main: 7 }
+  requests:
+    - index: 1
+      provider: main
+      tool_results:
+        - &form1 { id: form1, is_error: false, contains: '"release":"milestone"' }
+    - index: 2
+      provider: main
+      tool_results:
+        - *form1
+        - &url1 { id: url1, is_error: false, contains: '"action":"accept"' }
+    - index: 3
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - &form2 { id: form2, is_error: false, contains: '"action":"decline"' }
+    - index: 4
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - *form2
+        - &url2 { id: url2, is_error: false, contains: '"action":"decline"' }
+    - index: 5
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - *form2
+        - *url2
+        - &form3 { id: form3, is_error: false, contains: '"action":"cancel"' }
+    - index: 6
+      provider: main
+      tool_results:
+        - *form1
+        - *url1
+        - *form2
+        - *url2
+        - *form3
+        - { id: url3, is_error: false, contains: '"action":"cancel"' }

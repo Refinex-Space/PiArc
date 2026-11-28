@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 32,
+  "result": {
+    "failure": "unknownModel",
+    "message": "The reviewer model openai/gpt-5-mini is not configured or has no credentials.",
+    "model": "openai/gpt-5-mini",
+    "usage": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+    "inputHash": "",
+    "inputChars": 0,
+    "promptId": "4be1c0a9d812"
+  }
+}

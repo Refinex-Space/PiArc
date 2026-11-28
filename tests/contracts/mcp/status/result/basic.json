@@ -1,0 +1,46 @@
+{
+  "jsonrpc": "2.0",
+  "id": 71,
+  "result": {
+    "servers": [
+      {
+        "name": "docs",
+        "scope": "user",
+        "source": "/data/settings.json",
+        "transport": "http",
+        "state": "needsAuth",
+        "tools": 0,
+        "sessions": 1,
+        "error": "the server asked for a sign-in (401)",
+        "oauth": true
+      },
+      {
+        "name": "files",
+        "scope": "project",
+        "source": "/工作区 a/.mcp.json",
+        "transport": "stdio",
+        "state": "connected",
+        "tools": 3,
+        "sessions": 2,
+        "pid": 4242
+      },
+      {
+        "name": "legacy",
+        "scope": "local",
+        "source": "/home/u/.claude.json",
+        "transport": "sse",
+        "state": "unsupported",
+        "tools": 0,
+        "sessions": 0,
+        "error": "the SSE transport is deprecated and PiArc does not support it; use the server's Streamable HTTP endpoint (type \"http\")"
+      }
+    ],
+    "overridden": [
+      {
+        "name": "files",
+        "source": "/data/settings.json",
+        "by": "/工作区 a/.mcp.json"
+      }
+    ]
+  }
+}

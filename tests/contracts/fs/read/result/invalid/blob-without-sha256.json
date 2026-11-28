@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 16,
+  "result": {
+    "path": "/Users/dev/work space/项目/a.png",
+    "size": 1,
+    "offset": 0,
+    "bytesRead": 1,
+    "eof": true,
+    "blob": {
+      "path": "/tmp/x",
+      "size": 1
+    }
+  }
+}

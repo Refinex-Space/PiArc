@@ -1,0 +1,356 @@
+// Renders the worker's blocks and spans with React elements only (architecture sections 8.4 and
+// 10.3): no innerHTML, raw HTML shown as text, links opened through the main process's
+// confirmation (`window.piarc.openExternal`), images never loaded and shown as links. Blocks are
+// memoized by identity, so while a message streams only its changed tail re-renders.
+import { createContext, memo, useContext, type MouseEvent, type ReactNode } from 'react';
+
+import { fitFileTable } from '../../files/markdown/table-fit.js';
+import { fileLocation, openProjectFile } from '../../files/navigation.js';
+import { TranscriptContext } from '../services.js';
+import { revealBidi } from '../reveal.js';
+import { useT } from '../../app/app-context.js';
+import { CodeBlock } from '../highlight/CodeBlock.js';
+import { MarkdownMath } from '../../files/markdown/RichBlock.js';
+import { ChatDiagram } from './ChatDiagram.js';
+import { ProjectImage, RemoteImage, useProjectImage } from './ReplyImage.js';
+import type { Align, Block, Span } from './ir.js';
+
+// File documents opt into rich media and document-local navigation; chat keeps its own policy.
+export const DocumentElements = createContext<{
+  image: (source: string, alt: string) => ReactNode;
+  rich: (kind: 'math' | 'mermaid', source: string, inline: boolean) => ReactNode;
+  anchor: (name: string) => void;
+  anchorId: (name: string) => string;
+  checked?: (item: Extract<Block, { kind: 'list' }>['items'][number]) => boolean;
+  task?: (item: Extract<Block, { kind: 'list' }>['items'][number]) => void;
+} | null>(null);
+function openLink(event: MouseEvent<HTMLAnchorElement>, href: string): void {
+  event.preventDefault();
+  window.piarc.openExternal(href).catch((error: unknown) => {
+    console.error('[transcript] opening a link failed', error);
+  });
+}
+
+function Link({
+  href,
+  projectTarget,
+  title,
+  children,
+}: {
+  href: string | null;
+  projectTarget?: string | undefined;
+  title: string | null;
+  children: ReactNode;
+}) {
+  const t = useT();
+  const view = useContext(TranscriptContext);
+  const files = view?.fileLinks;
+  if (projectTarget && files?.root) {
+    const target =
+      projectTarget.startsWith('#L') && files.document
+        ? files.document + projectTarget
+        : projectTarget;
+    const location =
+      !projectTarget.startsWith('#') || files.document
+        ? fileLocation(target, files.root, projectTarget.startsWith('#') ? '' : files.directory)
+        : undefined;
+    if (location)
+      return (
+        <button
+          type="button"
+          className="md-link file-document-link"
+          title={revealBidi(title ?? projectTarget)}
+          data-file-path={location.path}
+          onClick={() => {
+            openProjectFile(files.sessionId, location);
+          }}
+        >
+          {children}
+        </button>
+      );
+  }
+  if (href === null) {
+    return (
+      <span className="md-link-blocked" title={t('markdown.linkBlocked')}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <a
+      className="md-link"
+      href={href}
+      title={title ?? href}
+      onClick={(event) => {
+        if (view?.actions.openLink?.(href) === true) {
+          event.preventDefault();
+          return;
+        }
+        openLink(event, href);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+function Spans({ spans }: { spans: readonly Span[] }): ReactNode {
+  return spans.map((span, index) => <SpanView key={index} span={span} />);
+}
+
+function SpanView({ span }: { span: Span }): ReactNode {
+  const document = useContext(DocumentElements);
+  switch (span.kind) {
+    case 'math':
+      return document ? (
+        document.rich('math', span.text, true)
+      ) : (
+        <MarkdownMath source={span.text} inline />
+      );
+    case 'note':
+      return (
+        <sup data-anchor={'fnref-' + span.label}>
+          <a
+            className="markdown-anchor"
+            href={'#' + (document?.anchorId('fn-' + span.label) ?? '')}
+            onClick={(event) => {
+              event.preventDefault();
+              document?.anchor('fn-' + span.label);
+            }}
+          >
+            {span.number}
+          </a>
+        </sup>
+      );
+    case 'text':
+      return span.text;
+    case 'strong':
+      return (
+        <strong>
+          <Spans spans={span.children} />
+        </strong>
+      );
+    case 'emphasis':
+      return (
+        <em>
+          <Spans spans={span.children} />
+        </em>
+      );
+    case 'mark':
+    case 'sup':
+    case 'sub':
+    case 'u': {
+      const Tag = span.kind;
+      return (
+        <Tag>
+          <Spans spans={span.children} />
+        </Tag>
+      );
+    }
+    case 'delete':
+      return (
+        <del>
+          <Spans spans={span.children} />
+        </del>
+      );
+    case 'code':
+      return <code className="md-inline-code">{span.text}</code>;
+    case 'break':
+      return <br />;
+    case 'link':
+      if (document && span.documentAnchor)
+        return (
+          <button
+            type="button"
+            className="markdown-anchor"
+            onClick={() => {
+              document.anchor(span.documentAnchor ?? '');
+            }}
+          >
+            <Spans spans={span.children} />
+          </button>
+        );
+      return (
+        <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
+          <Spans spans={span.children} />
+        </Link>
+      );
+    case 'image':
+      if (document && span.documentSource) return document.image(span.documentSource, span.alt);
+      return <ImageSpan span={span} />;
+    case 'html':
+      return <span className="md-raw-html">{span.text}</span>;
+  }
+}
+
+/** An image in a reply (ADR-0080): a project image inline, a remote one as a card, else a link. */
+function ImageSpan({ span }: { readonly span: Extract<Span, { kind: 'image' }> }) {
+  const t = useT();
+  const local = useProjectImage(span.projectTarget);
+  const link = (
+    <Link href={span.href} projectTarget={span.projectTarget} title={span.title}>
+      <span className="md-image-label">
+        {t('markdown.image', {
+          name: span.alt === '' ? (span.href ?? span.projectTarget ?? '') : span.alt,
+        })}
+      </span>
+    </Link>
+  );
+  if (local !== undefined) return <ProjectImage path={local} alt={span.alt} fallback={link} />;
+  if (span.href !== null && /^https?:/iu.test(span.href)) {
+    return <RemoteImage href={span.href} alt={span.alt} />;
+  }
+  return link;
+}
+
+/** `tight`: the items of a tight list, whose paragraphs render without paragraph spacing. */
+function Blocks({
+  blocks,
+  tight = false,
+}: {
+  blocks: readonly Block[];
+  tight?: boolean;
+}): ReactNode {
+  return blocks.map((block, index) =>
+    tight && block.kind === 'paragraph' ? (
+      <Spans key={index} spans={block.spans} />
+    ) : (
+      <BlockView key={index} block={block} />
+    ),
+  );
+}
+
+const BlockView = memo(function BlockView({ block }: { block: Block }): ReactNode {
+  const t = useT(),
+    document = useContext(DocumentElements);
+  switch (block.kind) {
+    case 'paragraph':
+      return (
+        <p>
+          <Spans spans={block.spans} />
+        </p>
+      );
+    case 'heading': {
+      const level = Math.min(6, Math.max(1, block.level));
+      const content = <Spans spans={block.spans} />;
+      switch (level) {
+        case 1:
+          return <h1>{content}</h1>;
+        case 2:
+          return <h2>{content}</h2>;
+        case 3:
+          return <h3>{content}</h3>;
+        case 4:
+          return <h4>{content}</h4>;
+        case 5:
+          return <h5>{content}</h5>;
+        default:
+          return <h6>{content}</h6>;
+      }
+    }
+    case 'code':
+      if (block.lang === 'mermaid')
+        return document ? (
+          document.rich('mermaid', block.text, false)
+        ) : (
+          <ChatDiagram lang={block.lang} source={block.text} complete={block.complete} />
+        );
+      if (block.lang === 'math' || block.lang === 'latex')
+        return document ? (
+          document.rich('math', block.text, false)
+        ) : block.complete ? (
+          <MarkdownMath source={block.text} inline={false} />
+        ) : (
+          <CodeBlock lang={block.lang} code={block.text} complete={false} />
+        );
+      return <CodeBlock lang={block.lang} code={block.text} complete={block.complete} />;
+    case 'list': {
+      const items = block.items.map((item, index) => (
+        <li key={index} className={item.checked === null ? undefined : 'md-task'}>
+          {item.checked === null ? null : (
+            <input
+              type="checkbox"
+              checked={document?.checked?.(item) ?? item.checked}
+              disabled={!document?.task || item.sourceLine === undefined}
+              onChange={() => {
+                document?.task?.(item);
+              }}
+              aria-label={t(
+                (document?.checked?.(item) ?? item.checked) ? 'markdown.taskDone' : 'markdown.task',
+              )}
+            />
+          )}
+          <Blocks blocks={item.blocks} tight={!block.loose} />
+        </li>
+      ));
+      const className = block.loose ? 'md-list md-loose' : 'md-list';
+      return block.ordered ? (
+        <ol className={className} start={block.start}>
+          {items}
+        </ol>
+      ) : (
+        <ul className={className}>{items}</ul>
+      );
+    }
+    case 'blockquote':
+      return (
+        <blockquote>
+          <Blocks blocks={block.blocks} />
+        </blockquote>
+      );
+    case 'table':
+      return (
+        <div
+          className="md-table-wrap"
+          ref={
+            document
+              ? (frame) => {
+                  const table = frame?.querySelector('table');
+                  return frame && table ? fitFileTable(frame, table) : undefined;
+                }
+              : undefined
+          }
+        >
+          <table>
+            <thead>
+              <tr>
+                {block.header.map((cell, index) => (
+                  <th key={index} className={alignClass(block.align[index])}>
+                    <Spans spans={cell} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, index) => (
+                    <td key={index} className={alignClass(block.align[index])}>
+                      <Spans spans={cell} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    case 'rule':
+      return <hr />;
+    case 'html':
+      return <pre className="md-raw-html-block">{block.text}</pre>;
+  }
+});
+
+function alignClass(align: Align | undefined): string | undefined {
+  return align === null || align === undefined ? undefined : `md-align-${align}`;
+}
+
+/** A message's blocks. */
+export const MarkdownView = memo(function MarkdownView({ blocks }: { blocks: readonly Block[] }) {
+  return (
+    <div className="md">
+      <Blocks blocks={blocks} />
+    </div>
+  );
+});

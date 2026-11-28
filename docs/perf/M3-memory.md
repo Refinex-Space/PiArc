@@ -1,0 +1,118 @@
+# M3 内存测量：3 个并行会话 + 子 agent
+
+结论：Agent Host 在预算内（最大 238 MB，预算 270 MB）；应用其余进程合计超出 macOS 预算（最大 576 MB，预算 510 MB）。超出的主体是没有会话时就已存在的基线（同机不连测试驱动、未打开工作区时 466 MB），3 个会话加子 agent 只增加约 65 MB，其中渲染进程约 50 MB。本任务范围内没有可修的单点，登记为 I146，列为 R4 的风险；预算不放宽。
+
+## 测量方法
+
+一条命令复现（先打开发构建 `npm run package:desktop -- --flavor development`）：
+
+```bash
+npm run perf:m3            # 打包形态，预热 20 s，采样 30 s
+npm run perf:m3 -- --form dev --warmup 20 --seconds 30
+```
+
+脚本 `scripts/perf/m3-memory.mjs` 做的事：
+
+1. 起严格 mock provider，临时数据目录的 `pi/models.json` 指向它；临时 git 仓库（路径含空格与中文）作为工作区。
+2. 用 Playwright 启动打包产物，1 个窗口，在同一工作区依次新建 3 个会话：普通会话、独立 worktree 会话（`.piarc/worktrees/m3-tree`）、派出 1 个前台 general-purpose 子 agent 的会话。
+3. 每个会话与子 agent 的脚本都是 120 步：每步流式输出约 520 字符（12 字符一块、块间 30 ms），再调用一个只读工具（Read、Bash `ls`、Grep），全程不需要审批。
+4. 等 3 个会话与子 agent 都向 mock 发出请求后预热 20 s，然后每 2 s 采样一次，共 30 s：
+   - 应用进程：`app.getAppMetrics()` 的 working set（macOS 上即常驻内存），按进程类型分列；
+   - Agent Host：主进程的子进程中命令行含 `agent-host` 的进程的 RSS（macOS `ps`，Windows 为 CIM 的 working set）；
+   - 主进程的 `process.memoryUsage()`。
+5. 在新建会话之前（窗口已显示、工作区已打开）另取一次空闲样本作为基线。
+
+结果写到 `tmp/evidence/T35/m3-memory.json`，超出任一预算时退出码为 1。MB 为 10^6 字节，与第 11 章一致。
+
+## 环境
+
+| 项 | 值 |
+|---|---|
+| 机器 | Apple M1 Max，32 GB（不是第 11 章的基准机型 M1 Pro / 16 GB） |
+| 系统 | macOS 26.5.2（Darwin 25.5.0） |
+| 构建 | 开发构建打包形态（`apps/desktop/out/development/`），Electron 45.3.2，内置 node |
+| 提交 | T35 实现完成后（`perf:m3` 首次运行于 2026-11-20） |
+| 负载 | 采样期间 mock 共收到约 83 次请求（三条会话脚本各约 27 次，子 agent 约 27 次，父会话 1 次在等子 agent） |
+
+## 数据
+
+三次运行结果一致，下表取最后一次（14 个样本）：
+
+| 指标 | 中位 | 最大 | 空闲基线 | 预算 |
+|---|---|---|---|---|
+| Agent Host（4 个活动会话） | 222 MB | 238 MB | — | 150 + 40 × 3 = 270 MB |
+| 应用其余进程合计 | 566 MB | 576 MB | 505 MB | macOS 510 MB（Windows 450 MB） |
+| 　主进程（含 Core） | 216 MB | 217 MB | 213 MB | — |
+| 　渲染进程 | 198 MB | 208 MB | 153 MB | 单窗口 ≤ 220 MB（另一行） |
+| 　GPU | 101 MB | 101 MB | 92 MB | — |
+| 　网络服务（Utility） | 51 MB | 51 MB | 51 MB | — |
+| 主进程 JavaScript 堆 | 6 MB | — | 7 MB | — |
+
+不连 Playwright、不打开工作区时同一构建的空闲值（`ps` 的 RSS，启动 12 s 后）：主进程 193 MB、渲染进程 137 MB、GPU 86 MB、网络服务 51 MB，合计 466 MB。测试驱动的调试连接与打开工作区约多出 40 MB。
+
+## 结论与原因
+
+- **Agent Host 达标。** 4 个活动会话（3 个会话 + 1 个子 agent，各自持续流式输出并执行工具）最大 238 MB，比按会话数线性推算的上限低 32 MB。Pi 的模块与目录是进程内共享的，第 2 个会话起每个会话的增量远小于 40 MB。
+- **应用其余进程超出，主体是基线。** 空闲基线已经是 505 MB（测量口径）或 466 MB（不连驱动），离 510 MB 只有 5–44 MB 余量；第 11 章在 M0 就把这一行标为"超出"（513 MB）。
+  - 主进程：空闲 193 MB（不连驱动），M0 为 160–164 MB；Core 在 M1–M3 增加了 SQLite、终端（libghostty-vt）、任务管理与会话层，JavaScript 堆只有 6–7 MB，增长在原生部分。会话运行时主进程只多 3 MB：事件批次与 Core 的会话状态不是增量来源。
+  - 渲染进程：会话运行时多约 50 MB（153 → 198–208 MB）。三个会话都在本窗口显示过，store 让它们的 transcript 保持实时（`watchSession`），流式 Markdown 解析的 worker 与行缓存随之增长；仍在单窗口渲染进程预算（220 MB）之内。
+  - GPU 与网络服务基本不随会话变化。
+- **本任务没有修改。** 超出部分来自 M0 起的基线与主进程原生内存的累积，不是 T35 引入的回归；能在本任务内单点修复的项目没有找到。登记 I146：R4 复测时按本报告的拆分逐项定位主进程原生内存（Core 各子系统的常驻量）与渲染进程的实时 transcript 缓存，T44 把这一行纳入 CI 的性能预算。
+
+## 复测时注意
+
+- 测量机型与基准机型不同；R4 复测在基准机型或同机两轮对比。
+- Windows 的预算是 450 MB，脚本在 Windows 上用 CIM 读 Agent Host 的 working set；W3 在 Windows 上跑同一命令。
+- 子 agent 是前台运行：父会话在第一次请求里等待它，所以父会话的请求数只有 1。
+
+## R4 复测（2026-11-21）
+
+结论不变：Agent Host 达标，应用其余进程合计仍超出 macOS 预算；超出的主体是 RSS 口径下各进程重复计入的共享框架页，不是会话带来的增长。
+
+R4 在 T35 的场景上加了 T35 之后的能力：项目 `.mcp.json` 里一个 stdio MCP server（`packages/testkit/src/mcp-echo-server.ts`），四个会话（含子 agent）每三步调用它一次，启动日志只有一行（同一个进程被共享）；项目里 8 个 skill，每个会话的首个请求都带着 skills 索引。脚本检查这两项都成立，否则以退出码 1 结束（`loadAsDescribed`）；`--out` 指定结果文件。
+
+| 项 | 值 |
+|---|---|
+| 机器 | 与 T35 同一台：Apple M1 Max，32 GB；macOS 26.5.2（25F84） |
+| 构建 | 开发构建打包形态，打包于 172d413（含 S1、S2 修复；之后的修复不涉及常驻内存），Core 为 cargo release 配置（两种形态都是） |
+| 负载 | 每轮采样 13 次（30 s），mock 收到 `m3-one`、`m3-tree`、`m3-child` 各 27 次、`m3-agent` 1 次 |
+
+| 指标（最大 / 中位，MB） | T35 | R4 第 1 轮 | R4 第 2 轮 | 预算 |
+|---|---|---|---|---|
+| Agent Host | 238 / 222 | 236 / 230 | 218 / 210 | 270 |
+| 应用其余进程合计 | 576 / 566 | 580 / 571 | 577 / 570 | 510 |
+| 　主进程 | 217 / 216 | 220 / 219（空闲 215） | 220 / 219（空闲 215） | — |
+| 　渲染进程 | 208 / 198 | 209 / 199（空闲 154） | 208 / 200（空闲 154） | 220 |
+| 　GPU | 101 / 101 | 101 / 101 | 100 / 100 | — |
+| 　网络服务 | 51 / 51 | 51 / 51 | 51 / 51 | — |
+| MCP server（不计入预算） | — | 75 | 74 | — |
+
+与 T35 的差都在 10% 以内（Agent Host 第 2 轮低 8%，是两轮之间请求节奏的差异，两轮的应用其余进程只差 3 MB）。
+
+**口径。** 第 2 轮同时每 5 s 读一次各应用进程的 `footprint`（物理占用，即活动监视器的"内存"列）：稳定在约 250 MB（主进程 60、各 Helper 合计 114、渲染进程 80），最大 298 MB。不连工作区的空闲应用用 `vmmap` 看主进程：RSS 190 MB，脏页 57 MB；RSS 里的大头是 Electron 框架等共享库的代码页（`__TEXT` 常驻 572 MB 中的已映射部分），Core 的 `.node` 空闲时几乎不在内存里。`app.getAppMetrics()` 的 working set 与 `ps` 的 RSS 都会把每个进程映射的同一份框架代码页各算一次，四个进程相加就重复计入。第 11 章这一行用 RSS 合计，改成物理占用等于放宽预算，须走 ADR；R4 不改，交 T44（I26、I146）。
+
+**首轮无效的一次。** 打包产物的 Agent Host 在 Seatbelt 宽松配置下运行，MCP server 只能写工作区：启动日志放在临时根时 server 以 EPERM 退出、从未连上，脚本报告负载不符；日志改到工作区（并加进 `.gitignore`）后正常（1af9363）。
+
+## R5：按物理占用判定（2026-11-22，ADR-0063）
+
+用户在 R5 采纳 ADR-0063："应用全部进程合计"改按各进程物理占用之和（macOS `phys_footprint`、Windows 私有工作集），预算数值不变。`scripts/perf/m3-memory.mjs` 的 `appOtherMB` 改为物理占用，工作集之和记为 `appOtherRssMB`。
+
+同一台 M1 Max / 32 GB、开发构建打包形态、同一场景（3 会话 + 1 子 agent + 共享 stdio MCP server 与 skills 索引，负载核对通过，预热 20 s、采样 12 次），`npm run perf:m3 -- --form packaged --out tmp/evidence/R5/m3-memory.json`：
+
+| 指标（MB） | 最小 | 中位 | 最大 | 预算 |
+|---|---|---|---|---|
+| 应用其余进程的物理占用 | 240 | 242 | 264 | 510，达标 |
+| 应用其余进程的 RSS 之和（参考） | 570 | 573 | 584 | — |
+| Agent Host（4 个活动会话） | 215 | 225 | 229 | 270，达标 |
+
+空闲（打开工作区、没有会话）时物理占用 190 MB、RSS 517 MB。M3 的内存退出标准在 macOS 上按新口径达标；Windows 由 W3 收尾时用同一脚本复测，见下面的"2026-11-25 Windows 复测"（W3 首次用性能计数器测得的私有工作集为 256 MB）。
+
+## 2026-11-24 收尾复测
+
+Apple M1 Max / 32 GB，macOS arm64，打包开发构建 1b15296，npm run perf:m3 -- --form packaged。12 个稳态样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享一个 stdio MCP server 且 4 个会话都取得 skills 索引；loadAsDescribed=true。Agent Host RSS 最大 217.9 MB / 270 MB，应用其余进程物理占用最大 270.0 MB / 510 MB。口径按已采纳的 ADR-0063，原始报告 tmp/evidence/partial-closure/m3-memory.json；此前 R5 复测为 229.1 与 263.8 MB。
+
+打包构建 0cbecdc 在相同 3 个会话加 1 个子 agent 负载下复跑，12 个稳态样本。Agent Host RSS 峰值 174.46/270 MB，应用其余进程物理占用峰值 259.25/510 MB。完整负载与两项预算均通过，原始报告为 tmp/evidence/partial-closure/m3-final.json。
+
+## 2026-11-25 Windows 复测（W3-A01）
+
+Windows 11 专业版 26200、i5-1340P（12 核 16 线程）/ 16 GB、电源已接；打包开发构建 326d5ba8，`npm run perf:m3 -- --form packaged`（943a1a45 的脚本），两轮：30 s 4 个样本与 60 s 9 个样本，3 个并行会话（含独立 worktree）加 1 个子 agent，共享的 stdio MCP server 只启动 1 次，4 个会话都拿到 MCP 工具与 skills 索引（`loadAsDescribed: true`）。应用其余进程的私有工作集最大 305.7、313.7 MB（中位 302.0、306.0 MB，预算 450 MB，达标；工作集 592–622 MB 只作参考），Agent Host 最大 130.1、162.8 MB（预算 270 MB，达标）。按类型（工作集）：浏览器进程约 150 MB，GPU 196–212 MB，网络等辅助进程 58 MB，渲染进程约 195 MB；空闲（打开工作区、没有会话）时私有工作集约 228 MB、工作集约 508 MB。测量时本机还有其他程序（可用内存 3.1–3.3 GB）。M3 的内存退出标准在 Windows 上按 ADR-0063 的口径达标。原始报告 `tmp/evidence/W3/m3-memory-a01-run{1,2}.json`。

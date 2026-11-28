@@ -1,0 +1,34 @@
+id: ctx-file-modified
+description: A file the session read and then changed by a command within the same turn is reported to the model after that round's tool results, once; an unchanged file it read is not (T27).
+capabilities: [CAP-CTX-CHANGED-001]
+workspace:
+  files:
+    a.txt: "before\n"
+    b.txt: "untouched\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: ra, name: Read, input: { path: a.txt } }
+          - { id: rb, name: Read, input: { path: b.txt } }
+      - tool_calls:
+          - id: change
+            name: Bash
+            input: { command: "node -e \"require('fs').writeFileSync('a.txt', 'after\\n')\"" }
+      - tool_calls: [{ id: g, name: Glob, input: { pattern: '*.md' } }]
+      - text: Done.
+actions:
+  - prompt: { text: Work on the files., turn: t }
+approvals:
+  - { tool: Bash, decision: allow }
+expect:
+  request_counts: { main: 4 }
+  files: { a.txt: "after\n" }
+  requests:
+    - { index: 1, not_contains: [changed outside this session] }
+    - index: 2
+      occurrences: { 'a.txt was changed outside this session after you last read or wrote it.': 1 }
+      not_contains: [b.txt was changed]
+    - index: 3
+      occurrences: { 'a.txt was changed outside this session after you last read or wrote it.': 1 }

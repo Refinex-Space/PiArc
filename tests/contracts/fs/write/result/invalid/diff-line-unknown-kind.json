@@ -1,0 +1,23 @@
+{
+  "jsonrpc": "2.0",
+  "id": 20,
+  "result": {
+    "path": "/Users/dev/work space/项目/a.txt",
+    "bytesWritten": 1,
+    "diff": {
+      "path": "a.txt",
+      "added": 1,
+      "removed": 0,
+      "unified": "",
+      "hunks": [
+        {
+          "oldStart": 0,
+          "oldLines": 0,
+          "newStart": 1,
+          "newLines": 1,
+          "lines": [{ "kind": "inserted", "text": "x" }]
+        }
+      ]
+    }
+  }
+}

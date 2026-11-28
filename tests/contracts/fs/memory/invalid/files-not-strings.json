@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "fs/memory",
+  "params": {
+    "sessionId": "session-a",
+    "toolCallId": "scan-2",
+    "files": [42]
+  }
+}

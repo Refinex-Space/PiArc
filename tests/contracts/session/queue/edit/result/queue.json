@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 25,
+  "result": {
+    "items": [
+      {
+        "itemId": "q-1",
+        "kind": "steer",
+        "text": "Also check the 中文 README."
+      },
+      {
+        "itemId": "q-2",
+        "kind": "followUp",
+        "text": "Then run the tests."
+      }
+    ]
+  }
+}

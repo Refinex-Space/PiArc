@@ -1,0 +1,44 @@
+id: mcp-rules-interaction
+description: mcp__server__* and mcp__server__tool rules apply to MCP calls (a wildcard allow runs whoami without asking, a tool deny refuses add_tool), and a tool marked requiresUserInteraction asks even with an allow rule and in bypassPermissions, offering nothing to save (T36).
+capabilities: [CAP-MCP-PERM-001]
+workspace:
+  trusted: true
+  files:
+    .mcp.json: '{"mcpServers":{"alpha":{"command":"node","args":["{{mcp_echo}}","alpha"]},"inter":{"command":"node","args":["{{mcp_echo}}","inter"],"env":{"MCP_ECHO_INTERACTIVE":"1"}}}}'
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"allow":["mcp__alpha__*","mcp__inter__echo"],"deny":["mcp__alpha__add_tool"],"enableBypassPermissions":true}}'
+providers:
+  manual:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: who, name: mcp__alpha__whoami, input: {} }]
+      - tool_calls: [{ id: add, name: mcp__alpha__add_tool, input: { name: x } }]
+      - tool_calls: [{ id: asked, name: mcp__inter__echo, input: { text: manual } }]
+      - text: Done.
+  bypass:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: asked-bypass, name: mcp__inter__echo, input: { text: bypass } }]
+      - text: Done.
+sessions:
+  manual: { provider: manual }
+  bypass: { provider: bypass, mode: bypassPermissions }
+actions:
+  - prompt: { session: manual, text: Go., turn: m }
+  - wait: { session: manual, method: turn/completed, turn: m }
+  - prompt: { session: bypass, text: Go., turn: b }
+approvals:
+  - { tool: mcp__inter__echo, decision: allow }
+  - { tool: mcp__inter__echo, decision: deny }
+expect:
+  request_counts: { manual: 4, bypass: 2 }
+  requests:
+    - provider: manual
+      index: 3
+      tool_results:
+        - { id: who, is_error: false, contains: '"pid"' }
+        - { id: add, is_error: true, contains: mcp__alpha__add_tool }
+        - { id: asked, is_error: false, contains: 'inter echoes "manual"' }
+    - provider: bypass
+      index: 1
+      tool_results: [{ id: asked-bypass, is_error: true }]

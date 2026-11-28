@@ -1,0 +1,25 @@
+{
+  "id": "t39-sandbox",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "escape",
+          "name": "Bash",
+          "input": { "command": "printf x > ../escape.txt" }
+        }
+      ]
+    },
+    { "text": "The sandbox refused that write." },
+    {
+      "tool_calls": [
+        {
+          "id": "asked",
+          "name": "Bash",
+          "input": { "command": "printf ok > made.txt" }
+        }
+      ]
+    },
+    { "text": "Written." }
+  ]
+}

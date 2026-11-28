@@ -1,0 +1,68 @@
+id: config-merge-order
+description: Claude Code's user, project and local settings merge with PiArc's in ADR-0005 order; allow rules of every file apply, a deny of any file beats them, the highest file's starting mode wins, and the run leaves every .claude directory unchanged (T24).
+capabilities: [CAP-CONFIG-COMPAT-001, CAP-CONFIG-DIAG-001]
+workspace:
+  trusted: true
+  files:
+    notes.txt: "first line\nsecond line\nthird line\n"
+    .claude/settings.json: '{"permissions":{"allow":["Bash(awk *)"],"deny":["Bash(sed -n 3p *)"],"defaultMode":"acceptEdits"},"theme":"dark"}'
+    .claude/settings.local.json: "{\r\n  \"permissions\": { \"defaultMode\": \"default\" }\r\n}\r\n"
+    .claude/rules/house.md: Follow the house style.
+  run_files:
+    'home 家/.claude/settings.json': '{"permissions":{"allow":["Bash(sed -n *)"],"defaultMode":"plan"},"plansDirectory":"plans"}'
+    'home 家/.claude.json': '{"numStartups":3,"mcpServers":{}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: user, name: Bash, input: { command: sed -n 1p notes.txt } }
+      - tool_calls:
+          - { id: project, name: Bash, input: { command: "awk 'NR==2' notes.txt" } }
+      - tool_calls:
+          - { id: denied, name: Bash, input: { command: sed -n 3p notes.txt } }
+      - tool_calls:
+          - { id: write, name: Write, input: { path: new.txt, content: written } }
+      - text: Finished.
+actions:
+  - prompt: { text: Check the merged settings., turn: t }
+# `default` from .claude/settings.local.json: a Write asks (acceptEdits would allow it, plan
+# would refuse it without asking).
+approvals:
+  - { tool: Write, decision: allow }
+expect:
+  request_counts: { main: 5 }
+  requests:
+    - index: 4
+      tool_results:
+        - { id: user, is_error: false, contains: first line }
+        - { id: project, is_error: false, contains: second line }
+        - { id: denied, is_error: true, contains: 'Bash(sed -n 3p *)' }
+        - { id: write, is_error: false }
+  files: { new.txt: written }
+  # The diagnostics explain where each key went (T24-A04, A10 Core half).
+  config_diagnostics:
+    trusted: true
+    files:
+      claudeProjectLocal:
+        status: loaded
+        effective:
+          - { pointer: /permissions/defaultMode, finalValue: default, source: claudeProjectLocal }
+      claudeProject:
+        status: loaded
+        writable: false
+        overridden:
+          - { pointer: /permissions/defaultMode, value: acceptEdits, source: claudeProjectLocal }
+        ignored: [{ pointer: /theme, reason: ignored }]
+      claudeUser:
+        status: loaded
+        overridden:
+          - { pointer: /permissions/defaultMode, value: plan, source: claudeProjectLocal }
+        ignored: [{ pointer: /plansDirectory, reason: planned, task: T48 }]
+      claudeState:
+        status: loaded
+        # T36: the user's MCP servers apply (listed by name only).
+        effective:
+          - { pointer: /mcpServers, value: [] }
+        ignored:
+          - { pointer: /numStartups, reason: ignored }

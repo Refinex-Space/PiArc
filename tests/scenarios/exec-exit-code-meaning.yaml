@@ -1,0 +1,55 @@
+id: exec-exit-code-meaning
+description: grep without a match and diff with a difference exit with 1 and still succeed, with the meaning in the result and on the item; the same grep failing for real (exit code 2) fails.
+capabilities: [CAP-EXEC-EXITCODE-001, CAP-TOOL-BASH-002]
+workspace:
+  files:
+    'a.txt': "alpha\n"
+    'b.txt': "beta\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_grep_none, name: Bash, input: { command: 'grep missing a.txt' } }
+      - tool_calls:
+          - { id: toolu_diff, name: Bash, input: { command: 'diff a.txt b.txt' } }
+      - tool_calls:
+          - {
+              id: toolu_grep_error,
+              name: Bash,
+              input: { command: 'grep missing no-such-file.txt' },
+            }
+      - text: 'Compared.'
+# grep and diff on workspace files are read-only commands: no approval (T23).
+actions:
+  - prompt: { text: 'Search and compare.', turn: t }
+expect:
+  events:
+    - method: item/completed
+      params:
+        item:
+          itemId: toolu_grep_none
+          status: completed
+          execution: { exitCode: 1, outcome: success, meaning: no matches }
+    - method: item/completed
+      params:
+        item:
+          itemId: toolu_diff
+          status: completed
+          execution: { exitCode: 1, outcome: success, meaning: files differ }
+    - method: item/completed
+      params:
+        item:
+          { itemId: toolu_grep_error, status: failed, execution: { exitCode: 2, outcome: failure } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 3
+      tool_results:
+        - {
+            id: toolu_grep_none,
+            is_error: false,
+            contains: 'Command exited with code 1 (no matches; not an error)',
+          }
+        - { id: toolu_diff, is_error: false, contains: 'files differ' }
+        - { id: toolu_grep_error, is_error: true, contains: 'Command exited with code 2' }
+  request_counts: { main: 4 }

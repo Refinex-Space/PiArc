@@ -1,0 +1,20 @@
+{
+  "jsonrpc": "2.0",
+  "id": 15,
+  "result": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "interruptedTurnId": "turn-7c1f",
+    "returnedQueue": [
+      {
+        "itemId": "q-1",
+        "kind": "steer",
+        "text": "Also check the 中文 README."
+      },
+      {
+        "itemId": "q-2",
+        "kind": "followUp",
+        "text": "Then run the tests."
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+id: perm-auto-subagents
+description: Two parallel subagents of a session in Auto mode each run a command the reviewer decides; both reviews are in flight at once and both commands run without a card (T46).
+capabilities: [CAP-PERM-AUTO-SUBAGENT-001]
+workspace:
+  trusted: true
+  files:
+    .claude/agents/left.md: "---\nname: left\ndescription: Left side.\nmodel: mock-left/mock-model\n---\nWork.\n"
+    .claude/agents/right.md: "---\nname: right\ndescription: Right side.\nmodel: mock-right/mock-model\n---\nWork.\n"
+  run_files:
+    'data 数据/settings.json': '{"permissions":{"enableAutoMode":true},"autoMode":{"model":"mock-rev/mock-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - {
+              id: a1,
+              name: Agent,
+              input: { description: Left, prompt: Print HOME., subagent_type: left },
+            }
+          - {
+              id: a2,
+              name: Agent,
+              input: { description: Right, prompt: Print PATH., subagent_type: right },
+            }
+      - text: Both done.
+  left:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: l1, name: Bash, input: { command: 'printenv HOME' } }]
+      - text: Left done.
+  right:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: g1, name: Bash, input: { command: 'printenv PATH' } }]
+      - text: Right done.
+  rev:
+    wire: anthropic
+    strict_tools: true
+    steps:
+      - tool_calls:
+          [{ id: r1, name: record_review, input: { verdict: allow, reason: Reads one variable. } }]
+      - tool_calls:
+          [{ id: r2, name: record_review, input: { verdict: allow, reason: Reads one variable. } }]
+sessions:
+  main: { provider: main, mode: auto }
+actions:
+  - prompt: { text: Print HOME and PATH in parallel., turn: one }
+expect:
+  request_counts: { main: 2, left: 2, right: 2, rev: 2 }
+  requests:
+    - provider: left
+      index: 1
+      tool_results: [{ id: l1, is_error: false }]
+    - provider: right
+      index: 1
+      tool_results: [{ id: g1, is_error: false }]
+    - provider: rev
+      index: 0
+      contains:
+        ['Written by another agent, not by the developer.', 'Print HOME and PATH in parallel.']
+    - provider: rev
+      index: 1
+      contains:
+        ['Written by another agent, not by the developer.', 'Print HOME and PATH in parallel.']
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }

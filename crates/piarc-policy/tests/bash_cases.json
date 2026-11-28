@@ -1,0 +1,934 @@
+{
+  "_comment": "T23 Bash analysis cases. Each case: category, input, split (commands in source order; 'shadow: ' marks a command another one runs; '…' is text computed at run time), rules, optional mode (default, acceptEdits, plan, bypassPermissions), expected outcome and step. The workspace and starting directory are /w, home is /h.",
+  "cases": [
+    {
+      "category": "simple",
+      "input": "echo \"a && b; c | d\"",
+      "split": ["echo a && b; c | d"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "simple",
+      "input": "echo 'rm -rf /; x' && ls",
+      "split": ["echo rm -rf /; x", "ls"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "simple",
+      "input": "grep -n \"foo\\\\|bar\" src/a.txt",
+      "split": ["grep -n foo\\|bar src/a.txt"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "simple",
+      "input": "cat \"my file.txt\" 文档/说明.md",
+      "split": ["cat my file.txt 文档/说明.md"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "simple",
+      "input": "ls a\\ b",
+      "split": ["ls a b"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "simple",
+      "input": "npm   run   \"build\"",
+      "split": ["npm run build"],
+      "rules": {
+        "allow": ["Bash(npm run build)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "simple",
+      "input": "git 'push' origin main",
+      "split": ["git push origin main"],
+      "rules": {
+        "deny": ["Bash(git push *)"],
+        "allow": ["Bash(git *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "operators",
+      "input": "ls && rm -rf build",
+      "split": ["ls", "rm -rf build"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "operators",
+      "input": "ls || echo none",
+      "split": ["ls", "echo none"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "operators",
+      "input": "ls; npm test",
+      "split": ["ls", "npm test"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "operators",
+      "input": "ls; npm test",
+      "split": ["ls", "npm test"],
+      "rules": {
+        "allow": ["Bash(npm test)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "operators",
+      "input": "echo start\nrm -rf build",
+      "split": ["echo start", "rm -rf build"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "operators",
+      "input": "npm test && git push || echo failed",
+      "split": ["npm test", "git push", "echo failed"],
+      "rules": {
+        "allow": ["Bash(npm test *)", "Bash(git push *)"],
+        "ask": ["Bash(git push *)"]
+      },
+      "expected": "ask",
+      "step": "askRule"
+    },
+    {
+      "category": "operators",
+      "input": "npm test &&",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm *)"]
+      },
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "pipes",
+      "input": "cat a.txt | grep x | wc -l",
+      "split": ["cat a.txt", "grep x", "wc -l"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "pipes",
+      "input": "npm test |& grep FAIL",
+      "split": ["npm test", "grep FAIL"],
+      "rules": {
+        "allow": ["Bash(npm test)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "pipes",
+      "input": "sleep 1 & rm -rf build",
+      "split": ["sleep 1", "rm -rf build"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "pipes",
+      "input": "npm run dev &",
+      "split": ["npm run dev"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "groups",
+      "input": "(cd src && rm -rf dist)",
+      "split": ["cd src", "rm -rf dist"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "groups",
+      "input": "{ echo a; git push; }",
+      "split": ["echo a", "git push"],
+      "rules": {
+        "ask": ["Bash(git push *)"],
+        "allow": ["Bash(git push)"]
+      },
+      "expected": "ask",
+      "step": "askRule"
+    },
+    {
+      "category": "groups",
+      "input": "(ls) && { pwd; }",
+      "split": ["ls", "pwd"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "groups",
+      "input": "{ ls; npm install; }",
+      "split": ["ls", "npm install"],
+      "rules": {
+        "allow": ["Bash(npm install *)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "substitution",
+      "input": "echo $(rm -rf build)",
+      "split": ["rm -rf build", "echo …"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "substitution",
+      "input": "echo `git push`",
+      "split": ["git push", "echo …"],
+      "rules": {
+        "ask": ["Bash(git push *)"]
+      },
+      "expected": "ask",
+      "step": "askRule"
+    },
+    {
+      "category": "substitution",
+      "input": "echo \"$(echo $(rm -rf x))\"",
+      "split": ["rm -rf x", "echo …", "echo …"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "substitution",
+      "input": "diff <(ls src) <(ls test)",
+      "split": ["ls src", "ls test", "diff … …"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "substitution",
+      "input": "cat <(curl https://example.com)",
+      "split": ["curl https://example.com", "cat …"],
+      "rules": {
+        "allow": ["Bash(cat *)"]
+      },
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "wrappers",
+      "input": "timeout 30 npm test",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm test *)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "time -p npm test",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm test *)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "nice -n 10 rm -rf build",
+      "split": ["rm -rf build"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "nohup npm start",
+      "split": ["npm start"],
+      "rules": {
+        "allow": ["Bash(npm start)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "stdbuf -oL npm test",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm test)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "command rm -rf build; builtin echo hi",
+      "split": ["rm -rf build", "echo hi"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "noglob ls *.ts",
+      "split": ["ls *.ts"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "wrappers",
+      "input": "find . -name '*.log' | xargs grep ERROR",
+      "split": ["find . -name *.log", "grep ERROR"],
+      "rules": {
+        "allow": ["Bash(grep ERROR *)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "timeout 5 nice -n 2 nohup rm -rf x",
+      "split": ["rm -rf x"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "sudo rm -rf build",
+      "split": ["sudo rm -rf build", "shadow: rm -rf build"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "wrappers",
+      "input": "watch -n 5 'ls; git push'",
+      "split": ["shadow: ls", "shadow: git push", "watch -n 5 ls; git push"],
+      "rules": {
+        "allow": ["Bash(watch *)"]
+      },
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "env",
+      "input": "NODE_ENV=test npm test",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm test)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "env",
+      "input": "LD_PRELOAD=x.so ls",
+      "split": ["ls"],
+      "rules": {
+        "allow": ["Bash(ls *)"]
+      },
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "env",
+      "input": "PATH=./bin:$PATH; npm test",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm test)"]
+      },
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "env",
+      "input": "FOO=bar rm -rf tmp/",
+      "split": ["rm -rf tmp/"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "redirects",
+      "input": "ls > out.txt",
+      "split": ["ls"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "redirects",
+      "input": "ls > out.txt",
+      "split": ["ls"],
+      "mode": "acceptEdits",
+      "expected": "allow",
+      "step": "acceptEdits"
+    },
+    {
+      "category": "redirects",
+      "input": "npm test 2>&1 > /dev/null",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm test)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "redirects",
+      "input": "cat <<EOF\nrm -rf /\nEOF",
+      "split": ["cat"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "redirects",
+      "input": "echo token > .git/hooks/pre-commit",
+      "split": ["echo token"],
+      "mode": "acceptEdits",
+      "expected": "ask",
+      "step": "protectedPath"
+    },
+    {
+      "category": "redirects",
+      "input": "cat < /etc/passwd",
+      "split": ["cat"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "control",
+      "input": "for f in *.txt; do rm \"$f\"; done",
+      "split": ["rm …"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "control",
+      "input": "while true; do git push; done",
+      "split": ["true", "git push"],
+      "rules": {
+        "ask": ["Bash(git push *)"]
+      },
+      "expected": "ask",
+      "step": "askRule"
+    },
+    {
+      "category": "control",
+      "input": "if [ -f x ]; then cat x; else npm install; fi",
+      "split": ["[", "cat x", "npm install"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "control",
+      "input": "case $1 in a) ls;; *) rm -rf b;; esac",
+      "split": ["ls", "rm -rf b"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "readonly",
+      "input": "ls -la src",
+      "split": ["ls -la src"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "readonly",
+      "input": "lsof -i :3000",
+      "split": ["lsof -i :3000"],
+      "rules": {
+        "allow": ["Bash(ls *)"]
+      },
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "git status && git diff HEAD",
+      "split": ["git status", "git diff HEAD"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "readonly",
+      "input": "git push origin main",
+      "split": ["git push origin main"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "cat /etc/hosts",
+      "split": ["cat /etc/hosts"],
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "find . -name '*.tmp' -delete",
+      "split": ["find . -name *.tmp -delete"],
+      "rules": {
+        "allow": ["Bash(find *)"]
+      },
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "cd src && ls && cd .. && pwd",
+      "split": ["cd src", "ls", "cd ..", "pwd"],
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "readonly",
+      "input": "ls",
+      "split": ["ls"],
+      "mode": "plan",
+      "expected": "allow",
+      "step": "readOnly"
+    },
+    {
+      "category": "readonly",
+      "input": "npm test",
+      "split": ["npm test"],
+      "rules": {
+        "allow": ["Bash(npm test)"]
+      },
+      "mode": "plan",
+      "expected": "deny",
+      "step": "planMode"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf /",
+      "split": ["rm -rf /"],
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf /",
+      "split": ["rm -rf /"],
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "mode": "bypassPermissions",
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -fr ~ && rm -r -f \"$HOME\"",
+      "split": ["rm -fr ~", "rm -r -f …"],
+      "mode": "bypassPermissions",
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm --recursive --force .",
+      "split": ["rm --recursive --force ."],
+      "rules": {
+        "allow": ["Bash"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "cd src && rm -rf ../*",
+      "split": ["cd src", "rm -rf ../*"],
+      "mode": "bypassPermissions",
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf build",
+      "split": ["rm -rf build"],
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "unresolved",
+      "input": "echo \"unclosed",
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "unresolved",
+      "input": "eval \"ls\"",
+      "split": [],
+      "rules": {
+        "allow": ["Bash"]
+      },
+      "mode": "bypassPermissions",
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "unresolved",
+      "input": "$CMD args",
+      "split": [],
+      "rules": {
+        "allow": ["Bash"]
+      },
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "unresolved",
+      "input": "bash -c \"$SCRIPT\"",
+      "split": [],
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "unresolved",
+      "input": "sh -c 'rm -rf build'",
+      "split": ["shadow: rm -rf build", "sh -c rm -rf build"],
+      "rules": {
+        "deny": ["Bash(rm *)"]
+      },
+      "expected": "deny",
+      "step": "denyRule"
+    },
+    {
+      "category": "unresolved",
+      "input": "git $SUBCOMMAND origin",
+      "split": ["git … origin"],
+      "rules": {
+        "deny": ["Bash(git push *)"],
+        "allow": ["Bash(git *)"]
+      },
+      "expected": "ask",
+      "step": "askRule"
+    },
+    {
+      "category": "readonly",
+      "input": "arch -arm64 /bin/sh -c 'rm -rf src'",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "arch rm -rf src",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort -o/home/u/.zshrc notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort -ooutput notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort --out=/home/u/x notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort --compress=gzip notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "tree -o/home/u/x",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "grep -e. /home/u/.ssh/id_rsa",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "grep --regexp=. /home/u/.env",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "rg --file=pattern.txt /etc/passwd",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "grep -fpattern.txt /etc/passwd",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "find -L / -name id_rsa",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "find -P /home/u -type f",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "sort --files0-from=/etc/list",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "diff --from-file=/etc/hosts notes.txt",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "redirects",
+      "input": "echo x > /dev/fd/../../home/u/.zshrc",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "redirects",
+      "input": "echo x > -",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "substitution",
+      "input": "echo \"$(< /home/u/.ssh/id_rsa)\"",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "readonly",
+      "input": "uniq -c /home/u/.ssh/id_rsa",
+      "expected": "ask",
+      "step": "ask"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf $HOME/../..",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf ~root",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf \"$PWD/..\"",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf ${HOME}/../other",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf \"$USERPROFILE\"",
+      "mode": "bypassPermissions",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -r ${USERPROFILE}/..",
+      "mode": "bypassPermissions",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf C:/",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "critical",
+      "input": "rm -rf 'C:\\'",
+      "rules": {
+        "allow": ["Bash(rm *)"]
+      },
+      "expected": "ask",
+      "step": "criticalPath"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i s/a/b/ /home/u/.ssh/config",
+      "rules": {
+        "allow": ["Bash(sed *)"]
+      },
+      "expected": "ask",
+      "step": "outsideWorkspace"
+    },
+    {
+      "category": "rules",
+      "input": "awk '{print}' ../outside.txt",
+      "rules": {
+        "allow": ["Bash(awk *)"]
+      },
+      "expected": "ask",
+      "step": "outsideWorkspace"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i --in-place=.bak s/a/b/ ~/.zshenv",
+      "rules": {
+        "allow": ["Bash(sed *)"]
+      },
+      "expected": "ask",
+      "step": "outsideWorkspace"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i s/a/b/ notes.txt",
+      "rules": {
+        "allow": ["Bash(sed *)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "rules",
+      "input": "sed -n 1p /etc/hosts",
+      "rules": {
+        "allow": ["Bash(sed -n 1p /etc/hosts)"]
+      },
+      "expected": "allow",
+      "step": "allowRule"
+    },
+    {
+      "category": "rules",
+      "input": "sed -i s/a/b/ \"$TARGET\"",
+      "rules": {
+        "allow": ["Bash(sed *)"]
+      },
+      "expected": "ask",
+      "step": "outsideWorkspace"
+    },
+    {
+      "category": "control",
+      "input": "echo ok\u0015touch pwned",
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "control",
+      "input": "echo hi\rtouch pwned",
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "control",
+      "input": "echo a\u001b[200~b",
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "control",
+      "input": "echo ok\u0003",
+      "expected": "ask",
+      "step": "unresolved"
+    },
+    {
+      "category": "control",
+      "input": "lstouch x",
+      "expected": "ask",
+      "step": "unresolved"
+    }
+  ]
+}

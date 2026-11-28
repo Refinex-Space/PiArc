@@ -1,0 +1,40 @@
+id: side-chat-isolation
+description: A side panel snapshots completed history, refuses tools locally, and bills its requests separately without adding side text to the parent.
+capabilities: [CAP-CHAT-SIDE-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - { text: Parent result. }
+      - tool_calls:
+          - { id: side-write, name: Write, input: { path: side.txt, content: private } }
+          - { id: side-shell, name: Bash, input: { command: 'echo private > shell.txt' } }
+      - { text: Private side answer. }
+      - { text: Final parent answer. }
+actions:
+  - prompt: { text: First parent question., turn: first }
+  - wait: { method: turn/completed, turn: first }
+  - side_chat: { panel: sidebar, text: Private side question., answer: Private side answer. }
+  - prompt: { text: Continue the parent., turn: last }
+  - wait: { method: turn/completed, turn: last }
+  - check_cost:
+      fields:
+        tokens: { requests: 4 }
+        auxiliary: [{ purpose: sideChat, tokens: { requests: 2 } }]
+expect:
+  no_core_io: [side-write, side-shell]
+  absent_on_disk: [Private side question.]
+  files: { side.txt: null, shell.txt: null }
+  request_counts: { main: 4 }
+  requests:
+    - {
+        index: 1,
+        same_system_as: 0,
+        same_tools_as: 0,
+        contains: [Parent result., Private side question.],
+      }
+    - index: 2
+      tool_results:
+        - { id: side-write, is_error: true, contains: Side chats cannot execute tools. }
+        - { id: side-shell, is_error: true, contains: Side chats cannot execute tools. }
+    - { index: 3, not_contains: [Private side, side-write, side-shell] }

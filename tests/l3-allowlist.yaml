@@ -1,0 +1,295 @@
+# L3 allowlist (T30, architecture section 12.5; format in scripts/l3/allowlist.mjs and
+# docs/engineering/testing.md section 14.4).
+#
+# differences: intended deviations of PiArc from Claude Code, by scenario and field path. Every
+# entry needs a reason; an entry that applies to a run (Claude Code version in range, scenario
+# ran) but matches no difference fails `npm run l3`, so fixed deviations leave the list.
+# follow_up names the task that revisits an entry (a label from the delivery history).
+# excluded: compared L2 scenarios (perm-, policy-, hooks-, config-) that no L3 scenario mirrors,
+# with the reason `claude -p` cannot reproduce them.
+# T48's mcp-elicitation cases use a desktop form and native consent to visit a URL. A URL
+# acceptance from a hook still requires native confirmation; an ambiguous request on a shared
+# connection returns cancel. The compared scenario prefixes above do not include mcp-.
+
+differences:
+  # ── Request structure: tool set ──────────────────────────────────────────────────────────
+  - scenario: '*'
+    path: 'requests.items[*].tools.ListAgents'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code lists its running agents and teammates with this tool; PiArc has no agent teams (not scheduled), a background subagent reports to the model through a reminder when it finishes (T31), and the client shows each run on its card.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Skill'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Skills are not part of PiArc yet; the Skill tool arrives with them.
+    follow_up: T37
+  - scenario: '*'
+    path: 'requests.items[*].tools.ReportFindings'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: A Claude Code product feature (structured code-review findings for its host UI) outside PiArc's requirements.
+  - scenario: '*'
+    path: 'requests.items[*].tools.ScheduleWakeup'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: A Claude Code product feature (self-paced /loop wakeups) outside PiArc's requirements; PiArc's background work is T32's Monitor.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Workflow'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: A Claude Code product feature (scripted multi-agent workflows) outside PiArc's requirements.
+  - scenario: '*'
+    path: 'requests.items[*].tools.ToolSearch'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code defers most built-in tools behind ToolSearch; PiArc declares its whole, smaller built-in tool set so every model of its multi-model Tool Profile sees the same tools (architecture section 6.13) and offers ToolSearch only when a session's MCP tools exceed the deferral threshold (ADR-0053). The L3 scenarios configure no MCP server.
+  - scenario: '*'
+    path: 'requests.items[*].tools.DeferredToolPlaceholder'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code's stand-in for the deferred tools behind ToolSearch; PiArc defers only MCP tools beyond the threshold (see the ToolSearch entry).
+  - scenario: '*'
+    path: 'requests.items[*].tools.EnterPlanMode'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code 2.1.318 defers EnterPlanMode behind ToolSearch; PiArc presents it directly (ADR-0042; built-in tools are never deferred, ADR-0053).
+  - scenario: '*'
+    path: 'requests.items[*].tools.ExitPlanMode'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code 2.1.318 defers ExitPlanMode behind ToolSearch; PiArc presents it directly (ADR-0042; built-in tools are never deferred, ADR-0053).
+  - scenario: '*'
+    path: 'requests.items[*].tools.WebFetch'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code 2.1.318 defers WebFetch behind ToolSearch; PiArc presents it directly (ADR-0045; built-in tools are never deferred, ADR-0053).
+  - scenario: '*'
+    path: 'requests.items[*].tools.Monitor'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code 2.1.318 does not declare Monitor up front; PiArc presents its Monitor directly (ADR-0049; built-in tools are never deferred, ADR-0053).
+  - scenario: '*'
+    path: 'requests.items[*].tools.KillShell'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code 2.1.318 does not declare KillShell up front; PiArc presents its KillShell directly (ADR-0049; built-in tools are never deferred, ADR-0053).
+  - scenario: '*'
+    path: 'requests.items[*].tools.Grep'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [macos]
+    reason: Claude Code 2.1.318 offers no Grep tool on macOS (searches go through Bash); PiArc keeps Grep as a canonical tool with Core-side I/O and its own rules and hooks matching (architecture section 6.1, ADR-0020), which also suits models weaker at shell search.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Grep.**'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: On Windows Claude Code 2.1.318 offers its own Grep with ripgrep's options (-A/-B/-C, -i, -n, -o, output_mode, head_limit, offset, multiline, type); PiArc's Grep keeps Pi's parameters (ignoreCase, literal, limit) with Core-side I/O (architecture section 6.1, ADR-0020), the same tool it offers on macOS.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Glob'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [macos]
+    reason: Claude Code 2.1.318 offers no Glob tool on macOS (searches go through Bash); PiArc keeps Glob as a canonical tool with Core-side I/O (architecture section 6.1, ADR-0020). perm-rules denies Glob as a whole, so there both sides lack it.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Glob.**'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: On Windows Claude Code 2.1.318 offers its own Glob; PiArc's Glob keeps Pi's limit parameter with Core-side I/O (architecture section 6.1, ADR-0020), the same tool it offers on macOS.
+  - scenario: '*'
+    path: 'requests.items[*].tools.PowerShell'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: PiArc offers a PowerShell tool on Windows next to Bash through Git Bash (architecture section 6.2.2, ADR-0028); Claude Code 2.1.318 offers none in its default configuration.
+  - scenario: '*'
+    path: 'requests.items[*].tools.KillShell'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: PiArc offers KillShell on every platform (T32, ADR-0049); Claude Code 2.1.318 on Windows offers no KillShell (it does on macOS, where both sides match).
+  - scenario: '*'
+    path: 'requests.items[*].tools.Monitor'
+    claude_code: '>=2.1.318 <2.2.0'
+    platforms: [windows]
+    reason: PiArc offers Monitor on every platform (T32, ADR-0049); Claude Code 2.1.318 on Windows offers no Monitor (it does on macOS, where both sides match).
+  - scenario: '*'
+    path: 'requests.items[*].tools.TodoWrite'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's task list is TodoWrite (T26 evaluated I01 and kept it as the canonical name so rules and hooks match one tool); Claude Code 2.1.318 uses deferred TaskCreate/TaskUpdate tools instead.
+  - scenario: '*'
+    path: 'requests.items[*].tools.SuggestNextSteps'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's own next-steps tool (T26, ADR-0042); Claude Code has no counterpart.
+
+  # ── Request structure: parameters ───────────────────────────────────────────────────────
+  - scenario: '*'
+    path: 'requests.items[*].tools.Read.**'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's file tools keep Pi's parameters (path, offset and limit as numbers) under the Tool Profile (ADR-0020, architecture section 6.13); scenarios map Claude Code's file_path to path and back. Claude Code's allow_large has no PiArc counterpart (PiArc pages large reads by its result budget, ADR-0027).
+  - scenario: '*'
+    path: 'requests.items[*].tools.Write.**'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's file tools keep Pi's parameters (path instead of file_path) under the Tool Profile (ADR-0020, architecture section 6.13).
+  - scenario: '*'
+    path: 'requests.items[*].tools.Edit.**'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's Edit keeps Pi's parameters (path and a list of oldText/newText edits, plus replaceAll) instead of file_path, old_string, new_string and replace_all (ADR-0020, architecture section 6.13).
+  - scenario: '*'
+    path: 'requests.items[*].tools.Bash.params.description'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's Bash keeps Pi's parameters (command, timeout in seconds, ADR-0028); the client shows the command itself instead of a model-written description.
+  - scenario: '*'
+    path: 'requests.items[*].tools.Bash.params.terminal'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's own parameter (ADR-0050) runs the command in a PiArc terminal the user can open, with the terminal's screen as the background task's output file.
+  - scenario: '*'
+    path: 'requests.items[*].tools.AskUserQuestion.params.*'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code's answers, annotations and metadata parameters carry answers a host fills in; PiArc's model only sends questions and the user answers on the question card (ADR-0042).
+
+  # ── Request structure: options and prompt layout ────────────────────────────────────────
+  - scenario: '*'
+    path: 'requests.items[*].keys'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's request options come from pi-ai's Anthropic adapter for the selected model (the mock model declares no reasoning, so no thinking or output_config); context_management, metadata and safeguards are Claude Code's own beta options.
+  - scenario: '*'
+    path: 'requests.items[*].system.*'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc writes its own system prompt in its own sections and cache segments (ADR-0006 clean-room, ADR-0033); segment count and breakpoints follow that layout, not Claude Code's.
+  - scenario: '*'
+    path: 'requests.items[*].messages'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc delivers project context in its system prompt and runtime context as piarc.reminder user messages (ADR-0033, ADR-0043); Claude Code adds a context block to the first user message and mid-conversation system messages, so block sequences and the last cache breakpoint differ while tool_use and tool_result order is the same.
+
+  # ── Behavior: permissions ───────────────────────────────────────────────────────────────
+  - scenario: perm-compound
+    path: 'tool_calls.calls.substitution.status'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc analyzes command substitutions and judges every command inside (`echo $(whoami)` is two read-only commands and runs; architecture section 6.2.2, ADR-0037); Claude Code 2.1.318 asks for any command substitution. R3 kept PiArc's analysis (I116), so a substitution whose output names the command, an eval or a substitution that reads a file through a redirect is still judged and asked for.
+  - scenario: perm-compound
+    path: 'tool_results.substitution.is_error'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Follows from the substitution call running in PiArc (see that entry).
+  - scenario: perm-compound
+    path: 'asks.substitution'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code asks for the command substitution; PiArc does not (see the status entry).
+  - scenario: perm-plan
+    path: 'asks.write'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc's plan mode refuses writes without asking and tells the model to present its plan (ladder step 5, T23); Claude Code 2.1.318 hands a plan-mode write to the permission prompt. The write is refused on both sides.
+  - scenario: perm-plan
+    path: 'requests.auxiliary'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: In plan mode Claude Code sends commands that are not read-only to its auto-mode classifier (non-streaming helper requests, refused by the mock, so it denies); PiArc keeps plan mode's hard block whatever the mode (T46 design addendum 6.3, useAutoModeDuringPlan ignored), so its reviewer never sees plan-mode calls and they are refused.
+  - scenario: perm-untrusted
+    path: 'tool_calls.calls.write.status'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc never applies the starting mode of a project that is not trusted (policy-untrusted, config-untrusted-project, T23/T24); Claude Code 2.1.318 in -p applies the untrusted project's defaultMode acceptEdits and writes without asking.
+  - scenario: perm-untrusted
+    path: 'tool_results.write.is_error'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Follows from the untrusted project's starting mode (see the status entry).
+  - scenario: perm-untrusted
+    path: 'asks.write'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc asks for the write because it ignores the untrusted project's acceptEdits; Claude Code does not ask (see the status entry).
+  - scenario: perm-untrusted
+    path: 'files["new.txt"]'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Follows from the untrusted project's starting mode (see the status entry).
+  - scenario: 'perm-*'
+    path: 'tool_calls.calls.edit.input.replace_all'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code fills the schema default replace_all false into the Edit call it sends back in later requests; PiArc keeps the model's call as it was (Pi's history).
+
+  # ── Behavior: hooks ─────────────────────────────────────────────────────────────────────
+  - scenario: 'hooks-*'
+    path: 'hooks.calls["*"].fields.effort'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Both send the session's effort on tool events and Stop (PiArc from T38, ADR-0055), but only for a model with effort levels; the L3 mock model has none on PiArc's side, while Claude Code 2.1.318 reports its own default.
+  - scenario: hooks-lifecycle
+    path: 'hooks.calls["start#0"].fields.model'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code documents model among SessionStart's fields and 2.1.318 leaves it out in -p; PiArc sends the session's model.
+  - scenario: hooks-permission-request
+    path: 'tool_calls.calls.first.status'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: With --permission-prompt-tool, Claude Code 2.1.318 runs PermissionRequest hooks but still lets the prompt tool decide (the hook's allow did not apply); PiArc applies the hook's decision before a card, as Claude Code documents for its interactive prompts (ADR-0039). -p cannot show the documented behavior.
+  - scenario: hooks-permission-request
+    path: 'tool_results.first.is_error'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Follows from the PermissionRequest decision (see the status entry).
+  - scenario: hooks-permission-request
+    path: 'files["first.txt"]'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Follows from the PermissionRequest decision (see the status entry).
+  - scenario: hooks-permission-request
+    path: 'asks.*'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: Claude Code asks its prompt tool for calls its PermissionRequest hook already decided (see the status entry); PiArc only shows a card when the hook leaves the decision open.
+  - scenario: hooks-permission-request
+    path: 'hooks.calls["notify#0"]'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: PiArc runs Notification (permission_prompt) when it shows an approval card; Claude Code in -p answers through the prompt tool and shows nothing, so it sends no notification.
+  - scenario: hooks-permission-request
+    path: 'hooks.order'
+    claude_code: '>=2.1.318 <2.2.0'
+    reason: The order differs only by PiArc's Notification hook (see that entry).
+
+excluded:
+  - scenario: hooks-m3-subagent
+    reason: The subagent runs on a second mock endpoint chosen by its definition's model (mock-child), and the scenario counts each endpoint's requests; `claude -p` sends a subagent's requests to the one base URL of the run, so the two request streams cannot be told apart.
+  - scenario: hooks-m3-prompt
+    reason: The prompt hook's judgement is an auxiliary request whose answer the scenario scripts as a step; the L3 mock answers auxiliary requests with a fixed reply without consuming steps (ADR-0046), so the judgement cannot be steered on either side.
+  - scenario: hooks-m3-post-tool-batch
+    reason: A PostToolBatch block ends PiArc's run by aborting it before the next request (Pi 1.5.2's turn_end cannot end a run, ADR-0055), which leaves an interruption marker and an interrupted turn by design; the turn shape cannot match Claude Code's.
+  - scenario: hooks-archive-during-hook
+    reason: It archives a session while its idle Notification hook runs and checks that PiArc removes the session's directory (a Windows file-handle race, W2); claude -p has no archive step, and the hook itself behaves as in hooks-notification.
+  - scenario: perm-critical-delete
+    reason: It runs deletions of the home directory, the workspace and the filesystem root; a difference in Claude Code's answer would delete real files outside the run's temporary root, so it is not run against Claude Code.
+  - scenario: perm-powershell-whole
+    reason: PowerShell is Windows only, and Claude Code 2.1.318 on Windows offers no PowerShell tool in its default configuration (W2 ran L3 on Windows), so claude -p cannot run the scenario; PiArc's PowerShell rules are covered by this L2 scenario.
+  - scenario: policy-accept-edits-powershell
+    reason: PowerShell is Windows only, and Claude Code 2.1.318 on Windows offers no PowerShell tool in its default configuration (W2 ran L3 on Windows), so claude -p cannot run the scenario; PiArc's PowerShell rules are covered by this L2 scenario.
+  - scenario: policy-manual-powershell
+    reason: PowerShell is Windows only, and Claude Code 2.1.318 on Windows offers no PowerShell tool in its default configuration (W2 ran L3 on Windows), so claude -p cannot run the scenario; PiArc's PowerShell rules are covered by this L2 scenario.
+  - scenario: policy-extra-directory
+    reason: Approving a new directory is a choice on PiArc's card; -p's permission prompt tool answers only allow or deny for the call, so the directory grant cannot be reproduced.
+  - scenario: policy-save-rule
+    reason: Saving an "always allow" rule is a choice on PiArc's card; -p's permission prompt tool answers only allow or deny for the call.
+  - scenario: policy-session-rule
+    reason: It needs two sessions and a "for this session" answer; one claude -p run is one session and the prompt tool answers only allow or deny.
+  - scenario: policy-mode-restore
+    reason: It restarts Core and restores the session; a claude -p run cannot be restarted in the middle.
+  - scenario: config-rules-paths
+    reason: Rules files are context (memory and rules), not permissions or hooks; L3 covers them when it covers memory.
+  - scenario: hooks-compact
+    reason: It needs a manual /compact after a turn, a second input that one claude -p prompt cannot send; compaction is not covered by L3 yet.
+  - scenario: hooks-pre-compact-block
+    reason: It needs a manual /compact after a turn, a second input that one claude -p prompt cannot send; compaction is not covered by L3 yet.
+  - scenario: perm-auto-allow
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-always-ask
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-ask-rule
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-deny
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-deny-rule
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-hooks-first
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-invalid-verdict
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-pause
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-project-ignored
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-provider-error
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-request-shape
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-subagents
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-timeout
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unavailable
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unparsable
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unsandboxed
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: perm-auto-unsure
+    reason: Auto mode's reviewer is a second mock endpoint whose answers the scenario scripts step by step (T46); claude -p's auto-mode classifier uses non-streaming helper requests that the L3 mock answers with a fixed reply without consuming steps (ADR-0046), and PiArc's reviewer settings (autoMode.model, permissions.enableAutoMode) have no Claude Code counterpart, so neither side's decisions can be steered or compared.
+  - scenario: hooks-m5-permission-denied
+    reason: The L3 classifier cannot be scripted to deny a specific call. PiArc runs PermissionDenied after a validated refusal and falls back to human approval when its reviewer has no verdict.
+  - scenario: hooks-m5-model-switch
+    reason: Single-model headless runs cannot operate PiArc's session model picker or answer its switch confirmation. ADR-0032 keeps the cost preview and explicit model and effort confirmation after a hook allows the switch. PostModelSwitch reports an actual session selection change; restoring an unchanged selection or receiving a provider's per-response fallback does not change the selected model. PiArc reports unknown pricing or TTL on unpriced and non-caching providers, and uses its T21 context estimate across providers.
+  - scenario: hooks-m5-worktree
+    reason: This scenario advances the Core retention clock after archiving a session and answers native cleanup confirmation for its hook-managed directory. A single headless prompt cannot exercise that lifecycle.

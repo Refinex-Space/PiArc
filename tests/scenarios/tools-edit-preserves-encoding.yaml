@@ -1,0 +1,74 @@
+id: tools-edit-preserves-encoding
+description: Edits of a CRLF file, a UTF-8 file with a byte order mark and a GBK file change only the target text and keep line endings, byte order mark and encoding byte for byte; a Write over a CRLF file takes its CRLF line endings.
+capabilities: [CAP-TOOL-WRITE-FIDELITY-001, CAP-TOOL-EDIT-002]
+workspace:
+  fixtures:
+    'crlf.txt': crlf.txt
+    'bom.txt': bom.txt
+    'gbk 国标.txt': gbk.txt
+    'write-crlf.txt': write-crlf.txt
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read_crlf, name: Read, input: { path: crlf.txt } }
+          - { id: toolu_read_bom, name: Read, input: { path: bom.txt } }
+          - { id: toolu_read_gbk, name: Read, input: { path: 'gbk 国标.txt' } }
+          - { id: toolu_read_write, name: Read, input: { path: write-crlf.txt } }
+      - tool_calls:
+          - {
+              id: toolu_edit_crlf,
+              name: Edit,
+              input: { path: crlf.txt, edits: [{ oldText: 'old value', newText: 'new value' }] },
+            }
+          - {
+              id: toolu_edit_bom,
+              name: Edit,
+              input: { path: bom.txt, edits: [{ oldText: 'old value', newText: 'new value' }] },
+            }
+          - {
+              id: toolu_edit_gbk,
+              name: Edit,
+              input:
+                { path: 'gbk 国标.txt', edits: [{ oldText: '旧的数值', newText: '新的数值' }] },
+            }
+          - {
+              id: toolu_write_crlf,
+              name: Write,
+              input: { path: write-crlf.txt, content: "uno\ndos\ntres\n" },
+            }
+      - text: 'Edited all four files.'
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
+actions:
+  - prompt: { text: 'Update the values.', turn: t }
+expect:
+  events:
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  fixtures:
+    'crlf.txt': crlf.after.txt
+    'bom.txt': bom.after.txt
+    'gbk 国标.txt': gbk.after.txt
+    'write-crlf.txt': write-crlf.after.txt
+  requests:
+    - index: 1
+      tool_results:
+        - { id: toolu_read_crlf, is_error: false, contains: "     2\told value" }
+        - { id: toolu_read_bom, is_error: false, contains: "     1\ttitle: 标题" }
+        - { id: toolu_read_gbk, is_error: false, contains: "     2\t旧的数值" }
+        - { id: toolu_read_write, is_error: false, contains: "     1\tone" }
+    - index: 2
+      tool_results:
+        - { id: toolu_read_crlf }
+        - { id: toolu_read_bom }
+        - { id: toolu_read_gbk }
+        - { id: toolu_read_write }
+        - { id: toolu_edit_crlf, is_error: false }
+        - { id: toolu_edit_bom, is_error: false }
+        - { id: toolu_edit_gbk, is_error: false }
+        - { id: toolu_write_crlf, is_error: false }
+  request_counts: { main: 3 }

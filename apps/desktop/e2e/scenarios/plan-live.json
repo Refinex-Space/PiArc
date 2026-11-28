@@ -1,0 +1,22 @@
+{
+  "id": "plan-live",
+  "steps": [
+    {
+      "text": "Reading the parser before I plan anything. The loop in parse() walks one token too far, so the plan starts with a failing test for that bound and then the fix.",
+      "chunk_chars": 4,
+      "chunk_delay_ms": 60,
+      "tool_calls": [
+        {
+          "id": "exit1",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Fix the parser bound\n\n## Steps\n\n1. Add a **failing test** for the loop bound in `src/parser.test.ts`\n2. Fix the off-by-one in `parse()`\n3. Run the tests\n\n## Check\n\n- `npm test` passes"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Plan approved; starting with the test."
+    }
+  ]
+}

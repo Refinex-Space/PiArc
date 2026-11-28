@@ -1,0 +1,80 @@
+name: Dependency security
+
+# Architecture section 13.3, "依赖安全" (T45, THR-08): npm audit over every workspace, cargo-audit,
+# cargo-deny's advisories and licenses, and the licenses of the npm packages that ship. Runs on
+# changes to the dependency manifests and every day, so a new advisory against a pinned version
+# shows up without a code change. Locally: npm run audit:deps.
+
+on:
+  push:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '**/package.json'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'deny.toml'
+      - 'tests/security/audit-exceptions.yaml'
+      - 'scripts/ci/audit-deps.mjs'
+      - 'scripts/lib/audit.mjs'
+      - '.github/workflows/deps-security.yml'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '**/package.json'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'deny.toml'
+      - 'tests/security/audit-exceptions.yaml'
+      - 'scripts/ci/audit-deps.mjs'
+      - 'scripts/lib/audit.mjs'
+      - '.github/workflows/deps-security.yml'
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: dependency audit
+    # The lockfiles and the advisory databases are the same on every platform.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show
+
+      - name: Cache repository-local tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools
+          key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/dev/install-tools.mjs', 'rust-toolchain.toml') }}
+
+      - name: Install pinned tools (cargo-deny, cargo-audit, ripgrep, fd, bindgen-cli)
+        run: node scripts/dev/install-tools.mjs
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Audit dependencies
+        run: npm run audit:deps

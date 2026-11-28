@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 61,
+  "method": "models/discover",
+  "params": {
+    "api": "openai-completions",
+    "baseUrl": "http://127.0.0.1:11434/v1"
+  }
+}

@@ -1,0 +1,49 @@
+id: ctx-compact-threshold
+description: With a 32,000-token window and a 4,096-token output the threshold is 14,904 tokens; a reply that reports 14,903 input tokens leaves the context alone, one that reports 14,904 compacts it automatically with PiArc's sectioned summary request, and the next request carries the summary and the restored state (T27).
+capabilities: [CAP-CTX-COMPACT-001]
+workspace:
+  trusted: true
+  files:
+    .pi/settings.json: '{"compaction":{"keepRecentTokens":1}}'
+providers:
+  main:
+    wire: anthropic
+    context_window: 32000
+    max_tokens: 4096
+    steps:
+      - { text: 'First answer.', usage: { input_tokens: 14903 } }
+      - { text: 'Second answer.', usage: { input_tokens: 14904 } }
+      - { text: 'Summary of the work so far.' }
+      - { text: 'Third answer.' }
+actions:
+  - prompt: { text: 'First question.', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - prompt: { text: 'Second question.', turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - prompt: { text: 'Third question.', turn: three }
+expect:
+  request_counts: { main: 4 }
+  requests:
+    - { index: 1, not_contains: ['You write handover notes for a coding session.'] }
+    - index: 2
+      contains:
+        - 'You write handover notes for a coding session.'
+        - '## Task goal'
+        - '## User requirements and constraints'
+        - '## Key decisions'
+        - '## Files changed'
+        - '## Errors and fixes'
+        - '## Open items'
+        - '## Current progress'
+        - '## Context to keep'
+        - 'First question.'
+      not_contains: ['Focus requested by the user']
+    - index: 3
+      contains: ['Summary of the work so far.']
+      user_message_contains:
+        - '[PiArc reminder]'
+        - 'The conversation above was compacted into a summary.'
+  events:
+    - method: item/completed
+      turn: two
+      params: { item: { type: contextCompaction, status: completed, reason: threshold } }

@@ -1,0 +1,113 @@
+/* The Pi package market's own parts (ADR-0102); rows, tabs and item pages are `catalog.css`. */
+
+.market {
+  display: grid;
+  min-width: 0;
+}
+.market-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-app] .market-sort {
+  min-height: 28px;
+  padding: 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  cursor: pointer;
+  outline: none;
+}
+:root[data-app] .market-sort:hover {
+  background: var(--piarc-session-ghost-hover);
+  color: var(--piarc-text-primary);
+}
+:root[data-app]:not([data-pointer-focus]) .market-sort:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+.market-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding-inline: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-button);
+}
+.market-state.is-icon {
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+.market-state > svg {
+  width: 16px;
+  height: 16px;
+}
+.market-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.market-empty-actions {
+  display: inline-flex;
+  gap: var(--piarc-space-2);
+}
+.market-readme {
+  display: grid;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  padding-block-start: var(--piarc-space-3);
+}
+.market-readme-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.market-readme-body :is(h1, h2) {
+  font-size: var(--piarc-font-size-heading);
+}
+.market-readme[data-open='false'] > .market-readme-body {
+  max-height: 28rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 75%, transparent);
+}
+.market-readme-toggle {
+  justify-self: start;
+}
+
+/* ---- uninstall and missing packages (installed view and package pages) ---- */
+.settings-surface .package-uninstall.button-ghost {
+  --action-ink: var(--piarc-text-danger);
+  --action-hover: var(--piarc-state-danger-subtle);
+}
+.package-uninstall-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+.package-uninstall-hint {
+  margin: calc(-1 * var(--piarc-space-3)) 0 0;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-session-footnote);
+  text-align: end;
+}
+.package-missing {
+  margin-block-end: var(--piarc-space-2);
+}
+.package-missing > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--piarc-space-2) var(--piarc-space-3);
+}
+.package-missing-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

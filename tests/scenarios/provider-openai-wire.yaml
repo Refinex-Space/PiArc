@@ -1,0 +1,33 @@
+id: provider-openai-wire
+description: A session on an OpenAI-compatible endpoint streams text and a tool call, and the tool result goes back as a tool message.
+capabilities: [CAP-PROVIDER-OPENAI-001]
+workspace:
+  files:
+    'hello.txt': "hello from the workspace\n"
+providers:
+  main:
+    wire: openai
+    steps:
+      - text: 'Reading.'
+        tool_calls:
+          - { id: call_read, name: Read, input: { path: hello.txt } }
+      - text: 'Done reading.'
+actions:
+  - prompt: { text: 'Read hello.txt.', turn: t }
+expect:
+  events:
+    - {
+        method: item/completed,
+        params: { item: { itemId: call_read, tool: Read, status: completed } },
+      }
+    - { method: item/completed, params: { item: { type: agentMessage, text: 'Done reading.' } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    # Windows sessions also get PowerShell (T17), so the list is checked by inclusion.
+    - {
+        index: 0,
+        tools_include: [Read, Write, Edit, Bash, Glob, Grep],
+        tools_exclude: [read, bash, powershell, edit, write, grep, find, ls],
+      }
+    - { index: 1, tool_results: [{ id: call_read, contains: hello from the workspace }] }
+  request_counts: { main: 2 }

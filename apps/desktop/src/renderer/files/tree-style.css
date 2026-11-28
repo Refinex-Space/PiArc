@@ -1,0 +1,257 @@
+.project-tree {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--piarc-space-1);
+  container: project-tree / inline-size;
+  color: var(--piarc-workbench-ink);
+  font-size: var(--piarc-font-size-body);
+}
+
+.project-filter {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-width: 0;
+  height: var(--piarc-size-button-height);
+  margin: var(--piarc-space-1) var(--piarc-space-2) 0;
+  padding-inline: var(--piarc-space-2);
+  gap: var(--piarc-space-1);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  color: var(--piarc-workbench-muted);
+}
+
+.project-filter > svg {
+  width: var(--piarc-font-size-body);
+  height: var(--piarc-font-size-body);
+  flex-shrink: 0;
+}
+
+:root[data-app] .project-filter > input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--piarc-workbench-ink);
+  font: inherit;
+  box-shadow: none;
+  text-overflow: ellipsis;
+}
+
+:root[data-app] .project-filter > input:is(:focus, :focus-visible) {
+  outline: none;
+}
+
+.project-filter-clear,
+.project-search-options button {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--piarc-size-button-height);
+  height: var(--piarc-button-small-height);
+  padding: 0 var(--piarc-space-1);
+  background: transparent;
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  color: var(--piarc-workbench-muted);
+  font: inherit;
+}
+.project-filter-clear svg {
+  width: var(--piarc-font-size-small);
+}
+.project-filter-clear:hover,
+.project-search-options button:hover {
+  background: var(--piarc-surface-hover);
+}
+.project-search-options button[aria-pressed='true'] {
+  background: var(--piarc-surface-active);
+  color: var(--piarc-text-primary);
+}
+.project-search-options {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+
+.project-tree-list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  contain: strict;
+}
+.project-tree-sizer {
+  position: relative;
+  margin-inline: var(--piarc-space-1);
+}
+
+.project-tree-row {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding-inline: calc(var(--piarc-space-2) + var(--tree-depth) * var(--piarc-space-4))
+    var(--piarc-space-2);
+  /* Leave the full row clickable; the painted surface stops short of its neighbours. */
+  border-block: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--piarc-radius-sm);
+  user-select: none;
+  cursor: default;
+  min-width: 0;
+}
+.project-tree-row > svg,
+.project-tree-type {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--piarc-text-secondary);
+}
+.project-tree-type {
+  object-fit: contain;
+  pointer-events: none;
+}
+.project-tree-row[aria-selected='true'],
+.project-tree-row[data-current] {
+  background-color: var(--piarc-surface-active);
+}
+.project-tree-row:hover:not([aria-disabled='true']) {
+  background-color: var(--piarc-surface-hover);
+}
+.project-tree-list:focus-visible .project-tree-row[data-focused] {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+.project-tree-row[aria-disabled='true'],
+.project-tree-note,
+.project-tree-message,
+.project-tree-link {
+  color: var(--piarc-text-secondary);
+}
+.project-tree-name,
+.project-tree-note {
+  overflow: hidden;
+  white-space: pre;
+  text-overflow: ellipsis;
+}
+.project-tree-line-number {
+  min-width: 3ch;
+  flex: none;
+  text-align: right;
+  color: var(--piarc-text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--piarc-font-size-small);
+}
+.project-tree-row code {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+}
+.project-tree-row mark {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-primary);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.project-tree-note,
+.project-tree-message {
+  font-size: var(--piarc-font-size-small);
+}
+.project-tree-message {
+  padding: var(--piarc-space-2);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.project-tree-parent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+@container project-tree (max-width: 210px) {
+  .project-filter:has(.project-search-options) {
+    display: grid;
+    height: auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: repeat(2, var(--piarc-size-button-height));
+    grid-template-areas: 'search query clear' '. options options';
+    row-gap: 0;
+  }
+  .project-filter:has(.project-search-options) > svg {
+    grid-area: search;
+  }
+  :root[data-app] .project-filter:has(.project-search-options) > input {
+    grid-area: query;
+    width: 100%;
+  }
+  .project-filter-clear {
+    grid-area: clear;
+  }
+  .project-search-options {
+    grid-area: options;
+  }
+}
+
+.project-tree-guide {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(
+    var(--piarc-space-2) + var(--piarc-font-size-body) / 2 + var(--tree-guide) *
+      var(--piarc-space-4)
+  );
+  border-inline-start: 1px solid var(--piarc-border-subtle);
+  pointer-events: none;
+}
+.project-search-spinner {
+  flex: none;
+  width: var(--piarc-font-size-body);
+  height: var(--piarc-font-size-body);
+  border: 1px solid var(--piarc-border-subtle);
+  border-top-color: var(--piarc-workbench-muted);
+  border-radius: 50%;
+  animation: project-file-search 0.8s linear infinite;
+}
+@keyframes project-file-search {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-search-spinner {
+    animation: none;
+  }
+}
+
+.project-tree-snippet {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  white-space: pre;
+}
+.project-tree-snippet :is(.project-match-lead, .project-match-tail, mark) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.project-match-lead {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.project-tree-snippet > mark {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+.project-match-tail {
+  flex: 1 999 auto;
+  min-width: 0;
+}

@@ -1,0 +1,103 @@
+id: term-user-share
+description: A terminal the user opens in the panel (T34) is a terminal task of the session that the agent cannot see - no screen file in the session's tasks directory - until the user turns on sharing; then the next turn tells the agent where the screen is and Read gives what the user ran there; turning sharing off hides it again (ADR-0050 rule 5).
+capabilities: [CAP-TERM-SHARE-001]
+platforms: [macos]
+platform_reason: The agent looks for the screen file with grep over a POSIX path of the tasks directory; the Windows variant (Git Bash paths) is W3's.
+providers:
+  main:
+    wire: anthropic
+    steps:
+      # Turn one: a background command reveals the tasks directory; no terminal screen in it.
+      - tool_calls:
+          - id: toolu_bg
+            name: Bash
+            input: { command: 'echo started', run_in_background: true }
+      - tool_calls:
+          - id: toolu_grep1
+            name: Bash
+            input:
+              command: "grep -l 'PiArc terminal' '{{result:toolu_bg:output goes to (.+)/bg-[0-9a-f]+\\.log; read it}}'/*.log"
+      - text: 'No terminal of yours is visible.'
+      # Turn two, after the user shared it: the screen file is there and readable.
+      - tool_calls:
+          - id: toolu_grep2
+            name: Bash
+            input:
+              command: "grep -l 'PiArc terminal' '{{result:toolu_bg:output goes to (.+)/bg-[0-9a-f]+\\.log; read it}}'/*.log"
+      - tool_calls:
+          - id: toolu_read
+            name: Read
+            # The path has spaces: the whole line grep printed.
+            input: { path: '{{result:toolu_grep2:(?m)^(/.+\.log)$}}' }
+      - text: 'I can read your terminal now.'
+      # Turn three, after the user stopped sharing: gone again.
+      - tool_calls:
+          - id: toolu_grep3
+            name: Bash
+            input:
+              command: "grep -l 'PiArc terminal' '{{result:toolu_bg:output goes to (.+)/bg-[0-9a-f]+\\.log; read it}}'/*.log"
+      - text: 'It is hidden again.'
+actions:
+  - open_terminal: {}
+  - wait:
+      {
+        method: core/tasks,
+        params: { kind: terminal, status: running, terminal: { origin: user, shared: false } },
+      }
+  - type_terminal: { text: "echo shared-$((40+2))\r" }
+  - prompt: { text: 'Can you see my terminal?', turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - share_terminal: { shared: true }
+  - wait:
+      { method: core/tasks, params: { kind: terminal, terminal: { origin: user, shared: true } } }
+  - prompt: { text: 'And now?', turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - share_terminal: { shared: false }
+  - wait:
+      {
+        method: core/tasks,
+        params: { kind: terminal, terminal: { origin: user, shared: false } },
+        count: 2,
+      }
+  - prompt: { text: 'And now that I stopped sharing?', turn: three }
+expect:
+  events:
+    - { method: turn/completed, turn: one, params: { status: completed } }
+    - { method: turn/completed, turn: two, params: { status: completed } }
+    - { method: turn/completed, turn: three, params: { status: completed } }
+  requests:
+    - index: 2
+      not_contains: ['The user shared a terminal with you']
+      tool_results:
+        - { id: toolu_bg }
+        - {
+            id: toolu_grep1,
+            is_error: false,
+            contains: 'Command exited with code 1 (no matches; not an error)',
+          }
+    - index: 3
+      contains:
+        - 'The user shared a terminal with you: bg-'
+        - 'read it with Read when it helps'
+    - index: 4
+      tool_results:
+        - { id: toolu_bg }
+        - { id: toolu_grep1 }
+        - { id: toolu_grep2, is_error: false, contains: '.log' }
+    - index: 5
+      tool_results:
+        - { id: toolu_bg }
+        - { id: toolu_grep1 }
+        - { id: toolu_grep2 }
+        - { id: toolu_read, is_error: false, contains: 'shared-42' }
+    - index: 7
+      tool_results:
+        - { id: toolu_bg }
+        - { id: toolu_grep1 }
+        - { id: toolu_grep2 }
+        - { id: toolu_read }
+        - {
+            id: toolu_grep3,
+            is_error: false,
+            contains: 'Command exited with code 1 (no matches; not an error)',
+          }

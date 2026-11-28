@@ -1,0 +1,50 @@
+id: exec-cwd-carry-over
+description: A cd inside the workspace carries over to the next command; a cd out of the workspace sends the next command back to the workspace root, and the result says why.
+capabilities: [CAP-EXEC-CWD-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_cd, name: Bash, input: { command: 'mkdir -p sub/inner && cd sub' } }
+      - tool_calls:
+          - { id: toolu_pwd_sub, name: Bash, input: { command: 'pwd -P' } }
+      - tool_calls:
+          - { id: toolu_leave, name: Bash, input: { command: 'cd ../..' } }
+      - tool_calls:
+          - { id: toolu_pwd_root, name: Bash, input: { command: 'pwd -P' } }
+      - text: 'Moved around.'
+# `pwd` is on the read-only list; `mkdir` and a `cd` out of the workspace ask (T23).
+approvals:
+  - { tool: Bash, decision: allow }
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: 'Change directories.', turn: t }
+expect:
+  events:
+    - { method: item/completed, params: { item: { itemId: toolu_cd, status: completed } } }
+    - { method: item/completed, params: { item: { itemId: toolu_pwd_sub, status: completed } } }
+    - method: item/completed
+      params:
+        item:
+          itemId: toolu_leave
+          status: completed
+          execution: { cwdReset: { reason: outsideWorkspace } }
+    - { method: item/completed, params: { item: { itemId: toolu_pwd_root, status: completed } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 2
+      tool_results:
+        - { id: toolu_cd, is_error: false }
+        - { id: toolu_pwd_sub, is_error: false, contains: "工作区/sub\n" }
+    - index: 4
+      tool_results:
+        - { id: toolu_cd }
+        - { id: toolu_pwd_sub }
+        - {
+            id: toolu_leave,
+            is_error: false,
+            contains: 'outside the workspace; the next command starts in',
+          }
+        - { id: toolu_pwd_root, is_error: false, contains: "工作区\n" }
+  request_counts: { main: 5 }

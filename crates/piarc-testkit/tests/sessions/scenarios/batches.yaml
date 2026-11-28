@@ -1,0 +1,20 @@
+# T14-A06: 12 read-only calls, a write, 2 read-only calls in one response.
+id: batches
+steps:
+  - tool_calls:
+      - { id: r01, name: Read, input: { path: 'files/01.txt' } }
+      - { id: r02, name: Read, input: { path: 'files/02.txt' } }
+      - { id: r03, name: Read, input: { path: 'files/03.txt' } }
+      - { id: r04, name: Read, input: { path: 'files/04.txt' } }
+      - { id: r05, name: Read, input: { path: 'files/05.txt' } }
+      - { id: r06, name: Read, input: { path: 'files/06.txt' } }
+      - { id: r07, name: Read, input: { path: 'files/07.txt' } }
+      - { id: r08, name: Read, input: { path: 'files/08.txt' } }
+      - { id: r09, name: Read, input: { path: 'files/09.txt' } }
+      - { id: r10, name: Read, input: { path: 'files/10.txt' } }
+      - { id: r11, name: Read, input: { path: 'files/11.txt' } }
+      - { id: r12, name: Read, input: { path: 'files/12.txt' } }
+      - { id: w13, name: Write, input: { path: 'files/out.txt', content: "written\n" } }
+      - { id: r14, name: Read, input: { path: 'files/13.txt' } }
+      - { id: r15, name: Read, input: { path: 'files/14.txt' } }
+  - text: 'Read and wrote everything.'

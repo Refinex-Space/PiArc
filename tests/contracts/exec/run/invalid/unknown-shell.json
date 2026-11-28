@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 28,
+  "method": "exec/run",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "requestId": "exec-91c2",
+    "command": "ls",
+    "shell": "fish"
+  }
+}

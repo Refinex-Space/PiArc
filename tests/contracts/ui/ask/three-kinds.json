@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "method": "ui/ask",
+  "params": {
+    "sessionId": "019a8f3e-5b2c-7d41-9e60-3f1a2b4c5d6e",
+    "toolCallId": "call-ask-1",
+    "questions": [
+      {
+        "question": "Which database?",
+        "header": "Database",
+        "options": [
+          { "label": "SQLite", "description": "One file", "default": true },
+          { "label": "Postgres" }
+        ]
+      },
+      {
+        "question": "哪些平台？",
+        "options": [{ "label": "macOS" }, { "label": "Windows" }],
+        "multiSelect": true
+      }
+    ]
+  }
+}

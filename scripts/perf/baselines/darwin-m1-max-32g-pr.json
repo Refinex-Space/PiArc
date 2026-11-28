@@ -1,0 +1,20 @@
+{
+  "machine": "m1-max-32g",
+  "lane": "pr",
+  "platform": "darwin-arm64",
+  "cpu": "Apple M1 Max",
+  "updated": "2026-11-22T06:13:15.868Z",
+  "reason": "T44: first PR-smoke baseline of the local M1 Max (32 GB, macOS 26.5.2), three runs per probe",
+  "values": {
+    "cold-start": 464,
+    "workspace-ready": 944.7,
+    "main-loop-p99": 3.848191,
+    "stream-frame-p99": 9.941,
+    "stream-long-tasks": 0,
+    "switch-cached": 29.099999994039536,
+    "switch-cold": 62.19999998807907,
+    "core-to-renderer-p95": 0.7240419999998267,
+    "ahp-round-trip-p95": 0.24,
+    "policy-decision-p95": 0.744792
+  }
+}

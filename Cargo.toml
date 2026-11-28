@@ -1,0 +1,168 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/piarc-protocol",
+    "crates/piarc-core",
+    "crates/piarc-host",
+    "crates/piarc-policy",
+    "crates/piarc-hooks",
+    "crates/piarc-config",
+    "crates/piarc-fs",
+    "crates/piarc-checkpoint",
+    "crates/piarc-ports",
+    "crates/piarc-exec",
+    "crates/piarc-term",
+    "crates/piarc-ghostty-sys",
+    "crates/piarc-sandbox",
+    "crates/piarc-store",
+    "crates/piarc-diff",
+    "crates/piarc-git",
+    "crates/piarc-secrets",
+    "crates/piarc-telemetry",
+    "crates/piarc-web",
+    "crates/piarc-browser-import",
+    "crates/piarc-speech",
+    "crates/piarc-sherpa-sys",
+    "crates/piarc-napi",
+    "crates/piarc-testkit",
+    "crates/piarc-devcli",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.99"
+publish = false
+
+# Every dependency is declared here and inherited with `workspace = true` in the
+# crates. Which workspace crate may depend on which is governed by
+# crates/deps-rules.json (checked by scripts/ci/check-crate-deps.mjs).
+[workspace.dependencies]
+piarc-protocol    = { path = "crates/piarc-protocol" }
+piarc-core        = { path = "crates/piarc-core" }
+piarc-host        = { path = "crates/piarc-host" }
+piarc-policy      = { path = "crates/piarc-policy" }
+piarc-hooks       = { path = "crates/piarc-hooks" }
+piarc-config      = { path = "crates/piarc-config" }
+piarc-fs          = { path = "crates/piarc-fs" }
+piarc-checkpoint  = { path = "crates/piarc-checkpoint" }
+piarc-ports       = { path = "crates/piarc-ports" }
+piarc-exec        = { path = "crates/piarc-exec" }
+piarc-term        = { path = "crates/piarc-term" }
+piarc-ghostty-sys = { path = "crates/piarc-ghostty-sys" }
+piarc-sandbox     = { path = "crates/piarc-sandbox" }
+piarc-store       = { path = "crates/piarc-store" }
+piarc-diff        = { path = "crates/piarc-diff" }
+piarc-git         = { path = "crates/piarc-git" }
+piarc-secrets     = { path = "crates/piarc-secrets" }
+piarc-telemetry   = { path = "crates/piarc-telemetry" }
+piarc-web         = { path = "crates/piarc-web" }
+piarc-browser-import = { path = "crates/piarc-browser-import" }
+piarc-speech      = { path = "crates/piarc-speech" }
+# The -sys layer of sherpa-onnx (ADR-0094): the upstream package name, PiArc's run-time loader.
+sherpa-onnx-sys   = { path = "crates/piarc-sherpa-sys" }
+piarc-napi        = { path = "crates/piarc-napi" }
+piarc-testkit     = { path = "crates/piarc-testkit" }
+
+# Third-party dependencies.
+base64 = "=0.23.1"
+image = { version = "=0.25.10", default-features = false, features = ["png","jpeg","gif","webp","bmp"] }
+quick-xml = "=0.42.0"
+aes-gcm     = { version = "=0.11.1", default-features = false, features = ["aes", "zeroize"] }
+apple-native-keyring-store = { version = "=1.0.2", default-features = false, features = ["keychain"] }
+getrandom   = { version = "=0.4.3", default-features = false }
+# Chrome sign-in import (ADR-0090): AES-128-CBC and PBKDF2-HMAC-SHA1 of macOS Chrome cookies.
+cbc         = { version = "=0.2.1", default-features = false, features = ["block-padding"] }
+pbkdf2      = { version = "=0.13.0", default-features = false, features = ["hmac"] }
+sha1        = { version = "=0.11.0", default-features = false }
+cap-std = "=4.0.3"
+cap-fs-ext = "=4.0.3"
+chardetng   = "=1.0.0"
+encoding_rs = "=0.8.44"
+globset     = "=0.4.21"
+htmd        = "=0.6.0"
+grep-matcher = "=0.1.9"
+grep-regex  = "=0.1.14"
+grep-searcher = "=0.1.17"
+http = "=1.5.0"
+http-body-util = "=0.1.5"
+hyper       = { version = "=1.12.0", features = ["http1", "server"] }
+hyper-util  = { version = "=0.1.21", features = ["tokio"] }
+ignore      = "=0.4.34"
+ipnet       = "=2.12.2"
+keyring-core = "=1.0.1"
+minisign-verify = "=0.3.0"
+jsonschema  = { version = "=0.61.2", default-features = false }
+libc        = { version = "=0.2.191", default-features = false }
+lopdf       = { version = "=0.46.0", default-features = false }
+notify      = { version = "=8.2.1", default-features = false, features = ["macos_fsevent"] }
+plist       = { version = "=1.10.3", default-features = false }
+napi        = { version = "=3.16.2", features = ["napi6", "serde-json"] }
+napi-build  = "=2.6.0"
+napi-derive = "=3.7.1"
+nix         = { version = "=0.28.0", default-features = false }
+portable-pty = { version = "=0.9.0", default-features = false }
+regex       = "=1.13.1"
+rusqlite    = { version = "=0.41.1", features = ["bundled"] }
+rustls      = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-platform-verifier = "=0.7.1"
+schemars    = { version = "=1.2.3", default-features = false, features = ["derive", "std"] }
+serde       = { version = "=1.0.229", features = ["derive"] }
+serde-saphyr = { version = "=2.1.1", default-features = false, features = ["deserialize"] }
+security-framework = { version = "=3.7.0", default-features = false }
+unicode-normalization = "=0.1.26"
+url         = "=2.5.9"
+serde_json  = "=1.0.154"
+sha2        = "=0.11.1"
+similar     = { version = "=3.2.1", default-features = false, features = ["std", "text"] }
+thiserror   = "=2.0.21"
+tree-sitter = "=0.27.1"
+tree-sitter-bash = "=0.25.1"
+tokio       = { version = "=1.54.1", default-features = false, features = ["rt-multi-thread", "sync", "time", "macros"] }
+tokio-util  = { version = "=0.7.20", default-features = false }
+tokio-rustls = { version = "=0.26.6", default-features = false, features = ["ring", "tls12"] }
+tracing     = { version = "=0.1.44", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["fmt", "std"] }
+windows-native-keyring-store = { version = "=1.1.0", default-features = false }
+windows-registry = { version = "=0.100.0", default-features = false }
+windows-sys = { version = "=0.61.2", default-features = false }
+zeroize     = { version = "=1.9.1", features = ["serde", "std"] }
+# Voice dictation (ADR-0094): the sherpa-onnx safe wrapper (its -sys crate is patched below),
+# audio capture, resampling, the capture queue and run-time library loading.
+sherpa-onnx = { version = "=2.0.1", default-features = false }
+cpal        = "=0.18.2"
+rubato      = "=5.1.0"
+rtrb        = "=0.3.6"
+libloading  = "=0.9.1"
+
+[patch.crates-io]
+# sherpa-onnx-sys downloads unverified prebuilt libraries and links them at build time; PiArc's
+# generated replacement loads the verified libraries of Resources/speech/runtime on first use
+# (ADR-0094, scripts/dev/gen-sherpa-sys.mjs).
+sherpa-onnx-sys = { path = "crates/piarc-sherpa-sys" }
+
+# Verifying the speech assets hashes about 200 MB on the first dictation; unoptimized SHA-256
+# makes that take seconds in development builds.
+[profile.dev.package.sha2]
+opt-level = 3
+
+[workspace.lints.rust]
+# `unsafe` is allowed only in -sys crates, at the NAPI boundary and in safe
+# wrapper modules over system interfaces (piarc-term's `vt`, piarc-exec's `job` and
+# `tty_processes`, piarc-browser-import's `dpapi`);
+# the crates opt out at the crate root, the wrappers on their module declaration,
+# each with a reason.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+# Functions over 80 lines (clippy.toml) need `#[expect(clippy::too_many_lines, reason = "...")]`.
+too_many_lines = "deny"
+allow_attributes_without_reason = "deny"
+# Every `unsafe` block needs a `// SAFETY:` comment.
+undocumented_unsafe_blocks = "deny"
+# No stubs or debugging leftovers in committed code.
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"

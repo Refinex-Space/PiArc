@@ -1,0 +1,30 @@
+id: model-default-setting
+description: A session created without a model starts on the settings' default model - Claude Code's model key naming the fast alias here - with the effortLevel the settings give (T31, I113).
+capabilities: [CAP-MODEL-ALIAS-001, CAP-CONFIG-COMPAT-001]
+workspace:
+  files:
+    .claude/settings.json: '{"model":"fast","effortLevel":"low"}'
+  run_files:
+    data 数据/settings.json: '{"modelAliases":{"fast":"mock-alt/alt-model"}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: Not used.
+  alt:
+    wire: anthropic
+    model: alt-model
+    reasoning: true
+    steps:
+      - text: Answered by the default model.
+sessions:
+  main: { provider: alt, settings_model: true }
+actions:
+  - prompt: { text: Which model answers?, turn: one }
+expect:
+  request_counts: { main: 0, alt: 1 }
+  requests:
+    - provider: alt
+      index: 0
+      # low: a 2,048-token thinking budget; without effortLevel the default gives 3,072.
+      body: { model: alt-model, thinking: { type: enabled, budget_tokens: 2048 } }

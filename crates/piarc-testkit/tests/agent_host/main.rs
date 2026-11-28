@@ -1,0 +1,827 @@
+//! S3 and the process half of S9, end to end: the real bundled Agent Host (Pi SDK sessions)
+//! under Core's supervisor, the strict mock provider as the model service. Run with
+//! `--nocapture` to print the observations recorded in `docs/spikes/S03-multi-session.md`
+//! and `docs/spikes/S09-ahp-resilience.md`.
+
+mod context;
+mod credentials;
+mod golden;
+mod harness;
+mod parity;
+mod token_server;
+mod tools;
+mod trust;
+
+use harness::{Env, assert_contiguous_seq, notification, open, payload, ping, prompt_text};
+use piarc_core::agent_host::{CallState, ExitReason, HostEvent};
+use piarc_protocol::session::SessionId;
+use piarc_protocol::turn::TurnId;
+use piarc_testkit::Outcome;
+use serde_json::json;
+
+const FILES_A: &str = r#"
+id: files-a
+steps:
+  - text: "Writing the note."
+    tool_calls: [{ name: Write, input: { path: "notes/note.txt", content: "written by session A" } }]
+  - tool_calls: [{ name: Edit, input: { path: "notes/note.txt", edits: [{ oldText: "session A", newText: "session A, edited" }] } }]
+  - tool_calls: [{ name: Read, input: { path: "notes/note.txt" } }]
+  - text: "Done in A."
+"#;
+
+const FILES_B: &str = r#"
+id: files-b
+steps:
+  - text: "Writing the note."
+    tool_calls: [{ name: Write, input: { path: "notes/note.txt", content: "written by session B" } }]
+  - tool_calls: [{ name: Edit, input: { path: "notes/note.txt", edits: [{ oldText: "session B", newText: "session B, edited" }] } }]
+  - tool_calls: [{ name: Read, input: { path: "notes/note.txt" } }]
+  - text: "Done in B."
+"#;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn two_sessions_run_tool_calls_concurrently_and_only_touch_their_own_workspace() {
+    let env = Env::new("files", &[FILES_A, FILES_B], json!({})).await;
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let rss_none = ping(&supervisor).await.rss_bytes;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let rss_one = ping(&supervisor).await.rss_bytes;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
+    let rss_two = ping(&supervisor).await.rss_bytes;
+
+    let (text_a, text_b) = (
+        prompt_text("Write a note.", "files-a"),
+        prompt_text("Write a note.", "files-b"),
+    );
+    let (ta, tb) = tokio::join!(
+        supervisor.prompt(&a, "req-a", &text_a),
+        supervisor.prompt(&b, "req-b", &text_b)
+    );
+    let (ta, tb) = (
+        ta.expect("A accepted").turn_id,
+        tb.expect("B accepted").turn_id,
+    );
+    let done_a = events.turn_completed(&ta.0).await;
+    let done_b = events.turn_completed(&tb.0).await;
+    assert_eq!(
+        (done_a["status"].as_str(), done_b["status"].as_str()),
+        (Some("completed"), Some("completed"))
+    );
+
+    let rss_after = ping(&supervisor).await.rss_bytes;
+    // The same idempotency key returns the turn it started; nothing new reaches the model.
+    let repeated = supervisor
+        .prompt(&a, "req-a", &text_a)
+        .await
+        .expect("answered")
+        .turn_id;
+    assert_eq!(repeated, ta);
+    assert_eq!(env.requests("files-a").len(), 4);
+    check_own_notes(&env, &events, &a, &b);
+    check_own_core_calls(&env, &core, &a, &b);
+    check_overlap(&events, &a);
+    let (na, nb) = (
+        assert_contiguous_seq(&events, &a.0),
+        assert_contiguous_seq(&events, &b.0),
+    );
+    println!(
+        "seq 1..={na} for A, 1..={nb} for B; RSS (bytes): no session {rss_none}, one {rss_one}, \
+         two {rss_two}, after both turns {rss_after}"
+    );
+    assert_eq!(*core.asked.lock().expect("lock"), [env.cwd(0), env.cwd(1)]);
+    supervisor.shutdown().await;
+}
+
+/// (tool, status, output) of every tool call of a session.
+fn harness_tools(events: &harness::Recorder, session: &str) -> Vec<(String, String, String)> {
+    events
+        .tool_results(session)
+        .into_iter()
+        .map(|item| {
+            let field = |name: &str| item[name].as_str().unwrap_or_default().to_owned();
+            (field("tool"), field("status"), field("output"))
+        })
+        .collect()
+}
+
+const STALL_A: &str = r#"
+id: stall-a
+# Every rule on: the Harness Kit closes the interrupted turn, so the next request alternates
+# (issue I18, T14).
+steps:
+  - text: "Still thinking about the answer"
+    stall_after_events: 4
+  - text: "Answered after the interruption."
+"#;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn interrupting_one_session_leaves_the_other_running_to_completion() {
+    let env = Env::new("abort", &[STALL_A, FILES_B], json!({})).await;
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
+    let ta = supervisor
+        .prompt(&a, "req-a", &prompt_text("Think.", "stall-a"))
+        .await
+        .expect("A accepted")
+        .turn_id;
+    // A's model stream stops after its first text delta and stays open.
+    events
+        .until(|e| {
+            notification(e).is_some_and(|n| {
+                n.method == "item/agentMessage/delta" && n.params.header.session_id == a
+            })
+        })
+        .await;
+    let tb = supervisor
+        .prompt(&b, "req-b", &prompt_text("Write a note.", "files-b"))
+        .await
+        .expect("B accepted")
+        .turn_id;
+    events
+        .until(|e| {
+            notification(e)
+                .is_some_and(|n| n.method == "turn/started" && n.params.header.session_id == b)
+        })
+        .await;
+
+    let stopped = supervisor.abort(&a).await.expect("abort answered");
+    assert_eq!(stopped.interrupted_turn_id.as_ref(), Some(&ta));
+    let done_a = events.turn_completed(&ta.0).await;
+    assert_eq!(done_a["status"], "interrupted");
+    let done_b = events.turn_completed(&tb.0).await;
+    assert_eq!(done_b["status"], "completed");
+    assert_eq!(
+        std::fs::read_to_string(env.ws[1].join("notes").join("note.txt"))
+            .expect("B wrote its note"),
+        "written by session B, edited"
+    );
+    check_only_a_was_interrupted(&events, &a);
+
+    // The interrupted session is still usable.
+    let again = supervisor
+        .prompt(&a, "req-a2", &prompt_text("Go on.", "stall-a"))
+        .await
+        .expect("accepted")
+        .turn_id;
+    let again_done = events.turn_completed(&again.0).await;
+    assert_eq!(again_done["status"], "completed", "{again_done}");
+    assert_eq!(
+        env.requests("stall-a")
+            .iter()
+            .map(|r| r.outcome)
+            .collect::<Vec<_>>(),
+        [Outcome::Stalled, Outcome::Streamed]
+    );
+    assert_contiguous_seq(&events, &a.0);
+    assert_contiguous_seq(&events, &b.0);
+    supervisor.shutdown().await;
+}
+
+const COMPACT_A: &str = r#"
+id: small-window
+steps:
+  - text: "A long answer that fills the small context window."
+    usage: { input_tokens: 20000, output_tokens: 500 }
+  - text: "Summary: the user asked for a long answer and got one."
+  - text: "Answer after the compaction."
+"#;
+
+const HISTORY_B: &str = r#"
+id: history-b
+steps:
+  - text: "B first answer."
+  - text: "B second answer."
+"#;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn compacting_one_session_leaves_the_history_of_the_other_untouched() {
+    let env = Env::new(
+        "compact",
+        &[COMPACT_A, HISTORY_B],
+        json!({ "compaction": { "keepRecentTokens": 1 } }),
+    )
+    .await;
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-small").await;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
+
+    let b1 = supervisor
+        .prompt(&b, "b1", &prompt_text("B question one.", "history-b"))
+        .await
+        .expect("accepted")
+        .turn_id;
+    let a1 = supervisor
+        .prompt(&a, "a1", "A question one.")
+        .await
+        .expect("accepted")
+        .turn_id;
+    assert_eq!(events.turn_completed(&b1.0).await["status"], "completed");
+    assert_eq!(events.turn_completed(&a1.0).await["status"], "completed");
+    let compactions = |id: &str| {
+        env.session_entries(id)
+            .iter()
+            .filter(|e| e["type"] == "compaction")
+            .count()
+    };
+    assert_eq!(
+        compactions(&a.0),
+        1,
+        "A crossed the threshold of its 32k window and compacted"
+    );
+    assert_eq!(compactions(&b.0), 0);
+
+    let a2 = supervisor
+        .prompt(&a, "a2", "A question two.")
+        .await
+        .expect("accepted")
+        .turn_id;
+    let b2 = supervisor
+        .prompt(&b, "b2", "B question two.")
+        .await
+        .expect("accepted")
+        .turn_id;
+    assert_eq!(events.turn_completed(&a2.0).await["status"], "completed");
+    assert_eq!(events.turn_completed(&b2.0).await["status"], "completed");
+
+    check_compacted_requests(&env);
+    check_b_history_untouched(&env, &b);
+    supervisor.shutdown().await;
+}
+
+const MCP_A: &str = r#"
+id: mcp-a
+steps:
+  - tool_calls: [{ name: mcp__alpha__echo, input: { text: "hi from A" } }]
+  - text: "A heard back."
+"#;
+
+const MCP_B: &str = r#"
+id: mcp-b
+steps:
+  - tool_calls: [{ name: mcp__alpha__echo, input: { text: "hi from B" } }]
+  - text: "B heard back."
+"#;
+
+/// T36 (replaces S3's per-session MCP servers): two sessions working in different
+/// directories of one workspace share the pool's one `alpha` process, which runs in the
+/// workspace root; each gets its own result. Pi's MCP extension and codemode are not loaded:
+/// the requests declare `mcp__alpha__echo` directly and no `codemode` or `tool_search`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sessions_of_a_workspace_share_one_mcp_server_process() {
+    let env = Env::new("mcp", &[MCP_A, MCP_B], json!({})).await;
+    *env.mcp.lock().expect("lock") = harness::mcp_servers(&["alpha"], &json!({}));
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let b = open(&supervisor, &core, &env.cwd(1), "mock-large").await;
+    let ta = supervisor
+        .prompt(&a, "a", &prompt_text("Call alpha.", "mcp-a"))
+        .await
+        .expect("accepted")
+        .turn_id;
+    let tb = supervisor
+        .prompt(&b, "b", &prompt_text("Call alpha too.", "mcp-b"))
+        .await
+        .expect("accepted")
+        .turn_id;
+    assert_eq!(events.turn_completed(&ta.0).await["status"], "completed");
+    assert_eq!(events.turn_completed(&tb.0).await["status"], "completed");
+
+    let mut pids = Vec::new();
+    for (session, said, selector) in [(&a, "hi from A", "mcp-a"), (&b, "hi from B", "mcp-b")] {
+        let results = harness_tools(&events, &session.0);
+        println!("{selector}: {results:?}");
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            (results[0].0.as_str(), results[0].1.as_str()),
+            ("mcp__alpha__echo", "completed")
+        );
+        let output = &results[0].2;
+        let (cwd, pid) = output
+            .strip_prefix(&format!("alpha echoes \"{said}\" from "))
+            .and_then(|reply| reply.strip_suffix(')'))
+            .and_then(|reply| reply.rsplit_once(" (pid "))
+            .unwrap_or_else(|| panic!("unexpected echo: {output}"));
+        // Node can report the Windows temporary directory with its 8.3 spelling.
+        assert_eq!(
+            harness::canonical(std::path::Path::new(cwd)),
+            harness::canonical(&env.root),
+            "the shared server runs in the workspace root"
+        );
+        pids.push(pid.parse::<std::num::NonZeroU32>().expect("server pid"));
+        let first = &env.requests(selector)[0].body;
+        assert!(first.contains("\"mcp__alpha__echo\""), "declared directly");
+        for absent in ["\"codemode\"", "\"tool_search\"", "\"ToolSearch\""] {
+            assert!(
+                !first.contains(absent),
+                "{absent} is not offered to {selector}"
+            );
+        }
+    }
+    assert_eq!(pids[0], pids[1], "one server process for both sessions");
+    supervisor.shutdown().await;
+}
+
+/// Call the host directly so its own deadline, rather than Core's hook runner, fires first.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_mcp_hooks_local_abort_reaches_core_as_a_timeout() {
+    use piarc_protocol::hooks::{HooksMcpTool, HooksMcpToolParams};
+
+    let env = Env::new("mcp hook timeout", &[], json!({})).await;
+    *env.mcp.lock().expect("lock") =
+        harness::mcp_servers(&["checks"], &json!({"MCP_ECHO_REPLY": "1"}));
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let session = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let error = supervisor
+        .call::<HooksMcpTool>(HooksMcpToolParams {
+            session_id: session.0,
+            server: "checks".into(),
+            tool: "reply".into(),
+            arguments: json!({"text": "late", "delay_ms": 5000}),
+            timeout_ms: 100,
+        })
+        .await
+        .expect_err("the hook must time out");
+    let piarc_core::agent_host::Error::Remote { error, .. } = error else {
+        panic!("expected a remote hook timeout, got {error:?}");
+    };
+    assert_eq!(error.data.kind, piarc_protocol::ErrorKind::Timeout);
+    supervisor.shutdown().await;
+}
+
+const KILL_A: &str = r#"
+id: kill-a
+# Every rule on: the reopened session's turn, cut off by the kill, is closed when the session
+# is resumed (issue I18, T14).
+steps:
+  - text: "Working on it"
+    stall_after_events: 4
+  - text: "Back after the restart."
+"#;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn killing_the_agent_host_mid_prompt_restarts_it_and_restores_the_session() {
+    let env = Env::new("kill", &[KILL_A], json!({})).await;
+    let (supervisor, mut events, core) = env.start(&[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { epoch: 1, .. }))
+        .await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let turn = supervisor
+        .prompt(&a, "req-1", &prompt_text("Work.", "kill-a"))
+        .await
+        .expect("accepted")
+        .turn_id;
+    events
+        .until(|e| notification(e).is_some_and(|n| n.method == "item/agentMessage/delta"))
+        .await;
+    let in_flight: Vec<_> = supervisor
+        .calls()
+        .into_iter()
+        .map(|c| (c.method, c.state, c.turn_id))
+        .collect();
+    println!("in flight before the kill: {in_flight:?}");
+    assert_eq!(
+        in_flight,
+        [(
+            "session/prompt".to_owned(),
+            CallState::Acknowledged,
+            Some(turn.0.clone())
+        )]
+    );
+
+    supervisor.kill().await;
+    check_restart(&mut events, &turn, &a).await;
+
+    let after = supervisor
+        .prompt(&a, "req-2", "Continue.")
+        .await
+        .expect("accepted")
+        .turn_id;
+    assert_eq!(events.turn_completed(&after.0).await["status"], "completed");
+    let requests = env.requests("kill-a");
+    assert_eq!(requests.len(), 2);
+    assert!(
+        requests[1].body.contains("Work."),
+        "the restored session still has the first prompt"
+    );
+    let count = assert_contiguous_seq(&events, &a.0);
+    println!("seq 1..={count} across both connections");
+    supervisor.shutdown().await;
+}
+
+/// One step with 100 parallel tool calls carrying 4 KiB of arguments each: about 800 KiB of
+/// notifications, more than the pipe and Core's reader buffer absorb, while the history (about
+/// 100k tokens) stays below the compaction threshold of the 200k window.
+///
+/// The tool does not exist, so Pi answers each call itself. A real tool would not do: since
+/// T07 every tool sends its I/O to Core over the same stdout, behind the queued notifications,
+/// so a Core that stops reading stops the tools too (by design, docs/spikes/S04).
+fn flood_scenario() -> String {
+    let content = "x".repeat(4096);
+    let calls: Vec<String> = (0..100)
+        .map(|i| {
+            format!(
+                r#"{{ name: NoSuchTool, input: {{ path: "flood/{i}.txt", content: "{content}" }} }}"#
+            )
+        })
+        .collect();
+    format!(
+        "id: flood\nsteps:\n  - tool_calls: [{}]\n  - text: \"Wrote them all.\"\n",
+        calls.join(", ")
+    )
+}
+
+/// What the Agent Host gets done while Core reads nothing.
+async fn check_progress_while_core_is_stalled(env: &Env) {
+    // The first step is requested before the flood. Its 100 tool calls end in a PostToolBatch
+    // `hooks/run` request (T38, ADR-0055) that Pi awaits before the next model request, and
+    // that request goes out behind the queued notifications: the second step is not requested
+    // until Core reads again, on every platform. (Before T38, Node's asynchronous pipe writes
+    // let Pi finish the turn on macOS while Core read nothing; on Windows fd 1 is blocking, so
+    // the pressure reached Pi there in the write itself, docs/spikes/S09-ahp-resilience.md.)
+    let deadline = std::time::Instant::now() + harness::WAIT;
+    while env.requests("flood").is_empty() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the turn did not start while Core was stalled"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    assert_eq!(
+        env.requests("flood").len(),
+        1,
+        "the next step was requested before Core answered the PostToolBatch hooks"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_slow_core_reader_makes_the_agent_host_queue_with_bounded_memory() {
+    let scenario = flood_scenario();
+    let env = Env::new("backpressure", &[&scenario], json!({})).await;
+    let mut config = env.config();
+    config.event_queue = 1;
+    // Two missed heartbeats take about 1.1 s, well inside the 2 s stall checked below, so the
+    // detector stays armed while Core does not read. A 50 ms timeout also flagged a busy but
+    // healthy Agent Host on a loaded Windows machine after Core read again (W1, 3 of 9 runs).
+    config.heartbeat_interval = std::time::Duration::from_millis(50);
+    config.heartbeat_timeout = std::time::Duration::from_millis(500);
+    let (supervisor, mut events, core) = env.start_with(config, &[]);
+    events
+        .until(|e| matches!(e, HostEvent::Connected { .. }))
+        .await;
+    let a = open(&supervisor, &core, &env.cwd(0), "mock-large").await;
+    let baseline = ping(&supervisor).await;
+    let turn = supervisor
+        .prompt(&a, "req", &prompt_text("Write the files.", "flood"))
+        .await
+        .expect("accepted")
+        .turn_id;
+
+    check_progress_while_core_is_stalled(&env).await;
+    let done = events.turn_completed(&turn.0).await;
+    assert_eq!(done["status"], "completed", "{done}");
+    let after = ping(&supervisor).await;
+    let items = events.tool_results(&a.0);
+    assert_eq!(items.len(), 100);
+    assert!(items.iter().all(|item| {
+        item["status"] == "failed"
+            && item["output"]
+                .as_str()
+                .is_some_and(|o| o.contains("NoSuchTool"))
+    }));
+    let count = assert_contiguous_seq(&events, &a.0);
+    assert!(
+        !events
+            .all
+            .iter()
+            .any(|e| matches!(e, HostEvent::Exited { .. })),
+        "the backpressured host was not killed"
+    );
+    let notified: usize = events
+        .notifications(&a.0)
+        .iter()
+        .map(|n| serde_json::to_vec(n).map_or(0, |bytes| bytes.len()))
+        .sum();
+    // Requests share the outbound queue: the PostToolBatch `hooks/run` carries the 100 calls'
+    // inputs and results (T38).
+    let requested: usize = core
+        .received
+        .lock()
+        .expect("lock")
+        .iter()
+        .map(|(_, size)| size)
+        .sum();
+    let produced = notified + requested;
+    println!(
+        "{count} notifications, {notified} bytes, requests {requested} bytes, Core event queue 1; \
+         Agent Host outbound peak {} bytes (before the turn {}); RSS {} -> {} bytes",
+        after.outbound_peak_bytes,
+        baseline.outbound_peak_bytes,
+        baseline.rss_bytes,
+        after.rss_bytes
+    );
+    if !cfg!(windows) {
+        // Asynchronous stdout: the writes report the full pipe and the outbound queue holds
+        // the rest. On Windows the write itself waits instead.
+        assert!(
+            after.outbound_peak_bytes > 64 * 1024,
+            "stdout pushed back and the Agent Host queued"
+        );
+    }
+    let peak = usize::try_from(after.outbound_peak_bytes).expect("fits");
+    assert!(
+        peak < produced,
+        "the queue held part of the turn's events, never more than it produced"
+    );
+    assert_eq!(
+        (after.outbound_queued_frames, after.outbound_queued_bytes),
+        (0, 0)
+    );
+    supervisor.shutdown().await;
+}
+
+/// Each session's note holds its own text, and each read result shows only its own workspace.
+fn check_own_notes(env: &Env, events: &harness::Recorder, a: &SessionId, b: &SessionId) {
+    let note = |i: usize| {
+        std::fs::read_to_string(env.ws[i].join("notes").join("note.txt")).expect("note exists")
+    };
+    assert_eq!(note(0), "written by session A, edited");
+    assert_eq!(note(1), "written by session B, edited");
+    for (session, own, other) in [(a, "session A", "session B"), (b, "session B", "session A")] {
+        let results = harness_tools(events, &session.0);
+        assert_eq!(
+            results.iter().map(|r| r.0.as_str()).collect::<Vec<_>>(),
+            ["Write", "Edit", "Read"]
+        );
+        assert!(results.iter().all(|r| r.1 == "completed"), "{results:?}");
+        let read = &results[2].2;
+        assert!(
+            read.contains(&format!("written by {own}, edited")) && !read.contains(other),
+            "{read}"
+        );
+    }
+}
+
+/// T07-A11: every file request of a session reached Core with the canonical tool name and
+/// resolved inside that session's own workspace, the same relative path in both sessions.
+fn check_own_core_calls(env: &Env, core: &harness::Core, a: &SessionId, b: &SessionId) {
+    for (index, session) in [a, b].into_iter().enumerate() {
+        // `exec/shells` (T17) asks for the session's command tools, not a file.
+        // `fs/changes` (T27) asks before a model request which files changed outside.
+        let (memory, calls): (Vec<_>, Vec<_>) = core
+            .calls_of(&session.0)
+            .into_iter()
+            .filter(|c| c.method.starts_with("fs/") && c.method != "fs/changes")
+            .partition(|c| c.method == "fs/memory");
+        assert!(!memory.is_empty(), "each session loads its own memory");
+        assert!(memory.iter().all(|c| c.tool.is_none() && c.error.is_none()));
+        let methods: Vec<(&str, Option<&str>)> = calls
+            .iter()
+            .map(|c| (c.method.as_str(), c.tool.as_deref()))
+            .collect();
+        assert_eq!(
+            methods,
+            [
+                ("fs/mkdir", Some("Write")),
+                ("fs/write", Some("Write")),
+                ("fs/stat", Some("Edit")),
+                ("fs/read", Some("Edit")),
+                ("fs/write", Some("Edit")),
+                ("fs/stat", Some("Read")),
+                ("fs/read", Some("Read")),
+                ("fs/stat", Some("Read"))
+            ],
+            "{calls:#?}"
+        );
+        let own = harness::canonical(&env.ws[index]);
+        for call in &calls {
+            // The Agent Host resolved "notes/note.txt" against the session's own cwd ...
+            let requested = call.path.as_deref().expect("a path");
+            assert!(
+                std::path::Path::new(requested).starts_with(&env.ws[index]),
+                "{requested}"
+            );
+            // ... and Core resolved it inside the session's own workspace root.
+            let resolved = call.resolved.as_deref().expect("succeeded");
+            assert!(
+                std::path::Path::new(resolved).starts_with(&own),
+                "{resolved} is not in {}",
+                own.display()
+            );
+        }
+    }
+}
+
+/// Both turns were running at the same time.
+fn check_overlap(events: &harness::Recorder, a: &SessionId) {
+    let order = events.labelled(a, |method| {
+        method.starts_with("turn/") || method == "item/completed"
+    });
+    println!("interleaving: {}", order.join(" "));
+    let position = |label: &str| {
+        order
+            .iter()
+            .position(|o| o.starts_with(label))
+            .expect(label)
+    };
+    assert!(
+        position("B:turn/started") < position("A:turn/completed"),
+        "B ran while A was running"
+    );
+    assert!(
+        position("A:turn/started") < position("B:turn/completed"),
+        "A ran while B was running"
+    );
+}
+
+fn check_only_a_was_interrupted(events: &harness::Recorder, a: &SessionId) {
+    let a_items: Vec<String> = events
+        .notifications(&a.0)
+        .iter()
+        .filter(|n| n.method == "item/completed")
+        .map(|n| {
+            let item = &payload(n)["item"];
+            format!(
+                "{}:{}",
+                item["type"].as_str().unwrap_or_default(),
+                item["status"].as_str().unwrap_or_default()
+            )
+        })
+        .collect();
+    // The prompt itself, then the reply that the abort cut off.
+    assert_eq!(
+        a_items,
+        ["userMessage:completed", "agentMessage:interrupted"]
+    );
+    println!(
+        "turns: {}",
+        events
+            .labelled(a, |method| method.starts_with("turn/"))
+            .join(" ")
+    );
+}
+
+/// A's requests: the answer, the summary request over A's history, then a request that starts
+/// from the summary.
+fn check_compacted_requests(env: &Env) {
+    let a_bodies: Vec<String> = env
+        .requests(harness::SMALL_WINDOW_SCENARIO)
+        .into_iter()
+        .map(|r| r.body)
+        .collect();
+    assert_eq!(a_bodies.len(), 3, "answer, summary, answer");
+    assert!(
+        a_bodies[1].contains("A question one."),
+        "the summary request reads A's history"
+    );
+    assert!(
+        a_bodies[2].contains("compacted into the following summary")
+            && a_bodies[2].contains("Summary: the user asked")
+    );
+    assert!(
+        !a_bodies[2].contains("A question one."),
+        "A's first question now lives only in the summary"
+    );
+}
+
+/// B's second request carries its whole history, B's file has no compaction, and nothing of A
+/// reached B.
+fn check_b_history_untouched(env: &Env, b: &SessionId) {
+    let b_bodies: Vec<String> = env
+        .requests("history-b")
+        .into_iter()
+        .map(|r| r.body)
+        .collect();
+    assert_eq!(b_bodies.len(), 2);
+    for text in ["B question one.", "B first answer.", "B question two."] {
+        assert!(
+            b_bodies[1].contains(text),
+            "B's second request lost {text:?}"
+        );
+    }
+    assert!(
+        !b_bodies
+            .iter()
+            .any(|body| body.contains("Summary:") || body.contains("A question")),
+        "nothing of A reached B"
+    );
+    let entries = env.session_entries(&b.0);
+    assert!(!entries.iter().any(|e| e["type"] == "compaction"));
+    let roles: Vec<String> = entries
+        .iter()
+        .filter(|e| e["type"] == "message")
+        .map(|e| e["message"]["role"].as_str().unwrap_or_default().to_owned())
+        .collect();
+    println!("B: entries {roles:?}; its second request keeps its whole history");
+    // Pi records the system prompt as the first message entry.
+    assert_eq!(roles, ["system", "user", "assistant", "user", "assistant"]);
+}
+
+/// After the kill: the exit, the uncertain prompt, a restart and the restored session.
+async fn check_restart(events: &mut harness::Recorder, turn: &TurnId, a: &SessionId) {
+    let exited = events
+        .until(|e| matches!(e, HostEvent::Exited { .. }))
+        .await;
+    let uncertain = events
+        .until(|e| matches!(e, HostEvent::Uncertain { .. }))
+        .await;
+    let restarting = events
+        .until(|e| matches!(e, HostEvent::Restarting { .. }))
+        .await;
+    events
+        .until(|e| matches!(e, HostEvent::Connected { epoch: 2, .. }))
+        .await;
+    let restored = events
+        .until(|e| matches!(e, HostEvent::SessionRestored { .. }))
+        .await;
+    println!("{exited:?}\n{uncertain:?}\n{restarting:?}\n{restored:?}");
+    assert!(matches!(
+        exited,
+        HostEvent::Exited {
+            epoch: 1,
+            reason: ExitReason::Killed,
+            ..
+        }
+    ));
+    let HostEvent::Uncertain { calls, .. } = uncertain else {
+        unreachable!()
+    };
+    let states: Vec<_> = calls
+        .iter()
+        .map(|c| (c.method.as_str(), c.state, c.turn_id.as_deref()))
+        .collect();
+    assert_eq!(
+        states,
+        [(
+            "session/prompt",
+            CallState::Uncertain,
+            Some(turn.0.as_str())
+        )]
+    );
+    let HostEvent::SessionRestored {
+        session_id,
+        restored_messages,
+        ..
+    } = restored
+    else {
+        unreachable!()
+    };
+    assert_eq!(session_id, a.0);
+    assert!(restored_messages >= 1, "the user's prompt was on disk");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_real_agent_host_exits_readably_when_core_speaks_another_major_version() {
+    let env = Env::new("mismatch", &[], json!({})).await;
+    let mut config = env.config();
+    config.protocol = "2.0".parse().expect("valid version");
+    let (supervisor, mut events, _core) = env.start_with(config, &[]);
+    let rejected = events
+        .until(|e| matches!(e, HostEvent::HandshakeRejected { .. }))
+        .await;
+    let exited = events
+        .until(|e| matches!(e, HostEvent::Exited { .. }))
+        .await;
+    events.until(|e| matches!(e, HostEvent::Stopped)).await;
+    println!("{rejected:?}\n{exited:?}");
+    let HostEvent::HandshakeRejected { error, .. } = rejected else {
+        unreachable!()
+    };
+    assert_eq!(
+        error.data.kind,
+        piarc_protocol::ErrorKind::ProtocolVersionMismatch
+    );
+    let HostEvent::Exited { reason, status, .. } = exited else {
+        unreachable!()
+    };
+    assert_eq!(reason, ExitReason::HandshakeRejected);
+    assert_eq!(
+        status.and_then(|s| s.code),
+        Some(3),
+        "the Agent Host's exit code for a protocol mismatch"
+    );
+    assert!(
+        !events
+            .all
+            .iter()
+            .any(|e| matches!(e, HostEvent::Restarting { .. }))
+    );
+    drop(supervisor);
+}

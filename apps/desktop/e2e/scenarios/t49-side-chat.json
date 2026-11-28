@@ -1,0 +1,18 @@
+{
+  "id": "t49-side-chat",
+  "steps": [
+    { "text": "The release milestone is Friday." },
+    {
+      "tool_calls": [
+        {
+          "id": "main-check",
+          "name": "Bash",
+          "input": { "command": "env echo ready", "description": "Check readiness" }
+        }
+      ]
+    },
+    { "text": "Private side answer." },
+    { "text": "Main check finished." },
+    { "text": "Queued work finished." }
+  ]
+}

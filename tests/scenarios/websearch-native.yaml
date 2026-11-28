@@ -1,0 +1,79 @@
+id: websearch-native
+description: The session's model searches natively (the user's per-model setting) - WebSearch asks in Manual mode and runs the project's PreToolUse hook, then one auxiliary request to the same endpoint carries only the provider's search tool and its result blocks become the sources of the tool result and the transcript item (T38).
+capabilities: [CAP-TOOL-WEBSEARCH-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: '{"hooks": {"PreToolUse": [{"matcher": "WebSearch", "hooks": [{"type": "command", "command": "node hook.mjs search"}]}]}}'
+  run_files:
+    data 数据/settings.json: '{"modelProviders":{"models":{"mock-main/mock-model":{"nativeWebSearch":true}}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - id: search
+            name: WebSearch
+            input: { query: piarc release notes, blocked_domains: [spam.example] }
+      - text: Two pages cover the release.
+        web_search:
+          query: piarc release notes
+          results:
+            - title: PiArc 1.0 released
+              url: https://piarc.example/blog/1-0
+              cited_text: PiArc 1.0 ships subagents and MCP.
+            - title: Mirror
+              url: https://spam.example/piarc
+            - title: Changelog
+              url: https://docs.piarc.example/changelog
+      - text: 'PiArc 1.0 shipped subagents. Sources: https://piarc.example/blog/1-0'
+actions:
+  - prompt: { text: What is new in PiArc?, turn: one }
+approvals:
+  - { tool: WebSearch, decision: allow }
+expect:
+  request_counts: { main: 3 }
+  events:
+    - method: item/completed
+      params:
+        item:
+          type: webSearch
+          status: completed
+          query: piarc release notes
+          backend: native
+          sources:
+            - {
+                title: PiArc 1.0 released,
+                url: 'https://piarc.example/blog/1-0',
+                snippet: PiArc 1.0 ships subagents and MCP.,
+              }
+            - { title: Changelog, url: 'https://docs.piarc.example/changelog' }
+    - { method: turn/completed, turn: one, params: { status: completed } }
+  requests:
+    - index: 0
+      tools_include: [WebSearch]
+    - index: 1
+      tools: [web_search]
+      contains:
+        [
+          '"type":"web_search_20250305"',
+          '"max_uses":1',
+          '"blocked_domains":["spam.example"]',
+          'Query: piarc release notes',
+        ]
+    - index: 2
+      tool_results:
+        - id: search
+          is_error: false
+          contains: "1. PiArc 1.0 released\n   https://piarc.example/blog/1-0\n   PiArc 1.0 ships subagents and MCP."
+      not_contains: ['https://spam.example/piarc']
+  json_lines:
+    hook-log/search.jsonl:
+      - input:
+          {
+            hook_event_name: PreToolUse,
+            tool_name: WebSearch,
+            tool_input: { query: piarc release notes },
+          }

@@ -1,0 +1,84 @@
+{
+  "id": "t42-comments",
+  "validation": {
+    "rules": {
+      "role_order": false
+    }
+  },
+  "steps": [
+    {
+      "text": "Ready."
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "read1",
+          "name": "Read",
+          "input": {
+            "path": "notes.ts"
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "edit1",
+          "name": "Edit",
+          "input": {
+            "path": "notes.ts",
+            "edits": [
+              {
+                "oldText": "export const second = 2;",
+                "newText": "export const second = 'two';"
+              },
+              {
+                "oldText": "export const twelfth = 12;",
+                "newText": "export const twelfth = 'twelve';"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "write1",
+          "name": "Write",
+          "input": {
+            "path": "src/made.ts",
+            "content": "export function made(): string {\n  return 'made';\n}\n"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Edited two files."
+    },
+    {
+      "text": "Read your comments."
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "wait1",
+          "name": "Bash",
+          "input": {
+            "command": "env sleep 1",
+            "description": "Wait"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Waited."
+    },
+    {
+      "text": "Read the queued comments."
+    },
+    {
+      "text": "Spare."
+    }
+  ]
+}

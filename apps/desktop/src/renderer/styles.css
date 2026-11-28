@@ -1,0 +1,109 @@
+/* Styles of the prototype test pages (event probe T04, transcript lab T09, terminal lab T10).
+   The app's own styles are app.css, built on the design tokens. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Event probe test page (T04). */
+.shell-heading {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shell-placeholder {
+  margin: 0;
+  color: color-mix(in srgb, canvastext 60%, canvas);
+}
+
+.probe {
+  padding: 12px 24px;
+}
+
+.probe-table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.probe-table th,
+.probe-table td {
+  padding: 4px 12px;
+  text-align: right;
+  border-bottom: 1px solid color-mix(in srgb, canvas 80%, canvastext);
+}
+
+.probe-table th:first-child,
+.probe-table td:first-child {
+  text-align: left;
+}
+
+/* Transcript prototype page (T09, #/transcript-lab); its transcript and composer use
+   transcript.css like the app. */
+.lab {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+}
+
+.lab-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, canvas 80%, canvastext);
+  user-select: none;
+}
+
+.lab-title {
+  margin-right: auto;
+  font-weight: 600;
+}
+
+/* Session gallery (#/session-gallery): the conversation column at full window height. */
+.session-gallery {
+  display: flex;
+  height: 100%;
+  background: var(--piarc-workbench-canvas);
+}
+
+.session-gallery > .main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Terminal prototype page (T10, #/terminal-lab). */
+.terminal-lab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100vh;
+  padding: 8px;
+  box-sizing: border-box;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font:
+    13px system-ui,
+    sans-serif;
+}
+
+.terminal-lab-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.terminal-lab-stats {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.terminal-lab-host {
+  flex: none;
+  align-self: flex-start;
+  cursor: text;
+}

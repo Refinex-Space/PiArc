@@ -1,0 +1,103 @@
+/* The "Browser" settings page and its Chrome import dialog (design addendum B5.1, B5.5), and
+   the site information button of the preview's address bar that opens the import. */
+/* The page uses the settings rows (`controls.css`): the control sits at the trailing edge,
+   several controls of one setting stay together and wrap under the text on a narrow page. */
+.browser-settings-control {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--piarc-space-2);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.browser-settings-control > select.input {
+  width: min(220px, 100%);
+}
+
+.browser-settings-number {
+  width: 7em;
+}
+
+/* A setting whose value is a list (the local names): its text above, the field across the row. */
+.preference-row.browser-settings-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--piarc-space-2);
+}
+
+.browser-settings-stacked > .browser-settings-control {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+}
+
+.browser-settings-names {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.browser-settings-note {
+  display: block;
+  margin-block-start: var(--piarc-space-1);
+}
+
+.preference-row code,
+.browser-settings-list code {
+  overflow-wrap: anywhere;
+}
+
+/* A list of a setting (allowed sites, imported sites) under its row, in the same group. */
+.browser-settings-list {
+  padding-block-end: var(--piarc-space-3);
+}
+
+.browser-settings-list > .permission-rules {
+  margin: 0;
+}
+
+.chrome-import-sites {
+  display: grid;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+
+.chrome-import-list {
+  margin: 0;
+  padding: var(--piarc-space-2);
+  list-style: none;
+  max-block-size: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+
+.chrome-import-list > li + li {
+  margin-block-start: var(--piarc-space-1);
+}
+
+.chrome-import-list .checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+
+.chrome-import-list code {
+  overflow-wrap: anywhere;
+}
+
+button.browser-site {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--piarc-radius-sm);
+}
+
+button.browser-site:focus-visible {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}

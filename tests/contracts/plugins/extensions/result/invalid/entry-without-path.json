@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "id": 91,
+  "result": { "extensions": [{ "package": "pi-demo" }] }
+}

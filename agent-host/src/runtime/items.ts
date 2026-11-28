@@ -1,0 +1,430 @@
+// Builders shared by the live projection (projector.ts) and the history projection
+// (history.ts): one canonical tool name maps to one item type, and item fields are bounded the
+// same way in both (architecture section 5.3).
+import type {
+  BrowserItemImage,
+  CommandExecutionInfo,
+  AutoCompactStop,
+  CompactionReason,
+  FileDiff,
+  InputAttachment,
+  InputMention,
+  Item,
+  ItemStatus,
+  PromptCommand,
+  SubagentState,
+  ToolReview,
+  TurnUsage,
+  WebSearchSource,
+} from '@piarc/protocol';
+
+import { wellFormedJson } from '../protocol/well-formed.js';
+import { parseDiff } from '../tools/core-io.js';
+import { parseExecutionInfo } from '../tools/shell.js';
+
+/** The most UTF-16 code units of tool output an item carries; longer output keeps its end. */
+export const MAX_ITEM_OUTPUT = 64 * 1024;
+
+/** Tool arguments larger than this (as JSON) are replaced by a note in items. */
+export const MAX_ITEM_ARGUMENTS = 256 * 1024;
+
+/** Tool arguments nested deeper than this are replaced by a note (frames stop at 127, I09). */
+export const MAX_ARGUMENT_DEPTH = 64;
+
+/** Canonical tools whose calls are `commandExecution` items. */
+const COMMAND_TOOLS = new Set(['Bash', 'PowerShell']);
+/** Canonical tools whose calls are `fileChange` items. */
+const FILE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit']);
+
+export type ToolItemType =
+  | 'commandExecution'
+  | 'fileChange'
+  | 'mcpToolCall'
+  | 'subagent'
+  | 'webFetch'
+  | 'webSearch'
+  | 'browser'
+  | 'dynamicToolCall';
+
+/** The Auto mode reviewer's decision on a call (T46: Core's `review`, or a `piarc.autoReview`
+ * entry), or undefined when `value` is not one. */
+export function parseReview(value: unknown): ToolReview | undefined {
+  if (
+    !isObject(value) ||
+    (value.verdict !== 'allow' && value.verdict !== 'deny') ||
+    typeof value.reason !== 'string' ||
+    typeof value.model !== 'string' ||
+    !(value.category === undefined || typeof value.category === 'string')
+  ) {
+    return undefined;
+  }
+  return {
+    verdict: value.verdict,
+    reason: value.reason.toWellFormed(),
+    model: value.model,
+    ...(typeof value.category === 'string' ? { category: value.category } : {}),
+  };
+}
+
+/** The item type of a canonical tool name. */
+export function toolItemType(tool: string): ToolItemType {
+  if (COMMAND_TOOLS.has(tool)) {
+    return 'commandExecution';
+  }
+  if (FILE_TOOLS.has(tool)) {
+    return 'fileChange';
+  }
+  if (splitMcpName(tool) !== undefined) {
+    return 'mcpToolCall';
+  }
+  if (tool === 'Agent') {
+    return 'subagent';
+  }
+  if (tool === 'WebSearch') return 'webSearch';
+  if (tool === 'Browser') return 'browser';
+  return tool === 'WebFetch' ? 'webFetch' : 'dynamicToolCall';
+}
+
+/** A WebSearch result's backend and sources (`details.webSearch`, T38). */
+function resultSearch(details: unknown): { backend?: string; sources: WebSearchSource[] } {
+  const search = isObject(details) ? details.webSearch : undefined;
+  if (!isObject(search)) return { sources: [] };
+  const sources: WebSearchSource[] = [];
+  if (Array.isArray(search.sources)) {
+    for (const s of search.sources as unknown[]) {
+      if (isObject(s) && typeof s.title === 'string' && typeof s.url === 'string') {
+        sources.push({
+          title: s.title.toWellFormed(),
+          url: s.url.toWellFormed(),
+          ...(typeof s.snippet === 'string' && s.snippet !== ''
+            ? { snippet: s.snippet.toWellFormed() }
+            : {}),
+        });
+      }
+    }
+  }
+  return {
+    ...(typeof search.backend === 'string' ? { backend: search.backend } : {}),
+    sources,
+  };
+}
+
+/** A Browser run's screenshots, blocked hosts and error code (`details.browser`, ADR-0089). */
+function resultBrowser(details: unknown): {
+  images: BrowserItemImage[];
+  blockedHosts: string[];
+  errorCode?: string;
+} {
+  const browser = isObject(details) ? details.browser : undefined;
+  if (!isObject(browser)) return { images: [], blockedHosts: [] };
+  const images: BrowserItemImage[] = [];
+  if (Array.isArray(browser.shots)) {
+    for (const s of browser.shots as unknown[]) {
+      if (
+        isObject(s) &&
+        typeof s.blob === 'string' &&
+        /^[0-9a-f]{64}$/.test(s.blob) &&
+        (s.mediaType === 'image/png' || s.mediaType === 'image/jpeg') &&
+        typeof s.width === 'number' &&
+        typeof s.height === 'number'
+      ) {
+        images.push({ blob: s.blob, mediaType: s.mediaType, width: s.width, height: s.height });
+      }
+    }
+  }
+  const blockedHosts = Array.isArray(browser.blockedHosts)
+    ? (browser.blockedHosts as unknown[]).flatMap((h) =>
+        typeof h === 'string' ? [h.toWellFormed()] : [],
+      )
+    : [];
+  return {
+    images,
+    blockedHosts,
+    ...(typeof browser.errorCode === 'string' ? { errorCode: browser.errorCode } : {}),
+  };
+}
+
+/** `mcp__<server>__<tool>` split into server and tool. */
+function splitMcpName(tool: string): { server: string; serverTool: string } | undefined {
+  if (!tool.startsWith('mcp__')) {
+    return undefined;
+  }
+  const rest = tool.slice('mcp__'.length);
+  const separator = rest.indexOf('__');
+  if (separator <= 0 || separator + 2 >= rest.length) {
+    return undefined;
+  }
+  return { server: rest.slice(0, separator), serverTool: rest.slice(separator + 2) };
+}
+
+/**
+ * A tool call as an item of the type its canonical name maps to; `details` are the details of
+ * the tool's result, where Write and Edit put the change Core made (`fileChange.diff`) and Bash
+ * and PowerShell how the command ran (`commandExecution.execution`).
+ */
+export function toolItem(
+  itemId: string,
+  status: ItemStatus,
+  tool: string,
+  args: Record<string, unknown>,
+  output: string | undefined,
+  details?: unknown,
+  review?: ToolReview,
+): Item {
+  const common = {
+    itemId,
+    status,
+    tool,
+    arguments: boundArguments(args),
+    ...(output === undefined ? {} : { output: boundOutput(output) }),
+    ...(review === undefined ? {} : { review }),
+  };
+  const text = (name: string): string => {
+    const value = args[name];
+    return typeof value === 'string' ? value.toWellFormed() : '';
+  };
+  switch (toolItemType(tool)) {
+    case 'commandExecution': {
+      const execution = resultExecution(details);
+      return {
+        type: 'commandExecution',
+        ...common,
+        command: text('command'),
+        ...(execution === undefined ? {} : { execution }),
+      };
+    }
+    case 'fileChange': {
+      const diff = resultDiff(details);
+      return {
+        type: 'fileChange',
+        ...common,
+        path: text('path') || text('file_path') || text('notebook_path'),
+        ...(diff === undefined ? {} : { diff }),
+      };
+    }
+    case 'mcpToolCall': {
+      const names = splitMcpName(tool) ?? { server: '', serverTool: tool };
+      return { type: 'mcpToolCall', ...common, ...names };
+    }
+    case 'subagent': {
+      const description = text('description');
+      const subagent = resultSubagent(details);
+      return {
+        type: 'subagent',
+        ...common,
+        ...(description === '' ? {} : { description }),
+        ...(subagent === undefined ? {} : { subagent }),
+      };
+    }
+    case 'webFetch':
+      return { type: 'webFetch', ...common, url: text('url') };
+    case 'webSearch': {
+      const { backend, sources } = resultSearch(details);
+      return {
+        type: 'webSearch',
+        ...common,
+        query: text('query'),
+        ...(backend === undefined ? {} : { backend }),
+        ...(sources.length === 0 ? {} : { sources }),
+      };
+    }
+    case 'browser': {
+      const description = text('description');
+      const { images, blockedHosts, errorCode } = resultBrowser(details);
+      return {
+        type: 'browser',
+        ...common,
+        ...(description === '' ? {} : { description }),
+        ...(images.length === 0 ? {} : { images }),
+        ...(blockedHosts.length === 0 ? {} : { blockedHosts }),
+        ...(errorCode === undefined ? {} : { errorCode }),
+      };
+    }
+    case 'dynamicToolCall':
+      return { type: 'dynamicToolCall', ...common };
+  }
+}
+
+/** A user message; `record` is what the user wrote with its mentions and attachments, when the
+ * input carried any (`piarc.input`, input.ts), otherwise the message's own `text` is shown. */
+export function userMessage(
+  itemId: string,
+  text: string,
+  record?: {
+    text: string;
+    mentions: readonly InputMention[];
+    attachments: readonly InputAttachment[];
+    command?: PromptCommand;
+  },
+): Item {
+  if (record === undefined) {
+    return { type: 'userMessage', itemId, status: 'completed', text: text.toWellFormed() };
+  }
+  return {
+    type: 'userMessage',
+    itemId,
+    status: 'completed',
+    text: record.text.toWellFormed(),
+    ...(record.mentions.length === 0 ? {} : { mentions: [...record.mentions] }),
+    ...(record.attachments.length === 0 ? {} : { attachments: [...record.attachments] }),
+    ...(record.command === undefined ? {} : { command: record.command }),
+  };
+}
+
+export function agentMessage(itemId: string, status: ItemStatus, text: string): Item {
+  return { type: 'agentMessage', itemId, status, text };
+}
+
+export function reasoning(itemId: string, status: ItemStatus, text: string): Item {
+  return { type: 'reasoning', itemId, status, text };
+}
+
+export function contextCompaction(
+  itemId: string,
+  status: ItemStatus,
+  fields: {
+    reason?: CompactionReason;
+    tokensBefore?: number;
+    tokensAfter?: number;
+    errorMessage?: string;
+    autoCompactStopped?: AutoCompactStop;
+  },
+): Item {
+  return {
+    type: 'contextCompaction',
+    itemId,
+    status,
+    ...(fields.reason === undefined ? {} : { reason: fields.reason }),
+    ...(fields.tokensBefore === undefined ? {} : { tokensBefore: Math.round(fields.tokensBefore) }),
+    ...(fields.tokensAfter === undefined ? {} : { tokensAfter: Math.round(fields.tokensAfter) }),
+    ...(fields.errorMessage === undefined
+      ? {}
+      : { errorMessage: fields.errorMessage.toWellFormed() }),
+    ...(fields.autoCompactStopped === undefined
+      ? {}
+      : { autoCompactStopped: fields.autoCompactStopped }),
+  };
+}
+
+/** Output text bounded to its last `MAX_ITEM_OUTPUT` code units, as well-formed UTF-16. */
+export function boundOutput(text: string): string {
+  if (text.length <= MAX_ITEM_OUTPUT) {
+    return text.toWellFormed();
+  }
+  const omitted = text.length - MAX_ITEM_OUTPUT;
+  return `[${String(omitted)} characters omitted]\n${text.slice(-MAX_ITEM_OUTPUT)}`.toWellFormed();
+}
+
+/**
+ * Tool arguments as items carry them: well-formed strings, and a note instead of arguments too
+ * large or too deeply nested for a frame (the tool still got the original arguments).
+ */
+export function boundArguments(args: Record<string, unknown>): Record<string, unknown> {
+  if (depthOf(args, 0) > MAX_ARGUMENT_DEPTH) {
+    return { piarcOmitted: `arguments nested deeper than ${String(MAX_ARGUMENT_DEPTH)} levels` };
+  }
+  const size = JSON.stringify(args).length;
+  if (size > MAX_ITEM_ARGUMENTS) {
+    return { piarcOmitted: `arguments of ${String(size)} characters` };
+  }
+  return wellFormedJson(args);
+}
+
+function depthOf(value: unknown, depth: number): number {
+  if (depth > MAX_ARGUMENT_DEPTH) {
+    return depth;
+  }
+  if (Array.isArray(value)) {
+    return value.reduce<number>((max, item) => Math.max(max, depthOf(item, depth + 1)), depth);
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.values(value).reduce<number>(
+      (max, item) => Math.max(max, depthOf(item, depth + 1)),
+      depth,
+    );
+  }
+  return depth;
+}
+
+/** The text parts of a tool result or message content, joined. */
+export function contentText(content: unknown): string | undefined {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+  return content
+    .flatMap((part: unknown) =>
+      isObject(part) && part.type === 'text' && typeof part.text === 'string' ? [part.text] : [],
+    )
+    .join('\n');
+}
+
+/** The text of a tool result (`{ content }`). */
+export function resultText(result: unknown): string | undefined {
+  return isObject(result) ? contentText(result.content) : undefined;
+}
+
+/** The change a file tool reported in its result's details (`details.fileDiff`, set by Write
+ * and Edit from Core's `fs/write` result). */
+export function resultDiff(details: unknown): FileDiff | undefined {
+  return isObject(details) ? parseDiff(details.fileDiff) : undefined;
+}
+
+/** How a command ran, as Bash and PowerShell put it in their result's details
+ * (`details.commandExecution`, from Core's `exec/run` result). */
+export function resultExecution(details: unknown): CommandExecutionInfo | undefined {
+  return isObject(details) ? parseExecutionInfo(details.commandExecution) : undefined;
+}
+
+const RUN_STATUS = new Set(['running', 'completed', 'partial', 'failed', 'interrupted']);
+
+/** A subagent run's state as the `Agent` tool puts it in its details (`details.subagent`, T31),
+ * or a parent's `piarc.subagentState` entry records it. */
+export function resultSubagent(details: unknown): SubagentState | undefined {
+  const value: unknown = isObject(details) ? details.subagent : undefined;
+  if (
+    !isObject(value) ||
+    typeof value.sessionId !== 'string' ||
+    typeof value.agentType !== 'string' ||
+    typeof value.status !== 'string' ||
+    !RUN_STATUS.has(value.status) ||
+    typeof value.startedAt !== 'number' ||
+    typeof value.toolCalls !== 'number'
+  ) {
+    return undefined;
+  }
+  return wellFormedJson(value) as unknown as SubagentState;
+}
+
+/** Pi's per-response usage, summed into a turn's usage. */
+export function addUsage(total: TurnUsage, usage: unknown): TurnUsage {
+  if (!isObject(usage)) {
+    return total;
+  }
+  const count = (name: string): number => {
+    const value = usage[name];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  };
+  const cost = isObject(usage.cost) && typeof usage.cost.total === 'number' ? usage.cost.total : 0;
+  return {
+    inputTokens: total.inputTokens + count('input'),
+    outputTokens: total.outputTokens + count('output'),
+    cacheReadTokens: total.cacheReadTokens + count('cacheRead'),
+    cacheWriteTokens: total.cacheWriteTokens + count('cacheWrite'),
+    cost: total.cost + (Number.isFinite(cost) ? cost : 0),
+  };
+}
+
+export const NO_USAGE: TurnUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  cost: 0,
+};
+
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}

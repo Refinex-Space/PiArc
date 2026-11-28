@@ -1,0 +1,107 @@
+// PiArc's tool layer (architecture section 6.1): the canonical tools, built from Pi's tool
+// code (or PiArc's own, keeping Pi's parameters) with every file and command operation
+// delegated to Core (ADR-0004).
+//
+// | Canonical | Built from                      | Core methods                    |
+// |-----------|---------------------------------|---------------------------------|
+// | Read      | Pi read, on a stand-in path     | fs/stat, fs/read                |
+// | Write     | Pi write, on a stand-in path    | fs/mkdir, fs/write              |
+// | Edit      | Pi edit, on a stand-in path     | fs/stat, fs/read, fs/write      |
+// | NotebookEdit | PiArc's (Claude Code's params) | fs/read, fs/write             |
+// | Bash      | PiArc's (Pi's parameters)       | exec/run, exec/kill, exec/output|
+// | PowerShell| PiArc's, Windows only           | exec/run, exec/kill, exec/output|
+// | Glob      | Pi find + FindOperations        | fs/stat, fs/glob                |
+// | Grep      | PiArc's (Pi's schema and output)| fs/grep                         |
+//
+// Nothing below `src/tools/` imports `fs` or `child_process` (ESLint `no-restricted-imports`).
+import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
+
+import type { CoreIo, Shells } from './core-io.js';
+import { createEditTool } from './edit.js';
+import { createNotebookEditTool } from './notebook.js';
+import { createGlobTool } from './glob.js';
+import { createGrepTool } from './grep.js';
+import { CORE_TOOLS, PI_BUILTIN_TOOL_NAMES, type CoreTool, type ToolProfile } from './profile.js';
+import { createReadTool } from './read.js';
+import type { ToolSetup } from './presentation.js';
+import { createBashTool, createPowerShellTool } from './shell.js';
+import { createWriteTool } from './write.js';
+
+export {
+  CoreIo,
+  ExecOutputRouter,
+  FileError,
+  type CoreIoOptions,
+  type Origin,
+  type Shells,
+} from './core-io.js';
+export {
+  CANONICAL_TOOLS,
+  CORE_TOOLS,
+  DEFAULT_PROFILE,
+  HOST_TOOLS,
+  PI_BUILTIN_TOOL_NAMES,
+  profileWithOverrides,
+  ToolNameMap,
+  type CanonicalTool,
+  type ToolPresentation,
+  type ToolProfile,
+} from './profile.js';
+export { lsOperations } from './ls.js';
+
+const FACTORIES: Record<CoreTool, (setup: ToolSetup) => ToolDefinition> = {
+  Read: createReadTool,
+  Write: createWriteTool,
+  Edit: createEditTool,
+  NotebookEdit: createNotebookEditTool,
+  Bash: createBashTool,
+  PowerShell: createPowerShellTool,
+  Glob: createGlobTool,
+  Grep: createGrepTool,
+};
+
+/** The session's tool definitions, presented as `profile` says: `Bash` only with bash,
+ * `PowerShell` only with PowerShell (Windows). */
+export function createToolSet(
+  io: CoreIo,
+  profile: ToolProfile,
+  shells: Shells,
+  autoResizeImages = true,
+  searched?: ToolSetup['searched'],
+): ToolDefinition[] {
+  return CORE_TOOLS.filter(
+    (tool) => (tool !== 'Bash' || shells.bash) && (tool !== 'PowerShell' || shells.powershell),
+  ).map((tool) =>
+    FACTORIES[tool]({
+      io,
+      presentation: profile[tool],
+      autoResizeImages,
+      ...(searched ? { searched } : {}),
+    }),
+  );
+}
+
+/**
+ * Session options that give the model exactly the canonical tool set: the definitions as custom
+ * tools (the Core tools, then the session's host tools), Pi's built-in tools excluded entirely
+ * (not merely inactive, so no extension can turn them back on). MCP and extension tools are
+ * unaffected.
+ */
+export function toolOptions(
+  io: CoreIo,
+  profile: ToolProfile,
+  shells: Shells,
+  autoResizeImages = true,
+  searched?: ToolSetup['searched'],
+  hostTools: readonly ToolDefinition[] = [],
+): {
+  customTools: ToolDefinition[];
+  noTools: 'builtin';
+  excludeTools: string[];
+} {
+  return {
+    customTools: [...createToolSet(io, profile, shells, autoResizeImages, searched), ...hostTools],
+    noTools: 'builtin',
+    excludeTools: [...PI_BUILTIN_TOOL_NAMES],
+  };
+}

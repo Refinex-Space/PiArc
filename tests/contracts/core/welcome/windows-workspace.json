@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocol": "1.2",
+    "enabled": [],
+    "workspace": "C:\\Users\\dev\\项目 目录",
+    "connectionEpoch": 0
+  }
+}

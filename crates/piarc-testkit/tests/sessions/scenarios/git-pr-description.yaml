@@ -1,0 +1,5 @@
+# ADR-0087: the one auxiliary request that writes a pull request's title and body. The scenario
+# marker sits in the PR instructions, which open the request's only user message.
+id: git-pr-description
+steps:
+  - text: "Validate the login form\n\n## Summary\n- Checks both fields before sending.\n"

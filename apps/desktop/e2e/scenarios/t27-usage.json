@@ -1,0 +1,35 @@
+{
+  "id": "t27-usage",
+  "steps": [
+    {
+      "text": "First answer.",
+      "usage": {
+        "input_tokens": 20000
+      }
+    },
+    {
+      "text": "Second answer.",
+      "usage": {
+        "input_tokens": 150000
+      }
+    },
+    {
+      "text": "Third answer.",
+      "usage": {
+        "input_tokens": 180000
+      }
+    },
+    {
+      "text": "Summary of the three answers. [[piarc-scenario:t27-usage]]"
+    },
+    {
+      "text": "Fourth answer.",
+      "usage": {
+        "input_tokens": 5000
+      }
+    },
+    {
+      "text": "Summary with the focus. [[piarc-scenario:t27-usage]]"
+    }
+  ]
+}

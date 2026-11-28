@@ -1,0 +1,35 @@
+id: hooks-post-tool-use
+area: hooks
+description: A PostToolUse hook blocks with a reason, replaces the output and adds context while another exits 1; a PostToolUseFailure hook adds context to a failed call.
+mirrors: [hooks-post-tool-use]
+workspace:
+  files:
+    notes.txt: "secret-line\n"
+    .claude/settings.json: |
+      {"hooks": {
+        "PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node .l3/hook.mjs post"}, {"type": "command", "command": "node .l3/hook.mjs crash"}]}],
+        "PostToolUseFailure": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node .l3/hook.mjs failure"}]}]
+      }}
+  plans:
+    post:
+      json:
+        decision: block
+        reason: Lint found 2 warnings.
+        hookSpecificOutput:
+          {
+            hookEventName: PostToolUse,
+            updatedToolOutput: '[redacted]',
+            additionalContext: Output was redacted.,
+          }
+    crash: { exit: 1, stderr: formatter crashed }
+    failure:
+      json:
+        {
+          hookSpecificOutput:
+            { hookEventName: PostToolUseFailure, additionalContext: Fix the file name. },
+        }
+prompt: Show the notes.
+steps:
+  - tool_calls: [{ id: ok, name: Bash, input: { command: cat notes.txt } }]
+  - tool_calls: [{ id: fail, name: Bash, input: { command: cat missing.txt } }]
+  - text: Done.

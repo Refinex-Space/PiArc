@@ -1,0 +1,38 @@
+id: sandbox-project-tightens
+description: A project file may turn the sandbox on but its auto-approval and allowed domains do not apply - the command still asks, runs sandboxed, and the configuration diagnostics mark the project values as not applying (T39).
+capabilities: [CAP-SANDBOX-PROJECT-001]
+platforms: [macos]
+platform_reason: The command sandbox (Seatbelt) exists on macOS only (requirement D7).
+workspace:
+  trusted: true
+  files:
+    .piarc/settings.json: '{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true,"network":{"allowedDomains":["example.com"]}}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - {
+              id: write,
+              name: Bash,
+              input: { command: 'printf p > p.txt && printf x > "$HOME/p.txt"' },
+            }
+      - text: Done.
+approvals:
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: Go., turn: t }
+expect:
+  request_counts: { main: 2 }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: write, is_error: true, contains: "PiArc's sandbox refused writing" }
+  files:
+    p.txt: p
+  config_diagnostics:
+    files:
+      project:
+        ignored:
+          - { pointer: /sandbox/autoAllowBashIfSandboxed, reason: projectSandbox }
+          - { pointer: /sandbox/network/allowedDomains, reason: projectSandbox }

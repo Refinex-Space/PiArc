@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 18,
+  "method": "fs/write",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "path": "/Users/dev/work space/项目/big.txt",
+    "content": "next piece",
+    "append": true
+  }
+}

@@ -1,0 +1,15 @@
+id: login-device-code
+description: A provider sign-in with the device code flow - the code is shown, polling waits while authorization is pending, approval stores the credential and an expired code ends with a clear message (T29).
+capabilities: [CAP-PROVIDER-OAUTH-001]
+oauth: { flow: device_code }
+providers:
+  main:
+    wire: openai
+    steps:
+      - text: Unused.
+actions:
+  - sign_in: { behavior: expire, outcome: failed, message: expired }
+  - sign_in: { behavior: approve, outcome: succeeded }
+  - prompt: { text: Hello., turn: one }
+expect:
+  request_counts: { main: 1 }

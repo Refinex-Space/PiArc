@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 26,
+  "method": "exec/run",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "requestId": "exec-0b8f",
+    "command": "npm run dev",
+    "background": true,
+    "origin": {
+      "tool": "Bash",
+      "toolCallId": "toolu_07"
+    }
+  }
+}

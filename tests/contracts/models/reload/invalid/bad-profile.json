@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "models/reload",
+  "params": {
+    "allowNetwork": false,
+    "preferences": {
+      "models": {
+        "shop/example": {
+          "toolProfile": "strict"
+        }
+      }
+    }
+  }
+}

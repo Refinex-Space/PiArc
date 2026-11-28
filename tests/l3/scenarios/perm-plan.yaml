@@ -1,0 +1,19 @@
+id: perm-plan
+area: permissions
+description: Plan mode runs reads and read-only commands and refuses writes and other commands.
+mirrors: [perm-plan]
+mode: plan
+workspace:
+  files:
+    notes.txt: "plain notes\n"
+prompt: Explore before changing anything.
+steps:
+  - tool_calls: [{ id: read, name: Read, input: { file_path: '{{workspace}}/notes.txt' } }]
+  - tool_calls: [{ id: list, name: Bash, input: { command: ls } }]
+  - tool_calls:
+      [{ id: write, name: Write, input: { file_path: '{{workspace}}/new.txt', content: "new\n" } }]
+  - tool_calls: [{ id: touch, name: Bash, input: { command: touch made.txt } }]
+  - text: Here is the plan.
+approvals:
+  - { call: write, decision: deny, feedback: Planning only. }
+  - { call: touch, decision: deny, feedback: Planning only. }

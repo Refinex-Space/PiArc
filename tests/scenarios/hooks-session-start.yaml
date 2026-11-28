@@ -1,0 +1,34 @@
+id: hooks-session-start
+description: A SessionStart hook of the trusted project runs when the session is created, gets the common input fields and source startup, and its plain stdout reaches the first model request as context (T25).
+capabilities: [CAP-HOOK-SESSION-001]
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    .claude/settings.json: |
+      {"hooks": {"SessionStart": [{"matcher": "startup|resume", "hooks": [{"type": "command", "command": "node hook.mjs start"}]}]}}
+    hook-plans/start.json: '{"stdout": "Deploy freeze until Friday.\n"}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'Noted the freeze.'
+actions:
+  - prompt: { text: 'What should I keep in mind?', turn: t }
+expect:
+  request_counts: { main: 1 }
+  requests:
+    - index: 0
+      user_message_contains: ['What should I keep in mind?', 'Deploy freeze until Friday.']
+  json_lines:
+    hook-log/start.jsonl:
+      - types:
+          {
+            session_id: string,
+            transcript_path: string,
+            cwd: string,
+            hook_event_name: string,
+            source: string,
+          }
+        input: { hook_event_name: SessionStart, source: startup }

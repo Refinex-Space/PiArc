@@ -1,0 +1,5 @@
+# T19: `/compact` as a turn of its own (`compaction.keepRecentTokens: 1` in the test's settings).
+id: compact
+steps:
+  - text: 'A first answer to summarize later.'
+  - text: 'Summary: the user asked a question and got an answer.'

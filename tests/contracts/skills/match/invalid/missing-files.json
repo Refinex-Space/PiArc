@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 74,
+  "method": "skills/match",
+  "params": {
+    "sessionId": "s1",
+    "skills": []
+  }
+}

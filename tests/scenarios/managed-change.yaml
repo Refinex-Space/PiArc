@@ -1,0 +1,61 @@
+id: managed-change
+description: A managed settings change applies to an open session within the poll (the next call is decided with it); the session's ConfigChange hook hears it as policy_settings and its block does not hold; a managed file that breaks while Core runs keeps its last content (T47).
+capabilities: [CAP-CONFIG-MANAGED-CHANGE-001]
+managed:
+  files:
+    PiArc/managed-settings.json: '{}'
+workspace:
+  trusted: true
+  fixtures:
+    hook.mjs: hooks/hook.mjs.txt
+  files:
+    a.txt: "alpha\n"
+    .piarc/settings.json: |
+      {"permissions": {"allow": ["Bash(sed -n 1p a.txt)"]},
+       "hooks": {"ConfigChange": [{"matcher": "policy_settings", "hooks": [{"type": "command", "command": "node hook.mjs policy"}]}]}}
+    hook-plans/policy.json: '{"json": {"decision": "block", "reason": "Keep the old policy."}}'
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls: [{ id: before, name: Bash, input: { command: sed -n 1p a.txt } }]
+      - text: First.
+      - tool_calls: [{ id: after, name: Bash, input: { command: sed -n 1p a.txt } }]
+      - text: Second.
+      - tool_calls: [{ id: broken, name: Bash, input: { command: sed -n 1p a.txt } }]
+      - text: Third.
+actions:
+  - prompt: { text: Print it., turn: one }
+  - wait: { method: turn/completed, turn: one }
+  - write_managed:
+      {
+        path: PiArc/managed-settings.json,
+        content: '{"permissions": {"deny": ["Bash(sed -n 1p a.txt)"]}}',
+      }
+  - wait: { method: core/settings, params: { changed: [/permissions/deny] } }
+  - prompt: { text: Print it again., turn: two }
+  - wait: { method: turn/completed, turn: two }
+  - write_managed: { path: PiArc/managed-settings.json, content: '{"permissions": ' }
+  - prompt: { text: And once more., turn: three }
+expect:
+  request_counts: { main: 6 }
+  requests:
+    - index: 1
+      tool_results: [{ id: before, is_error: false, contains: alpha }]
+    - index: 3
+      tool_results:
+        - { id: before, is_error: false, contains: alpha }
+        - { id: after, is_error: true }
+    - index: 5
+      tool_results:
+        - { id: before, is_error: false }
+        - { id: after, is_error: true }
+        - { id: broken, is_error: true }
+  json_lines:
+    hook-log/policy.jsonl:
+      - types: { file_path: string }
+        input: { hook_event_name: ConfigChange, source: policy_settings }
+  config_diagnostics:
+    files:
+      enterprise:managed-settings.json:
+        status: stale

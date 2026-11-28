@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "mcp/elicit",
+  "params": {
+    "sessionId": "s",
+    "toolCallId": "t",
+    "server": "alpha",
+    "serverTool": "echo",
+    "request": {
+      "message": "Choose a name."
+    },
+    "interaction": 1
+  }
+}

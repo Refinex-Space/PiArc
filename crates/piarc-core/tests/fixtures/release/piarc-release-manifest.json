@@ -1,0 +1,18 @@
+{
+  "format": "piarc-release-manifest/1",
+  "product": "PiArc",
+  "version": "0.1.0",
+  "createdAt": "2026-11-16T03:32:39.646Z",
+  "files": [
+    {
+      "name": "PiArc-0.1.0-arm64.dmg",
+      "size": 25,
+      "sha256": "858238816e3a5d4b831063d11c9ac51d69cd1ba1ad9fc9077c21ee737565f7f3"
+    },
+    {
+      "name": "PiArc-0.1.0-arm64.zip",
+      "size": 32,
+      "sha256": "12a410aa94237b69469f8a736e7f6d31e04747471cbc44109bfda6b51730c83b"
+    }
+  ]
+}

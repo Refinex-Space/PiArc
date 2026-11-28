@@ -1,0 +1,18 @@
+{
+  "id": "t33-terminal",
+  "steps": [
+    {
+      "tool_calls": [
+        {
+          "id": "term-build",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'built 中文\\nall done\\n'",
+            "terminal": true
+          }
+        }
+      ]
+    },
+    { "text": "It runs in a terminal." }
+  ]
+}

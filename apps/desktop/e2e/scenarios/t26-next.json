@@ -1,0 +1,32 @@
+{
+  "id": "t26-next",
+  "steps": [
+    {
+      "text": "The parser is fixed.",
+      "tool_calls": [
+        {
+          "id": "next",
+          "name": "SuggestNextSteps",
+          "input": {
+            "suggestions": [
+              {
+                "title": "Run the tests",
+                "prompt": "Run the whole test suite and report failures."
+              },
+              {
+                "title": "Write the release note",
+                "prompt": "Write a release note for the parser fix [[piarc-scenario:t26-next-new]]"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Pick a next step if you like."
+    },
+    {
+      "text": "All tests pass."
+    }
+  ]
+}

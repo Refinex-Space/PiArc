@@ -1,0 +1,10 @@
+{
+  "id": "t35-slow",
+  "steps": [
+    {
+      "text": "Still working in the background while no window is open. Still working in the background while no window is open. Still working in the background while no window is open. ",
+      "chunk_chars": 4,
+      "chunk_delay_ms": 120
+    }
+  ]
+}

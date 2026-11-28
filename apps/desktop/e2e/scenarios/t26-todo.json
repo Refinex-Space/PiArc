@@ -1,0 +1,63 @@
+{
+  "id": "t26-todo",
+  "steps": [
+    {
+      "text": "Tracking the work.",
+      "tool_calls": [
+        {
+          "id": "todo1",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "content": "Read the parser",
+                "status": "completed",
+                "activeForm": "Reading the parser"
+              },
+              {
+                "content": "Fix the loop bound",
+                "status": "in_progress",
+                "activeForm": "Fixing the loop bound"
+              },
+              {
+                "content": "Add a regression test",
+                "status": "pending",
+                "activeForm": "Adding a regression test"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "todo2",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "content": "Read the parser",
+                "status": "completed",
+                "activeForm": "Reading the parser"
+              },
+              {
+                "content": "Fix the loop bound",
+                "status": "completed",
+                "activeForm": "Fixing the loop bound"
+              },
+              {
+                "content": "Add a regression test",
+                "status": "in_progress",
+                "activeForm": "Adding a regression test"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "Two of three tasks are done."
+    }
+  ]
+}

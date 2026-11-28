@@ -1,0 +1,1245 @@
+// The IPC contract between the preload script and the main process: channel names and the
+// shape of `window.piarc`. Every channel is registered in the main process through
+// `registerHandler` (src/main/ipc/register.ts), which checks the sender's origin first.
+import type {
+  ModelRef,
+  ApprovalAnswer,
+  DiscardRequest,
+  PermissionMode,
+  InputAttachment,
+  InputMention,
+  RewindRequest,
+} from '@piarc/protocol';
+
+import type { ImageInput, ImageSettingsRequest } from './markdown-images.js';
+import type { ProjectRequest } from './project-files.js';
+import type {
+  BrowserPick,
+  BrowserPickMode,
+  BrowserPlacement,
+  BrowserRequest,
+  BrowserSessionState,
+} from './browser.js';
+import type { CommandId } from './keybindings.js';
+import type { Locale } from './i18n/index.js';
+import type { PreferenceChange, Preferences } from './preferences.js';
+
+export type { ApprovalAnswer, PermissionMode } from '@piarc/protocol';
+
+/** Channel names, one per `window.piarc` command. */
+export const IPC_CHANNELS = {
+  getAppVersion: 'piarc:app.getVersion',
+  toolWindowPrepare: 'piarc:toolWindow.prepare',
+  toolWindowPin: 'piarc:toolWindow.pin',
+  openExternal: 'piarc:shell.openExternal',
+  eventsConnect: 'piarc:events.connect',
+  eventsSubscribe: 'piarc:events.subscribe',
+  eventsUnsubscribe: 'piarc:events.unsubscribe',
+  terminalOpenSession: 'piarc:terminal.openSession',
+  terminalShare: 'piarc:terminal.share',
+  terminalClose: 'piarc:terminal.close',
+  terminalInput: 'piarc:terminal.input',
+  terminalKey: 'piarc:terminal.key',
+  terminalMouse: 'piarc:terminal.mouse',
+  terminalFocus: 'piarc:terminal.focus',
+  terminalPaste: 'piarc:terminal.paste',
+  terminalResize: 'piarc:terminal.resize',
+  terminalRequestFrame: 'piarc:terminal.requestFrame',
+  terminalScroll: 'piarc:terminal.scroll',
+  terminalColors: 'piarc:terminal.colors',
+  terminalClearSelection: 'piarc:terminal.clearSelection',
+  terminalSelectionText: 'piarc:terminal.selectionText',
+  terminalLinkAt: 'piarc:terminal.linkAt',
+  terminalSearch: 'piarc:terminal.search',
+  terminalScreenText: 'piarc:terminal.screenText',
+  terminalInfo: 'piarc:terminal.info',
+  appState: 'piarc:app.state',
+  preferencesSet: 'piarc:preferences.set',
+  settingsOpen: 'piarc:settings.open',
+  folderDialog: 'piarc:workspace.folderDialog',
+  workspaceOpen: 'piarc:workspace.open',
+  workspaceRemove: 'piarc:workspace.remove',
+  sessionCreate: 'piarc:session.create',
+  sessionCreateDraft: 'piarc:session.createDraft',
+  sessionDiscardDraft: 'piarc:session.discardDraft',
+  sessionResume: 'piarc:session.resume',
+  sessionClose: 'piarc:session.close',
+  sessionPrompt: 'piarc:session.prompt',
+  sessionSteer: 'piarc:session.steer',
+  sessionFollowUp: 'piarc:session.followUp',
+  sessionAbort: 'piarc:session.abort',
+  sideChatAsk: 'piarc:session.sideChatAsk',
+  sideChatControl: 'piarc:session.sideChatControl',
+  sessionPermissionMode: 'piarc:session.permissionMode',
+  approvalAnswer: 'piarc:approval.answer',
+  sessionCompact: 'piarc:session.compact',
+  sessionContextUsage: 'piarc:session.contextUsage',
+  sessionRewindPreview: 'piarc:session.rewindPreview',
+  sessionRewind: 'piarc:session.rewind',
+  sessionUndoRewind: 'piarc:session.undoRewind',
+  sessionChanges: 'piarc:session.changes',
+  sessionDiscardChange: 'piarc:session.discardChange',
+  gitRequest: 'piarc:git.request',
+  browserRequest: 'piarc:browser.request',
+  browserPlace: 'piarc:browser.place',
+  gitCancel: 'piarc:git.cancel',
+  sessionSwitchBranch: 'piarc:session.switchBranch',
+  sessionFork: 'piarc:session.fork',
+  queueEdit: 'piarc:session.queueEdit',
+  queueDelete: 'piarc:session.queueDelete',
+  attachmentStore: 'piarc:session.attachmentStore',
+  markdownImage: 'piarc:files.markdownImage',
+  sessionImage: 'piarc:files.sessionImage',
+  markdownImageSettings: 'piarc:files.markdownImageSettings',
+  projectFileWatch: 'piarc:files.watch',
+  projectFilePreview: 'piarc:files.preview',
+  projectFiles: 'piarc:files.project',
+  projectFileAction: 'piarc:files.action',
+  filesSearch: 'piarc:files.search',
+  filesCancel: 'piarc:files.cancel',
+  providerSettings: 'piarc:providers.list',
+  saveProvider: 'piarc:providers.save',
+  deleteProvider: 'piarc:providers.delete',
+  setCatalogRefresh: 'piarc:providers.catalogRefresh',
+  setModelPreferences: 'piarc:providers.modelPreferences',
+  startLogin: 'piarc:providers.login',
+  answerLogin: 'piarc:providers.answerLogin',
+  logoutProvider: 'piarc:providers.logout',
+  setProviderEnabled: 'piarc:providers.setEnabled',
+  testProvider: 'piarc:providers.test',
+  discoverModels: 'piarc:providers.discover',
+  useProviderAccount: 'piarc:providers.useAccount',
+  removeProviderAccount: 'piarc:providers.removeAccount',
+  workspaceModels: 'piarc:workspace.models',
+  sessionModels: 'piarc:session.models',
+  previewModelSwitch: 'piarc:session.previewModelSwitch',
+  setSessionModel: 'piarc:session.setModel',
+  setSessionEffort: 'piarc:session.setEffort',
+  composerInfo: 'piarc:composer.info',
+  sessionMarkRead: 'piarc:session.markRead',
+  sessionRename: 'piarc:session.rename',
+  sessionSetPinned: 'piarc:session.setPinned',
+  sessionSetArchived: 'piarc:session.setArchived',
+  sessionDelete: 'piarc:session.delete',
+  sessionTranscript: 'piarc:session.transcript',
+  subagentTranscript: 'piarc:subagent.transcript',
+  subagentStop: 'piarc:subagent.stop',
+  taskStop: 'piarc:task.stop',
+  taskOutput: 'piarc:task.output',
+  agentsList: 'piarc:agents.list',
+  commandsList: 'piarc:commands.list',
+  skillsList: 'piarc:skills.list',
+  outputStyleSet: 'piarc:outputStyle.set',
+  webSearchSettings: 'piarc:webSearch.settings',
+  managedSettings: 'piarc:managed.settings',
+  memoryView: 'piarc:memory.view',
+  memoryEdit: 'piarc:memory.edit',
+  memoryReveal: 'piarc:memory.reveal',
+  piInstructions: 'piarc:instructions.view',
+  savePiInstructions: 'piarc:instructions.save',
+  skillReveal: 'piarc:skills.reveal',
+  webSearchBackendSet: 'piarc:webSearch.backend.set',
+  webSearchKeySet: 'piarc:webSearch.key.set',
+  snapshotsResend: 'piarc:snapshots.resend',
+  trustGet: 'piarc:trust.get',
+  trustDecide: 'piarc:trust.decide',
+  attentionNotify: 'piarc:attention.notify',
+  attentionCount: 'piarc:attention.count',
+  permissionRules: 'piarc:permissions.rules',
+  permissionCheck: 'piarc:permissions.check',
+  permissionUpdate: 'piarc:permissions.update',
+  auditEvents: 'piarc:permissions.audit',
+  usageReport: 'piarc:usage.report',
+  sessionUsage: 'piarc:usage.session',
+  modelPriceSet: 'piarc:usage.price.set',
+  sandboxSettings: 'piarc:sandbox.settings',
+  sandboxUpdate: 'piarc:sandbox.update',
+  packagesList: 'piarc:packages.list',
+  packageInstall: 'piarc:packages.install',
+  marketQuery: 'piarc:market.query',
+  marketDetail: 'piarc:market.detail',
+  marketRefresh: 'piarc:market.refresh',
+  marketInstall: 'piarc:market.install',
+  packageUpdate: 'piarc:packages.update',
+  packageEnable: 'piarc:packages.enable',
+  packageConfirm: 'piarc:packages.confirm',
+  packageUninstall: 'piarc:packages.uninstall',
+  configDiagnostics: 'piarc:config.diagnostics',
+  diagnosticsPrepare: 'piarc:diagnostics.prepare',
+  diagnosticsExport: 'piarc:diagnostics.export',
+  sessionsBulk: 'piarc:sessions.bulk',
+  dataExport: 'piarc:data.export',
+  dataExportReveal: 'piarc:data.exportReveal',
+  imageSave: 'piarc:image.save',
+  proxyDetect: 'piarc:proxy.detect',
+  worktreeBranches: 'piarc:worktree.branches',
+  worktreeIgnore: 'piarc:worktree.ignore',
+  worktreeRemove: 'piarc:worktree.remove',
+  worktreeKeep: 'piarc:worktree.keep',
+  sessionSearch: 'piarc:session.search',
+  sessionOpenWindow: 'piarc:session.openWindow',
+  launchTargets: 'piarc:app.launchTargets',
+  mcpStatus: 'piarc:mcp.status',
+  mcpReconnect: 'piarc:mcp.reconnect',
+  mcpSetEnabled: 'piarc:mcp.setEnabled',
+  mcpLogin: 'piarc:mcp.login',
+  mcpAddServer: 'piarc:mcp.addServer',
+  chromeProfiles: 'piarc:chrome.profiles',
+  chromeSites: 'piarc:chrome.sites',
+  chromeImport: 'piarc:chrome.import',
+  browserImports: 'piarc:browser.imports',
+  browserForgetImport: 'piarc:browser.forgetImport',
+  browserClearWorkspace: 'piarc:browser.clearWorkspace',
+  dictationStart: 'piarc:dictation.start',
+  dictationStop: 'piarc:dictation.stop',
+  dictationCancel: 'piarc:dictation.cancel',
+  dictationStatus: 'piarc:dictation.status',
+  speechDevices: 'piarc:speech.devices',
+  speechModels: 'piarc:speech.models',
+  speechModelAction: 'piarc:speech.modelAction',
+  openMicrophoneSettings: 'piarc:dictation.openMicrophoneSettings',
+  focusDictationOwner: 'piarc:dictation.focusOwner',
+} as const;
+
+/** The new-session form's worktree choice (T35). */
+export interface WorktreeOptions {
+  /** 1–64 of `[A-Za-z0-9._-]`, starting with a letter or digit; Core picks one when absent. */
+  readonly name?: string;
+  /** The branch or commit it starts from; the workspace's HEAD when absent. */
+  readonly base?: string;
+}
+
+/** Worktree names as Core accepts them (`piarc_git::worktree::check_name`). */
+export function isWorktreeName(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value) &&
+    !value.includes('..') &&
+    !value.endsWith('.') &&
+    !value.endsWith('.lock')
+  );
+}
+
+/** What a link, a dropped folder or a second start asks the app to open (T35). */
+export type LaunchTarget =
+  | { readonly kind: 'workspace'; readonly path: string }
+  | { readonly kind: 'draft'; readonly path: string; readonly text: string }
+  | { readonly kind: 'newSession' }
+  | { readonly kind: 'chooseFolder' }
+  | { readonly kind: 'settings'; readonly page?: string }
+  | { readonly kind: 'session'; readonly sessionId: string };
+
+/** The list a permission rule is in. */
+export type RuleBehavior = 'allow' | 'ask' | 'deny';
+
+/** Writable settings files the permission page may change (T23). */
+export const RULE_LAYERS = ['projectLocal', 'project', 'user'] as const;
+export type RuleLayer = (typeof RULE_LAYERS)[number];
+
+/** Add (no `old`), replace, or remove (no `rule`) one rule of a writable source. */
+export interface PermissionRuleChange {
+  readonly workspace: string;
+  readonly layer: RuleLayer;
+  readonly behavior: RuleBehavior;
+  readonly old?: string;
+  readonly rule?: string;
+}
+
+/** Filters of the permission audit view; absent fields match everything. */
+export interface AuditQuery {
+  readonly workspace?: string;
+  /** `permission` (the default), `sandbox`: sandbox denials and network approvals (T39), or
+   * `autoReview`: the Auto mode reviewer's decisions (T46), or `plugin`: package installs,
+   * updates, switches and uninstalls (ADR-0102). */
+  readonly kind?: 'permission' | 'sandbox' | 'autoReview' | 'plugin';
+  readonly sessionId?: string;
+  readonly tool?: string;
+  readonly conclusion?: 'allow' | 'deny';
+  readonly since?: number;
+  readonly limit?: number;
+}
+
+/** What the settings page installs (T40): a directory, a git URL or an npm spec, and where it
+ * is declared (the project scope needs the workspace). */
+/**
+ * An MCP server the settings page adds (ADR-0101): a local command or an HTTP endpoint, for every
+ * project (`user`) or only this one, not shared (`projectLocal`, `.piarc/settings.local.json`).
+ */
+export type McpServerInput =
+  | {
+      readonly scope: 'user' | 'projectLocal';
+      readonly name: string;
+      readonly transport: 'stdio';
+      readonly command: string;
+      readonly args: readonly string[];
+      readonly env: Readonly<Record<string, string>>;
+    }
+  | {
+      readonly scope: 'user' | 'projectLocal';
+      readonly name: string;
+      readonly transport: 'http';
+      readonly url: string;
+    };
+
+/** One page of the Pi package market (ADR-0102). */
+export interface MarketQueryInput {
+  readonly query: string;
+  readonly category: 'all' | 'extension' | 'skill' | 'prompt';
+  readonly sort: 'popular' | 'updated';
+  readonly offset: number;
+  readonly limit: number;
+  readonly workspace: string | null;
+}
+
+/** Installs one market package: an npm name and an exact version the catalog lists. */
+export interface MarketInstallInput {
+  readonly name: string;
+  readonly version: string;
+  readonly scope: 'user' | 'project';
+  readonly workspace: string | null;
+}
+
+export interface PackageInstallInput {
+  readonly kind: 'directory' | 'git' | 'npm';
+  readonly location: string;
+  readonly scope: 'user' | 'project';
+  readonly workspace?: string;
+}
+
+/** The user's sandbox values the settings page changes (T39); absent fields stay. */
+/** A user's model price in USD per million tokens (T41). */
+export interface ModelPriceInput {
+  readonly input: number;
+  readonly output: number;
+  readonly cacheRead: number;
+  readonly cacheWrite: number;
+}
+
+export interface SandboxChange {
+  readonly enabled?: boolean;
+  readonly autoAllow?: boolean;
+  readonly allowedDomains?: readonly string[];
+  readonly denyRead?: readonly string[];
+}
+
+/**
+ * Main → preload messages about the app (`webContents.send`): preference changes, commands
+ * from the menu, focus changes. Not an invoke channel.
+ */
+export const APP_EVENT_CHANNEL = 'piarc:app.event';
+
+/** Commands the main process sends to a window: shortcuts plus menu-only commands. */
+export type AppCommand = CommandId | 'workspace.openFolder' | 'view.toggleSidebar';
+
+/** What a window learns about the app when it starts. */
+export interface AppState {
+  /** `process.platform` of the main process. */
+  readonly platform: string;
+  readonly preferences: Preferences;
+  /** The locale the preferences and the system languages resolve to. */
+  readonly locale: Locale;
+  /** Whether the asking window is the one in front (keyboard focus). */
+  readonly focused: boolean;
+  /**
+   * Whether the system shows PiArc's notifications at all (T42): without them PiArc falls back to
+   * in-app reminders, the Dock bounce or taskbar flash and the badge (ADR-0018 item 6).
+   */
+  readonly notificationsSupported: boolean;
+}
+
+/** Messages on `APP_EVENT_CHANNEL`. */
+export type AppEvent =
+  | { readonly type: 'projectFileLink'; readonly sessionId: string; readonly path: string }
+  | { readonly type: 'projectWebLink'; readonly sessionId: string; readonly url: string }
+  | { readonly type: 'projectFilesChanged'; readonly sessionId: string }
+  | { readonly type: 'preferences'; readonly preferences: Preferences; readonly locale: Locale }
+  | { readonly type: 'providersChanged' }
+  | { readonly type: 'command'; readonly command: AppCommand }
+  | { readonly type: 'openSession'; readonly sessionId: string }
+  /**
+   * The window came to the front or left it. The main process tells: a page cannot trust
+   * `document.hasFocus()` for this (it stays true under automation and in some window
+   * arrangements).
+   */
+  | { readonly type: 'focus'; readonly focused: boolean }
+  /** The window was minimized or hidden (`false`), restored or shown (`true`) (T34). */
+  | { readonly type: 'visibility'; readonly visible: boolean }
+  | {
+      readonly type: 'toolWindow';
+      readonly ticket: string;
+      readonly state: 'visible' | 'hidden' | 'closed';
+    }
+  /** A link, a dropped folder or a second start asks to open something (T35). */
+  | { readonly type: 'launch'; readonly target: LaunchTarget }
+  /**
+   * An answer given in a system notification was not applied (T42): the request was answered
+   * elsewhere first or is no longer current.
+   */
+  | { readonly type: 'approvalNotice'; readonly sessionId: string; readonly status: string }
+  /** The built-in browser's state of a session changed (ADR-0088). */
+  | { readonly type: 'browser'; readonly sessionId: string; readonly state: BrowserSessionState }
+  /**
+   * A process tree of the session started listening on `port` (B4.4): the window shows a toast
+   * and a dot on the preview tool. Sent once per port and session.
+   */
+  | {
+      readonly type: 'browserService';
+      readonly sessionId: string;
+      readonly port: number;
+      readonly url: string;
+    }
+  /** A development server of the session exited or did not become ready (B4.5). */
+  | { readonly type: 'browserServerFailed'; readonly sessionId: string; readonly name: string }
+  /** A preview key pressed while the page had focus (`main/browser/keymap.ts`). */
+  | {
+      readonly type: 'browserKey';
+      readonly sessionId: string;
+      readonly tab: string;
+      readonly key: string;
+    }
+  /**
+   * The user picked an element in the page (B3.1: a real click while the picker is on, or the
+   * page menu's "Add to conversation"); `shot` asks for that element's screenshot only.
+   */
+  | {
+      readonly type: 'browserPick';
+      readonly sessionId: string;
+      readonly mode: BrowserPickMode;
+      readonly pick: BrowserPick;
+    };
+
+/**
+ * The approval a waiting session's notification is about (T42): the card's identity as Core
+ * gave it (the main process answers with it through the ledger) and what the notification
+ * shows. `allow` is the card's `notificationAllow`; Core checks it again when answered.
+ */
+export interface NotificationApproval {
+  readonly requestId: string;
+  /** The ledger the answer goes to (a subagent's card answers to the subagent). */
+  readonly sessionId: string;
+  readonly revision: number;
+  readonly connectionEpoch: number;
+  readonly tool: string;
+  /** The command or the file, cut to what a notification shows. */
+  readonly summary: string;
+  readonly allow: boolean;
+}
+
+/** Something the user should look at (architecture section 8.8): the main process notifies. */
+export interface AttentionNotice {
+  readonly kind: 'completed' | 'awaiting' | 'failed';
+  readonly sessionId: string;
+  /** The session's title as the sidebar shows it. */
+  readonly title: string;
+  /** `awaiting`: the first pending approval (T42). */
+  readonly approval?: NotificationApproval;
+}
+
+/** Longest text the renderer may send as one prompt (bytes of UTF-16 code units). */
+/** Independent in-memory side conversations per workbench page. */
+export const MAX_SIDE_CHATS = 8;
+
+export const MAX_PROMPT_LENGTH = 1_000_000;
+
+/**
+ * Largest attachment the main process passes to Core. Core enforces the real limits per kind
+ * (`composerInfo().attachments`); this only bounds what one IPC message may carry.
+ */
+export const MAX_ATTACHMENT_IPC_BYTES = 33 * 1024 * 1024;
+
+/**
+ * What the composer sends (ADR-0030): the text the model reads (mentions spelled `@<path>`),
+ * where the mentions are, the attachments Core stored for this session, and the client's
+ * idempotency key, so sending the same message again does not repeat it.
+ */
+export interface OutgoingInput {
+  readonly requestId: string;
+  readonly text: string;
+  readonly mentions: readonly InputMention[];
+  readonly attachments: readonly InputAttachment[];
+}
+
+/** Session ids as Core accepts them (`piarc_core::sessions::check_session_id`). */
+export function isSessionId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= 128 &&
+    /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(value)
+  );
+}
+
+/**
+ * Main → preload message that carries the window's event port (`webContents.postMessage`
+ * with the port in its transfer list). Not an invoke channel: nothing is registered for it.
+ */
+export const EVENTS_PORT_CHANNEL = 'piarc:events.port';
+
+/**
+ * One batch of Core events (architecture section 7.6). The main process forwards it by
+ * `route` and never reads `payload`.
+ */
+export interface EventBatch {
+  /** Route key the batch was delivered under: a test or demo topic, later a `sessionId`. */
+  readonly route: string;
+  /** Per-route batch number, starting at 1 and consecutive. */
+  readonly seq: number;
+  /** UTF-8 JSON array of the batch's events. */
+  readonly payload: Uint8Array;
+}
+
+/** What the main process posts on a window's event port for one Core delivery. */
+export interface EventPortMessage {
+  /** The batches of the delivery whose route this window subscribed to. */
+  readonly batches: readonly EventBatch[];
+}
+
+/** Grid size and the cell size in CSS pixels (for pixel size reports). */
+export interface TerminalSize {
+  readonly cols: number;
+  readonly rows: number;
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+}
+
+/** A `KeyboardEvent` as the terminal needs it; Core encodes it with the terminal's modes. */
+export interface TerminalKeyMessage {
+  readonly action: 'press' | 'repeat' | 'release';
+  /** `KeyboardEvent.code`. */
+  readonly code: string;
+  /** The character the key produced (`KeyboardEvent.key` when it is one grapheme), else ''. */
+  readonly text: string;
+  /** Bits: 1 Shift, 2 Ctrl, 4 Alt/Option, 8 Meta/Command. */
+  readonly mods: number;
+  /** Part of an input-method composition. */
+  readonly composing: boolean;
+}
+
+/** Largest grid side Core accepts. */
+export const MAX_TERMINAL_SIDE = 1000;
+
+/** Validates a terminal size received over IPC. */
+export function isTerminalSize(value: unknown): value is TerminalSize {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const side = (v: unknown) =>
+    typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_TERMINAL_SIDE;
+  const cell = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 256;
+  return (
+    'cols' in value &&
+    side(value.cols) &&
+    'rows' in value &&
+    side(value.rows) &&
+    'cellWidth' in value &&
+    cell(value.cellWidth) &&
+    'cellHeight' in value &&
+    cell(value.cellHeight)
+  );
+}
+
+/** Validates a key message received over IPC. */
+export function isTerminalKeyMessage(value: unknown): value is TerminalKeyMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'action' in value &&
+    (value.action === 'press' || value.action === 'repeat' || value.action === 'release') &&
+    'code' in value &&
+    typeof value.code === 'string' &&
+    value.code.length <= 64 &&
+    'text' in value &&
+    typeof value.text === 'string' &&
+    value.text.length <= 64 &&
+    'mods' in value &&
+    typeof value.mods === 'number' &&
+    Number.isInteger(value.mods) &&
+    value.mods >= 0 &&
+    value.mods <= 15 &&
+    'composing' in value &&
+    typeof value.composing === 'boolean'
+  );
+}
+
+/** A pointer event in pixels of the terminal's canvas (T34). */
+export interface TerminalMouseMessage {
+  readonly action: 'press' | 'release' | 'motion';
+  /** 1 left, 2 right, 3 middle, 4–7 wheel up, down, left, right; absent for motion alone. */
+  readonly button?: number;
+  /** Bits: 1 Shift, 2 Ctrl, 4 Alt/Option, 8 Meta/Command. */
+  readonly mods: number;
+  readonly x: number;
+  readonly y: number;
+  /** For a press: clicks in a row (`MouseEvent.detail`). */
+  readonly clicks?: number;
+}
+
+/** Validates a mouse message received over IPC. */
+export function isTerminalMouseMessage(value: unknown): value is TerminalMouseMessage {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const integer = (n: unknown, min: number, max: number) =>
+    typeof n === 'number' && Number.isInteger(n) && n >= min && n <= max;
+  const coordinate = (n: unknown) =>
+    typeof n === 'number' && Number.isFinite(n) && n >= -100_000 && n <= 100_000;
+  return (
+    (v.action === 'press' || v.action === 'release' || v.action === 'motion') &&
+    (v.button === undefined || integer(v.button, 1, 11)) &&
+    integer(v.mods, 0, 15) &&
+    coordinate(v.x) &&
+    coordinate(v.y) &&
+    (v.clicks === undefined || integer(v.clicks, 1, 3))
+  );
+}
+
+/** Where to move a terminal's viewport (`piarc_protocol::terminal::TerminalScroll`). */
+export type TerminalScrollTarget =
+  | { readonly kind: 'top' }
+  | { readonly kind: 'bottom' }
+  | { readonly kind: 'delta'; readonly rows: number }
+  | { readonly kind: 'row'; readonly row: number };
+
+export function isTerminalScrollTarget(value: unknown): value is TerminalScrollTarget {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const integer = (n: unknown, min: number) =>
+    typeof n === 'number' && Number.isSafeInteger(n) && n >= min;
+  switch (v.kind) {
+    case 'top':
+    case 'bottom':
+      return true;
+    case 'delta':
+      return integer(v.rows, -1_000_000) && (v.rows as number) <= 1_000_000;
+    case 'row':
+      return integer(v.row, 0);
+    default:
+      return false;
+  }
+}
+
+/** A terminal's default colors from the theme, `0xRRGGBB` each (T34). */
+export interface TerminalThemeColors {
+  readonly foreground: number;
+  readonly background: number;
+  readonly cursor: number;
+}
+
+export function isTerminalThemeColors(value: unknown): value is TerminalThemeColors {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const color = (n: unknown) =>
+    typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 0xffffff;
+  return color(v.foreground) && color(v.background) && color(v.cursor);
+}
+
+/** A session terminal the panel opened (`openSessionTerminal`). */
+export interface TerminalOpened {
+  readonly terminalId: number;
+  readonly taskId: string;
+  /** How a saved terminal came back: `snapshot`, `replay`, `text`, or null for a new one. */
+  readonly restored: string | null;
+}
+
+/** An OSC 8 link on a viewport row (`piarc_protocol::terminal::TerminalLink`). */
+export interface TerminalLinkInfo {
+  readonly uri: string;
+  readonly row: number;
+  readonly start: number;
+  readonly end: number;
+}
+
+/** A search match, rows counted from the top of the scrollback. */
+export interface TerminalMatchInfo {
+  readonly start: { readonly row: number; readonly col: number };
+  readonly end: { readonly row: number; readonly col: number };
+}
+
+/** What a terminal shows (`piarc_protocol::terminal::TerminalInfo`, the fields the panel reads). */
+export interface TerminalInfoView {
+  readonly terminalId: number;
+  readonly cols: number;
+  readonly rows: number;
+  readonly title: string;
+  readonly pwd: string;
+  readonly alternateScreen: boolean;
+  readonly sessionId?: string;
+  readonly taskId?: string;
+  readonly shared: boolean;
+}
+
+/** What a paste did: `unsafe` text could run commands by itself (ask, then paste again). */
+export type TerminalPasteOutcome = 'pasted' | 'unsafe' | 'empty';
+
+/** Longest find-bar query. */
+export const MAX_TERMINAL_QUERY = 1000;
+
+/** Largest paste, in characters. */
+export const MAX_TERMINAL_PASTE = 1024 * 1024;
+
+/** Receives the batches of one route. */
+export type EventListener = (batch: EventBatch) => void;
+
+/** Longest route key, in bytes (the limit Core enforces as well). */
+export const MAX_ROUTE_KEY_LENGTH = 128;
+
+/** Route keys: 1 to 128 ASCII letters, digits and `. _ : / -` (Core's grammar). */
+export function isRouteKey(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_ROUTE_KEY_LENGTH &&
+    /^[A-Za-z0-9._:/-]+$/.test(value)
+  );
+}
+
+/**
+ * The API the preload script exposes to the renderer as `window.piarc`. Adding a member
+ * means adding a channel above, a handler in the main process, and updating the key
+ * snapshot in `e2e/preload.e2e.ts`.
+ */
+export interface PiarcApi {
+  /** The application version (`app.getVersion()`). */
+  getAppVersion(): Promise<string>;
+  prepareToolWindow(sessionId: string, panelId: string): Promise<string>;
+  pinToolWindow(ticket: string, pinned: boolean): Promise<void>;
+  /**
+   * Asks the main process to open `url` in the system browser. The main process accepts only
+   * `https:`, `http:` and `mailto:` URLs and shows a native confirmation dialog first.
+   * Resolves `true` when the link was opened, `false` when it was rejected or cancelled.
+   */
+  openExternal(url: string): Promise<boolean>;
+  /**
+   * Receives the Core event batches of `route` in this window. One listener per route:
+   * subscribing again replaces it. The listener gets the batch only, never an Electron
+   * event object. Resolves once the main process routes `route` to this window.
+   */
+  subscribeEvents(route: string, listener: EventListener): Promise<void>;
+  /** Stops the batches of `route`. Resolves once the main process stopped routing them. */
+  unsubscribeEvents(route: string): Promise<void>;
+  /**
+   * Opens a terminal in session `sessionId` (T33, T34): the user's shell in the session's
+   * directory and command environment, a background task of kind `terminal`. Its events
+   * arrive on `term/<terminalId>`. It belongs to the session, not to this window: it survives
+   * a reload and ends when it is closed, the session is archived or deleted, or PiArc quits.
+   * Needs recent user input in this window; at most 16 per session.
+   */
+  openSessionTerminal(
+    sessionId: string,
+    size: TerminalSize,
+    directory?: string,
+  ): Promise<TerminalOpened>;
+  /** Shares a user's terminal with the agent or stops sharing it (ADR-0050). */
+  shareTerminal(id: number, shared: boolean): Promise<boolean>;
+  /** Closes the terminal: its program and everything it started end. */
+  closeTerminal(id: number): Promise<void>;
+  /** Writes text to the terminal as typed (committed input-method text). */
+  terminalInput(id: number, text: string): Promise<void>;
+  /** Sends a key event; Core encodes it with the terminal's current modes. */
+  terminalKey(id: number, key: TerminalKeyMessage): Promise<void>;
+  /**
+   * A pointer event: the program gets it while it tracks the mouse; otherwise it selects
+   * (Shift extends, `clicks` 2 a word, 3 a line) and the wheel scrolls the scrollback.
+   */
+  terminalMouse(id: number, event: TerminalMouseMessage): Promise<void>;
+  /** Reports focus to the program when it asked for focus reports. */
+  terminalFocus(id: number, gained: boolean): Promise<void>;
+  /** Pastes as the program's modes require; `unsafe` asks for confirmation first. */
+  terminalPaste(id: number, text: string, allowUnsafe: boolean): Promise<TerminalPasteOutcome>;
+  /** Resizes the terminal and its PTY. */
+  terminalResize(id: number, size: TerminalSize): Promise<void>;
+  /**
+   * Resolves with the terminal's next frame (`piarc_protocol::term_frame`, version 2; 14 bytes
+   * when nothing changed); `full` asks for a RESET frame (after a reload or a decode error).
+   * With `park`, the view stops pulling when the frame is empty and Core sends an `output`
+   * event on `term/<id>` at the next output. The frame is the reply to this request, not a
+   * message on the event port: after a key, Chromium handles event-port messages only after
+   * the next rendered frame (ADR-0023). One request in flight per terminal and window.
+   */
+  requestTerminalFrame(id: number, full: boolean, park?: boolean): Promise<Uint8Array>;
+  /** Moves the viewport through the scrollback. */
+  terminalScroll(id: number, to: TerminalScrollTarget): Promise<void>;
+  /**
+   * Gives the terminal the theme's default colors: cells without colors of their own and
+   * programs that ask (OSC 10/11/12) get them.
+   */
+  terminalColors(id: number, colors: TerminalThemeColors): Promise<void>;
+  /** Clears the selection. */
+  terminalClearSelection(id: number): Promise<void>;
+  /** The selected text, '' when nothing is selected. */
+  terminalSelectionText(id: number): Promise<string>;
+  /** The OSC 8 link at viewport cell (`col`, `row`), or null. */
+  terminalLinkAt(id: number, col: number, row: number): Promise<TerminalLinkInfo | null>;
+  /** Finds `query` in the screen and scrollback, newest match first. */
+  terminalSearch(id: number, query: string): Promise<readonly TerminalMatchInfo[]>;
+  /** The visible screen as plain text from Core's formatter (the screen reader view). */
+  terminalScreenText(id: number): Promise<string>;
+  /** Title, directory, size and sharing of the terminal. */
+  terminalInfo(id: number): Promise<TerminalInfoView>;
+
+  /** Platform, preferences and locale, for the first render. */
+  getAppState(): Promise<AppState>;
+  /**
+   * Changes one preference: written to the user's settings file through Core; every window
+   * then receives the new preferences as an app event. Resolves with them.
+   */
+  setPreference(change: PreferenceChange): Promise<Preferences>;
+  /** Receives app events; returns the function that stops them. */
+  onAppEvent(listener: (event: AppEvent) => void): () => void;
+  /** Opens the settings dialog in the calling workbench, optionally on `page`. */
+  openSettings(page?: string): Promise<void>;
+
+  /** Shows the system folder picker; resolves with the chosen directory, or `null`. */
+  chooseFolder(): Promise<string | null>;
+
+  /** Chrome's profiles (ADR-0090): `{ chrome, profiles: [{ id, name }] }` JSON. */
+  chromeProfiles(): Promise<string>;
+  /** The sites of a Chrome profile with cookie counts: `{ sites: [{ site, count }] }` JSON. */
+  chromeSites(profile: string): Promise<string>;
+  /**
+   * Imports the sign-ins of `sites` from Chrome profile `profile` into `workspace`'s browser
+   * partition after the main process's native confirmation (B5.1). Resolves with JSON
+   * `{ status: 'imported', sites: [{ site, imported, skipped: [{ reason, count }] }] }`,
+   * `{ status: 'cancelled' }` or `{ status: 'unavailable' }` (clear-on-quit mode); no cookie
+   * value ever reaches the page.
+   */
+  chromeImport(workspace: string, profile: string, sites: readonly string[]): Promise<string>;
+  /** The sites of `workspace` with imported sign-ins: `{ imports: [...] }` JSON (B5.3). */
+  browserImports(workspace: string): Promise<string>;
+  /** Removes an imported site: its cookies from the partition, then the record (B5.3). */
+  forgetBrowserImport(workspace: string, site: string): Promise<string>;
+  /** Clears `workspace`'s browsing data (B5.5). */
+  clearBrowserData(workspace: string): Promise<null>;
+  /** Opens a directory as a workspace (starts its Agent Host); resolves with Core's JSON. */
+  openWorkspace(path: string): Promise<string>;
+  /**
+   * Removes a project from the sidebar: Core stops its running sessions and background tasks
+   * (after a native confirmation when there are some) and keeps its folder and sessions;
+   * opening the folder again lists it. Resolves `false` when the user kept it.
+   */
+  removeWorkspace(path: string): Promise<boolean>;
+  /** Creates a session in a workspace; resolves with `{ sessionId, ... }` as JSON. */
+  createSession(workspace: string, model?: ModelRef, worktree?: WorktreeOptions): Promise<string>;
+  /**
+   * Opens a draft session in a workspace for the new-session view's tools (ADR-0099): session
+   * lists leave it out until its first input; resolves as `createSession` does. The window owns
+   * it: its drafts are discarded when its page goes away.
+   */
+  createDraftSession(workspace: string): Promise<string>;
+  /** Discards a draft session that took no input (with its terminals); others are refused. */
+  discardDraftSession(id: string): Promise<void>;
+  providerSettings(): Promise<string>;
+  saveProvider(configJson: string, secretJson?: string): Promise<string>;
+  deleteProvider(id: string): Promise<string | null>;
+  setCatalogRefresh(enabled: boolean): Promise<string>;
+  /** Saves per-model settings and the auxiliary model (T29); resolves with the settings. */
+  setModelPreferences(preferencesJson: string): Promise<string>;
+  /** Signs in to a provider (T29); steps arrive on `core/login`, resolves when it ended. */
+  startLogin(provider: string): Promise<string>;
+  /** Answers the sign-in's question; `null` cancels the sign-in. */
+  answerLogin(loginId: string, value: string | null): Promise<void>;
+  /** Signs out of a provider after a native confirmation; `null` when the user declined. */
+  logoutProvider(provider: string): Promise<string | null>;
+  /** Turns a provider on or off (ADR-0083); resolves with the settings. */
+  setProviderEnabled(id: string, enabled: boolean): Promise<string>;
+  /** One short request to a model of the provider (ADR-0083): `{ ok, model?, latencyMs?, message?, network? }`. */
+  testProvider(id: string): Promise<string>;
+  /** An endpoint's model list (ADR-0083): `{ api, baseUrl, provider? }` and `{ key }`; resolves with `{ models }`. */
+  discoverModels(requestJson: string, secretJson?: string): Promise<string>;
+  /** Makes a signed-in account the one in use (ADR-0083); resolves with the settings. */
+  useProviderAccount(provider: string, account: string): Promise<string>;
+  /** Removes a signed-in account not in use after a native confirmation; `null` when declined. */
+  removeProviderAccount(provider: string, account: string): Promise<string | null>;
+  workspaceModels(workspace: string): Promise<string>;
+  sessionModels(sessionId: string): Promise<string>;
+  previewModelSwitch(sessionId: string, provider: string, model: string): Promise<string>;
+  setSessionModel(
+    sessionId: string,
+    provider: string,
+    model: string,
+    effort?: string,
+  ): Promise<string>;
+  setSessionEffort(sessionId: string, effort: string): Promise<string>;
+  /** Reopens a session from its file. */
+  resumeSession(id: string): Promise<string>;
+  /** Closes an open session. */
+  closeSession(id: string): Promise<string>;
+  /** Starts a turn; resolves with `{ turnId }` as JSON. */
+  prompt(id: string, input: string | OutgoingInput): Promise<string>;
+  /**
+   * A steering message for the running turn (a new turn when idle); resolves with
+   * `{ disposition: "queued", itemId }` or `{ disposition: "started", turnId }` as JSON.
+   */
+  steer(id: string, input: string | OutgoingInput): Promise<string>;
+  /** A follow-up queued for after the running turn (a new turn when idle); like `steer`. */
+  followUp(id: string, input: string | OutgoingInput): Promise<string>;
+  /** Stops the running turn; resolves with the returned queue as JSON. */
+  abort(id: string): Promise<string>;
+  askSideChat(sessionId: string, panelId: string, question: string): Promise<string>;
+  controlSideChat(sessionId: string, panelId: string, close: boolean): Promise<void>;
+  /** Resolves false when the user declined the native confirmation (Bypass permissions). */
+  setPermissionMode(id: string, mode: PermissionMode): Promise<boolean>;
+  /** The permission rules of a workspace by source (JSON), the most recent one when null. */
+  permissionRules(workspace: string | null): Promise<string>;
+  /** Whether a rule parses for a list, and whether it is broad (JSON). */
+  checkPermissionRule(rule: string, behavior: RuleBehavior): Promise<string>;
+  /** Change one rule; new or changed allow rules need the native confirmation (JSON). */
+  updatePermissionRule(change: PermissionRuleChange): Promise<string>;
+  /** Permission (or, with `kind: 'sandbox'`, sandbox) audit events, newest first (JSON). */
+  auditEvents(query: AuditQuery): Promise<string>;
+  /**
+   * The sandbox of a workspace (JSON, T39), the most recent one when null: on or off, mode,
+   * allowed domains and `denyRead` with their sources, writable places, project values that
+   * do not apply, and whether the platform has a sandbox.
+   */
+  sandboxSettings(workspace: string | null): Promise<string>;
+  /**
+   * Usage by model and by session with estimated costs (JSON `UsageReport`, T41), for every
+   * workspace or one.
+   */
+  usageReport(workspace: string | null): Promise<string>;
+  /** One session's usage with its subagents and auxiliary calls (JSON `SessionUsage`, T41). */
+  sessionUsage(sessionId: string): Promise<string>;
+  /**
+   * Sets the user's price of a model in USD per million tokens (T41); null removes it and the
+   * catalog's price applies again.
+   */
+  setModelPrice(provider: string, model: string, price: ModelPriceInput | null): Promise<void>;
+  /**
+   * Writes the user's sandbox values; turning auto-approval on and adding domains need the
+   * native confirmation (`{ status: 'cancelled' }`). Resolves with the new view (JSON).
+   */
+  setSandboxSettings(workspace: string | null, change: SandboxChange): Promise<string>;
+  /**
+   * The configuration diagnostics of a workspace (JSON), the most recent one when null:
+   * every settings file with its load state and its applied, overridden and ignored keys.
+   */
+  configDiagnostics(workspace: string | null): Promise<string>;
+  /**
+   * Prepares the diagnostic bundle (T45) with a workspace's configuration diagnostics (the most
+   * recent one when null) and resolves with its manifest (JSON): `{id, files: [{name, bytes}],
+   * redactions: {<kind>: count}, excluded}`. Nothing is written yet.
+   */
+  prepareDiagnostics(workspace: string | null): Promise<string>;
+  /**
+   * Writes the prepared bundle `id` where the user chooses in the native save dialog; resolves
+   * with `{path, bytes}` (JSON), or null when the user cancelled.
+   */
+  exportDiagnostics(id: string): Promise<string | null>;
+  /**
+   * Saves an image the window drew (a transcript diagram, ADR-0080) where the user picks in the
+   * main process's save dialog. Resolves true once written, false when the user cancelled.
+   */
+  /**
+   * Resolves the system's proxy again (ADR-0082) and answers it, `null` for direct: what the
+   * Agent Hosts use while the proxy choice is `auto`.
+   */
+  detectProxy(): Promise<string | null>;
+  saveImage(request: {
+    readonly kind: 'svg' | 'png';
+    readonly name: string;
+    readonly bytes: Uint8Array;
+  }): Promise<boolean>;
+  answerApproval(answer: ApprovalAnswer): Promise<string>;
+  /**
+   * Compacts the conversation as a turn of its own (`/compact [focus]`); `instructions` is what
+   * the summary should focus on. Resolves with `{ turnId }`.
+   */
+  compact(id: string, instructions?: string): Promise<string>;
+  /** The session's context usage by category (`ContextUsage` JSON, T27). */
+  contextUsage(id: string): Promise<string>;
+  /** What rewinding the files to before a turn would do (`RewindPreview` JSON, T28). */
+  rewindPreview(id: string, turnId: string): Promise<string>;
+  /** Rewinds the files, the conversation or both (`RewindReport` JSON, T28). */
+  rewind(id: string, request: RewindRequest): Promise<string>;
+  /** Undoes the files of a rewind (`RewindReport` JSON, T28). */
+  undoRewind(id: string, restoreId: string): Promise<string>;
+  /** The session's changed files, or one file with its diff (`ChangesView` JSON, T28). */
+  sessionChanges(id: string, path?: string): Promise<string>;
+  /** Discards a file's change or one hunk; the file's `ChangesView` afterwards (T28). */
+  discardChange(id: string, request: DiscardRequest): Promise<string>;
+  /**
+   * One Git panel request of session `id` (ADR-0084, ADR-0085): `{ result }` or `{ failure }`
+   * JSON. Writes need recent real input; destructive ones stop at a native confirmation.
+   * `opId` names the operation in `core/git` progress events and `cancelGit`.
+   */
+  git(id: string, request: Record<string, unknown>, opId?: string): Promise<string>;
+  /** Cancels Git operation `opId`; whether one was running. */
+  cancelGit(opId: string): Promise<boolean>;
+  /**
+   * Starts a dictation in this window (ADR-0094, ADR-0096): needs recent real input in the
+   * visible window; the main process asks for the microphone the first time. Resolves with
+   * `DictationStarted` JSON (`sessionId`, the window's `route`). Refusals read back as
+   * `speech:<code>` (`microphoneDenied`, `busy`, `disabled`, `modelMissing`…).
+   */
+  dictationStart(request: {
+    composer: string;
+    workspace?: string;
+    test?: boolean;
+  }): Promise<string>;
+  /** Stops this window's dictation `sessionId`, keeping its text or for sending. */
+  dictationStop(sessionId: string, mode: 'keep' | 'send'): Promise<void>;
+  /** Cancels this window's dictation `sessionId`; its text is dropped. */
+  dictationCancel(sessionId: string): Promise<void>;
+  /**
+   * The running dictation (`DictationStatus`) with this window's `route`, whether the running
+   * one is this window's (`mine`) and the microphone permission (`microphone`), as JSON.
+   */
+  dictationStatus(): Promise<string>;
+  /** The input devices (`InputDevice[]` JSON). */
+  speechDevices(): Promise<string>;
+  /** The speech models' state (`SpeechModels` JSON); also broadcast on `core/speech`. */
+  speechModels(): Promise<string>;
+  /**
+   * Downloads, cancels, deletes or verifies a speech model; `SpeechModels` JSON afterwards.
+   * Download and delete need recent real input; delete asks natively first.
+   */
+  speechModelAction(
+    modelId: string,
+    action: 'download' | 'cancel' | 'delete' | 'verify',
+  ): Promise<string>;
+  /** Opens the system's microphone privacy settings. */
+  openMicrophoneSettings(): Promise<void>;
+  /** Brings forward the window that is dictating. */
+  focusDictationOwner(): Promise<void>;
+  /**
+   * One request to the built-in browser of session `id` (ADR-0088): `state` answers the
+   * session's state, `newTab` and `navigate` the tab id, the rest `null`.
+   */
+  browser(id: string, request: BrowserRequest): Promise<unknown>;
+  /** Where the session's preview panel wants its page; `null` when the panel is gone. */
+  placeBrowser(id: string, placement: BrowserPlacement): Promise<void>;
+  /** Continues the session on another branch (`SessionRewound` JSON, T28). */
+  switchBranch(id: string, entryId: string): Promise<string>;
+  /**
+   * Opens a new session whose conversation stops where `beforeTurn` started ("branch from
+   * here", T28); resolves with the new session as JSON.
+   */
+  forkSession(id: string, beforeTurn: string): Promise<string>;
+  /** Changes the text of a queued input; resolves with the queue as JSON. */
+  editQueueItem(id: string, itemId: string, text: string): Promise<string>;
+  /** Removes a queued input; resolves with the queue as JSON. */
+  deleteQueueItem(id: string, itemId: string): Promise<string>;
+  /**
+   * Hands an attachment's bytes to Core, which stores them in the session's directory;
+   * resolves with the attachment (`InputAttachment`) as JSON.
+   */
+  storeAttachment(id: string, name: string, mimeType: string, data: Uint8Array): Promise<string>;
+  /**
+   * Fuzzy-searches the files below `root` (inside a workspace) for an `@` mention; a newer
+   * search with the same `searchId` cancels this one. Resolves with `{ root, results: [{ path,
+   * name, positions }], truncated }` as JSON.
+   */
+  markdownImage(sessionId: string, document: string, request: ImageInput): Promise<string>;
+  /**
+   * A short-lived URL of an image a tool returned in the session (ADR-0093: `blob` is its
+   * SHA-256 in the session's blobs); with `release`, gives that URL up and resolves `''`.
+   */
+  sessionImage(sessionId: string, blob: string, release?: string): Promise<string>;
+  markdownImageSettings(request: ImageSettingsRequest): Promise<string>;
+  watchProjectFiles(sessionId: string, paths: readonly string[]): Promise<void>;
+  projectFilePreview(
+    sessionId: string,
+    path: string,
+    mode: 'static' | 'interactive' | 'media' | 'release',
+    token?: string,
+  ): Promise<string>;
+  projectFiles(sessionId: string, operation: ProjectRequest): Promise<string>;
+  projectFileAction(sessionId: string, path: string, action: string): Promise<string>;
+  searchFiles(searchId: string, root: string, query: string, limit: number): Promise<string>;
+  /** Stops a file search. */
+  cancelFileSearch(searchId: string): Promise<void>;
+  /** The composer's configuration as JSON: commands, attachment limits, search cap. */
+  composerInfo(): Promise<string>;
+  /** Clears a session's unread flag. */
+  markSessionRead(id: string): Promise<void>;
+  /** Gives a session a title, or removes it (`null`). */
+  renameSession(id: string, title: string | null): Promise<void>;
+  setSessionPinned(id: string, pinned: boolean): Promise<void>;
+  setSessionArchived(id: string, archived: boolean): Promise<boolean>;
+  /**
+   * Deletes a session after the user confirms in a native dialog shown by the main process
+   * (`title` is what the dialog names). Resolves `false` when the user cancelled.
+   */
+  deleteSession(id: string, title: string): Promise<boolean>;
+  /**
+   * Archives, restores or deletes sessions `ids` (settings, Data management). Archiving and
+   * deleting first confirm in a native dialog shown by the main process, which lists the
+   * sessions from Core's index. Resolves `{done, failed}`, or null when the user cancelled.
+   */
+  bulkSessions(
+    op: 'archive' | 'unarchive' | 'delete',
+    ids: readonly string[],
+  ): Promise<{ done: number; failed: number } | null>;
+  /**
+   * Exports every session as a ZIP archive where the user picks in the main process's save
+   * dialog. Resolves Core's JSON `{path, bytes, sessions}`, or null when the user cancelled.
+   */
+  exportData(): Promise<string | null>;
+  /** Shows the file the last `exportData` wrote in the system's file manager. */
+  revealDataExport(): Promise<boolean>;
+  /**
+   * Items `start .. start + limit` of a session's persisted conversation (open or not), the
+   * last `limit` when `start` is `null`, as JSON: `{ start, total, items: [{ entryId, item }] }`.
+   */
+  transcriptWindow(id: string, start: number | null, limit: number): Promise<string>;
+  /**
+   * Items of subagent `child`'s transcript (T31), read through session `parent` whose card
+   * shows it; the same JSON as `transcriptWindow`.
+   */
+  subagentTranscript(
+    parent: string,
+    child: string,
+    start: number | null,
+    limit: number,
+  ): Promise<string>;
+  /** Stops subagent `child` of session `parent` (T31); resolves with `{ stopped }` as JSON. */
+  stopSubagent(parent: string, child: string): Promise<string>;
+  /**
+   * Stops background task `taskId` with its whole process tree (T32, the panel's stop button;
+   * the same Core entry as KillShell); resolves with `{ task, stopped, tail }` as JSON.
+   */
+  stopTask(taskId: string): Promise<string>;
+  /**
+   * At most 64 KiB of background task `taskId`'s output from byte `offset` (T32), as
+   * `TaskOutputChunk` JSON; the window reads the file in parts instead of receiving it whole.
+   */
+  readTaskOutput(taskId: string, offset: number, length: number | null): Promise<string>;
+  /**
+   * The subagent types of a workspace (T31): definition files and built-in types with their
+   * source, overrides, warnings and resolved model, as `AgentsList` JSON.
+   */
+  listAgents(workspace: string): Promise<string>;
+  /**
+   * The slash commands and output styles of a workspace from `cwd` (its root when null): built-in
+   * commands, command files, Pi templates and user-invocable skills, as `CommandsList` JSON (T37).
+   */
+  listCommands(workspace: string, cwd: string | null): Promise<string>;
+  /** The skills of a workspace with source, overrides and warnings, as `SkillsList` JSON (T37). */
+  listSkills(workspace: string): Promise<string>;
+  /**
+   * The installed extension packages as `workspace` (or, when null, the user settings) sees
+   * them, as `PackagesList` JSON (T40).
+   */
+  listPackages(workspace: string | null): Promise<string>;
+  /** Installs a package, off; answers `PackageInstallResult` JSON (T40). */
+  installPackage(input: PackageInstallInput): Promise<string>;
+  /** Fetches a package's newest version; answers `PackageInstallResult` JSON (T40). */
+  updatePackage(id: string, workspace: string | null): Promise<string>;
+  /**
+   * Turns a package on or off in a scope. Turning on shows the main process's native
+   * confirmation of its source and executable items first; answers the `PackagesList` JSON, or
+   * `{"status":"cancelled"}` (T40).
+   */
+  setPackageEnabled(
+    id: string,
+    enabled: boolean,
+    scope: 'user' | 'project',
+    workspace: string | null,
+  ): Promise<string>;
+  /**
+   * Confirms the executable items of a package that wait for confirmation, after the native
+   * confirmation lists them; answers the list or `{"status":"cancelled"}` (T40).
+   */
+  confirmPackage(id: string, workspace: string | null): Promise<string>;
+  /** Uninstalls a package; answers the list (T40). */
+  uninstallPackage(id: string, workspace: string | null): Promise<string>;
+  /**
+   * One page of the Pi package market as `MarketPage` JSON (ADR-0102); sync progress, kinds
+   * and installs arrive on `core/market`.
+   */
+  marketQuery(query: MarketQueryInput): Promise<string>;
+  /** One market package's details as `MarketDetail` JSON. */
+  marketDetail(name: string, workspace: string | null): Promise<string>;
+  /** Syncs the catalog now; answers `MarketStatus` JSON. */
+  marketRefresh(): Promise<string>;
+  /** Installs a market package, off; answers `PackageInstallResult` JSON. */
+  marketInstall(input: MarketInstallInput): Promise<string>;
+  /**
+   * Sets the output style: the workspace's `.piarc/settings.local.json` (`/output-style`), or the
+   * user's settings when `workspace` is null; a null name removes the choice (T37).
+   */
+  setOutputStyle(workspace: string | null, name: string | null): Promise<void>;
+  /**
+   * WebSearch's settings as JSON `{ backend, backends: [{ id, name, hasKey }] }`: the chosen
+   * third-party backend and whether each has a key in the vault (T38). Keys never come back.
+   */
+  webSearchSettings(): Promise<string>;
+  /** Chooses WebSearch's third-party backend in the user's settings; null chooses none (T38). */
+  setWebSearchBackend(backend: string | null): Promise<void>;
+  /** Saves a WebSearch backend's API key in the vault; null removes it (T38). */
+  setWebSearchKey(backend: string, key: string | null): Promise<void>;
+  /**
+   * What the organization's managed settings lock, as JSON `{ configured, sources, locked,
+   * values, entries, taken }` (T47): the settings window marks those controls and keeps them read-only.
+   */
+  managedSettings(): Promise<string>;
+  /**
+   * The memory page of a workspace as JSON (T47): its repository's auto memory notes, the
+   * switches and Claude Code's memory available to import.
+   */
+  memoryView(workspace: string): Promise<string>;
+  /**
+   * One edit of the memory page, JSON `{ op: save | delete | deleteAll | import | setEnabled, … }`;
+   * answers the page anew (T47).
+   */
+  memoryEdit(workspace: string, edit: string): Promise<string>;
+  /** Shows the workspace repository's memory folder in Finder or File Explorer (T47). */
+  revealMemory(workspace: string): Promise<void>;
+  /**
+   * Pi's global instructions in `~/.pi/agent` as JSON `{ path, exists, content, hash }`
+   * (ADR-0108): the file Pi loads before any project file, the first of `AGENTS.override.md`,
+   * `AGENTS.md`, `CLAUDE.md` there.
+   */
+  piInstructions(): Promise<string>;
+  /**
+   * Saves Pi's global instructions over the version whose SHA-256 is `base` (null when the
+   * file did not exist); answers the new view, or fails with `fileModified` when the file
+   * changed since (ADR-0108).
+   */
+  savePiInstructions(content: string, base: string | null): Promise<string>;
+  /** Shows skill `name`'s file in Finder or File Explorer: the file Core lists for the
+   * workspace, never a path from the page (ADR-0102). */
+  revealSkill(workspace: string, name: string): Promise<void>;
+  /** Asks Core to send the workspace and session snapshots again. */
+  resendSnapshots(): Promise<void>;
+  /** The trust view of a directory as JSON (`TrustView`). */
+  projectTrust(path: string): Promise<string>;
+  /** Records the user's trust decision; resolves with the new `TrustView` as JSON. */
+  decideProjectTrust(path: string, trusted: boolean, version: string): Promise<string>;
+
+  /**
+   * Tells the main process a session needs the user: a system notification (when the window
+   * is not in front and notifications are on), the Dock bounce or taskbar flash.
+   */
+  worktreeBranches(workspace: string): Promise<string>;
+  ignoreWorktrees(workspace: string): Promise<string>;
+  removeSessionWorktree(id: string): Promise<boolean>;
+  keepSessionWorktree(id: string): Promise<void>;
+  searchSessions(query: string): Promise<string>;
+  openSessionWindow(id: string): Promise<void>;
+  takeLaunchTargets(): Promise<readonly LaunchTarget[]>;
+  pathForFile(file: object): string;
+
+  /**
+   * The MCP servers of a workspace (T36): source, transport, state, tools and the last error,
+   * as `McpStatus` JSON; changes arrive on `core/mcp`.
+   */
+  mcpStatus(workspace: string): Promise<string>;
+  /** Connects an MCP server anew; its `McpServerStatus` as JSON. */
+  mcpReconnect(workspace: string, name: string): Promise<string>;
+  /** Turns an MCP server on or off for the workspace; its `McpServerStatus` as JSON. */
+  mcpSetEnabled(workspace: string, name: string, enabled: boolean): Promise<string>;
+  /**
+   * Signs in to an OAuth MCP server; steps on `core/login` (provider `mcp:<name>`), answered
+   * with `answerLogin`. Resolves with its `McpServerStatus` and `loginId` as JSON.
+   */
+  mcpLogin(workspace: string, name: string): Promise<string>;
+  /**
+   * Adds an MCP server after a native confirmation that shows the command or address; resolves
+   * with the workspace's `McpStatus` as JSON, or `{"status":"cancelled"}`.
+   */
+  mcpAddServer(workspace: string, server: McpServerInput): Promise<string>;
+
+  notifyAttention(notice: AttentionNotice): Promise<void>;
+  /** The number of sessions that need the user (Dock badge, taskbar overlay icon). */
+  setAttentionCount(count: number): Promise<void>;
+}

@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "fs/memory",
+  "params": {
+    "sessionId": "session-a",
+    "toolCallId": "scan-1",
+    "turnId": "turn-1",
+    "directories": ["src"],
+    "includeGit": true
+  }
+}

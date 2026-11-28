@@ -1,0 +1,29 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "allowJs": true,
+    "checkJs": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": "..",
+    "outDir": "../node_modules/.cache/tsc/scripts",
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/scripts/.tsbuildinfo",
+    "types": ["node"]
+  },
+  // The benchmarks use the test-hook and probe types of the desktop app.
+  "references": [{ "path": "../apps/desktop/src/shared" }],
+  "include": [
+    "**/*.mjs",
+    "../*.mjs",
+    "../apps/desktop/fuses.mjs",
+    "../apps/desktop/core-binary.mjs",
+    "../apps/desktop/app-identity.mjs",
+    "../apps/desktop/packaging/agent-bundle.mjs",
+    "../apps/desktop/packaging/agent-host-layout.mjs",
+    "../apps/desktop/packaging/macos-sign.mjs",
+    "../apps/desktop/packaging/speech-layout.mjs",
+    "../apps/desktop/packaging/trim.mjs"
+  ]
+}

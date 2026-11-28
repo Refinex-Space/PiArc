@@ -1,0 +1,14 @@
+id: browser-client-absent
+description: Without a desktop client attached (headless Core, the L2 default) the model's request declares no Browser tool (design addendum browser.md B2.1.1).
+capabilities: [CAP-BROWSER-TOOL-001]
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - text: 'No browser here.'
+actions:
+  - prompt: { text: 'Open example.com.', turn: one }
+expect:
+  requests:
+    - { index: 0, tools_exclude: [Browser] }
+  request_counts: { main: 1 }

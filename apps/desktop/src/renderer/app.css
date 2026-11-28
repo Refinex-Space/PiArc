@@ -1,0 +1,3376 @@
+@import './files/markdown/reader-selection.css';
+@import './files/markdown/workspace.css';
+@import './files/markdown/outline.css';
+@import './files/markdown/editor.css';
+@import './files/markdown/table-controls.css';
+@import './files/markdown/media-viewer.css';
+@import './files/markdown/slash-menu.css';
+@import './files/files-panel.css';
+@import './files/viewer-styles.css';
+@import './files/tree-style.css';
+@import './changes/git/git.css';
+@import './browser/browser.css';
+@import './settings/browser-page.css';
+@import './settings/voice-page.css';
+@import './changes/git/history.css';
+@import './changes/git/merge.css';
+@import './changes/git/review.css';
+
+/* PiArc's window styles. Colors, fonts and sizes come only from the design tokens
+   (theme/tokens.generated.css, generated from design/tokens/): a change of visual direction
+   changes tokens, never these rules. Element rules apply only to the app's own windows
+   (`data-app` on <html>, set by main.tsx), not to the prototype test pages. */
+
+:root[data-app] *,
+:root[data-app] *::before,
+:root[data-app] *::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+:root[data-app] body {
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-body);
+  line-height: 1.45;
+  color: var(--piarc-text-primary);
+  background: var(--piarc-c-window-background);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The app's windows are not documents: chrome text is not selectable (content areas opt back
+   in) and the window itself never scrolls. */
+.shell,
+.settings {
+  user-select: none;
+  overflow: hidden;
+}
+
+/* The platform's material (macOS vibrancy, Windows Mica) shows behind the sidebar; content
+   areas stay opaque. High-contrast modes are opaque everywhere. */
+:root[data-app][data-platform='mac']:not([data-color-mode$='HighContrast']) body,
+:root[data-app][data-platform='windows']:not([data-color-mode$='HighContrast']) body {
+  background: transparent;
+}
+
+:root[data-app][data-reduce-motion='true'] *,
+:root[data-app][data-reduce-motion='true'] *::before,
+:root[data-app][data-reduce-motion='true'] *::after {
+  animation-duration: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+}
+
+/* Scrollbars (docs/engineering/visual-design.md section 5): a thumb only, no track, corner or
+   border; clear until the pointer is over the scroller, darker on the thumb itself. `:where`
+   keeps this the floor, so a surface's own scrollbar rules still win. A styled scrollbar is
+   never an overlay one, so it looks the same with "always show scroll bars" on. */
+:where(:root[data-app]) ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+:where(:root[data-app]) ::-webkit-scrollbar-track,
+:where(:root[data-app]) ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+:where(:root[data-app]) ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--piarc-radius-pill);
+  background: transparent padding-box;
+}
+:where(:root[data-app] :hover)::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--piarc-text-primary) 16%, transparent);
+}
+:where(:root[data-app]) ::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--piarc-text-primary) 30%, transparent);
+}
+
+/* A search field's native clear button looks different on each platform (and sits beside the
+   field's own close or clear control): it is not shown (visual-design.md section 6). */
+:root[data-app] input[type='search']::-webkit-search-cancel-button {
+  display: none;
+  -webkit-appearance: none;
+}
+
+/* Paint one fine edge (the light focus style), including on controls whose actual focus target
+   is invisible. Keeping it inside the bounds also protects the indicator in clipped panels and
+   virtual lists. */
+:root[data-app] :focus-visible:not(:where([data-focus-proxy])),
+:root[data-app] .settings-search:has(input:focus-visible),
+:root[data-app] .browser-address:has(> input:focus-visible),
+.segment:has(> input:focus-visible),
+.composer-attach:has(> input:focus-visible),
+:root[data-app] .terminal-surface:has(textarea:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+
+/* A focused menu shows its active item by the item's fill alone; the editor delegates its
+   indicator to the composer card. */
+:root[data-app] .menu:focus-visible:has(> .menu-item.is-active),
+:root[data-app] .composer-editor:focus-visible {
+  outline: none;
+}
+
+/* Leave room around inline text, filled buttons, narrow separators, and native check marks. */
+:root[data-app]
+  :is(
+    a[href],
+    .button-primary,
+    .button-destructive,
+    .resizer,
+    input[type='radio'],
+    input[type='checkbox']
+  ):focus-visible {
+  outline-offset: 1px;
+}
+
+/* A pointer-focused text field still shows its insertion point and a single quiet edge (the
+   keyboard ring is the strong one; visual-design.md section 4). A native select clicked with the
+   pointer opens its list, which is indication enough: no edge. */
+:root[data-app][data-pointer-focus]
+  :is(input:read-write, input[readonly], textarea):focus:not(:where([data-focus-proxy])),
+:root[data-app][data-pointer-focus] .settings-search:has(input:focus),
+:root[data-app][data-pointer-focus] .browser-address:has(> input:focus) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-border-default);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+  transition: outline-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+:root[data-app][data-pointer-focus] select:focus:not(:where([data-focus-proxy])),
+:root[data-app][data-pointer-focus] .settings-scope-project:has(select:focus) {
+  outline: none;
+}
+
+/* The focused terminal draws its own cursor on the canvas. */
+:root[data-app][data-pointer-focus] .terminal-surface:focus-within {
+  outline: none;
+}
+
+/* A menu filter is a quiet strip, not a boxed field. */
+:root[data-app] input.menu-filter:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] input.menu-filter:focus {
+  outline: none;
+}
+
+/* The find field keeps its own hairline; the browser focus ring reads as a thick yellow frame. */
+:root[data-app] .cm-panel.md-find input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .cm-panel.md-find input:focus {
+  outline: none;
+}
+
+/* The file-tree filter already has its hairline. Focus must not add a second frame. */
+:root[data-app] .project-filter:has(> input:is(:focus, :focus-visible)),
+:root[data-app] .project-filter > input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .project-filter:has(> input:focus),
+:root[data-app][data-pointer-focus] .project-filter > input:focus {
+  outline: none;
+}
+
+/* File find keeps its hairline; the browser focus ring reads as a thick frame. */
+:root[data-app] .file-find input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .file-find input:focus {
+  outline: none;
+}
+
+/* The terminal find chip has no boxed field; focus stays on the caret. */
+:root[data-app] .terminal-find-input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .terminal-find-input:focus {
+  outline: none;
+  border-color: transparent;
+}
+
+:root[data-app] button,
+:root[data-app] input,
+:root[data-app] select,
+:root[data-app] textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:root[data-app] code,
+:root[data-app] kbd {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+}
+
+:root[data-app] kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-raised);
+}
+
+.muted {
+  color: var(--piarc-text-secondary);
+}
+
+.small {
+  font-size: var(--piarc-font-size-small);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-text {
+  color: var(--piarc-text-danger);
+}
+
+.warning-text {
+  color: var(--piarc-text-warning);
+}
+
+/* A single column for interactive rows. Only the items paint backgrounds and receive clicks;
+   the density scale leaves 4px (comfortable) or 3px (compact) of clear surface between them. */
+.interactive-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  align-content: start;
+  row-gap: var(--piarc-space-1);
+}
+
+.palette-option:hover,
+.mention-option:hover,
+.style-choice:hover,
+.model-option:enabled:hover {
+  background: var(--piarc-surface-hover);
+}
+
+.palette-option.is-active,
+.mention-option.is-active,
+.style-choice.is-current,
+.model-option[aria-current='true'] {
+  background: var(--piarc-surface-selected);
+}
+
+/* ---- controls ---- */
+
+/* Keep the native hit and focus box stable. The small painted surface can be shorter in
+   compact density; its surrounding space still belongs to the same button. */
+.button {
+  --action-height: var(--piarc-c-button-height);
+  --action-radius: var(--piarc-c-button-radius);
+  --action-pad: var(--piarc-space-3);
+  --action-font: var(--piarc-c-button-font-size);
+  --action-line: var(--piarc-c-button-line-height);
+  --action-fill: var(--piarc-c-button-secondary-background);
+  --action-hover: var(--piarc-action-hover);
+  --action-down: var(--piarc-action-pressed);
+  --action-ink: var(--piarc-text-primary);
+  --action-shadow:
+    inset 0 0 0 1px var(--piarc-c-button-secondary-border), var(--piarc-shadow-button);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--piarc-space-1);
+  box-sizing: border-box;
+  height: max(24px, var(--action-height));
+  padding: 0 var(--action-pad);
+  border: 0;
+  border-radius: var(--action-radius);
+  background-color: transparent;
+  user-select: none;
+  white-space: nowrap;
+  cursor: default;
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+.button,
+:root[data-app] .button {
+  color: var(--action-ink);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--action-font);
+  line-height: var(--action-line);
+  font-weight: var(--action-weight, var(--piarc-font-weight-regular));
+}
+
+.button::before {
+  position: absolute;
+  inset: max(0px, calc((24px - var(--action-height)) / 2)) 0;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+  border-radius: inherit;
+  background-color: var(--action-surface, var(--action-fill));
+  box-shadow: var(--action-shadow);
+  transition:
+    background-color var(--piarc-motion-surface) var(--piarc-motion-easing),
+    box-shadow var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+.button-small {
+  --action-height: var(--piarc-button-small-height);
+  --action-radius: var(--piarc-button-small-radius);
+  --action-pad: var(--piarc-button-small-padding);
+  --action-font: var(--piarc-button-small-font-size);
+  --action-line: var(--piarc-button-small-line-height);
+}
+
+.button-ghost {
+  --action-fill: transparent;
+  --action-shadow: none;
+}
+
+.button-primary {
+  --action-fill: var(--piarc-c-button-primary-background);
+  --action-hover: var(--piarc-c-button-primary-background-hover);
+  --action-down: var(--piarc-action-primary-pressed);
+  --action-ink: var(--piarc-c-button-primary-text);
+}
+
+.button-destructive {
+  --action-fill: var(--piarc-action-danger);
+  --action-hover: var(--piarc-action-danger-hover);
+  --action-down: var(--piarc-action-danger-pressed);
+  --action-ink: var(--piarc-action-on-danger);
+}
+
+.button-primary,
+.button-destructive {
+  --action-weight: var(--piarc-font-weight-medium);
+  background-color: var(--action-surface, var(--action-fill));
+}
+
+.button-primary::before,
+.button-destructive::before {
+  content: none;
+}
+
+.button:enabled:is(:hover, [aria-expanded='true']) {
+  --action-surface: var(--action-hover);
+}
+
+.button:enabled:active {
+  --action-surface: var(--action-down);
+}
+
+.button:focus-visible::before,
+.button:enabled:active::before {
+  box-shadow: none;
+}
+
+.button:disabled:not([aria-busy='true']) {
+  opacity: 0.4;
+}
+
+.button[aria-busy='true'] .button-label {
+  opacity: 0;
+}
+
+.button[aria-busy='true']::after {
+  content: '';
+  position: absolute;
+  width: 1em;
+  height: 1em;
+  border: 1.5px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: piarc-spin 0.9s linear infinite;
+}
+
+@media (forced-colors: active) {
+  :root[data-app] .button {
+    border: 1px solid ButtonText;
+    background-color: ButtonFace;
+    color: ButtonText;
+  }
+  :root[data-app] .button:disabled:not([aria-busy='true']) {
+    border-color: GrayText;
+    color: GrayText;
+    opacity: 1;
+  }
+  .button::before {
+    content: none;
+  }
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: var(--piarc-text-secondary);
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--piarc-surface-active);
+  color: var(--piarc-text-primary);
+}
+
+.icon-button:not(:disabled):active {
+  background-color: var(--piarc-action-pressed);
+}
+
+.icon-button,
+.row-action {
+  transition: background-color var(--piarc-motion-surface) var(--piarc-motion-easing);
+}
+
+.input {
+  height: var(--piarc-c-input-height);
+  padding: 0 var(--piarc-space-2);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-c-input-background);
+  color: var(--piarc-c-input-text);
+  user-select: text;
+}
+
+.input::placeholder {
+  color: var(--piarc-text-secondary);
+}
+
+textarea.input {
+  height: auto;
+  padding: var(--piarc-space-2);
+  resize: vertical;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+
+.tag {
+  padding: 0 6px;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-active);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+}
+
+/* T39: the sandbox is on in the settings but does not apply here. */
+.tag.sandbox-warning,
+.tag.auto-review-warning {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
+.icon {
+  flex: none;
+}
+
+/* ---- window layout ---- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--piarc-sidebar-width) minmax(0, 1fr);
+  height: 100%;
+}
+
+.shell.is-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--piarc-c-window-titlebar-height);
+  padding: 0 var(--piarc-space-3);
+  -webkit-app-region: drag;
+}
+
+.titlebar button,
+.titlebar input,
+.titlebar select {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS: the traffic lights sit at the top left of the sidebar. */
+:root[data-platform='mac'] .sidebar-titlebar {
+  padding-left: 80px;
+}
+
+:root[data-platform='mac'] .is-collapsed .main-titlebar {
+  padding-left: 112px;
+}
+
+/* Windows: the window controls overlay covers the top right of the main area. */
+:root[data-platform='windows'] .main-titlebar {
+  padding-right: 148px;
+}
+
+/* ...and a short divider, clear of the top and the bottom, separates the app's own buttons from
+   the window's (138 px of caption buttons sit inside the 148 px kept for them). */
+:root[data-platform='windows'] .workbench-header.has-session::after,
+:root[data-platform='windows'] .workbench-header:has(.session-tools)::after,
+:root[data-platform='windows']
+  .tool-tile-slot[data-overlay-edge='true']:not([data-compact-caption='true'])
+  .tool-tile-header::after {
+  position: absolute;
+  top: 50%;
+  right: 143px;
+  width: 1px;
+  height: 16px;
+  background: var(--piarc-border-subtle);
+  content: '';
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+:root[data-platform='windows']
+  .tool-tiles[data-has-tools='true']
+  .tile-primary
+  .workbench-header::after {
+  display: none;
+}
+
+.resizer {
+  position: relative;
+  background: var(--piarc-border-subtle);
+}
+
+.resizer::after {
+  position: absolute;
+  inset: 0 -3px;
+  content: '';
+  cursor: col-resize;
+}
+
+.resizer-y::after {
+  inset: -3px 0;
+  cursor: row-resize;
+}
+
+.workspace-area {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.main-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--piarc-surface-app);
+}
+
+.expand-sidebar {
+  position: absolute;
+  top: 7px;
+  left: var(--piarc-space-3);
+  z-index: 1;
+  -webkit-app-region: no-drag;
+}
+
+:root[data-platform='mac'] .expand-sidebar {
+  left: 80px;
+}
+
+.panel-area {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--piarc-surface-panel);
+}
+
+.panel-area-rail {
+  position: relative;
+  border-left: 1px solid var(--piarc-border-subtle);
+}
+
+.panel-area > .resizer {
+  position: absolute;
+  z-index: 1;
+  background: transparent;
+}
+
+.panel-area-rail > .resizer {
+  inset: 0 auto 0 -2px;
+  width: 4px;
+}
+
+.panel-body {
+  flex: 1;
+  overflow: auto;
+}
+
+.side-chat {
+  padding: var(--piarc-space-3);
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+
+.side-chat-history,
+.side-chat-exchange,
+.side-chat form {
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+
+.side-chat-exchange {
+  justify-items: start;
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  padding-block: var(--piarc-space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.side-chat-exchange p {
+  margin: 0;
+}
+.side-chat-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+.side-chat textarea {
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+  background: var(--piarc-surface-panel);
+}
+
+/* ---- sidebar ---- */
+
+.sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--piarc-c-sidebar-background);
+}
+
+/* The sidebar's separator is inside its landmark, on its right edge. It shows only under the
+   pointer or the keyboard: the desk's card draws the edge (ADR-0105). */
+.sidebar-resizer {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 1;
+  width: 1px;
+  background: transparent;
+}
+
+/* The navigation's surface belongs to the window (ADR-0105): the shell carries it, and the
+   sidebars in a grid (the workbench's, and the settings view's above it) are transparent on it,
+   so the corners the desk's card leaves open show the very same surface. The material shows
+   through a light veil of the sidebar's own color: text keeps its contrast whatever is behind
+   the window (axe, which cannot see the material, measures it on white). */
+.shell {
+  background: var(--piarc-c-sidebar-background);
+}
+:root[data-platform='mac']:not([data-color-mode$='HighContrast']) .shell,
+:root[data-platform='windows']:not([data-color-mode$='HighContrast']) .shell {
+  background: color-mix(in srgb, var(--piarc-c-sidebar-background) 90%, transparent);
+}
+.shell > .sidebar,
+.settings-sidebar-clip > .settings-sidebar {
+  background: transparent;
+}
+
+.titlebar-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.sidebar-filter {
+  padding: 0 var(--piarc-space-3) var(--piarc-space-2);
+}
+
+.sidebar-filter .input {
+  width: 100%;
+}
+
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--piarc-space-2) var(--piarc-space-3);
+}
+
+.workspace-group + .workspace-group {
+  margin-top: var(--piarc-space-3);
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  color: var(--piarc-c-sidebar-group-label);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.workspace-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.workspace-header .icon-button,
+.session-row .icon-button {
+  visibility: hidden;
+  min-width: 22px;
+  height: 22px;
+}
+
+.workspace-header:hover .icon-button,
+.workspace-header .icon-button:focus-visible,
+.workspace-header .icon-button[aria-expanded='true'],
+.session-row:hover .icon-button,
+.session-row.is-selected .icon-button,
+.session-row .icon-button:focus-visible,
+.session-row .icon-button[aria-expanded='true'] {
+  visibility: visible;
+}
+
+.session-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  height: var(--piarc-c-sidebar-row-height);
+  padding: 0 var(--piarc-space-1) 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-md);
+}
+
+.session-row:hover {
+  background: var(--piarc-c-sidebar-row-hover);
+}
+
+.session-row.is-selected {
+  background: var(--piarc-c-sidebar-row-selected);
+}
+
+.session-row.is-archived .session-title {
+  color: var(--piarc-text-secondary);
+}
+
+.session-title {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.session-title .truncate {
+  flex: 1;
+}
+
+/* A title that changes in place (a generated title replacing the first message, ADR-0106, or a
+   rename) settles in instead of jumping. */
+.title-in {
+  animation: title-in var(--piarc-motion-view) var(--piarc-motion-curve-out) both;
+}
+@keyframes title-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+.pin-mark {
+  display: inline-flex;
+  color: var(--piarc-text-secondary);
+}
+
+.rename-input {
+  flex: 1;
+  min-width: 0;
+  height: calc(var(--piarc-c-sidebar-row-height) - 6px);
+  padding: 0 var(--piarc-space-1);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-input);
+  user-select: text;
+}
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  color: var(--piarc-text-secondary);
+}
+
+.footer-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* ---- status badges: distinct shapes, not only colors ---- */
+
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+}
+
+/* An error is a warning sign in the error ink (the reference's sidebar glyph). */
+.badge-error {
+  color: var(--piarc-c-badge-error);
+}
+
+/* Waiting for the user: the reference's amber dot, inside a thin ring so that it differs from the
+   unread dot by shape as well as color. */
+.badge-awaiting {
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  margin: 1px;
+  border: 1.5px solid var(--piarc-c-badge-awaiting);
+  border-radius: var(--piarc-radius-pill);
+}
+
+.badge-awaiting::before {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-c-badge-awaiting);
+  content: '';
+}
+
+.badge-running {
+  width: 14px;
+  height: 14px;
+}
+
+.badge-unread::before {
+  width: var(--piarc-c-badge-size);
+  height: var(--piarc-c-badge-size);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-c-badge-unread);
+  content: '';
+}
+
+@keyframes piarc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (forced-colors: active) {
+  .badge-awaiting {
+    border-color: CanvasText;
+  }
+  /* The dots are backgrounds: keep them, in a system color. */
+  .badge-awaiting::before {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  .badge-unread::before {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+}
+
+/* ---- main area ---- */
+
+/* Core's notices sit above the input: quiet cards on the page, the icon carries the tone. */
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-session-gap-xs);
+  max-height: min(40vh, 256px);
+  margin-bottom: var(--piarc-space-2);
+  overflow-y: auto;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-session-gap-sm);
+  padding: var(--piarc-session-pad-md) var(--piarc-session-pad-md) var(--piarc-session-pad-md)
+    var(--piarc-session-pad-lg);
+  border-radius: var(--piarc-session-radius-card);
+  background: var(--piarc-workbench-canvas);
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-session-body);
+  line-height: var(--piarc-session-body-line);
+  animation: session-notice-in var(--piarc-motion-normal) var(--piarc-motion-curve-out);
+}
+
+@keyframes session-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.notice-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  height: var(--piarc-session-body-line);
+  color: var(--piarc-text-secondary);
+}
+
+.notice[data-tone='warning'] .notice-icon {
+  color: var(--piarc-state-warning);
+}
+
+.notice[data-tone='danger'] .notice-icon {
+  color: var(--piarc-state-danger);
+}
+
+.notice-text {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0 var(--piarc-space-2);
+  /* Long paths wrap anywhere: the text must not push the notice's buttons out. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.notice-text strong {
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.notice > .button {
+  flex: none;
+  margin-block: -4px;
+}
+
+.notice-dismiss {
+  margin: -2px -4px -2px 0;
+}
+
+@media (forced-colors: active) {
+  .notice {
+    border: 1px solid CanvasText;
+  }
+}
+
+.home,
+.conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.home-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-3);
+  width: min(680px, 100% - 2 * var(--piarc-space-5));
+  margin: 8vh auto 0;
+}
+
+.home-title {
+  margin: 0 0 var(--piarc-space-2);
+  font-size: var(--piarc-font-size-heading);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+
+.field-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-label {
+  color: var(--piarc-text-secondary);
+}
+
+.prompt-input {
+  width: 100%;
+  min-height: 96px;
+  line-height: 1.5;
+}
+
+.home-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.conversation-header {
+  gap: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+
+.conversation-title {
+  margin: 0;
+  font-size: var(--piarc-font-size-title);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.detail-switch {
+  align-self: center;
+  margin-left: auto;
+  font-size: var(--piarc-font-size-small);
+  -webkit-app-region: no-drag;
+}
+
+.conversation-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.conversation-note {
+  position: absolute;
+  top: var(--piarc-space-4);
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+.conversation-composer {
+  border-top: 1px solid var(--piarc-border-subtle);
+  background: var(--piarc-surface-app);
+}
+
+/* ---- dialogs, menus, toasts ---- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--piarc-c-dialog-scrim);
+}
+
+.dialog {
+  width: min(440px, 100% - 32px);
+  max-height: calc(100% - 64px);
+  overflow-y: auto;
+  padding: var(--piarc-space-5);
+  border: 1px solid var(--piarc-c-dialog-border);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-c-dialog-background);
+  box-shadow: var(--piarc-shadow-overlay);
+  user-select: text;
+}
+
+/* The container only holds the focus while its content loads. */
+.dialog:focus {
+  outline: none;
+}
+
+.dialog-wide {
+  width: min(560px, 100% - 32px);
+}
+
+.dialog-title {
+  margin: 0 0 var(--piarc-space-3);
+  font-size: var(--piarc-font-size-title);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.dialog p {
+  margin: 0 0 var(--piarc-space-3);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--piarc-space-2);
+  margin-top: var(--piarc-space-4);
+}
+
+.trust-groups {
+  margin-bottom: var(--piarc-space-3);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+}
+
+.trust-group h3 {
+  margin: var(--piarc-space-2) 0 var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.trust-group ul {
+  margin: 0;
+  padding-left: var(--piarc-space-4);
+}
+
+.trust-group li {
+  overflow-wrap: anywhere;
+}
+
+.menu {
+  position: fixed;
+  z-index: 30;
+  inset: 0 auto auto 0;
+  width: max-content;
+  min-width: min(180px, 100%);
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding: var(--piarc-space-1);
+  border: 1px solid var(--piarc-c-dialog-border);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  box-shadow: var(--piarc-shadow-overlay);
+  /* Its own ink: a menu opened from the environment bar does not take the bar's grey. */
+  color: var(--piarc-text-primary);
+  outline: none;
+}
+
+.menu-item {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.menu-item.is-active {
+  background: var(--piarc-accent-subtle);
+}
+
+.menu-item.is-danger {
+  color: var(--piarc-text-danger);
+}
+
+/* A choice that cannot be made steps down; its hint (why) stays readable. */
+.menu-item.is-disabled {
+  color: var(--piarc-text-disabled);
+  cursor: default;
+}
+
+.menu-item.is-disabled .menu-item-hint {
+  color: var(--piarc-text-secondary);
+}
+
+.menu-item-hint {
+  display: block;
+  max-width: 280px;
+  font-size: var(--piarc-font-size-small);
+  color: var(--piarc-text-secondary);
+}
+
+.toasts {
+  position: fixed;
+  right: var(--piarc-space-4);
+  bottom: var(--piarc-space-4);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  max-width: 380px;
+  padding: var(--piarc-space-2) var(--piarc-space-2) var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  box-shadow: var(--piarc-shadow-overlay);
+}
+
+.toast-text {
+  flex: 1;
+}
+
+.shortcut-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcut-table th,
+.shortcut-table td {
+  padding: var(--piarc-space-2) var(--piarc-space-1);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.shortcut-table th {
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-4);
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.setting-label {
+  padding: 0;
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.setting select {
+  width: 240px;
+}
+
+.segmented {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  min-height: var(--piarc-segment-height);
+  padding: 1px;
+  border-radius: var(--piarc-segment-radius);
+  background: var(--piarc-segment-track);
+  font-size: var(--piarc-segment-font-size);
+  font-weight: var(--piarc-font-weight-control);
+  line-height: var(--piarc-segment-line-height);
+  user-select: none;
+}
+
+.segment-thumb {
+  position: absolute;
+  inset: 1px auto 1px 0;
+  pointer-events: none;
+  border-radius: calc(var(--piarc-segment-radius) - 1px);
+  background: var(--piarc-segment-thumb);
+  box-shadow: 0 0 0 1px var(--piarc-segment-edge);
+}
+
+.segment-thumb[data-moving] {
+  transition:
+    transform var(--piarc-motion-fast) var(--piarc-motion-easing),
+    width var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 var(--piarc-segment-padding);
+  border-radius: calc(var(--piarc-segment-radius) - 2px);
+  color: color-mix(in srgb, var(--piarc-text-primary) 85%, var(--piarc-text-secondary));
+  text-align: center;
+  overflow-wrap: anywhere;
+  transition:
+    color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.segment > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+}
+
+.segment:has(input:checked),
+.segment:has(input:enabled):hover {
+  color: var(--piarc-text-primary);
+}
+
+.segment:has(input:enabled):active {
+  background-color: var(--piarc-segment-edge);
+}
+
+.segmented:has(input:checked:focus-visible) .segment-thumb {
+  box-shadow: none;
+}
+
+.segmented:has(input:disabled) {
+  opacity: 0.5;
+}
+
+@media (forced-colors: active) {
+  .segment-thumb {
+    border: 1px solid ButtonText;
+  }
+  .segment:has(input:checked) {
+    text-decoration: underline;
+  }
+  .segmented:has(input:disabled) {
+    opacity: 1;
+  }
+  .segment:has(input:disabled) {
+    color: GrayText;
+  }
+}
+
+.shortcut-help {
+  margin: 0 0 var(--piarc-space-4);
+}
+.shortcut-editor {
+  table-layout: fixed;
+}
+.shortcut-editor th:first-child {
+  width: 50%;
+}
+.shortcut-editor thead th:last-child {
+  text-align: end;
+}
+.shortcut-editor tbody th,
+.shortcut-editor td {
+  padding: var(--piarc-space-2) 0;
+  border-bottom: 1px solid var(--settings-divider);
+  vertical-align: middle;
+}
+.shortcut-editor tbody th {
+  font-weight: var(--piarc-font-weight-regular);
+  font-size: var(--piarc-c-button-font-size);
+  color: var(--piarc-text-primary);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.shortcut-editor th p {
+  margin: var(--piarc-space-1) 0 0;
+}
+.shortcut-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+}
+.shortcut-recorder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--piarc-space-2);
+  min-height: 32px;
+  max-width: 100%;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+.shortcut-recorder > span {
+  min-width: 0;
+}
+.shortcut-edit-mark {
+  flex: none;
+  opacity: 0;
+  color: var(--piarc-text-secondary);
+}
+.shortcut-recorder:is(:hover, :focus-visible) .shortcut-edit-mark {
+  opacity: 1;
+}
+.shortcut-recorder:hover {
+  background: var(--piarc-action-surface);
+}
+:root[data-app] .shortcut-recorder[aria-pressed='true'] {
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  padding-inline: var(--piarc-space-2);
+}
+.shortcut-recorder[aria-pressed='true']::before {
+  content: '';
+  height: 1em;
+  border-inline-start: 2px solid currentColor;
+}
+.keycaps,
+.keycaps-visual {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  max-width: 100%;
+}
+.keycaps-visual {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+}
+:root[data-app] .keycaps-visual kbd {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--piarc-text-secondary) 28%, transparent);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-panel);
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+.keycap-joiner {
+  font-size: var(--piarc-font-size-caption);
+  color: var(--piarc-text-secondary);
+}
+@media (forced-colors: active) {
+  :root[data-app] .keycaps-visual kbd {
+    border-color: ButtonText;
+  }
+  .shortcut-recorder[aria-pressed='true'] {
+    outline: 1px dashed Highlight;
+  }
+}
+.provider-form {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.provider-list,
+.model-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.provider-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-default);
+}
+.provider-list li > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* subagent types (T31) */
+
+.agents-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-3);
+}
+.agent-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.agent-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  padding-block: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-default);
+  overflow-wrap: anywhere;
+}
+.agent-row p {
+  margin: 0;
+}
+.agent-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+
+/* sign-in and model settings (T29) */
+
+.settings-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  padding-top: var(--piarc-space-4);
+  border-top: 1px solid var(--piarc-border-subtle);
+}
+
+.settings-heading {
+  margin: 0;
+  font-size: var(--piarc-font-size-body);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+
+.login-dialog .login-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.login-dialog .login-step + .login-step {
+  margin-top: var(--piarc-space-4);
+  padding-top: var(--piarc-space-4);
+  border-top: 1px solid var(--piarc-border-subtle);
+}
+
+.login-dialog .login-step > p,
+.login-dialog .login-note,
+.login-dialog .login-outcome {
+  margin: 0;
+}
+
+.login-dialog .login-note {
+  margin-top: var(--piarc-space-3);
+}
+
+.login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+
+.login-dialog .dialog-actions .login-proxy {
+  margin-inline-end: auto;
+}
+
+.button.login-copy {
+  gap: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+}
+
+.button.login-copy[data-copied] {
+  color: var(--piarc-text-success);
+}
+
+/* The device code is the thing to copy: the whole block is the button. */
+.login-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--piarc-space-3);
+  width: 100%;
+  padding: var(--piarc-space-3) var(--piarc-space-4);
+  border: 1px dashed var(--piarc-border-strong);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.login-code > span:first-child {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-title);
+  letter-spacing: 0.12em;
+  user-select: all;
+}
+
+.login-code:hover {
+  background: var(--piarc-surface-hover);
+}
+
+.login-code[data-copied] {
+  border-style: solid;
+  border-color: var(--piarc-text-success);
+}
+
+.login-code-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  white-space: nowrap;
+}
+
+.login-code[data-copied] .login-code-hint {
+  color: var(--piarc-text-success);
+}
+
+.login-options > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: var(--piarc-space-2);
+  padding: 0;
+}
+
+.login-option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.login-option:hover {
+  border-color: var(--piarc-border-strong);
+  background: var(--piarc-surface-hover);
+}
+
+.login-answer {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+
+.login-answer > .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Provider connections (T21, T29): name with status, and the "add a service" chooser. */
+
+.provider-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+
+.provider-badge,
+.service-badge {
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.provider-badge.is-warning {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
+.provider-badge.is-muted {
+  background: var(--piarc-surface-active);
+  color: var(--piarc-text-secondary);
+}
+
+/* A provider turned off (ADR-0083): its mark, name and details recede; the controls stay usable. */
+.provider-list > li.is-off > :is(.provider-row-mark, div:first-of-type) {
+  opacity: 0.6;
+  transition: opacity var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.service-item-mark,
+.provider-row-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-session-fill);
+  color: var(--piarc-text-primary);
+}
+
+.provider-list > li > .preference-switch {
+  flex-shrink: 0;
+}
+
+/* The connection test's answer takes the row's full width under its controls. */
+.provider-test {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  margin: 0;
+}
+
+.provider-test.is-ok {
+  color: var(--piarc-text-success);
+}
+
+.provider-test-link {
+  color: var(--piarc-text-accent);
+}
+
+.model-discovery {
+  display: grid;
+  gap: var(--piarc-space-2);
+  justify-items: start;
+}
+
+.model-discovery > p {
+  margin: 0;
+}
+
+.model-discovered {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: var(--piarc-space-1) var(--piarc-space-3);
+  width: 100%;
+  max-height: 14rem;
+  margin: 0;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  overflow-y: auto;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+
+.model-discovered > legend {
+  padding: 0 var(--piarc-space-1);
+}
+
+.model-discovered-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.provider-form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+
+.dialog.service-chooser {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100% - 32px);
+  height: min(560px, 100% - 64px);
+  overflow: hidden;
+}
+
+.service-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.service-search > .icon {
+  position: absolute;
+  inset-inline-start: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  pointer-events: none;
+}
+
+.service-search > .input {
+  flex: 1;
+  padding-inline-start: calc(var(--piarc-space-2) * 2 + 16px);
+}
+
+.service-groups {
+  flex: 1;
+  min-height: 0;
+  margin: var(--piarc-space-3) calc(var(--piarc-space-5) * -1) calc(var(--piarc-space-5) * -1);
+  padding: 0 var(--piarc-space-5) var(--piarc-space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.service-group + .service-group {
+  margin-top: var(--piarc-space-4);
+}
+
+.service-group-title {
+  margin: 0 0 var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--piarc-motion-fast) var(--piarc-motion-easing),
+    border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.service-item > .icon {
+  flex-shrink: 0;
+  color: var(--piarc-text-secondary);
+  opacity: 0;
+  transform: translateX(-2px);
+  transition:
+    opacity var(--piarc-motion-fast) var(--piarc-motion-easing),
+    transform var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+
+.service-item:hover {
+  border-color: var(--piarc-border-strong);
+  background: var(--piarc-surface-hover);
+}
+
+.service-item:is(:hover, :focus-visible) > .icon {
+  opacity: 1;
+  transform: none;
+}
+
+.service-item-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.service-item-name {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  font-weight: var(--piarc-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.service-item-detail {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  overflow-wrap: anywhere;
+}
+
+.service-empty {
+  display: grid;
+  gap: var(--piarc-space-3);
+  justify-items: start;
+}
+
+.service-empty > p {
+  margin: 0;
+}
+.model-list {
+  max-height: 45vh;
+  overflow: auto;
+  margin-block: var(--piarc-space-3);
+}
+.model-option {
+  display: grid;
+  width: 100%;
+  text-align: start;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2);
+  overflow-wrap: anywhere;
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background-color: transparent;
+}
+.model-preview {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--piarc-space-2) var(--piarc-space-4);
+  margin-block: var(--piarc-space-3);
+}
+.model-preview dd {
+  margin: 0;
+}
+/* Permissions settings page (T23). */
+.permission-rules {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.permission-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  overflow-wrap: anywhere;
+}
+.permission-rule code {
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+}
+.permission-badge {
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.permission-badge.is-deny {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.permission-badge.is-ask {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+.permission-actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: var(--piarc-space-1);
+}
+.permission-editor,
+.permission-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+/* A workspace path longer than the page shrinks the selector instead of widening the page. */
+.permission-filters > .input {
+  min-width: 0;
+  max-width: 100%;
+}
+.permission-editor .input[aria-label] {
+  min-width: 0;
+}
+.permission-editor input.input {
+  flex: 1 1 16rem;
+}
+.permission-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--piarc-font-size-small);
+}
+.permission-audit-table th,
+.permission-audit-table td {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+.permission-audit-table th,
+.permission-nowrap {
+  white-space: nowrap;
+}
+.permission-audit-table th {
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.permission-heading {
+  margin: 0;
+  font-size: var(--piarc-font-size-heading);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+/* T46: the Auto review section's policy lists. */
+.auto-review {
+  display: grid;
+  gap: var(--piarc-space-3);
+}
+.auto-review-list {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+.auto-review-entries {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.auto-review-entries li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+.auto-review-entry {
+  overflow-wrap: anywhere;
+}
+.auto-review-add {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+.auto-review-add .input {
+  flex: 1;
+  max-width: 480px;
+}
+.permission-source,
+.permission-audit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+}
+.permission-source-title {
+  margin: 0;
+  font-size: var(--piarc-font-size-body);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.permission-add {
+  align-self: flex-start;
+}
+.diagnostics-page,
+.diagnostics-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+}
+.diagnostics-page {
+  gap: var(--piarc-space-4);
+  min-width: 0;
+}
+.diagnostics-page select {
+  max-width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.diagnostics-status {
+  margin-inline-start: var(--piarc-space-2);
+  padding-inline: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  background: var(--piarc-accent-subtle);
+}
+.diagnostics-status.is-invalid,
+.diagnostics-status.is-stale {
+  background: var(--piarc-state-danger-subtle);
+  color: var(--piarc-text-danger);
+}
+.diagnostics-status.is-untrusted {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+.diagnostics-status.is-missing {
+  background: transparent;
+  color: var(--piarc-text-secondary);
+}
+.diagnostics-details > summary {
+  cursor: pointer;
+  color: var(--piarc-text-secondary);
+}
+.diagnostics-details h4 {
+  margin: var(--piarc-space-2) 0 var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+.diagnostics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--piarc-font-size-small);
+}
+.diagnostics-table th,
+.diagnostics-table td {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border-bottom: 1px solid var(--piarc-border-subtle);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.diagnostics-table th {
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-medium);
+  white-space: nowrap;
+}
+.diagnostics-code {
+  font-family: var(--piarc-font-mono);
+}
+.package-source {
+  overflow-wrap: anywhere;
+}
+.diagnostics-ignored,
+.diagnostics-issues {
+  margin: 0;
+  padding-inline-start: var(--piarc-space-4);
+  font-size: var(--piarc-font-size-small);
+}
+.permission-filter-label {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+
+/* T26: the task panel (rail). */
+:root[data-app] .task-panel {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+
+/* T26, ADR-0103: the plan panel (dock). A status line (state, how to comment, copy) over the plan
+   as the Files Markdown reader shows it; comments are custom highlights on the rendered text. */
+:root[data-app] .plan-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  container-type: inline-size;
+}
+:root[data-app] .plan-panel-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-height: 32px;
+  padding: 0 var(--piarc-space-2) 0 var(--piarc-space-3);
+  border-bottom: 1px solid var(--piarc-session-line);
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .plan-state {
+  flex: none;
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+  font-weight: var(--piarc-font-weight-medium);
+  line-height: 20px;
+}
+:root[data-app] .plan-state[data-state='approved'] {
+  background: var(--piarc-surface-hover);
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .plan-panel-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+:root[data-app] .plan-panel-hint > .icon {
+  flex: none;
+}
+/* A narrow panel keeps the icon; its tooltip says the rest. */
+@container (max-width: 340px) {
+  :root[data-app] .plan-panel-hint-text {
+    display: none;
+  }
+}
+:root[data-app] .plan-panel-head > .icon-button {
+  flex: none;
+  margin-inline-start: auto;
+}
+:root[data-app] .plan-doc {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+:root[data-app] .plan-doc:focus {
+  outline: none;
+}
+/* The plan reads like a Markdown file in the Files tool: the reader's own layout and type. */
+:root[data-app] .plan-doc > .markdown-reader {
+  flex: 1;
+  min-height: 0;
+}
+::highlight(piarc-plan-comment) {
+  background-color: color-mix(in srgb, var(--piarc-accent-solid) 14%, transparent);
+  text-decoration: underline 2px color-mix(in srgb, var(--piarc-accent-solid) 70%, transparent);
+  text-underline-offset: 3px;
+}
+::highlight(piarc-plan-comment-focus) {
+  background-color: color-mix(in srgb, var(--piarc-accent-solid) 26%, transparent);
+}
+
+/* The comment field (ADR-0103): a raised popover next to the passage, the field and its icon
+   buttons on one line. */
+.plan-comment-popover {
+  position: fixed;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-surface-raised);
+  box-shadow: var(--piarc-shadow-overlay);
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-ui);
+  font-size: var(--piarc-font-size-body);
+  line-height: 1.45;
+}
+.plan-comment-popover[data-placed='false'] {
+  visibility: hidden;
+}
+.plan-comment-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .plan-comment-row textarea {
+  flex: 1;
+  min-width: 0;
+  max-height: 8lh;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  appearance: none;
+  color: inherit;
+  font: inherit;
+  resize: none;
+  field-sizing: content;
+}
+.plan-comment-row textarea::placeholder {
+  color: var(--piarc-text-secondary);
+}
+.plan-comment-buttons {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+:root[data-app] .plan-comment-delete:hover {
+  color: var(--piarc-text-danger);
+}
+.plan-comment-error {
+  margin: var(--piarc-space-1) 0 0;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-font-size-small);
+}
+
+/* T27: context usage, the environment bar's ring (75 % hint, 90 % warning) and the rail's
+   context card. */
+.usage-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+.usage-ring-track {
+  fill: none;
+  stroke: var(--piarc-border-subtle);
+}
+.usage-ring-value {
+  transition: stroke-dashoffset var(--piarc-motion-normal) var(--piarc-motion-easing);
+  fill: none;
+  stroke: var(--piarc-text-accent);
+  stroke-linecap: round;
+}
+[data-level='warning'] .usage-ring-value {
+  stroke: var(--piarc-state-warning);
+}
+[data-level='critical'] .usage-ring-value {
+  stroke: var(--piarc-state-danger);
+}
+.usage-ring[data-level='warning'] .usage-ring-text {
+  color: var(--piarc-text-warning);
+}
+.usage-ring[data-level='critical'] .usage-ring-text {
+  color: var(--piarc-text-danger);
+}
+:root[data-app] .context-panel {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .context-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .context-tokens,
+:root[data-app] .context-auto {
+  margin: 0;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .context-auto.is-stopped,
+:root[data-app] .context-error {
+  margin: 0;
+  color: var(--piarc-text-warning);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .context-categories {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .context-category {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) 5.5em;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .context-category-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .context-category-bar {
+  block-size: 6px;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-active);
+  overflow: hidden;
+}
+:root[data-app] .context-category-bar > span {
+  display: block;
+  block-size: 100%;
+  background: var(--piarc-text-accent);
+}
+:root[data-app] .context-category-tokens {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .context-panel > .button {
+  justify-self: start;
+}
+
+/* T28: the Changes panel and the rail's changes card, the rewind dialog, the branch switcher. */
+:root[data-app] .changes-panel,
+:root[data-app] .changes-card {
+  display: grid;
+  align-content: start;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .changes-card > .button {
+  justify-self: start;
+}
+:root[data-app] .changes-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .changes-head > .row-action {
+  margin-inline-start: auto;
+}
+:root[data-app] .changes-note {
+  margin: 0;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .changes-error {
+  margin: 0;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .changes-files {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .changes-file-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+:root[data-app] .changes-file-path {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--piarc-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .changes-discard-file {
+  margin-inline-start: auto;
+}
+:root[data-app] .changes-hunk-range {
+  font-family: var(--piarc-font-mono);
+}
+:root[data-app] .changes-hunk-discard {
+  float: inline-end;
+}
+:root[data-app] .diff-gutter-button {
+  /* WCAG 2.5.8: line numbers are targets, 24 px apart. */
+  min-height: 24px;
+  min-width: 2.5em;
+  padding: 0 var(--piarc-space-1);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+:root[data-app] .diff-gutter-button:hover {
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+}
+:root[data-app] .diff-comment td,
+:root[data-app] .diff-comment-editor td {
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-block: 1px solid var(--piarc-border-subtle);
+  background: var(--piarc-surface-panel);
+  font-family: var(--piarc-font-ui);
+  white-space: normal;
+}
+:root[data-app] .diff-comment-body p {
+  margin: var(--piarc-space-1) 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+:root[data-app] .diff-comment-form {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .diff-comment-input {
+  width: 100%;
+  resize: vertical;
+}
+:root[data-app] .diff-comment-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .diff-comments-bar {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin-block-start: var(--piarc-space-2);
+}
+:root[data-app] .diff-comments-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .diff-comments-stale {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+:root[data-app] .changes-plain {
+  margin: var(--piarc-space-1) 0 0;
+  max-height: 24em;
+  overflow: auto;
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre;
+}
+:root[data-app] .rewind-message {
+  margin: 0 0 var(--piarc-space-3);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border-inline-start: 2px solid var(--piarc-border-default);
+  background: var(--piarc-surface-panel);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+:root[data-app] .rewind-scopes {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0 0 var(--piarc-space-3);
+  padding: 0;
+  border: 0;
+}
+:root[data-app] .rewind-scope {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .rewind-scope > span {
+  display: grid;
+  gap: 2px;
+}
+:root[data-app] .rewind-scope-name {
+  font-weight: var(--piarc-font-weight-medium);
+}
+:root[data-app] .rewind-scope-hint {
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-section {
+  margin: 0 0 var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+:root[data-app] .rewind-files,
+:root[data-app] .rewind-turns {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0 0 var(--piarc-space-3);
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .rewind-file {
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+:root[data-app] .rewind-file-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .rewind-file-path {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--piarc-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .change-tag {
+  flex: none;
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-active);
+  font-size: var(--piarc-font-size-caption);
+}
+:root[data-app] .rewind-file-head > .change-tag {
+  margin-inline-start: auto;
+}
+:root[data-app] .rewind-action.is-conflict,
+:root[data-app] .rewind-outcome.is-failed {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+:root[data-app] .rewind-file-note {
+  margin: var(--piarc-space-1) 0 0;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-3);
+  margin-top: var(--piarc-space-1);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-note {
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .rewind-turn {
+  width: 100%;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  overflow: hidden;
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .rewind-turn:hover {
+  background: var(--piarc-surface-hover);
+}
+:root[data-app] .branch-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  align-self: flex-end;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-app] .branch-tail {
+  display: grid;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .branch-tail ul {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .branch-tail li {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+}
+:root[data-app] .branch-preview {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Background tasks (T32): the rail card and the dock panel. */
+:root[data-app] .bg-tasks-card,
+:root[data-app] .bg-tasks-panel {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .bg-task-list {
+  display: grid;
+  gap: var(--piarc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+:root[data-app] .bg-task {
+  display: grid;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-raised);
+}
+:root[data-app] .bg-task-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .bg-task-kind,
+:root[data-app] .bg-task-duration {
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .bg-task-title {
+  overflow: hidden;
+  font-family: var(--piarc-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .bg-task-status[data-status='running'] {
+  color: var(--piarc-text-accent);
+}
+:root[data-app] .bg-task-status[data-status='completed'] {
+  color: var(--piarc-text-success);
+}
+:root[data-app] .bg-task-status[data-status='failed'] {
+  color: var(--piarc-text-danger);
+}
+:root[data-app] .bg-task-status[data-status='killed'],
+:root[data-app] .bg-task-status[data-status='interrupted'] {
+  color: var(--piarc-text-warning);
+}
+:root[data-app] .bg-task-tail,
+:root[data-app] .bg-task-log {
+  overflow: auto;
+  margin: 0;
+  padding: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-surface-input);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-caption);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+:root[data-app] .bg-task-log {
+  max-height: 24em;
+}
+:root[data-app] .bg-task-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .bg-task-stop {
+  justify-self: start;
+}
+:root[data-app] .bg-task-error {
+  margin: 0;
+  color: var(--piarc-text-danger);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .bg-task-group {
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+:root[data-app] .bg-task-group-title {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-semibold);
+}
+:root[data-app] .bg-task-output {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+
+/* Terminal panel (T34): tabs, toolbar, find bar and the canvas that fills the rest. */
+:root[data-app] .terminal-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+:root[data-app] .terminal-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-1) var(--piarc-space-2) 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--piarc-border-subtle);
+}
+:root[data-app] .terminal-tablist {
+  display: flex;
+  align-items: stretch;
+  gap: var(--piarc-space-1);
+  min-width: 0;
+}
+:root[data-app] .terminal-tab,
+:root[data-app] .terminal-new {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--piarc-radius-md) var(--piarc-radius-md) 0 0;
+  background: transparent;
+  color: var(--piarc-text-secondary);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  cursor: pointer;
+}
+:root[data-app] .terminal-tab.is-active {
+  border-color: var(--piarc-border-subtle);
+  background: var(--piarc-c-terminal-background);
+  color: var(--piarc-text-primary);
+}
+:root[data-app] .terminal-tab-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-app] .terminal-tab-close {
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-md);
+}
+:root[data-app] .terminal-tab-close:hover {
+  background: var(--piarc-surface-hover);
+}
+:root[data-app] .terminal-tab-badge {
+  margin-left: var(--piarc-space-1);
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  font-size: var(--piarc-font-size-caption);
+}
+:root[data-app] .terminal-tab-rename {
+  width: 160px;
+  margin: var(--piarc-space-1);
+  font: inherit;
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .terminal-toolbar,
+:root[data-app] .terminal-find {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .terminal-toolbar-gap {
+  flex: 1;
+}
+:root[data-app] .terminal-share {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+:root[data-app] .terminal-find-input {
+  flex: 0 1 260px;
+  min-width: 0;
+  height: var(--piarc-c-input-height);
+  border: 1px solid var(--piarc-c-input-border);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-c-input-background);
+  color: var(--piarc-c-input-text);
+  font: inherit;
+  padding: 0 var(--piarc-space-2);
+}
+:root[data-app] .terminal-find-count {
+  min-width: 96px;
+  color: var(--piarc-text-secondary);
+}
+:root[data-app] .terminal-surface {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: var(--piarc-space-1);
+  overflow: hidden;
+  background: var(--piarc-c-terminal-background);
+}
+:root[data-app] .terminal-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+:root[data-app] .terminal-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+}
+:root[data-app] .terminal-status:empty {
+  display: none;
+}
+:root[data-app] .terminal-status,
+:root[data-app] .terminal-error {
+  margin: 0;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .terminal-error {
+  color: var(--piarc-text-danger);
+}
+:root[data-app] .terminal-screen-text,
+:root[data-app] .terminal-paste-preview {
+  max-height: 50vh;
+  overflow: auto;
+  margin: 0;
+  padding: var(--piarc-space-2);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-c-terminal-background);
+  color: var(--piarc-c-terminal-foreground);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre;
+}
+
+/* T35: the session's worktree in the environment bar, the new-session form's worktree fields. */
+:root[data-app] .worktree-tag {
+  font-family: var(--piarc-font-mono);
+  overflow-wrap: anywhere;
+}
+:root[data-app] .worktree-fields {
+  display: grid;
+  gap: var(--piarc-space-2);
+}
+
+/* Sidebar message search (T35). */
+:root[data-app] .message-search {
+  padding-block: var(--piarc-space-2);
+  border-top: 1px solid var(--piarc-border-subtle);
+}
+:root[data-app] .search-results,
+:root[data-app] .search-hits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* A session heading and its hits form a group within the search results. */
+:root[data-app] .search-results {
+  row-gap: var(--piarc-space-2);
+}
+:root[data-app] .search-session,
+:root[data-app] .search-hit {
+  display: block;
+  width: 100%;
+  padding: var(--piarc-space-1) var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-sm);
+  background: none;
+  text-align: start;
+  cursor: pointer;
+}
+:root[data-app] .search-session {
+  font-weight: 600;
+}
+:root[data-app] .search-session:hover,
+:root[data-app] .search-hit:hover {
+  background: var(--piarc-surface-hover);
+}
+:root[data-app] .search-hit {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .search-role {
+  margin-inline-end: var(--piarc-space-1);
+  color: var(--piarc-text-tertiary);
+}
+:root[data-app] .search-snippet mark {
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-accent-subtle-hover);
+  color: var(--piarc-text-primary);
+}
+
+.style-list {
+  max-height: 360px;
+  margin: var(--piarc-space-2) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.style-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: var(--piarc-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--piarc-radius-sm);
+  background: none;
+  color: var(--piarc-text-primary);
+  text-align: left;
+}
+
+.style-name {
+  font-weight: 600;
+}
+
+/* T41: usage and cost, the rail's usage card and the settings page. */
+:root[data-app] .usage-card {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding: var(--piarc-space-3);
+  font-size: var(--piarc-font-size-small);
+}
+:root[data-app] .usage-card > p {
+  margin: 0;
+}
+.usage-total,
+.usage-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+.usage-cost {
+  font-weight: var(--piarc-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.usage-cost.is-unknown {
+  color: var(--piarc-text-secondary);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.usage-tokens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5em, 1fr));
+  gap: var(--piarc-space-1) var(--piarc-space-3);
+  flex-basis: 100%;
+  margin: 0;
+}
+.usage-token dt {
+  color: var(--piarc-text-secondary);
+}
+.usage-token dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.usage-lines {
+  display: grid;
+  gap: var(--piarc-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.usage-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--piarc-space-2);
+}
+.usage-line-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usage-lines .usage-cost {
+  font-weight: var(--piarc-font-weight-regular);
+}
+.usage-subheading {
+  margin: var(--piarc-space-1) 0 0;
+  font-size: var(--piarc-font-size-small);
+  font-weight: var(--piarc-font-weight-medium);
+  color: var(--piarc-text-secondary);
+}
+.usage-number {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.usage-table td.usage-number,
+.usage-table th.usage-number {
+  text-align: end;
+}
+.usage-table-wrap {
+  overflow-x: auto;
+}
+.usage-table td.usage-model-cell {
+  min-width: 12em;
+  overflow-wrap: break-word;
+}
+.usage-price-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin-top: var(--piarc-space-1);
+}
+.usage-price-form {
+  display: grid;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-2);
+}
+.usage-price-form p {
+  margin: 0;
+}
+.usage-price-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 8em));
+  gap: var(--piarc-space-2);
+}
+.usage-price-field {
+  display: grid;
+  gap: var(--piarc-space-1);
+}
+.usage-price-actions {
+  display: flex;
+  gap: var(--piarc-space-2);
+}
+
+/* T47: the managed settings' marks and the memory page. */
+.managed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-inline-start: var(--piarc-space-2);
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-caption);
+  font-weight: var(--piarc-font-weight-medium);
+  vertical-align: middle;
+}
+.managed-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  margin: 0 0 var(--piarc-space-4);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-default);
+  border-radius: var(--piarc-radius-md);
+  background: var(--piarc-surface-panel);
+}
+.managed-banner > .managed-badge {
+  margin-inline-start: 0;
+}
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.memory-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-1);
+  padding: var(--piarc-space-2) var(--piarc-space-3);
+  border: 1px solid var(--piarc-border-subtle);
+  border-radius: var(--piarc-radius-md);
+}
+.memory-note-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--piarc-space-2);
+}
+.memory-disclosure {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--piarc-text-accent);
+  font: inherit;
+  font-weight: var(--piarc-font-weight-medium);
+  cursor: pointer;
+}
+.memory-type {
+  padding: 0 var(--piarc-space-2);
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-surface-selected);
+  font-size: var(--piarc-font-size-caption);
+}
+.memory-note-description {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.memory-note-body {
+  margin: 0;
+  padding: var(--piarc-space-2);
+  border-radius: var(--piarc-radius-sm);
+  background: var(--piarc-code-background);
+  color: var(--piarc-code-text);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.memory-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+}
+.memory-body-input {
+  font-family: var(--piarc-font-mono);
+  resize: vertical;
+}
+.memory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--piarc-space-2);
+}
+.memory-start {
+  align-self: flex-start;
+}
+
+/* Settings › Instructions (ADR-0108): one file, edited in place. */
+.instructions-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-3);
+}
+.instructions-path {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.instructions-file {
+  font-family: var(--piarc-font-mono);
+}
+/* Above `:root[data-app] textarea { font: inherit }`. */
+:root[data-app] .instructions-editor textarea.instructions-input {
+  min-height: 16rem;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  line-height: 1.6;
+  resize: vertical;
+}
+.instructions-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.instructions-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.instructions-error > p {
+  margin: 0;
+}
+
+/* The desk and its navigation share a title bar and a single reading column. */
+.shell,
+body[data-tool-window] {
+  --piarc-surface-app: var(--piarc-workbench-canvas);
+  --piarc-text-primary: var(--piarc-workbench-ink);
+  --piarc-text-secondary: var(--piarc-workbench-muted);
+  --piarc-c-sidebar-background: var(--piarc-workbench-navigation);
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-c-button-font-size);
+}
+:root[data-app] .workbench-icon:disabled {
+  color: var(--piarc-text-disabled);
+  opacity: 0.65;
+}
+:root[data-app] .project-toggle {
+  font-size: var(--piarc-font-size-body);
+  font-weight: var(--piarc-font-weight-medium);
+  color: var(--piarc-workbench-ink);
+}
+.workspace-area {
+  background: var(--piarc-workbench-canvas);
+}
+/* The desk is a card on the navigation's surface (ADR-0105): rounded where it meets the sidebar
+   with one hairline there, flush with the window's other edges. Without a sidebar beside it
+   (collapsed, or floating over a narrow window) it is the whole window. */
+.shell:not(.is-collapsed) > .workspace-area {
+  overflow: clip;
+  border-start-start-radius: var(--piarc-radius-lg);
+  border-end-start-radius: var(--piarc-radius-lg);
+  box-shadow: 0 0 0 1px var(--piarc-session-line);
+}
+@media (forced-colors: active) {
+  .shell:not(.is-collapsed) > .workspace-area {
+    border-inline-start: 1px solid CanvasText;
+  }
+}
+.workbench-header {
+  gap: var(--piarc-space-1);
+  padding-inline: var(--piarc-space-4) var(--piarc-space-2);
+  position: relative;
+  min-width: 0;
+}
+.workbench-header.has-session {
+  box-shadow: inset 0 -1px var(--piarc-border-subtle);
+}
+.workbench-heading {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--piarc-c-button-font-size);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.home-heading {
+  margin-inline-start: var(--piarc-space-2);
+  color: var(--piarc-text-secondary);
+}
+.workbench-title {
+  display: block;
+  box-sizing: border-box;
+  max-width: calc(100% + 2 * var(--piarc-session-pad-xs));
+  height: var(--piarc-session-row);
+  margin-inline: calc(-1 * var(--piarc-session-pad-xs));
+  padding-inline: var(--piarc-session-pad-xs);
+  border-radius: var(--piarc-session-radius);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: text;
+}
+.workbench-title:hover {
+  background: var(--piarc-session-ghost-hover);
+}
+:root[data-app] .workbench-title:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--piarc-c-focus-ring);
+}
+.workbench-header > .rename-input {
+  min-width: 0;
+  max-width: 32ch;
+}
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+  margin-inline-start: auto;
+}
+.history-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-1);
+}
+.workbench-icon {
+  flex: none;
+  height: var(--piarc-size-button-height);
+  min-width: var(--piarc-size-button-height);
+  border-radius: var(--piarc-radius-button);
+  color: var(--piarc-text-primary);
+}
+.workbench-icon svg {
+  width: var(--piarc-workbench-icon-size);
+  height: var(--piarc-workbench-icon-size);
+}
+.workbench-icon[aria-pressed='true'],
+.workbench-icon[aria-expanded='true'] {
+  background: var(--piarc-action-pressed);
+}
+.workbench-icon:disabled {
+  color: var(--piarc-text-disabled);
+}
+.view-control {
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+.view-control > button {
+  anchor-name: --transcript-view;
+}
+.view-popover {
+  position: fixed;
+  position-anchor: --transcript-view;
+  inset: anchor(bottom) auto auto anchor(left);
+  position-try-fallbacks: flip-inline;
+  margin: var(--piarc-space-1) 0;
+  background: var(--piarc-surface-raised);
+  color: var(--piarc-text-primary);
+  border: 1px solid var(--piarc-action-edge);
+  border-radius: var(--piarc-workbench-menu-radius);
+  padding: var(--piarc-space-2);
+  box-shadow: var(--piarc-shadow-overlay);
+}
+.view-caption {
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-small);
+  padding: var(--piarc-space-1);
+  margin-bottom: var(--piarc-space-1);
+}
+:root[data-platform='mac'] .is-collapsed .workbench-header {
+  padding-left: 80px;
+}
+.shell .sidebar-backdrop {
+  display: none;
+}
+@media (max-width: 699px) {
+  .shell,
+  .shell.is-collapsed {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .shell > .sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 5;
+    width: min(var(--piarc-sidebar-width), 80%);
+    background: var(--piarc-c-sidebar-background);
+    box-shadow: var(--piarc-shadow-overlay);
+  }
+  .shell:not(.is-collapsed) > .workspace-area {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .shell .sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    border: 0;
+    background: var(--piarc-overlay-scrim);
+  }
+}

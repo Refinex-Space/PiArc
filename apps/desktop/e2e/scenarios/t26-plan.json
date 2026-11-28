@@ -1,0 +1,68 @@
+{
+  "id": "t26-plan",
+  "validation": {
+    "rules": {
+      "role_order": false
+    }
+  },
+  "steps": [
+    {
+      "text": "I will plan this first.",
+      "tool_calls": [
+        {
+          "id": "enter",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "exit1",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Plan\n\n1. Read src/parser.ts\n2. Fix the off-by-one in the loop\n3. Add a regression test"
+          }
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "exit2",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Plan\n\n1. Add a failing test for the loop bound\n2. Fix the off-by-one in the loop\n3. Run the tests"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Plan approved; starting with the test."
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "enter2",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      ]
+    },
+    {
+      "tool_calls": [
+        {
+          "id": "exit3",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "# Plan\n\n1. Rename the helper\n2. Update the callers"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Renaming now."
+    }
+  ]
+}

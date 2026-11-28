@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 21,
+  "method": "fs/spill",
+  "params": {
+    "sessionId": "sess-7f3a",
+    "name": "toolu_04",
+    "content": "a very long tool result …",
+    "origin": { "tool": "Grep", "toolCallId": "toolu_04" }
+  }
+}

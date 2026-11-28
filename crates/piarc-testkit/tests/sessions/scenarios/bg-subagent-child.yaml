@@ -1,0 +1,5 @@
+# T31: the background subagent of `bg-subagent`; its reply stalls after the first events.
+id: bg-subagent-child
+steps:
+  - text: 'Still surveying the workspace'
+    stall_after_events: 3

@@ -1,0 +1,90 @@
+id: tools-canonical-via-core
+description: The six canonical tools (Read, Write, Edit, Bash, Glob, Grep) run through Core's AHP fs and exec methods, change the workspace and return their results to the model.
+capabilities:
+  [
+    CAP-TOOL-CORE-001,
+    CAP-TOOL-READ-001,
+    CAP-TOOL-WRITE-001,
+    CAP-TOOL-EDIT-001,
+    CAP-TOOL-BASH-001,
+    CAP-TOOL-GLOB-001,
+    CAP-TOOL-GREP-001,
+  ]
+workspace:
+  files:
+    'src/app 应用.ts': "export const answer = 41;\n"
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - { id: toolu_read, name: Read, input: { path: 'src/app 应用.ts' } }
+          - { id: toolu_glob, name: Glob, input: { pattern: '**/*.ts' } }
+          - { id: toolu_grep, name: Grep, input: { pattern: 'answer' } }
+          - { id: toolu_bash, name: Bash, input: { command: 'echo from bash 中文' } }
+      - tool_calls:
+          - {
+              id: toolu_edit,
+              name: Edit,
+              input: { path: 'src/app 应用.ts', edits: [{ oldText: '41', newText: '42' }] },
+            }
+          - { id: toolu_write, name: Write, input: { path: 'notes/new.txt', content: "created\n" } }
+      - text: 'All six tools ran.'
+# echo is a read-only command (T23).
+approvals:
+  - { tool: Edit, decision: allow }
+  - { tool: Write, decision: allow }
+actions:
+  - prompt: { text: 'Use every tool.', turn: t }
+expect:
+  events:
+    - any_order:
+        - {
+            method: item/completed,
+            params: { item: { itemId: toolu_read, tool: Read, status: completed } },
+          }
+        - {
+            method: item/completed,
+            params: { item: { itemId: toolu_glob, tool: Glob, status: completed } },
+          }
+        - {
+            method: item/completed,
+            params: { item: { itemId: toolu_grep, tool: Grep, status: completed } },
+          }
+        - {
+            method: item/completed,
+            params:
+              {
+                item: { itemId: toolu_bash, tool: Bash, type: commandExecution, status: completed },
+              },
+          }
+    - any_order:
+        - {
+            method: item/completed,
+            params:
+              { item: { itemId: toolu_edit, tool: Edit, type: fileChange, status: completed } },
+          }
+        - {
+            method: item/completed,
+            params:
+              { item: { itemId: toolu_write, tool: Write, type: fileChange, status: completed } },
+          }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  files:
+    'src/app 应用.ts': "export const answer = 42;\n"
+    'notes/new.txt': "created\n"
+  core_io:
+    - { call: toolu_read, method: fs/read }
+    - { call: toolu_glob, method: fs/glob }
+    - { call: toolu_grep, method: fs/grep }
+    - { call: toolu_bash, method: exec/run }
+    - { call: toolu_edit, method: fs/write }
+    - { call: toolu_write, method: fs/write }
+  requests:
+    - index: 1
+      tool_results:
+        - { id: toolu_read, is_error: false, contains: 'answer = 41' }
+        - { id: toolu_glob, is_error: false, contains: 'app 应用.ts' }
+        - { id: toolu_grep, is_error: false, contains: 'answer = 41' }
+        - { id: toolu_bash, is_error: false, contains: 'from bash 中文' }
+  request_counts: { main: 3 }

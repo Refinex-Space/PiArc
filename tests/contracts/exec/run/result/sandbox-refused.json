@@ -1,0 +1,31 @@
+{
+  "jsonrpc": "2.0",
+  "id": 31,
+  "result": {
+    "exitCode": 1,
+    "killed": false,
+    "timedOut": false,
+    "timeout": {
+      "ms": 120000
+    },
+    "durationMs": 42,
+    "outcome": "failure",
+    "cwd": "/Users/dev/work space/项目",
+    "output": {
+      "head": "touch: /Users/dev/elsewhere.txt: Operation not permitted\ncurl: (56) CONNECT tunnel failed, response 403\n",
+      "totalChars": 105
+    },
+    "sandbox": {
+      "denials": [
+        {
+          "kind": "write",
+          "target": "/Users/dev/elsewhere.txt"
+        },
+        {
+          "kind": "network",
+          "target": "example.com:443"
+        }
+      ]
+    }
+  }
+}

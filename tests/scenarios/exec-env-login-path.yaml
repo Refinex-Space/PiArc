@@ -1,0 +1,36 @@
+id: exec-env-login-path
+description: Commands get the PATH and locale the user's login shell sets in its profile, which an application started from the Dock would otherwise miss.
+capabilities: [CAP-EXEC-LOGINENV-001]
+platforms: [macos]
+platform_reason: Windows has no login shell to ask; its process environment already carries the registry's PATH.
+providers:
+  main:
+    wire: anthropic
+    steps:
+      - tool_calls:
+          - {
+              id: toolu_tool,
+              name: Bash,
+              input:
+                {
+                  command: 'l2-login-tool; echo "profile: $LC_TIME; private: ${L2_LOGIN_PROFILE-unset}"',
+                },
+            }
+      - text: 'Ran it.'
+approvals:
+  - { tool: Bash, decision: allow }
+actions:
+  - prompt: { text: 'Run the tool from my PATH.', turn: t }
+expect:
+  events:
+    - { method: item/completed, params: { item: { itemId: toolu_tool, status: completed } } }
+    - { method: turn/completed, turn: t, params: { status: completed } }
+  requests:
+    - index: 1
+      tool_results:
+        - {
+            id: toolu_tool,
+            is_error: false,
+            contains: "login PATH works\nprofile: C; private: unset\n",
+          }
+  request_counts: { main: 2 }

@@ -1,0 +1,29 @@
+id: perm-default-mode
+area: permissions
+description: Default mode runs read-only commands and reads without asking, asks for other commands, writes, edits and a read-only command whose path leaves the workspace.
+mirrors: [policy-manual, perm-read-only]
+mode: default
+workspace:
+  files:
+    notes.txt: "plain notes\n"
+prompt: Work through the default mode.
+steps:
+  - tool_calls: [{ id: list, name: Bash, input: { command: ls } }]
+  - tool_calls: [{ id: cat, name: Bash, input: { command: cat notes.txt } }]
+  - tool_calls: [{ id: outside, name: Bash, input: { command: cat /etc/hosts } }]
+  - tool_calls: [{ id: touch, name: Bash, input: { command: touch made.txt } }]
+  - tool_calls:
+      [{ id: write, name: Write, input: { file_path: '{{workspace}}/new.txt', content: "new\n" } }]
+  - tool_calls: [{ id: read, name: Read, input: { file_path: '{{workspace}}/notes.txt' } }]
+  - tool_calls:
+      - {
+          id: edit,
+          name: Edit,
+          input: { file_path: '{{workspace}}/notes.txt', old_string: plain, new_string: PLAIN },
+        }
+  - text: Finished.
+approvals:
+  - { call: outside, decision: deny, feedback: Stay in the workspace. }
+  - { call: touch, decision: allow }
+  - { call: write, decision: deny, feedback: Not now. }
+  - { call: edit, decision: allow }
