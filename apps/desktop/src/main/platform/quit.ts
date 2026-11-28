@@ -16,12 +16,15 @@ export function parseRunningWork(text: string): { sessions: number; tasks: numbe
 
 let asking = false;
 
-/** Quits, after the user confirms when sessions or background tasks are running. */
-export async function confirmQuit(
+/**
+ * Whether PiArc may quit now: true at once without running work, otherwise after the user
+ * confirms in a native dialog. False while another confirmation is open.
+ */
+export async function mayQuit(
   core: { runningWork(): string },
   translator: () => Translator,
-): Promise<void> {
-  if (asking) return;
+): Promise<boolean> {
+  if (asking) return false;
   let work: { sessions: number; tasks: number };
   try {
     work = parseRunningWork(core.runningWork());
@@ -29,10 +32,7 @@ export async function confirmQuit(
     console.warn('[app] cannot read the running work; asking anyway', error);
     work = { sessions: 1, tasks: 0 };
   }
-  if (work.sessions + work.tasks === 0) {
-    app.quit();
-    return;
-  }
+  if (work.sessions + work.tasks === 0) return true;
   const t = translator();
   const options: Electron.MessageBoxOptions = {
     type: 'warning',
@@ -53,8 +53,16 @@ export async function confirmQuit(
       window === null
         ? await dialog.showMessageBox(options)
         : await dialog.showMessageBox(window, options);
-    if (response === 0) app.quit();
+    return response === 0;
   } finally {
     asking = false;
   }
+}
+
+/** Quits, after the user confirms when sessions or background tasks are running. */
+export async function confirmQuit(
+  core: { runningWork(): string },
+  translator: () => Translator,
+): Promise<void> {
+  if (await mayQuit(core, translator)) app.quit();
 }

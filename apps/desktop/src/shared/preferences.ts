@@ -48,6 +48,8 @@ export interface Preferences {
   readonly memory: { readonly readBoth: boolean };
   /** ADR-0109: keep the computer from idle sleep while a session is in a turn (default on). */
   readonly power: { readonly keepAwake: boolean };
+  /** ADR-0111: check for a newer release at start and every 24 hours (default on). */
+  readonly updates: { readonly autoCheck: boolean };
   /** ADR-0110: the first-run guide was finished or skipped, or the file shows a user who set
    * PiArc up before (a configured provider or a signed-in account). */
   readonly onboarding: { readonly completed: boolean };
@@ -300,6 +302,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   notifications: { enabled: true },
   memory: { readBoth: false },
   power: { keepAwake: true },
+  updates: { autoCheck: true },
   onboarding: { completed: false },
   permissions: { enableBypassPermissions: false, enableAutoMode: false },
   autoMode: {
@@ -408,6 +411,7 @@ export function preferencesFrom(settings: unknown): Preferences {
     },
     memory: { readBoth: isRecord(file.memory) && file.memory.readBoth === true },
     power: { keepAwake: !(isRecord(file.power) && file.power.keepAwake === false) },
+    updates: { autoCheck: !(isRecord(file.updates) && file.updates.autoCheck === false) },
     onboarding: { completed: onboardingCompleted(file) },
     permissions: {
       enableBypassPermissions:
@@ -553,6 +557,7 @@ export type PreferenceChange =
   | { readonly key: 'notifications.enabled'; readonly value: boolean }
   | { readonly key: 'memory.readBoth'; readonly value: boolean }
   | { readonly key: 'power.keepAwake'; readonly value: boolean }
+  | { readonly key: 'updates.autoCheck'; readonly value: boolean }
   /** ADR-0110: only ever set to `true`. */
   | { readonly key: 'onboarding.completed'; readonly value: true }
   | { readonly key: 'permissions.enableBypassPermissions'; readonly value: boolean }
@@ -650,6 +655,8 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
       return typeof value === 'boolean' ? { pointer: '/memory/readBoth', value } : undefined;
     case 'power.keepAwake':
       return typeof value === 'boolean' ? { pointer: '/power/keepAwake', value } : undefined;
+    case 'updates.autoCheck':
+      return typeof value === 'boolean' ? { pointer: '/updates/autoCheck', value } : undefined;
     case 'onboarding.completed':
       return value === true ? { pointer: '/onboarding/completed', value } : undefined;
     case 'permissions.enableBypassPermissions':

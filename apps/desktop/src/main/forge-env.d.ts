@@ -18,3 +18,5 @@ interface ImportMeta {
 
 // Vite replaces it at build time (vite.main.config.ts): true in the release flavor only.
 declare const __PIARC_RELEASE_BUILD__: boolean;
+// Versions of the bundled parts the About page shows (vite.main.config.ts, ADR-0111).
+declare const __PIARC_COMPONENTS__: { readonly pi: string; readonly ghostty: string };

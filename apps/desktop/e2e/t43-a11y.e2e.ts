@@ -303,6 +303,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     'usage',
     'data',
     'diagnostics',
+    'about',
     'shortcuts',
   ] as const) {
     await settings.getByTestId(`settings-nav-${id}`).click();

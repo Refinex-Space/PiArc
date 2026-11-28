@@ -146,6 +146,12 @@ export const A11Y_STATES = [
     area: 'state',
     note: 'Data management: the archived sessions grouped by project, with search and filter',
   },
+  {
+    id: 'settings:about',
+    area: 'settings',
+    page: 'about',
+    note: 'About: version, update status and notes, versions of the parts, resources',
+  },
   { id: 'settings:shortcuts', area: 'settings', page: 'shortcuts', note: 'Keyboard shortcuts' },
   // Transcript rows, one per row kind.
   { id: 'row:userMessage', area: 'row', row: 'userMessage', note: 'a sent message' },

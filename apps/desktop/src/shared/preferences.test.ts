@@ -136,6 +136,18 @@ describe('preferences', () => {
     expect(pointerOf({ key: 'power.keepAwake', value: 'off' })).toBeUndefined();
   });
 
+  it('checks for updates automatically unless the file says false', () => {
+    expect(DEFAULT_PREFERENCES.updates.autoCheck).toBe(true);
+    expect(preferencesFrom({}).updates.autoCheck).toBe(true);
+    expect(preferencesFrom({ updates: { autoCheck: false } }).updates.autoCheck).toBe(false);
+    expect(preferencesFrom({ updates: { autoCheck: 0 } }).updates.autoCheck).toBe(true);
+    expect(pointerOf({ key: 'updates.autoCheck', value: false })).toEqual({
+      pointer: '/updates/autoCheck',
+      value: false,
+    });
+    expect(pointerOf({ key: 'updates.autoCheck', value: 'no' })).toBeUndefined();
+  });
+
   it('counts the first-run guide as done after it or for a user who set up a provider', () => {
     const done = (file: unknown) => preferencesFrom(file).onboarding.completed;
     expect(DEFAULT_PREFERENCES.onboarding.completed).toBe(false);

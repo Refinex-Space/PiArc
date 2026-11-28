@@ -18,6 +18,7 @@ import {
   SearchIcon,
   SidebarIcon,
 } from './icons.js';
+import { UpdateNotice } from '../updates/UpdateNotice.js';
 import { ChoiceButton } from './Menu.js';
 import { ProjectGroup, type ProjectSessions } from './ProjectGroup.js';
 import { sessionTitle } from './SessionRow.js';
@@ -243,6 +244,7 @@ export function Sidebar({
           );
         })}
       </div>
+      <UpdateNotice />
       <footer className="sidebar-footer">
         <ChoiceButton
           className="sidebar-identity"

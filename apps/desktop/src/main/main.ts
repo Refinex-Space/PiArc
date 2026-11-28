@@ -39,7 +39,11 @@ import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar, registerHostHandler } from './ipc/register.js';
 import { registerWorktreeHandlers } from './core/worktree-ipc.js';
+import { PROTOCOL_VERSION } from '@piarc/protocol';
+
 import { registerMarketHandlers } from './core/market-ipc.js';
+import { UpdateScheduler, registerUpdateHandlers } from './core/updates-ipc.js';
+import { aboutInfo, createInstaller } from './platform/update-installer.js';
 import { registerMcpHandlers } from './core/mcp-ipc.js';
 import { NativeConfirm, registerPackageHandlers } from './core/plugins-ipc.js';
 import { registerGitHandlers } from './core/git-ipc.js';
@@ -152,7 +156,7 @@ function startCoreOrExit(dirs: DataDirs): CoreHost | undefined {
         resourcesPath: process.resourcesPath,
       },
       eventRouter,
-      { dataDir: dirs.data, cacheDir: dirs.cache },
+      { dataDir: dirs.data, cacheDir: dirs.cache, appVersion: app.getVersion() },
       process.env[MEMORY_KEYCHAIN_ENV] === '1',
     );
   } catch (error) {
@@ -442,6 +446,11 @@ function start(dirs: DataDirs): void {
       quit: () => {
         void confirmQuit(core.runtime, () => appShell.t());
       },
+      checkForUpdates: () => {
+        core.runtime.checkForUpdates().catch((error: unknown) => {
+          console.warn('[updates] the check failed', error);
+        });
+      },
     });
     shell = appShell;
     const iconDirectory = trayIconDirectory(
@@ -517,6 +526,30 @@ function start(dirs: DataDirs): void {
     registerMcpHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerPackageHandlers(registerHandler, core.runtime, () => appShell.t(), nativeConfirm);
     registerMarketHandlers(registerHandler, core.runtime);
+    // ADR-0111: in-app updates. Core checks, downloads and verifies; the main process installs.
+    registerUpdateHandlers(
+      registerHandler,
+      core.runtime,
+      createInstaller({
+        core: core.runtime,
+        translator: () => appShell.t(),
+        cacheDir: dirs.cache,
+      }),
+      () =>
+        aboutInfo({ ...__PIARC_COMPONENTS__, protocol: PROTOCOL_VERSION }, __PIARC_RELEASE_BUILD__),
+    );
+    const updateScheduler = new UpdateScheduler({
+      check: () => core.runtime.checkForUpdates(),
+      enabled: () => preferences.get().updates.autoCheck,
+      now: () => Date.now(),
+      setTimer: (run, ms) => setTimeout(run, ms),
+      clearTimer: (timer) => {
+        clearTimeout(timer as ReturnType<typeof setTimeout>);
+      },
+    });
+    app.on('will-quit', () => {
+      updateScheduler.stop();
+    });
     registerWorktreeHandlers(
       registerHandler,
       core.runtime,
@@ -608,6 +641,7 @@ function start(dirs: DataDirs): void {
     // The preferences come first: the window's language, theme and menu depend on them.
     void preferences.load().then((loaded) => {
       keepAwake.setEnabled(loaded.power.keepAwake);
+      updateScheduler.start();
       appShell.start();
       const targets = [
         ...launchTargets(process.argv, process.defaultApp, process.cwd()),

@@ -160,6 +160,12 @@ export const IPC_CHANNELS = {
   marketDetail: 'piarc:market.detail',
   marketRefresh: 'piarc:market.refresh',
   marketInstall: 'piarc:market.install',
+  updateStatus: 'piarc:updates.status',
+  updateCheck: 'piarc:updates.check',
+  updateDownload: 'piarc:updates.download',
+  updateCancel: 'piarc:updates.cancel',
+  updateInstall: 'piarc:updates.install',
+  aboutInfo: 'piarc:about.info',
   packageUpdate: 'piarc:packages.update',
   packageEnable: 'piarc:packages.enable',
   packageConfirm: 'piarc:packages.confirm',
@@ -289,6 +295,65 @@ export interface MarketQueryInput {
   readonly offset: number;
   readonly limit: number;
   readonly workspace: string | null;
+}
+
+/** The About page's versions (ADR-0111; architecture section 13.4). */
+export interface AboutInfo {
+  readonly app: string;
+  readonly electron: string;
+  readonly chromium: string;
+  readonly node: string;
+  readonly pi: string;
+  /** AHP, `major.minor`. */
+  readonly protocol: string;
+  readonly ghostty: string;
+  /** `darwin` or `win32`. */
+  readonly platform: string;
+  readonly arch: string;
+  /** The operating system's own version (`os.release()` mapped to the product version). */
+  readonly osVersion: string;
+  /** A release build (not the development flavor or the source tree). */
+  readonly release: boolean;
+}
+
+/** What `installUpdate` did (ADR-0111 rules 5–7). */
+export type UpdateInstallOutcome =
+  /** PiArc is quitting; the update is applied and PiArc starts again. */
+  | { readonly kind: 'restarting' }
+  /** The user kept PiArc running (running work, quit declined). */
+  | { readonly kind: 'cancelled' }
+  /** This copy cannot be updated in place; the release page has the installer. */
+  | {
+      readonly kind: 'manual';
+      readonly reason:
+        'notBundle' | 'translocated' | 'notWritable' | 'notInstalled' | 'unsupported';
+    };
+
+const MANUAL_REASONS = ['notBundle', 'translocated', 'notWritable', 'notInstalled', 'unsupported'];
+
+/** Narrows a value from the main process to an install outcome. */
+export function isUpdateInstallOutcome(value: unknown): value is UpdateInstallOutcome {
+  if (typeof value !== 'object' || value === null || !('kind' in value)) return false;
+  if (value.kind === 'restarting' || value.kind === 'cancelled') return true;
+  return (
+    value.kind === 'manual' &&
+    'reason' in value &&
+    typeof value.reason === 'string' &&
+    MANUAL_REASONS.includes(value.reason)
+  );
+}
+
+/** Narrows a value from the main process to the About page's versions. */
+export function isAboutInfo(value: unknown): value is AboutInfo {
+  if (typeof value !== 'object' || value === null) return false;
+  const keys = ['app', 'electron', 'chromium', 'node', 'pi', 'protocol', 'ghostty', 'platform'];
+  const record = value as Record<string, unknown>;
+  return (
+    keys.every((key) => typeof record[key] === 'string') &&
+    typeof record.arch === 'string' &&
+    typeof record.osVersion === 'string' &&
+    typeof record.release === 'boolean'
+  );
 }
 
 /** Installs one market package: an npm name and an exact version the catalog lists. */
@@ -1153,6 +1218,21 @@ export interface PiarcApi {
   marketRefresh(): Promise<string>;
   /** Installs a market package, off; answers `PackageInstallResult` JSON. */
   marketInstall(input: MarketInstallInput): Promise<string>;
+  /**
+   * In-app updates (ADR-0111) as `UpdateStatus` JSON; changes and download progress arrive on
+   * `core/updates`.
+   */
+  updateStatus(): Promise<string>;
+  /** Reads the latest release through the user's proxy; answers `UpdateStatus` JSON. */
+  checkForUpdates(): Promise<string>;
+  /** Starts downloading the newer release; answers `UpdateStatus` JSON. */
+  downloadUpdate(): Promise<string>;
+  /** Cancels the running download; answers `UpdateStatus` JSON. */
+  cancelUpdateDownload(): Promise<string>;
+  /** Installs the ready update: quits (after confirming running work) and restarts. */
+  installUpdate(): Promise<UpdateInstallOutcome>;
+  /** The versions the About page shows. */
+  aboutInfo(): Promise<AboutInfo>;
   /**
    * Sets the output style: the workspace's `.piarc/settings.local.json` (`/output-style`), or the
    * user's settings when `workspace` is null; a null name removes the choice (T37).

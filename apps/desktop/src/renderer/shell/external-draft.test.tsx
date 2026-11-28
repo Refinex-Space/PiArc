@@ -31,6 +31,8 @@ it('presents external text for editing only after a trust decision and never sen
       .mockResolvedValue('{"version":"2","decision":"denied","applied":true}'),
     setAttentionCount: vi.fn().mockResolvedValue(undefined),
     subscribeEvents: vi.fn().mockResolvedValue(undefined),
+    unsubscribeEvents: vi.fn().mockResolvedValue(undefined),
+    updateStatus: vi.fn().mockResolvedValue('{"state":"idle","current":"1.0.0"}'),
     resendSnapshots: vi.fn().mockResolvedValue(undefined),
     composerInfo: vi.fn().mockResolvedValue('{}'),
     createSession,

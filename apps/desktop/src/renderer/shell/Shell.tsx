@@ -8,6 +8,7 @@ import type { AppCommand, LaunchTarget } from '../../shared/ipc.js';
 import { parseComposerInfo, type ComposerInfo } from '../composer/attachments.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
+import { followUpdates } from '../updates/update-store.js';
 import { preloadSettings, SettingsLayer } from '../settings/SettingsLayer.js';
 import { useOnboarding } from '../onboarding/use-onboarding.js';
 import { AppStore } from '../store/app-store.js';
@@ -135,6 +136,8 @@ export function Shell() {
       }
     };
   }, [store, transcriptServices]);
+  // ADR-0111: the update status for the sidebar notice and the About page.
+  useEffect(() => followUpdates(), []);
   const watched = useRef(new Set<string>());
   const watchSession = useCallback(
     (id: string) => {

@@ -94,6 +94,8 @@ describe('side chat in a running session window', () => {
         events.set(name, listener);
         return Promise.resolve();
       },
+      unsubscribeEvents: () => Promise.resolve(),
+      updateStatus: () => Promise.resolve('{"state":"idle","current":"1.0.0"}'),
       resendSnapshots: vi.fn().mockResolvedValue(undefined),
       contextUsage: vi.fn().mockResolvedValue('{}'),
       composerInfo: vi.fn().mockResolvedValue('{}'),

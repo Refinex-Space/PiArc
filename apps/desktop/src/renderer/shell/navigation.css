@@ -155,6 +155,54 @@
   background-color: currentColor;
   mask: url('../../../../../design/brand/mark.svg') center / contain no-repeat;
 }
+.workbench-navigation .sidebar-update {
+  padding: var(--piarc-space-1) var(--piarc-space-2) 0;
+}
+.workbench-navigation .sidebar-update-button {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  width: 100%;
+  min-height: var(--piarc-size-button-height);
+  padding: 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-button);
+  background: var(--piarc-accent-subtle);
+  color: var(--piarc-text-accent);
+  font: inherit;
+  font-size: var(--piarc-font-size-button);
+  font-weight: var(--piarc-font-weight-medium);
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--piarc-motion-fast) var(--piarc-motion-curve-out);
+}
+.workbench-navigation .sidebar-update-button:hover {
+  background: var(--piarc-accent-subtle-hover);
+}
+.workbench-navigation .sidebar-update-button[data-security='true'] {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+.workbench-navigation .sidebar-update-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--piarc-radius-pill);
+  background: currentColor;
+}
+.workbench-navigation .sidebar-update-button[data-state='downloading'] .sidebar-update-dot {
+  animation: sidebar-update-pulse 1.4s var(--piarc-motion-easing) infinite;
+}
+@keyframes sidebar-update-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (forced-colors: active) {
+  .workbench-navigation .sidebar-update-button {
+    border: 1px solid ButtonText;
+  }
+}
 .workbench-navigation .sidebar-resizer:hover,
 .workbench-navigation .sidebar-resizer:active {
   background: var(--piarc-border-focus);

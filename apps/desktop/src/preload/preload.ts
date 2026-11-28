@@ -8,6 +8,8 @@ import {
   APP_EVENT_CHANNEL,
   EVENTS_PORT_CHANNEL,
   IPC_CHANNELS,
+  isAboutInfo,
+  isUpdateInstallOutcome,
   type AppEvent,
   type AppState,
   type EventBatch,
@@ -754,6 +756,24 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.marketInstall, input)
       .then((value: unknown) => expectString(value)),
+  updateStatus: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateStatus).then((value: unknown) => expectString(value)),
+  checkForUpdates: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateCheck).then((value: unknown) => expectString(value)),
+  downloadUpdate: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateDownload).then((value: unknown) => expectString(value)),
+  cancelUpdateDownload: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateCancel).then((value: unknown) => expectString(value)),
+  installUpdate: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateInstall).then((value: unknown) => {
+      if (!isUpdateInstallOutcome(value)) throw new TypeError('invalid install outcome');
+      return value;
+    }),
+  aboutInfo: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.aboutInfo).then((value: unknown) => {
+      if (!isAboutInfo(value)) throw new TypeError('invalid about info');
+      return value;
+    }),
   setOutputStyle: async (workspace, name) => {
     await ipcRenderer.invoke(IPC_CHANNELS.outputStyleSet, workspace, name);
   },
