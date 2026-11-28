@@ -1,6 +1,6 @@
 // verify step "design tokens": the committed outputs match design/tokens/ (drift), every
-// declared foreground/background pair meets WCAG in all four color modes, the brand rules hold
-// (accent hue, surfaces, fonts) and no font, sound or other brand's icon is bundled.
+// declared foreground/background pair meets WCAG in all four color modes of every accent preset,
+// the brand rules hold (default accent hue, surfaces, fonts) and no font, sound or other brand's icon is bundled.
 // `--tokens <dir>` checks another token directory (for trying a change without editing the
 // repository); drift is then skipped.
 import { readFile } from 'node:fs/promises';
@@ -57,17 +57,18 @@ async function main() {
   const failing = results.filter((r) => !r.ok);
   for (const r of failing) {
     console.error(
-      `contrast: ${r.fg} on ${r.bg} (${r.kind}) in ${r.mode} is ${r.ratio.toFixed(2)}:1, ` +
+      `contrast: ${r.fg} on ${r.bg} (${r.kind}) in ${r.mode}, accent ${r.accent}, is ` +
+        `${r.ratio.toFixed(2)}:1, ` +
         `needs ${r.required.toFixed(1)}:1`,
     );
   }
   const weakest = [...results].sort((a, b) => a.ratio / a.required - b.ratio / b.required)[0];
   console.log(
     `contrast: ${String(results.length - failing.length)}/${String(results.length)} pairs pass ` +
-      `(${String(sources.pairs.length)} pairs × 4 modes)` +
+      `(${String(sources.pairs.length)} pairs × 4 modes × ${String(model.accents.ids.length)} accents)` +
       (weakest === undefined
         ? ''
-        : `; closest: ${weakest.fg} on ${weakest.bg} in ${weakest.mode} ` +
+        : `; closest: ${weakest.fg} on ${weakest.bg} in ${weakest.mode} (${weakest.accent}) ` +
           `${weakest.ratio.toFixed(2)}:1 ≥ ${weakest.required.toFixed(1)}:1`),
   );
   failed ||= failing.length > 0;
@@ -78,7 +79,7 @@ async function main() {
   }
   console.log(
     brand.length === 0
-      ? `brand: accent ramp "${String(model.ramps.accent)}" outside the orange/terracotta hues; ` +
+      ? `brand: default accent ramp "${String(model.ramps.accent)}" outside the orange/terracotta hues; ` +
           'system fonts only; no bundled fonts, sounds or other brands’ icons'
       : '',
   );

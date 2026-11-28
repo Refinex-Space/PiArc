@@ -1,5 +1,5 @@
 {
-  "$description": "Raw colors (layer 1). Each family has a 12-step light ladder and a 12-step dark ladder: 1 app background, 2 subtle background, 3 element, 4 hover, 5 pressed, 6 subtle border, 7 border, 8 strong border, 9 solid, 10 solid hover, 11 low-contrast text, 12 high-contrast text. Values are PiArc's own; the accent must stay away from orange and terracotta hues (scripts/lib/design-tokens.mjs, BRAND_RULES).",
+  "$description": "Raw colors (layer 1). Each family has a 12-step light ladder and a 12-step dark ladder: 1 app background, 2 subtle background, 3 element, 4 hover, 5 pressed, 6 subtle border, 7 border, 8 strong border, 9 solid, 10 solid hover, 11 low-contrast text, 12 high-contrast text. Values are PiArc's own; the default accent (accents.json) must stay away from orange and terracotta hues (scripts/lib/design-tokens.mjs, BRAND_RULES); the presets a user picks (ADR-0104) may not.",
   "slate": {
     "light": [
       "#fcfcfd",
@@ -175,5 +175,185 @@
     "white20": "#ffffff33",
     "scrimLight": "#1d202733",
     "scrimDark": "#00000080"
+  },
+  "graphite": {
+    "light": [
+      "#fcfcfd",
+      "#f8f9fa",
+      "#f0f1f3",
+      "#e8e9ec",
+      "#e0e2e6",
+      "#d8dbe0",
+      "#cdd0d6",
+      "#b8bcc4",
+      "#1f2023",
+      "#2c2e33",
+      "#3c3f45",
+      "#111214"
+    ],
+    "dark": [
+      "#111214",
+      "#17181b",
+      "#1e2024",
+      "#25272c",
+      "#2b2e34",
+      "#33363d",
+      "#3e424a",
+      "#50555f",
+      "#e6e7ea",
+      "#d2d4d9",
+      "#b9bcc3",
+      "#eceef2"
+    ]
+  },
+  "emerald": {
+    "light": [
+      "#fbfefc",
+      "#f3fbf6",
+      "#e4f6ea",
+      "#d4f0dd",
+      "#c2e8cf",
+      "#ace0bd",
+      "#8ed3a5",
+      "#5fbf82",
+      "#178044",
+      "#02773c",
+      "#006431",
+      "#123d24"
+    ],
+    "dark": [
+      "#0e1511",
+      "#131c16",
+      "#15291d",
+      "#173523",
+      "#1b422b",
+      "#204f33",
+      "#275e3e",
+      "#2f7449",
+      "#178044",
+      "#25894d",
+      "#6fd69a",
+      "#c8f2d8"
+    ]
+  },
+  "yellow": {
+    "light": [
+      "#fdfcf9",
+      "#f9f7ed",
+      "#f3eedb",
+      "#ece5c7",
+      "#e4d9b0",
+      "#d9cb95",
+      "#cab66d",
+      "#b69a25",
+      "#b48c00",
+      "#a68000",
+      "#685600",
+      "#342a00"
+    ],
+    "dark": [
+      "#181405",
+      "#201b05",
+      "#2f2500",
+      "#392f00",
+      "#453800",
+      "#514300",
+      "#615000",
+      "#736000",
+      "#f4ce23",
+      "#e6c100",
+      "#cfb44b",
+      "#eae0ba"
+    ]
+  },
+  "pink": {
+    "light": [
+      "#fffbfc",
+      "#fef3f7",
+      "#fce8ee",
+      "#f9dbe5",
+      "#f5ccdb",
+      "#eeb9cd",
+      "#e49fb9",
+      "#d57ba0",
+      "#ba1d70",
+      "#a91365",
+      "#9b115c",
+      "#4c102d"
+    ],
+    "dark": [
+      "#1d0f14",
+      "#28141c",
+      "#3b1927",
+      "#4c1c31",
+      "#5a223b",
+      "#6b2946",
+      "#7f3355",
+      "#983a65",
+      "#c6317b",
+      "#c94081",
+      "#ef96b9",
+      "#fad4e1"
+    ]
+  },
+  "orange": {
+    "light": [
+      "#fffbfa",
+      "#fff4ef",
+      "#fee9df",
+      "#fddcce",
+      "#fbceba",
+      "#f5bca2",
+      "#eda280",
+      "#e17e4f",
+      "#ad4600",
+      "#9c3e00",
+      "#8f3900",
+      "#4b1a00"
+    ],
+    "dark": [
+      "#1e0f09",
+      "#2a150b",
+      "#3f1a06",
+      "#511d00",
+      "#602400",
+      "#712b00",
+      "#873500",
+      "#9f3f00",
+      "#be4e00",
+      "#c35000",
+      "#fb986b",
+      "#ffd5c3"
+    ]
+  },
+  "purple": {
+    "light": [
+      "#fdfbfe",
+      "#f8f5fd",
+      "#f1eafb",
+      "#eadff8",
+      "#e0d1f4",
+      "#d4c0ed",
+      "#c3a9e4",
+      "#ad88d7",
+      "#863fc4",
+      "#7936b2",
+      "#6f31a4",
+      "#361b50"
+    ],
+    "dark": [
+      "#16111d",
+      "#1f1728",
+      "#2d1e3c",
+      "#39244e",
+      "#442b5d",
+      "#50346d",
+      "#603f83",
+      "#73499d",
+      "#914dcf",
+      "#9356ce",
+      "#c6a2f0",
+      "#e6d9f9"
+    ]
   }
 }

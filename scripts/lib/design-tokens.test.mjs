@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -17,6 +17,7 @@ import {
   renderCss,
   renderTs,
 } from './design-tokens.mjs';
+import { repoRoot } from './repo.mjs';
 
 describe('color math', () => {
   it('computes WCAG contrast ratios', () => {
@@ -67,6 +68,59 @@ describe('the repository tokens', () => {
   });
 });
 
+describe('accent presets (ADR-0104)', () => {
+  it('resolve the default into the base colors and write the others as data-accent blocks', async () => {
+    const sources = await loadTokenSources();
+    const model = buildModel(sources);
+    expect(model.accents.ids[0]).toBe(sources.accents.default);
+    expect(model.accents.colors[sources.accents.default]).toEqual(model.colors);
+    const css = renderCss(model);
+    for (const id of model.accents.ids.slice(1)) {
+      expect(css).toContain(`:root[data-accent='${id}'][data-color-mode='light']`);
+      expect(css).toContain(`:root[data-accent='${id}']:not([data-color-mode])`);
+    }
+    // Forced colors still win over every accent selector.
+    expect(css).toMatch(
+      /@media \(forced-colors: active\) \{\s+:root,\s+:root\[data-color-mode\],\s+:root\[data-accent\]:not\(\[data-color-mode\]\),\s+:root\[data-accent\]\[data-color-mode\]/,
+    );
+    expect(css.lastIndexOf('forced-colors')).toBeGreaterThan(css.lastIndexOf('data-accent='));
+    // Status dots and graph lanes are not the accent.
+    expect(model.accents.tokens).not.toContain('agentStatus.running');
+    expect(model.accents.tokens).toContain('accent.solid');
+  });
+
+  it('checks contrast for every preset', async () => {
+    const sources = await loadTokenSources();
+    const yellow = sources.palette.yellow;
+    if (yellow === undefined || !Array.isArray(yellow.light)) {
+      throw new Error('yellow ladder expected');
+    }
+    yellow.light[8] = '#f4ce23';
+    const failing = checkContrast(buildModel(sources), sources.pairs).filter((r) => !r.ok);
+    expect(failing.some((r) => r.accent === 'yellow' && r.fg === 'accent.solid')).toBe(true);
+    expect(failing.every((r) => r.accent === 'yellow')).toBe(true);
+  });
+
+  it('match the accents Core accepts in the settings file', async () => {
+    const { accents } = await loadTokenSources();
+    const schema = await readFile(
+      path.join(repoRoot, 'crates', 'piarc-config', 'src', 'schema.rs'),
+      'utf8',
+    );
+    const field = /name: "accent",\s*shape: Shape::OneOf\(&\[([^\]]*)\]/.exec(schema);
+    const listed = [...(field?.[1] ?? '').matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    expect(listed).toEqual([...Object.keys(accents.presets), 'custom']);
+  });
+
+  it('refuses a preset override of an unknown color', async () => {
+    const sources = await loadTokenSources();
+    const blue = sources.accents.presets.blue;
+    if (blue === undefined) throw new Error('blue preset expected');
+    blue.overrides['text.nothing'] = 'accent.9';
+    expect(() => buildModel(sources)).toThrow(/not a semantic color/);
+  });
+});
+
 describe('the checks fail on bad tokens', () => {
   it('reports a pair below AA', async () => {
     const sources = await loadTokenSources();
@@ -82,7 +136,8 @@ describe('the checks fail on bad tokens', () => {
 
   it('refuses an orange accent, a cream surface and a brand font', async () => {
     const sources = await loadTokenSources();
-    const accent = sources.palette.indigo;
+    // The default accent's ladder; the presets a user picks are not brand-checked (ADR-0104).
+    const accent = sources.palette.graphite;
     const neutral = sources.palette.slate;
     if (
       accent === undefined ||

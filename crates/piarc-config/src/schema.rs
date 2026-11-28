@@ -695,6 +695,17 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
                 name: "reduceMotion",
                 shape: Shape::OneOf(&["system", "on", "off"]),
             },
+            // ADR-0104: the presets in design/tokens/accents.json, or a custom `#rrggbb`.
+            Field {
+                name: "accent",
+                shape: Shape::OneOf(&[
+                    "graphite", "blue", "green", "yellow", "pink", "orange", "purple", "custom",
+                ]),
+            },
+            Field {
+                name: "accentColor",
+                shape: Shape::String,
+            },
         ]),
     },
     // Command id → key in `Mod` notation; an empty string unbinds the command.

@@ -1,0 +1,78 @@
+{
+  "$description": "Accent presets (ADR-0104): the colour of primary buttons, switches, the focus ring, selection and links. `default` is what PiArc ships (it must pass the brand rules); a preset names the palette ladder that stands in for the `accent` ramp and may override semantic values (graphite keeps links blue and carries dark text on its light solids in dark mode; yellow carries dark text; green uses emerald, the success ladder with solids dark enough for white text). The generator writes each preset as `[data-accent]` blocks and checks every contrast pair for every preset.",
+  "default": "graphite",
+  "presets": {
+    "graphite": {
+      "ramp": "graphite",
+      "overrides": {
+        "text.accent": {
+          "light": "link.11",
+          "dark": "link.11",
+          "highContrast": "link.12"
+        },
+        "text.onAccent": {
+          "light": "base.white",
+          "dark": "neutral.1",
+          "lightHighContrast": "base.white",
+          "darkHighContrast": "neutral.1"
+        },
+        "accent.solidHover": {
+          "light": "accent.10",
+          "dark": "accent.10",
+          "lightHighContrast": "accent.12",
+          "darkHighContrast": "accent.11"
+        },
+        "border.focus": {
+          "light": "accent.11",
+          "dark": "accent.11",
+          "lightHighContrast": "accent.12",
+          "darkHighContrast": "accent.11"
+        },
+        "action.primaryPressed": {
+          "light": "accent.11",
+          "dark": "accent.11",
+          "lightHighContrast": "accent.12",
+          "darkHighContrast": "accent.11"
+        }
+      }
+    },
+    "blue": {
+      "ramp": "indigo"
+    },
+    "green": {
+      "ramp": "emerald"
+    },
+    "yellow": {
+      "ramp": "yellow",
+      "overrides": {
+        "text.onAccent": {
+          "light": "base.black",
+          "dark": "base.black",
+          "lightHighContrast": "base.white",
+          "darkHighContrast": "base.black"
+        },
+        "accent.solidHover": {
+          "light": "accent.10",
+          "dark": "accent.10",
+          "lightHighContrast": "accent.12",
+          "darkHighContrast": "accent.11"
+        },
+        "action.primaryPressed": {
+          "light": "accent.8",
+          "dark": "accent.11",
+          "lightHighContrast": "accent.12",
+          "darkHighContrast": "accent.11"
+        }
+      }
+    },
+    "pink": {
+      "ramp": "pink"
+    },
+    "orange": {
+      "ramp": "orange"
+    },
+    "purple": {
+      "ramp": "purple"
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.80（2026-11-27） |
+| 版本 | 2.81（2026-11-27） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -258,6 +258,7 @@ PiArc/
 | [0041](../adr/0041-windows-ahp-round-trip-budget.md) | 小文件 fs 操作的 AHP 往返按平台给预算：macOS p95 ≤ 5 ms，Windows p95 ≤ 15 ms | ADR-0036 的每次访问都从卷根逐级绑定目录，W1 实测 Windows p95 5.0–9.3 ms |
 | [0042](../adr/0042-plan-todo-ask-next-steps.md) | 计划模式、任务清单、提问与下一步是宿主工具：模式由 Core 持有，`ExitPlanMode` 在裁决中必问（PermissionRequest hook 不能代答）；计划卡与提问表单进同一审批账本，批准的计划存为会话 entry，任务清单在工具结果里；提醒只经 `reminders.ts` | 计划与清单随分支回溯、压缩后可重注入，工具集不变以保住缓存（第 6.5、6.15 节） |
 | [0103](../adr/0103-plan-review-in-the-conversation.md) | 计划审阅回到对话：等待审阅时输入框的消息先 steer、再以 `via: conversation` 退回计划；计划卡是决策栏（停止、修改、两种批准）；计划面板渲染 Markdown，评论仍锚定原文 UTF-16 偏移；窗口从会话快照接管错过的运行态 | 修订 ADR-0042 第 2、3 条，计划调整与主输入框一致 |
+| [0104](../adr/0104-accent-color.md) | 外观设置里的强调色：七个预设（默认石墨）与自定义色，按 `data-accent` 切换，逐预设检查对比度，自定义色按对比度对修正 | 修订 ADR-0006 与 8.6 节：品牌色相限制只约束默认强调色 |
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
@@ -1395,12 +1396,12 @@ T34 落地（ADR-0051）：Ctrl+\` 切换终端面板（`terminal.toggle`）。�
 
 桌面前端以 Claude Desktop 的视觉、UI 细节和交互为长期参考，可按组件与流程逐项复刻。按 ADR-0073 固定版本、实测并映射到 PiArc 的组件和令牌。Core、Agent Host、Pi Harness 与后端能力继续采用本文的自有架构。
 
-- PiArc 使用**自有视觉品牌**（ADR-0006）：主色避开橙色 / 陶土色系；不用"暖奶油底 + 衬线大标题"组合；插画、提示音自行设计。应用图标与标记用 `design/brand/` 中的黑白 Pi 字形（来源与许可证见该目录 README）；公开发布前要确认 Pi logo 的使用许可（需求 D3）。
+- PiArc 使用**自有视觉品牌**（ADR-0006）：默认强调色避开橙色 / 陶土色系（用户在外观页自选的预设或自定义色不受此限，ADR-0104）；不用"暖奶油底 + 衬线大标题"组合；插画、提示音自行设计。应用图标与标记用 `design/brand/` 中的黑白 Pi 字形（来源与许可证见该目录 README）；公开发布前要确认 Pi logo 的使用许可（需求 D3）。
 - **字体**：使用系统字体，不打包专有字体。界面字体 macOS 为 SF Pro、Windows 为 Segoe UI Variable，中文回退 PingFang SC / Microsoft YaHei UI；等宽字体 macOS 为 SF Mono、Windows 为 Cascadia Mono。
 - **令牌分层**：原始色板 → 明暗阶梯 → 语义层（surface / text / border / accent / state / agent-status / diff / code）→ 组件层；四种模式（明、暗，各自含高对比度）× 两档密度。跟随 `prefers-color-scheme`、`prefers-contrast` 与 Windows 的 `forced-colors`。
 - **单一来源**：`design/tokens/*.json`，由脚本生成 CSS 自定义属性和 TypeScript 常量；CI 检查文本对比度（WCAG AA）。组件只读语义层。
 - **平台外观**：macOS 用隐藏式标题栏保留红绿灯、侧栏使用系统 vibrancy；Windows 11 使用 Mica 背景与标题栏覆盖层（窗口控件在右上）。Electron 45 没有 Liquid Glass API（相关 PR 已关闭未合并），第一版只用 vibrancy；系统绘制的标题栏、菜单和对话框会随系统外观变化。正文、代码、diff 使用不透明背景，保证可读性。
-- T18 落地（ADR-0029）：令牌在 `design/tokens/`（`palette` → `ramps` → `semantic` → `component`，另有 `scale` 与 `contrast`），`npm run gen:tokens` 生成 `tokens.generated.css`（`:root` 加 `data-color-mode` 四种模式、`data-density`、`prefers-color-scheme` 回退、`forced-colors` 映射到系统色）与 `src/shared/design-tokens.ts`（主进程取窗口背景与标题栏覆盖层颜色）。verify 检查生成物漂移、42 对前景 / 背景在四种模式下的对比度、主色色相不在 10°–50°、表面色不是暖奶油色、只用系统字体、不打包字体与音频。主题偏好经 `nativeTheme.themeSource` 同时作用于页面、vibrancy 材质与原生对话框。主色为 indigo 色族（用户在 T18 视觉关口确认，D3），名称字标仍待定。窗口外观：macOS 为 `titleBarStyle: 'hidden'`、红绿灯位于 (16, 13)、`vibrancy: 'sidebar'`；Windows 为 Mica 与透明的标题栏覆盖层（符号色随主题），页面顶部 40 px 是拖动区；高对比度模式下侧栏不透明。
+- T18 落地（ADR-0029）：令牌在 `design/tokens/`（`palette` → `ramps` → `semantic` → `component`，另有 `scale` 与 `contrast`），`npm run gen:tokens` 生成 `tokens.generated.css`（`:root` 加 `data-color-mode` 四种模式、`data-density`、`prefers-color-scheme` 回退、`forced-colors` 映射到系统色）与 `src/shared/design-tokens.ts`（主进程取窗口背景与标题栏覆盖层颜色）。verify 检查生成物漂移、42 对前景 / 背景在四种模式下的对比度、主色色相不在 10°–50°、表面色不是暖奶油色、只用系统字体、不打包字体与音频。主题偏好经 `nativeTheme.themeSource` 同时作用于页面、vibrancy 材质与原生对话框。主色为 indigo 色族（用户在 T18 视觉关口确认，D3），名称字标仍待定。ADR-0104 起强调色可在外观页选择：默认石墨，indigo 成为“蓝色”预设，链接、运行中状态点与提交图泳道读 `link` 阶梯（indigo）。窗口外观：macOS 为 `titleBarStyle: 'hidden'`、红绿灯位于 (16, 13)、`vibrancy: 'sidebar'`；Windows 为 Mica 与透明的标题栏覆盖层（符号色随主题），页面顶部 40 px 是拖动区；高对比度模式下侧栏不透明。
 
 ### 8.7 无障碍与本地化
 
@@ -1938,6 +1939,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.73 | 2026-11-25 | Git 工具（ADR-0084、ADR-0085、ADR-0086）：第 4 章新增三条 ADR，ADR-0044 第 8 条被 ADR-0084 取代；6.9 节说明 Changes 面板成为 Git 工具的"本会话"范围；7.6 节 `gitRequest`、`cancelGit` 与事件 `core/git`；7.7 节 Git diff 的来源、上限与按 hunk 暂存；8.2 节 Git 工具、提交视图、分支弹窗与设置页；10.1 节新增威胁"恶意仓库的 Git 配置"（THR-15）。 |
 | 2.74 | 2026-11-26 | 内置浏览器（ADR-0088–0093，[设计增补](addenda/browser.md)）：第 4 章新增六条 ADR；5.4、8.5、10.3 写明浏览器 guest 不属于应用窗口；10.1 THR-13 第一条改为"应用窗口"；ADR-0013 增加浏览器平台集成、ADR-0021 增加浏览器分区 cookie 的例外。THR-16、THR-17 与第 7.1、8.1 节的模块表随实现落地补入。 |
 | 2.79 | 2026-11-27 | Pi 包市场与卸载（ADR-0102，[设计增补](addenda/pi-package-market.md)）：6.7 节写明市场视图、目录来源、安装核对与每包一个 npm 前缀；9.2 节新增 `market_packages`、`market_sync`（schema v16）；10.1 节 THR-03 新增市场安装的核对；10.5 节外连含市场。 |
+| 2.81 | 2026-11-27 | 第 4 章决策表加入 ADR-0104；8.6 节：强调色可在外观页选择（七个预设与自定义色，默认石墨），品牌色相限制只约束默认强调色，状态点与泳道改读 `link`。 |
 | 2.80 | 2026-11-27 | 第 4 章决策表：计划审阅回到对话，计划卡改为决策栏，计划面板渲染 Markdown 并保持原文偏移锚点，窗口从会话快照接管错过的运行态（ADR-0103，修订 ADR-0042 第 2、3 条）。 |
 | 2.78 | 2026-11-27 | 第 8.2 节：设置改为工作台里的一个视图，按组导航，搜索结果在主区（ADR-0101）。 |
 | 2.77 | 2026-11-27 | 第 8.2 节：两层输入卡片与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏（ADR-0100）。 |

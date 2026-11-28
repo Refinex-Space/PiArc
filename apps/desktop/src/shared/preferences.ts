@@ -3,6 +3,7 @@
 // (`piarc_core::client_settings`); the main process reads it at start, writes single keys
 // through Core and sends the result to every window.
 
+import { ACCENTS, DEFAULT_ACCENT, type Accent } from './design-tokens.js';
 import { isCommandId, parseKey } from './keybindings.js';
 
 export const LANGUAGES = ['system', 'en', 'zh-CN'] as const;
@@ -21,6 +22,15 @@ export const MOTIONS = ['system', 'on', 'off'] as const;
 /** `on`: reduce motion; `off`: full motion; `system`: follow `prefers-reduced-motion`. */
 export type ReduceMotionPreference = (typeof MOTIONS)[number];
 
+/** ADR-0104: a preset, or `custom` (the user's `accentColor`). */
+export const ACCENT_PREFERENCES = [...ACCENTS, 'custom'] as const;
+export type AccentPreference = Accent | 'custom';
+
+/** A custom accent color: `#rrggbb` (lower case when stored). */
+export function isAccentColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
 export interface Preferences {
   readonly language: LanguagePreference;
   readonly appearance: {
@@ -28,6 +38,9 @@ export interface Preferences {
     readonly contrast: ContrastPreference;
     readonly density: DensityPreference;
     readonly reduceMotion: ReduceMotionPreference;
+    readonly accent: AccentPreference;
+    /** `#rrggbb`; `''` until a custom color was chosen. */
+    readonly accentColor: string;
   };
   /** Command id → key in `Mod` notation; `''` unbinds. Only overrides are stored. */
   readonly keybindings: Readonly<Record<string, string>>;
@@ -275,6 +288,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
     contrast: 'system',
     density: 'comfortable',
     reduceMotion: 'system',
+    accent: DEFAULT_ACCENT,
+    accentColor: '',
   },
   keybindings: {},
   notifications: { enabled: true },
@@ -372,6 +387,10 @@ export function preferencesFrom(settings: unknown): Preferences {
       contrast: oneOf(CONTRASTS, appearance.contrast, defaults.contrast),
       density: oneOf(DENSITY_PREFERENCES, appearance.density, defaults.density),
       reduceMotion: oneOf(MOTIONS, appearance.reduceMotion, defaults.reduceMotion),
+      accent: oneOf(ACCENT_PREFERENCES, appearance.accent, defaults.accent),
+      accentColor: isAccentColor(appearance.accentColor)
+        ? appearance.accentColor.toLowerCase()
+        : defaults.accentColor,
     },
     keybindings,
     notifications: {
@@ -504,6 +523,9 @@ export type PreferenceChange =
   | { readonly key: 'appearance.contrast'; readonly value: ContrastPreference }
   | { readonly key: 'appearance.density'; readonly value: DensityPreference }
   | { readonly key: 'appearance.reduceMotion'; readonly value: ReduceMotionPreference }
+  | { readonly key: 'appearance.accent'; readonly value: AccentPreference }
+  /** `#rrggbb`. */
+  | { readonly key: 'appearance.accentColor'; readonly value: string }
   | { readonly key: 'notifications.enabled'; readonly value: boolean }
   | { readonly key: 'memory.readBoth'; readonly value: boolean }
   | { readonly key: 'permissions.enableBypassPermissions'; readonly value: boolean }
@@ -586,6 +608,14 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
     case 'appearance.reduceMotion':
       return oneOf(MOTIONS, value, 'system') === value
         ? { pointer: '/appearance/reduceMotion', value }
+        : undefined;
+    case 'appearance.accent':
+      return oneOf(ACCENT_PREFERENCES, value, DEFAULT_ACCENT) === value
+        ? { pointer: '/appearance/accent', value }
+        : undefined;
+    case 'appearance.accentColor':
+      return isAccentColor(value)
+        ? { pointer: '/appearance/accentColor', value: value.toLowerCase() }
         : undefined;
     case 'notifications.enabled':
       return typeof value === 'boolean' ? { pointer: '/notifications/enabled', value } : undefined;

@@ -109,8 +109,8 @@
   "agentStatus": {
     "error": "danger.9",
     "awaiting": { "light": "warning.10", "dark": "warning.9" },
-    "running": { "light": "accent.9", "dark": "accent.11" },
-    "unread": { "light": "accent.9", "dark": "accent.11" },
+    "running": { "light": "link.9", "dark": "link.11" },
+    "unread": { "light": "link.9", "dark": "link.11" },
     "idle": "neutral.8"
   },
   "diff": {
@@ -120,12 +120,12 @@
     "removedText": { "light": "danger.11", "dark": "danger.11", "highContrast": "danger.12" }
   },
   "graph": {
-    "lane0": { "light": "accent.9", "dark": "accent.11" },
+    "lane0": { "light": "link.9", "dark": "link.11" },
     "lane1": { "light": "success.10", "dark": "success.9" },
     "lane2": { "light": "warning.10", "dark": "warning.9" },
     "lane3": { "light": "danger.9", "dark": "danger.10" },
     "lane4": { "light": "neutral.10", "dark": "neutral.9" },
-    "lane5": { "light": "accent.11", "dark": "accent.9" },
+    "lane5": { "light": "link.11", "dark": "link.9" },
     "lane6": { "light": "success.11", "dark": "success.11" },
     "lane7": { "light": "warning.11", "dark": "warning.11" }
   },

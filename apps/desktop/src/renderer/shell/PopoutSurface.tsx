@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { adoptCustomAccent } from '../app/accent.js';
 import { IconButton } from '../app/IconButton.js';
 import { useT } from '../app/app-context.js';
 import { SurfaceDocument } from '../app/surface-document.js';
@@ -62,6 +63,8 @@ function mirrorAppearance(doc: Document): () => void {
       'data-app',
       'data-platform',
       'data-color-mode',
+      'data-accent',
+      'data-accent-color',
       'data-density',
       'data-reduce-motion',
     ]) {
@@ -69,6 +72,11 @@ function mirrorAppearance(doc: Document): () => void {
       if (value === null) target.removeAttribute(attr);
       else target.setAttribute(attr, value);
     }
+    // A custom accent's sheet is per document (constructed sheets do not cross documents).
+    adoptCustomAccent(
+      doc,
+      target.dataset.accent === 'custom' ? (target.dataset.accentColor ?? null) : null,
+    );
   };
   sync();
   for (const style of document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')) {

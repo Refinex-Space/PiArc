@@ -1,6 +1,7 @@
 // Design tokens (architecture section 8.6): loads the four layers in design/tokens/ (palette →
 // light/dark ramps → semantic colors → component tokens, plus the mode-independent scale and
-// density values), resolves them for the four color modes, renders the CSS custom properties
+// density values), resolves them for the four color modes and every accent preset (ADR-0104),
+// renders the CSS custom properties
 // and the TypeScript constants, and checks WCAG contrast, the brand rules and the bundled
 // assets. `scripts/dev/gen-design-tokens.mjs` writes the outputs;
 // `scripts/ci/check-design-tokens.mjs` (a verify step) checks drift, contrast and brand.
@@ -41,11 +42,12 @@ export const CONTRAST_MIN = {
 
 /**
  * PiArc's brand boundary (ADR-0006, architecture section 8.6, ui-reference-notes section 9):
- * the accent stays out of the orange and terracotta hues, surfaces are not warm cream, and
- * no Anthropic font, serif display font, icon or sound ships.
+ * the default accent stays out of the orange and terracotta hues (presets the user picks may
+ * not, ADR-0104), surfaces are not warm cream, and no Anthropic font, serif display font, icon
+ * or sound ships.
  */
 export const BRAND_RULES = {
-  /** HSL hues (degrees, inclusive) the accent may not use: orange, terracotta, clay. */
+  /** HSL hues (degrees, inclusive) the default accent may not use: orange, terracotta, clay. */
   forbiddenAccentHues: { from: 10, to: 50 },
   /** Below this HSL saturation a color is a gray and has no meaningful hue. */
   minSaturation: 0.2,
@@ -97,6 +99,14 @@ export const BRAND_RULES = {
  * @property {Record<string, unknown>} component
  * @property {Record<string, unknown>} scale
  * @property {{ fg: string, bg: string, kind: 'text' | 'large' | 'ui' }[]} pairs
+ * @property {AccentSources} accents
+ */
+
+/**
+ * @typedef {object} AccentSources
+ * @property {string} default the preset PiArc ships
+ * @property {Record<string, { ramp: string, overrides: Record<string, unknown> }>} presets
+ *   id → the ladder standing in for the `accent` ramp and semantic values it replaces
  */
 
 /**
@@ -108,6 +118,18 @@ export const BRAND_RULES = {
  * @property {Record<Density, Record<string, string>>} density
  * @property {Record<string, string>} component component token → referenced token
  * @property {Record<string, string>} ramps role → palette family
+ * @property {AccentModel} accents
+ */
+
+/**
+ * @typedef {object} AccentModel
+ * @property {string} default the preset `colors` holds
+ * @property {string[]} ids every preset, the default first
+ * @property {string[]} tokens the colors that differ between presets
+ * @property {TokenSources['pairs']} pairs the contrast pairs with one of those colors (a custom
+ *   accent is corrected until they hold)
+ * @property {Record<string, Record<Mode, Record<string, string>>>} colors resolved hex per preset
+ *   and mode (every color, for the checks)
  */
 
 /**
@@ -151,14 +173,16 @@ const HEX = /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/;
 export async function loadTokenSources(dir = TOKENS_DIR) {
   const read = async (/** @type {string} */ name) =>
     record(await readJsonFile(path.join(dir, name)), name);
-  const [paletteFile, rampsFile, semantic, component, scale, contrastFile] = await Promise.all([
-    read('palette.json'),
-    read('ramps.json'),
-    read('semantic.json'),
-    read('component.json'),
-    read('scale.json'),
-    read('contrast.json'),
-  ]);
+  const [paletteFile, rampsFile, semantic, component, scale, contrastFile, accentsFile] =
+    await Promise.all([
+      read('palette.json'),
+      read('ramps.json'),
+      read('semantic.json'),
+      read('component.json'),
+      read('scale.json'),
+      read('contrast.json'),
+      read('accents.json'),
+    ]);
   /** @type {TokenSources['palette']} */
   const palette = {};
   for (const [family, value] of entries(paletteFile)) {
@@ -178,15 +202,37 @@ export async function loadTokenSources(dir = TOKENS_DIR) {
       );
     }
   }
+  const isLadder = (/** @type {string} */ name) => {
+    const target = palette[name];
+    return target !== undefined && 'light' in target && Array.isArray(target.light);
+  };
   /** @type {Record<string, string>} */
   const ramps = {};
   for (const [role, family] of entries(rampsFile)) {
     const name = text(family, `ramps.${role}`);
-    const target = palette[name];
-    if (target === undefined || !('light' in target) || !Array.isArray(target.light)) {
+    if (!isLadder(name)) {
       throw new Error(`ramps.${role} names ${name}, which is not a palette ladder`);
     }
     ramps[role] = name;
+  }
+  /** @type {AccentSources['presets']} */
+  const presets = {};
+  for (const [id, value] of entries(record(accentsFile.presets, 'accents.presets'))) {
+    if (!/^[a-z][a-z0-9-]*$/.test(id) || id === 'custom') {
+      throw new Error(`accents.presets.${id}: ids are lower-case words other than custom`);
+    }
+    const shape = record(value, `accents.presets.${id}`);
+    const ramp = text(shape.ramp, `accents.presets.${id}.ramp`);
+    if (!isLadder(ramp)) {
+      throw new Error(`accents.presets.${id}.ramp names ${ramp}, which is not a palette ladder`);
+    }
+    const overrides =
+      shape.overrides === undefined ? {} : record(shape.overrides, `accents.presets.${id}`);
+    presets[id] = { ramp, overrides };
+  }
+  const defaultAccent = text(accentsFile.default, 'accents.default');
+  if (presets[defaultAccent]?.ramp !== ramps.accent) {
+    throw new Error(`accents.default must be a preset whose ramp is ramps.accent`);
   }
   const rawPairs = contrastFile.pairs;
   if (!Array.isArray(rawPairs)) {
@@ -205,7 +251,15 @@ export async function loadTokenSources(dir = TOKENS_DIR) {
     }
     return { fg: text(shape.fg, `${where}.fg`), bg: text(shape.bg, `${where}.bg`), kind: checked };
   });
-  return { palette, ramps, semantic, component, scale, pairs };
+  return {
+    palette,
+    ramps,
+    semantic,
+    component,
+    scale,
+    pairs,
+    accents: { default: defaultAccent, presets },
+  };
 }
 
 /**
@@ -326,15 +380,43 @@ export function buildModel(sources) {
       throw new Error(`forcedColors.${token} is not a semantic color`);
     }
   }
-  const colors = /** @type {Record<Mode, Record<string, string>>} */ ({});
-  for (const mode of MODES) {
-    colors[mode] = Object.fromEntries(
-      colorNames.map((token) => {
-        const reference = referenceFor(values[token], mode, `semantic.${token}`);
-        return [token, resolveReference(sources, reference, mode, `semantic.${token}`)];
-      }),
-    );
+  /** @type {AccentModel['colors']} */
+  const accentColors = {};
+  const ids = [
+    sources.accents.default,
+    ...Object.keys(sources.accents.presets).filter((id) => id !== sources.accents.default),
+  ];
+  for (const id of ids) {
+    const preset = sources.accents.presets[id];
+    if (preset === undefined) {
+      throw new Error(`accent preset ${id} is missing`);
+    }
+    for (const token of Object.keys(preset.overrides)) {
+      if (!colorNames.includes(token)) {
+        throw new Error(`accents.presets.${id}.overrides.${token} is not a semantic color`);
+      }
+    }
+    const presetSources = { ...sources, ramps: { ...sources.ramps, accent: preset.ramp } };
+    const presetValues = { ...values, ...preset.overrides };
+    const byMode = /** @type {Record<Mode, Record<string, string>>} */ ({});
+    for (const mode of MODES) {
+      byMode[mode] = Object.fromEntries(
+        colorNames.map((token) => {
+          const where = token in preset.overrides ? `accents.${id}.${token}` : `semantic.${token}`;
+          const reference = referenceFor(presetValues[token], mode, where);
+          return [token, resolveReference(presetSources, reference, mode, where)];
+        }),
+      );
+    }
+    accentColors[id] = byMode;
   }
+  const colors = accentColors[sources.accents.default];
+  if (colors === undefined) {
+    throw new Error('the default accent preset did not resolve');
+  }
+  const accentTokens = colorNames.filter((token) =>
+    ids.some((id) => MODES.some((mode) => accentColors[id]?.[mode][token] !== colors[mode][token])),
+  );
   /** @type {Record<string, string>} */
   const common = {};
   const { density: densityGroup, ...rest } = sources.scale;
@@ -364,7 +446,39 @@ export function buildModel(sources) {
       component[`${part}.${name}`] = target;
     }
   }
-  return { colorNames, colors, forced, common, density, component, ramps: sources.ramps };
+  return {
+    colorNames,
+    colors,
+    forced,
+    common,
+    density,
+    component,
+    ramps: sources.ramps,
+    accents: {
+      default: sources.accents.default,
+      ids,
+      tokens: accentTokens,
+      pairs: sources.pairs.filter(
+        (pair) => accentTokens.includes(pair.fg) || accentTokens.includes(pair.bg),
+      ),
+      colors: accentColors,
+    },
+  };
+}
+
+/**
+ * The colors of preset `id` in `mode` that differ from the default preset.
+ * @param {TokenModel} model
+ * @param {string} id
+ * @param {Mode} mode
+ */
+function accentDifferences(model, id, mode) {
+  const preset = model.accents.colors[id]?.[mode] ?? {};
+  return Object.fromEntries(
+    model.accents.tokens
+      .filter((token) => preset[token] !== model.colors[mode][token])
+      .map((token) => [token, preset[token] ?? '']),
+  );
 }
 
 /**
@@ -395,8 +509,10 @@ const HEADER = 'Generated by scripts/dev/gen-design-tokens.mjs from design/token
 
 /**
  * The CSS custom properties: scale and component tokens on `:root`, colors per
- * `data-color-mode` (with a media-query fallback before the attribute is set), density per
- * `data-density`, and system colors under forced colors.
+ * `data-color-mode` (with a media-query fallback before the attribute is set), the accent
+ * presets other than the default per `data-accent` (only the colors they change), density per
+ * `data-density`, and system colors under forced colors (whose selectors match every accent
+ * selector's specificity, so they still win).
  * @param {TokenModel} model
  */
 export function renderCss(model) {
@@ -424,11 +540,32 @@ export function renderCss(model) {
       modeBody('dark', '    '),
     ).replace(/\n}$/, '\n  }')}\n}`,
     ...MODES.map((mode) => block(`:root[data-color-mode='${mode}']`, modeBody(mode, '  '))),
+    ...model.accents.ids.slice(1).flatMap((id) => {
+      const fallback = `:root[data-accent='${id}']:not([data-color-mode])`;
+      return [
+        block(fallback, declarations(accentDifferences(model, id, 'light'), '  ')),
+        `@media (prefers-color-scheme: dark) {\n${block(
+          `  ${fallback}`,
+          declarations(accentDifferences(model, id, 'dark'), '    '),
+        ).replace(/\n}$/, '\n  }')}\n}`,
+        ...MODES.flatMap((mode) => {
+          const values = accentDifferences(model, id, mode);
+          return Object.keys(values).length === 0
+            ? []
+            : [
+                block(
+                  `:root[data-accent='${id}'][data-color-mode='${mode}']`,
+                  declarations(values, '  '),
+                ),
+              ];
+        }),
+      ];
+    }),
     ...DENSITIES.slice(1).map((density) =>
       block(`:root[data-density='${density}']`, declarations(model.density[density], '  ')),
     ),
     `@media (forced-colors: active) {\n${block(
-      '  :root,\n  :root[data-color-mode]',
+      '  :root,\n  :root[data-color-mode],\n  :root[data-accent]:not([data-color-mode]),\n  :root[data-accent][data-color-mode]',
       declarations(model.forced, '    '),
     ).replace(/\n}$/, '\n  }')}\n}`,
   ];
@@ -457,6 +594,37 @@ export type Density = (typeof DENSITIES)[number];
 /** Semantic colors (the only colors components read). */
 export type ColorToken =
 ${union(model.colorNames)};
+
+/** Accent presets (ADR-0104), the default first; \`data-accent\` on the root selects one. */
+export const ACCENTS = ${JSON.stringify(model.accents.ids)} as const;
+export type Accent = (typeof ACCENTS)[number];
+export const DEFAULT_ACCENT: Accent = ${JSON.stringify(model.accents.default)};
+
+/** The colors that change with the accent (a custom accent sets each of them). */
+export const ACCENT_TOKENS: readonly ColorToken[] = ${JSON.stringify(model.accents.tokens)};
+
+/** The contrast pairs with an accent color; WCAG minimums are \`CONTRAST_MIN\`. */
+export const ACCENT_PAIRS: readonly {
+  readonly fg: ColorToken;
+  readonly bg: ColorToken;
+  readonly kind: 'text' | 'large' | 'ui';
+}[] = ${JSON.stringify(model.accents.pairs)};
+
+/** WCAG 2.2 minimum ratios by pair kind in the normal modes (a custom accent's targets). */
+export const CONTRAST_MIN = ${JSON.stringify(CONTRAST_MIN.normal)} as const;
+
+/** The solid color of each preset per base mode (the swatches on the Appearance page). */
+export const ACCENT_SWATCHES: Readonly<Record<Accent, { readonly light: string; readonly dark: string }>> = ${JSON.stringify(
+    Object.fromEntries(
+      model.accents.ids.map((id) => [
+        id,
+        {
+          light: model.accents.colors[id]?.light['accent.solid'] ?? '',
+          dark: model.accents.colors[id]?.dark['accent.solid'] ?? '',
+        },
+      ]),
+    ),
+  )};
 
 /** Mode- and density-dependent sizes, fonts and motion values. */
 export type ScaleToken =
@@ -553,6 +721,7 @@ export function hueAndSaturation(color) {
 
 /**
  * @typedef {object} ContrastResult
+ * @property {string} accent the preset
  * @property {Mode} mode
  * @property {string} fg
  * @property {string} bg
@@ -563,12 +732,30 @@ export function hueAndSaturation(color) {
  */
 
 /**
- * Measures every declared pair in every mode.
+ * Measures every declared pair in every mode of every accent preset.
  * @param {TokenModel} model
  * @param {TokenSources['pairs']} pairs
  * @returns {ContrastResult[]}
  */
 export function checkContrast(model, pairs) {
+  /** @type {ContrastResult[]} */
+  const results = [];
+  for (const accent of model.accents.ids) {
+    const colors = model.accents.colors[accent];
+    if (colors !== undefined) {
+      results.push(...contrastOf(colors, pairs, accent));
+    }
+  }
+  return results;
+}
+
+/**
+ * @param {Record<Mode, Record<string, string>>} colors
+ * @param {TokenSources['pairs']} pairs
+ * @param {string} accent
+ * @returns {ContrastResult[]}
+ */
+function contrastOf(colors, pairs, accent) {
   /** @type {ContrastResult[]} */
   const results = [];
   for (const mode of MODES) {
@@ -577,8 +764,8 @@ export function checkContrast(model, pairs) {
         ? CONTRAST_MIN.highContrast
         : CONTRAST_MIN.normal;
     for (const pair of pairs) {
-      const fg = model.colors[mode][pair.fg];
-      const bg = model.colors[mode][pair.bg];
+      const fg = colors[mode][pair.fg];
+      const bg = colors[mode][pair.bg];
       if (fg === undefined || bg === undefined) {
         throw new Error(`contrast pair ${pair.fg} on ${pair.bg} names an unknown token`);
       }
@@ -587,14 +774,15 @@ export function checkContrast(model, pairs) {
       }
       const ratio = contrastRatio(fg, bg);
       const required = minimum[pair.kind];
-      results.push({ mode, ...pair, ratio, required, ok: ratio >= required });
+      results.push({ accent, mode, ...pair, ratio, required, ok: ratio >= required });
     }
   }
   return results;
 }
 
 /**
- * Brand rules on the resolved tokens: accent hues, cream surfaces, font stacks.
+ * Brand rules on the resolved tokens: the default accent's hues (the presets a user picks are
+ * not checked, ADR-0104), cream surfaces, font stacks.
  * @param {TokenModel} model
  * @param {TokenSources} sources
  * @returns {string[]} problems

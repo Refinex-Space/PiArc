@@ -25,6 +25,7 @@ export const SEARCH_FIELDS: Record<
   ],
   appearance: [
     ['settings.theme.title', 'setting-theme', 'settings.theme'],
+    ['settings.accent', 'setting-accent'],
     ['settings.contrast', 'setting-contrast'],
     ['settings.density', 'setting-density'],
     ['settings.reduceMotion', 'setting-reduceMotion'],

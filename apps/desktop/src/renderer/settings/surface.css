@@ -966,6 +966,97 @@ body:has(.settings-layer[data-phase='in']) .shell > .workspace-area {
   }
 }
 
+/* Accent (ADR-0104): a quiet trigger with the swatch, the menu's swatches, and for a custom
+   color the system picker behind a swatch plus a short hex field. Swatches follow the color
+   mode through `light-dark()` (the token sheet sets `color-scheme` per mode). */
+.accent-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.accent-swatch {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: light-dark(var(--swatch-light), var(--swatch-dark));
+  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
+}
+.accent-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--piarc-space-2);
+  height: var(--piarc-c-button-height);
+  padding: 0 var(--piarc-space-2);
+  border: 0;
+  border-radius: var(--piarc-radius-md);
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.accent-trigger:hover:not(:disabled),
+.accent-trigger[aria-expanded='true'] {
+  background: var(--piarc-session-fill);
+}
+.accent-trigger:disabled {
+  color: var(--piarc-text-disabled);
+}
+.accent-trigger > svg {
+  color: var(--piarc-text-secondary);
+}
+.accent-picker {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--piarc-radius-md);
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+.accent-picker:hover {
+  background: var(--piarc-session-fill);
+}
+.accent-picker .accent-swatch {
+  width: 16px;
+  height: 16px;
+}
+.accent-picker-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+:root[data-app] .accent-picker:has(.accent-picker-input:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: 1px;
+}
+:root[data-app][data-pointer-focus] .accent-picker:has(.accent-picker-input:focus-visible) {
+  outline: none;
+}
+.settings-surface .accent-hex {
+  width: 9ch;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+}
+.settings-surface .accent-hex[aria-invalid='true'] {
+  color: var(--piarc-text-danger);
+}
+.menu-item-line > .accent-swatch {
+  margin-inline-end: var(--piarc-space-1);
+}
+@media (forced-colors: active) {
+  .accent-swatch {
+    forced-color-adjust: none;
+  }
+}
+
 /* Shortcuts: rows on hairlines, quiet keycaps (a fill with a soft lower edge, no outline). */
 .settings-surface .shortcut-table th,
 .settings-surface .shortcut-table td {

@@ -1,5 +1,5 @@
-// The settings pages: General (language, notifications, memory), Appearance (theme, contrast,
-// density, motion) and Keyboard Shortcuts (every registered command; changes take effect at
+// The settings pages: General (language, notifications, memory), Appearance (theme, accent,
+// contrast, density, motion) and Keyboard Shortcuts (every registered command; changes take effect at
 // once in every window and in the menu; conflicts are refused with a message).
 import { useEffect, useId, useState, type ReactNode } from 'react';
 
@@ -45,6 +45,7 @@ import { Keycaps } from '../app/Keycaps.js';
 import { isImeComposing } from '../composer/ime-guard.js';
 import { Button } from '../app/Button.js';
 import { SettingsRow, SettingsSection } from './layout.js';
+import { AccentRow } from './AccentRow.js';
 
 function useSave(): { save: (change: PreferenceChange) => void; error: string | undefined } {
   const { t } = useApp();
@@ -334,6 +335,7 @@ function AppearancePage() {
             save({ key: 'appearance.theme', value });
           }}
         />
+        <AccentRow save={save} />
         <Choice
           label="settings.contrast"
           name="contrast"

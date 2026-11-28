@@ -30,6 +30,8 @@ describe('preferences', () => {
       contrast: 'system',
       density: 'compact',
       reduceMotion: 'system',
+      accent: 'graphite',
+      accentColor: '',
     });
     expect(prefs.keybindings).toEqual({ 'session.new': 'Mod+Shift+N' });
     expect(prefs.notifications.enabled).toBe(false);
@@ -48,6 +50,27 @@ describe('preferences', () => {
       value: true,
     });
     expect(pointerOf({ key: 'permissions.enableBypassPermissions', value: 'on' })).toBe(undefined);
+  });
+
+  it('reads and writes the accent (ADR-0104)', () => {
+    expect(
+      preferencesFrom({ appearance: { accent: 'orange', accentColor: '#10A37F' } }).appearance,
+    ).toMatchObject({ accent: 'orange', accentColor: '#10a37f' });
+    expect(
+      preferencesFrom({ appearance: { accent: 'teal', accentColor: 'red' } }).appearance,
+    ).toMatchObject({ accent: 'graphite', accentColor: '' });
+    expect(pointerOf({ key: 'appearance.accent', value: 'custom' })).toEqual({
+      pointer: '/appearance/accent',
+      value: 'custom',
+    });
+    expect(pointerOf({ key: 'appearance.accent', value: 'teal' })).toBe(undefined);
+    expect(pointerOf({ key: 'appearance.accentColor', value: '#ABCDEF' })).toEqual({
+      pointer: '/appearance/accentColor',
+      value: '#abcdef',
+    });
+    for (const bad of ['#abc', 'abcdef', '#abcdefff', 'rgb(0,0,0)', 7]) {
+      expect(pointerOf({ key: 'appearance.accentColor', value: bad })).toBe(undefined);
+    }
   });
 
   it('reads and writes Auto review settings (T46)', () => {
