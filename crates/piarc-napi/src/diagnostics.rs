@@ -1,4 +1,5 @@
-//! Exports of T45: the diagnostic bundle's preview and export. Results are JSON text.
+//! Exports of T45: the diagnostic bundle's preview and export; and the data export (settings,
+//! Data management). Results are JSON text.
 
 use napi::Env;
 use napi::bindgen_prelude::Object;
@@ -35,6 +36,21 @@ impl CoreRuntime {
     ) -> napi::Result<Object<'env>> {
         self.queue(env, "CoreRuntime.exportDiagnostics", move |core, done| {
             core.export_diagnostics(id, path.into(), done)
+        })
+    }
+
+    /// Writes every session to the absolute `path` as a ZIP archive (each conversation as
+    /// Markdown in the words of `labelsJson`, its original records, and an index); answers
+    /// `{path, bytes, sessions}` as JSON text.
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn export_sessions<'env>(
+        &self,
+        env: &'env Env,
+        path: String,
+        labels_json: String,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.exportSessions", move |core, done| {
+            core.export_sessions(path.into(), &labels_json, done)
         })
     }
 }

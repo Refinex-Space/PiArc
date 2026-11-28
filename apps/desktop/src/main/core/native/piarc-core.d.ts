@@ -97,6 +97,12 @@ export declare class CoreRuntime {
    */
   exportDiagnostics(id: string, path: string): Promise<string>;
   /**
+   * Writes every session to the absolute `path` as a ZIP archive (each conversation as
+   * Markdown in the words of `labelsJson`, its original records, and an index); answers
+   * `{path, bytes, sessions}` as JSON text.
+   */
+  exportSessions(path: string, labelsJson: string): Promise<string>;
+  /**
    * Starts a dictation. `requestJson` is a `DictationStart` (`windowId`, `composer`,
    * `workspace?`, `test?`). Resolves with `DictationStarted` (`sessionId`, `route`).
    */

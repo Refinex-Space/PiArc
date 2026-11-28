@@ -62,3 +62,7 @@
 - 配置变更先在 `agent-host/provider-change.json` 记录公开目标和变更 ID。若设置 Host 或 Core 中断，下一次打开工作区或设置时从新 Host 查询已持久化凭据的变更 ID，恢复对应的公开配置和端点投影。恢复记录、诊断、客户端回应均不带密钥。
 - 变更端点地址或线协议时须重新提交或清除密钥。自定义凭据在保险箱内绑定端点与协议，随 AHP 交给 Host。云厂商字段放在 Pi 的单次请求 credential.env 中。进程环境使用启动器既有的白名单。
 - T49 的 `Op::SideChatAsk` 与 `Op::SideChatControl` 经同一会话 actor 分发到独立请求，不占主回合、不触发输入 hooks。Agent Host 返回每次请求的模型与 token，Core 在返回答案前向数据库记账。面板正文只在客户端和 Agent Host 的内存中。
+
+## 数据导出（设置 › 数据管理）
+
+- `sessions/export.rs`：`Hub::export_sessions(path, labels)` 读会话索引（跳过子 agent 会话），在阻塞线程池上经 `piarc_telemetry::zip::ArchiveWriter` 逐个写入：`raw/<id>.jsonl`（原样，只读 `pi/sessions/` 之下的文件，其余在索引里标 `missing`）、`markdown/<项目>/<日期> <标题>.md`（当前分支：用户与助手正文、每次工具调用一行、压缩与分支摘要；推理、工具结果与提醒不写）、最后 `sessions.json`；先写同目录临时文件再改名。用词与时区偏移来自客户端的 `ExportLabels`（NAPI `exportSessions` 的 JSON），Core 不做本地化。测试：`cargo test -p piarc-core --lib sessions::export`。

@@ -29,7 +29,7 @@
 - 内容：`logs/` 下 Core 与 Agent Host 的日志文件（保留期内全部）、`versions.json`（客户端传入的应用、Electron、Chromium、Node、平台版本加 Core 与协议版本）、`settings/settings.json`、`settings/pi-settings.json`、`settings/pi-models.json`（存在时）、`config-diagnostics.json`（工作区的配置诊断）、`manifest.json`（文件清单、按类别的替换计数、`EXCLUDED`）。
 - 每个文件先经 `redact` 再经 `redact_home`；JSON 设置与诊断另替换名字表明是密钥的键（以 `key`、`token`、`secret`、`password` 结尾，或 `authorization`、`cookie`、`credentials`）与 `env`、`headers` 下的全部字符串值，`${NAME}` 引用保留。
 - 永不包含（`EXCLUDED`）：`secrets.vault`、`core.sqlite`、`sessions/`、`pi/sessions/`、`checkpoints/`、`agent-host/`。加文件只经 `BundleInput`，不要把数据目录整个打进去。
-- 流程：Core 的 `Hub::prepare_diagnostics` 组装并只保留最近一份，答 manifest 与 id；`export_diagnostics(id, path)` 写同一份（主进程的保存对话框选了路径才调用）。ZIP 是 stored 条目、UTF-8 文件名、CRC-32，先写同目录的临时文件再改名。
+- 流程：Core 的 `Hub::prepare_diagnostics` 组装并只保留最近一份，答 manifest 与 id；`export_diagnostics(id, path)` 写同一份（主进程的保存对话框选了路径才调用）。ZIP 是 stored 条目、UTF-8 文件名、CRC-32，先写同目录的临时文件再改名。`zip::ArchiveWriter` 逐条写入、只把中央目录留在内存（数据导出用它，一次一个会话），`write_archive` 是它的一次性包装；超过 4 GiB 或 65,535 个条目（无 ZIP64）返回错误。
 
 ## 参考
 

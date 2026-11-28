@@ -50,4 +50,25 @@ impl CoreRuntime {
             hub.export_diagnostics(id, path).await
         })
     }
+
+    /// Writes every session to `path` (absolute) as a ZIP archive: each conversation as Markdown
+    /// in the client's words (`labels_json`, see [`crate::sessions::ExportLabels`]) and its
+    /// original records, with an index. Answers `{path, bytes, sessions}`.
+    ///
+    /// # Errors
+    ///
+    /// A relative `path` or malformed labels; otherwise as
+    /// [`open_workspace`](Self::open_workspace).
+    pub fn export_sessions(&self, path: PathBuf, labels_json: &str, on_done: Done) -> Result<()> {
+        if !path.is_absolute() {
+            return Err(Error::InvalidArgument {
+                field: "path",
+                reason: "an absolute path".into(),
+            });
+        }
+        let labels = crate::sessions::ExportLabels::parse(labels_json)?;
+        self.on_sessions(on_done, move |hub| async move {
+            hub.export_sessions(path, labels).await
+        })
+    }
 }

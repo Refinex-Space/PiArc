@@ -38,6 +38,7 @@ mod create;
 mod dev_servers;
 mod diagnostics;
 mod drafts;
+mod export;
 mod git;
 mod hooks;
 mod inbound;
@@ -96,6 +97,7 @@ pub(crate) use diagnostics::PreparedBundle;
 pub(crate) use git::{Place, check_scope, session_base};
 pub(crate) use snapshot::{SnapshotMsg, Snapshots};
 
+pub use export::{ExportLabels, ExportSession, write_export};
 pub use piarc_store::SessionPrefsChange;
 pub use snapshot::{Activity, HostState, SessionStatus, SessionView, WorkspaceView, WorktreeView};
 pub use worktrees::{MAX_SEARCH_SESSIONS, SEARCH_HITS_PER_SESSION, WorktreeRequest};
