@@ -587,9 +587,10 @@ export function registerSessionHandlers(
         window === null
           ? await dialog.showMessageBox(options)
           : await dialog.showMessageBox(window, options);
-      if (result.response !== 0) return;
+      if (result.response !== 0) return false;
     }
     await core.setPermissionMode(sessionId(id), mode);
+    return true;
   });
   const elicitationLinks = new LinkConfirmations();
   registerHandler(IPC_CHANNELS.approvalAnswer, async (event, [raw]) => {

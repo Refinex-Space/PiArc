@@ -403,9 +403,10 @@ const api: PiarcApi = {
   controlSideChat: async (session, panel, close) => {
     await ipcRenderer.invoke(IPC_CHANNELS.sideChatControl, session, panel, close);
   },
-  setPermissionMode: async (id, mode) => {
-    await ipcRenderer.invoke(IPC_CHANNELS.sessionPermissionMode, id, mode);
-  },
+  setPermissionMode: (id, mode) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.sessionPermissionMode, id, mode)
+      .then((value: unknown) => expectBoolean(value)),
   answerApproval: (answer) =>
     ipcRenderer
       .invoke(IPC_CHANNELS.approvalAnswer, answer)

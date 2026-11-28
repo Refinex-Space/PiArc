@@ -1,6 +1,6 @@
 // T23-A08, A11, A12: "always allow" offers one prefix rule per subcommand, editable before
 // the native confirmation; a critical deletion offers none; Bypass permissions appears only
-// after it is enabled in settings and still asks natively; the Permissions page adds, edits
+// after it is enabled in settings (on the new-session view too) and still asks natively; the Permissions page adds, edits
 // and removes rules (allow rules behind the native confirmation) and filters the audit.
 // Screenshots go to tmp/evidence/T23/.
 import { openSettings, closeSettings } from './settings-panel.js';
@@ -8,8 +8,8 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ElectronApplication } from '@playwright/test';
 
-import { expect, test } from './sessions.js';
-import { idle, openSession } from './t19.js';
+import { expect, makeWorkspace, openFolder, test } from './sessions.js';
+import { idle, openSession, prefer } from './t19.js';
 
 const EVIDENCE = path.join(import.meta.dirname, '..', '..', '..', 'tmp', 'evidence', 'T23');
 
@@ -101,6 +101,52 @@ test('always allow saves one edited rule per subcommand; bypass needs settings a
   expect(shown).toHaveLength(2);
   expect(shown[0]).toContain('Switch this session to Bypass permissions?');
   await page.screenshot({ path: path.join(EVIDENCE, 'bypass-mode.png') });
+});
+
+test('the new-session view offers Bypass permissions once enabled and confirms it when sending', async ({
+  page,
+  app,
+  workspaces,
+}) => {
+  test.setTimeout(120_000);
+  await prefer(page, { key: 'language', value: 'en' });
+  const ws = await makeWorkspace(workspaces, 'bypass home 跳过', {});
+  await openFolder(page, app, ws);
+  const modeButton = page.getByTestId('home-mode');
+  await modeButton.click();
+  await expect(page.getByTestId('menu-plan')).toBeVisible();
+  await expect(page.getByTestId('menu-bypassPermissions')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const settings = await openSettings(page);
+  await settings.getByTestId('settings-nav-permissions').click();
+  await settings.getByTestId('setting-enable-bypass').click();
+  await expect(settings.getByTestId('setting-enable-bypass')).toBeChecked();
+  await closeSettings(settings);
+  await modeButton.click();
+  await page.getByTestId('menu-bypassPermissions').click();
+  await expect(modeButton).toHaveText(/Bypass permissions/u);
+
+  // Declining the native confirmation keeps the message on the new-session view, unsent.
+  await scriptDialogs(app, [1, 0]);
+  const message = 'Say hello [[piarc-scenario:t18-chat]]';
+  await page.getByTestId('home-input').fill(message);
+  await page.getByTestId('home-start').click();
+  await page.getByTestId('trust-accept').click();
+  await expect.poll(() => dialogs(app)).toHaveLength(1);
+  await expect(page.getByTestId('home')).toBeVisible();
+  await expect(page.getByTestId('conversation')).toHaveCount(0);
+  await expect(page.getByTestId('home-input')).toContainText('Say hello');
+  await expect(modeButton).toHaveText(/Bypass permissions/u);
+
+  // Confirming starts the session in Bypass permissions.
+  await page.getByTestId('home-start').click();
+  await expect(page.getByTestId('conversation')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('permission-mode')).toHaveText(/Bypass permissions/u);
+  await expect(page.getByTestId('agent-message')).toHaveText(/Done\./u, { timeout: 30_000 });
+  const shown = await dialogs(app);
+  expect(shown).toHaveLength(2);
+  expect(shown[1]).toContain('Switch this session to Bypass permissions?');
+  await page.screenshot({ path: path.join(EVIDENCE, 'bypass-new-session.png') });
 });
 
 test('the Permissions page edits rules by source behind a native confirmation and filters the audit', async ({

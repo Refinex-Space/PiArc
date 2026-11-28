@@ -15,7 +15,7 @@ import { ChoiceButton, type MenuItem } from './Menu.js';
 import { keyOf, useModelCatalog, type Effort } from './model-catalog.js';
 import { permissionChoices } from './PermissionModeMenu.js';
 import { reason } from './errors.js';
-import { startSession } from './start-session.js';
+import { StartDeclined, startSession } from './start-session.js';
 import { baseName, useUi } from './ui.js';
 import { NoticeBar } from './NoticeBar.js';
 import { ActivityMark } from '../transcript/rows/ActivityMark.js';
@@ -180,6 +180,8 @@ function HomeForm({
       if (!session.created) ui.show({ kind: 'session', id });
       return true;
     } catch (cause) {
+      // Declining Bypass permissions keeps the message here, unsent.
+      if (cause instanceof StartDeclined) return false;
       const failed = t('home.failed', { reason: reason(cause) });
       if (session.created) ui.show({ kind: 'home', workspace, error: failed });
       else setError(failed);
@@ -343,7 +345,7 @@ function HomeForm({
                     setMode(undefined);
                   },
                 },
-                ...permissionChoices(t, preferences.permissions, mode, setMode, false),
+                ...permissionChoices(t, preferences.permissions, mode, setMode),
               ]}
               heading={t('approval.modeMenu')}
             >

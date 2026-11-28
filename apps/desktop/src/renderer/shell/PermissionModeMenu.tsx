@@ -4,16 +4,19 @@ import type { Preferences } from '../../shared/preferences.js';
 import { useApp, type AppContextValue } from '../app/app-context.js';
 import { choiceName, MenuPopup, useMenu, type MenuItem } from './Menu.js';
 
-/** First-turn choices use the same policy options. Bypass requires the live session's native confirmation. */
+/**
+ * The mode choices of a session and of the new-session view. Bypass permissions is listed once
+ * enabled in settings; the main process confirms it natively when it applies (for a new session,
+ * when the first message is sent).
+ */
 export function permissionChoices(
   t: AppContextValue['t'],
   permissions: Preferences['permissions'],
   current: PermissionMode | undefined,
   choose: (mode: PermissionMode) => void,
-  live: boolean,
 ): MenuItem[] {
   const modes: PermissionMode[] = ['default', 'acceptEdits', 'plan', 'auto'];
-  if (live && permissions.enableBypassPermissions) modes.push('bypassPermissions');
+  if (permissions.enableBypassPermissions) modes.push('bypassPermissions');
   const hints = {
     default: 'workbench.mode.manualHint',
     acceptEdits: 'workbench.mode.editHint',
@@ -73,16 +76,10 @@ export function PermissionModeMenu({
           at={menu.open}
           numbered
           onClose={menu.close}
-          items={permissionChoices(
-            t,
-            preferences.permissions,
-            mode,
-            (next) => {
-              if (next !== mode || next === 'auto')
-                window.piarc.setPermissionMode(id, next).catch(onError);
-            },
-            true,
-          )}
+          items={permissionChoices(t, preferences.permissions, mode, (next) => {
+            if (next !== mode || next === 'auto')
+              window.piarc.setPermissionMode(id, next).catch(onError);
+          })}
         />
       )}
     </>

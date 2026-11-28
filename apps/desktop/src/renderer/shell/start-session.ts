@@ -30,6 +30,14 @@ function unignoredWorktree(text: string): boolean {
   }
 }
 
+/** The user declined the native confirmation of the chosen mode (Bypass permissions). */
+export class StartDeclined extends Error {
+  constructor() {
+    super('The user declined the permission mode');
+    this.name = 'StartDeclined';
+  }
+}
+
 function field(text: string, name: string): string | undefined {
   try {
     const value: unknown = JSON.parse(text);
@@ -88,6 +96,21 @@ export async function startSession(options: {
   if (sessionId === undefined) {
     throw new Error('Core did not return a session id');
   }
+  // The mode goes first: Bypass permissions asks natively, and declining it leaves the user on
+  // the new-session view with the message instead of sending it under another mode.
+  if (options.mode !== undefined) {
+    let applied: boolean;
+    try {
+      applied = await api.setPermissionMode(sessionId, options.mode);
+    } catch (error) {
+      discard(api, sessionId, existing);
+      throw error;
+    }
+    if (!applied) {
+      discard(api, sessionId, existing);
+      throw new StartDeclined();
+    }
+  }
   const transcript = store.transcript(sessionId);
   const draft = options.draft ?? { text, mentions: [], pending: [], stored: [] };
   transcript.addOptimistic(clientId, {
@@ -107,7 +130,6 @@ export async function startSession(options: {
       await api.setSessionModel(sessionId, options.model.provider, options.model.id);
     }
     if (options.effort !== undefined) await api.setSessionEffort(sessionId, options.effort);
-    if (options.mode !== undefined) await api.setPermissionMode(sessionId, options.mode);
     const input = await prepareOutgoing(api, sessionId, clientId, draft);
     const turnId = field(await api.prompt(sessionId, input), 'turnId');
     if (turnId !== undefined) {
@@ -117,13 +139,22 @@ export async function startSession(options: {
   } catch (error) {
     transcript.rollback(clientId);
     unwatch();
-    // A draft stays for the new-session view (its tools may hold a terminal); a session made
-    // for this message goes again.
-    if (existing === undefined) {
-      api.closeSession(sessionId).catch((closeError: unknown) => {
-        console.error('[start] closing the session that did not start failed', closeError);
-      });
-    }
+    discard(api, sessionId, existing);
     throw error;
   }
+}
+
+/**
+ * A draft stays for the new-session view (its tools may hold a terminal); a session made for
+ * this message goes again.
+ */
+function discard(
+  api: Pick<PiarcApi, 'closeSession'>,
+  sessionId: string,
+  existing: string | undefined,
+): void {
+  if (existing !== undefined) return;
+  api.closeSession(sessionId).catch((closeError: unknown) => {
+    console.error('[start] closing the session that did not start failed', closeError);
+  });
 }

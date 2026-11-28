@@ -870,7 +870,8 @@ export interface PiarcApi {
   abort(id: string): Promise<string>;
   askSideChat(sessionId: string, panelId: string, question: string): Promise<string>;
   controlSideChat(sessionId: string, panelId: string, close: boolean): Promise<void>;
-  setPermissionMode(id: string, mode: PermissionMode): Promise<void>;
+  /** Resolves false when the user declined the native confirmation (Bypass permissions). */
+  setPermissionMode(id: string, mode: PermissionMode): Promise<boolean>;
   /** The permission rules of a workspace by source (JSON), the most recent one when null. */
   permissionRules(workspace: string | null): Promise<string>;
   /** Whether a rule parses for a list, and whether it is broad (JSON). */
