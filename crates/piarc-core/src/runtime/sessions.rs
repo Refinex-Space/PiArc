@@ -870,6 +870,38 @@ impl CoreRuntime {
         })
     }
 
+    /// Pi's global instructions in `~/.pi/agent` (ADR-0108): `{ path, exists, content, hash }`.
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn pi_instructions(
+        &self,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(
+            on_done,
+            move |hub| async move { hub.pi_instructions().await },
+        )
+    }
+
+    /// Saves Pi's global instructions over the version whose SHA-256 is `base` (`None` for a
+    /// file that did not exist); answers the new view (ADR-0108).
+    ///
+    /// # Errors
+    ///
+    /// As [`open_workspace`](Self::open_workspace).
+    pub fn save_pi_instructions(
+        &self,
+        content: String,
+        base: Option<String>,
+        on_done: impl FnOnce(Result<serde_json::Value>) + Send + 'static,
+    ) -> Result<()> {
+        self.on_sessions(on_done, move |hub| async move {
+            hub.save_pi_instructions(content, base).await
+        })
+    }
+
     /// The WebSearch settings: the chosen third-party backend and which backends have a key
     /// (T38).
     ///

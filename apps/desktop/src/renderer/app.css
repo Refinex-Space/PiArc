@@ -3176,6 +3176,44 @@ textarea.input {
   align-self: flex-start;
 }
 
+/* Settings › Instructions (ADR-0108): one file, edited in place. */
+.instructions-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--piarc-space-2);
+  padding-block: var(--piarc-space-3);
+}
+.instructions-path {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.instructions-file {
+  font-family: var(--piarc-font-mono);
+}
+/* Above `:root[data-app] textarea { font: inherit }`. */
+:root[data-app] .instructions-editor textarea.instructions-input {
+  min-height: 16rem;
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-font-size-small);
+  line-height: 1.6;
+  resize: vertical;
+}
+.instructions-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.instructions-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--piarc-space-2);
+}
+.instructions-error > p {
+  margin: 0;
+}
+
 /* The desk and its navigation share a title bar and a single reading column. */
 .shell,
 body[data-tool-window] {

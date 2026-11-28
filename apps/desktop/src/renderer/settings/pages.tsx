@@ -40,6 +40,7 @@ import { AgentsPage } from './AgentsPage.js';
 import { McpPage } from './McpPage.js';
 import { MarkdownPage } from './MarkdownPage.js';
 import { MemoryPage } from './MemoryPage.js';
+import { InstructionsPage } from './InstructionsPage.js';
 import { SkillsPage } from './SkillsPage.js';
 import { UsagePage } from '../usage/UsagePage.js';
 import { Keycaps } from '../app/Keycaps.js';
@@ -654,6 +655,14 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.skills',
     order: 45,
     component: SkillsPage,
+  });
+  registerSettingsPage({
+    id: 'instructions',
+    group: 'agents',
+    description: 'settings.description.instructions',
+    title: 'settings.instructions',
+    order: 46,
+    component: InstructionsPage,
   });
   registerSettingsPage({
     id: 'memory',

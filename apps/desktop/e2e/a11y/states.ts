@@ -106,6 +106,12 @@ export const A11Y_STATES = [
     note: 'Pi package market: no catalog yet and the registry unreachable',
   },
   {
+    id: 'settings:instructions',
+    area: 'settings',
+    page: 'instructions',
+    note: 'Instructions: Pi’s global AGENTS.md, missing until saved (ADR-0108)',
+  },
+  {
     id: 'settings:memory',
     area: 'settings',
     page: 'memory',

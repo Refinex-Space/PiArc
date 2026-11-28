@@ -788,6 +788,12 @@ const api: PiarcApi = {
     ipcRenderer
       .invoke(IPC_CHANNELS.memoryEdit, workspace, edit)
       .then((value: unknown) => expectString(value)),
+  piInstructions: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.piInstructions).then((value: unknown) => expectString(value)),
+  savePiInstructions: (content, base) =>
+    ipcRenderer
+      .invoke(IPC_CHANNELS.savePiInstructions, content, base)
+      .then((value: unknown) => expectString(value)),
   revealMemory: async (workspace) => {
     await ipcRenderer.invoke(IPC_CHANNELS.memoryReveal, workspace);
   },

@@ -486,6 +486,16 @@ export declare class CoreRuntime {
   memoryView(workspace: string): Promise<string>;
   /** One edit of the memory page (JSON text `{ op, … }`); answers the page anew (T47). */
   memoryEdit(workspace: string, edit: string): Promise<string>;
+  /**
+   * Pi's global instructions in `~/.pi/agent`, JSON text `{ path, exists, content, hash }`
+   * (ADR-0108).
+   */
+  piInstructions(): Promise<string>;
+  /**
+   * Saves Pi's global instructions over the version whose SHA-256 is `base` (null for a file
+   * that did not exist); answers the new view, or `fileModified` when it changed (ADR-0108).
+   */
+  savePiInstructions(content: string, base?: string | null): Promise<string>;
   /** The WebSearch settings, JSON text `{ backend, backends: [{ id, name, hasKey }] }` (T38). */
   webSearchSettings(): Promise<string>;
   /** Chooses WebSearch's third-party backend; null chooses none (T38). */

@@ -135,6 +135,8 @@ export const IPC_CHANNELS = {
   memoryView: 'piarc:memory.view',
   memoryEdit: 'piarc:memory.edit',
   memoryReveal: 'piarc:memory.reveal',
+  piInstructions: 'piarc:instructions.view',
+  savePiInstructions: 'piarc:instructions.save',
   skillReveal: 'piarc:skills.reveal',
   webSearchBackendSet: 'piarc:webSearch.backend.set',
   webSearchKeySet: 'piarc:webSearch.key.set',
@@ -1182,6 +1184,18 @@ export interface PiarcApi {
   memoryEdit(workspace: string, edit: string): Promise<string>;
   /** Shows the workspace repository's memory folder in Finder or File Explorer (T47). */
   revealMemory(workspace: string): Promise<void>;
+  /**
+   * Pi's global instructions in `~/.pi/agent` as JSON `{ path, exists, content, hash }`
+   * (ADR-0108): the file Pi loads before any project file, the first of `AGENTS.override.md`,
+   * `AGENTS.md`, `CLAUDE.md` there.
+   */
+  piInstructions(): Promise<string>;
+  /**
+   * Saves Pi's global instructions over the version whose SHA-256 is `base` (null when the
+   * file did not exist); answers the new view, or fails with `fileModified` when the file
+   * changed since (ADR-0108).
+   */
+  savePiInstructions(content: string, base: string | null): Promise<string>;
   /** Shows skill `name`'s file in Finder or File Explorer: the file Core lists for the
    * workspace, never a path from the page (ADR-0102). */
   revealSkill(workspace: string, name: string): Promise<void>;

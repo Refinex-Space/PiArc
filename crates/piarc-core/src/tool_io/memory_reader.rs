@@ -78,6 +78,10 @@ pub(super) fn collect(
     }
     let mut rules = rules::Selection::default();
     if let Some(home) = home {
+        // Pi's own global instructions first, as Pi loads them before anything else (ADR-0108).
+        if let Some(file) = crate::pi_instructions::global_file(home)? {
+            sources.push(file);
+        }
         user_source(home, ".claude/CLAUDE.md", &mut sources)?;
         if let Ok(home) = home.canonicalize() {
             rules.add(

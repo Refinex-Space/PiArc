@@ -108,6 +108,8 @@ export type SessionCore = Pick<
   | 'managedSettings'
   | 'memoryView'
   | 'memoryEdit'
+  | 'piInstructions'
+  | 'savePiInstructions'
   | 'resendSnapshots'
   | 'projectTrust'
   | 'decideProjectTrust'
@@ -950,6 +952,17 @@ export function registerSessionHandlers(
       throw new TypeError('edit must be a JSON text of at most 64 KiB');
     }
     return core.memoryEdit(absolutePath(dir), edit);
+  });
+  registerHandler(IPC_CHANNELS.piInstructions, () => core.piInstructions());
+  registerHandler(IPC_CHANNELS.savePiInstructions, (_event, [content, base]) => {
+    // Core measures the encoded bytes against the same 4 MiB; this bounds the message.
+    if (typeof content !== 'string' || content.length > 4 * 1024 * 1024) {
+      throw new TypeError('content must be a string of at most 4 Mi characters');
+    }
+    if (base !== null && (typeof base !== 'string' || !/^[0-9a-f]{64}$/u.test(base))) {
+      throw new TypeError('base must be a SHA-256 in hex or null');
+    }
+    return core.savePiInstructions(content, base);
   });
   registerHandler(IPC_CHANNELS.memoryReveal, async (_event, [dir]) => {
     // The folder Core names for this workspace's repository, never a path from the page.

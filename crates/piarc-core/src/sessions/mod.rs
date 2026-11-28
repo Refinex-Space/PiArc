@@ -42,6 +42,7 @@ mod export;
 mod git;
 mod hooks;
 mod inbound;
+mod instructions;
 mod login;
 mod market;
 mod mcp;

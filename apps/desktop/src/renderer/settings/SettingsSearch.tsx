@@ -74,6 +74,7 @@ export const SEARCH_FIELDS: Record<
     ['settings.voice.dictionary', 'voice-dictionary'],
   ],
   diagnostics: [['diagnostics.bundle.title', 'diagnostic-bundle']],
+  instructions: [['instructions.editor', 'instructions-editor']],
   memory: [
     ['memory.userEnabled', 'memory-user-enabled'],
     ['memory.import.button', 'memory-import'],

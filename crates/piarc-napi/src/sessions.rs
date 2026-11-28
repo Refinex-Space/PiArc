@@ -1112,6 +1112,29 @@ impl CoreRuntime {
         })
     }
 
+    /// Pi's global instructions in `~/.pi/agent`, JSON text `{ path, exists, content, hash }`
+    /// (ADR-0108).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn pi_instructions<'env>(&self, env: &'env Env) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.piInstructions", |core, done| {
+            core.pi_instructions(done)
+        })
+    }
+
+    /// Saves Pi's global instructions over the version whose SHA-256 is `base` (null for a file
+    /// that did not exist); answers the new view, or `fileModified` when it changed (ADR-0108).
+    #[napi(ts_return_type = "Promise<string>", catch_unwind)]
+    pub fn save_pi_instructions<'env>(
+        &self,
+        env: &'env Env,
+        content: String,
+        #[napi(ts_arg_type = "string | null")] base: Option<String>,
+    ) -> napi::Result<Object<'env>> {
+        self.queue(env, "CoreRuntime.savePiInstructions", |core, done| {
+            core.save_pi_instructions(content, base, done)
+        })
+    }
+
     /// The WebSearch settings, JSON text `{ backend, backends: [{ id, name, hasKey }] }` (T38).
     #[napi(ts_return_type = "Promise<string>", catch_unwind)]
     pub fn web_search_settings<'env>(&self, env: &'env Env) -> napi::Result<Object<'env>> {

@@ -93,6 +93,7 @@ mod markdown_images;
 pub mod market;
 pub mod mcp;
 pub mod network;
+pub mod pi_instructions;
 pub mod plugins;
 pub(crate) mod ports;
 pub(crate) mod provider_accounts;

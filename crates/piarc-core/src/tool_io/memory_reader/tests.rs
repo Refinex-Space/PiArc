@@ -493,3 +493,60 @@ fn managed_instructions_lead_the_documents() {
         ]
     );
 }
+
+#[test]
+fn pi_global_instructions_lead_the_user_documents() {
+    let tree = Tree::new();
+    tree.file("home/.pi/agent/AGENTS.md", "pi global");
+    tree.file("home/.claude/CLAUDE.md", "claude user");
+    tree.file("data/MEMORY.md", "piarc user");
+    let contents = |result: Collection| {
+        result
+            .files
+            .into_iter()
+            .map(|f| f.content)
+            .filter(|c| {
+                [
+                    "pi global",
+                    "pi override",
+                    "pi claude",
+                    "claude user",
+                    "piarc user",
+                ]
+                .contains(&c.as_str())
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        contents(tree.collect(&[], false, None)),
+        ["pi global", "claude user", "piarc user"]
+    );
+    // Pi takes the first of its candidates in the agent directory, as Pi itself does.
+    tree.file("home/.pi/agent/AGENTS.override.md", "pi override");
+    assert_eq!(
+        contents(tree.collect(&[], false, None)),
+        ["pi override", "claude user", "piarc user"]
+    );
+}
+
+#[test]
+fn pi_global_instructions_fall_back_to_claude_md_in_the_agent_directory() {
+    let tree = Tree::new();
+    tree.file("home/.pi/agent/CLAUDE.md", "pi claude");
+    let result = tree.collect(&[], false, None);
+    assert_eq!(
+        tree.source(&result, "home/.pi/agent/CLAUDE.md"),
+        "pi claude"
+    );
+    assert_eq!(
+        crate::pi_instructions::global_file(&tree.root.join("home"))
+            .ok()
+            .flatten(),
+        Some(
+            tree.root
+                .join("home/.pi/agent/CLAUDE.md")
+                .canonicalize()
+                .unwrap()
+        )
+    );
+}

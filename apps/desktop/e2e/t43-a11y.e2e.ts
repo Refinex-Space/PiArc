@@ -296,6 +296,7 @@ test('windows, the trust dialog, a first conversation, palettes, rail cards and 
     'browser',
     'agents',
     'skills',
+    'instructions',
     'memory',
     'mcp',
     'usage',

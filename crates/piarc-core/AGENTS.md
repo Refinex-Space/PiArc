@@ -120,6 +120,11 @@ Core 的运行时门面：tokio 多线程运行时、事件队列与合并器、
 - 源码树运行时 Agent Host 的 node 是裸名 `node`：npm 经 `plugins::fetch::locate_npm` 在命令环境的 `PATH` 里找同目录的 `npm-cli.js`（发布构建用内置 node）。卸载的审计行带 `removed`（删除的前缀、克隆与数据目录）与 `declarations`。
 - 测试：`cargo test -p piarc-core --lib market` 与 `--lib plugins`；端到端 `cargo test -p piarc-testkit --test market`（假 npm registry 与 CONNECT 代理，真实 npm）。开发构建的 `createForTests` 读 `PIARC_TEST_MARKET_REGISTRY`（没设时指向 `https://registry.invalid`）、`PIARC_TEST_MARKET_CA`、`PIARC_TEST_MARKET_HOSTS`。
 
+## Pi 的全局指令（`pi_instructions`，ADR-0108）
+
+- `global_file(home)` 是 `~/.pi/agent` 下 Pi 实际加载的文件（第一个存在的 `CONTEXT_FILES`），memory 发现与设置页共用；`view`、`save` 是"指令"页的读写（`sessions/instructions.rs`，NAPI `piInstructions`、`savePiInstructions`）：保存核对读取时的 SHA-256（不符为 `fileModified`），按 `piarc_fs::encoding` 保持编码、BOM 与主要换行，符号链接写到目标，上限 `MAX_BYTES`（与 memory 读取同为 4 MiB）。家目录取 `DataDirs::home()`，测试一律用临时目录。
+- 测试：`cargo test -p piarc-core --lib -- pi_instructions memory_reader`。
+
 ## 用量与成本（`usage`，T41，ADR-0059）
 
 - `usage.rs` 是计价的唯一实现：单价换成每 token 的皮美元（`Pricing`），没有分档按合计算、有分档逐请求选档（`calculateCost` 的规则，1 小时缓存写入按输入价两倍），`u128` 精确求和后才转美元；`PriceBook` 先用户的 `modelPrices` 后目录价，都没有为 `Unknown`（成本 `None`，报告标 `partial`）。`report` 沿 `subagent_parent` 把子会话计入主会话并单独列出，辅助调用按用途列出。共享向量 `tests/usage/cost-vectors.json` 由 pi-ai 的 `calculateCost` 算出，`usage_tests.rs` 与 `agent-host/src/providers/usage-costs.test.ts` 都按它核对。
