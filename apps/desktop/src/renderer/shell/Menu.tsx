@@ -325,7 +325,8 @@ export function MenuPopup({
       key={item.id}
       id={`${id}-${String(i)}`}
       role="menuitem"
-      title={item.tooltip}
+      data-tooltip={item.tooltip}
+      aria-description={item.tooltip}
       tabIndex={-1}
       aria-disabled={item.disabled === true ? true : undefined}
       aria-describedby={item.hint === undefined ? undefined : `${id}-${String(i)}-hint`}
@@ -373,6 +374,7 @@ export function MenuPopup({
         data-menu-tree={group}
         hidden={!!child?.replacesParent && !!activeChild?.submenu}
         className="interactive-list menu"
+        data-tooltip-side="end"
         role={filterLabel === undefined ? 'menu' : 'dialog'}
         aria-label={label}
         tabIndex={-1}

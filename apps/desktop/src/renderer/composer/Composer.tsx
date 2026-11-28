@@ -8,7 +8,7 @@ import { keydownHandler, keymap } from 'prosemirror-keymap';
 import { Fragment, Slice } from 'prosemirror-model';
 import { EditorState, TextSelection, type Command } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { Fragment as ReactFragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import { fileMentionPath, type MentionScope } from '../files/file-path.js';
 import { onFileAttachment, droppedFiles, FILE_DRAG_TYPE } from '../files/navigation.js';
@@ -161,6 +161,21 @@ function paletteChoices(
 ): readonly PaletteCommand[] {
   const offered = state.atStart ? commands : commands.filter((c) => c.kind !== 'builtIn');
   return filterCommands(offered, state.query);
+}
+
+/** The palette's choices as runs of one source, with each run's index in the whole list. */
+function paletteSections(choices: readonly PaletteCommand[]) {
+  const sections: {
+    source: PaletteCommand['source'];
+    start: number;
+    choices: PaletteCommand[];
+  }[] = [];
+  choices.forEach((choice, index) => {
+    const last = sections.at(-1);
+    if (last?.source === choice.source) last.choices.push(choice);
+    else sections.push({ source: choice.source, start: index, choices: [choice] });
+  });
+  return sections;
 }
 
 function clearCommand(): Command {
@@ -731,6 +746,7 @@ export function Composer({
       ? -1
       : ((mention.index % matches.length) + matches.length) % matches.length;
   const paletteMatches = palette.active ? paletteChoices(commands, palette) : [];
+  const paletteId = useId();
   const paletteIndex =
     paletteMatches.length === 0
       ? -1
@@ -913,6 +929,7 @@ export function Composer({
       {palette.active ? (
         <ul
           className="interactive-list composer-popup command-popup"
+          data-tooltip-side="end"
           role="listbox"
           data-testid="command-popup"
           aria-label={t('composer.commands.label')}
@@ -920,67 +937,80 @@ export function Composer({
           {paletteMatches.length === 0 ? (
             <li className="mention-empty">{t('composer.commands.none')}</li>
           ) : (
-            paletteMatches.map((choice, index) => {
-              const previous = paletteMatches[index - 1];
-              const label = builtin(choice.name)?.label;
-              return (
-                <ReactFragment key={`${choice.source}:${choice.name}`}>
-                  {previous?.source === choice.source ? null : (
-                    <li
-                      className="command-group"
-                      role="presentation"
-                      data-testid="command-group"
-                      data-source={choice.source}
-                    >
-                      {sourceLabel(t, choice.source)}
-                    </li>
-                  )}
-                  <li
-                    role="option"
-                    ref={index === paletteIndex ? revealListOption : undefined}
-                    aria-selected={index === paletteIndex}
-                    data-command={choice.name}
-                    data-kind={choice.kind}
-                    className={
-                      index === paletteIndex ? 'mention-option is-active' : 'mention-option'
-                    }
-                    data-tooltip={choice.description === '' ? undefined : choice.description}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      const view = viewRef.current;
-                      if (view === null) return;
-                      if (choice.kind !== 'builtIn') {
-                        insertCommand(view, choice, palette.from, view.state.selection.from);
-                        return;
-                      }
-                      view.dispatch(closeCommands(view.state));
-                      clearCommand()(view.state, view.dispatch.bind(view), view);
-                      handlers.runCommand?.(choice);
-                    }}
-                  >
-                    <span className="mention-label">
-                      /{choice.name}
-                      {choice.argumentHint === undefined ? null : (
-                        <span
-                          className="command-hint"
-                          data-testid="command-hint"
-                          title={t('composer.commands.args', { hint: choice.argumentHint })}
-                        >
-                          {' '}
-                          {choice.argumentHint}
+            // One section per source: its heading stays at the top while its own commands
+            // scroll, and the next section's heading pushes it away.
+            paletteSections(paletteMatches).map(({ source, start: first, choices }) => (
+              <li
+                key={source}
+                className="command-section"
+                role="group"
+                aria-labelledby={`${paletteId}-${source}`}
+              >
+                <div
+                  id={`${paletteId}-${source}`}
+                  className="command-group"
+                  role="presentation"
+                  data-testid="command-group"
+                  data-source={source}
+                >
+                  <span className="command-group-label">{sourceLabel(t, source)}</span>
+                </div>
+                <ul className="command-section-list" role="none">
+                  {choices.map((choice, offset) => {
+                    const index = first + offset;
+                    const label = builtin(choice.name)?.label;
+                    return (
+                      <li
+                        key={choice.name}
+                        role="option"
+                        ref={index === paletteIndex ? revealListOption : undefined}
+                        aria-selected={index === paletteIndex}
+                        data-command={choice.name}
+                        data-kind={choice.kind}
+                        className={
+                          index === paletteIndex ? 'mention-option is-active' : 'mention-option'
+                        }
+                        data-tooltip={choice.description === '' ? undefined : choice.description}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          const view = viewRef.current;
+                          if (view === null) return;
+                          if (choice.kind !== 'builtIn') {
+                            insertCommand(view, choice, palette.from, view.state.selection.from);
+                            return;
+                          }
+                          view.dispatch(closeCommands(view.state));
+                          clearCommand()(view.state, view.dispatch.bind(view), view);
+                          handlers.runCommand?.(choice);
+                        }}
+                      >
+                        <span className="mention-label">
+                          /{choice.name}
+                          {choice.argumentHint === undefined ? null : (
+                            <span
+                              className="command-hint"
+                              data-testid="command-hint"
+                              title={t('composer.commands.args', { hint: choice.argumentHint })}
+                            >
+                              {' '}
+                              {choice.argumentHint}
+                            </span>
+                          )}
+                          {choice.kind === 'skill' ? (
+                            <span className="command-kind">
+                              {t('composer.commands.kind.skill')}
+                            </span>
+                          ) : null}
                         </span>
-                      )}
-                      {choice.kind === 'skill' ? (
-                        <span className="command-kind">{t('composer.commands.kind.skill')}</span>
-                      ) : null}
-                    </span>
-                    <span className="mention-path">
-                      {label === undefined ? choice.description : t(label)}
-                    </span>
-                  </li>
-                </ReactFragment>
-              );
-            })
+                        <span className="mention-path">
+                          {label === undefined ? choice.description : t(label)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))
           )}
         </ul>
       ) : null}

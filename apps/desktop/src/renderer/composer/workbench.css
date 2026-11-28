@@ -514,7 +514,8 @@
   max-height: min(384px, 58vh);
   margin-bottom: var(--piarc-space-2);
   padding: var(--piarc-session-pad-xs);
-  row-gap: 0;
+  /* Neighbouring rows keep 2 px apart: a hovered row never merges with the selected one. */
+  row-gap: 2px;
   z-index: 5;
 }
 .composer .command-popup {
@@ -558,15 +559,55 @@
 .composer .mention-popup .mention-path {
   text-align: start;
 }
+/* One section per source. Its heading stays at the top while its own commands scroll under it
+   and the next section's heading pushes it away; a hairline across the list and some air
+   above it close the previous section. */
+.composer .command-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.composer .command-section + .command-section {
+  margin-top: var(--piarc-space-2);
+  border-top: 1px solid var(--piarc-session-line);
+  margin-inline: calc(-1 * var(--piarc-session-pad-xs));
+  padding-inline: var(--piarc-session-pad-xs);
+}
+.composer .command-section-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .composer .command-group {
-  padding: var(--piarc-space-1) calc(var(--piarc-session-pad-sm) + 2px);
+  position: sticky;
+  top: calc(-1 * var(--piarc-session-pad-xs));
+  z-index: 1;
+  margin-inline: calc(-1 * var(--piarc-session-pad-xs));
+  padding: 0;
+  container-type: scroll-state;
+}
+.composer .command-group-label {
+  display: block;
+  padding: var(--piarc-space-2)
+    calc(var(--piarc-session-pad-sm) + 2px + var(--piarc-session-pad-xs)) var(--piarc-space-1);
+  border-bottom: 1px solid transparent;
+  background: var(--piarc-surface-raised);
   color: var(--piarc-text-secondary);
   font-size: var(--piarc-session-footnote);
-  font-weight: var(--piarc-font-weight-medium);
+  font-weight: var(--piarc-font-weight-semibold);
   line-height: var(--piarc-session-footnote-line);
+  transition: border-color var(--piarc-motion-fast) var(--piarc-motion-easing);
 }
-.composer .command-group:not(:first-child) {
-  margin-top: var(--piarc-space-1);
+.composer .command-section + .command-section .command-group-label {
+  padding-top: var(--piarc-space-3);
+}
+/* Stuck over scrolled commands, the heading ends in a hairline instead of cutting a row. */
+@container scroll-state(stuck: top) {
+  .composer .command-group-label {
+    border-bottom-color: var(--piarc-session-line);
+  }
 }
 .composer .command-hint {
   color: var(--piarc-text-secondary);

@@ -66,6 +66,31 @@ body,
   transition-duration: 0s !important;
 }
 
+/* Scrollbars (docs/engineering/visual-design.md section 5): a thumb only, no track, corner or
+   border; clear until the pointer is over the scroller, darker on the thumb itself. `:where`
+   keeps this the floor, so a surface's own scrollbar rules still win. A styled scrollbar is
+   never an overlay one, so it looks the same with "always show scroll bars" on. */
+:where(:root[data-app]) ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+:where(:root[data-app]) ::-webkit-scrollbar-track,
+:where(:root[data-app]) ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+:where(:root[data-app]) ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--piarc-radius-pill);
+  background: transparent padding-box;
+}
+:where(:root[data-app] :hover)::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--piarc-text-primary) 16%, transparent);
+}
+:where(:root[data-app]) ::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--piarc-text-primary) 30%, transparent);
+}
+
 /* Paint one fine edge (the light focus style), including on controls whose actual focus target
    is invisible. Keeping it inside the bounds also protects the indicator in clipped panels and
    virtual lists. */
@@ -1133,6 +1158,8 @@ textarea.input {
 .menu-item {
   padding: var(--piarc-space-1) var(--piarc-space-2);
   border-radius: var(--piarc-radius-sm);
+  cursor: pointer;
+  user-select: none;
 }
 
 .menu-item.is-active {

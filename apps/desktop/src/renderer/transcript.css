@@ -1983,6 +1983,10 @@
   cursor: default;
 }
 
+.mention-option {
+  cursor: pointer;
+}
+
 .mention-path {
   overflow: hidden;
   color: var(--piarc-text-secondary);
