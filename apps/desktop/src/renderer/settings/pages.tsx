@@ -26,6 +26,7 @@ import {
 import { SegmentedControl } from '../app/SegmentedControl.js';
 import { useApp } from '../app/app-context.js';
 import { reason } from '../shell/errors.js';
+import { AboutPage } from './AboutPage.js';
 import { ConfigDiagnosticsPage } from './ConfigDiagnosticsPage.js';
 import { PermissionsPage } from './PermissionsPage.js';
 import { SandboxPage } from './SandboxPage.js';
@@ -731,6 +732,14 @@ export function registerBuiltInSettingsPages(): void {
     title: 'settings.configDiagnostics',
     order: 80,
     component: ConfigDiagnosticsPage,
+  });
+  registerSettingsPage({
+    id: 'about',
+    group: 'support',
+    description: 'settings.description.about',
+    title: 'settings.about',
+    order: 90,
+    component: AboutPage,
   });
   registerSettingsPage({
     id: 'shortcuts',

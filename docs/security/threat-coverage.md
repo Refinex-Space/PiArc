@@ -16,7 +16,7 @@
 | THR-06 | 审批疲劳与误点 | 5 | 5 | 0 | 0 | 0 | 13 |
 | THR-07 | 多窗口审批错乱 | 1 | 1 | 0 | 0 | 0 | 5 |
 | THR-08 | 供应链 | 4 | 3 | 1 | 0 | 0 | 10 |
-| THR-09 | 更新通道被劫持 | 4 | 1 | 0 | 1 | 2 | 5 |
+| THR-09 | 更新通道被劫持 | 5 | 3 | 1 | 1 | 0 | 12 |
 | THR-10 | 应用文件被篡改 | 3 | 1 | 1 | 1 | 0 | 3 |
 | THR-11 | 渲染进程注入（XSS） | 8 | 8 | 0 | 0 | 0 | 30 |
 | THR-12 | 应用被当作通用运行时滥用 | 3 | 3 | 0 | 0 | 0 | 10 |
@@ -110,9 +110,10 @@
 
 | 对策 | 类型 | 测试与依据 |
 |---|---|---|
-| 更新只经 HTTPS 下载 | 待补 | 理由：更新流程由 T50 实现，届时补测试并更新本条<br>由 T50 补测试 |
+| 更新只经 HTTPS 从发布主机下载，其他协议与主机在连接前拒绝 | 自动化 | Rust `crates/piarc-testkit/tests/updates.rs` · thr09_only_https_and_the_release_hosts_are_reached<br>Rust `crates/piarc-web/tests/download.rs` · redirects_follow_allowed_hosts_only |
 | 发布清单签名与文件哈希校验，篡改即拒绝 | 自动化 | Rust `crates/piarc-core/tests/release.rs` · a_signed_manifest_and_its_files_verify<br>Rust `crates/piarc-core/tests/release.rs` · changed_manifest_content_is_refused<br>Rust `crates/piarc-core/tests/release.rs` · a_file_whose_hash_differs_from_the_manifest_is_refused<br>Rust `crates/piarc-core/tests/release.rs` · a_manifest_signed_with_another_key_is_refused<br>Vitest `scripts/release/release-manifest.test.mjs` · rejects changed content, a changed trusted comment and another key |
-| 清单签名私钥只在受保护的发布环境 | 待补 | 理由：发布流水线与受保护环境由 T50 建立<br>由 T50 补测试 |
+| 清单签名私钥只在受保护的发布环境 | 流程 | 流程 `docs/engineering/release.md` · release-environment<br>理由：私钥只存在 GitHub 的 `release` 环境密钥里，该环境要维护者审批、只允许 `v*` 标签；工作流只在这个作业里读它（`.github/workflows/release.yml`），配置是否到位由发布规范的一次性配置核对 |
+| 篡改的产物、别的密钥签的清单、不属于该版本的更新说明一律拒绝；解出的应用包标识或版本不符不安装；Velopack 找到的版本与 Core 校验的不同就不安装 | 自动化 | Rust `crates/piarc-testkit/tests/updates.rs` · thr09_tampered_artefacts_other_keys_and_foreign_notes_are_refused<br>Rust `crates/piarc-core/src/updates/feed.rs` · the_velopack_feed_names_the_full_package<br>Vitest `apps/desktop/src/main/platform/mac-update.test.ts` · THR-09 refuses another app or another version and removes the staging folder<br>Vitest `apps/desktop/src/main/platform/windows-update.test.ts` · THR-09 refuses a version other than the one Core verified |
 | 发布账号被攻破 | 已接受风险 | 理由：清单签名只防下载渠道与镜像被篡改；能以发布账号身份签名与发布的攻击者不在防护范围内<br>依据：ADR-0018 |
 
 ## THR-10 应用文件被篡改

@@ -7,7 +7,7 @@
 | `release-manifest.test.key` / `.pub` | 签名与校验发布清单的测试（`scripts/release/release-manifest.test.mjs`、`crates/piarc-core/tests/release.rs`） |
 | `other.test.key` / `.pub` | "换用其他密钥签名"的反例 |
 
-应用内置的公钥（`piarc_core::release::BUILTIN_RELEASE_KEYS`）不包含这两把测试公钥；正式密钥由 T50 在受保护的发布环境中生成和保管（ADR-0024）。重新生成：
+应用内置的公钥（`piarc_core::release::BUILTIN_RELEASE_KEYS`）不包含这两把测试公钥。正式密钥的生成与保管见 `docs/engineering/release.md` 第 7 节：私钥只在 GitHub `release` 环境的密钥里，公钥是 `scripts/release/piarc-release.pub`。Release 工作流的演练（`workflow_dispatch`）用这里的测试密钥签名。重新生成：
 
 ```bash
 node scripts/release/release-manifest.mjs keygen --out-dir scripts/release/test-keys --name release-manifest.test

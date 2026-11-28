@@ -333,10 +333,11 @@ threats:
     title: 更新通道被劫持
     countermeasures:
       - arch: 没有平台签名可依赖（ADR-0018）：HTTPS
-        measure: 更新只经 HTTPS 下载
-        type: deferred
-        task: T50
-        reason: 更新流程由 T50 实现，届时补测试并更新本条
+        measure: 更新只经 HTTPS 从发布主机下载，其他协议与主机在连接前拒绝
+        type: automated
+        tests:
+          - rust:crates/piarc-testkit/tests/updates.rs::thr09_only_https_and_the_release_hosts_are_reached
+          - rust:crates/piarc-web/tests/download.rs::redirects_follow_allowed_hosts_only
       - arch: 每个版本的发布清单（文件名 + SHA-256）用项目自有 Ed25519 密钥签名，应用内置公钥，验证失败拒绝更新
         measure: 发布清单签名与文件哈希校验，篡改即拒绝
         type: automated
@@ -348,9 +349,18 @@ threats:
           - vitest:scripts/release/release-manifest.test.mjs::rejects changed content, a changed trusted comment and another key
       - arch: 私钥只在需要维护者审批的发布环境中使用
         measure: 清单签名私钥只在受保护的发布环境
-        type: deferred
-        task: T50
-        reason: 发布流水线与受保护环境由 T50 建立
+        type: process
+        reason: 私钥只存在 GitHub 的 `release` 环境密钥里，该环境要维护者审批、只允许 `v*` 标签；工作流只在这个作业里读它（`.github/workflows/release.yml`），配置是否到位由发布规范的一次性配置核对
+        tests:
+          - process:docs/engineering/release.md#release-environment
+      - arch: 应用内更新（ADR-0111）只认验签通过的清单，更新说明与每个产物核对大小与 SHA-256 后才交给安装步骤，macOS 安装前核对解出应用包的标识与版本，Windows 的 Velopack 源文件本身在清单里
+        measure: 篡改的产物、别的密钥签的清单、不属于该版本的更新说明一律拒绝；解出的应用包标识或版本不符不安装；Velopack 找到的版本与 Core 校验的不同就不安装
+        type: automated
+        tests:
+          - rust:crates/piarc-testkit/tests/updates.rs::thr09_tampered_artefacts_other_keys_and_foreign_notes_are_refused
+          - rust:crates/piarc-core/src/updates/feed.rs::the_velopack_feed_names_the_full_package
+          - vitest:apps/desktop/src/main/platform/mac-update.test.ts::THR-09 refuses another app or another version and removes the staging folder
+          - vitest:apps/desktop/src/main/platform/windows-update.test.ts::THR-09 refuses a version other than the one Core verified
       - arch: 不防发布账号本身被攻破
         measure: 发布账号被攻破
         type: accepted-risk

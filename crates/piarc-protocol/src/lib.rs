@@ -94,6 +94,7 @@ pub mod text;
 pub mod tool_call;
 pub mod trust;
 pub mod turn;
+pub mod updates;
 pub mod usage;
 mod version;
 pub mod web;

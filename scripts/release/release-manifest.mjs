@@ -10,8 +10,13 @@
 //        [--files-dir <dir>]
 //       Checks the signature and, with --files-dir, every listed file.
 //   node scripts/release/release-manifest.mjs keygen --out-dir <dir> --name <name>
-//       Writes an unencrypted key pair <name>.key / <name>.pub. Only for test keys: the release
-//       key is generated and kept by T50 in the protected release environment.
+//       Writes an unencrypted key pair <name>.key / <name>.pub. Test keys live in test-keys/.
+//       The release key is made the same way once, on a maintainer's machine, outside the
+//       repository (docs/engineering/release.md, section 7): its secret key goes only into the
+//       `release` environment's secret PIARC_RELEASE_SIGNING_KEY and an offline backup (the
+//       secret store is its protection, so the file is not encrypted); its public key is
+//       committed as scripts/release/piarc-release.pub and built into the app
+//       (`piarc_core::release::BUILTIN_RELEASE_KEYS`).
 //
 // Formats (https://jedisct1.github.io/minisign/): public key "Ed" ‖ key id ‖ key; signature
 // "ED" (prehashed: Ed25519 over BLAKE2b-512 of the file) ‖ key id ‖ signature, then a trusted
@@ -283,7 +288,9 @@ async function main() {
       }
       const pair = generateKeyPair(`PiArc ${values.name}`);
       await mkdir(values['out-dir'], { recursive: true });
-      await writeFile(path.join(values['out-dir'], `${values.name}.key`), pair.secretKeyText);
+      await writeFile(path.join(values['out-dir'], `${values.name}.key`), pair.secretKeyText, {
+        mode: 0o600,
+      });
       await writeFile(path.join(values['out-dir'], `${values.name}.pub`), pair.publicKeyText);
       console.log(`key ${pair.keyId} written to ${values['out-dir']}`);
       return;

@@ -182,6 +182,9 @@ describe('i18n', () => {
             term: 'PiArc',
             // The Pi package market (ADR-0102).
             when: '2 hours ago',
+            // In-app updates (ADR-0111).
+            arch: 'arm64',
+            received: '12 MB',
           }),
         ).not.toThrow();
       }

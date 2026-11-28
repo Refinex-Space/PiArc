@@ -1,0 +1,171 @@
+/* The About page (ADR-0111, design addendum about-and-updates.md): a hero with the app mark,
+   then the settings page system's sections. Tokens only. */
+
+.about-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-5);
+  padding-block: var(--piarc-space-2) calc(var(--piarc-space-5) + var(--piarc-space-2));
+}
+.about-mark {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--piarc-session-line);
+}
+.about-mark-tile {
+  fill: var(--piarc-workbench-card);
+}
+.about-mark-glyph {
+  fill: var(--piarc-text-primary);
+}
+.about-hero-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.about-name {
+  margin: 0;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-heading);
+  font-weight: var(--piarc-font-weight-semibold);
+  line-height: 1.2;
+}
+.about-version {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-font-size-body);
+  font-variant-numeric: tabular-nums;
+  user-select: text;
+}
+.about-tagline {
+  margin: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+/* The security mark beside the status line. */
+.settings-badge.about-badge.is-security {
+  background: var(--piarc-state-warning-subtle);
+  color: var(--piarc-text-warning);
+}
+
+/* Download progress: a thin bar and the figures beside it. */
+.about-progress-line {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+  margin-block-start: var(--piarc-space-1);
+}
+.about-progress {
+  position: relative;
+  flex: 1 1 auto;
+  max-width: 240px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--piarc-radius-pill);
+  background: var(--piarc-session-fill);
+}
+.about-progress-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: inherit;
+  background: var(--piarc-accent-solid);
+  transition: width var(--piarc-motion-normal) var(--piarc-motion-curve-out);
+}
+.about-progress-text {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.about-problem {
+  color: var(--piarc-text-danger);
+}
+.about-error {
+  margin: var(--piarc-space-2) 0 0;
+}
+
+/* Release notes under the status line: Markdown, clipped until expanded. */
+.about-notes {
+  display: grid;
+  gap: var(--piarc-space-2);
+  min-width: 0;
+  padding-block: var(--piarc-space-3);
+  border-block-end: 1px solid var(--settings-divider);
+}
+.about-notes-head {
+  display: flex;
+  align-items: center;
+  gap: var(--piarc-space-3);
+}
+.about-notes-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  font-weight: var(--piarc-font-weight-medium);
+}
+.about-notes-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.about-notes-body :is(h1, h2, h3) {
+  font-size: var(--piarc-font-size-title);
+}
+.about-notes[data-open='false'] > .about-notes-body {
+  max-height: 16rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 70%, transparent);
+}
+.about-notes-toggle {
+  justify-self: start;
+}
+
+/* Versions: a two-column hairline list, values in mono and selectable. */
+.about-versions {
+  display: grid;
+  margin: 0;
+}
+.about-version-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--piarc-space-5);
+  padding-block: var(--piarc-space-2);
+  border-block-end: 1px solid var(--settings-divider);
+}
+.about-version-row > dt {
+  color: var(--piarc-text-secondary);
+}
+.about-version-row > dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--piarc-text-primary);
+  font-family: var(--piarc-font-mono);
+  font-size: var(--piarc-session-footnote);
+  text-align: end;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.about-legal {
+  margin: var(--piarc-space-4) 0 0;
+  color: var(--piarc-text-secondary);
+  font-size: var(--piarc-session-footnote);
+  line-height: var(--piarc-session-footnote-line);
+}
+
+@media (forced-colors: active) {
+  .about-progress {
+    border: 1px solid CanvasText;
+  }
+  .about-progress-fill {
+    background: Highlight;
+  }
+  .about-mark {
+    border: 1px solid CanvasText;
+  }
+}

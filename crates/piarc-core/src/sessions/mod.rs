@@ -56,6 +56,7 @@ mod skills;
 mod snapshot;
 mod subagents;
 mod tasks;
+mod updates;
 mod usage;
 mod web_search;
 mod workspace;
@@ -186,6 +187,8 @@ pub(crate) struct Ctx {
     pub npm_lock: Arc<tokio::sync::Mutex<()>>,
     /// The Pi package market (ADR-0102).
     pub market: crate::market::Market,
+    /// In-app updates (ADR-0111).
+    pub updates: crate::updates::Updates,
     /// The Git panel's locks and operations (ADR-0085).
     pub git: Arc<crate::git::GitState>,
     /// The built-in browser's partition proxies (ADR-0088).

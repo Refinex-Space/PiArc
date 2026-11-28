@@ -18,7 +18,7 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
 
-use crate::connect::{Connector, STALL, host_header, platform_tls, target};
+use crate::connect::{Connector, STALL, host_header, platform_tls, target, trusting_tls};
 use crate::fetch::{Resolve, SystemResolver};
 use crate::ssrf::Allowlist;
 
@@ -138,6 +138,28 @@ impl Downloader {
                 user_agent: format!("PiArc-ModelDownload/{}", env!("CARGO_PKG_VERSION")),
             },
         }
+    }
+
+    /// A downloader that trusts only the roots in `ca_pem` (PEM): development builds' and
+    /// tests' local servers, never a release build's network.
+    ///
+    /// # Errors
+    ///
+    /// [`DownloadError::Tls`] when the PEM holds no usable certificate.
+    pub fn trusting(
+        ca_pem: &[u8],
+        resolver: Arc<dyn Resolve>,
+        allow: Allowlist,
+    ) -> Result<Self, DownloadError> {
+        let tls = trusting_tls(ca_pem).map_err(DownloadError::Tls)?;
+        Ok(Self::with_parts(resolver, tls, allow))
+    }
+
+    /// The `User-Agent` this downloader sends instead of the model downloads' one.
+    #[must_use]
+    pub fn with_user_agent(mut self, user_agent: String) -> Self {
+        self.connector.user_agent = user_agent;
+        self
     }
 
     /// Downloads `job` into `job.dest`, calling `progress` with the bytes on disk.

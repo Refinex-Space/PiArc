@@ -9,7 +9,7 @@ import type { MenuItemConstructorOptions } from 'electron';
 import type { AppCommand } from '../shared/ipc.js';
 
 /** Commands the main process runs itself (T35): quitting asks first when work is running. */
-export type MainCommand = 'app.quit' | 'window.new';
+export type MainCommand = 'app.quit' | 'window.new' | 'app.about' | 'app.checkUpdates';
 import type { Translator } from '../shared/i18n/index.js';
 import { commandLabel, toAccelerator, type CommandId } from '../shared/keybindings.js';
 
@@ -45,7 +45,20 @@ export function buildMenuTemplate(context: MenuContext): MenuItemConstructorOpti
   const appMenu: MenuItemConstructorOptions = {
     label: t('app.name'),
     submenu: [
-      { role: 'about', label: t('menu.app.about') },
+      {
+        id: 'app.about',
+        label: t('menu.app.about'),
+        click: () => {
+          run('app.about');
+        },
+      },
+      {
+        id: 'app.checkUpdates',
+        label: t('menu.app.checkUpdates'),
+        click: () => {
+          run('app.checkUpdates');
+        },
+      },
       separator,
       command('app.settings'),
       separator,
@@ -164,7 +177,28 @@ export function buildMenuTemplate(context: MenuContext): MenuItemConstructorOpti
   const helpMenu: MenuItemConstructorOptions = {
     label: t('menu.help'),
     role: 'help',
-    submenu: [command('help.shortcuts')],
+    submenu: [
+      command('help.shortcuts'),
+      ...(mac
+        ? []
+        : [
+            separator,
+            {
+              id: 'app.checkUpdates',
+              label: t('menu.app.checkUpdates'),
+              click: () => {
+                run('app.checkUpdates');
+              },
+            },
+            {
+              id: 'app.about',
+              label: t('menu.app.about'),
+              click: () => {
+                run('app.about');
+              },
+            },
+          ]),
+    ],
   };
   return [...(mac ? [appMenu] : []), fileMenu, editMenu, viewMenu, windowMenu, helpMenu];
 }

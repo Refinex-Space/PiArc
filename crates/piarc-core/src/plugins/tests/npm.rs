@@ -16,9 +16,11 @@ impl Fixture {
             self.write(&format!("packs/{file}/package/{path}"), text);
         }
         let out = self.root.join("packs").join(format!("{file}.tgz"));
+        // Relative to the working directory: Windows' tar.exe cannot open a path argument with
+        // characters outside the ANSI code page, and the fixture root has Chinese in it.
         let status = std::process::Command::new("tar")
             .args(["-czf"])
-            .arg(&out)
+            .arg(format!("../{file}.tgz"))
             .arg("package")
             .current_dir(&dir)
             .status()

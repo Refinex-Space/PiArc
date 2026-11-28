@@ -12,6 +12,7 @@
 @import './browser/browser.css';
 @import './settings/browser-page.css';
 @import './settings/voice-page.css';
+@import './settings/about.css';
 @import './changes/git/history.css';
 @import './changes/git/merge.css';
 @import './changes/git/review.css';

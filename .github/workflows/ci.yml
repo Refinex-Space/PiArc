@@ -71,13 +71,16 @@ jobs:
           path: target/l2/results.json
           if-no-files-found: ignore
 
-  desktop:
-    # L4 tests and the fuse check need a packaged Electron app (docs/engineering/testing.md, L4).
-    name: desktop L4 (${{ matrix.os }})
+  desktop-l4:
+    # L4 needs a packaged Electron app (docs/engineering/testing.md, L4). The suite (both forms,
+    # about 700 tests on one worker) does not fit one job's hour, so each platform runs it in
+    # four shards; `desktop` below reports them under the required check names.
+    name: desktop L4 (${{ matrix.os }}, ${{ matrix.shard }}/4)
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        shard: [1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
@@ -99,12 +102,14 @@ jobs:
 
       - name: Cache cargo registry and target
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: desktop-${{ matrix.os }}
 
       - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .tools/cache/ghostty-vt
-          key: ghostty-vt-${{ github.job }}-${{ matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+          key: ghostty-vt-desktop-${{ matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
 
       - name: Install npm dependencies
         run: npm ci --ignore-scripts
@@ -114,16 +119,62 @@ jobs:
 
       # package:desktop builds the Core module of the flavor before packaging.
       - name: Package the development flavor
-        id: development
         run: npm run package:desktop -- --flavor development
 
-      - name: L4 smoke and security tests (dev form and packaged app)
-        run: npm run test:e2e -w @piarc/desktop
+      - name: L4 smoke and security tests (dev form and packaged app), shard ${{ matrix.shard }}/4
+        run: npm run test:e2e -w @piarc/desktop -- --shard=${{ matrix.shard }}/4
 
-      # An unrelated L4 failure must not suppress the release security checks.
+      - name: Upload L4 evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: l4-evidence-${{ matrix.os }}-${{ matrix.shard }}
+          path: tmp/evidence/ci
+          if-no-files-found: ignore
+
+  desktop-release:
+    # The release package's security checks and the performance smoke, beside the L4 shards.
+    name: desktop release checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: |
+          rustup toolchain install
+          rustup show
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: desktop-${{ matrix.os }}
+
+      - name: Cache the libghostty-vt artefacts (build.rs verifies them on every use)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cache/ghostty-vt
+          key: ghostty-vt-desktop-${{ matrix.os }}-${{ hashFiles('crates/piarc-ghostty-sys/ghostty-vt.lock.json') }}
+
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download the Electron binary (skipped by --ignore-scripts)
+        run: node node_modules/electron/install.js
+
       - name: Package the release flavor
         id: release
-        if: ${{ !cancelled() && steps.development.outcome == 'success' }}
         run: npm run package:desktop -- --flavor release
 
       - name: Check the fuses of the release package
@@ -138,6 +189,12 @@ jobs:
         if: ${{ !cancelled() && steps.release.outcome == 'success' }}
         run: node scripts/ci/check-app-layout.mjs --flavor release
 
+      # The performance probes measure the development package (scripts/perf/run.mjs).
+      - name: Package the development flavor
+        id: development
+        if: ${{ !cancelled() }}
+        run: npm run package:desktop -- --flavor development
+
       # T44: the PR subset of chapter 11, three-run medians, judged against this runner class's
       # baseline in scripts/perf/baselines/ (hosted runners are not the reference machines, so
       # the absolute budgets are not checked here). A runner class without a baseline fails:
@@ -145,6 +202,7 @@ jobs:
       # --update-baseline (docs/engineering/performance.md section 2.1). Last, so that a
       # performance failure does not skip the release checks above (R5).
       - name: Performance smoke
+        if: ${{ !cancelled() && steps.development.outcome == 'success' }}
         run: node scripts/perf/run.mjs --lane pr --runs 3
 
       - name: Upload the performance report
@@ -155,13 +213,24 @@ jobs:
           path: tmp/perf/pr/report.json
           if-no-files-found: ignore
 
-      - name: Upload L4 evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: l4-evidence-${{ matrix.os }}
-          path: tmp/evidence/ci
-          if-no-files-found: ignore
+  desktop:
+    # The required checks "desktop L4 (<os>)": every L4 shard and the release checks passed.
+    # A matrix job's result covers all its legs, so each check reflects both platforms.
+    name: desktop L4 (${{ matrix.os }})
+    needs: [desktop-l4, desktop-release]
+    if: ${{ always() }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every shard and the release checks passed
+        env:
+          L4: ${{ needs.desktop-l4.result }}
+          RELEASE: ${{ needs.desktop-release.result }}
+        run: |
+          echo "L4 shards: $L4, release checks: $RELEASE"
+          test "$L4" = success && test "$RELEASE" = success
 
   core-build:
     # The four prebuilt Core modules (ADR-0014). Both macOS targets build on Apple silicon,

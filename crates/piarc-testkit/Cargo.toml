@@ -20,6 +20,10 @@ name = "piarc-mock-npm"
 path = "src/bin/mock_npm.rs"
 
 [[bin]]
+name = "piarc-mock-releases"
+path = "src/bin/mock_releases.rs"
+
+[[bin]]
 name = "piarc-mock-proxy"
 path = "src/bin/mock_proxy.rs"
 
@@ -53,6 +57,7 @@ tokio-rustls.workspace = true
 
 [dev-dependencies]
 hyper = { workspace = true, features = ["client"] }
+tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

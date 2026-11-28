@@ -46,6 +46,8 @@ export interface AppShellOptions {
   readonly windowState: WindowStateFile;
   /** Quits after asking when work is running (T35). */
   readonly quit: () => void;
+  /** Starts an update check (ADR-0111); its result arrives on `core/updates`. */
+  readonly checkForUpdates?: () => void;
 }
 
 /** How long moving or resizing waits before the window state is written. */
@@ -241,6 +243,11 @@ export class AppShell {
     }
     if (command === 'app.quit') {
       this.options.quit();
+      return;
+    }
+    if (command === 'app.about' || command === 'app.checkUpdates') {
+      this.deliver(this.focusMain(), { kind: 'settings', page: 'about' });
+      if (command === 'app.checkUpdates') this.options.checkForUpdates?.();
       return;
     }
     if (command === 'window.new') {

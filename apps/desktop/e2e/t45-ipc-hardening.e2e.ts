@@ -33,6 +33,16 @@ const NO_PARAMETERS = new Set([
   // Data management: the export asks where in the native save dialog (stubbed: cancelled).
   'exportData',
   'revealDataExport',
+  // Chrome sign-in import (ADR-0090) and Pi's global instructions (ADR-0108).
+  'chromeProfiles',
+  'piInstructions',
+  // In-app updates (ADR-0111): the page chooses no file, URL or version.
+  'updateStatus',
+  'checkForUpdates',
+  'downloadUpdate',
+  'cancelUpdateDownload',
+  'installUpdate',
+  'aboutInfo',
 ]);
 
 /** Synchronous preload functions (no IPC round trip). */

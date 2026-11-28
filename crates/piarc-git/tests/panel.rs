@@ -7,7 +7,10 @@ mod support;
 
 use std::path::Path;
 
-use piarc_git::{Cancel, ExecOptions, Git, GitError, diff, log, refs, status};
+// Only the Unix-only exec test uses these.
+#[cfg(unix)]
+use piarc_git::{Cancel, ExecOptions, Git, GitError};
+use piarc_git::{diff, log, refs, status};
 use piarc_protocol::git::{GitFileStatus, GitRepoState, GitScope, GitTextSource};
 use support::{git, home, reader, repository, temp_dir};
 

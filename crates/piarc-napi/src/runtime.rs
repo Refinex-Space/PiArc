@@ -29,6 +29,9 @@ pub struct CoreOptions {
     /// Voice dictation's bundled assets (`Resources/speech`, or the source tree's
     /// `target/speech-assets/<platform>-<arch>`, ADR-0094); absent: dictation reports them missing.
     pub speech_dir: Option<String>,
+    /// The app's version (`app.getVersion()`), for in-app updates (ADR-0111); absent:
+    /// `0.0.0`.
+    pub app_version: Option<String>,
 }
 
 /// Where the Agent Host comes from: the packaged app's resources, or a Node executable and a
@@ -103,6 +106,9 @@ pub(crate) fn config_of(options: CoreOptions) -> piarc_core::Result<piarc_core::
         config.sessions.idle_timeout = Duration::from_millis(u64::from(ms));
     }
     config.speech.dir = options.speech_dir.map(PathBuf::from);
+    if let Some(version) = options.app_version {
+        config.updates.current = version;
+    }
     Ok(config)
 }
 

@@ -18,6 +18,10 @@
 - 窗口状态：主窗口移动、缩放（防抖 500 ms）与关闭时写 `<userData>/window-state.json`（`platform/window-state.ts`，同目录临时文件 + rename）；新窗口按 24 px 错开，`placeWindow` 把落在已不存在显示器上的窗口移回主显示器居中。
 - 关闭最后一个窗口不退出（两个平台一样）。退出只经菜单与托盘的 `app.quit` 命令（`platform/quit.ts`）：Core 的 `runningWork()` 报告有运行中的会话或后台任务时先弹原生确认；系统注销、测试驱动的 `app.quit()` 不询问。不要把确认挂到 `before-quit` 上。
 
+## 应用内更新（ADR-0111）
+
+- 调度与命令在 `core/updates-ipc.ts`（`UpdateScheduler`：启动 30 s 后检查，之后每小时看一次是否满 24 h，读偏好 `updates.autoCheck`；`installUpdate`：取 Core 的安装计划 → `mayQuit` → 平台步骤 → `app.quit()`）。平台步骤在 `platform/update-installer.ts`：macOS 用 `platform/mac-update.ts`（`bundleOf`、`replaceable` 拒绝 App Translocation 与不可写目录、`stageMacUpdate` 用 `ditto -x -k` 解压到同卷的 `.PiArc.app.update-<版本>/` 并用 `plutil` 核对 `CFBundleIdentifier` 与 `CFBundleShortVersionString`、`startSwap` 以分离的 `/bin/sh` 运行 `SWAP_SCRIPT`，日志在 `<缓存>/updates/install.log`），Windows 用 `platform/windows-update.ts`（Velopack `UpdateManager` 以 Core 下载的目录为源，版本必须与 Core 校验的一致）。源码树运行（`!app.isPackaged`）一律答 `manual`。替换脚本的单测在真实 `/bin/sh` 上替换与回滚（`mac-update.test.ts`，只在 macOS 运行）。
+
 ## 托盘（`platform/tray.ts`）
 
 - 计数只来自 Core：快照任务在路由 `core/activity` 发运行中与等待审批的会话数和等待审批的会话（不含归档），主进程经 `EventRouter.listen` 只监听这一个路由；不要在主进程订阅 `core/sessions` 自己统计。

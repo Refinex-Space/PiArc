@@ -741,6 +741,16 @@ export declare class CoreRuntime {
    * as JSON; it may wait while macOS asks the user for keychain access.
    */
   keychainProbe(action: string, dir: string): Promise<string>;
+  /** The update status (`UpdateStatus`). */
+  updateStatus(): Promise<string>;
+  /** Reads the latest release through the effective proxy (`UpdateStatus`). */
+  checkForUpdates(): Promise<string>;
+  /** Starts downloading the newer release in the background (`UpdateStatus`). */
+  downloadUpdate(): Promise<string>;
+  /** Cancels the running download (`UpdateStatus`). */
+  cancelUpdateDownload(): Promise<string>;
+  /** The verified files of the ready release, checked once more (`UpdateInstall`). */
+  updateInstallPlan(): Promise<string>;
   /**
    * Usage by model and by session, for every workspace or `workspace`'s, as JSON text
    * (`UsageReport`).
@@ -876,6 +886,11 @@ export interface CoreOptions {
    * `target/speech-assets/<platform>-<arch>`, ADR-0094); absent: dictation reports them missing.
    */
   speechDir?: string;
+  /**
+   * The app's version (`app.getVersion()`), for in-app updates (ADR-0111); absent:
+   * `0.0.0`.
+   */
+  appVersion?: string;
 }
 
 /** Lifecycle state of a runtime. */

@@ -64,7 +64,15 @@ export const STEPS = [
   // Before ESLint: type-aware lint reads workspace packages (`@piarc/protocol`) from their
   // built declarations, which are stale or missing until the build refreshes them.
   { name: 'tsc --build', command: nodeBin('typescript', ['--build'], 'tsc') },
-  { name: 'ESLint', command: nodeBin('eslint', ['.']) },
+  // Type-aware lint of the whole repository outgrows Node's default heap on CI runners (7 GB
+  // macOS runners ran out of memory at the default limit).
+  {
+    name: 'ESLint',
+    command: () => ({
+      cmd: process.execPath,
+      args: ['--max-old-space-size=6144', resolveBin('eslint'), '.'],
+    }),
+  },
   // Builds the Core module the Vitest integration tests load, and checks its .d.ts snapshot.
   { name: 'Core module + API snapshot', command: nodeScript('scripts/ci/check-core-types.mjs') },
   { name: 'Vitest', command: nodeBin('vitest', ['run']) },

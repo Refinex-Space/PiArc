@@ -61,6 +61,30 @@ impl AsyncWrite for Stream {
 /// # Errors
 ///
 /// The platform verifier cannot be set up.
+/// A TLS configuration that trusts only the roots in `ca_pem` (PEM): development builds' and
+/// tests' local servers, never a release build's network.
+pub(crate) fn trusting_tls(ca_pem: &[u8]) -> Result<Arc<rustls::ClientConfig>, String> {
+    use rustls::pki_types::CertificateDer;
+    use rustls::pki_types::pem::PemObject as _;
+    let mut roots = rustls::RootCertStore::empty();
+    for cert in CertificateDer::pem_slice_iter(ca_pem) {
+        let cert = cert.map_err(|e| e.to_string())?;
+        roots.add(cert).map_err(|e| e.to_string())?;
+    }
+    if roots.is_empty() {
+        return Err("no certificate".into());
+    }
+    let mut tls = rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .map_err(|e| e.to_string())?
+    .with_root_certificates(roots)
+    .with_no_client_auth();
+    tls.alpn_protocols = vec![b"http/1.1".to_vec()];
+    Ok(Arc::new(tls))
+}
+
 pub(crate) fn platform_tls() -> Result<Arc<rustls::ClientConfig>, String> {
     use rustls_platform_verifier::BuilderVerifierExt as _;
     let provider = Arc::new(rustls::crypto::ring::default_provider());

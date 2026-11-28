@@ -262,7 +262,7 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-fn server_tls() -> std::io::Result<Arc<rustls::ServerConfig>> {
+pub(crate) fn server_tls() -> std::io::Result<Arc<rustls::ServerConfig>> {
     use rustls::pki_types::pem::PemObject as _;
     use rustls::pki_types::{CertificateDer, PrivateKeyDer};
     let invalid = |e: String| std::io::Error::new(std::io::ErrorKind::InvalidData, e);
@@ -313,9 +313,11 @@ fn build_tarball(
         std::fs::write(file, text)?;
     }
     let out: PathBuf = dir.join("package.tgz");
+    // Relative to the working directory: Windows' tar.exe cannot open a path argument with
+    // characters outside the ANSI code page (test directories have Chinese in their names).
     let status = std::process::Command::new("tar")
         .arg("-czf")
-        .arg(&out)
+        .arg("package.tgz")
         .arg("package")
         .current_dir(&dir)
         .status()?;

@@ -20,6 +20,8 @@ export type ProtocolValue =
   | MarketInstallRequest
   | MarketEvent
   | UsageReport
+  | UpdateStatus
+  | UpdateInstall
   | BrowserClientEvent
   | BrowserRunAnswer
   | BrowserSiteRequest
@@ -1383,6 +1385,35 @@ export type MarketEvent =
  * Where a model's price comes from.
  */
 export type PriceSource = 'catalog' | 'user' | 'unknown';
+/**
+ * Where the update flow stands.
+ */
+export type UpdateState =
+  'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'ready' | 'failed';
+/**
+ * Why updates cannot work in this build at all.
+ */
+export type UpdateUnavailable = 'noTrustedKey' | 'platform';
+/**
+ * What the main process installs once the state is `ready`.
+ */
+export type UpdateInstall =
+  | {
+      /**
+       * Absolute path of the verified ZIP.
+       */
+      archive: string;
+      platform: 'macos';
+      version: string;
+    }
+  | {
+      /**
+       * Absolute path of the directory.
+       */
+      feed: string;
+      platform: 'windows';
+      version: string;
+    };
 /**
  * What Core tells the desktop client on `core/browser` (Core API).
  */
@@ -11623,6 +11654,94 @@ export interface SubagentUsage {
    * The tokens.
    */
   tokens: UsageTokens;
+}
+/**
+ * The update flow's snapshot: answered by every `update*` call and sent on `core/updates`
+ * whenever it changes.
+ */
+export interface UpdateStatus {
+  /**
+   * Milliseconds since the Unix epoch of the last completed check.
+   */
+  checkedAt?: number | null;
+  /**
+   * The running version.
+   */
+  current: string;
+  problem?: UpdateProblem | null;
+  /**
+   * While `downloading`.
+   */
+  progress?: UpdateProgress | null;
+  /**
+   * The newer release (`available`, `downloading`, `ready`, and `failed` after one was
+   * found).
+   */
+  release?: UpdateRelease | null;
+  state: UpdateState;
+  /**
+   * Present when updates cannot work in this build.
+   */
+  unavailable?: UpdateUnavailable | null;
+}
+/**
+ * Why the last check or download failed.
+ */
+export interface UpdateProblem {
+  /**
+   * Stable code: `network`, `proxy`, `tls`, `timeout`, `refused`, `integrity` (signature,
+   * size or hash), `notFound` (no release published yet), `disk`, `diskFull`, `cancelled`.
+   */
+  code: string;
+  /**
+   * Technical detail (English), shown under the localized reason.
+   */
+  message: string;
+}
+/**
+ * Download progress.
+ */
+export interface UpdateProgress {
+  /**
+   * Bytes on disk.
+   */
+  received: number;
+  /**
+   * Bytes in all.
+   */
+  total: number;
+}
+/**
+ * A newer release.
+ */
+export interface UpdateRelease {
+  /**
+   * Release date (`YYYY-MM-DD`).
+   */
+  date: string;
+  /**
+   * Release notes in Markdown by locale (`en`, `zh-CN`); the client picks its language and
+   * falls back to `en`.
+   */
+  notes: {
+    [k: string]: string;
+  };
+  /**
+   * The release's page on GitHub.
+   */
+  pageUrl: string;
+  /**
+   * A security update (ADR-0018 rule 8).
+   */
+  security: boolean;
+  /**
+   * Bytes this platform downloads.
+   */
+  size: number;
+  /**
+   * SemVer of the release.
+   */
+  version: string;
 }
 /**
  * A TCP port a process tree of a session listens on.

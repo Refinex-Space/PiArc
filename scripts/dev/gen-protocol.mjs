@@ -163,6 +163,8 @@ async function buildFiles() {
       'MarketInstallRequest',
       'MarketEvent',
       'UsageReport',
+      'UpdateStatus',
+      'UpdateInstall',
       'BrowserClientEvent',
       'BrowserRunAnswer',
       'BrowserSiteRequest',

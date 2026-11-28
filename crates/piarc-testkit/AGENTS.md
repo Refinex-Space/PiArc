@@ -20,6 +20,8 @@ T48 的 fork 场景用 `same_system_as`、`same_tools_as` 核对原始请求字�
 | `cargo test -p piarc-testkit --test scenarios` | L2：`tests/scenarios/*.yaml` 每个文件一个测试（自定义 harness）；`-- <id> --exact` 只跑一个，`-- --results target/l2/results.json` 写 JSON 报告（相对路径按仓库根解析）。`test = false`：不在 `cargo test --workspace` 里，由 verify 第 13 步运行 |
 | `cargo test -p piarc-testkit --test l2_runner -- --nocapture` | 运行器自身：格式错误、可读差异、未用的审批应答、重复运行与临时目录清理 |
 | `cargo test -p piarc-testkit --test npm_registry` | Pi 包市场的测试设施（ADR-0102）：真实 npm 只经 CONNECT 代理从 mock registry 安装（`NODE_EXTRA_CA_CERTS` 信任测试 CA、空的 `npm_config_userconfig`、`--save-exact`），代理 407 时没有直连；搜索的过滤、排序与翻页上限；未知路径记为违规 |
+| `cargo test -p piarc-testkit --test updates` | 应用内更新（ADR-0111）：经 `release_feed::MockReleases`（GitHub 的 `latest/download` 与资产主机两跳重定向、`Range`、`slow`）检测、下载与校验两个平台的产物，篡改、换密钥、外来说明、只连 HTTPS 与发布主机、代理 CONNECT、本机地址直连、代理不可达不直连；清单由 `scripts/release/release-manifest.mjs` 用测试密钥签名（要 PATH 上的 node） |
+| `cargo run -q -p piarc-testkit --bin piarc-mock-releases -- --dir <目录> --latest <版本>` | L4 用的发布源：`<目录>/<版本>/<文件>`，stdout 第一行是端口，源是 `https://localhost:<端口>/releases`；stdin 每行一个控制（`latest <版本>`、`offline`、`online`、`status <路径前缀> <码>`、`slow <每 50 ms 字节数>`、`requests`），EOF 退出 |
 | `cargo run -q -p piarc-testkit --bin piarc-mock-npm -- --fixtures <packages.json> --work <目录>` 与 `--bin piarc-mock-proxy` | L4 用的独立进程：stdout 第一行是端口；stdin 每行一个控制（npm：`offline`、`online`、`status <路径> <码>`、`hold <路径>`、`release`、`requests`、`violations`；代理：`route <主机> <端口>`、`tunnel`、`refuse <状态>`、`drop`、`connects`），EOF 退出 |
 
 ## 两种运行形态

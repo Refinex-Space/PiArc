@@ -109,6 +109,7 @@ pub mod npm_registry;
 mod openai;
 pub mod plaintext;
 mod record;
+pub mod release_feed;
 mod request;
 mod rules;
 mod scenario;

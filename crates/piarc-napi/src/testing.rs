@@ -84,6 +84,42 @@ fn test_market() -> piarc_core::market::MarketConfig {
     }
 }
 
+/// In-app updates of development builds (ADR-0111): the feed is `PIARC_TEST_UPDATE_FEED` (the
+/// releases URL of a local mock, `…/releases`), or an address that resolves nowhere so a test
+/// that forgot it never reaches GitHub; `PIARC_TEST_UPDATE_CA` (a PEM file) is the only CA
+/// trusted, `PIARC_TEST_UPDATE_HOSTS` (comma-separated names) resolve to loopback and
+/// `PIARC_TEST_UPDATE_KEY` (a base64 minisign public key, the test key) is the trusted key.
+fn test_updates(current: String) -> piarc_core::updates::UpdateConfig {
+    let releases = std::env::var("PIARC_TEST_UPDATE_FEED")
+        .unwrap_or_else(|_| "https://updates.invalid/releases".to_owned());
+    let releases = releases.trim_end_matches('/').to_owned();
+    let hosts: Vec<String> = std::env::var("PIARC_TEST_UPDATE_HOSTS")
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect();
+    let host = piarc_core::updates::host_of_url(&releases);
+    let test_net =
+        std::env::var_os("PIARC_TEST_UPDATE_CA").map(|file| piarc_core::updates::UpdateTestNet {
+            ca_pem: std::fs::read(file).unwrap_or_default(),
+            loopback: hosts.clone(),
+        });
+    piarc_core::updates::UpdateConfig {
+        current,
+        latest_url: format!("{releases}/latest/download"),
+        asset_url: format!("{releases}/download/v{{version}}/{{name}}"),
+        page_url: format!("{releases}/tag/v{{version}}"),
+        hosts: std::iter::once(host).chain(hosts).collect(),
+        keys: std::env::var("PIARC_TEST_UPDATE_KEY")
+            .map(|k| vec![k])
+            .unwrap_or_default(),
+        test_net,
+        ..piarc_core::updates::UpdateConfig::default()
+    }
+}
+
 /// Session titles (ADR-0106) in development builds: off unless `PIARC_TEST_SESSION_TITLES` is
 /// `1`, since the title request would take a step of the strict mock's script.
 fn test_session_titles() -> bool {
@@ -139,6 +175,7 @@ impl CoreRuntime {
                     .collect();
             }
             config.market = test_market();
+            config.updates = test_updates(config.updates.current.clone());
             if let Ok(list) = std::env::var("PIARC_TEST_SEARCH_ENDPOINTS") {
                 config.web.search_endpoints = list
                     .split(',')

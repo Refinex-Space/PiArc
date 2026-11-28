@@ -93,13 +93,26 @@ Get the latest version from the [Releases](https://github.com/Refinex-Space/PiAr
 
 | Platform | Package | Updates |
 |---|---|---|
-| macOS 13 or later, Apple silicon | `.dmg` (arm64) | Announced in the app, installed manually |
-| macOS 13 or later, Intel | `.dmg` (x64) | Announced in the app, installed manually |
-| Windows 11 | Setup `.exe` (x64) | Automatic |
+| macOS 13 or later, Apple silicon | `.dmg` (arm64) | In the app |
+| macOS 13 or later, Intel | `.dmg` (x64) | In the app |
+| Windows 11 | Setup `.exe` (x64 or arm64) | In the app |
 
-Windows 10 runs PiArc but is not part of the test matrix.
+Windows 10 runs PiArc but is not part of the test matrix. PiArc checks for new versions once a day (Settings → About), downloads them through your proxy and installs them when you restart.
 
-Each release publishes a manifest of SHA-256 checksums signed with the project's key; the app checks it before updating.
+<details>
+<summary><strong>Verifying downloads</strong></summary>
+
+<br>
+
+Each release has `piarc-release-manifest.json`, which lists the size and SHA-256 of every file, and its signature `piarc-release-manifest.json.minisig`, made with the project's key. PiArc verifies both before it installs an update. To check a download yourself with [minisign](https://jedisct1.github.io/minisign/):
+
+```sh
+minisign -Vm piarc-release-manifest.json -P RWSfClxRoYHPxM7sdTNsYBIJZwEZbb6ust9F1hHGBteKjMwAMSqlXDHc
+```
+
+The release public key (ID `C4CF81A1515C0A9F`) is the one above; it is also in [`scripts/release/piarc-release.pub`](scripts/release/piarc-release.pub). Then compare the file's SHA-256 (`shasum -a 256 <file>` on macOS, `certutil -hashfile <file> SHA256` on Windows) with its entry in the manifest.
+
+</details>
 
 <details>
 <summary><strong>First launch: approving an unsigned app</strong></summary>

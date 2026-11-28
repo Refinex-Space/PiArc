@@ -30,6 +30,8 @@ it('retargets open settings on the same page and closes them before handling wor
     },
     setAttentionCount: vi.fn().mockResolvedValue(undefined),
     subscribeEvents: vi.fn().mockResolvedValue(undefined),
+    unsubscribeEvents: vi.fn().mockResolvedValue(undefined),
+    updateStatus: vi.fn().mockResolvedValue('{"state":"idle","current":"1.0.0"}'),
     resendSnapshots: vi.fn().mockResolvedValue(undefined),
     composerInfo: vi.fn().mockResolvedValue('{}'),
   });

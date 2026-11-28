@@ -30,7 +30,7 @@ Core（Rust）在这次会话里不发起连接：它的网络出口只有下表
 | Pi 的远程模型目录 `https://pi.dev/api/models/providers/<id>` | Agent Host（Pi `ModelRuntime`） | 服务商 id，不含会话内容 | 只对配置了凭据的内置服务商，每个至多 4 小时一次 | 默认开启，`modelProviders.catalogRefresh: false` 关闭；mock 会话里没有内置服务商的凭据，不发生 |
 | Chromium 拼写检查词典 | Electron（Hunspell） | 语言代码 | Windows 与 Linux 首次需要某语言的词典时，从 Google 的 CDN（`redirector.gvt1.com`）下载 | 保留：只取词典文件，不含会话内容；macOS 用系统拼写检查，不下载。Windows 的 L4 允许这个主机 |
 | Chromium 的 IPv6/IPv4 可达性探测 | Electron（网络服务的主机解析器） | 不发数据：对 `[2001:4860:4860::8888]:443` 的 UDP `connect()` 只用来确定本机路由 | Chromium 的网络栈第一次解析主机名时 | 保留：没有数据包离开本机；`t45-egress` 只在该套接字没有发送字节时把它当作探测 |
-| 应用更新检查 | 主进程 | 版本号 | 启动与每 24 小时 | 尚未实现（T50），实现后补入本表与测试 |
+| 应用更新检查与下载（ADR-0111） | Core（`piarc_core::updates`，经生效代理） | 只发 GET：`User-Agent: PiArc/<版本>`，请求 `github.com/Refinex-Space/PiArc/releases/latest/download/` 下的清单、签名与更新说明，用户点"下载更新"后取本平台的产物；跟随重定向只到 `release-assets.githubusercontent.com`、`objects.githubusercontent.com` | 启动 30 s 后与此后每 24 小时（`updates.autoCheck`，可关）、手动检查、用户点下载 | 设置"关于"页的"自动检查更新"；开发构建只连 `PIARC_TEST_UPDATE_FEED`（缺省解析不到），`t45-egress` 不受影响；`cargo test -p piarc-testkit --test updates` 覆盖主机限制、代理与不直连 |
 
 ## 3. 已关闭的外连
 

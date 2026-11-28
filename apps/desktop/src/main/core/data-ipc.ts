@@ -99,7 +99,8 @@ export function exportLabels(t: Translator, now: Date): string {
     updated: t.t('export.label.updated'),
     archived: t.t('export.label.archived'),
     untitled: t.t('session.untitled'),
-    offsetMinutes: -now.getTimezoneOffset(),
+    // `0 -` keeps UTC at 0: a bare `-0` is not 0 for `Object.is` (and JSON writes it as 0).
+    offsetMinutes: 0 - now.getTimezoneOffset(),
   });
 }
 

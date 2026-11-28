@@ -64,7 +64,7 @@ export function speechDir(location: {
 export function startCore(
   location: CoreModuleLocation & { readonly resourcesPath: string },
   router: EventRouter,
-  dirs: { readonly dataDir: string; readonly cacheDir: string },
+  dirs: { readonly dataDir: string; readonly cacheDir: string; readonly appVersion?: string },
   memoryKeychain = false,
 ): CoreHost {
   const modulePath = resolveCoreModulePath(location);
