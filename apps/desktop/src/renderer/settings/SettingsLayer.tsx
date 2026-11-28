@@ -41,12 +41,15 @@ export function SettingsLayer({
   entry,
   onClose,
   sidebarWidth,
+  resizer,
 }: {
   readonly open: boolean;
   /** A new number remounts the settings (a new entry point, such as a link to a field). */
   readonly entry: number;
   readonly onClose: () => void;
   readonly sidebarWidth: number;
+  /** The workbench sidebar's separator: the settings navigation resizes the same width. */
+  readonly resizer?: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(open);
   const [phase, setPhase] = useState<'in' | 'out'>(open ? 'in' : 'out');
@@ -112,7 +115,11 @@ export function SettingsLayer({
       style={{ '--settings-sidebar-width': `${String(sidebarWidth)}px` } as React.CSSProperties}
     >
       <Suspense fallback={<div className="settings settings-surface is-loading" />}>
-        <SettingsContent key={`${String(generation)}:${String(entry)}`} onClose={onClose} />
+        <SettingsContent
+          key={`${String(generation)}:${String(entry)}`}
+          onClose={onClose}
+          resizer={resizer}
+        />
       </Suspense>
     </div>
   );

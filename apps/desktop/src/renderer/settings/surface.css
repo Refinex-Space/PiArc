@@ -69,6 +69,10 @@ body:has(.settings-layer[data-phase='in']) .shell > .workspace-area {
     transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
     opacity calc(var(--piarc-motion-view) * 0.6) linear calc(var(--piarc-motion-view) * 0.3);
 }
+.settings-surface .settings-sidebar .sidebar-resizer:hover,
+.settings-surface .settings-sidebar .sidebar-resizer:active {
+  background: var(--piarc-border-focus);
+}
 .settings-layer[data-phase='out'] .settings-sidebar {
   opacity: 0;
   transform: translateX(24px);

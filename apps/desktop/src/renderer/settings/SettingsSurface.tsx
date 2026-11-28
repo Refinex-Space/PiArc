@@ -1,5 +1,6 @@
 // Settings as a workbench view (ADR-0101): the navigation takes the sidebar's column, the page
 // takes the main area. Registered pages, hash routes and links to a field stay as they were.
+import type { ReactNode } from 'react';
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { useApp } from '../app/app-context.js';
@@ -29,7 +30,14 @@ function escapeTakenInside(target: EventTarget | null): boolean {
   }
 }
 
-export function SettingsSurface({ onClose }: { readonly onClose: () => void }) {
+export function SettingsSurface({
+  onClose,
+  resizer,
+}: {
+  readonly onClose: () => void;
+  /** The sidebar's separator (the workbench and settings share one width). */
+  readonly resizer?: ReactNode;
+}) {
   const { t } = useApp();
   const pages = settingsPages();
   const listId = useId();
@@ -193,6 +201,7 @@ export function SettingsSurface({ onClose }: { readonly onClose: () => void }) {
                 );
               })}
             </div>
+            {resizer}
           </nav>
         </div>
         <section className="settings-view">

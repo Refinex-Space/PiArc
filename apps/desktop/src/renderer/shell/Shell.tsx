@@ -575,6 +575,41 @@ export function Shell() {
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
   };
+  /** The sidebar's separator: drag, arrow keys or a double click (back to the default width).
+   * Settings put the same one in their navigation, so both columns share one width. */
+  const sidebarResizer = (testId: string) => (
+    <div
+      className="resizer resizer-x sidebar-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={t('sidebar.resize')}
+      aria-valuemin={200}
+      aria-valuemax={420}
+      aria-valuenow={layout.sidebarWidth}
+      tabIndex={0}
+      data-testid={testId}
+      onPointerDown={startResize}
+      onDoubleClick={() => {
+        setLayout((current) => ({
+          ...current,
+          sidebarWidth: loadLayout(undefined).sidebarWidth,
+        }));
+      }}
+      onKeyDown={(event) => {
+        if (isImeComposing(event.nativeEvent)) {
+          return;
+        }
+        const step = event.key === 'ArrowLeft' ? -16 : event.key === 'ArrowRight' ? 16 : 0;
+        if (step !== 0) {
+          event.preventDefault();
+          setLayout((current) => ({
+            ...current,
+            sidebarWidth: clampSidebar(current.sidebarWidth + step),
+          }));
+        }
+      }}
+    />
+  );
   const context = usePanelContext(store, toolSession, view.kind === 'home' ? homeTools : undefined);
   return (
     <StoreContext.Provider value={store}>
@@ -602,45 +637,7 @@ export function Shell() {
             { '--piarc-sidebar-width': `${String(layout.sidebarWidth)}px` } as React.CSSProperties
           }
         >
-          {!collapsed && (
-            <Sidebar
-              history={history}
-              resizer={
-                <div
-                  className="resizer resizer-x sidebar-resizer"
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-label={t('sidebar.resize')}
-                  aria-valuemin={200}
-                  aria-valuemax={420}
-                  aria-valuenow={layout.sidebarWidth}
-                  tabIndex={0}
-                  data-testid="sidebar-resizer"
-                  onPointerDown={startResize}
-                  onDoubleClick={() => {
-                    setLayout((current) => ({
-                      ...current,
-                      sidebarWidth: loadLayout(undefined).sidebarWidth,
-                    }));
-                  }}
-                  onKeyDown={(event) => {
-                    if (isImeComposing(event.nativeEvent)) {
-                      return;
-                    }
-                    const step =
-                      event.key === 'ArrowLeft' ? -16 : event.key === 'ArrowRight' ? 16 : 0;
-                    if (step !== 0) {
-                      event.preventDefault();
-                      setLayout((current) => ({
-                        ...current,
-                        sidebarWidth: clampSidebar(current.sidebarWidth + step),
-                      }));
-                    }
-                  }}
-                />
-              }
-            />
-          )}
+          {!collapsed && <Sidebar history={history} resizer={sidebarResizer('sidebar-resizer')} />}
           {narrow && sidebarPeek && (
             <button
               type="button"
@@ -698,6 +695,7 @@ export function Shell() {
           entry={settingsEntry ?? 0}
           onClose={closeSettings}
           sidebarWidth={layout.sidebarWidth}
+          resizer={sidebarResizer('settings-sidebar-resizer')}
         />
         <Toasts />
         <BrowserNotices />
