@@ -9,7 +9,8 @@
     "small": "12px",
     "body": "13px",
     "title": "15px",
-    "heading": "20px"
+    "heading": "20px",
+    "display": "26px"
   },
   "fontWeight": {
     "regular": "400",

@@ -11,6 +11,7 @@ import { parseCommandsList } from '../composer/commands-list.js';
 import { coreMentions, draftOf } from '../composer/session-draft.js';
 import { useStore, useWorkspaces } from '../store/hooks.js';
 import { ComputerIcon, FolderIcon, GitBranchIcon } from './icons.js';
+import { Mascot } from './Mascot.js';
 import { ChoiceButton, type MenuItem } from './Menu.js';
 import { keyOf, modelChoiceItems, useModelCatalog, type Effort } from './model-catalog.js';
 import { permissionChoices } from './PermissionModeMenu.js';
@@ -253,6 +254,35 @@ function HomeForm({
   return (
     <section className="home workbench-home" data-testid="home" data-starting={echo !== undefined}>
       <div className="environment-stage">
+        {echo === undefined ? (
+          <div className="home-hero" data-testid="home-hero">
+            <Mascot />
+            <div className="home-greeting" data-testid="home-greeting">
+              {workspace === undefined ? (
+                t('home.greeting.alone')
+              ) : (
+                <>
+                  {t('home.greeting.before')}
+                  <ChoiceButton
+                    label={t('home.folder')}
+                    valueLabel={label}
+                    items={folderItems}
+                    heading={t('jumpList.recentWorkspaces')}
+                    filterLabel={t('home.searchProjects')}
+                    above={false}
+                    className="home-greeting-project"
+                    testId="home-greeting-project"
+                    value={workspace}
+                    disabled={busy}
+                  >
+                    <span className="truncate">{label}</span>
+                  </ChoiceButton>
+                  {t('home.greeting.after')}
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
         {echo === undefined ? null : (
           // Where the conversation will show it: the user's message at the top of the reading
           // column (quiet while it is on its way), the working line at the foot.

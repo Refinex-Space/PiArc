@@ -909,6 +909,10 @@ export const en = {
 
   'home.title': 'Start a session',
   'home.folder': 'Folder',
+  'home.greeting.before': 'What’s next in ',
+  'home.greeting.after': '?',
+  'home.greeting.alone': 'What’s next?',
+  'home.searchProjects': 'Search projects',
   'home.chooseFolder': 'Open a project…',
   'home.noFolder': 'Open a project to start a session in it.',
   'home.placeholder': 'Describe a task for the agent',

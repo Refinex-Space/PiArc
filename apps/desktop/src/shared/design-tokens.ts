@@ -181,6 +181,7 @@ export type ScaleToken =
   | 'fontSize.body'
   | 'fontSize.title'
   | 'fontSize.heading'
+  | 'fontSize.display'
   | 'fontWeight.regular'
   | 'fontWeight.control'
   | 'fontWeight.medium'
@@ -774,6 +775,7 @@ export const CSS_VARS: Readonly<Record<ColorToken | ScaleToken | ComponentToken,
   'fontSize.body': '--piarc-font-size-body',
   'fontSize.title': '--piarc-font-size-title',
   'fontSize.heading': '--piarc-font-size-heading',
+  'fontSize.display': '--piarc-font-size-display',
   'fontWeight.regular': '--piarc-font-weight-regular',
   'fontWeight.control': '--piarc-font-weight-control',
   'fontWeight.medium': '--piarc-font-weight-medium',

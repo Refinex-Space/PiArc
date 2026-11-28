@@ -893,6 +893,10 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
 
   'home.title': '开始一个会话',
   'home.folder': '文件夹',
+  'home.greeting.before': '接下来，在 ',
+  'home.greeting.after': ' 做点什么？',
+  'home.greeting.alone': '接下来做点什么？',
+  'home.searchProjects': '搜索项目',
   'home.chooseFolder': '打开项目…',
   'home.noFolder': '打开一个项目，在其中开始会话。',
   'home.placeholder': '描述要交给智能体的任务',

@@ -10,6 +10,84 @@
   padding: var(--piarc-space-4);
   padding-block-end: calc(var(--piarc-space-4) + min(5vh, 44px));
 }
+/* The new session page's hero: the mascot (shell/Mascot.tsx) over one line naming the project,
+   a little above the middle of the empty stage. The mascot's blocks are the working mark's ink;
+   its frames are switched by script, which holds still when this entrance animation is cut to
+   nothing ("reduce motion", app.css). */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--piarc-space-5);
+  max-width: 100%;
+  margin-block-end: min(8vh, 72px);
+}
+.home-mascot {
+  display: block;
+  max-width: 100%;
+  color: var(--piarc-accent-solid);
+  shape-rendering: crispEdges;
+  pointer-events: none;
+  user-select: none;
+  animation: mascot-enter var(--piarc-motion-slow) var(--piarc-motion-curve-out) both;
+}
+.home-mascot path {
+  fill: currentColor;
+}
+@keyframes mascot-enter {
+  from {
+    opacity: 0;
+  }
+}
+@media (forced-colors: active) {
+  .home-mascot {
+    color: CanvasText;
+  }
+}
+.home-greeting {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  max-width: 100%;
+  margin: 0;
+  color: var(--piarc-text-primary);
+  font-size: var(--piarc-font-size-display);
+  font-weight: var(--piarc-font-weight-regular);
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+}
+/* The project in the sentence opens the project menu; it reads as part of the line. */
+:root[data-app] .home-greeting .choice-button.home-greeting-project {
+  min-width: 0;
+  max-width: 14em;
+  min-height: 0;
+  padding: 0 var(--piarc-space-1);
+  border-radius: var(--piarc-radius-sm);
+  background: transparent;
+  color: var(--piarc-text-primary);
+  font: inherit;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--piarc-text-secondary);
+  text-underline-offset: 0.2em;
+  transition: background-color var(--piarc-motion-fast) var(--piarc-motion-easing);
+}
+:root[data-app] .home-greeting .choice-button.home-greeting-project:hover,
+:root[data-app] .home-greeting .choice-button.home-greeting-project[aria-expanded='true'] {
+  background: var(--piarc-surface-hover);
+}
+/* The project menu opens inside the line: it keeps the menu's own type and alignment. */
+.home-greeting > :not(.choice-button) {
+  font-size: var(--piarc-font-size-body);
+  line-height: normal;
+  text-align: start;
+}
+@media (max-height: 560px) {
+  .home-mascot {
+    display: none;
+  }
+}
 .home[data-starting='true'] .environment-stage {
   place-items: stretch center;
   padding: 0 0 var(--piarc-space-2);
