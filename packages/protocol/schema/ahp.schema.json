@@ -18249,6 +18249,73 @@
       "required": ["sessionId"],
       "type": "object"
     },
+    "SessionTitleAnswer": {
+      "description": "The generated title (`session/title`).",
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ModelRef",
+          "description": "The model that wrote it."
+        },
+        "title": {
+          "description": "One line without quotes or closing punctuation (at most 80 UTF-16 units); empty when the\nmodel gave nothing usable.",
+          "type": "string"
+        }
+      },
+      "required": ["title", "model"],
+      "type": "object"
+    },
+    "SessionTitleParams": {
+      "description": "Parameters of `session/title` (Core → Agent Host, ADR-0106).",
+      "properties": {
+        "sessionId": {
+          "$ref": "#/$defs/SessionId",
+          "description": "The session whose model channel answers."
+        },
+        "text": {
+          "description": "The session's first message, as the user wrote it (at most 4,000 UTF-16 units).",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "text"],
+      "type": "object"
+    },
+    "SessionTitleRequest": {
+      "description": "Request for `session/title`.",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "method": {
+          "const": "session/title",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/$defs/SessionTitleParams"
+        }
+      },
+      "required": ["jsonrpc", "id", "method", "params"],
+      "type": "object"
+    },
+    "SessionTitleResponse": {
+      "description": "Successful response to `session/title`.",
+      "properties": {
+        "error": false,
+        "id": {
+          "$ref": "#/$defs/RequestId"
+        },
+        "jsonrpc": {
+          "$ref": "#/$defs/JsonRpcVersion"
+        },
+        "result": {
+          "$ref": "#/$defs/SessionTitleAnswer"
+        }
+      },
+      "required": ["jsonrpc", "id", "result"],
+      "type": "object"
+    },
     "SessionUsage": {
       "description": "One main session's usage: its own requests, its subagents' and its auxiliary calls.",
       "properties": {
@@ -22316,6 +22383,12 @@
     },
     {
       "$ref": "#/$defs/SessionCommitMessageResponse"
+    },
+    {
+      "$ref": "#/$defs/SessionTitleRequest"
+    },
+    {
+      "$ref": "#/$defs/SessionTitleResponse"
     },
     {
       "$ref": "#/$defs/SessionGitAssistRequest"

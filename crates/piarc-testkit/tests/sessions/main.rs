@@ -20,6 +20,7 @@ mod rewind;
 mod sandbox;
 mod support;
 mod tasks;
+mod titles;
 mod turns;
 mod workspaces;
 

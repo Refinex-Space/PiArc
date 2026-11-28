@@ -120,6 +120,9 @@ pub struct SessionsConfig {
     pub clock: Arc<dyn Clock>,
     /// Supervisor settings adjustments, applied to every start.
     pub tune_host: Option<HostTuning>,
+    /// Name new sessions from their first message (ADR-0106). The app turns it on; tests leave
+    /// it off, since the title request would take a step of the strict mock's script.
+    pub session_titles: bool,
 }
 
 impl std::fmt::Debug for SessionsConfig {
@@ -138,6 +141,7 @@ impl Default for SessionsConfig {
             idle_timeout: DEFAULT_IDLE_TIMEOUT,
             clock: Arc::new(crate::clock::SystemClock),
             tune_host: None,
+            session_titles: false,
         }
     }
 }

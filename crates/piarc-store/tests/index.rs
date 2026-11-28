@@ -356,6 +356,7 @@ fn user_titles_pins_and_archives_survive_a_rebuild_and_removal_forgets_the_sessi
         custom_title: Some(Some("重命名的会话".into())),
         pinned: Some(true),
         archived: Some(true),
+        ..Default::default()
     };
     assert!(
         !store
@@ -373,6 +374,7 @@ fn user_titles_pins_and_archives_survive_a_rebuild_and_removal_forgets_the_sessi
         custom_title: Some(None),
         pinned: Some(false),
         archived: None,
+        ..Default::default()
     };
     assert!(store.set_session_prefs("s-prefs", &unpin).expect("write"));
     let record = store.session("s-prefs").expect("read").expect("indexed");
@@ -383,6 +385,44 @@ fn user_titles_pins_and_archives_survive_a_rebuild_and_removal_forgets_the_sessi
     assert_eq!(file.as_deref(), Some(record.file_path.as_str()));
     assert!(store.session("s-prefs").expect("read").is_none());
     assert_eq!(store.remove_session("s-prefs").expect("remove again"), None);
+}
+
+/// ADR-0106: a generated title stands in for the first message, survives a rebuild, and gives
+/// way to the user's title.
+#[test]
+fn generated_titles_come_after_the_users_and_survive_a_rebuild() {
+    let dir = TempDir::new("auto titles 标题");
+    let sessions = dir.path().join("sessions");
+    let mut store = Store::open_in_memory(0).expect("store");
+    let mut writer = SessionWriter::create(&sessions, "/w", "s-auto", Some(3));
+    let line = writer.user("我想系统地学习 Spring Boot，请帮我规划一个四周的入门学习计划");
+    writer.append_raw(&line);
+    store.sync_dir(&sessions).expect("sync");
+
+    let generated = piarc_store::SessionPrefsChange {
+        auto_title: Some("Spring Boot 入门学习计划".into()),
+        ..Default::default()
+    };
+    assert!(
+        store
+            .set_session_prefs("s-auto", &generated)
+            .expect("write")
+    );
+    store.rebuild_index(&sessions).expect("rebuild");
+    let record = store.session("s-auto").expect("read").expect("indexed");
+    assert_eq!(record.title(), Some("Spring Boot 入门学习计划"));
+
+    let renamed = piarc_store::SessionPrefsChange {
+        custom_title: Some(Some("我的计划".into())),
+        ..Default::default()
+    };
+    assert!(store.set_session_prefs("s-auto", &renamed).expect("write"));
+    let record = store.session("s-auto").expect("read").expect("indexed");
+    assert_eq!(record.title(), Some("我的计划"));
+    assert_eq!(
+        record.auto_title.as_deref(),
+        Some("Spring Boot 入门学习计划")
+    );
 }
 
 /// T31-A09: a subagent's file names its parent in its first `piarc.subagent` entry; the index

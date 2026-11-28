@@ -10,6 +10,7 @@ import { MoreIcon, PinIcon } from './icons.js';
 import { MenuButton, MenuPopup, useMenu, type MenuItem } from './Menu.js';
 import { SessionTitleInput } from './SessionTitleInput.js';
 import { StatusBadge } from './StatusBadge.js';
+import { useTitleChanges } from './title-change.js';
 import { useUi } from './ui.js';
 
 /** The title the sidebar shows for a session. */
@@ -33,6 +34,7 @@ export const SessionRow = memo(function SessionRow({ id }: { readonly id: string
     return null;
   }
   const title = sessionTitle(session.title, t('session.untitled'));
+  const changes = useTitleChanges(title);
   const selected = ui.view.kind === 'session' && ui.view.id === id;
   const items: MenuItem[] = [
     {
@@ -125,7 +127,9 @@ export const SessionRow = memo(function SessionRow({ id }: { readonly id: string
             ui.show({ kind: 'session', id });
           }}
         >
-          <span className="truncate">{title}</span>
+          <span key={changes} className={changes > 0 ? 'truncate title-in' : 'truncate'}>
+            {title}
+          </span>
           {session.pinned && (
             <span className="pin-mark" title={t('session.pinned')} data-testid="pin-mark">
               <PinIcon label={t('session.pinned')} />

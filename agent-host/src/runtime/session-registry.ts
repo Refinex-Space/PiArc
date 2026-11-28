@@ -27,6 +27,8 @@ import {
 import type {
   CommitMessageAnswer,
   CommitMessageParams,
+  SessionTitleAnswer,
+  SessionTitleParams,
   GitAssistAnswer,
   GitAssistParams,
   HistoryWindow,
@@ -53,6 +55,7 @@ import type {
 
 import { reviewCall } from '../harness/auto-review.js';
 import { generateCommitMessage } from '../harness/commit-message.js';
+import { generateSessionTitle } from '../harness/session-title.js';
 import { generateGitAssist } from '../harness/git-assist.js';
 import { judgeHook, type JudgeRequest } from '../harness/hook-judge.js';
 import { expiredApprovals } from '../harness/policy.js';
@@ -769,6 +772,18 @@ export class SessionRegistry {
       auxiliary,
       preferences: this.#options.workspace.preferences,
     });
+  }
+
+  /** `session/title` (ADR-0106): a title for session `sessionId` from its first message. */
+  async sessionTitle(sessionId: string, params: SessionTitleParams): Promise<SessionTitleAnswer> {
+    const auxiliary = this.#get(sessionId).harness.auxiliary;
+    if (auxiliary === undefined) {
+      throw new AhpError(
+        'invalidParams',
+        `session/title: session ${sessionId} has no model channel`,
+      );
+    }
+    return generateSessionTitle(params, auxiliary);
   }
 
   /** `session/gitAssist` (ADR-0087): a PR description or a review from session `sessionId`'s

@@ -71,6 +71,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
         (14, "browser_imports".to_owned()),
         (15, "removed_workspaces".to_owned()),
         (16, "market".to_owned()),
+        (17, "session_auto_titles".to_owned()),
     ];
     assert_eq!(first.migrations().expect("ledger"), ledger);
     drop(first);
@@ -81,7 +82,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     // Opening an already migrated database applies nothing and keeps the ledger as it was.
     for _ in 0..2 {
         let again = Store::open(&path, 2000).expect("migrated database opens");
-        assert_eq!(again.schema_version().expect("version"), 16);
+        assert_eq!(again.schema_version().expect("version"), 17);
         assert_eq!(again.migrations().expect("ledger"), ledger);
         drop(again);
         assert_eq!(tables(&path), schema_after_first);
@@ -101,7 +102,7 @@ fn migrating_twice_from_empty_and_from_migrated_gives_the_same_schema() {
     let mut conn = Connection::open(&other).expect("open");
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 5).expect("first"),
-        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     );
     assert_eq!(
         migrate::apply(&mut conn, MIGRATIONS, 6).expect("second"),
@@ -187,20 +188,21 @@ fn a_database_from_a_newer_build_is_refused() {
         MIGRATIONS[13],
         MIGRATIONS[14],
         MIGRATIONS[15],
+        MIGRATIONS[16],
         Migration {
-            version: 17,
+            version: 18,
             name: "future",
             sql: "CREATE TABLE future (x INTEGER) STRICT;",
         },
     ];
     Store::open_with(&path, &newer, 1).expect("newer build migrates");
-    let error = Store::open(&path, 2).expect_err("this build does not know version 17");
+    let error = Store::open(&path, 2).expect_err("this build does not know version 18");
     assert!(
         matches!(
             error,
             Error::SchemaTooNew {
-                found: 17,
-                known: 16
+                found: 18,
+                known: 17
             }
         ),
         "{error:?}"

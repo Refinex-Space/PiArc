@@ -44,6 +44,7 @@ pub(crate) mod notices;
 pub(crate) mod presence;
 mod rewind;
 mod side_chat;
+mod title;
 
 pub use rewind::CheckpointOp;
 
@@ -146,6 +147,8 @@ pub(crate) enum SessionMsg {
     /// Background-task notices wait for the session (T32).
     Notices,
     NoticesSent,
+    /// The title request ended (ADR-0106): the title, or none.
+    Titled(Option<String>),
 }
 
 /// How a request affects turns: a rewind or branch switch needs the session to itself.
@@ -199,16 +202,18 @@ impl SessionHandle {
         id: String,
         cwd: PathBuf,
     ) -> Result<Self> {
-        Self::spawn_as(ctx, workspace, id, cwd, false)
+        Self::spawn_as(ctx, workspace, id, cwd, false, false)
     }
 
-    /// [`Self::spawn`] for a draft session when `draft`: listed as one until its first input.
+    /// [`Self::spawn`] for a session this Core creates (`new`: its first message may name it,
+    /// ADR-0106), and a draft session when `draft`: listed as one until its first input.
     pub fn spawn_as(
         ctx: &Arc<Ctx>,
         workspace: &WorkspaceHandle,
         id: String,
         cwd: PathBuf,
         draft: bool,
+        new: bool,
     ) -> Result<Self> {
         let draft = Arc::new(AtomicBool::new(draft));
         // A session in a worktree has the worktree's files and the workspace's settings (T35).
@@ -245,6 +250,7 @@ impl SessionHandle {
             unread: false,
             prefs: piarc_store::SessionPrefsChange::default(),
             first_message: None,
+            titling: title::Titling::new(new && ctx.config.session_titles),
             worktree_branch: worktree
                 .as_deref()
                 .and_then(piarc_git::worktree::head_branch),
@@ -419,6 +425,8 @@ struct SessionActor {
     prefs: piarc_store::SessionPrefsChange,
     /// The first message this actor sent (the title until the index has the session).
     first_message: Option<String>,
+    /// Whether and with what its first message may still name it (ADR-0106).
+    titling: title::Titling,
     /// The worktree it works in (T35), and its branch when the session opened.
     worktree: Option<PathBuf>,
     worktree_branch: Option<String>,
@@ -447,6 +455,9 @@ impl SessionActor {
                 SessionMsg::Filled(entries) => self.on_filled(entries).await,
                 SessionMsg::Op(op, reply) => self.start_op(op, reply),
                 SessionMsg::OpDone(kind, took_input) => {
+                    if kind == OpKind::Starting {
+                        self.ask_title(took_input);
+                    }
                     if took_input && self.draft.swap(false, Ordering::SeqCst) {
                         // Its first message went out: it is an ordinary session from now on.
                         self.publish();
@@ -476,6 +487,7 @@ impl SessionActor {
                         self.send_notices();
                     }
                 }
+                SessionMsg::Titled(title) => self.titled(title),
                 SessionMsg::RestoreFailed(error) => self.fail(error.to_string()),
                 SessionMsg::Uncertain(call) => self.on_uncertain(&call).await,
                 SessionMsg::HostLost(message) => {
@@ -743,6 +755,9 @@ impl SessionActor {
             OpKind::Exclusive => self.exclusive = true,
             OpKind::Other => {}
         }
+        if let Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) = &op {
+            self.titling.offer(&input.text);
+        }
         if let Op::Prompt(input) | Op::Steer(input) | Op::FollowUp(input) = &op
             && self.first_message.is_none()
             && !input.text.trim().is_empty()
@@ -758,15 +773,7 @@ impl SessionActor {
         }
         self.ops += 1;
         self.report_busy();
-        let request = Request {
-            storage: self.ctx.storage.clone(),
-            id: SessionId(self.id.clone()),
-            ws: self.ws.clone(),
-            tool_io: self.ctx.tool_io.clone(),
-            cancel: self.cancel.clone(),
-            events: self.ctx.events.clone(),
-            in_host: Arc::clone(&self.in_host),
-        };
+        let request = self.request();
         let tx = self.tx.clone();
         let input = matches!(op, Op::Prompt(_) | Op::Steer(_) | Op::FollowUp(_));
         self.ctx.handle.spawn(async move {
@@ -832,6 +839,19 @@ impl SessionActor {
             };
             let _ = reply.send(result);
         });
+    }
+
+    /// A request of this session, to run outside the actor.
+    fn request(&self) -> Request {
+        Request {
+            storage: self.ctx.storage.clone(),
+            id: SessionId(self.id.clone()),
+            ws: self.ws.clone(),
+            tool_io: self.ctx.tool_io.clone(),
+            cancel: self.cancel.clone(),
+            events: self.ctx.events.clone(),
+            in_host: Arc::clone(&self.in_host),
+        }
     }
 
     // ---- state reports ----
@@ -1131,6 +1151,9 @@ fn merge_prefs(
     }
     if change.archived.is_some() {
         into.archived = change.archived;
+    }
+    if change.auto_title.is_some() {
+        into.auto_title = change.auto_title;
     }
 }
 

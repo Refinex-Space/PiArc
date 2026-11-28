@@ -146,6 +146,7 @@ pub(crate) struct Enabled {
     pub side_chat: bool,
     pub commit_message: bool,
     pub git_assist: bool,
+    pub session_title: bool,
 }
 
 impl Link {
@@ -157,6 +158,7 @@ impl Link {
             side_chat: on("sideChat"),
             commit_message: on("commitMessage"),
             git_assist: on("gitAssist"),
+            session_title: on("sessionTitle"),
         };
     }
 }

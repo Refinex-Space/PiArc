@@ -761,6 +761,18 @@ textarea.input {
   flex: 1;
 }
 
+/* A title that changes in place (a generated title replacing the first message, ADR-0106, or a
+   rename) settles in instead of jumping. */
+.title-in {
+  animation: title-in var(--piarc-motion-view) var(--piarc-motion-curve-out) both;
+}
+@keyframes title-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
 .pin-mark {
   display: inline-flex;
   color: var(--piarc-text-secondary);

@@ -119,6 +119,8 @@ export type AhpMessage =
   | SideChatControlResponse
   | SessionCommitMessageRequest
   | SessionCommitMessageResponse
+  | SessionTitleRequest
+  | SessionTitleResponse
   | SessionGitAssistRequest
   | SessionGitAssistResponse
   | SessionCompactRequest
@@ -4174,6 +4176,51 @@ export interface CommitMessageAnswer {
    * The message, without code fences or control characters (at most 4 KiB).
    */
   text: string;
+}
+/**
+ * Request for `session/title`.
+ */
+export interface SessionTitleRequest {
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  method: 'session/title';
+  params: SessionTitleParams;
+}
+/**
+ * Parameters of `session/title` (Core → Agent Host, ADR-0106).
+ */
+export interface SessionTitleParams {
+  /**
+   * The session whose model channel answers.
+   */
+  sessionId: SessionId;
+  /**
+   * The session's first message, as the user wrote it (at most 4,000 UTF-16 units).
+   */
+  text: string;
+}
+/**
+ * Successful response to `session/title`.
+ */
+export interface SessionTitleResponse {
+  error?: never;
+  id: RequestId;
+  jsonrpc: JsonRpcVersion;
+  result: SessionTitleAnswer;
+}
+/**
+ * The generated title (`session/title`).
+ */
+export interface SessionTitleAnswer {
+  /**
+   * The model that wrote it.
+   */
+  model: ModelRef;
+  /**
+   * One line without quotes or closing punctuation (at most 80 UTF-16 units); empty when the
+   * model gave nothing usable.
+   */
+  title: string;
 }
 /**
  * Request for `session/gitAssist`.

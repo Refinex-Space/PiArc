@@ -2259,6 +2259,7 @@ export const en = {
   'git.pr.method.rebase': 'Rebase and merge',
   'settings.git': 'Git',
   'usage.purpose.commitMessage': 'Commit messages',
+  'usage.purpose.sessionTitle': 'Session titles',
   'diagnostics.reason.projectGit': 'Git settings apply from your user settings only',
   'git.view.label': 'View',
   'git.view.changes': 'Changes',

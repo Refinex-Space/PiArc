@@ -16,6 +16,10 @@
 - 客户端偏好（`client_settings`）：可写 `language`、`appearance`、`keybindings`、`notifications`，以及布尔偏好 `/memory/readBoth`，经 `piarc_config::write_value`；读取返回整份文件（不存在为 `{}`）。
 - I62 已接上：工作区 actor 打开时启动设置监听（`WorkspaceSettings`）。macOS 的首次 FSEvents 注册在阻塞线程池进行，与 Host 握手并行。注册完成后重新读取设置，显式 `open_settings` 仍等待监听就绪。回合结束时同步索引。信任变化重启（T18 起）：`CoreRuntime::trust_view`（决定）与 `revoke_trust` 在应答前调 `Hub::trust_changed`，同一主 checkout 的工作区 actor 先把状态置为 `Restarting`（之后的请求等新进程就绪）再调 `HostSupervisor::restart`，所以信任对话框之后立即创建的会话落在新进程上；`agent_host::restart_on_trust_change` 只剩监管器层面的测试使用。
 
+## 会话标题（ADR-0106）
+
+- `session/title.rs`：`Titling` 只在 `spawn_as(.., new: true)`（`create`，含草稿）且 `SessionsConfig.session_titles` 打开时生效；`start_op` 对 prompt、steer、follow-up 调 `offer`，`OpDone`（`Starting`）调 `ask_title`，被接受的第一条文字输入（命令等下一条，单行不超过 32 列的消息就是标题）经 `Request::session_title`（AHP `session/title`，40 s）在后台请求，回答以 `SessionMsg::Titled` 回到 actor：写进 `prefs.auto_title`、`publish` 并 `persist`。至多两次，用户改过名的不请求，失败只记错误类别（服务商的错误可能引用对话）。快照的 `live_title` 是标题优先级的唯一实现：用户改名 › Pi 会话名 › 自动标题 › 首条消息（索引侧同序的是 `SessionRecord::title`）。应用（NAPI `create`）打开，测试默认关闭，`createForTests` 读 `PIARC_TEST_SESSION_TITLES`。端到端：`cargo test -p piarc-testkit --test sessions titles::`。
+
 ## 草稿会话（ADR-0099）
 
 - `sessions/drafts.rs`：`Hub::create_draft_session` 经 `create_session_as(.., draft: true)` 建会话；`discard_draft_session` 只对 `SessionHandle::is_draft()` 为真的会话走 `delete_session`，其余返回 `invalidParams`。草稿标记是句柄与 actor 共享的 `AtomicBool`，请求任务结束时以 `OpDone(kind, took_input)` 报告，prompt、steer、follow-up 成功才清除并重新发布。快照的 `SessionView.draft` 只在为真时序列化，`Activity` 不计草稿。端到端：`cargo test -p piarc-testkit --test sessions drafts::`。

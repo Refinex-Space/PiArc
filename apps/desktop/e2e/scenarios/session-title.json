@@ -1,0 +1,7 @@
+{
+  "id": "session-title",
+  "steps": [
+    { "text": "Spring Boot 入门学习计划", "chunk_chars": 4, "chunk_delay_ms": 400 },
+    { "text": "Spring Boot 入门学习计划", "chunk_chars": 4, "chunk_delay_ms": 400 }
+  ]
+}

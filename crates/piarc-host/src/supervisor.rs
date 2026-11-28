@@ -478,6 +478,16 @@ impl Link {
                 ),
             });
         }
+        if !self.enabled.session_title && method == "session/title" {
+            return Err(Error::Remote {
+                method: method.to_owned(),
+                error: piarc_protocol::ErrorObject::new(
+                    ErrorKind::MethodNotFound,
+                    "the connected Agent Host does not write session titles",
+                    false,
+                ),
+            });
+        }
         if !self.enabled.commit_message && method == "session/commitMessage" {
             return Err(Error::Remote {
                 method: method.to_owned(),

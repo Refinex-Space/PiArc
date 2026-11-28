@@ -14,6 +14,7 @@ fn prefs(title: Option<Option<&str>>, pinned: Option<bool>, archived: Option<boo
         custom_title: title.map(|t| t.map(str::to_owned)),
         pinned,
         archived,
+        ..SessionPrefsChange::default()
     })
 }
 

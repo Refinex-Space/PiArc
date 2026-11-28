@@ -139,6 +139,8 @@ impl CoreRuntime {
             let mut config = config_of(options)?;
             // The administrator's places of this computer (T47); tests use createForTests.
             config.managed = piarc_core::managed::ManagedConfig::system();
+            // New sessions are named from their first message (ADR-0106).
+            config.sessions.session_titles = true;
             let sink = Arc::new(JsEventSink::new(on_events));
             piarc_core::CoreRuntime::start(config, sink).map(|core| Self { core })
         })

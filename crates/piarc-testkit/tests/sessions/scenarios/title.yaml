@@ -1,0 +1,7 @@
+# Session titles (ADR-0106): the first turn and the title request race to the mock, so both
+# steps answer the same short line; whichever comes first, the title is that line.
+id: title
+steps:
+  - text: 'Spring Boot 入门学习计划'
+  - text: 'Spring Boot 入门学习计划'
+  - text: 'Second answer.'

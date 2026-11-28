@@ -10,6 +10,7 @@ import { DetailSwitch } from '../transcript/DetailSwitch.js';
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, SidebarIcon } from './icons.js';
 import { sessionTitle } from './SessionRow.js';
 import { StatusBadge } from './StatusBadge.js';
+import { useTitleChanges } from './title-change.js';
 import { useUi } from './ui.js';
 
 function SessionHeading({ id }: { readonly id: string }) {
@@ -20,6 +21,7 @@ function SessionHeading({ id }: { readonly id: string }) {
   const popoverId = useId();
   const [renaming, setRenaming] = useState(false);
   const title = sessionTitle(session?.title, t('session.untitled'));
+  const changes = useTitleChanges(title);
   // The tip names the whole title while it is cut off, and the action otherwise.
   const titleTooltip = (event: { readonly currentTarget: HTMLButtonElement }) => {
     const button = event.currentTarget;
@@ -56,7 +58,9 @@ function SessionHeading({ id }: { readonly id: string }) {
             }}
             data-testid="conversation-title"
           >
-            {title}
+            <span key={changes} className={changes > 0 ? 'title-in' : undefined}>
+              {title}
+            </span>
           </button>
         </h1>
       )}

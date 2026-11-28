@@ -84,7 +84,19 @@ fn test_market() -> piarc_core::market::MarketConfig {
     }
 }
 
+/// Session titles (ADR-0106) in development builds: off unless `PIARC_TEST_SESSION_TITLES` is
+/// `1`, since the title request would take a step of the strict mock's script.
+fn test_session_titles() -> bool {
+    std::env::var_os("PIARC_TEST_SESSION_TITLES").is_some_and(|v| v == "1")
+}
+
+// `createForTests` is one flat list of the development build's test switches; the lint lands
+// on the item `#[napi]` generates, so the expectation sits on the block.
 #[napi]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one flat list of the development build's test switches, read in one place"
+)]
 impl CoreRuntime {
     /// Like `create`, with the vault's master key in memory under a `piarc-test.` name instead
     /// of the system credential store: tests that open workspaces never touch the keychain
@@ -99,7 +111,8 @@ impl CoreRuntime {
     /// `PIARC_TEST_GH` (the fake `gh` the Git tool runs instead of the one on `PATH`, so L4
     /// never reaches the machine's `gh` and the user's GitHub account). The Chrome import
     /// (ADR-0090) reads `PIARC_TEST_CHROME_ROOT` (a fixture Chrome folder) and always uses the
-    /// fixed test key, never the keychain or DPAPI.
+    /// fixed test key, never the keychain or DPAPI. Session titles (ADR-0106) are off unless
+    /// `PIARC_TEST_SESSION_TITLES` is `1`.
     #[napi(factory, catch_unwind)]
     pub fn create_for_tests(
         env: Env,
@@ -175,6 +188,7 @@ impl CoreRuntime {
                     poll: std::time::Duration::from_millis(200),
                 };
             }
+            config.sessions.session_titles = test_session_titles();
             if let Some(program) = std::env::var_os("PIARC_TEST_GH") {
                 config.gh_program = Some(std::path::PathBuf::from(program));
             }

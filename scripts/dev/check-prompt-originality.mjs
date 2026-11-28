@@ -33,6 +33,7 @@ function render() {
         import * as commit from './agent-host/src/harness/prompts/commit-message.ts';
         import * as assist from './agent-host/src/harness/prompts/git-assist.ts';
         import * as browserNotices from './agent-host/src/harness/prompts/browser-notices.ts';
+        import { SESSION_TITLE_SYSTEM } from './agent-host/src/harness/prompts/session-title.ts';
         const system = assembleSystem(CANONICAL_TOOLS, DEFAULT_PROFILE, [],
           {cwd: '', platform: '', date: '', gitStatus: ''}).text;
         const conservative = conservativeProfile(DEFAULT_PROFILE);
@@ -93,6 +94,8 @@ function render() {
           // ADR-0086, ADR-0087: the Git tool's commit message, PR description and review requests.
           commit.COMMIT_MESSAGE_SYSTEM, ...Object.values(commit.LANGUAGE_REQUIREMENT), commit.AMEND_NOTE,
           assist.PR_DESCRIPTION_SYSTEM, assist.REVIEW_SYSTEM, ...Object.values(assist.ASSIST_LANGUAGE),
+          // ADR-0106: the request that names a new session from its first message.
+          SESSION_TITLE_SYSTEM,
           // ADR-0092: the reminder after the agent changed a running dev server's front end.
           browserNotices.browserVerifyNotice(' ' + String.fromCharCode(10) + ' ')];
         process.stdout.write([system, ...descriptions, ...notices].join(String.fromCharCode(10)));`,

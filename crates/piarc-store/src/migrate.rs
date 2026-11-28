@@ -105,6 +105,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "market",
         sql: include_str!("sql/0016_market.sql"),
     },
+    Migration {
+        version: 17,
+        name: "session_auto_titles",
+        sql: include_str!("sql/0017_session_auto_titles.sql"),
+    },
 ];
 
 /// The highest version in `migrations`.

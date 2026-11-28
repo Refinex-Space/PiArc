@@ -2181,6 +2181,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'git.pr.method.rebase': '变基并合并',
   'settings.git': 'Git',
   'usage.purpose.commitMessage': '提交信息',
+  'usage.purpose.sessionTitle': '会话标题',
   'diagnostics.reason.projectGit': 'Git 设置只在用户级设置中生效',
   'git.view.label': '视图',
   'git.view.changes': '改动',

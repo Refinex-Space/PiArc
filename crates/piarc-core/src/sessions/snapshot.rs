@@ -497,12 +497,7 @@ impl SnapshotTask {
             .map(|record| {
                 let mut view = indexed_view(record);
                 if let Some(live) = self.live.get(&record.id) {
-                    let derived = record
-                        .meta
-                        .name
-                        .as_ref()
-                        .or(record.meta.first_message.as_ref());
-                    apply_live(&mut view, live, derived);
+                    apply_live(&mut view, live, Some(record));
                 }
                 view
             })
@@ -669,9 +664,28 @@ fn empty_view(id: &str) -> SessionView {
     }
 }
 
-/// Live state over the indexed view; `derived` is the title without the user's (to show when
-/// the user removes theirs).
-fn apply_live(view: &mut SessionView, live: &LiveSession, derived: Option<&String>) {
+/// The title of an open session: the user's (changed while open, else stored), Pi's session
+/// name, the generated one (ADR-0106, new, else stored), the first message (stored, else the
+/// one this actor sent: Pi writes the file only with the first reply).
+fn live_title(record: Option<&piarc_store::SessionRecord>, live: &LiveSession) -> Option<String> {
+    let custom = match &live.prefs.custom_title {
+        Some(change) => change.clone(),
+        None => record.and_then(|r| r.custom_title.clone()),
+    };
+    custom
+        .or_else(|| record.and_then(|r| r.meta.name.clone()))
+        .or_else(|| live.prefs.auto_title.clone())
+        .or_else(|| record.and_then(|r| r.auto_title.clone()))
+        .or_else(|| record.and_then(|r| r.meta.first_message.clone()))
+        .or_else(|| live.first_message.clone())
+}
+
+/// Live state over the indexed view of `record` (none until the index has the session).
+fn apply_live(
+    view: &mut SessionView,
+    live: &LiveSession,
+    record: Option<&piarc_store::SessionRecord>,
+) {
     view.workspace = Some(live.workspace.clone());
     view.cwd = Some(live.cwd.clone());
     view.draft = live.draft;
@@ -679,15 +693,7 @@ fn apply_live(view: &mut SessionView, live: &LiveSession, derived: Option<&Strin
     view.unread = live.unread;
     view.open = true;
     view.error.clone_from(&live.error);
-    if view.title.is_none() {
-        view.title.clone_from(&live.first_message);
-    }
-    if let Some(title) = &live.prefs.custom_title {
-        view.title = title
-            .clone()
-            .or_else(|| derived.cloned())
-            .or_else(|| live.first_message.clone());
-    }
+    view.title = live_title(record, live);
     if let Some(pinned) = live.prefs.pinned {
         view.pinned = pinned;
     }

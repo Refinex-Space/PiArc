@@ -598,6 +598,7 @@ impl Driver<'_> {
             custom_title: prefs.title.clone().map(Some),
             pinned: prefs.pinned,
             archived: prefs.archived,
+            ..Default::default()
         };
         self.op(prefs.session.as_deref(), Op::Prefs(change))
             .await

@@ -71,3 +71,7 @@ T27 的摘要提示另与 Pi 1.5.2 自带的摘要提示（`node_modules/@earend
 ## 计划模式的提醒与退回说明（ADR-0103）
 
 `PLAN_ON`（`agent-host/src/harness/prompts/notices.ts`）从一句话改为约束、四步方法与回复后的做法，`ExitPlanMode` 的描述（`agent-host/src/tools/profile.ts`）加了"用户可能以对话回复"。Core 给模型的退回说明在 `crates/piarc-core/src/tool_io/policy/plan.rs` 的 `keep_planning`，新增"用户在对话里回复"的一句。三处按 ADR-0103 自写；调研只记了 Claude Code 计划提醒的结构（约束、流程、提交协议），写作时没有打开参考仓库的提示词原文。2026-11-27 用上面的脚本做 10 词窗口比对，0 个匹配窗口。
+
+## 会话标题请求（ADR-0106）
+
+`SESSION_TITLE_SYSTEM`（`agent-host/src/harness/prompts/session-title.ts`）是按首条消息给新会话起标题的辅助请求的 system 文本，脚本自此一并取出。按 ADR-0106 自写：调研只记录了参考实现的行为（何时触发、标题的长度与语言、不回答原问题），写作时没有打开参考仓库的提示词原文。2026-11-27 做 10 词窗口比对，PiArc 词数 10883，0 个匹配窗口。

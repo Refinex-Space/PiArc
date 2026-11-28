@@ -671,7 +671,8 @@ export declare class CoreRuntime {
    * `PIARC_TEST_GH` (the fake `gh` the Git tool runs instead of the one on `PATH`, so L4
    * never reaches the machine's `gh` and the user's GitHub account). The Chrome import
    * (ADR-0090) reads `PIARC_TEST_CHROME_ROOT` (a fixture Chrome folder) and always uses the
-   * fixed test key, never the keychain or DPAPI.
+   * fixed test key, never the keychain or DPAPI. Session titles (ADR-0106) are off unless
+   * `PIARC_TEST_SESSION_TITLES` is `1`.
    */
   static createForTests(
     options: CoreOptions,

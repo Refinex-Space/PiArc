@@ -59,7 +59,7 @@ impl Hub {
             });
         }
         let spawned =
-            session::SessionHandle::spawn_as(&self.ctx, &workspace, id.clone(), cwd, draft);
+            session::SessionHandle::spawn_as(&self.ctx, &workspace, id.clone(), cwd, draft, true);
         let opened = match spawned {
             Ok(handle) => match self.register(handle.clone()) {
                 Ok(()) => match handle.create(model, mode).await {

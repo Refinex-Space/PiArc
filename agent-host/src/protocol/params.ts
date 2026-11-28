@@ -9,6 +9,7 @@ import type {
   ModelPreferences,
   ModelRef,
   PolicyReviewParams,
+  SessionTitleParams,
 } from '@piarc/protocol';
 
 import { parsePreferences } from '../providers/preferences.js';
@@ -316,6 +317,19 @@ export function gitAssistParams(params: unknown): GitAssistParams {
     ...(base.branch === undefined ? {} : { branch: base.branch }),
     ...(baseBranch === undefined ? {} : { base: baseBranch }),
   };
+}
+
+/** `session/title`'s params (ADR-0106): the first message, at most 4,000 UTF-16 units. */
+export function sessionTitleParams(params: unknown): SessionTitleParams {
+  const method = 'session/title';
+  const fields = paramsObject(method, params);
+  const text = stringField(method, fields, 'text');
+  if (text.length > 4000) {
+    throw new AhpError('invalidParams', `${method}: text is too long`, {
+      details: { member: 'text' },
+    });
+  }
+  return { sessionId: stringField(method, fields, 'sessionId'), text };
 }
 
 /** The members `session/commitMessage` and `session/gitAssist` share. */

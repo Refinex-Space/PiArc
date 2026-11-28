@@ -125,6 +125,7 @@ impl HostConfig {
                 Capability::new("sideChat"),
                 Capability::new("commitMessage"),
                 Capability::new("gitAssist"),
+                Capability::new("sessionTitle"),
             ],
             allow_model_network: None,
             model_preferences: None,

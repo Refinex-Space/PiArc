@@ -52,7 +52,8 @@ use crate::secrets::{
 use crate::session::{
     PolicyRecover, SessionAbort, SessionClose, SessionCommitMessage, SessionCompact, SessionCreate,
     SessionEventNotification, SessionFollowUp, SessionFork, SessionGitAssist, SessionPrompt,
-    SessionResume, SessionSetPermissionMode, SessionSteer, SideChatAsk, SideChatControl,
+    SessionResume, SessionSetPermissionMode, SessionSteer, SessionTitle, SideChatAsk,
+    SideChatControl,
 };
 use crate::skills::{
     ResourcesListCommands, ResourcesListSkills, ResourcesReload, SkillsInvoke, SkillsListMethod,
@@ -227,6 +228,8 @@ pub static CONTRACTS: &[Contract] = &[
     response::<SideChatControl>("session/sideChatControl/result"),
     request::<SessionCommitMessage>(SessionCommitMessage::NAME),
     response::<SessionCommitMessage>("session/commitMessage/result"),
+    request::<SessionTitle>(SessionTitle::NAME),
+    response::<SessionTitle>("session/title/result"),
     request::<SessionGitAssist>(SessionGitAssist::NAME),
     response::<SessionGitAssist>("session/gitAssist/result"),
     request::<SessionCompact>(SessionCompact::NAME),

@@ -14,6 +14,7 @@ import { OutboundQueue, type FrameSink } from './protocol/outbound.js';
 import {
   commitMessageParams,
   gitAssistParams,
+  sessionTitleParams,
   modelField,
   optionalCount,
   optionalString,
@@ -67,6 +68,7 @@ export const HOST_CAPABILITIES: readonly string[] = [
   'sideChat',
   'commitMessage',
   'gitAssist',
+  'sessionTitle',
 ];
 
 /** Exit codes, for Core's log and restart decisions. */
@@ -115,6 +117,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
   let sideChatEnabled = false;
   let commitMessageEnabled = false;
   let gitAssistEnabled = false;
+  let sessionTitleEnabled = false;
   // The workspace's MCP pool (T36), when Core enabled `mcpPool`.
   let mcp: McpPool | undefined;
   // Core may send its first request right after `core/welcome`, while the workspace is still
@@ -466,6 +469,15 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
     }
     return registry.gitAssist(request.sessionId, request);
   });
+  connection.handle('session/title', async (params) => {
+    const method = 'session/title';
+    const request = sessionTitleParams(params);
+    const registry = await sessions(method);
+    if (!sessionTitleEnabled) {
+      throw new AhpError('methodNotFound', 'Core did not enable sessionTitle');
+    }
+    return registry.sessionTitle(request.sessionId, request);
+  });
   connection.handle('session/sideChatControl', async (params) => {
     const method = 'session/sideChatControl';
     const fields = paramsObject(method, params);
@@ -752,6 +764,7 @@ export function runHost(input: FrameSource, output: FrameSink, options: HostOpti
       sideChatEnabled = welcome.enabled.includes('sideChat');
       commitMessageEnabled = welcome.enabled.includes('commitMessage');
       gitAssistEnabled = welcome.enabled.includes('gitAssist');
+      sessionTitleEnabled = welcome.enabled.includes('sessionTitle');
       if (welcome.modelPreferences != null) workspace.preferences.set(welcome.modelPreferences);
       if (options.testOAuthProvider !== undefined) {
         registerTestOAuthProvider(workspace.modelRuntime, options.testOAuthProvider);

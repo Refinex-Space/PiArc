@@ -422,6 +422,33 @@ request!(
     SessionCommitMessage, "session/commitMessage", CommitMessageParams, CommitMessageAnswer
 );
 
+/// Parameters of `session/title` (Core → Agent Host, ADR-0106).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTitleParams {
+    /// The session whose model channel answers.
+    pub session_id: SessionId,
+    /// The session's first message, as the user wrote it (at most 4,000 UTF-16 units).
+    pub text: String,
+}
+
+/// The generated title (`session/title`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTitleAnswer {
+    /// One line without quotes or closing punctuation (at most 80 UTF-16 units); empty when the
+    /// model gave nothing usable.
+    pub title: String,
+    /// The model that wrote it.
+    pub model: ModelRef,
+}
+
+request!(
+    /// Generate a short title from a session's first message on its auxiliary model channel
+    /// (Core → Agent Host).
+    SessionTitle, "session/title", SessionTitleParams, SessionTitleAnswer
+);
+
 /// What `session/gitAssist` writes (ADR-0087).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

@@ -80,18 +80,21 @@ pub struct SessionRecord {
     pub unread: bool,
     /// Core's own state: the title the user gave the session in PiArc.
     pub custom_title: Option<String>,
+    /// Core's own state: the title generated from the first message (ADR-0106).
+    pub auto_title: Option<String>,
     /// Core's own state: the session's worktree (T35).
     pub worktree: Option<crate::worktrees::WorktreeRecord>,
 }
 
 impl SessionRecord {
-    /// The display title: the user's title, else the session name, else the first user
-    /// message.
+    /// The display title: the user's title, else the session name, else the generated title
+    /// (ADR-0106), else the first user message.
     #[must_use]
     pub fn title(&self) -> Option<&str> {
         self.custom_title
             .as_deref()
             .or(self.meta.name.as_deref())
+            .or(self.auto_title.as_deref())
             .or(self.meta.first_message.as_deref())
     }
 }
@@ -105,6 +108,9 @@ pub struct SessionPrefsChange {
     pub pinned: Option<bool>,
     /// Archived (hidden from the default list).
     pub archived: Option<bool>,
+    /// The title Core generated from the first message (ADR-0106); set by Core only, never by
+    /// a client.
+    pub auto_title: Option<String>,
 }
 
 /// What a sync of one file did.
@@ -582,6 +588,9 @@ impl Store {
         if let Some(archived) = change.archived {
             write("UPDATE sessions SET archived = ?2 WHERE id = ?1", &archived)?;
         }
+        if let Some(title) = &change.auto_title {
+            write("UPDATE sessions SET auto_title = ?2 WHERE id = ?1", title)?;
+        }
         Ok(true)
     }
 
@@ -735,7 +744,7 @@ const SESSION_COLUMNS: &str = "id, file_path, cwd, parent_session, name, first_m
     cache_write_tokens, cost_total, created_at, updated_at, format_version, index_status, \
     index_error, workspace_path, pinned, archived, unread, status, custom_title, \
     subagent_parent, subagent_type, worktree, worktree_branch, worktree_cleanup_at, \
-    worktree_confirm, worktree_removed_at";
+    worktree_confirm, worktree_removed_at, auto_title";
 
 fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> {
     let status: String = row.get(17)?;
@@ -773,6 +782,7 @@ fn session_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRecord> 
         unread: row.get(22)?,
         status: row.get(23)?,
         custom_title: row.get(24)?,
+        auto_title: row.get(32)?,
         worktree: row
             .get::<_, Option<String>>(27)?
             .map(
