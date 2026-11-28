@@ -1,9 +1,9 @@
 <div align="center">
 
-<h1>
-  <img src="design/brand/icon.iconset/icon_128x128@2x.png" width="64" height="64" align="center" alt="">
-  PiArc
-</h1>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/wordmark-dark.svg">
+  <img src=".github/assets/wordmark.svg" alt="PiArc" width="208" height="80">
+</picture>
 
 **macOS 与 Windows 上的桌面编码智能体，基于 [Pi](https://github.com/earendil-works/pi) 构建。**
 

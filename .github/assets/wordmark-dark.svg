@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 80" width="208" height="80" role="img" aria-labelledby="wordmark-dark-title">
+  <title id="wordmark-dark-title">PiArc</title>
+  <g transform="translate(8 8) scale(0.0625)">
+    <rect width="1024" height="1024" rx="224" fill="#ffffff" stroke="rgba(236,238,242,0.16)" stroke-width="16"/>
+    <g transform="scale(1.28)" fill="#000000" fill-rule="evenodd">
+      <path d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/>
+      <path d="M517.36 400 H634.72 V634.72 H517.36 Z"/>
+    </g>
+  </g>
+  <text x="92" y="55.5" fill="#eceef2" font-size="44" font-weight="600" letter-spacing="-0.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif">PiArc</text>
+</svg>
