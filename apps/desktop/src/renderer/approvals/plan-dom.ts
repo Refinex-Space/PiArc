@@ -1,9 +1,9 @@
 // The plan panel's rendered blocks and the plan's source (ADR-0103): a selection becomes the
 // UTF-16 source range it shows, and a comment's source range becomes the DOM ranges that mark
-// it. Each block element carries `data-src-start` and `data-src-end` (its source lines as
-// offsets); the mapping inside a block is `plan-source.ts`. Text the renderer adds (buttons,
-// hidden labels) is not part of a block's text.
-import { alignRendered, renderedRuns, sourceRange } from './plan-source.js';
+// it. The panel renders the plan with the Files Markdown reader, whose sections carry the source
+// lines they come from (`data-doc-line`, `data-end-line`); the mapping inside a section is
+// `plan-source.ts`. Text the renderer adds (buttons, hidden labels) is not part of a block's text.
+import { alignRendered, lineStarts, linesRange, renderedRuns, sourceRange } from './plan-source.js';
 
 /** A rendered block: its text nodes, where each starts in the block's text, and the mapping. */
 interface BlockText {
@@ -32,18 +32,31 @@ function textNodes(block: Element): Text[] {
   return nodes;
 }
 
-/** The source range a block element shows, from its data attributes. */
-export function blockSource(block: Element): { start: number; end: number } | undefined {
-  const start = Number(block.getAttribute('data-src-start'));
-  const end = Number(block.getAttribute('data-src-end'));
-  return Number.isInteger(start) && Number.isInteger(end) && start <= end
-    ? { start, end }
+/** The plan and where its lines start: what block lines turn into offsets with. */
+interface Plan {
+  readonly text: string;
+  readonly starts: readonly number[];
+}
+
+function planOf(text: string): Plan {
+  return { text, starts: lineStarts(text) };
+}
+
+/** The source range a block element shows, from its 1-based source lines. */
+export function blockSource(
+  block: Element,
+  plan: Plan,
+): { start: number; end: number } | undefined {
+  const first = Number(block.getAttribute('data-doc-line'));
+  const last = Number(block.getAttribute('data-end-line'));
+  return Number.isInteger(first) && Number.isInteger(last) && first >= 1 && first <= last
+    ? linesRange(plan.text, plan.starts, first, last)
     : undefined;
 }
 
 /** A block's text, read from the DOM each time: code highlighting replaces text nodes later. */
-function blockText(block: Element, plan: string): BlockText | undefined {
-  const source = blockSource(block);
+function blockText(block: Element, plan: Plan): BlockText | undefined {
+  const source = blockSource(block, plan);
   if (source === undefined) return undefined;
   const nodes = textNodes(block);
   const starts: number[] = [];
@@ -58,7 +71,7 @@ function blockText(block: Element, plan: string): BlockText | undefined {
     nodes,
     starts,
     length,
-    map: alignRendered(rendered, plan.slice(source.start, source.end), source.start),
+    map: alignRendered(rendered, plan.text.slice(source.start, source.end), source.start),
   };
 }
 
@@ -91,13 +104,13 @@ function pointAt(text: BlockText, at: number, end: boolean): { node: Text; offse
 
 function blockOf(node: Node, root: Element): Element | null {
   const element = node instanceof Element ? node : node.parentElement;
-  const block = element?.closest('[data-src-start]') ?? null;
+  const block = element?.closest('[data-doc-line]') ?? null;
   return block !== null && root.contains(block) ? block : null;
 }
 
 /** The blocks under `root`, in document order. */
 function blocksOf(root: Element): Element[] {
-  return [...root.querySelectorAll('[data-src-start]')];
+  return [...root.querySelectorAll('[data-doc-line]')];
 }
 
 /**
@@ -109,8 +122,9 @@ function blocksOf(root: Element): Element[] {
 export function selectionToSource(
   root: Element,
   range: Range,
-  plan: string,
+  text: string,
 ): { start: number; end: number } | undefined {
+  const plan = planOf(text);
   const blocks = blocksOf(root).filter((block) => range.intersectsNode(block));
   let start: number | undefined;
   let end: number | undefined;
@@ -134,10 +148,11 @@ export function selectionToSource(
 }
 
 /** The DOM ranges under `root` that show source `[start, end)` of `plan`. */
-export function sourceToRanges(root: Element, plan: string, start: number, end: number): Range[] {
+export function sourceToRanges(root: Element, text: string, start: number, end: number): Range[] {
+  const plan = planOf(text);
   const ranges: Range[] = [];
   for (const block of blocksOf(root)) {
-    const source = blockSource(block);
+    const source = blockSource(block, plan);
     if (source === undefined || source.end <= start || source.start >= end) continue;
     const text = blockText(block, plan);
     if (text === undefined || text.nodes.length === 0) continue;
@@ -161,7 +176,7 @@ export function pointToSource(
   plan: string,
 ): number | undefined {
   const block = blockOf(node, root);
-  const text = block === null ? undefined : blockText(block, plan);
+  const text = block === null ? undefined : blockText(block, planOf(plan));
   if (text === undefined) return undefined;
   const at = indexOf(text, node, offset);
   // The character under the point, or the one before it at the end of the text.

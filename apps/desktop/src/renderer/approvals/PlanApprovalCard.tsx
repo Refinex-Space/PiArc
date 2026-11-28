@@ -1,9 +1,9 @@
 // The plan card (T26, ADR-0103): an ExitPlanMode call waiting for the user, as a compact decision
 // bar under the plan's own row (which shows the plan; the plan panel shows it whole, with
-// comments). Approve and accept edits (Mod+Enter), approve and review edits (Mod+Shift+Enter),
-// revise (Esc: the composer takes the reply; a message sent while the card waits declines the
-// plan with that message), send the inline comments alone, or stop the turn. The answer names the
-// card's revision and Agent Host connection, like every approval.
+// comments). Stop the turn, send the inline comments alone, approve and review edits
+// (Mod+Shift+Enter), approve and accept edits (Mod+Enter). Changes are asked for in the composer:
+// a message sent while the card waits declines the plan with that message, and Esc puts the caret
+// there. The answer names the card's revision and Agent Host connection, like every approval.
 import type { ApprovalRequest } from '@piarc/protocol';
 import { useEffect, useRef, useState } from 'react';
 
@@ -154,7 +154,7 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
           </ul>
         )}
         <div className="approval-actions plan-actions">
-          <div className="approval-persist">
+          <div className="approval-main">
             <button
               type="button"
               className="button button-ghost"
@@ -179,21 +179,7 @@ export function PlanApprovalCard({ request }: { readonly request: ApprovalReques
               >
                 {t('plan.sendComments', { count: comments.length })}
               </button>
-            ) : (
-              <button
-                type="button"
-                className="button"
-                disabled={waiting !== undefined}
-                data-testid="plan-revise"
-                data-tooltip={t('plan.reviseHint')}
-                aria-keyshortcuts="Escape"
-                onClick={revise}
-              >
-                {t('plan.revise')}
-              </button>
-            )}
-          </div>
-          <div className="approval-main">
+            ) : null}
             <button
               type="button"
               className="button"

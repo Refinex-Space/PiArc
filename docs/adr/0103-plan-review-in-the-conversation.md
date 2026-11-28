@@ -1,6 +1,6 @@
 # 0103. 计划审阅回到对话：输入框回复即修改、渲染后的计划面板与停止入口
 
-- 状态：已接受（用户在 2026-11-27 的会话中提出这些改动）
+- 状态：已接受（用户在 2026-11-27 的会话中提出这些改动；2026-11-28 按用户意见去掉卡片的"修改"按钮，面板改用 Files 的 Markdown 阅读器）
 - 日期：2026-11-27
 - 修订：ADR-0042 第 2 条（计划卡的内容与热键）、第 3 条（计划面板以原文显示）
 - 相关：架构第 6.5、8.2 节；ADR-0026（steer 与排队）、ADR-0073（桌面前端复刻范围）、ADR-0078（会话主块）
@@ -19,8 +19,8 @@ T26 的计划模式在真实使用里有三处问题：
 
 1. **窗口从会话快照接管运行态。** `SessionTranscript.syncStatus(status)`：快照报 `running` 而本窗口没有运行中的回合时接管它（工作行出现、输入框变为停止与插话、重新读取历史窗口）；接管的回合在第一条带 `turnId` 的事件里得到它的 id，由 `turn/completed` 或快照转为非运行状态结束。本窗口刚看到回合结束的 1.5 s 内（`ADOPT_AFTER_MS`），`running` 快照视为落后于会话事件，不接管。AppStore 在快照的 `status` 变化与创建 transcript 时调用它。
 2. **等待审阅时，输入框的消息就是对计划的回复。** 渲染进程先把消息作为 steer 发出（Pi 把它排在本批工具之后、下一次请求之前），再以 `deny` 加 `via: conversation`（Core API `AnswerVia` 新增值）答复计划卡，随附面板里的评论。Core 只对计划卡接受这个来源，且不接受它带 `feedback`（消息本身就是反馈）；给模型的拒绝理由改为"没有批准、用户在对话里写了回复，消息紧跟在这个结果之后，按消息行事，计划变了就完整地重新提交"。transcript 里依次是退回的计划行、用户消息、修改后的计划。排队（Mod+Enter）不答复计划，照旧等回合结束。
-3. **计划卡是决策栏。** 卡片不再重复计划正文（正文在它上方的计划行，完整版在面板），只有标题、"打开计划"、一句说明、评论列表与按钮：左侧"停止"（中断回合，卡片随之撤下，模式保持 Plan）与"修改"（Esc，把光标放进输入框；有评论时换成"发送 N 条评论"，只发评论），右侧"批准，逐项审批编辑"（Mod+Shift+Enter）与"批准并自动接受编辑"（Mod+Enter）。批准的语义与 ADR-0042 相同。
-4. **计划面板显示渲染后的 Markdown，锚点仍是原文偏移。** 面板用文件阅读器的解析器（`useParsedDocument`）逐块渲染，每块带它的原文区间；块内按顺序把渲染后的字符匹配回原文（跳过 `**`、列表标记、链接目标等被去掉的标记，`approvals/plan-source.ts`）。选区换算成原文的 UTF-16 区间，评论的 `start`、`end`、`quote` 与 ADR-0042 第 3 条相同，Core 的校验不变。评论标记与正在评论的段落是 CSS Custom Highlight（`::highlight()`），不改动渲染出的 DOM。选中文字直接在旁边弹出 320 px 的评论框（Enter 保存、Shift+Enter 换行、Esc 关闭，下方放不下时翻到上方），点已评论的段落重新打开它（可改、可删）。
+3. **计划卡是决策栏。** 卡片不再重复计划正文（正文在它上方的计划行，完整版在面板），只有标题、"打开计划"、一句说明、评论列表与右对齐的按钮："停止"（中断回合，卡片随之撤下，模式保持 Plan）、有评论时的"发送 N 条评论"（只发评论）、"批准"（之后编辑仍询问，Mod+Shift+Enter）与"批准并自动接受编辑"（Mod+Enter）。修改计划就在输入框里写，卡片上没有"修改"按钮；Esc 把光标放进输入框。批准的语义与 ADR-0042 相同。
+4. **计划面板显示渲染后的 Markdown，锚点仍是原文偏移。** 面板直接用 Files 的 Markdown 阅读器（`MarkdownReader`）渲染，计划与项目里的 Markdown 文件是同一套排版；阅读器的每节带它的原文行（`data-doc-line`、`data-end-line`）；块内按顺序把渲染后的字符匹配回原文（跳过 `**`、列表标记、链接目标等被去掉的标记，`approvals/plan-source.ts`）。选区换算成原文的 UTF-16 区间，评论的 `start`、`end`、`quote` 与 ADR-0042 第 3 条相同，Core 的校验不变。评论标记与正在评论的段落是 CSS Custom Highlight（`::highlight()`），不改动渲染出的 DOM。选中文字直接在旁边弹出 320 px 的评论框（Enter 保存、Shift+Enter 换行、Esc 关闭，下方放不下时翻到上方），点已评论的段落重新打开它（可改、可删）。
 5. **transcript 的计划行可以展开。** 计划行默认显示前 240 px 并渐隐，"展开全文"显示整份计划；状态"已退回修改"同时覆盖卡片退回与对话回复两种。
 6. **计划模式的提醒给出工作方法。** `PLAN_ON` 从一句话改为：不改动的约束、四步方法（读代码与可复用的部分并想好怎么验证、需要用户决定时用 AskUserQuestion、写出目标与唯一推荐方案与步骤与验证、用 ExitPlanMode 提交且不在消息里求批准）、过程中用一句话说明在看什么、用户回复后完整地重新提交。`ExitPlanMode` 的描述同步说明用户可能以对话回复。文案是 PiArc 自写的，改后跑原创性检查。
 
@@ -38,6 +38,6 @@ T26 的计划模式在真实使用里有三处问题：
 ## 后果
 
 - Core API：`AnswerVia` 新增 `conversation`（`npm run gen:protocol` 重新生成）；主进程 `answerApproval` 的校验接受 `deny` 带它。AHP 与 Agent Host 不变。
-- 计划卡的测试 id：去掉 `plan-feedback`、`plan-keep-planning`、`plan-comment-count`，新增 `plan-stop`、`plan-revise`、`plan-send-comments`、`plan-comment`；面板的 `plan-mark` 改为 Custom Highlight，评论框是 `plan-comment-popover`。
+- 计划卡的测试 id：去掉 `plan-feedback`、`plan-keep-planning`、`plan-comment-count`，新增 `plan-stop`、`plan-send-comments`、`plan-comment`；面板的 `plan-mark` 改为 Custom Highlight，评论框是 `plan-comment-popover`。
 - 研究依据：Pi 1.5.2 中 steer 在工具调用等待裁决时的送达时机与 abort 的副作用（`pi-agent-core` 的 `Agent` 层实测）；Claude Code 的计划模式机制以官方文档为准；Codex 提交 `18c09f20` 的 Plan 协作模式；OpenClaudeDesktop `next-4.16336.0` 的计划卡与计划面板。
 - 留到以后：计划文件（ADR-0042 的 I104）；以对话回合而不是挡住的审批来承载计划（上表 Codex 一行）；计划模式里的子 agent 分工提示随 `Agent` 工具的可用性调整。

@@ -1,31 +1,18 @@
-// A plan as the plan panel shows it (ADR-0103): rendered Markdown, block by block, each block
-// tagged with the source range it comes from. A plan under review takes inline comments:
+// A plan as the plan panel shows it (ADR-0103): rendered by the Files Markdown reader, so a plan
+// reads exactly like a Markdown file in the Files tool, with each section tagged with the source
+// lines it comes from. A plan under review takes inline comments:
 // selecting a passage opens the comment field next to it, a marked passage opens its comment
 // again. Marks and the passage being commented are custom highlights (`::highlight()`), so the
 // rendered DOM stays exactly what the Markdown renderer made and the anchors stay UTF-16 offsets
 // of the source (`plan-dom.ts`).
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 
 import { useT } from '../app/app-context.js';
-import { projectFileRoot, projectPath } from '../files/file-path.js';
-import type { MarkdownDocument } from '../files/markdown/document-model.js';
 import { useParsedDocument } from '../files/markdown/use-parsed-document.js';
-import { useUi } from '../shell/ui.js';
-import { useSession, useStore } from '../store/hooks.js';
-import { MarkdownView } from '../transcript/markdown/MarkdownView.js';
-import { TranscriptContext, type TranscriptView } from '../transcript/services.js';
+import { MarkdownReader } from '../files/viewer-markdown.js';
 import { PlanCommentPopover } from './PlanCommentPopover.js';
 import { planComments, usePlanComments } from './plan-comments.js';
 import { pointToSource, selectionToSource, sourceToRanges } from './plan-dom.js';
-import { lineStarts, linesRange } from './plan-source.js';
 
 /** Highlight names (styled in app.css with `::highlight()`). */
 const MARKS = 'piarc-plan-comment';
@@ -39,14 +26,6 @@ function caretAt(doc: Document, x: number, y: number): { node: Node; offset: num
   const position = doc.caretPositionFromPoint(x, y);
   if (position !== null) return { node: position.offsetNode, offset: position.offset };
   return undefined;
-}
-
-/**
- * Whether the rendered blocks show the whole plan: front matter and footnote definitions are not
- * blocks, and a plan too large for the renderer is plain; such a plan shows as its source text.
- */
-function renderable(document: MarkdownDocument): boolean {
-  return !document.plain && document.fields.length === 0 && document.notes.length === 0;
 }
 
 /** The rectangle the comment field sits against: the passage's last line, and its first line's
@@ -72,33 +51,14 @@ export function PlanDocument({
   readonly requestId?: string | undefined;
 }) {
   const t = useT();
-  const ui = useUi();
-  const store = useStore();
-  const session = useSession(sessionId);
   const parsed = useParsedDocument(plan);
   const document = parsed?.source === plan ? parsed.document : undefined;
-  const starts = useMemo(() => lineStarts(plan), [plan]);
   const root = useRef<HTMLDivElement>(null);
   const comments = usePlanComments(requestId);
   const [editor, setEditor] = useState<Editor | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   // The renderer changes text nodes after the first paint (code highlighting): marks follow.
   const [domVersion, setDomVersion] = useState(0);
-
-  const fileRoot = projectFileRoot(session);
-  const view = useMemo<TranscriptView>(
-    () => ({
-      services: ui.transcriptServices,
-      fileLinks: {
-        sessionId,
-        root: fileRoot,
-        directory: projectPath(session?.cwd ?? '', fileRoot) ?? '',
-      },
-      transcript: store.transcript(sessionId),
-      actions: { retry: () => undefined, resend: () => undefined },
-    }),
-    [ui.transcriptServices, sessionId, fileRoot, session?.cwd, store],
-  );
 
   useEffect(() => {
     const element = root.current;
@@ -201,6 +161,8 @@ export function PlanDocument({
       ? undefined
       : passageRect(element, plan, editor.start, editor.end);
   }, [editor, plan]);
+  // The field stays inside the plan's area.
+  const area = useCallback(() => root.current?.getBoundingClientRect(), []);
 
   const dismiss = useCallback(() => {
     unsaved.current = false;
@@ -216,14 +178,13 @@ export function PlanDocument({
 
   const editing = editor?.kind === 'edit' ? comments.find((c) => c.id === editor.id) : undefined;
   return (
-    <TranscriptContext.Provider value={view}>
+    <>
       <div
         ref={root}
         className="plan-doc"
         tabIndex={-1}
         data-testid="plan-text"
         data-reviewing={reviewing}
-        aria-busy={document === undefined && parsed?.error === undefined}
         onPointerUp={() => {
           root.current?.ownerDocument.defaultView?.requestAnimationFrame(pick);
         }}
@@ -232,36 +193,14 @@ export function PlanDocument({
         }}
         onClick={clicked}
       >
-        {document === undefined || !renderable(document) ? (
-          parsed?.error !== undefined || document !== undefined ? (
-            <pre className="plan-block plan-plain" data-src-start={0} data-src-end={plan.length}>
-              {plan}
-            </pre>
-          ) : (
-            <span className="muted" role="status">
-              {t('plan.panel.loading')}
-            </span>
-          )
-        ) : (
-          document.blocks.map((entry, i) => {
-            const range = linesRange(plan, starts, entry.line, entry.end);
-            return (
-              <section
-                key={`${String(i)}:${String(range.start)}`}
-                className="plan-block"
-                data-src-start={range.start}
-                data-src-end={range.end}
-              >
-                <MarkdownView blocks={[entry.block]} />
-              </section>
-            );
-          })
-        )}
+        {/* No `path`: the plan is no file; links and images resolve from the project root. */}
+        <MarkdownReader parsed={parsed} sessionId={sessionId} path="" text={plan} />
       </div>
       {editor !== undefined && root.current !== null && requestId !== undefined ? (
         <PlanCommentPopover
           key={editor.kind === 'edit' ? editor.id : `${String(editor.start)}-${String(editor.end)}`}
           host={root.current.ownerDocument}
+          area={area}
           anchor={anchor}
           initial={editing?.text ?? ''}
           editing={editing !== undefined}
@@ -293,6 +232,6 @@ export function PlanDocument({
           }
         />
       ) : null}
-    </TranscriptContext.Provider>
+    </>
   );
 }

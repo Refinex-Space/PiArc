@@ -167,6 +167,14 @@ test('a reply in the composer revises the plan, and comments on the rendered pla
   await selectInPlan(page, 'bound.test.ts');
   const popover = page.getByTestId('plan-comment-popover');
   await expect(popover).toBeVisible();
+  // Focused with the mouse, the empty field draws no box of its own: the popover is the field.
+  await page.getByTestId('plan-comment-input').click();
+  const edge = await page.getByTestId('plan-comment-input').evaluate((field) => {
+    const style = getComputedStyle(field);
+    return [style.outlineStyle, style.borderTopStyle, style.boxShadow].join(' ');
+  });
+  expect(edge).toBe('none none none');
+  await shoot(page, info, 'plan-comment-popover-empty');
   await page.getByTestId('plan-comment-input').fill('Name it after parse()');
   await shoot(page, info, 'plan-comment-popover');
   await page.getByTestId('plan-comment-input').press('Enter');

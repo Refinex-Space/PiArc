@@ -2,7 +2,7 @@
 // opened by selecting text or by clicking a marked passage. Enter saves, Shift+Enter breaks the
 // line, Esc closes; a press outside closes it while nothing was typed. It sits 8 px under the
 // passage's last line, centred on it, flips above when there is no room and keeps 8 px inside
-// the window. The passage keeps its selection colour while the field has focus (the panel draws
+// the plan's area (a narrow panel makes it narrower rather than letting it cover the chat). The passage keeps its selection colour while the field has focus (the panel draws
 // it as a custom highlight).
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -16,26 +16,38 @@ const GAP = 8;
 const MARGIN = 8;
 const WIDTH = 320;
 
-/** Where the popover goes for an anchor rectangle, inside a viewport of `width` × `height`. */
+interface Box {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/**
+ * Where the popover goes for an anchor rectangle, kept inside `area` (the plan's area within the
+ * window): its width (at most 320 px, less in a narrow area), left edge and top, and the side.
+ */
 export function popoverPlace(
-  anchor: { left: number; right: number; top: number; bottom: number },
-  size: { width: number; height: number },
-  viewport: { width: number; height: number },
-): { left: number; top: number; side: 'below' | 'above' } {
+  anchor: Box,
+  height: number,
+  area: Box,
+): { left: number; top: number; width: number; side: 'below' | 'above' } {
+  const width = Math.max(0, Math.min(WIDTH, area.right - area.left - 2 * MARGIN));
   const centre = (anchor.left + anchor.right) / 2;
   const left = Math.min(
-    Math.max(MARGIN, centre - size.width / 2),
-    Math.max(MARGIN, viewport.width - MARGIN - size.width),
+    Math.max(area.left + MARGIN, centre - width / 2),
+    area.right - MARGIN - width,
   );
   const below = anchor.bottom + GAP;
-  if (below + size.height <= viewport.height - MARGIN || anchor.top - GAP - size.height < MARGIN) {
-    return { left, top: Math.min(below, viewport.height - MARGIN - size.height), side: 'below' };
+  if (below + height <= area.bottom - MARGIN || anchor.top - GAP - height < area.top + MARGIN) {
+    return { left, width, top: Math.min(below, area.bottom - MARGIN - height), side: 'below' };
   }
-  return { left, top: anchor.top - GAP - size.height, side: 'above' };
+  return { left, width, top: anchor.top - GAP - height, side: 'above' };
 }
 
 export function PlanCommentPopover({
   host,
+  area,
   anchor,
   initial,
   editing,
@@ -48,6 +60,8 @@ export function PlanCommentPopover({
 }: {
   /** The document the plan is in (a popped-out tool has its own). */
   readonly host: Document;
+  /** The plan's area in the window's coordinates: the popover stays inside it. */
+  readonly area: () => Box | undefined;
   /** The passage's last line (below) and first line (above), in the window's coordinates. */
   readonly anchor: () => { left: number; right: number; top: number; bottom: number } | undefined;
   readonly initial: string;
@@ -68,7 +82,9 @@ export function PlanCommentPopover({
   const [text, setText] = useState(initial);
   const latest = useRef({ text, initial, dismiss: onDismiss ?? onClose });
   latest.current = { text, initial, dismiss: onDismiss ?? onClose };
-  const [place, setPlace] = useState<{ left: number; top: number } | undefined>(undefined);
+  const [place, setPlace] = useState<{ left: number; top: number; width: number } | undefined>(
+    undefined,
+  );
 
   useLayoutEffect(() => {
     const element = box.current;
@@ -78,13 +94,18 @@ export function PlanCommentPopover({
     const measure = () => {
       const at = anchor();
       if (at === undefined) return;
-      const next = popoverPlace(
-        at,
-        { width: element.offsetWidth || WIDTH, height: element.offsetHeight },
-        { width: win.innerWidth, height: win.innerHeight },
-      );
+      const view = { left: 0, top: 0, right: win.innerWidth, bottom: win.innerHeight };
+      const inside = area() ?? view;
+      const next = popoverPlace(at, element.offsetHeight, {
+        left: Math.max(view.left, inside.left),
+        right: Math.min(view.right, inside.right),
+        top: Math.max(view.top, inside.top),
+        bottom: Math.min(view.bottom, inside.bottom),
+      });
       setPlace((old) =>
-        old?.left === next.left && old.top === next.top ? old : { left: next.left, top: next.top },
+        old?.left === next.left && old.top === next.top && old.width === next.width
+          ? old
+          : { left: next.left, top: next.top, width: next.width },
       );
     };
     const schedule = () => {
@@ -110,7 +131,7 @@ export function PlanCommentPopover({
       win.removeEventListener('resize', schedule);
       element.ownerDocument.removeEventListener('pointerdown', press, true);
     };
-  }, [anchor]);
+  }, [anchor, area]);
 
   const save = () => {
     if (text.trim()) onSave(text);
@@ -123,12 +144,16 @@ export function PlanCommentPopover({
       aria-label={t('plan.comment.label')}
       data-testid="plan-comment-popover"
       data-placed={place !== undefined}
-      style={place === undefined ? undefined : { left: place.left, top: place.top }}
+      style={
+        place === undefined ? undefined : { left: place.left, top: place.top, width: place.width }
+      }
     >
       <div className="plan-comment-row">
+        {/* The popover is the field: no box or focus outline of its own inside it. */}
         <textarea
           ref={field}
           rows={1}
+          data-focus-proxy
           value={text}
           placeholder={t('plan.comment.placeholder')}
           aria-label={t('plan.comment.placeholder')}

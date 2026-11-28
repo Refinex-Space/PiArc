@@ -2080,7 +2080,7 @@ textarea.input {
 }
 
 /* T26, ADR-0103: the plan panel (dock). A status line (state, how to comment, copy) over the plan
-   rendered as prose in a reading column; comments are custom highlights on the rendered text. */
+   as the Files Markdown reader shows it; comments are custom highlights on the rendered text. */
 :root[data-app] .plan-panel {
   display: flex;
   flex-direction: column;
@@ -2134,51 +2134,18 @@ textarea.input {
   margin-inline-start: auto;
 }
 :root[data-app] .plan-doc {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-height: 0;
-  padding: var(--piarc-space-4) var(--piarc-space-4) var(--piarc-space-5);
-  overflow-y: auto;
-  color: var(--piarc-text-primary);
-  font-size: var(--piarc-session-body);
-  line-height: var(--piarc-session-prose-line);
-  user-select: text;
-  overflow-wrap: anywhere;
 }
 :root[data-app] .plan-doc:focus {
   outline: none;
 }
-:root[data-app] .plan-doc > * {
-  max-width: 72ch;
-  margin-inline: auto;
-}
-:root[data-app] .plan-doc .plan-block + .plan-block {
-  margin-top: var(--piarc-space-3);
-}
-:root[data-app] .plan-doc .md > :last-child {
-  margin-bottom: 0;
-}
-:root[data-app] .plan-doc .md :is(h1, h2, h3, h4) {
-  margin: var(--piarc-space-2) 0 0;
-  font-weight: var(--piarc-font-weight-semibold);
-  line-height: 1.3;
-}
-:root[data-app] .plan-doc .md h1 {
-  font-size: calc(var(--piarc-session-body) + 5px);
-}
-:root[data-app] .plan-doc .md h2 {
-  font-size: calc(var(--piarc-session-body) + 2px);
-}
-:root[data-app] .plan-doc .md :is(h3, h4) {
-  font-size: var(--piarc-session-body);
-}
-:root[data-app] .plan-doc .plan-block:first-child .md > :first-child {
-  margin-top: 0;
-}
-:root[data-app] .plan-plain {
-  margin: 0;
-  font-family: var(--piarc-font-mono);
-  font-size: var(--piarc-font-size-small);
-  white-space: pre-wrap;
+/* The plan reads like a Markdown file in the Files tool: the reader's own layout and type. */
+:root[data-app] .plan-doc > .markdown-reader {
+  flex: 1;
+  min-height: 0;
 }
 ::highlight(piarc-plan-comment) {
   background-color: color-mix(in srgb, var(--piarc-accent-solid) 14%, transparent);
@@ -2222,8 +2189,11 @@ textarea.input {
   max-height: 8lh;
   padding: 2px 0;
   border: 0;
+  border-radius: 0;
   outline: none;
+  box-shadow: none;
   background: transparent;
+  appearance: none;
   color: inherit;
   font: inherit;
   resize: none;

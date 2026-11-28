@@ -682,14 +682,15 @@ it('renders the five ledger card kinds, keeps approvals through a history reload
   expect(form?.textContent).toContain('Which database?');
   expect(form?.querySelectorAll('input[type="radio"]')).toHaveLength(3);
   expect(form?.textContent).toContain('Other');
-  // ADR-0103: the plan card is a decision bar (the plan itself is in its row and the panel): it
-  // offers stop, revise and the two approvals, and does not name the ExitPlanMode tool.
+  // ADR-0103: the plan card is a decision bar (the plan itself is in its row and the panel): stop
+  // and the two approvals; changes are asked for in the composer. It does not name the tool.
   const planCard = root.querySelector('[data-approval-card="plan"]');
   expect(planCard?.textContent).not.toContain('Fix it');
   expect(planCard?.textContent).not.toContain('ExitPlanMode');
-  for (const id of ['plan-stop', 'plan-revise', 'plan-approve-manual', 'plan-approve-auto']) {
+  for (const id of ['plan-stop', 'plan-approve-manual', 'plan-approve-auto']) {
     expect(planCard?.querySelector(`[data-testid="${id}"]`)).not.toBeNull();
   }
+  expect(planCard?.querySelector('[data-testid="plan-revise"]')).toBeNull();
   expect(root.querySelector('[data-approval-card="fileChange"]')?.textContent).not.toContain(
     'Always allow',
   );

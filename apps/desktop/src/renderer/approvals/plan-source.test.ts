@@ -10,21 +10,19 @@ import { alignRendered, lineStarts, linesRange, renderedRuns, sourceRange } from
 const PLAN =
   '# 计划\n\n1. Read **😀 parser** first\n2. Fix [the loop](https://x.dev/a) in `parse()`';
 
-/** The first and second list items as the renderer shows them (markers by CSS, no markup). */
+/** The heading and the list as the Files Markdown reader shows them: sections tagged with their
+ * source lines, list markers by CSS, no markup. */
 function render(): HTMLElement {
-  const starts = lineStarts(PLAN);
   const root = document.createElement('div');
   const heading = document.createElement('h1');
   heading.textContent = '计划';
-  const title = linesRange(PLAN, starts, 1, 1);
-  const titleBlock = Object.assign(document.createElement('section'), {});
-  titleBlock.setAttribute('data-src-start', String(title.start));
-  titleBlock.setAttribute('data-src-end', String(title.end));
+  const titleBlock = document.createElement('section');
+  titleBlock.setAttribute('data-doc-line', '1');
+  titleBlock.setAttribute('data-end-line', '1');
   titleBlock.append(heading);
-  const list = linesRange(PLAN, starts, 3, 4);
   const listBlock = document.createElement('section');
-  listBlock.setAttribute('data-src-start', String(list.start));
-  listBlock.setAttribute('data-src-end', String(list.end));
+  listBlock.setAttribute('data-doc-line', '3');
+  listBlock.setAttribute('data-end-line', '4');
   const ol = document.createElement('ol');
   const first = document.createElement('li');
   const strong = document.createElement('strong');
