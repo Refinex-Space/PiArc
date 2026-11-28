@@ -120,8 +120,19 @@
   box-shadow: inset 0 0 0 1px var(--piarc-session-line);
   color: var(--piarc-text-secondary);
 }
-.catalog-search:focus-within {
-  box-shadow: inset 0 0 0 1px var(--piarc-text-secondary);
+/* One quiet field: the input draws no ring of its own; the pill keeps its hairline under the
+   pointer and shows the keyboard ring around the whole field (visual-design.md section 4). */
+:root[data-app] .catalog-search > input:is(:focus, :focus-visible),
+:root[data-app][data-pointer-focus] .catalog-search > input:focus {
+  outline: none;
+}
+:root[data-app] .catalog-search:has(> input:focus-visible) {
+  outline: var(--piarc-c-focus-width) solid var(--piarc-c-focus-ring);
+  outline-offset: calc(-1 * var(--piarc-c-focus-width));
+}
+:root[data-app][data-pointer-focus] .catalog-search:has(> input:focus) {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--piarc-border-default);
 }
 .catalog-search > svg {
   flex: none;
@@ -166,7 +177,7 @@
 }
 .catalog-row::after {
   position: absolute;
-  inset: auto var(--piarc-space-2) 0 calc(var(--piarc-space-2) + 32px + var(--piarc-space-3));
+  inset: auto var(--piarc-space-2) 0 calc(var(--piarc-space-2) + 24px + var(--piarc-space-3));
   height: 1px;
   background: var(--piarc-session-line);
   content: '';
@@ -267,21 +278,19 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 24px;
   height: 32px;
-  border-radius: var(--piarc-radius-md);
-  background: var(--piarc-session-fill);
-  box-shadow: inset 0 0 0 1px var(--piarc-session-line);
   color: var(--piarc-text-secondary);
 }
 .catalog-tile > svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 .catalog-tile.is-lg {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--piarc-radius-lg);
+  background: var(--piarc-session-fill);
 }
 .catalog-tile.is-lg > svg {
   width: 22px;
@@ -406,6 +415,9 @@
   gap: var(--piarc-space-3);
 }
 :root[data-app] .catalog-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -460,7 +472,7 @@
   .catalog-tab[data-selected] {
     outline: 1px solid CanvasText;
   }
-  .catalog-tile {
+  .catalog-tile.is-lg {
     border: 1px solid CanvasText;
   }
 }
@@ -495,4 +507,10 @@
 .catalog-view {
   display: grid;
   min-width: 0;
+}
+
+.catalog-link > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
 }

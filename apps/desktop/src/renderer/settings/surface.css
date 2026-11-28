@@ -1,28 +1,38 @@
 /* Settings as a workbench view (ADR-0101) and the borderless page system of the visual guide
    (docs/engineering/visual-design.md). */
 
-/* ---- the morph: the workbench leaves, settings arrive ---- */
-.shell > .sidebar,
+/* ---- the morph: the workbench leaves, settings arrive (shared axis) ----
+   Each side's transition is the one of the pose it moves to. Entering: the workbench's
+   navigation fades out quickly while sliding left, the settings navigation fades in a beat later
+   while sliding into place, the page fades up over the workbench (which stays opaque, only
+   settling back a little). Leaving plays it back, quicker. Both sides follow the settings
+   layer's phase, so they never drift apart. */
+.shell > .sidebar {
+  transition:
+    transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    opacity calc(var(--piarc-motion-view) * 0.55) linear calc(var(--piarc-motion-view) * 0.3),
+    visibility 0s linear 0s;
+}
 .shell > .workspace-area {
   transition:
     transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
-    opacity var(--piarc-motion-view) var(--piarc-motion-curve-out),
     visibility 0s linear 0s;
 }
-.shell[data-settings='open'] > .sidebar,
-.shell[data-settings='open'] > .workspace-area {
+body:has(.settings-layer[data-phase='in']) .shell > .sidebar {
   visibility: hidden;
+  opacity: 0;
+  transform: translateX(-24px);
   transition:
     transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
-    opacity var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    opacity calc(var(--piarc-motion-view) * 0.35) linear,
     visibility 0s linear var(--piarc-motion-view);
 }
-.shell[data-settings='open'] > .sidebar {
-  transform: translateX(-100%);
-}
-.shell[data-settings='open'] > .workspace-area {
-  opacity: 0;
-  transform: scale(0.985);
+body:has(.settings-layer[data-phase='in']) .shell > .workspace-area {
+  visibility: hidden;
+  transform: scale(0.99);
+  transition:
+    transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    visibility 0s linear var(--piarc-motion-view);
 }
 
 .settings-layer {
@@ -55,10 +65,16 @@
 .settings-surface .settings-sidebar {
   height: 100%;
   box-shadow: inset -1px 0 var(--piarc-session-line);
-  transition: transform var(--piarc-motion-view) var(--piarc-motion-curve-out);
+  transition:
+    transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    opacity calc(var(--piarc-motion-view) * 0.6) linear calc(var(--piarc-motion-view) * 0.3);
 }
 .settings-layer[data-phase='out'] .settings-sidebar {
-  transform: translateX(100%);
+  opacity: 0;
+  transform: translateX(24px);
+  transition:
+    transform calc(var(--piarc-motion-view) * 0.65) var(--piarc-motion-curve-out),
+    opacity calc(var(--piarc-motion-view) * 0.3) linear;
 }
 .settings-view {
   display: flex;
@@ -67,12 +83,15 @@
   min-height: 0;
   background: var(--piarc-workbench-canvas);
   transition:
-    opacity var(--piarc-motion-view) var(--piarc-motion-curve-out),
+    opacity calc(var(--piarc-motion-view) * 0.75) linear calc(var(--piarc-motion-view) * 0.15),
     transform var(--piarc-motion-view) var(--piarc-motion-curve-out);
 }
 .settings-layer[data-phase='out'] .settings-view {
   opacity: 0;
   transform: translateY(8px);
+  transition:
+    opacity calc(var(--piarc-motion-view) * 0.5) linear,
+    transform calc(var(--piarc-motion-view) * 0.65) var(--piarc-motion-curve-out);
 }
 .settings-surface.is-loading {
   grid-template-columns: minmax(0, 1fr);

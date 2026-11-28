@@ -4,11 +4,13 @@
 // confirmation; the README renders through `MarkdownView` only (raw HTML stays text, remote
 // images stay host cards).
 import type { MarketDetail as Detail } from '@piarc/protocol';
+import type { ReactNode } from 'react';
 import { useContext, useEffect, useMemo, useState } from 'react';
 
 import { useApp } from '../../app/app-context.js';
 import { Button } from '../../app/Button.js';
 import { reason } from '../../shell/errors.js';
+import { GitBranchIcon, GitHubIcon, GlobeIcon, NpmIcon } from '../../shell/icons.js';
 import { UiContext } from '../../shell/ui.js';
 import { SessionTranscript } from '../../store/transcript.js';
 import { MarkdownView } from '../../transcript/markdown/MarkdownView.js';
@@ -110,7 +112,7 @@ export function MarketDetail({
       </p>
     );
   }
-  const link = (url: string | null | undefined, label: string, testId: string) =>
+  const link = (url: string | null | undefined, label: string, testId: string, icon: ReactNode) =>
     url == null ? null : (
       <button
         key={testId}
@@ -122,13 +124,24 @@ export function MarketDetail({
           void window.piarc.openExternal(url);
         }}
       >
+        {icon}
         {label}
       </button>
     );
+  const repository = detail?.repositoryUrl;
   const links = [
-    link(detail?.npmUrl, t('market.detail.npm'), 'market-link-npm'),
-    link(detail?.repositoryUrl, t('market.detail.repository'), 'market-link-repository'),
-    link(detail?.homepageUrl, t('market.detail.homepage'), 'market-link-homepage'),
+    link(detail?.npmUrl, t('market.detail.npm'), 'market-link-npm', <NpmIcon />),
+    link(
+      repository,
+      t('market.detail.repository'),
+      'market-link-repository',
+      repository != null && /^https:\/\/(?:www\.)?github\.com\//u.test(repository) ? (
+        <GitHubIcon />
+      ) : (
+        <GitBranchIcon />
+      ),
+    ),
+    link(detail?.homepageUrl, t('market.detail.homepage'), 'market-link-homepage', <GlobeIcon />),
   ].filter((l) => l !== null);
   const keywords = detail?.keywords ?? [];
   const facts: InfoItem[] = [

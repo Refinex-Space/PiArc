@@ -1,7 +1,11 @@
-// Settings morph in over the workbench (ADR-0101): the settings navigation slides into the
-// sidebar's column while the workbench's slides out, and the page fades in over the main area.
-// The workbench stays mounted and inert underneath; closing plays the morph back, then unmounts.
-// Settings code loads on first use (or when the window is idle) so the workbench paints first.
+// Settings morph in over the workbench (ADR-0101) as one shared-axis move: the workbench's
+// navigation fades out early while sliding left, the settings navigation fades in a beat later
+// while sliding into place, and the page fades up over the opaque workbench, so two layers are
+// never half transparent over the window's vibrancy at once. The morph starts only once the
+// settings code is in and the starting pose has been laid out (otherwise the browser skips the
+// transition and the view jumps). The workbench stays mounted and inert underneath; closing
+// plays the morph back, quicker, then unmounts. Settings code loads on first use (or when the
+// window is idle) so the workbench paints first.
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const load = () =>
@@ -61,11 +65,22 @@ export function SettingsLayer({
 
   useEffect(() => {
     if (open) {
-      // One frame in the "out" pose so the morph has somewhere to start from.
-      const frame = requestAnimationFrame(() => {
-        setPhase('in');
+      // Start from the "out" pose, laid out, with the settings rendered: two frames after the
+      // code is in, so the lazy page has mounted and its starting styles are computed.
+      let cancelled = false;
+      let frame = 0;
+      void loadOnce().then(() => {
+        if (cancelled) return;
+        frame = requestAnimationFrame(() => {
+          frame = requestAnimationFrame(() => {
+            if (cancelled) return;
+            ref.current?.getBoundingClientRect();
+            setPhase('in');
+          });
+        });
       });
       return () => {
+        cancelled = true;
         cancelAnimationFrame(frame);
       };
     }
