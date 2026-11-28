@@ -12,7 +12,7 @@
 //!
 //! Every failure is a [`ReleaseError`] whose kind is `releaseIntegrity` (or `ioError` when a
 //! file cannot be read) with `details.reason`; callers refuse the update on any error. The
-//! update flow itself (checking, prompting, Velopack) is T50's.
+//! update flow itself (checking, downloading, the install plan) is [`crate::updates`] (ADR-0111).
 
 use std::fs::File;
 use std::io::Read;
@@ -25,10 +25,13 @@ use sha2::{Digest, Sha256};
 /// The `format` member of a manifest this build understands.
 pub const MANIFEST_FORMAT: &str = "piarc-release-manifest/1";
 
-/// Base64 minisign public keys whose signatures the app accepts. Empty until T50 generates the
-/// release key in the protected release environment: with no key every manifest is refused
-/// (fail closed). The test keys in `scripts/release/test-keys/` must never be listed here.
-pub const BUILTIN_RELEASE_KEYS: &[&str] = &[];
+/// Base64 minisign public keys whose signatures the app accepts (docs/engineering/release.md
+/// section 7: rotation lists the old and the new key together). With no key every manifest
+/// is refused (fail closed) and in-app updates report themselves unavailable. The test keys in `scripts/release/test-keys/` must never be listed here.
+pub const BUILTIN_RELEASE_KEYS: &[&str] = &[
+    // Key C4CF81A1515C0A9F (scripts/release/piarc-release.pub), generated 2026-11-28.
+    "RWSfClxRoYHPxM7sdTNsYBIJZwEZbb6ust9F1hHGBteKjMwAMSqlXDHc",
+];
 
 /// One artefact of a release.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

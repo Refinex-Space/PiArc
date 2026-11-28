@@ -135,12 +135,26 @@ fn without_a_trusted_key_or_with_a_broken_signature_nothing_verifies() {
     let none = TrustedKeys::from_base64(&[]).expect("empty list");
     let error = verify_manifest(&read(MANIFEST), &text(SIGNATURE), &none).expect_err("refused");
     assert_refused(&error, "noTrustedKey");
-    // The app ships no release key until T50; the test keys are not built in.
+    // The built-in keys decode and do not include the test keys.
     let builtin = TrustedKeys::builtin().expect("built-in keys decode");
     let error = verify_manifest(&read(MANIFEST), &text(SIGNATURE), &builtin).expect_err("refused");
-    assert_refused(&error, "noTrustedKey");
+    assert_refused(&error, "unknownKey");
 
     let error =
         verify_manifest(&read(MANIFEST), "not a signature", &trusted()).expect_err("refused");
     assert_refused(&error, "malformedSignature");
+}
+
+#[test]
+fn the_built_in_key_is_the_committed_release_public_key() {
+    // docs/engineering/release.md section 7: the publish job verifies with this file, the app
+    // with the built-in list; they must name the same key.
+    let pub_file =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/release/piarc-release.pub");
+    let text = std::fs::read_to_string(pub_file).expect("scripts/release/piarc-release.pub");
+    let key = text.lines().nth(1).expect("a key line").trim();
+    assert!(
+        piarc_core::release::BUILTIN_RELEASE_KEYS.contains(&key),
+        "BUILTIN_RELEASE_KEYS does not list {key}"
+    );
 }

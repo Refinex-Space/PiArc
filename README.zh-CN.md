@@ -93,13 +93,26 @@ Claude Code 级别的智能体编排，任意模型服务商，一个快速的�
 
 | 平台 | 安装包 | 更新方式 |
 |---|---|---|
-| macOS 13 及以上，Apple 芯片 | `.dmg`（arm64） | 应用内提示，手动安装 |
-| macOS 13 及以上，Intel | `.dmg`（x64） | 应用内提示，手动安装 |
-| Windows 11 | 安装程序 `.exe`（x64） | 自动更新 |
+| macOS 13 及以上，Apple 芯片 | `.dmg`（arm64） | 应用内更新 |
+| macOS 13 及以上，Intel | `.dmg`（x64） | 应用内更新 |
+| Windows 11 | 安装程序 `.exe`（x64 或 arm64） | 应用内更新 |
 
-Windows 10 可以运行 PiArc，但不在测试矩阵中。
+Windows 10 可以运行 PiArc，但不在测试矩阵中。PiArc 每天检查一次新版本（设置 → 关于），经你的代理下载，重启时安装。
 
-每个版本都附带用项目密钥签名的 SHA-256 校验清单，应用在更新前会核对它。
+<details>
+<summary><strong>校验下载</strong></summary>
+
+<br>
+
+每个版本都附带 `piarc-release-manifest.json`（列出每个文件的大小与 SHA-256）和用项目密钥做的签名 `piarc-release-manifest.json.minisig`，PiArc 在安装更新前会核对两者。自己校验下载时用 [minisign](https://jedisct1.github.io/minisign/)：
+
+```sh
+minisign -Vm piarc-release-manifest.json -P RWSfClxRoYHPxM7sdTNsYBIJZwEZbb6ust9F1hHGBteKjMwAMSqlXDHc
+```
+
+发布公钥（ID `C4CF81A1515C0A9F`）就是上面这一行，也在 [`scripts/release/piarc-release.pub`](scripts/release/piarc-release.pub) 里。然后把文件的 SHA-256（macOS 用 `shasum -a 256 <文件>`，Windows 用 `certutil -hashfile <文件> SHA256`）与清单里的条目比对。
+
+</details>
 
 <details>
 <summary><strong>首次启动：放行未签名的应用</strong></summary>
