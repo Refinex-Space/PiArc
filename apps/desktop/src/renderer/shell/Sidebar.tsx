@@ -200,9 +200,6 @@ export function Sidebar({
         </button>
       </div>
       <div className="sidebar-list" data-testid="session-list">
-        {loaded && groups.length === 0 && (
-          <p className="sidebar-empty muted">{t('sidebar.empty')}</p>
-        )}
         {groups.map((group, index) => {
           const closed = groupLayout.collapsed.includes(group.path);
           return (

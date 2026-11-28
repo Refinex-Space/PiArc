@@ -704,10 +704,6 @@ textarea.input {
   padding: 0 var(--piarc-space-2) var(--piarc-space-3);
 }
 
-.sidebar-empty {
-  margin: var(--piarc-space-4) var(--piarc-space-2);
-}
-
 .workspace-group + .workspace-group {
   margin-top: var(--piarc-space-3);
 }
@@ -742,11 +738,6 @@ textarea.input {
 .session-row .icon-button:focus-visible,
 .session-row .icon-button[aria-expanded='true'] {
   visibility: visible;
-}
-
-.workspace-empty {
-  margin: 0;
-  padding: 2px var(--piarc-space-2) 2px calc(var(--piarc-space-2) + 16px);
 }
 
 .session-list {

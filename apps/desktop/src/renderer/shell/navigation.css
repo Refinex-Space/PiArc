@@ -62,8 +62,7 @@
   padding: 0 var(--piarc-space-1) 0 0;
   border-radius: var(--piarc-radius-button);
 }
-.workbench-navigation .workspace-group .session-list,
-.workbench-navigation .workspace-empty {
+.workbench-navigation .workspace-group .session-list {
   margin-top: var(--piarc-space-1);
 }
 .workbench-navigation .project-toggle {
@@ -135,9 +134,6 @@
 }
 .workbench-navigation .session-title {
   font-size: var(--piarc-font-size-button);
-}
-.workbench-navigation .workspace-empty {
-  padding: var(--piarc-space-1) var(--piarc-space-3);
 }
 .workbench-navigation .sidebar-footer {
   gap: var(--piarc-space-2);

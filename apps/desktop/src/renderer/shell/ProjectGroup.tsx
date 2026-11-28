@@ -182,16 +182,13 @@ export function ProjectGroup({
         </IconButton>
       </header>
       <div id={listId} hidden={!expanded}>
-        {expanded &&
-          (group.sessions.length > 0 ? (
-            <ul className="interactive-list session-list">
-              {group.sessions.map((session) => (
-                <SessionRow key={session.id} id={session.id} />
-              ))}
-            </ul>
-          ) : (
-            <p className="workspace-empty muted small">{t('sidebar.workspaceEmpty')}</p>
-          ))}
+        {expanded && group.sessions.length > 0 && (
+          <ul className="interactive-list session-list">
+            {group.sessions.map((session) => (
+              <SessionRow key={session.id} id={session.id} />
+            ))}
+          </ul>
+        )}
       </div>
       {menu.open && (
         <MenuPopup
