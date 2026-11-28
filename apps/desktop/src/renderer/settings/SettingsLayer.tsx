@@ -89,12 +89,6 @@ export function SettingsLayer({
     }
     if (!mounted) return;
     setPhase('out');
-    const back = opener.current?.isConnected
-      ? opener.current
-      : document.querySelector<HTMLElement>(
-          '[data-testid="open-settings"], [data-testid="expand-sidebar"]',
-        );
-    back?.focus({ preventScroll: true });
     const view = ref.current?.querySelector('.settings-view');
     const wait = view ? transitionMs(view) : 0;
     const timer = window.setTimeout(() => {
@@ -104,6 +98,18 @@ export function SettingsLayer({
       window.clearTimeout(timer);
     };
   }, [open, mounted]);
+
+  // Focus goes back once the workbench is visible again: in the "in" pose it is
+  // `visibility: hidden`, and focusing a hidden control does nothing.
+  useEffect(() => {
+    if (open || !mounted || phase !== 'out') return;
+    const back = opener.current?.isConnected
+      ? opener.current
+      : document.querySelector<HTMLElement>(
+          '[data-testid="open-settings"], [data-testid="expand-sidebar"]',
+        );
+    back?.focus({ preventScroll: true });
+  }, [open, mounted, phase]);
 
   if (!mounted) return null;
   return (
