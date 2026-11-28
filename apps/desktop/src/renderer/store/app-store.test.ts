@@ -94,3 +94,17 @@ describe('draft sessions', () => {
     expect(store.session('draft')?.draft).toBe(false);
   });
 });
+
+it('tells listeners about the first workspace snapshot even when it is empty (ADR-0110)', () => {
+  const store = new AppStore();
+  let calls = 0;
+  store.subscribeWorkspaces(() => {
+    calls += 1;
+  });
+  expect(store.hasWorkspaces()).toBe(false);
+  store.applyWorkspaces({ revision: 1, workspaces: [] });
+  expect(store.hasWorkspaces()).toBe(true);
+  expect(calls).toBe(1);
+  store.applyWorkspaces({ revision: 2, workspaces: [] });
+  expect(calls).toBe(1);
+});

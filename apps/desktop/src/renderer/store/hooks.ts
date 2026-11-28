@@ -24,6 +24,12 @@ export function useWorkspaces(): readonly WorkspaceEntry[] {
   return useSyncExternalStore(store.subscribeWorkspaces, store.workspaces);
 }
 
+/** Whether the first workspace snapshot arrived (ADR-0110). */
+export function useHasWorkspaces(): boolean {
+  const store = useStore();
+  return useSyncExternalStore(store.subscribeWorkspaces, store.hasWorkspaces);
+}
+
 export function useSessions(): readonly SessionEntry[] {
   const store = useStore();
   return useSyncExternalStore(store.subscribeSessions, store.sessions);

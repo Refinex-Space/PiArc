@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AliasSection } from './AliasSection.js';
 import { ModelSettingsSection } from './ModelSettingsSection.js';
 import { WebSearchSection } from './WebSearchSection.js';
@@ -9,6 +9,7 @@ import { ModelDiscovery } from './ModelDiscovery.js';
 import { useT } from '../app/app-context.js';
 import type { MessageId } from '../../shared/i18n/index.js';
 import { reason } from '../shell/errors.js';
+import { UiContext } from '../shell/ui.js';
 import {
   APIS,
   configOf,
@@ -36,6 +37,8 @@ const AUTH_LABEL: Record<Auth, MessageId> = {
 };
 export function ProvidersPage() {
   const t = useT();
+  // ADR-0110: "Quick setup…" opens the first-run guide's "Connect a model" over the workbench.
+  const ui = useContext(UiContext);
   const [settings, setSettings] = useState<ProviderSettings>();
   const [form, setForm] = useState<Form>();
   const [original, setOriginal] = useState<Provider>();
@@ -221,17 +224,32 @@ export function ProvidersPage() {
           title={t('providers.connections')}
           testId="provider-connections"
           aside={
-            <Button
-              size="small"
-              variant="primary"
-              data-testid="provider-add"
-              disabled={busy || signIn.open}
-              onClick={() => {
-                setChoosing(true);
-              }}
-            >
-              {t('providers.add')}
-            </Button>
+            <>
+              {ui === null ? null : (
+                <Button
+                  size="small"
+                  variant="ghost"
+                  data-testid="provider-quick-setup"
+                  disabled={busy || signIn.open}
+                  onClick={() => {
+                    ui.openOnboarding('settings');
+                  }}
+                >
+                  {t('providers.quickSetup')}
+                </Button>
+              )}
+              <Button
+                size="small"
+                variant="primary"
+                data-testid="provider-add"
+                disabled={busy || signIn.open}
+                onClick={() => {
+                  setChoosing(true);
+                }}
+              >
+                {t('providers.add')}
+              </Button>
+            </>
           }
         >
           <ConnectionList

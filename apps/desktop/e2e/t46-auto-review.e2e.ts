@@ -11,6 +11,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
+import { L4_USER_SETTINGS } from './fixtures.js';
 import { expect, test } from './sessions.js';
 import { idle, openSession, openToolGroups, prefer, requests, send } from './t19.js';
 
@@ -66,6 +67,7 @@ async function addReviewer(dataDir: string): Promise<void> {
   await writeFile(
     path.join(dataDir, 'settings.json'),
     JSON.stringify({
+      ...L4_USER_SETTINGS,
       modelPrices: {
         [REVIEWER]: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
       },

@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test';
 import { exerciseElicitation } from './elicitation.js';
 import { AXE_DIR, checkState } from './a11y.js';
 import { A11Y_STATES } from './a11y/states.js';
+import { L4_USER_SETTINGS } from './fixtures.js';
 import { expect, focusMain, makeWorkspace, openFolder, test } from './sessions.js';
 import { IPC_CHANNELS } from '../src/shared/ipc.js';
 import { expectTestHooks } from './core.js';
@@ -528,6 +529,7 @@ test.describe('web search', () => {
     await writeFile(
       path.join(userDataDir, 'settings.json'),
       JSON.stringify({
+        ...L4_USER_SETTINGS,
         modelProviders: { models: { 'piarc-mock/mock-large': { nativeWebSearch: true } } },
         permissions: { allow: ['WebSearch'] },
       }),
@@ -907,6 +909,23 @@ test('the Git tool with a review and a pull request on GitHub', async ({
   await page.getByTestId('git-pr-submit').click();
   await expect(page.getByTestId('git-pr')).toBeVisible({ timeout: 30_000 });
   await checkState(page, 'state:git-pull-request');
+});
+
+// ADR-0110: the first-run guide, on a data directory without the first-run mark.
+const firstRun = test.extend({
+  userDataDir: async ({ userDataDir }, use) => {
+    await writeFile(path.join(userDataDir, 'settings.json'), '{}');
+    await use(userDataDir);
+  },
+});
+
+firstRun('the first-run guide: welcome and connect a model', async ({ page }) => {
+  await prefer(page, { key: 'language', value: 'en' });
+  await expect(page.getByTestId('onboarding')).toHaveAttribute('data-step', 'welcome');
+  await checkState(page, 'window:onboarding-welcome');
+  await page.getByTestId('onboarding-start').click();
+  await expect(page.getByTestId('onboarding-card')).toBeVisible();
+  await checkState(page, 'window:onboarding-connect');
 });
 
 test('every listed state was checked in this run', async () => {

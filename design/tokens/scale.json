@@ -10,7 +10,8 @@
     "body": "13px",
     "title": "15px",
     "heading": "20px",
-    "display": "26px"
+    "display": "26px",
+    "hero": "30px"
   },
   "fontWeight": {
     "regular": "400",

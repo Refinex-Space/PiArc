@@ -64,6 +64,9 @@ export class AppStore {
   sessions = (): readonly SessionEntry[] => this.sessionList;
   notices = (): readonly Notice[] => this.noticeList;
 
+  /** Whether a workspace snapshot arrived (ADR-0110: the first-run guide waits for it). */
+  hasWorkspaces = (): boolean => this.workspaceRevision >= 0;
+
   /** Whether a session snapshot arrived (the sidebar shows Core's data). */
   hasSessions(): boolean {
     return this.sessionRevision >= 0;
@@ -103,7 +106,6 @@ export class AppStore {
     if (snapshot === undefined || snapshot.revision <= this.workspaceRevision) {
       return false;
     }
-    this.workspaceRevision = snapshot.revision;
     const previous = new Map(this.workspaceList.map((w) => [w.path, w]));
     const next = snapshot.entries.map((entry) => {
       const old = previous.get(entry.path);
@@ -111,7 +113,9 @@ export class AppStore {
       return old !== undefined && sameEntry(old, entry) ? old : entry;
     });
     for (const path of previous.keys()) this.drafts.delete(`workspace:${path}`);
-    if (!sameList(this.workspaceList, next)) {
+    const first = this.workspaceRevision < 0;
+    this.workspaceRevision = snapshot.revision;
+    if (!sameList(this.workspaceList, next) || first) {
       this.workspaceList = next;
       emit(this.workspaceListeners);
     }

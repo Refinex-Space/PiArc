@@ -728,6 +728,14 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             shape: Shape::Bool,
         }]),
     },
+    // The first-run guide was finished or skipped (ADR-0110); the desktop client reads it.
+    Field {
+        name: "onboarding",
+        shape: Shape::Object(&[Field {
+            name: "completed",
+            shape: Shape::Bool,
+        }]),
+    },
     // The Git panel (ADR-0085), read from the user's file and managed settings only: a project
     // must not unprotect branches or turn on force pushes (`crate::settings` removes it there).
     Field {

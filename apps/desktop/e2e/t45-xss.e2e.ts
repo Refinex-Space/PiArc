@@ -13,6 +13,7 @@ import type { Locator, Page } from '@playwright/test';
 
 import { XSS_PAYLOADS, XSS_SENTINEL_UNTOUCHED } from '../src/shared/xss-payloads.js';
 import { startMock } from './agent-host.js';
+import { L4_USER_SETTINGS } from './fixtures.js';
 import {
   expect,
   focusMain,
@@ -220,6 +221,7 @@ test('THR-11 settings pages and a hook notice show names, values and messages as
   await writeFile(
     path.join(userDataDir, 'settings.json'),
     JSON.stringify({
+      ...L4_USER_SETTINGS,
       language: 'en',
       // A valid name with markup in what it runs (a server row) and a name made of markup
       // (listed as a configuration problem).

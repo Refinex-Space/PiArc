@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
 
-import { expect, test } from './fixtures.js';
+import { expect, L4_USER_SETTINGS, test } from './fixtures.js';
 import { prefer } from './t19.js';
 
 const EVIDENCE = path.join(import.meta.dirname, '..', '..', '..', 'tmp', 'evidence', 'T45');
@@ -64,6 +64,7 @@ test('the diagnostic bundle shows what it holds and is written only where the us
   await writeFile(
     path.join(userDataDir, 'settings.json'),
     JSON.stringify({
+      ...L4_USER_SETTINGS,
       mcpServers: { tools: { command: 'node', env: { TOKEN: SECRET } } },
       language: 'en',
     }),

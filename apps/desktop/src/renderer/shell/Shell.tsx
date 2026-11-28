@@ -9,6 +9,7 @@ import { parseComposerInfo, type ComposerInfo } from '../composer/attachments.js
 import { isImeComposing } from '../composer/ime-guard.js';
 import { useApp } from '../app/app-context.js';
 import { preloadSettings, SettingsLayer } from '../settings/SettingsLayer.js';
+import { useOnboarding } from '../onboarding/use-onboarding.js';
 import { AppStore } from '../store/app-store.js';
 import { StoreConnection } from '../store/connection.js';
 import { StoreContext, useHarnessOf, useSessionOf, useTasksOf } from '../store/hooks.js';
@@ -223,6 +224,9 @@ export function Shell() {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     setSettingsEntry(null);
   }, []);
+  // ADR-0110: the first-run guide, over the workbench like Settings.
+  const onboarding = useOnboarding(store, settingsOpen);
+  const { noteLaunch, open: openGuide } = onboarding;
   useEffect(() => {
     const sync = () => {
       setSettingsEntry((current) => (isSettingsRoute() ? (current ?? 0) : null));
@@ -345,6 +349,7 @@ export function Shell() {
   // is not trusted yet, the trust dialog shows as for any folder; a session is shown.
   const launch = useCallback(
     (target: LaunchTarget) => {
+      noteLaunch();
       if (target.kind === 'settings') {
         openSettings(target.page);
         return;
@@ -371,7 +376,7 @@ export function Shell() {
           console.error('[shell] cannot open the launch target', error);
         });
     },
-    [show, ensureTrust, openFolder, openPath, openSettings, closeSettings],
+    [show, ensureTrust, openFolder, openPath, openSettings, closeSettings, noteLaunch],
   );
   useLaunchTargets(launch);
   const drop = useMemo(
@@ -415,6 +420,10 @@ export function Shell() {
       dismissToast: (id) => {
         setToasts((list) => list.filter((toast) => toast.id !== id));
       },
+      openOnboarding: (from) => {
+        closeSettings();
+        openGuide(from);
+      },
     }),
     [
       view,
@@ -428,6 +437,8 @@ export function Shell() {
       toggleSidebar,
       homeTools,
       toasts,
+      closeSettings,
+      openGuide,
     ],
   );
 
@@ -443,6 +454,7 @@ export function Shell() {
         closeSettings();
       return;
     }
+    if (onboarding.covering) return;
     if (trust || document.querySelector('[data-testid="workspace-search"]')) return;
     switch (command) {
       case 'session.new':
@@ -628,7 +640,7 @@ export function Shell() {
         <div
           className={`shell${collapsed ? ' is-collapsed' : ''}`}
           data-testid="app-shell"
-          inert={Boolean(trust) || shortcutsOpen || settingsOpen}
+          inert={Boolean(trust) || shortcutsOpen || settingsOpen || onboarding.covering}
           data-settings={settingsOpen ? 'open' : undefined}
           onKeyDown={(event) => {
             if (
@@ -707,6 +719,7 @@ export function Shell() {
           sidebarWidth={layout.sidebarWidth}
           resizer={sidebarResizer('settings-sidebar-resizer')}
         />
+        {onboarding.layer}
         <Toasts />
         <BrowserNotices />
         <AgentReveal />

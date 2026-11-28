@@ -48,6 +48,9 @@ export interface Preferences {
   readonly memory: { readonly readBoth: boolean };
   /** ADR-0109: keep the computer from idle sleep while a session is in a turn (default on). */
   readonly power: { readonly keepAwake: boolean };
+  /** ADR-0110: the first-run guide was finished or skipped, or the file shows a user who set
+   * PiArc up before (a configured provider or a signed-in account). */
+  readonly onboarding: { readonly completed: boolean };
   /** T23: offer Bypass permissions in the mode menu (the user's own file only); T46: Auto
    * mode is enabled (the main process confirms natively before it writes `true`). */
   readonly permissions: {
@@ -297,6 +300,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   notifications: { enabled: true },
   memory: { readBoth: false },
   power: { keepAwake: true },
+  onboarding: { completed: false },
   permissions: { enableBypassPermissions: false, enableAutoMode: false },
   autoMode: {
     model: '',
@@ -404,6 +408,7 @@ export function preferencesFrom(settings: unknown): Preferences {
     },
     memory: { readBoth: isRecord(file.memory) && file.memory.readBoth === true },
     power: { keepAwake: !(isRecord(file.power) && file.power.keepAwake === false) },
+    onboarding: { completed: onboardingCompleted(file) },
     permissions: {
       enableBypassPermissions:
         isRecord(file.permissions) && file.permissions.enableBypassPermissions === true,
@@ -520,6 +525,21 @@ function autoModeFrom(value: unknown): AutoModePreferences {
   };
 }
 
+/**
+ * ADR-0110: the first-run guide counts as done when the user finished or skipped it, or when
+ * the file already holds a provider or a signed-in account (a user from before the guide).
+ * Only the lengths of those lists are read; the settings Host is too slow to ask at start.
+ */
+function onboardingCompleted(file: Record<string, unknown>): boolean {
+  if (isRecord(file.onboarding) && file.onboarding.completed === true) return true;
+  const providers = isRecord(file.modelProviders) ? file.modelProviders : {};
+  const listed = (key: string): boolean => {
+    const list = providers[key];
+    return Array.isArray(list) && list.length > 0;
+  };
+  return listed('providers') || listed('accounts');
+}
+
 /** One change the renderer asks for: a JSON Pointer in the settings file and its value. */
 export type PreferenceChange =
   | { readonly key: 'language'; readonly value: LanguagePreference }
@@ -533,6 +553,8 @@ export type PreferenceChange =
   | { readonly key: 'notifications.enabled'; readonly value: boolean }
   | { readonly key: 'memory.readBoth'; readonly value: boolean }
   | { readonly key: 'power.keepAwake'; readonly value: boolean }
+  /** ADR-0110: only ever set to `true`. */
+  | { readonly key: 'onboarding.completed'; readonly value: true }
   | { readonly key: 'permissions.enableBypassPermissions'; readonly value: boolean }
   /** T46: turning it on needs the main process's native confirmation and a reviewer. */
   | { readonly key: 'permissions.enableAutoMode'; readonly value: boolean }
@@ -628,6 +650,8 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
       return typeof value === 'boolean' ? { pointer: '/memory/readBoth', value } : undefined;
     case 'power.keepAwake':
       return typeof value === 'boolean' ? { pointer: '/power/keepAwake', value } : undefined;
+    case 'onboarding.completed':
+      return value === true ? { pointer: '/onboarding/completed', value } : undefined;
     case 'permissions.enableBypassPermissions':
       return typeof value === 'boolean'
         ? { pointer: '/permissions/enableBypassPermissions', value }

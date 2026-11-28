@@ -381,22 +381,37 @@ function HomeForm({
           }
           trailing={
             <>
-              <ChoiceButton
-                label={t('models.label')}
-                className="composer-model"
-                items={modelItems}
-                heading={t('models.label')}
-                filterLabel={t('models.search')}
-                buttonRef={modelButton}
-                valueLabel={modelLabel}
-                disabled={!workspace || busy}
-                onOpen={() => {
-                  setCatalogRequested(workspace);
-                }}
-                testId="home-model"
-              >
-                {modelLabel}
-              </ChoiceButton>
+              {catalog?.models.length === 0 ? (
+                // ADR-0110: no model anywhere yet; this opens the guide's "Connect a model".
+                <button
+                  type="button"
+                  className="choice-button composer-model home-connect-model"
+                  data-testid="home-connect-model"
+                  disabled={busy}
+                  onClick={() => {
+                    ui.openOnboarding('home');
+                  }}
+                >
+                  {t('home.connectModel')}
+                </button>
+              ) : (
+                <ChoiceButton
+                  label={t('models.label')}
+                  className="composer-model"
+                  items={modelItems}
+                  heading={t('models.label')}
+                  filterLabel={t('models.search')}
+                  buttonRef={modelButton}
+                  valueLabel={modelLabel}
+                  disabled={!workspace || busy}
+                  onOpen={() => {
+                    setCatalogRequested(workspace);
+                  }}
+                  testId="home-model"
+                >
+                  {modelLabel}
+                </ChoiceButton>
+              )}
               {resolved && resolved.efforts.length > 1 && (
                 <ChoiceButton
                   label={t('models.effort')}

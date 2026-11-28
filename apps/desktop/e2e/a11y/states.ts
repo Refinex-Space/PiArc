@@ -28,6 +28,16 @@ export const A11Y_STATES = [
   // Windows.
   { id: 'window:welcome', area: 'window', note: 'main window without a workspace' },
   { id: 'window:new-session', area: 'window', note: 'new session form of an open workspace' },
+  {
+    id: 'window:onboarding-welcome',
+    area: 'window',
+    note: 'the first-run guide’s welcome over the inert workbench (ADR-0110)',
+  },
+  {
+    id: 'window:onboarding-connect',
+    area: 'window',
+    note: 'the first-run guide’s "Connect a model" card with quick-setup tiles',
+  },
   { id: 'window:tool', area: 'window', note: 'a detached tool with return and pin controls' },
   { id: 'window:conversation', area: 'window', note: 'a session after a turn, sidebar and rail' },
   {

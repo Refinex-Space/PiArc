@@ -136,6 +136,29 @@ describe('preferences', () => {
     expect(pointerOf({ key: 'power.keepAwake', value: 'off' })).toBeUndefined();
   });
 
+  it('counts the first-run guide as done after it or for a user who set up a provider', () => {
+    const done = (file: unknown) => preferencesFrom(file).onboarding.completed;
+    expect(DEFAULT_PREFERENCES.onboarding.completed).toBe(false);
+    expect(done({})).toBe(false);
+    expect(done({ onboarding: { completed: true } })).toBe(true);
+    expect(done({ onboarding: { completed: 'yes' } })).toBe(false);
+    // `catalogRefresh` alone writes `modelProviders`: that is not a set-up provider.
+    expect(done({ modelProviders: { catalogRefresh: false, providers: [] } })).toBe(false);
+    expect(done({ modelProviders: { providers: [{ id: 'deepseek', kind: 'builtin' }] } })).toBe(
+      true,
+    );
+    expect(done({ modelProviders: { accounts: [{ provider: 'openai-codex', id: 'a' }] } })).toBe(
+      true,
+    );
+    expect(done({ modelProviders: { providers: 'deepseek' } })).toBe(false);
+    expect(pointerOf({ key: 'onboarding.completed', value: true })).toEqual({
+      pointer: '/onboarding/completed',
+      value: true,
+    });
+    expect(pointerOf({ key: 'onboarding.completed', value: false })).toBeUndefined();
+    expect(pointerOf({ key: 'onboarding.completed', value: 'true' })).toBeUndefined();
+  });
+
   it('maps only valid changes to settings pointers', () => {
     expect(pointerOf({ key: 'language', value: 'en' })).toEqual({
       pointer: '/language',

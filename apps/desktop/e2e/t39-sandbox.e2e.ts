@@ -11,6 +11,7 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
 
+import { L4_USER_SETTINGS } from './fixtures.js';
 import { expect, test as base } from './sessions.js';
 import { idle, lastUserBlocks, openSession, prefer, requests } from './t19.js';
 
@@ -38,7 +39,7 @@ const test = base.extend<{ hello: number; sandboxSettings: Record<string, unknow
   userDataDir: async ({ userDataDir, sandboxSettings }, use) => {
     await writeFile(
       path.join(userDataDir, 'settings.json'),
-      JSON.stringify({ sandbox: sandboxSettings }),
+      JSON.stringify({ ...L4_USER_SETTINGS, sandbox: sandboxSettings }),
     );
     await use(userDataDir);
   },

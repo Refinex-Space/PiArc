@@ -65,6 +65,8 @@ export interface Ui {
   readonly toasts: readonly Toast[];
   readonly addToast: (toast: Omit<Toast, 'id'>) => void;
   readonly dismissToast: (id: string) => void;
+  /** Opens the first-run guide on "Connect a model" (ADR-0110), closing Settings first. */
+  readonly openOnboarding: (from: 'settings' | 'home') => void;
 }
 
 export const UiContext = createContext<Ui | null>(null);

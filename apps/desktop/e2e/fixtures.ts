@@ -21,6 +21,15 @@ export interface AppLog {
   waitFor(pattern: RegExp, timeoutMs?: number): Promise<void>;
 }
 
+/**
+ * What every test's user settings file starts with: the first-run guide counts as done
+ * (ADR-0110), so it does not cover the window. A spec that writes the whole file spreads this
+ * in; the guide's own spec removes it.
+ */
+export const L4_USER_SETTINGS: Readonly<Record<string, unknown>> = {
+  onboarding: { completed: true },
+};
+
 export interface Fixtures {
   userDataDir: string;
   /** Extra command-line arguments for the app, set per test file with `test.use`. */
@@ -79,6 +88,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   // eslint-disable-next-line no-empty-pattern -- Playwright requires a destructuring pattern here.
   userDataDir: async ({}, use) => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'piarc e2e 测试-'));
+    await writeFile(path.join(dir, 'settings.json'), JSON.stringify(L4_USER_SETTINGS));
     await use(dir);
     await rm(dir, { recursive: true, force: true });
   },
