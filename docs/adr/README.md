@@ -122,5 +122,6 @@ ADR 记录 PiArc 中影响全局、难以回退的决策：选了什么、为什
 | [0106](0106-session-titles.md) | 按首条消息自动生成会话标题：新建会话的第一条文字输入经 `session/title` 在辅助模型通道上生成一行标题，与首个回合并行，存 Core 的 `auto_title`；优先级在用户改名与 Pi 会话名之后、首条消息之前；测试默认关闭 | 已接受（补充 0029、0086） |
 | [0107](0107-provider-brand-marks.md) | 模型服务商的品牌标记：LobeHub Icons 的 mono SVG 原样放进 `design/brand/providers/` 并按哈希锁定，生成数据模块经 `ProviderMark` 以 `currentColor` 绘制；按 id、端点主机、名称中的词识别，没有标记时用中性字形 | 已接受（修订 0006 第 4 条） |
 | [0108](0108-pi-global-instructions.md) | Pi 的全局指令：Core 先于 `~/.claude/CLAUDE.md` 读取 `~/.pi/agent` 下第一个存在的候选文件（候选与顺序同 Pi），设置“智能体 › 指令”页查看并编辑它；保存核对读取时的哈希，保持编码、BOM 与换行，符号链接写到目标 | 已接受（修订 0033 第 3 条） |
+| [0109](0109-keep-awake-while-working.md) | 会话运行时防止系统休眠：偏好 `power.keepAwake`（默认开）且 Core 的 `core/activity` 报告有回合进行中时，主进程持有 `prevent-app-suspension` 阻止器，回合结束、关闭开关或退出时释放；只防闲置睡眠，后台命令与终端不计入 | 已接受 |
 | [0100](0100-two-tier-composer-and-context-tray.md) | 两层输入卡片（编辑区在上、模式与模型等在卡片内的操作行）与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏 | 已接受（修订 0073 的 composer 范围） |
 | [0079](0079-turn-work-grouping.md) | 回合过程的合并与收起：思考并入工具组、运行中展开、之后收起，思考默认折叠 | 已接受（取代 0078 第 6 条一项） |

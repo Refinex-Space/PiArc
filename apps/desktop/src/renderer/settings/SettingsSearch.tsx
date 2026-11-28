@@ -17,6 +17,7 @@ export const SEARCH_FIELDS: Record<
     ['settings.language', 'setting-language'],
     ['settings.notifications', 'setting-notifications'],
     ['settings.memory', 'setting-memory-read-both'],
+    ['settings.power.keepAwake', 'setting-keep-awake'],
   ],
   markdown: [
     ['files.images.storage', 'markdown-image-storage'],

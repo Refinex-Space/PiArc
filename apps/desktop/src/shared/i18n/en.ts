@@ -1225,7 +1225,7 @@ export const en = {
   'settings.scoped.hint': 'Set per project',
   'settings.results': '{count, plural, one {# result} other {# results}}',
   'settings.results.keys': '↑↓ to choose, Enter to open',
-  'settings.description.general': 'Language, notifications and project instructions',
+  'settings.description.general': 'Language, notifications, project instructions and power',
   'settings.description.voice': 'Dictate into the input; recognition stays on this computer',
   'settings.description.appearance': 'Theme, accent color, contrast, density and motion',
   'settings.description.markdown':
@@ -1278,6 +1278,10 @@ export const en = {
   'settings.language.en': 'English',
   'settings.language.zh-CN': '简体中文',
   'settings.notifications': 'Notifications',
+  'settings.power': 'Power',
+  'settings.power.keepAwake': 'Keep the computer awake while working',
+  'settings.power.keepAwakeHint':
+    'While a session runs, the computer does not go to sleep when idle; the display still turns off, and closing the lid still sleeps.',
   'settings.notifications.enabled':
     'Notify me when a session finishes or needs approval while PiArc is in the background',
   'settings.notifications.actions':

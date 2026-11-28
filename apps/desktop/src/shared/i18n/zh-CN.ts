@@ -1194,7 +1194,7 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'settings.scoped.hint': '按项目设置',
   'settings.results': '{count, plural, other {# 个结果}}',
   'settings.results.keys': '↑↓ 选择，Enter 打开',
-  'settings.description.general': '语言、通知与项目指令',
+  'settings.description.general': '语言、通知、项目指令与电源',
   'settings.description.voice': '在输入框中用语音输入，识别在本机完成',
   'settings.description.appearance': '主题、强调色、对比度、密度与动态效果',
   'settings.description.markdown': 'Markdown 文件中图片的保存位置与链接方式',
@@ -1243,6 +1243,10 @@ export const zhCN: Readonly<Record<MessageId, string>> = {
   'settings.language.en': 'English',
   'settings.language.zh-CN': '简体中文',
   'settings.notifications': '通知',
+  'settings.power': '电源',
+  'settings.power.keepAwake': '运行时防止系统休眠',
+  'settings.power.keepAwakeHint':
+    '会话运行时电脑不会因闲置进入睡眠；屏幕仍会按系统设置关闭，合盖仍会睡眠。',
   'settings.notifications.enabled': 'PiArc 在后台时，会话完成或需要审批时通知我',
   'settings.notifications.actions':
     '会话等待审批时，可以在通知里直接允许本次或拒绝；需要仔细查看的请求只能打开审批卡。',

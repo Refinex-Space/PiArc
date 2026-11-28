@@ -170,6 +170,9 @@ function GeneralPage() {
   const managedLanguage = useIsManaged('/language');
   const managedNotifications = useIsManaged('/notifications/enabled');
   const managedReadBoth = useIsManaged('/memory/readBoth');
+  const keepAwakeId = useId();
+  const keepAwakeHint = useId();
+  const managedKeepAwake = useIsManaged('/power/keepAwake');
   return (
     <>
       <SettingsSection title={t('settings.general.basics')}>
@@ -256,6 +259,28 @@ function GeneralPage() {
           descriptionId={notificationDescription}
           descriptionTestId="setting-notifications-note"
         />
+      </SettingsSection>
+      <SettingsSection title={t('settings.power')}>
+        <SettingsRow
+          label={t('settings.power.keepAwake')}
+          description={t('settings.power.keepAwakeHint')}
+          descriptionId={keepAwakeHint}
+          htmlFor={keepAwakeId}
+          badge={managedKeepAwake && <ManagedBadge testId="managed-keep-awake" />}
+        >
+          <input
+            id={keepAwakeId}
+            type="checkbox"
+            className="preference-switch"
+            checked={preferences.power.keepAwake}
+            disabled={managedKeepAwake}
+            aria-describedby={keepAwakeHint}
+            data-testid="setting-keep-awake"
+            onChange={(event) => {
+              save({ key: 'power.keepAwake', value: event.currentTarget.checked });
+            }}
+          />
+        </SettingsRow>
       </SettingsSection>
       {error !== undefined && (
         <p className="error-text" role="alert">

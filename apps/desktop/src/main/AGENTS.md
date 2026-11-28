@@ -23,6 +23,10 @@
 - 计数只来自 Core：快照任务在路由 `core/activity` 发运行中与等待审批的会话数和等待审批的会话（不含归档），主进程经 `EventRouter.listen` 只监听这一个路由；不要在主进程订阅 `core/sessions` 自己统计。
 - macOS：`trayTemplate.png`（+ `@2x`）设为 template 图，计数作为标题 `▸运行中 ?等待审批`。Windows：按 `nativeTheme.shouldUseDarkColorsForSystemIntegratedUI` 选 `tray-dark.ico`（白）或 `tray-light.ico`（黑），左键打开窗口，计数在提示文字里。图标目录：打包时在 `process.resourcesPath`（Forge `extraResource`），源码树运行时在仓库的 `design/brand/`。
 
+## 防止休眠（`platform/keep-awake.ts`，ADR-0109）
+
+- 偏好 `power.keepAwake`（默认开）且 `core/activity` 的 `running` 大于 0 时持有一个 `prevent-app-suspension` 阻止器，否则立即释放；`main.ts` 在读到偏好后、偏好变化时与每批 activity 调用 `KeepAwake`，`will-quit` 时 `dispose`。运行数只取这个路由，后台命令与终端不计入。Electron 调用经 `PowerBlocker` 端口（单测用替身），测试钩子 `keepAwake()` 读是否持有；`e2e/keep-awake.e2e.ts` 在 macOS 上另用 `pmset -g assertions` 核对 `NoIdleSleepAssertion`。
+
 ## 启动目标（`launch.ts`）
 
 - `piarc://open?path=<绝对路径>` 与 `piarc://session/<id>` 只做定位；这两种链接继续忽略提示词。T49 专用的 `piarc://draft?path=…&text=…` 只预填新会话草稿，由用户手动发送。T29 的 OAuth 回调走回环端口，不经这里。

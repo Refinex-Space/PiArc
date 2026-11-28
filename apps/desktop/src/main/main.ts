@@ -34,6 +34,7 @@ import { registerProxyHandlers, SystemProxy } from './core/proxy-ipc.js';
 import { FaultInjector, registerSessionHandlers } from './core/session-ipc.js';
 import { startupFailure } from './core/startup-error.js';
 import { installTestHooks } from './core/test-hooks.js';
+import { ELECTRON_POWER_BLOCKER, KeepAwake } from './platform/keep-awake.js';
 import { applyDevServerCsp, resolveDevServer } from './dev-server.js';
 import { registerIpcHandlers } from './ipc/handlers.js';
 import { createIpcRegistrar, registerHostHandler } from './ipc/register.js';
@@ -99,6 +100,8 @@ const trustedOrigins: readonly string[] =
 
 let shell: AppShell | undefined;
 let tray: TrayIcon | undefined;
+// ADR-0109: off until the preferences are read, so a saved `false` never takes a hold.
+const keepAwake = new KeepAwake(ELECTRON_POWER_BLOCKER, false);
 /** The built-in browser (ADR-0088); exists once Core runs. */
 let browser: BrowserService | undefined;
 /** The agent's side of the browser (ADR-0089); exists once Core runs. */
@@ -170,6 +173,7 @@ function startTestHooks(core: CoreHost, terminalOwners: TerminalOwners, app: App
   }
   installTestHooks({
     tray: () => tray?.observe(),
+    keepAwake: () => ({ held: keepAwake.held() }),
     launch: (target) => {
       launch(target);
     },
@@ -471,7 +475,15 @@ function start(dirs: DataDirs): void {
     );
     eventRouter.listen('core/activity', (batch) => {
       const activity = parseActivity(batch.payload);
-      if (activity !== undefined) tray?.update(activity);
+      if (activity === undefined) return;
+      tray?.update(activity);
+      keepAwake.setRunning(activity.running);
+    });
+    preferences.onChange((next) => {
+      keepAwake.setEnabled(next.power.keepAwake);
+    });
+    app.on('will-quit', () => {
+      keepAwake.dispose();
     });
     const registerHandler = createIpcRegistrar(trustedOrigins);
     registerIpcHandlers(registerHandler, () => appShell.t());
@@ -594,7 +606,8 @@ function start(dirs: DataDirs): void {
     startBrowserAgent(core, browser, preferences, chromeImports);
     startTestHooks(core, terminalOwners, appShell);
     // The preferences come first: the window's language, theme and menu depend on them.
-    void preferences.load().then(() => {
+    void preferences.load().then((loaded) => {
+      keepAwake.setEnabled(loaded.power.keepAwake);
       appShell.start();
       const targets = [
         ...launchTargets(process.argv, process.defaultApp, process.cwd()),

@@ -40,6 +40,7 @@ export function installTestHooks(options: {
   readonly answerConfirm: (answer: boolean) => void;
   readonly confirmations: () => readonly { readonly message: string; readonly detail: string }[];
   readonly tray: () => TrayObservation | undefined;
+  readonly keepAwake: PiarcTestHooks['keepAwake'];
   readonly launch: (target: LaunchTarget) => void;
   readonly quit: () => void;
   readonly mainWindows: () => number[];
@@ -62,6 +63,7 @@ export function installTestHooks(options: {
     routesOf: (id) => router.routesOf(id),
     openWindow: options.openWindow,
     tray: options.tray,
+    keepAwake: options.keepAwake,
     launch: options.launch,
     quit: options.quit,
     mainWindows: options.mainWindows,

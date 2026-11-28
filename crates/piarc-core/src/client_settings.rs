@@ -19,6 +19,7 @@ use crate::error::{Error, Result};
 /// `browser` (B5.5): the built-in browser's settings, user-level only (`tool_io::browser`
 /// reads `agentEnabled` and `approvalTimeout`, the main process the rest).
 /// `voiceDictation` (ADR-0094): voice input, user-level only (`dictation::VoicePreferences`).
+/// `power` (ADR-0109): `keepAwake`, read by the main process's keep-awake controller.
 pub const CLIENT_KEYS: &[&str] = &[
     "language",
     "appearance",
@@ -29,6 +30,7 @@ pub const CLIENT_KEYS: &[&str] = &[
     "git",
     "browser",
     "voiceDictation",
+    "power",
 ];
 
 /// The user's settings file as a JSON object; `{}` when it does not exist.

@@ -124,6 +124,18 @@ describe('preferences', () => {
     }
   });
 
+  it('keeps the computer awake while working unless the file says false', () => {
+    expect(DEFAULT_PREFERENCES.power.keepAwake).toBe(true);
+    expect(preferencesFrom({}).power.keepAwake).toBe(true);
+    expect(preferencesFrom({ power: { keepAwake: false } }).power.keepAwake).toBe(false);
+    expect(preferencesFrom({ power: { keepAwake: 'no' } }).power.keepAwake).toBe(true);
+    expect(pointerOf({ key: 'power.keepAwake', value: false })).toEqual({
+      pointer: '/power/keepAwake',
+      value: false,
+    });
+    expect(pointerOf({ key: 'power.keepAwake', value: 'off' })).toBeUndefined();
+  });
+
   it('maps only valid changes to settings pointers', () => {
     expect(pointerOf({ key: 'language', value: 'en' })).toEqual({
       pointer: '/language',

@@ -46,6 +46,8 @@ export interface Preferences {
   readonly keybindings: Readonly<Record<string, string>>;
   readonly notifications: { readonly enabled: boolean };
   readonly memory: { readonly readBoth: boolean };
+  /** ADR-0109: keep the computer from idle sleep while a session is in a turn (default on). */
+  readonly power: { readonly keepAwake: boolean };
   /** T23: offer Bypass permissions in the mode menu (the user's own file only); T46: Auto
    * mode is enabled (the main process confirms natively before it writes `true`). */
   readonly permissions: {
@@ -294,6 +296,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   keybindings: {},
   notifications: { enabled: true },
   memory: { readBoth: false },
+  power: { keepAwake: true },
   permissions: { enableBypassPermissions: false, enableAutoMode: false },
   autoMode: {
     model: '',
@@ -400,6 +403,7 @@ export function preferencesFrom(settings: unknown): Preferences {
           : DEFAULT_PREFERENCES.notifications.enabled,
     },
     memory: { readBoth: isRecord(file.memory) && file.memory.readBoth === true },
+    power: { keepAwake: !(isRecord(file.power) && file.power.keepAwake === false) },
     permissions: {
       enableBypassPermissions:
         isRecord(file.permissions) && file.permissions.enableBypassPermissions === true,
@@ -528,6 +532,7 @@ export type PreferenceChange =
   | { readonly key: 'appearance.accentColor'; readonly value: string }
   | { readonly key: 'notifications.enabled'; readonly value: boolean }
   | { readonly key: 'memory.readBoth'; readonly value: boolean }
+  | { readonly key: 'power.keepAwake'; readonly value: boolean }
   | { readonly key: 'permissions.enableBypassPermissions'; readonly value: boolean }
   /** T46: turning it on needs the main process's native confirmation and a reviewer. */
   | { readonly key: 'permissions.enableAutoMode'; readonly value: boolean }
@@ -621,6 +626,8 @@ export function pointerOf(change: unknown): { pointer: string; value: unknown } 
       return typeof value === 'boolean' ? { pointer: '/notifications/enabled', value } : undefined;
     case 'memory.readBoth':
       return typeof value === 'boolean' ? { pointer: '/memory/readBoth', value } : undefined;
+    case 'power.keepAwake':
+      return typeof value === 'boolean' ? { pointer: '/power/keepAwake', value } : undefined;
     case 'permissions.enableBypassPermissions':
       return typeof value === 'boolean'
         ? { pointer: '/permissions/enableBypassPermissions', value }

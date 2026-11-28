@@ -251,6 +251,8 @@ export interface PiarcTestHooks {
   confirmations(): readonly { readonly message: string; readonly detail: string }[];
   /** The tray's title, tooltip, menu item ids and counts (T35); undefined before it exists. */
   tray(): TrayObservation | undefined;
+  /** Whether the keep-awake power save blocker is held (ADR-0109). */
+  keepAwake(): { readonly held: boolean };
   /** Routes a launch target as a link or a second start would (T35). */
   launch(target: LaunchTarget): void;
   /** Quits as the menu and the tray do: asks first when work is running (T35). */

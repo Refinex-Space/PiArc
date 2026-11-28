@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | 2.85（2026-11-28） |
+| 版本 | 2.86（2026-11-28） |
 | 状态 | 已接受。后续修改遵循第 18 章的维护规则 |
 | 适用范围 | macOS 与 Windows，同一代码库；每个里程碑 macOS 先达标，Windows 最多滞后一个里程碑 |
 | 配套文档 | [需求规格](../product/REQUIREMENTS.md)、[架构决策记录](../adr/README.md)、[调研资料](../research/) |
@@ -263,6 +263,7 @@ PiArc/
 | [0106](../adr/0106-session-titles.md) | 新建会话的首条文字消息经 AHP `session/title` 在辅助模型通道上生成一行标题，与首个回合并行；存 Core 的 `auto_title`，显示在用户改名与 Pi 会话名之后、首条消息之前；短消息即标题，命令等下一条，改名与恢复、分叉的会话不生成 | 补充 ADR-0029、ADR-0086；8.2、9.2 节 |
 | [0107](../adr/0107-provider-brand-marks.md) | 服务商卡片、连接列表与模型菜单显示服务商的品牌标记：LobeHub Icons 的 mono SVG 原样放在 `design/brand/providers/` 并按哈希锁定，生成为数据模块后经 `ProviderMark` 以 `currentColor` 绘制，不从网络加载；按服务商 id、端点主机、名称中的词识别，没有标记时用中性字形 | 修订 ADR-0006 第 4 条；8.6 节 |
 | [0108](../adr/0108-pi-global-instructions.md) | Core 发现用户级 memory 时先读 Pi 的全局指令（`~/.pi/agent` 下第一个存在的 `AGENTS.override.md`、`AGENTS.md`、`CLAUDE.md` 等，同 Pi），设置“智能体 › 指令”页经 Core 查看与编辑；保存核对读取时的哈希，保持编码与换行，符号链接写到目标 | 修订 ADR-0033 第 3 条；6.6 节 |
+| [0109](../adr/0109-keep-awake-while-working.md) | 会话运行时防止系统休眠：偏好 `power.keepAwake`（默认开）且 `core/activity` 报告有回合进行中时，主进程持有 `prevent-app-suspension` 阻止器，回合结束、关闭开关或退出时释放；只防闲置睡眠，后台命令与终端不计入 | 补充；8.1 节 |
 | [0043](../adr/0043-reminders-compaction-usage.md) | 运行时提示统一走 system reminder 通道；压缩用 PiArc 自写的分节摘要、按阈值公式配置 Pi 触发、连续 3 次失败或无效即熔断、压缩后按上限重注入；上下文用量按类别估算并以服务商报告为准 | 动态信息不改写 system prompt，长会话压缩及时且不丢关键状态，用户看得到上下文被什么占用 |
 | [0044](../adr/0044-checkpoints-rewind-changes.md) | 检查点按会话加回合 id 建索引，写前快照存内容寻址对象库；代码恢复按时间计算、冲突逐个选择、逐文件结果可撤销；对话回退在 Agent Host 移动 leaf 并以追加条目持久化，分支变化后同一 id 重建会话；Changes 面板基于最早快照并在路径锁内核对版本后丢弃 | 回退结果与对话分支经过的路径无关；回退位置跨重启保留；不在过期的 diff 上改文件 |
 | [0045](../adr/0045-webfetch-sign-in-model-settings.md) | WebFetch 由 Core 抓取（`piarc-web`：rustls + 系统信任库、SSRF 纯函数、连接钉住已检查的地址、同站重定向）并绑定已获准的调用；辅助模型通道在 Agent Host；登录在设置 Host 上运行、交互经 `core/login`；每模型设置与辅助模型存用户级设置并随握手下发；本地端点的模型为低可靠性、用保守 Tool Profile | 网络访问与文件、命令一样由 Core 授权审计；规则主机与连接主机不会不一致；凭据只在保险箱 |
@@ -1302,7 +1303,7 @@ diff hunk 等结构化数据随条目增量下发；Markdown 解析与代码高�
 
 每个窗口一个渲染进程。所有窗口共用主进程里的同一个 Core 实例，所以多窗口看到的审批和会话状态天然一致。
 
-T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新窗口中打开"、托盘与文件菜单的"新建窗口"），最近获得焦点的一个负责菜单命令、系统通知与 Dock 角标；窗口的位置、大小与是否最大化写入数据目录的 `window-state.json`（移动与缩放防抖 500 ms、关闭时），新窗口沿用并错开 24 px，落在已不存在的显示器上时移回主显示器。主进程的窗口、启动目标、托盘与退出在 `src/main/app-shell.ts`、`launch.ts`、`platform/tray.ts`、`platform/window-state.ts`、`platform/quit.ts`、`platform/windows-shell.ts`。
+T35 落地（ADR-0052）：主窗口可以有任意多个（会话菜单"在新窗口中打开"、托盘与文件菜单的"新建窗口"），最近获得焦点的一个负责菜单命令、系统通知与 Dock 角标；窗口的位置、大小与是否最大化写入数据目录的 `window-state.json`（移动与缩放防抖 500 ms、关闭时），新窗口沿用并错开 24 px，落在已不存在的显示器上时移回主显示器。主进程的窗口、启动目标、托盘与退出在 `src/main/app-shell.ts`、`launch.ts`、`platform/tray.ts`、`platform/window-state.ts`、`platform/quit.ts`、`platform/windows-shell.ts`。ADR-0109 起，有会话处在回合中且偏好 `power.keepAwake` 打开（默认）时，主进程持有 `prevent-app-suspension` 阻止器（`platform/keep-awake.ts`，运行数取自同一个 `core/activity`），系统不会因闲置睡眠；显示器、合盖与手动睡眠仍按系统处理。
 
 ### 8.2 信息架构
 
@@ -1950,6 +1951,7 @@ M0 结论（R1）：没有不通过的项，没有触发 ADR 的重新评估。m
 | 2.83 | 2026-11-28 | 第 4 章决策表加入 ADR-0106；8.2 节：会话标题的来源与生成；9.2 节：schema v17 的 `auto_title`。 |
 | 2.84 | 2026-11-28 | 第 4 章决策表加入 ADR-0107；8.6 节：服务商以品牌标记标识（修订 ADR-0006 第 4 条）。 |
 | 2.85 | 2026-11-28 | 第 4 章决策表加入 ADR-0108；6.6 节：用户级 memory 先读 Pi 的全局指令 `~/.pi/agent/AGENTS.md`，设置“指令”页可查看与编辑（修订 ADR-0033 第 3 条）。 |
+| 2.86 | 2026-11-28 | 第 4 章决策表加入 ADR-0109；8.1 节：会话运行时防止系统闲置睡眠。 |
 | 2.80 | 2026-11-27 | 第 4 章决策表：计划审阅回到对话，计划卡改为决策栏，计划面板渲染 Markdown 并保持原文偏移锚点，窗口从会话快照接管错过的运行态（ADR-0103，修订 ADR-0042 第 2、3 条）。 |
 | 2.78 | 2026-11-27 | 第 8.2 节：设置改为工作台里的一个视图，按组导航，搜索结果在主区（ADR-0101）。 |
 | 2.77 | 2026-11-27 | 第 8.2 节：两层输入卡片与上方的运行位置托盘，去掉新会话页的环境卡与卡片下的环境栏（ADR-0100）。 |

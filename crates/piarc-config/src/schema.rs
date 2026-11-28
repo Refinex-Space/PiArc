@@ -720,6 +720,14 @@ pub const PIARC_SETTINGS: Shape = Shape::Object(&[
             shape: Shape::Bool,
         }]),
     },
+    // Keep the computer awake while a session works (ADR-0109); the desktop client reads it.
+    Field {
+        name: "power",
+        shape: Shape::Object(&[Field {
+            name: "keepAwake",
+            shape: Shape::Bool,
+        }]),
+    },
     // The Git panel (ADR-0085), read from the user's file and managed settings only: a project
     // must not unprotect branches or turn on force pushes (`crate::settings` removes it there).
     Field {
