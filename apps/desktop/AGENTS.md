@@ -108,6 +108,7 @@ Electron 客户端：主进程只做平台集成与转发，渲染进程只做�
 - L4 夹具给应用设 `PIARC_TEST_MEMORY_KEYCHAIN=1`：开发构建的 Core 改用 `createForTests`，保险箱主密钥放在内存。每次重新打包都是新的 ad-hoc 签名，打包形态读钥匙串里的 `cn.piarc.desktop.credential-vault` 时 macOS 会弹窗要登录密码，会话创建会一直等它（T18 实测）。发布构建没有 `createForTests`，这个开关不起作用；真实钥匙串的验证在 `piarc-secrets` 的 `system_store` 测试与 S6 的 `keychainProbe`。
 - T18 的 L4 依赖窗口真的在前台（标记已读只在前台发生）：测试里用 `e2e/sessions.ts` 的 `focusMain(app)`（`app.focus({ steal: true })`），不要假设 Playwright 启动的窗口有焦点。原生对话框用 `stubFolderDialog`、`stubMessageBox` 替换，Playwright 点不到它们。
 - macOS 上页面截图把半透明的侧栏合成在白底上，看不到 vibrancy：评审截图用 `screencapture -l <窗口号>`（`BrowserWindow.getMediaSourceId()` 的数字部分，见 `e2e/t18-review.e2e.ts`）。运行 L4 的终端要有系统设置中的“屏幕录制”权限，否则 `t18-review` 报 `could not create image from window`。
+- 主区 `.workspace-area` 与设置的 `.settings-view` 按卡片圆角裁切（`overflow: clip`，ADR-0105）：要伸出主区边界的元素用 `position: fixed` 或放到顶层（`TooltipLayer` 一类），不要靠溢出；侧栏底色在 `.shell` 上，栅格里的侧栏是透明的，给侧栏加背景会与外层薄纱叠成两层。
 - 新建会话时乐观消息用 `flushSync` 立即提交：创建失败可能在下一次渲染之前就返回。
 - `useState` 的初始化函数不要有副作用（例如读完即删 sessionStorage）：页面首次渲染可能挂起，React 丢弃这次渲染后会再调用一次（`settings/browser-import-target.ts` 的 `useImportTarget` 先读、提交后再删）。
 - composer 的附件只有一个货架（`composer-attachments`，网格区域 `shelf`）：再加一个同区域的容器会与它重叠。

@@ -625,19 +625,31 @@ textarea.input {
   background: var(--piarc-c-sidebar-background);
 }
 
-/* The sidebar's separator is inside its landmark, on its right edge. */
+/* The sidebar's separator is inside its landmark, on its right edge. It shows only under the
+   pointer or the keyboard: the desk's card draws the edge (ADR-0105). */
 .sidebar-resizer {
   position: absolute;
   inset: 0 0 0 auto;
   z-index: 1;
   width: 1px;
+  background: transparent;
 }
 
-/* The material shows through a light veil of the sidebar's own color: text keeps its contrast
-   whatever is behind the window (axe, which cannot see the material, measures it on white). */
-:root[data-platform='mac']:not([data-color-mode$='HighContrast']) .sidebar,
-:root[data-platform='windows']:not([data-color-mode$='HighContrast']) .sidebar {
+/* The navigation's surface belongs to the window (ADR-0105): the shell carries it, and the
+   sidebars in a grid (the workbench's, and the settings view's above it) are transparent on it,
+   so the corners the desk's card leaves open show the very same surface. The material shows
+   through a light veil of the sidebar's own color: text keeps its contrast whatever is behind
+   the window (axe, which cannot see the material, measures it on white). */
+.shell {
+  background: var(--piarc-c-sidebar-background);
+}
+:root[data-platform='mac']:not([data-color-mode$='HighContrast']) .shell,
+:root[data-platform='windows']:not([data-color-mode$='HighContrast']) .shell {
   background: color-mix(in srgb, var(--piarc-c-sidebar-background) 90%, transparent);
+}
+.shell > .sidebar,
+.settings-sidebar-clip > .settings-sidebar {
+  background: transparent;
 }
 
 .titlebar-actions {
@@ -3216,6 +3228,20 @@ body[data-tool-window] {
 .workspace-area {
   background: var(--piarc-workbench-canvas);
 }
+/* The desk is a card on the navigation's surface (ADR-0105): rounded where it meets the sidebar
+   with one hairline there, flush with the window's other edges. Without a sidebar beside it
+   (collapsed, or floating over a narrow window) it is the whole window. */
+.shell:not(.is-collapsed) > .workspace-area {
+  overflow: clip;
+  border-start-start-radius: var(--piarc-radius-lg);
+  border-end-start-radius: var(--piarc-radius-lg);
+  box-shadow: 0 0 0 1px var(--piarc-session-line);
+}
+@media (forced-colors: active) {
+  .shell:not(.is-collapsed) > .workspace-area {
+    border-inline-start: 1px solid CanvasText;
+  }
+}
 .workbench-header {
   gap: var(--piarc-space-1);
   padding-inline: var(--piarc-space-4) var(--piarc-space-2);
@@ -3333,7 +3359,12 @@ body[data-tool-window] {
     inset: 0 auto 0 0;
     z-index: 5;
     width: min(var(--piarc-sidebar-width), 80%);
+    background: var(--piarc-c-sidebar-background);
     box-shadow: var(--piarc-shadow-overlay);
+  }
+  .shell:not(.is-collapsed) > .workspace-area {
+    border-radius: 0;
+    box-shadow: none;
   }
   .shell .sidebar-backdrop {
     display: block;

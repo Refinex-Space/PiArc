@@ -7,6 +7,7 @@ PiArc 桌面界面的视觉方向是无边框、低噪声、排布整齐。层�
 ## 1. 层次
 
 - **不用描边区分区域。** 区域之间的边界靠背景色差（侧栏 `workbench.navigation`、主区 `workbench.canvas`、输入卡片 `workbench.editor`）。描边只留给需要明确轮廓的输入卡片与浮层，并且用 1 px 的 `session.line` 环（`box-shadow: 0 0 0 1px`），不用 `border`。
+- **主区是一张卡片（ADR-0105）。** 侧栏底色铺满窗口，主区（含工具分块）与设置页放在其上：靠侧栏两角 `radius-lg` 圆角加一圈 `session.line`，顶、右、底贴窗口边。卡片内各区域之间的线（标题栏下沿、工具分块之间）同样是 `session.line` 的细线；`border.subtle` 与它同值。侧栏底部不画分隔线。
 - **不做卡片套卡片。** 一组记录（服务商、MCP 服务器、规则）直接排成行，行与行之间是 1 px 的 `session.line` 分隔线，不再外包一张带边框和背景的卡片。
 - **用填充表达"可操作"与"状态"。** 次要按钮、选择器、分段控件的轨道用 `session.fill`；悬停用 `session.ghost-hover`；选中用 `surface.active` 或 `session.fill-hover`。状态徽标是浅色填充加同色系文字（成功、警告、强调），不加描边。
 - **阴影只给浮层。** 菜单、弹出框、选择器面板用 `session.popover-shadow` 加 1 px 环；页面内的元素不加阴影。

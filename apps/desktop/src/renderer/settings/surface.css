@@ -64,7 +64,6 @@ body:has(.settings-layer[data-phase='in']) .shell > .workspace-area {
 }
 .settings-surface .settings-sidebar {
   height: 100%;
-  box-shadow: inset -1px 0 var(--piarc-session-line);
   transition:
     transform var(--piarc-motion-view) var(--piarc-motion-curve-out),
     opacity calc(var(--piarc-motion-view) * 0.6) linear calc(var(--piarc-motion-view) * 0.3);
@@ -80,11 +79,13 @@ body:has(.settings-layer[data-phase='in']) .shell > .workspace-area {
     transform calc(var(--piarc-motion-view) * 0.65) var(--piarc-motion-curve-out),
     opacity calc(var(--piarc-motion-view) * 0.3) linear;
 }
+/* The page is the same card as the desk it replaces (ADR-0105). */
 .settings-view {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: clip;
   background: var(--piarc-workbench-canvas);
   transition:
     opacity calc(var(--piarc-motion-view) * 0.75) linear calc(var(--piarc-motion-view) * 0.15),
@@ -96,6 +97,11 @@ body:has(.settings-layer[data-phase='in']) .shell > .workspace-area {
   transition:
     opacity calc(var(--piarc-motion-view) * 0.5) linear,
     transform calc(var(--piarc-motion-view) * 0.65) var(--piarc-motion-curve-out);
+}
+.settings-surface:not(.is-loading) > .settings-view {
+  border-start-start-radius: var(--piarc-radius-lg);
+  border-end-start-radius: var(--piarc-radius-lg);
+  box-shadow: 0 0 0 1px var(--piarc-session-line);
 }
 .settings-surface.is-loading {
   grid-template-columns: minmax(0, 1fr);
